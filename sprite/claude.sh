@@ -7,7 +7,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}🚀 Spawn an OpenClaw agent on Sprite${NC}"
+echo -e "${GREEN}Claude Code on Sprite${NC}"
 echo ""
 
 # Check if sprite is installed, install if not
@@ -27,13 +27,20 @@ fi
 read -p "Enter sprite name: " SPRITE_NAME < /dev/tty
 
 # Check if sprite exists, create if not
-if sprite list | grep -qx "$SPRITE_NAME"; then
+if sprite list 2>/dev/null | grep -q "^${SPRITE_NAME}$\|^${SPRITE_NAME} "; then
     echo -e "${GREEN}Sprite '$SPRITE_NAME' already exists${NC}"
 else
     echo -e "${YELLOW}Creating sprite '$SPRITE_NAME'...${NC}"
     sprite create -skip-console "$SPRITE_NAME" || true
     echo -e "${YELLOW}Waiting for sprite to be ready...${NC}"
-    sleep 3
+    sleep 5
+fi
+
+# Verify sprite is accessible
+echo -e "${YELLOW}Verifying sprite connectivity...${NC}"
+if ! sprite exec -s "$SPRITE_NAME" -- echo "ok" >/dev/null 2>&1; then
+    echo -e "${YELLOW}Sprite not ready, waiting longer...${NC}"
+    sleep 5
 fi
 
 echo -e "${YELLOW}Setting up sprite environment...${NC}"
@@ -68,9 +75,9 @@ EOF
 sprite exec -s "$SPRITE_NAME" -file "$BASH_TEMP:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
 rm "$BASH_TEMP"
 
-# 2. Install openclaw using bun
-echo -e "${YELLOW}Installing openclaw...${NC}"
-run_sprite "/.sprite/languages/bun/bin/bun install -g openclaw"
+# 2. Install Claude Code using claude install (reinitializes properly)
+echo -e "${YELLOW}Installing Claude Code...${NC}"
+run_sprite "claude install > /dev/null 2>&1"
 
 # 3. Get OpenRouter API key via OAuth
 echo ""
@@ -192,13 +199,6 @@ fi
 
 echo -e "${GREEN}Successfully obtained OpenRouter API key!${NC}"
 
-# Get model preference
-echo ""
-echo -e "${YELLOW}Browse models at: https://openrouter.ai/models${NC}"
-echo -e "${YELLOW}Which model would you like to use?${NC}"
-read -p "Enter model ID [openrouter/auto]: " MODEL_ID < /dev/tty
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
-
 # 4. Inject environment variables
 echo -e "${YELLOW}Setting up environment variables...${NC}"
 
@@ -208,50 +208,64 @@ cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY="${OPENROUTER_API_KEY}"
 export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
+export ANTHROPIC_AUTH_TOKEN="${OPENROUTER_API_KEY}"
+export ANTHROPIC_API_KEY=""
+export CLAUDE_CODE_SKIP_ONBOARDING="1"
+export CLAUDE_CODE_ENABLE_TELEMETRY="0"
 EOF
 
 # Upload and append to zshrc
 sprite exec -s "$SPRITE_NAME" -file "$ENV_TEMP:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 rm "$ENV_TEMP"
 
-# 5. Setup openclaw to bypass initial settings
-echo -e "${YELLOW}Configuring openclaw...${NC}"
+# 5. Setup Claude Code settings to bypass initial setup
+echo -e "${YELLOW}Configuring Claude Code...${NC}"
 
-# Remove old config and create fresh
-run_sprite "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
+run_sprite "mkdir -p ~/.claude"
 
-# Generate a random gateway token
-GATEWAY_TOKEN=$(openssl rand -hex 16)
-
-OPENCLAW_CONFIG='{
+# Create Claude settings.json via file upload
+SETTINGS_TEMP=$(mktemp)
+cat > "$SETTINGS_TEMP" << EOF
+{
+  "theme": "dark",
+  "editor": "vim",
   "env": {
-    "OPENROUTER_API_KEY": "'"$OPENROUTER_API_KEY"'"
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}"
   },
-  "gateway": {
-    "mode": "local",
-    "auth": {
-      "token": "'"$GATEWAY_TOKEN"'"
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "openrouter/'"$MODEL_ID"'"
-      }
-    }
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "dangerouslySkipPermissions": true
   }
-}'
+}
+EOF
 
-run_sprite "echo '$OPENCLAW_CONFIG' > ~/.openclaw/openclaw.json"
+sprite exec -s "$SPRITE_NAME" -file "$SETTINGS_TEMP:/tmp/claude_settings" -- bash -c "mv /tmp/claude_settings ~/.claude/settings.json"
+rm "$SETTINGS_TEMP"
+
+# Create ~/.claude.json global state to skip onboarding and trust dialogs
+GLOBAL_STATE_TEMP=$(mktemp)
+cat > "$GLOBAL_STATE_TEMP" << EOF
+{
+  "hasCompletedOnboarding": true,
+  "bypassPermissionsModeAccepted": true
+}
+EOF
+
+sprite exec -s "$SPRITE_NAME" -file "$GLOBAL_STATE_TEMP:/tmp/claude_global" -- bash -c "mv /tmp/claude_global ~/.claude.json"
+rm "$GLOBAL_STATE_TEMP"
+
+# Create empty CLAUDE.md to prevent first-run prompts
+run_sprite "touch ~/.claude/CLAUDE.md"
 
 echo ""
 echo -e "${GREEN}✅ Sprite setup completed successfully!${NC}"
 echo ""
 
-# Start openclaw gateway in background and run openclaw tui
-echo -e "${YELLOW}Starting openclaw...${NC}"
-sprite exec -s "$SPRITE_NAME" -- zsh -c "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
-sleep 2
-sprite exec -s "$SPRITE_NAME" -tty -- zsh -c "source ~/.zshrc && openclaw tui"
+# Start Claude Code immediately
+echo -e "${YELLOW}Starting Claude Code...${NC}"
+sleep 1
+clear
+sprite exec -s "$SPRITE_NAME" -tty -- zsh -c "source ~/.zshrc && claude"
