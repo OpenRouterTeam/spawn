@@ -23,6 +23,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/openclaw.sh)
 ```
 
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/nanoclaw.sh)
+```
+
 ### Non-Interactive Mode
 
 For automation or CI/CD, set environment variables:
@@ -41,6 +47,14 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 SPRITE_NAME=dev-mk1 \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+SPRITE_NAME=dev-mk1 \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/nanoclaw.sh)
 ```
 
 **Environment Variables:**
