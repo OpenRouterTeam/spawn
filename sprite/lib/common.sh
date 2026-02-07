@@ -93,14 +93,25 @@ ensure_sprite_exists() {
     fi
 }
 
-# Verify sprite is accessible
+# Verify sprite is accessible (retry up to max_attempts)
 verify_sprite_connectivity() {
     local sprite_name=$1
+    local max_attempts=${2:-6}
+    local attempt=1
+
     log_warn "Verifying sprite connectivity..."
-    if ! sprite exec -s "$sprite_name" -- echo "ok" >/dev/null 2>&1; then
-        log_warn "Sprite not ready, waiting longer..."
+    while [[ $attempt -le $max_attempts ]]; do
+        if sprite exec -s "$sprite_name" -- echo "ok" >/dev/null 2>&1; then
+            log_info "Sprite '$sprite_name' is ready"
+            return 0
+        fi
+        log_warn "Sprite not ready, retrying ($attempt/$max_attempts)..."
         sleep 5
-    fi
+        ((attempt++))
+    done
+
+    log_error "Sprite '$sprite_name' failed to respond after $max_attempts attempts"
+    return 1
 }
 
 # Helper function to run commands on sprite
