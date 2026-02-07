@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Common bash functions shared between spawn scripts
 
 # Source shared provider-agnostic functions
