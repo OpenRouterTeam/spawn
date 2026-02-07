@@ -134,6 +134,19 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override and GEMINI_API_KEY"
+    },
+    "amazonq": {
+      "name": "Amazon Q CLI",
+      "description": "AWS's AI coding assistant CLI",
+      "url": "https://aws.amazon.com/q/developer/",
+      "install": "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash",
+      "launch": "q chat",
+      "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
     }
   },
   "clouds": {
@@ -295,6 +308,13 @@
     "lambda/goose": "implemented",
     "lambda/codex": "implemented",
     "lambda/interpreter": "implemented",
-    "lambda/gemini": "implemented"
+    "lambda/gemini": "implemented",
+    "sprite/amazonq": "implemented",
+    "hetzner/amazonq": "implemented",
+    "digitalocean/amazonq": "implemented",
+    "vultr/amazonq": "implemented",
+    "linode/amazonq": "implemented",
+    "lambda/amazonq": "implemented",
+    "aws-lightsail/amazonq": "implemented"
   }
 }
