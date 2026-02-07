@@ -147,6 +147,19 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
+    },
+    "cline": {
+      "name": "Cline",
+      "description": "Open-source AI coding agent for the terminal",
+      "url": "https://github.com/cline/cline",
+      "install": "npm install -g cline",
+      "launch": "cline",
+      "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
     }
   },
   "clouds": {
@@ -315,6 +328,13 @@
     "vultr/amazonq": "implemented",
     "linode/amazonq": "implemented",
     "lambda/amazonq": "implemented",
-    "aws-lightsail/amazonq": "implemented"
+    "aws-lightsail/amazonq": "implemented",
+    "sprite/cline": "implemented",
+    "hetzner/cline": "implemented",
+    "digitalocean/cline": "implemented",
+    "vultr/cline": "implemented",
+    "linode/cline": "implemented",
+    "lambda/cline": "implemented",
+    "aws-lightsail/cline": "implemented"
   }
 }
