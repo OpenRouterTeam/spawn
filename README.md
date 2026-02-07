@@ -60,6 +60,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/gemini.sh)
 ```
 ### Non-Interactive Mode
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/amazonq.sh)
+```
 For automation or CI/CD, set environment variables:
 
 #### Claude Code
@@ -147,6 +152,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/gemini.sh)
 ```
 ### Non-Interactive Mode
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/amazonq.sh)
+```
 ```bash
 HETZNER_SERVER_NAME=dev-mk1 \
 HCLOUD_TOKEN=your-hetzner-api-token \
@@ -218,6 +228,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/gemini.sh)
 ```
 ### Non-Interactive Mode
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/amazonq.sh)
+```
 ```bash
 DO_DROPLET_NAME=dev-mk1 \
 DO_API_TOKEN=your-digitalocean-api-token \
@@ -289,6 +304,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/gemini.sh)
 ```
 ### Non-Interactive Mode
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/amazonq.sh)
+```
 ```bash
 VULTR_SERVER_NAME=dev-mk1 \
 VULTR_API_KEY=your-vultr-api-key \
@@ -360,6 +380,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/gemini.sh)
 ```
 ### Non-Interactive Mode
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/amazonq.sh)
+```
 ```bash
 LINODE_SERVER_NAME=dev-mk1 \
 LINODE_API_TOKEN=your-linode-api-token \
@@ -431,6 +456,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/gemini.sh)
 ```
 ### Non-Interactive Mode
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/amazonq.sh)
+```
 ```bash
 LIGHTSAIL_SERVER_NAME=dev-mk1 \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
@@ -499,6 +529,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/interpreter.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/gemini.sh)
 ```
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/amazonq.sh)
+```
 ### Non-Interactive Mode
 
 ```bash
