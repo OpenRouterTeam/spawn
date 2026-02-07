@@ -313,11 +313,47 @@ cleanup_oauth_session() {
     fi
 }
 
+# Check network connectivity to OpenRouter
+# Returns 0 if reachable, 1 if network is unreachable
+check_openrouter_connectivity() {
+    local host="openrouter.ai"
+    local port="443"
+    local timeout=5
+
+    # Try curl with short timeout if available
+    if command -v curl &> /dev/null; then
+        if curl -s --connect-timeout "$timeout" --max-time "$timeout" "https://$host" -o /dev/null 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    # Fallback to nc/telnet test
+    if command -v nc &> /dev/null; then
+        if timeout "$timeout" nc -z "$host" "$port" 2>/dev/null; then
+            return 0
+        fi
+    elif command -v timeout &> /dev/null && command -v bash &> /dev/null; then
+        # Bash TCP socket test as last resort
+        if timeout "$timeout" bash -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 # Try OAuth flow (orchestrates the helper functions above)
 try_oauth_flow() {
     local callback_port=${1:-5180}
 
     log_warn "Attempting OAuth authentication..."
+
+    # Check network connectivity before starting OAuth flow
+    if ! check_openrouter_connectivity; then
+        log_warn "Cannot reach openrouter.ai - network may be unavailable"
+        log_warn "Please check your internet connection and try again"
+        return 1
+    fi
 
     if ! command -v nc &> /dev/null; then
         log_warn "netcat (nc) not found - OAuth server unavailable"
