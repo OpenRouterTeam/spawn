@@ -42,22 +42,11 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-# 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-EOF
-
-upload_file "$DO_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$DO_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$DO_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_BASE_URL="https://openrouter.ai/api""
 
 # 8. Create nanoclaw .env file
 log_warn "Configuring nanoclaw..."

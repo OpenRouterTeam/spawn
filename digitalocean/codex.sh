@@ -31,18 +31,10 @@ else
 fi
 
 log_warn "Setting up environment variables..."
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-EOF
-upload_file "$DO_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$DO_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$DO_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "OPENAI_API_KEY=$OPENROUTER_API_KEY" \
+    "OPENAI_BASE_URL="https://openrouter.ai/api/v1""
 
 echo ""
 log_info "DigitalOcean droplet setup completed successfully!"

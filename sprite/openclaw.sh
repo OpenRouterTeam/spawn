@@ -45,23 +45,11 @@ if ! validate_model_id "$MODEL_ID"; then
     exit 1
 fi
 
-# Inject environment variables
 log_warn "Setting up environment variables..."
-
-# Create temp file with env config
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-EOF
-
-# Upload and append to zshrc
-sprite exec -s "$SPRITE_NAME" -file "$ENV_TEMP:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_sprite "$SPRITE_NAME" \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_BASE_URL="https://openrouter.ai/api""
 
 # Setup openclaw to bypass initial settings
 log_warn "Configuring openclaw..."

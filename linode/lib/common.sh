@@ -55,13 +55,20 @@ ensure_linode_token() {
         return 1
     fi
     export LINODE_API_TOKEN="$token"
-    local test_response=$(linode_api GET "/profile")
-    if echo "$test_response" | grep -q '"username"'; then
+    local response=$(linode_api GET "/profile")
+    if echo "$response" | grep -q '"username"'; then
         log_info "API token validated"
     else
         log_error "Authentication failed: Invalid Linode API token"
-        log_warn "Verify your token at: https://cloud.linode.com/profile/tokens"
-        log_warn "Ensure the token has read/write permissions"
+
+        # Parse error details
+        local error_msg=$(echo "$response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print(errs[0].get('reason','No details') if errs else 'Unable to parse')" 2>/dev/null || echo "Unable to parse error")
+        log_error "API Error: $error_msg"
+
+        log_warn "Remediation steps:"
+        log_warn "  1. Verify token at: https://cloud.linode.com/profile/tokens"
+        log_warn "  2. Ensure the token has read/write permissions"
+        log_warn "  3. Check token hasn't expired or been revoked"
         unset LINODE_API_TOKEN
         return 1
     fi
@@ -91,7 +98,19 @@ ensure_ssh_key() {
     local register_response=$(linode_api POST "/profile/sshkeys" "$register_body")
     if echo "$register_response" | grep -q '"id"'; then
         log_info "SSH key registered with Linode"
-    else log_error "Failed to register SSH key: $register_response"; return 1; fi
+    else
+        log_error "Failed to register SSH key with Linode"
+
+        # Parse error details
+        local error_msg=$(echo "$register_response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')" 2>/dev/null || echo "$register_response")
+        log_error "API Error: $error_msg"
+
+        log_warn "Common causes:"
+        log_warn "  - SSH key already registered"
+        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_warn "  - API token lacks write permissions"
+        return 1
+    fi
 }
 
 get_server_name() {
@@ -156,13 +175,23 @@ print(json.dumps(body))
         export LINODE_SERVER_ID
         log_info "Linode created: ID=$LINODE_SERVER_ID"
     else
+        log_error "Failed to create Linode instance"
+
+        # Parse error details
         local error_msg=$(echo "$response" | python3 -c "
 import json,sys
 d = json.loads(sys.stdin.read())
 errs = d.get('errors', [])
 print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')
 " 2>/dev/null || echo "$response")
-        log_error "Failed to create Linode: $error_msg"
+        log_error "API Error: $error_msg"
+
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance"
+        log_warn "  - Type/region unavailable (try different LINODE_TYPE or LINODE_REGION)"
+        log_warn "  - Instance limit reached"
+        log_warn "  - Invalid cloud-init metadata"
+        log_warn "Remediation: Check https://cloud.linode.com/"
         return 1
     fi
 

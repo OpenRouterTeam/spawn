@@ -33,26 +33,14 @@ run_sprite "$SPRITE_NAME" "claude install > /dev/null 2>&1"
 echo ""
 OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 
-# Inject environment variables
 log_warn "Setting up environment variables..."
-
-# Create temp file with env config
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-export ANTHROPIC_AUTH_TOKEN="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY=""
-export CLAUDE_CODE_SKIP_ONBOARDING="1"
-export CLAUDE_CODE_ENABLE_TELEMETRY="0"
-EOF
-
-# Upload and append to zshrc
-sprite exec -s "$SPRITE_NAME" -file "$ENV_TEMP:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_sprite "$SPRITE_NAME" \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_BASE_URL="https://openrouter.ai/api"" \
+    "ANTHROPIC_AUTH_TOKEN=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_API_KEY=""" \
+    "CLAUDE_CODE_SKIP_ONBOARDING="1"" \
+    "CLAUDE_CODE_ENABLE_TELEMETRY="0""
 
 # Setup Claude Code settings to bypass initial setup
 log_warn "Configuring Claude Code..."

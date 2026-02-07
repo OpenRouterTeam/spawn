@@ -47,20 +47,9 @@ MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
 if ! validate_model_id "$MODEL_ID"; then log_error "Exiting due to invalid model ID"; exit 1; fi
 
-# 8. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-
-upload_file "$DO_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$DO_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$DO_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 
 echo ""
 log_info "DigitalOcean droplet setup completed successfully!"

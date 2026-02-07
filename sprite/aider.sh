@@ -50,19 +50,9 @@ if ! validate_model_id "$MODEL_ID"; then
     exit 1
 fi
 
-# Inject environment variables
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-
-sprite exec -s "$SPRITE_NAME" -file "$ENV_TEMP:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_sprite "$SPRITE_NAME" \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 
 echo ""
 log_info "Sprite setup completed successfully!"

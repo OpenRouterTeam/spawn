@@ -118,6 +118,25 @@ EOF
     rm "$bash_temp"
 }
 
+# Inject environment variables into sprite's shell config
+# Usage: inject_env_vars_sprite SPRITE_NAME KEY1=val1 KEY2=val2 ...
+# Example: inject_env_vars_sprite "$SPRITE_NAME" \
+#            "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+#            "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+inject_env_vars_sprite() {
+    local sprite_name="$1"
+    shift
+
+    local env_temp=$(mktemp)
+    chmod 600 "$env_temp"
+
+    generate_env_config "$@" > "$env_temp"
+
+    # Upload and append to .zshrc using sprite exec with -file flag
+    sprite exec -s "$sprite_name" -file "$env_temp:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    rm "$env_temp"
+}
+
 # Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers) are now in shared/common.sh
 
 # Validate model ID to prevent command injection

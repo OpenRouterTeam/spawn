@@ -62,13 +62,20 @@ ensure_vultr_token() {
         return 1
     fi
     export VULTR_API_KEY="$api_key"
-    local test_response=$(vultr_api GET "/account")
-    if echo "$test_response" | grep -q '"account"'; then
+    local response=$(vultr_api GET "/account")
+    if echo "$response" | grep -q '"account"'; then
         log_info "API key validated"
     else
         log_error "Authentication failed: Invalid Vultr API key"
-        log_warn "Verify your API key at: https://my.vultr.com/settings/#settingsapi"
-        log_warn "Ensure the key has appropriate permissions"
+
+        # Parse error details
+        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        log_error "API Error: $error_msg"
+
+        log_warn "Remediation steps:"
+        log_warn "  1. Verify API key at: https://my.vultr.com/settings/#settingsapi"
+        log_warn "  2. Ensure the key has appropriate permissions"
+        log_warn "  3. Check key hasn't been revoked"
         unset VULTR_API_KEY
         return 1
     fi
@@ -108,7 +115,16 @@ ensure_ssh_key() {
     if echo "$register_response" | grep -q '"ssh_key"'; then
         log_info "SSH key registered with Vultr"
     else
-        log_error "Failed to register SSH key: $register_response"
+        log_error "Failed to register SSH key with Vultr"
+
+        # Parse error details
+        local error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$register_response")
+        log_error "API Error: $error_msg"
+
+        log_warn "Common causes:"
+        log_warn "  - SSH key already registered with this name"
+        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_warn "  - API key lacks write permissions"
         return 1
     fi
 }
@@ -168,8 +184,18 @@ print(json.dumps(body))
         export VULTR_SERVER_ID
         log_info "Instance created: ID=$VULTR_SERVER_ID"
     else
+        log_error "Failed to create Vultr instance"
+
+        # Parse error details
         local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "Failed to create instance: $error_msg"
+        log_error "API Error: $error_msg"
+
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance"
+        log_warn "  - Plan/region unavailable (try different VULTR_PLAN or VULTR_REGION)"
+        log_warn "  - Instance limit reached"
+        log_warn "  - Invalid cloud-init userdata"
+        log_warn "Remediation: Check https://my.vultr.com/"
         return 1
     fi
 

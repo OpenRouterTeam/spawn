@@ -82,13 +82,20 @@ ensure_do_token() {
 
     # Validate token
     export DO_API_TOKEN="$token"
-    local test_response=$(do_api GET "/account")
-    if echo "$test_response" | grep -q '"id"'; then
+    local response=$(do_api GET "/account")
+    if echo "$response" | grep -q '"id"'; then
         log_info "API token validated"
     else
         log_error "Authentication failed: Invalid DigitalOcean API token"
-        log_warn "Verify your token at: https://cloud.digitalocean.com/account/api/tokens"
-        log_warn "Ensure the token has read/write permissions"
+
+        # Parse error details if available
+        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        log_error "API Error: $error_msg"
+
+        log_warn "Remediation steps:"
+        log_warn "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
+        log_warn "  2. Ensure the token has read/write permissions"
+        log_warn "  3. Check token hasn't expired or been revoked"
         unset DO_API_TOKEN
         return 1
     fi
@@ -131,7 +138,16 @@ ensure_ssh_key() {
     if echo "$register_response" | grep -q '"id"'; then
         log_info "SSH key registered with DigitalOcean"
     else
-        log_error "Failed to register SSH key: $register_response"
+        log_error "Failed to register SSH key with DigitalOcean"
+
+        # Parse error details
+        local error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        log_error "API Error: $error_msg"
+
+        log_warn "Common causes:"
+        log_warn "  - SSH key already registered (check: doctl compute ssh-key list)"
+        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_warn "  - API token lacks write permissions"
         return 1
     fi
 }
@@ -197,8 +213,18 @@ print(json.dumps(body))
         export DO_DROPLET_ID
         log_info "Droplet created: ID=$DO_DROPLET_ID"
     else
+        log_error "Failed to create DigitalOcean droplet"
+
+        # Parse error details
         local error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "Failed to create droplet: $error_msg"
+        log_error "API Error: $error_msg"
+
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance or payment method required"
+        log_warn "  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)"
+        log_warn "  - Droplet limit reached (check account limits)"
+        log_warn "  - Invalid cloud-init userdata"
+        log_warn "Remediation: Check https://cloud.digitalocean.com/droplets"
         return 1
     fi
 

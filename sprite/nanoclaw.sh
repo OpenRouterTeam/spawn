@@ -37,21 +37,11 @@ run_sprite "$SPRITE_NAME" "git clone https://github.com/gavrielc/nanoclaw.git ~/
 echo ""
 OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 
-# Inject environment variables
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-EOF
-
-sprite exec -s "$SPRITE_NAME" -file "$ENV_TEMP:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_sprite "$SPRITE_NAME" \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_BASE_URL="https://openrouter.ai/api""
 
 # Create nanoclaw .env file
 log_warn "Configuring nanoclaw..."

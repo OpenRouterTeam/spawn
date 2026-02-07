@@ -18,17 +18,9 @@ echo ""
 if [[ -n "$OPENROUTER_API_KEY" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 log_warn "Setting up environment variables..."
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export GOOSE_PROVIDER=openrouter
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-upload_file "$LINODE_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$LINODE_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$LINODE_SERVER_IP" upload_file run_server \
+    "GOOSE_PROVIDER=openrouter" \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 echo ""
 log_info "Linode setup completed successfully!"
 echo ""

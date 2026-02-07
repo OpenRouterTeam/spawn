@@ -80,11 +80,18 @@ ensure_hcloud_token() {
 
     # Validate token by making a test API call
     export HCLOUD_TOKEN="$token"
-    local test_response=$(hetzner_api GET "/servers?per_page=1")
-    if echo "$test_response" | grep -q '"error"'; then
+    local response=$(hetzner_api GET "/servers?per_page=1")
+    if echo "$response" | grep -q '"error"'; then
         log_error "Authentication failed: Invalid Hetzner API token"
-        log_warn "Verify your token at: https://console.hetzner.cloud/projects → API Tokens"
-        log_warn "Ensure the token has read/write permissions"
+
+        # Parse error details
+        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        log_error "API Error: $error_msg"
+
+        log_warn "Remediation steps:"
+        log_warn "  1. Verify token at: https://console.hetzner.cloud/projects → API Tokens"
+        log_warn "  2. Ensure the token has read/write permissions"
+        log_warn "  3. Check token hasn't expired"
         unset HCLOUD_TOKEN
         return 1
     fi
@@ -125,7 +132,16 @@ ensure_ssh_key() {
     local register_response=$(hetzner_api POST "/ssh_keys" "$register_body")
 
     if echo "$register_response" | grep -q '"error"'; then
-        log_error "Failed to register SSH key: $register_response"
+        log_error "Failed to register SSH key with Hetzner"
+
+        # Parse error details
+        local error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        log_error "API Error: $error_msg"
+
+        log_warn "Common causes:"
+        log_warn "  - SSH key already registered with this name"
+        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_warn "  - API token lacks write permissions"
         return 1
     fi
 
@@ -188,8 +204,18 @@ print(json.dumps(body))
 
     # Check for errors
     if echo "$response" | grep -q '"error"'; then
+        log_error "Failed to create Hetzner server"
+
+        # Parse error details
         local error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('error',{}).get('message','Unknown error'))")
-        log_error "Failed to create server: $error_msg"
+        log_error "API Error: $error_msg"
+
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance or payment method required"
+        log_warn "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
+        log_warn "  - Server limit reached"
+        log_warn "  - Invalid cloud-init userdata"
+        log_warn "Remediation: Check https://console.hetzner.cloud/"
         return 1
     fi
 
