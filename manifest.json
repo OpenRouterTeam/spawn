@@ -164,6 +164,21 @@
         "region": "ewr",
         "os_id": 2284
       }
+    },
+    "linode": {
+      "name": "Linode (Akamai)",
+      "description": "Linode instances via REST API",
+      "url": "https://www.linode.com/",
+      "type": "api",
+      "auth": "LINODE_API_TOKEN",
+      "provision_method": "POST /v4/linode/instances with metadata.user_data",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "type": "g6-standard-1",
+        "region": "us-east",
+        "image": "linode/ubuntu24.04"
+      }
     }
   },
   "matrix": {
@@ -190,6 +205,12 @@
     "sprite/codex": "implemented",
     "hetzner/codex": "implemented",
     "digitalocean/codex": "implemented",
-    "vultr/codex": "implemented"
+    "vultr/codex": "implemented",
+    "linode/claude": "implemented",
+    "linode/openclaw": "implemented",
+    "linode/nanoclaw": "implemented",
+    "linode/aider": "implemented",
+    "linode/goose": "implemented",
+    "linode/codex": "implemented"
   }
 }
