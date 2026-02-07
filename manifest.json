@@ -120,6 +120,20 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
+    },
+    "gemini": {
+      "name": "Gemini CLI",
+      "description": "Google's open-source coding agent",
+      "url": "https://github.com/google-gemini/gemini-cli",
+      "install": "npm install -g @google/gemini-cli",
+      "launch": "gemini",
+      "env": {
+        "GEMINI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override and GEMINI_API_KEY"
     }
   },
   "clouds": {
@@ -252,6 +266,12 @@
     "aws-lightsail/aider": "implemented",
     "aws-lightsail/goose": "implemented",
     "aws-lightsail/codex": "implemented",
-    "aws-lightsail/interpreter": "implemented"
+    "aws-lightsail/interpreter": "implemented",
+    "sprite/gemini": "implemented",
+    "hetzner/gemini": "implemented",
+    "digitalocean/gemini": "implemented",
+    "vultr/gemini": "implemented",
+    "linode/gemini": "implemented",
+    "aws-lightsail/gemini": "implemented"
   }
 }
