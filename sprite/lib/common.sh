@@ -7,38 +7,36 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Print colored message
+# Print colored message (to stderr so they don't pollute command substitution output)
 log_info() {
-    echo -e "${GREEN}$1${NC}"
+    echo -e "${GREEN}$1${NC}" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}$1${NC}"
+    echo -e "${YELLOW}$1${NC}" >&2
 }
 
 log_error() {
-    echo -e "${RED}$1${NC}"
+    echo -e "${RED}$1${NC}" >&2
 }
 
 # Safe read function that works in both interactive and non-interactive modes
 safe_read() {
     local prompt="$1"
-    local var_name="$2"
     local result=""
 
-    # Try to read from TTY if available
-    if [[ -c /dev/tty ]]; then
-        read -p "$prompt" result < /dev/tty
-    elif [[ -t 0 ]]; then
-        # stdin is a terminal
+    if [[ -t 0 ]]; then
+        # stdin is a terminal - read directly
         read -p "$prompt" result
+    elif echo -n "" > /dev/tty 2>/dev/null; then
+        # /dev/tty is functional - use it
+        read -p "$prompt" result < /dev/tty
     else
         # No interactive input available
         log_error "Cannot read input: no TTY available"
         return 1
     fi
 
-    # Return the result via stdout for command substitution
     echo "$result"
 }
 
@@ -85,7 +83,7 @@ ensure_sprite_exists() {
     local sprite_name=$1
     local sleep_time=${2:-3}
 
-    if sprite list 2>/dev/null | grep -q "^${sprite_name}$\|^${sprite_name} "; then
+    if sprite list 2>/dev/null | grep -qE "^${sprite_name}( |$)"; then
         log_info "Sprite '$sprite_name' already exists"
     else
         log_warn "Creating sprite '$sprite_name'..."
