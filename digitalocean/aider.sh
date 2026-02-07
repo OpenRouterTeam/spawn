@@ -51,6 +51,7 @@ if ! validate_model_id "$MODEL_ID"; then log_error "Exiting due to invalid model
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
+chmod 600 "$ENV_TEMP"
 cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]

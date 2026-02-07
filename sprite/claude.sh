@@ -38,6 +38,7 @@ log_warn "Setting up environment variables..."
 
 # Create temp file with env config
 ENV_TEMP=$(mktemp)
+chmod 600 "$ENV_TEMP"
 cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]
@@ -60,6 +61,7 @@ run_sprite "$SPRITE_NAME" "mkdir -p ~/.claude"
 
 # Create Claude settings.json via file upload
 SETTINGS_TEMP=$(mktemp)
+chmod 600 "$SETTINGS_TEMP"
 cat > "$SETTINGS_TEMP" << EOF
 {
   "theme": "dark",
@@ -81,6 +83,7 @@ rm "$SETTINGS_TEMP"
 
 # Create ~/.claude.json global state to skip onboarding and trust dialogs
 GLOBAL_STATE_TEMP=$(mktemp)
+chmod 600 "$GLOBAL_STATE_TEMP"
 cat > "$GLOBAL_STATE_TEMP" << EOF
 {
   "hasCompletedOnboarding": true,

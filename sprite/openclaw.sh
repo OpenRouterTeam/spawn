@@ -50,6 +50,7 @@ log_warn "Setting up environment variables..."
 
 # Create temp file with env config
 ENV_TEMP=$(mktemp)
+chmod 600 "$ENV_TEMP"
 cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]

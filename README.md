@@ -348,3 +348,40 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 - `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
 - `LINODE_TYPE` - Instance type (default: `g6-standard-1`)
 - `LINODE_REGION` - Datacenter region (default: `us-east`)
+
+---
+
+## Security
+
+### API Token Storage
+
+Spawn stores cloud provider API tokens and OpenRouter API keys locally in JSON files at `~/.config/spawn/`:
+
+- `hetzner.json` - Hetzner Cloud API token
+- `digitalocean.json` - DigitalOcean API token
+- `vultr.json` - Vultr API key
+- `linode.json` - Linode API token
+- OpenRouter API keys stored in shell config files (`~/.bashrc`, `~/.zshrc`)
+
+**Security Posture:**
+- All token files are created with `chmod 600` (user read/write only)
+- Tokens are stored in **plaintext** - not encrypted at rest
+- Security relies on filesystem permissions and OS user isolation
+
+**Recommendations:**
+1. **Protect your user account** - Use strong passwords, disk encryption, and secure your SSH keys
+2. **Use dedicated API tokens** - Create tokens specifically for Spawn with minimal required permissions
+3. **Rotate tokens regularly** - Revoke and regenerate API tokens periodically
+4. **Multi-user systems** - On shared machines, be aware that root users can read these files
+5. **Backup security** - Ensure backups of `~/.config/` are encrypted
+
+**Why plaintext?**
+- Simplicity and compatibility across all Unix-like systems
+- File permissions (`600`) provide adequate protection for single-user machines
+- Encryption at rest would require key management, adding complexity without significant security benefit for typical use cases
+- Cloud providers recommend similar approaches for CLI tools (AWS CLI, gcloud, etc.)
+
+**Alternative approaches:**
+- For higher security requirements, consider using environment variables instead of saved tokens
+- Pass `OPENROUTER_API_KEY`, `HCLOUD_TOKEN`, etc. as environment variables on each run
+- Use OS credential stores (Keychain on macOS, Secret Service on Linux) - requires additional dependencies

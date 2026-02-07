@@ -35,6 +35,7 @@ fi
 
 log_warn "Setting up environment variables..."
 ENV_TEMP=$(mktemp)
+chmod 600 "$ENV_TEMP"
 cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]
@@ -53,6 +54,7 @@ log_warn "Configuring Claude Code..."
 run_server "$VULTR_SERVER_IP" "mkdir -p ~/.claude"
 
 SETTINGS_TEMP=$(mktemp)
+chmod 600 "$SETTINGS_TEMP"
 cat > "$SETTINGS_TEMP" << EOF
 {
   "theme": "dark",
@@ -72,6 +74,7 @@ upload_file "$VULTR_SERVER_IP" "$SETTINGS_TEMP" "/root/.claude/settings.json"
 rm "$SETTINGS_TEMP"
 
 GLOBAL_STATE_TEMP=$(mktemp)
+chmod 600 "$GLOBAL_STATE_TEMP"
 cat > "$GLOBAL_STATE_TEMP" << EOF
 {
   "hasCompletedOnboarding": true,

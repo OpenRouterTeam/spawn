@@ -46,6 +46,7 @@ fi
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
+chmod 600 "$ENV_TEMP"
 cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]
@@ -68,6 +69,7 @@ run_server "$HETZNER_SERVER_IP" "mkdir -p ~/.claude"
 
 # Upload settings.json
 SETTINGS_TEMP=$(mktemp)
+chmod 600 "$SETTINGS_TEMP"
 cat > "$SETTINGS_TEMP" << EOF
 {
   "theme": "dark",
@@ -89,6 +91,7 @@ rm "$SETTINGS_TEMP"
 
 # Upload ~/.claude.json global state
 GLOBAL_STATE_TEMP=$(mktemp)
+chmod 600 "$GLOBAL_STATE_TEMP"
 cat > "$GLOBAL_STATE_TEMP" << EOF
 {
   "hasCompletedOnboarding": true,

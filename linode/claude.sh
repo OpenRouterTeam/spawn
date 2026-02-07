@@ -22,6 +22,7 @@ if [[ -n "$OPENROUTER_API_KEY" ]]; then log_info "Using OpenRouter API key from 
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 log_warn "Setting up environment variables..."
 ENV_TEMP=$(mktemp)
+chmod 600 "$ENV_TEMP"
 cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]
@@ -38,6 +39,7 @@ rm "$ENV_TEMP"
 log_warn "Configuring Claude Code..."
 run_server "$LINODE_SERVER_IP" "mkdir -p ~/.claude"
 SETTINGS_TEMP=$(mktemp)
+chmod 600 "$SETTINGS_TEMP"
 cat > "$SETTINGS_TEMP" << EOF
 {
   "theme": "dark",
@@ -56,6 +58,7 @@ EOF
 upload_file "$LINODE_SERVER_IP" "$SETTINGS_TEMP" "/root/.claude/settings.json"
 rm "$SETTINGS_TEMP"
 GLOBAL_STATE_TEMP=$(mktemp)
+chmod 600 "$GLOBAL_STATE_TEMP"
 cat > "$GLOBAL_STATE_TEMP" << EOF
 {
   "hasCompletedOnboarding": true,

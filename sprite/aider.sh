@@ -54,6 +54,7 @@ fi
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
+chmod 600 "$ENV_TEMP"
 cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]

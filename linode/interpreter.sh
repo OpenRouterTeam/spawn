@@ -19,6 +19,7 @@ if [[ -n "$OPENROUTER_API_KEY" ]]; then log_info "Using OpenRouter API key from 
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 log_warn "Setting up environment variables..."
 ENV_TEMP=$(mktemp)
+chmod 600 "$ENV_TEMP"
 cat > "$ENV_TEMP" << EOF
 
 # [spawn:env]
