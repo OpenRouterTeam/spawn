@@ -584,3 +584,86 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 - `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
 - `LAMBDA_INSTANCE_TYPE` - Instance type (default: `gpu_1x_a10`)
 - `LAMBDA_REGION` - Region (default: `us-east-1`)
+
+---
+
+## GCP Compute Engine
+
+Spawn agents on [Google Cloud Compute Engine](https://cloud.google.com/compute) instances. Requires `gcloud` CLI installed and configured.
+
+### Usage
+
+#### Claude Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/claude.sh)
+```
+
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/nanoclaw.sh)
+```
+
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/aider.sh)
+```
+
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/goose.sh)
+```
+
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/codex.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/interpreter.sh)
+```
+
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/gemini.sh)
+```
+
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/amazonq.sh)
+```
+
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/cline.sh)
+```
+
+### Non-Interactive Mode
+
+```bash
+GCP_INSTANCE_NAME=dev-mk1 \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/gcp/claude.sh)
+```
+
+**Environment Variables:**
+- `GCP_INSTANCE_NAME` - Name for the instance (skips prompt)
+- `GCP_PROJECT` - GCP project ID (defaults to gcloud config)
+- `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
+- `GCP_MACHINE_TYPE` - Machine type (default: `e2-medium`)
+- `GCP_ZONE` - Compute zone (default: `us-central1-a`)
