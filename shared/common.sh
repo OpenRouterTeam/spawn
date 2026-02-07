@@ -180,7 +180,7 @@ try_oauth_flow() {
     sleep 1
 
     # Check if the background process is still running
-    if ! kill -0 $server_pid 2>/dev/null; then
+    if ! kill -0 "$server_pid" 2>/dev/null; then
         log_warn "Failed to start OAuth server (port may be in use)"
         rm -rf "$oauth_dir"
         return 1
@@ -193,14 +193,14 @@ try_oauth_flow() {
     # Wait for the code file to be created (timeout after 2 minutes)
     local timeout=120
     local elapsed=0
-    while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do
+    while [[ ! -f "$code_file" ]] && [[ "$elapsed" -lt "$timeout" ]]; do
         sleep 1
         ((elapsed++))
     done
 
     # Kill the background server process
-    kill $server_pid 2>/dev/null || true
-    wait $server_pid 2>/dev/null || true
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
 
     if [[ ! -f "$code_file" ]]; then
         log_warn "OAuth timeout - no response received"
