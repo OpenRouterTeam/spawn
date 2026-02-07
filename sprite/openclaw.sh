@@ -39,7 +39,7 @@ OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 echo ""
 log_warn "Browse models at: https://openrouter.ai/models"
 log_warn "Which model would you like to use?"
-read -p "Enter model ID [openrouter/auto]: " MODEL_ID < /dev/tty
+MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
 
 # Inject environment variables

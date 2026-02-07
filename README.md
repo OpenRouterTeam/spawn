@@ -11,18 +11,33 @@ Conjure your agents!
 
 ## Usage
 
-### Claude Code Setup
+### Interactive Mode
 
-Setup a sprite with Claude Code pre-configured (via OpenRouter):
+Run the scripts and provide input when prompted:
 
 ```bash
+# Claude Code
 curl https://openrouter.ai/lab/spawn/sprite/claude.sh | bash
-```
 
-### OpenClaw Setup
-
-Setup a sprite with openclaw pre-configured:
-
-```bash
+# OpenClaw
 curl https://openrouter.ai/lab/spawn/sprite/openclaw.sh | bash
 ```
+
+### Non-Interactive Mode
+
+For automation or CI/CD, set environment variables:
+
+```bash
+# Claude Code
+SPRITE_NAME=dev-mk1 \
+  curl https://openrouter.ai/lab/spawn/sprite/claude.sh | bash
+
+# OpenClaw (with optional API key)
+SPRITE_NAME=dev-mk1 \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  curl https://openrouter.ai/lab/spawn/sprite/openclaw.sh | bash
+```
+
+**Environment Variables:**
+- `SPRITE_NAME` - Name for the sprite (required for non-interactive)
+- `OPENROUTER_API_KEY` - Skip OAuth and use this API key (optional)

@@ -20,6 +20,28 @@ log_error() {
     echo -e "${RED}$1${NC}"
 }
 
+# Safe read function that works in both interactive and non-interactive modes
+safe_read() {
+    local prompt="$1"
+    local var_name="$2"
+    local result=""
+
+    # Try to read from TTY if available
+    if [[ -c /dev/tty ]]; then
+        read -p "$prompt" result < /dev/tty
+    elif [[ -t 0 ]]; then
+        # stdin is a terminal
+        read -p "$prompt" result
+    else
+        # No interactive input available
+        log_error "Cannot read input: no TTY available"
+        return 1
+    fi
+
+    # Return the result via stdout for command substitution
+    echo "$result"
+}
+
 # Check if sprite CLI is installed, install if not
 ensure_sprite_installed() {
     if ! command -v sprite &> /dev/null; then
@@ -39,8 +61,23 @@ ensure_sprite_authenticated() {
 
 # Prompt for sprite name
 get_sprite_name() {
-    read -p "Enter sprite name: " SPRITE_NAME < /dev/tty
-    echo "$SPRITE_NAME"
+    # Check if SPRITE_NAME is already set in environment
+    if [[ -n "$SPRITE_NAME" ]]; then
+        log_info "Using sprite name from environment: $SPRITE_NAME"
+        echo "$SPRITE_NAME"
+        return 0
+    fi
+
+    # Try to read interactively
+    local sprite_name=$(safe_read "Enter sprite name: ")
+    if [[ -z "$sprite_name" ]]; then
+        log_error "Sprite name is required"
+        log_warn "Set SPRITE_NAME environment variable for non-interactive usage:"
+        log_warn "  SPRITE_NAME=dev-mk1 curl ... | bash"
+        return 1
+    fi
+
+    echo "$sprite_name"
 }
 
 # Check if sprite exists, create if not
@@ -112,14 +149,14 @@ get_openrouter_api_key_manual() {
 
     local api_key=""
     while [[ -z "$api_key" ]]; do
-        read -p "Enter your OpenRouter API key: " api_key < /dev/tty
+        api_key=$(safe_read "Enter your OpenRouter API key: ") || return 1
 
         # Basic validation - OpenRouter keys typically start with "sk-or-"
         if [[ -z "$api_key" ]]; then
             log_error "API key cannot be empty"
         elif [[ ! "$api_key" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
             log_warn "Warning: API key format doesn't match expected pattern (sk-or-v1-...)"
-            read -p "Use this key anyway? (y/N): " confirm < /dev/tty
+            local confirm=$(safe_read "Use this key anyway? (y/N): ") || return 1
             if [[ "$confirm" =~ ^[Yy]$ ]]; then
                 break
             else
@@ -255,7 +292,11 @@ get_openrouter_api_key_oauth() {
     log_warn "OAuth authentication failed or unavailable"
     log_warn "You can enter your API key manually instead"
     echo ""
-    read -p "Would you like to enter your API key manually? (Y/n): " manual_choice < /dev/tty
+    local manual_choice=$(safe_read "Would you like to enter your API key manually? (Y/n): ") || {
+        log_error "Cannot prompt for manual entry in non-interactive mode"
+        log_warn "Set OPENROUTER_API_KEY environment variable for non-interactive usage"
+        return 1
+    }
 
     if [[ ! "$manual_choice" =~ ^[Nn]$ ]]; then
         api_key=$(get_openrouter_api_key_manual)
