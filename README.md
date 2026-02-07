@@ -180,3 +180,57 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 - `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
 - `DO_DROPLET_SIZE` - Droplet size (default: `s-2vcpu-2gb`)
 - `DO_REGION` - Datacenter region (default: `nyc3`)
+
+---
+
+## Vultr
+
+Spawn agents on [Vultr](https://www.vultr.com/) Cloud Compute instances via REST API.
+
+### Usage
+
+#### Claude Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/claude.sh)
+```
+
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/nanoclaw.sh)
+```
+
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/aider.sh)
+```
+
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/goose.sh)
+```
+
+### Non-Interactive Mode
+
+```bash
+VULTR_SERVER_NAME=dev-mk1 \
+VULTR_API_KEY=your-vultr-api-key \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/claude.sh)
+```
+
+**Environment Variables:**
+- `VULTR_SERVER_NAME` - Name for the instance (skips prompt)
+- `VULTR_API_KEY` - Vultr API key (skips prompt, saved to `~/.config/spawn/vultr.json`)
+- `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
+- `VULTR_PLAN` - Instance plan (default: `vc2-1c-2gb`)
+- `VULTR_REGION` - Datacenter region (default: `ewr`)
