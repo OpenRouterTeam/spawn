@@ -45,7 +45,7 @@ safe_read() {
 nc_listen() {
     local port=$1
     shift
-    if nc --help 2>&1 | grep -q "BusyBox\|busybox" || nc --help 2>&1 | grep -q "\-p "; then
+    if nc --help 2>&1 | grep -q "BusyBox\|busybox"; then
         nc -l -p "$port" "$@"
     else
         nc -l "$port" "$@"
@@ -113,26 +113,21 @@ try_oauth_flow() {
 
     log_warn "Starting local OAuth server on port ${callback_port}..."
 
+    # Write the HTTP response to a file (using printf for macOS bash 3.x compat)
+    local response_tpl="$oauth_dir/response.http"
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>@keyframes checkmark{0%{transform:scale(0) rotate(-45deg);opacity:0}60%{transform:scale(1.2) rotate(-45deg);opacity:1}100%{transform:scale(1) rotate(-45deg);opacity:1}}@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}.check{width:80px;height:80px;border-radius:50%;background:#00d4aa22;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}.check::after{content:"";display:block;width:28px;height:14px;border-left:4px solid #00d4aa;border-bottom:4px solid #00d4aa;animation:checkmark .5s ease forwards}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}.sub{color:#ffffff66;font-size:.85rem;animation:fadein .5s ease .5s both}</style></head><body><div class="card"><div class="check"></div><h1>Authentication Successful!</h1><p>Redirecting back to terminal...</p><p class="sub">This tab will close automatically</p></div><script>setTimeout(function(){try{window.close()}catch(e){}setTimeout(function(){document.querySelector(".sub").textContent="You can safely close this tab"},500)},3000)</script></body></html>' > "$response_tpl"
+    
+    # Background listener
     (
-        local success_response='HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>@keyframes checkmark{0%{transform:scale(0) rotate(-45deg);opacity:0}60%{transform:scale(1.2) rotate(-45deg);opacity:1}100%{transform:scale(1) rotate(-45deg);opacity:1}}@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}.check{width:80px;height:80px;border-radius:50%;background:#00d4aa22;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}.check::after{content:"";display:block;width:28px;height:14px;border-left:4px solid #00d4aa;border-bottom:4px solid #00d4aa;animation:checkmark .5s ease forwards}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}.sub{color:#ffffff66;font-size:.85rem;animation:fadein .5s ease .5s both}</style></head><body><div class="card"><div class="check"></div><h1>Authentication Successful!</h1><p>Redirecting back to terminal...</p><p class="sub">This tab will close automatically</p></div><script>setTimeout(function(){try{window.close()}catch(e){}setTimeout(function(){document.querySelector(".sub").textContent="You can safely close this tab"},500)},3000)</script></body></html>'
-
         while true; do
-            local response_file=$(mktemp)
-            echo -e "$success_response" > "$response_file"
-
-            local request=$(nc_listen "$callback_port" < "$response_file" 2>/dev/null | head -1)
-            local nc_status=$?
-            rm -f "$response_file"
-
-            if [[ $nc_status -ne 0 ]]; then
-                break
-            fi
-
-            if [[ "$request" == *"/callback?code="* ]]; then
-                local code=$(echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p')
-                echo "$code" > "$code_file"
-                break
-            fi
+            request=$(nc_listen "$callback_port" < "$response_tpl" 2>/dev/null | head -1) || break
+            
+            case "$request" in
+                *"/callback?code="*)
+                    echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p' > "$code_file"
+                    break
+                    ;;
+            esac
         done
     ) </dev/null &
     local server_pid=$!
@@ -152,7 +147,7 @@ try_oauth_flow() {
     local elapsed=0
     while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do
         sleep 1
-        ((elapsed++))
+        elapsed=$((elapsed + 1))
     done
 
     kill $server_pid 2>/dev/null || true
@@ -452,7 +447,7 @@ for net in data['droplet']['networks']['v4']:
 
         log_warn "Droplet status: $status ($attempt/$max_attempts)"
         sleep 5
-        ((attempt++))
+        attempt=$((attempt + 1))
     done
 
     log_error "Droplet did not become active in time"
@@ -473,7 +468,7 @@ verify_server_connectivity() {
         fi
         log_warn "Waiting for SSH... ($attempt/$max_attempts)"
         sleep 5
-        ((attempt++))
+        attempt=$((attempt + 1))
     done
 
     log_error "Server failed to respond via SSH after $max_attempts attempts"
@@ -494,7 +489,7 @@ wait_for_cloud_init() {
         fi
         log_warn "Cloud-init in progress... ($attempt/$max_attempts)"
         sleep 5
-        ((attempt++))
+        attempt=$((attempt + 1))
     done
 
     log_error "Cloud-init did not complete after $max_attempts attempts"

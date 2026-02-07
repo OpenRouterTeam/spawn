@@ -149,14 +149,15 @@ EOF
     rm "$bash_temp"
 }
 
-# Listen on a port with netcat (handles busybox/Termux nc requiring -p flag)
+# Listen on a port with netcat (handles macOS, Linux, busybox/Termux)
 nc_listen() {
     local port=$1
     shift
-    # Detect if nc requires -p flag (busybox nc on Termux)
-    if nc --help 2>&1 | grep -q "BusyBox\|busybox" || nc --help 2>&1 | grep -q "\-p "; then
+    # BusyBox nc (Termux) requires -p flag
+    if nc --help 2>&1 | grep -q "BusyBox\|busybox"; then
         nc -l -p "$port" "$@"
     else
+        # macOS and Linux GNU nc both accept: nc -l <port>
         nc -l "$port" "$@"
     fi
 }
@@ -211,29 +212,21 @@ try_oauth_flow() {
 
     log_warn "Starting local OAuth server on port ${callback_port}..."
 
-    # Use a simpler nc approach - pipe response while capturing request
+    # Write the HTTP response to a file (using printf for macOS bash 3.x compat)
+    local response_tpl="$oauth_dir/response.http"
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class="card"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>' > "$response_tpl"
+
+    # Background listener
     (
-        local success_response='HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>@keyframes checkmark{0%{transform:scale(0) rotate(-45deg);opacity:0}60%{transform:scale(1.2) rotate(-45deg);opacity:1}100%{transform:scale(1) rotate(-45deg);opacity:1}}@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}.check{width:80px;height:80px;border-radius:50%;background:#00d4aa22;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}.check::after{content:"";display:block;width:28px;height:14px;border-left:4px solid #00d4aa;border-bottom:4px solid #00d4aa;animation:checkmark .5s ease forwards}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}.sub{color:#ffffff66;font-size:.85rem;animation:fadein .5s ease .5s both}</style></head><body><div class="card"><div class="check"></div><h1>Authentication Successful!</h1><p>Redirecting back to terminal...</p><p class="sub">This tab will close automatically</p></div><script>setTimeout(function(){try{window.close()}catch(e){}setTimeout(function(){document.querySelector(".sub").textContent="You can safely close this tab"},500)},3000)</script></body></html>'
-
         while true; do
-            # Listen and capture just the first line of the request, then respond
-            local response_file=$(mktemp)
-            echo -e "$success_response" > "$response_file"
+            request=$(nc_listen "$callback_port" < "$response_tpl" 2>/dev/null | head -1) || break
 
-            local request=$(nc_listen "$callback_port" < "$response_file" 2>/dev/null | head -1)
-            local nc_status=$?
-            rm -f "$response_file"
-
-            # If nc failed, exit the loop
-            if [[ $nc_status -ne 0 ]]; then
-                break
-            fi
-
-            if [[ "$request" == *"/callback?code="* ]]; then
-                local code=$(echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p')
-                echo "$code" > "$code_file"
-                break
-            fi
+            case "$request" in
+                *"/callback?code="*)
+                    echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p' > "$code_file"
+                    break
+                    ;;
+            esac
         done
     ) </dev/null &
     local server_pid=$!
@@ -257,7 +250,7 @@ try_oauth_flow() {
     local elapsed=0
     while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do
         sleep 1
-        ((elapsed++))
+        elapsed=$((elapsed + 1))
     done
 
     # Kill the background server process

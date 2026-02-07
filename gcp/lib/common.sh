@@ -25,7 +25,7 @@ safe_read() {
 
 nc_listen() {
     local port=$1; shift
-    if nc --help 2>&1 | grep -q "BusyBox\|busybox" || nc --help 2>&1 | grep -q "\-p "; then
+    if nc --help 2>&1 | grep -q "BusyBox\|busybox"; then
         nc -l -p "$port" "$@"
     else nc -l "$port" "$@"; fi
 }
@@ -62,23 +62,29 @@ try_oauth_flow() {
     local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
     local oauth_dir=$(mktemp -d) code_file="$oauth_dir/code"
     log_warn "Starting local OAuth server on port ${callback_port}..."
+
+    # Write the HTTP response to a file (using printf for macOS bash 3.x compat)
+    local response_tpl="$oauth_dir/response.http"
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>body{font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#00d4aa}p{color:#ffffffcc}</style></head><body><div class="card"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>' > "$response_tpl"
+    
+    # Background listener
     (
-        local success_response='HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>body{font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#00d4aa}p{color:#ffffffcc}</style></head><body><div class="card"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>'
         while true; do
-            local response_file=$(mktemp); echo -e "$success_response" > "$response_file"
-            local request=$(nc_listen "$callback_port" < "$response_file" 2>/dev/null | head -1)
-            local nc_status=$?; rm -f "$response_file"
-            if [[ $nc_status -ne 0 ]]; then break; fi
-            if [[ "$request" == *"/callback?code="* ]]; then
-                echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p' > "$code_file"; break
-            fi
+            request=$(nc_listen "$callback_port" < "$response_tpl" 2>/dev/null | head -1) || break
+            
+            case "$request" in
+                *"/callback?code="*)
+                    echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p' > "$code_file"
+                    break
+                    ;;
+            esac
         done
     ) </dev/null &
     local server_pid=$!; sleep 1
     if ! kill -0 $server_pid 2>/dev/null; then log_warn "Failed to start OAuth server"; rm -rf "$oauth_dir"; return 1; fi
     log_warn "Opening browser to authenticate with OpenRouter..."; open_browser "$auth_url"
     local timeout=120 elapsed=0
-    while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do sleep 1; ((elapsed++)); done
+    while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do sleep 1; elapsed=$((elapsed + 1)); done
     kill $server_pid 2>/dev/null || true; wait $server_pid 2>/dev/null || true
     if [[ ! -f "$code_file" ]]; then log_warn "OAuth timeout"; rm -rf "$oauth_dir"; return 1; fi
     local oauth_code=$(cat "$code_file"); rm -rf "$oauth_dir"
@@ -222,7 +228,7 @@ verify_server_connectivity() {
         if ssh $SSH_OPTS -o ConnectTimeout=5 "${username}@$ip" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi
-        log_warn "Waiting for SSH... ($attempt/$max_attempts)"; sleep 5; ((attempt++))
+        log_warn "Waiting for SSH... ($attempt/$max_attempts)"; sleep 5; attempt=$((attempt + 1))
     done
     log_error "Server failed to respond via SSH after $max_attempts attempts"; return 1
 }
@@ -235,7 +241,7 @@ wait_for_cloud_init() {
         if ssh $SSH_OPTS "${username}@$ip" "test -f /tmp/.cloud-init-complete" >/dev/null 2>&1; then
             log_info "Startup script completed"; return 0
         fi
-        log_warn "Startup script in progress... ($attempt/$max_attempts)"; sleep 5; ((attempt++))
+        log_warn "Startup script in progress... ($attempt/$max_attempts)"; sleep 5; attempt=$((attempt + 1))
     done
     log_error "Startup script did not complete after $max_attempts attempts"; return 1
 }
