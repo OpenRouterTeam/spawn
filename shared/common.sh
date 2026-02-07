@@ -128,41 +128,28 @@ get_openrouter_api_key_manual() {
     echo "$api_key"
 }
 
-# Try OAuth flow, fallback to manual entry if it fails
-try_oauth_flow() {
-    local callback_port=${1:-5180}
+# Generate OAuth success response HTML
+create_oauth_response_html() {
+    cat << 'HTML_EOF'
+HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>@keyframes checkmark{0%{transform:scale(0) rotate(-45deg);opacity:0}60%{transform:scale(1.2) rotate(-45deg);opacity:1}100%{transform:scale(1) rotate(-45deg);opacity:1}}@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}.check{width:80px;height:80px;border-radius:50%;background:#00d4aa22;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}.check::after{content:"";display:block;width:28px;height:14px;border-left:4px solid #00d4aa;border-bottom:4px solid #00d4aa;animation:checkmark .5s ease forwards}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}.sub{color:#ffffff66;font-size:.85rem;animation:fadein .5s ease .5s both}</style></head><body><div class="card"><div class="check"></div><h1>Authentication Successful!</h1><p>Redirecting back to terminal...</p><p class="sub">This tab will close automatically</p></div><script>setTimeout(function(){try{window.close()}catch(e){}setTimeout(function(){document.querySelector(".sub").textContent="You can safely close this tab"},500)},3000)</script></body></html>
+HTML_EOF
+}
 
-    log_warn "Attempting OAuth authentication..."
+# Start OAuth callback server in background, returns server PID
+start_oauth_server() {
+    local port="$1"
+    local code_file="$2"
+    local success_response=$(create_oauth_response_html)
 
-    # Check if nc is available
-    if ! command -v nc &> /dev/null; then
-        log_warn "netcat (nc) not found - OAuth server unavailable"
-        return 1
-    fi
-
-    local callback_url="http://localhost:${callback_port}/callback"
-    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
-
-    # Create a temporary directory for the OAuth flow
-    local oauth_dir=$(mktemp -d)
-    local code_file="$oauth_dir/code"
-
-    log_warn "Starting local OAuth server on port ${callback_port}..."
-
-    # Use a simpler nc approach - pipe response while capturing request
     (
-        local success_response='HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>@keyframes checkmark{0%{transform:scale(0) rotate(-45deg);opacity:0}60%{transform:scale(1.2) rotate(-45deg);opacity:1}100%{transform:scale(1) rotate(-45deg);opacity:1}}@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}.check{width:80px;height:80px;border-radius:50%;background:#00d4aa22;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}.check::after{content:"";display:block;width:28px;height:14px;border-left:4px solid #00d4aa;border-bottom:4px solid #00d4aa;animation:checkmark .5s ease forwards}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}.sub{color:#ffffff66;font-size:.85rem;animation:fadein .5s ease .5s both}</style></head><body><div class="card"><div class="check"></div><h1>Authentication Successful!</h1><p>Redirecting back to terminal...</p><p class="sub">This tab will close automatically</p></div><script>setTimeout(function(){try{window.close()}catch(e){}setTimeout(function(){document.querySelector(".sub").textContent="You can safely close this tab"},500)},3000)</script></body></html>'
-
         while true; do
-            # Listen and capture just the first line of the request, then respond
             local response_file=$(mktemp)
             echo -e "$success_response" > "$response_file"
 
-            local request=$(nc_listen "$callback_port" < "$response_file" 2>/dev/null | head -1)
+            local request=$(nc_listen "$port" < "$response_file" 2>/dev/null | head -1)
             local nc_status=$?
             rm -f "$response_file"
 
-            # If nc failed, exit the loop
             if [[ $nc_status -ne 0 ]]; then
                 break
             fi
@@ -174,45 +161,28 @@ try_oauth_flow() {
             fi
         done
     ) </dev/null &
-    local server_pid=$!
 
-    # Give the server a moment to start and check if it's running
-    sleep 1
+    echo $!
+}
 
-    # Check if the background process is still running
-    if ! kill -0 "$server_pid" 2>/dev/null; then
-        log_warn "Failed to start OAuth server (port may be in use)"
-        rm -rf "$oauth_dir"
-        return 1
-    fi
-
-    # Open browser
-    log_warn "Opening browser to authenticate with OpenRouter..."
-    open_browser "$auth_url"
-
-    # Wait for the code file to be created (timeout after 2 minutes)
-    local timeout=120
+# Wait for OAuth code with timeout, returns 0 if code received
+wait_for_oauth_code() {
+    local code_file="$1"
+    local timeout="${2:-120}"
     local elapsed=0
-    while [[ ! -f "$code_file" ]] && [[ "$elapsed" -lt "$timeout" ]]; do
+
+    while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do
         sleep 1
         ((elapsed++))
     done
 
-    # Kill the background server process
-    kill "$server_pid" 2>/dev/null || true
-    wait "$server_pid" 2>/dev/null || true
+    [[ -f "$code_file" ]]
+}
 
-    if [[ ! -f "$code_file" ]]; then
-        log_warn "OAuth timeout - no response received"
-        rm -rf "$oauth_dir"
-        return 1
-    fi
+# Exchange OAuth code for API key
+exchange_oauth_code() {
+    local oauth_code="$1"
 
-    local oauth_code=$(cat "$code_file")
-    rm -rf "$oauth_dir"
-
-    # Exchange the code for an API key
-    log_warn "Exchanging OAuth code for API key..."
     local key_response=$(curl -s -X POST "https://openrouter.ai/api/v1/auth/keys" \
         -H "Content-Type: application/json" \
         -d "{\"code\": \"$oauth_code\"}")
@@ -223,6 +193,65 @@ try_oauth_flow() {
         log_error "Failed to exchange OAuth code: ${key_response}"
         return 1
     fi
+
+    echo "$api_key"
+}
+
+# Clean up OAuth session resources
+cleanup_oauth_session() {
+    local server_pid="$1"
+    local oauth_dir="$2"
+
+    if [[ -n "$server_pid" ]]; then
+        kill "$server_pid" 2>/dev/null || true
+        wait "$server_pid" 2>/dev/null || true
+    fi
+
+    if [[ -n "$oauth_dir" && -d "$oauth_dir" ]]; then
+        rm -rf "$oauth_dir"
+    fi
+}
+
+# Try OAuth flow (orchestrates the helper functions above)
+try_oauth_flow() {
+    local callback_port=${1:-5180}
+
+    log_warn "Attempting OAuth authentication..."
+
+    if ! command -v nc &> /dev/null; then
+        log_warn "netcat (nc) not found - OAuth server unavailable"
+        return 1
+    fi
+
+    local callback_url="http://localhost:${callback_port}/callback"
+    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
+    local oauth_dir=$(mktemp -d)
+    local code_file="$oauth_dir/code"
+
+    log_warn "Starting local OAuth server on port ${callback_port}..."
+    local server_pid=$(start_oauth_server "$callback_port" "$code_file")
+
+    sleep 1
+    if ! kill -0 "$server_pid" 2>/dev/null; then
+        log_warn "Failed to start OAuth server (port may be in use)"
+        cleanup_oauth_session "" "$oauth_dir"
+        return 1
+    fi
+
+    log_warn "Opening browser to authenticate with OpenRouter..."
+    open_browser "$auth_url"
+
+    if ! wait_for_oauth_code "$code_file" 120; then
+        log_warn "OAuth timeout - no response received"
+        cleanup_oauth_session "$server_pid" "$oauth_dir"
+        return 1
+    fi
+
+    local oauth_code=$(cat "$code_file")
+    cleanup_oauth_session "$server_pid" "$oauth_dir"
+
+    log_warn "Exchanging OAuth code for API key..."
+    local api_key=$(exchange_oauth_code "$oauth_code") || return 1
 
     log_info "Successfully obtained OpenRouter API key via OAuth!"
     echo "$api_key"
@@ -259,4 +288,34 @@ get_openrouter_api_key_oauth() {
         log_error "Authentication cancelled by user"
         return 1
     fi
+}
+
+# ============================================================
+# SSH connectivity helpers
+# ============================================================
+
+# Generic SSH wait function - polls until a remote command succeeds
+# Usage: generic_ssh_wait IP SSH_OPTS TEST_CMD DESCRIPTION MAX_ATTEMPTS INTERVAL
+generic_ssh_wait() {
+    local ip="$1"
+    local ssh_opts="$2"
+    local test_cmd="$3"
+    local description="$4"
+    local max_attempts="${5:-30}"
+    local interval="${6:-5}"
+    local attempt=1
+
+    log_warn "Waiting for $description to $ip..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        if ssh $ssh_opts "root@$ip" "$test_cmd" >/dev/null 2>&1; then
+            log_info "$description ready"
+            return 0
+        fi
+        log_warn "Waiting for $description... ($attempt/$max_attempts)"
+        sleep "$interval"
+        ((attempt++))
+    done
+
+    log_error "$description failed after $max_attempts attempts"
+    return 1
 }

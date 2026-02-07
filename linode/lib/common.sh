@@ -8,115 +8,14 @@ set -euo pipefail
 # Provider-agnostic functions
 # ============================================================
 
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly NC='\033[0m'
-
-log_info() { echo -e "${GREEN}$1${NC}" >&2; }
-log_warn() { echo -e "${YELLOW}$1${NC}" >&2; }
-log_error() { echo -e "${RED}$1${NC}" >&2; }
-
-safe_read() {
-    local prompt="$1" result=""
-    if [[ -t 0 ]]; then read -p "$prompt" result
-    elif echo -n "" > /dev/tty 2>/dev/null; then read -p "$prompt" result < /dev/tty
-    else log_error "Cannot read input: no TTY available"; return 1; fi
-    echo "$result"
+# Source shared provider-agnostic functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../shared/common.sh" || {
+    echo "ERROR: Failed to load shared/common.sh" >&2
+    exit 1
 }
 
-nc_listen() {
-    local port=$1; shift
-    if nc --help 2>&1 | grep -q "BusyBox\|busybox" || nc --help 2>&1 | grep -q "\-p "; then
-        nc -l -p "$port" "$@"
-    else nc -l "$port" "$@"; fi
-}
-
-open_browser() {
-    local url=$1
-    if command -v termux-open-url &>/dev/null; then termux-open-url "$url" </dev/null
-    elif command -v open &>/dev/null; then open "$url" </dev/null
-    elif command -v xdg-open &>/dev/null; then xdg-open "$url" </dev/null
-    else log_warn "Please open: ${url}"; fi
-}
-
-validate_model_id() {
-    local model_id="$1"
-    if [[ -z "$model_id" ]]; then return 0; fi
-    if [[ ! "$model_id" =~ ^[a-zA-Z0-9/_:.-]+$ ]]; then
-        log_error "Invalid model ID: contains unsafe characters"
-        log_error "Model IDs should only contain: letters, numbers, /, -, _, :, ."
-        return 1
-    fi
-    return 0
-}
-
-get_openrouter_api_key_manual() {
-    echo ""; log_warn "Manual API Key Entry"
-    echo -e "${YELLOW}Get your API key from: https://openrouter.ai/settings/keys${NC}"; echo ""
-    local api_key=""
-    while [[ -z "$api_key" ]]; do
-        api_key=$(safe_read "Enter your OpenRouter API key: ") || return 1
-        if [[ -z "$api_key" ]]; then log_error "API key cannot be empty"
-        elif [[ ! "$api_key" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
-            log_warn "Warning: API key format doesn't match expected pattern (sk-or-v1-...)"
-            local confirm=$(safe_read "Use this key anyway? (y/N): ") || return 1
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then break; else api_key=""; fi
-        fi
-    done
-    log_info "API key accepted!"; echo "$api_key"
-}
-
-try_oauth_flow() {
-    local callback_port=${1:-5180}
-    log_warn "Attempting OAuth authentication..."
-    if ! command -v nc &>/dev/null; then log_warn "netcat (nc) not found"; return 1; fi
-    local callback_url="http://localhost:${callback_port}/callback"
-    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
-    local oauth_dir=$(mktemp -d) code_file="$oauth_dir/code"
-    log_warn "Starting local OAuth server on port ${callback_port}..."
-    (
-        local success_response='HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>@keyframes checkmark{0%{transform:scale(0) rotate(-45deg);opacity:0}60%{transform:scale(1.2) rotate(-45deg);opacity:1}100%{transform:scale(1) rotate(-45deg);opacity:1}}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}.check{width:80px;height:80px;border-radius:50%;background:#00d4aa22;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}.check::after{content:"";display:block;width:28px;height:14px;border-left:4px solid #00d4aa;border-bottom:4px solid #00d4aa;animation:checkmark .5s ease forwards}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class="card"><div class="check"></div><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>'
-        while true; do
-            local response_file=$(mktemp); echo -e "$success_response" > "$response_file"
-            local request=$(nc_listen "$callback_port" < "$response_file" 2>/dev/null | head -1)
-            local nc_status=$?; rm -f "$response_file"
-            if [[ "$nc_status" -ne 0 ]]; then break; fi
-            if [[ "$request" == *"/callback?code="* ]]; then
-                echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p' > "$code_file"; break
-            fi
-        done
-    ) </dev/null &
-    local server_pid=$!; sleep 1
-    if ! kill -0 "$server_pid" 2>/dev/null; then log_warn "Failed to start OAuth server"; rm -rf "$oauth_dir"; return 1; fi
-    log_warn "Opening browser to authenticate with OpenRouter..."; open_browser "$auth_url"
-    local timeout=120 elapsed=0
-    while [[ ! -f "$code_file" ]] && [[ "$elapsed" -lt "$timeout" ]]; do sleep 1; ((elapsed++)); done
-    kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true
-    if [[ ! -f "$code_file" ]]; then log_warn "OAuth timeout"; rm -rf "$oauth_dir"; return 1; fi
-    local oauth_code=$(cat "$code_file"); rm -rf "$oauth_dir"
-    log_warn "Exchanging OAuth code for API key..."
-    local key_response=$(curl -s -X POST "https://openrouter.ai/api/v1/auth/keys" \
-        -H "Content-Type: application/json" -d "{\"code\": \"$oauth_code\"}")
-    local api_key=$(echo "$key_response" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
-    if [[ -z "$api_key" ]]; then log_error "Failed to exchange OAuth code: ${key_response}"; return 1; fi
-    log_info "Successfully obtained OpenRouter API key via OAuth!"; echo "$api_key"
-}
-
-get_openrouter_api_key_oauth() {
-    local callback_port=${1:-5180}
-    local api_key=$(try_oauth_flow "$callback_port")
-    if [[ -n "$api_key" ]]; then echo "$api_key"; return 0; fi
-    echo ""; log_warn "OAuth authentication failed or unavailable"
-    log_warn "You can enter your API key manually instead"; echo ""
-    local manual_choice=$(safe_read "Would you like to enter your API key manually? (Y/n): ") || {
-        log_error "Cannot prompt for manual entry in non-interactive mode"
-        log_warn "Set OPENROUTER_API_KEY environment variable for non-interactive usage"; return 1
-    }
-    if [[ ! "$manual_choice" =~ ^[Nn]$ ]]; then
-        api_key=$(get_openrouter_api_key_manual); echo "$api_key"; return 0
-    else log_error "Authentication cancelled by user"; return 1; fi
-}
+# Note: Provider-agnostic functions (logging, OAuth, browser, nc_listen) are now in shared/common.sh
 
 # ============================================================
 # Linode (Akamai) specific functions
@@ -296,27 +195,13 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
 }
 
 verify_server_connectivity() {
-    local ip="$1" max_attempts=${2:-30} attempt=1
-    log_warn "Waiting for SSH connectivity to $ip..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        if ssh $SSH_OPTS -o ConnectTimeout=5 "root@$ip" "echo ok" >/dev/null 2>&1; then
-            log_info "SSH connection established"; return 0
-        fi
-        log_warn "Waiting for SSH... ($attempt/$max_attempts)"; sleep 5; ((attempt++))
-    done
-    log_error "Server failed to respond via SSH after $max_attempts attempts"; return 1
+    local ip="$1" max_attempts=${2:-30}
+    generic_ssh_wait "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
 }
 
 wait_for_cloud_init() {
-    local ip="$1" max_attempts=${2:-60} attempt=1
-    log_warn "Waiting for cloud-init to complete..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        if ssh $SSH_OPTS "root@$ip" "test -f /root/.cloud-init-complete" >/dev/null 2>&1; then
-            log_info "Cloud-init completed"; return 0
-        fi
-        log_warn "Cloud-init in progress... ($attempt/$max_attempts)"; sleep 5; ((attempt++))
-    done
-    log_error "Cloud-init did not complete after $max_attempts attempts"; return 1
+    local ip="$1" max_attempts=${2:-60}
+    generic_ssh_wait "$ip" "$SSH_OPTS" "test -f /root/.cloud-init-complete" "cloud-init" "$max_attempts" 5
 }
 
 run_server() { local ip="$1" cmd="$2"; ssh $SSH_OPTS "root@$ip" "$cmd"; }

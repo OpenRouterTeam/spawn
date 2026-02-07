@@ -233,42 +233,14 @@ print(json.dumps(body))
 verify_server_connectivity() {
     local ip="$1"
     local max_attempts=${2:-30}
-    local attempt=1
-
-    log_warn "Waiting for SSH connectivity to $ip..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        if ssh $SSH_OPTS -o ConnectTimeout=5 "root@$ip" "echo ok" >/dev/null 2>&1; then
-            log_info "SSH connection established"
-            return 0
-        fi
-        log_warn "Waiting for SSH... ($attempt/$max_attempts)"
-        sleep 5
-        ((attempt++))
-    done
-
-    log_error "Server failed to respond via SSH after $max_attempts attempts"
-    return 1
+    generic_ssh_wait "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
 }
 
 # Wait for cloud-init to complete
 wait_for_cloud_init() {
     local ip="$1"
     local max_attempts=${2:-60}
-    local attempt=1
-
-    log_warn "Waiting for cloud-init to complete..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        if ssh $SSH_OPTS "root@$ip" "test -f /root/.cloud-init-complete" >/dev/null 2>&1; then
-            log_info "Cloud-init completed"
-            return 0
-        fi
-        log_warn "Cloud-init in progress... ($attempt/$max_attempts)"
-        sleep 5
-        ((attempt++))
-    done
-
-    log_error "Cloud-init did not complete after $max_attempts attempts"
-    return 1
+    generic_ssh_wait "$ip" "$SSH_OPTS" "test -f /root/.cloud-init-complete" "cloud-init" "$max_attempts" 5
 }
 
 # Run a command on the server
