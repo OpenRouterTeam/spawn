@@ -136,6 +136,21 @@
         "region": "nyc3",
         "image": "ubuntu-24-04-x64"
       }
+    },
+    "vultr": {
+      "name": "Vultr",
+      "description": "Vultr Cloud Compute instances via REST API",
+      "url": "https://www.vultr.com/",
+      "type": "api",
+      "auth": "VULTR_API_KEY",
+      "provision_method": "POST /v2/instances with user_data (base64)",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "plan": "vc2-1c-2gb",
+        "region": "ewr",
+        "os_id": 2284
+      }
     }
   },
   "matrix": {
@@ -153,6 +168,11 @@
     "digitalocean/aider": "implemented",
     "sprite/goose": "implemented",
     "hetzner/goose": "implemented",
-    "digitalocean/goose": "implemented"
+    "digitalocean/goose": "implemented",
+    "vultr/claude": "implemented",
+    "vultr/openclaw": "implemented",
+    "vultr/nanoclaw": "implemented",
+    "vultr/aider": "implemented",
+    "vultr/goose": "implemented"
   }
 }
