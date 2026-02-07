@@ -88,6 +88,9 @@ Research cloud providers with API-based provisioning. To add one:
 
 ```
 spawn/
+  cli/
+    spawn.sh          # Main CLI binary (interactive picker, matrix viewer, launcher)
+    install.sh        # One-liner installer (downloads spawn.sh to ~/.local/bin)
   {cloud}/
     lib/common.sh     # Cloud-specific shared functions
     {agent}.sh        # One script per agent
@@ -96,6 +99,13 @@ spawn/
   test/run.sh         # Test harness
   README.md           # User-facing docs
 ```
+
+## CLI (`cli/`)
+
+The `spawn` CLI is a pure-bash binary that provides a unified entry point for the matrix.
+
+- **`cli/spawn.sh`** — Main binary. Fetches manifest.json from GitHub (cached for 1hr at `~/.cache/spawn/`), parses it with `jq` or `python3` fallback, and provides: interactive picker (`spawn`), direct launch (`spawn <agent> <cloud>`), agent info (`spawn <agent>`), matrix table (`spawn list`), and self-update (`spawn update`). Installed to `~/.local/bin/spawn`.
+- **`cli/install.sh`** — One-liner installer. Downloads `spawn.sh` to `~/.local/bin/spawn`, sets executable bit, and prints PATH instructions if needed. Override install dir with `SPAWN_INSTALL_DIR` env var.
 
 ## Script Conventions
 

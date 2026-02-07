@@ -2,6 +2,25 @@
 
 One command to launch any AI coding agent on any cloud, pre-configured with [OpenRouter](https://openrouter.ai).
 
+## Quick Start
+
+Install the `spawn` CLI:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
+```
+
+Then launch any agent interactively:
+
+```bash
+spawn                       # Interactive picker
+spawn claude sprite         # Launch Claude Code on Sprite
+spawn aider hetzner         # Launch Aider on Hetzner Cloud
+spawn list                  # See the full matrix
+```
+
+Or run directly without installing:
+
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/{cloud}/{agent}.sh)
 ```
