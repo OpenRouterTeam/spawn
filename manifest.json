@@ -65,6 +65,23 @@
         }
       },
       "notes": "Requires WhatsApp QR code scan for authentication"
+    },
+    "aider": {
+      "name": "Aider",
+      "description": "AI pair programming in the terminal",
+      "url": "https://github.com/paul-gauthier/aider",
+      "install": "pip install aider-chat",
+      "launch": "aider --model openrouter/${MODEL_ID}",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "interactive_prompts": {
+        "model_id": {
+          "prompt": "Enter model ID",
+          "default": "openrouter/auto"
+        }
+      },
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and --model openrouter/... flag"
     }
   },
   "clouds": {
@@ -118,6 +135,9 @@
     "hetzner/nanoclaw": "implemented",
     "digitalocean/claude": "implemented",
     "digitalocean/openclaw": "implemented",
-    "digitalocean/nanoclaw": "implemented"
+    "digitalocean/nanoclaw": "implemented",
+    "sprite/aider": "implemented",
+    "hetzner/aider": "implemented",
+    "digitalocean/aider": "implemented"
   }
 }
