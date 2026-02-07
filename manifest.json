@@ -82,6 +82,18 @@
         }
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and --model openrouter/... flag"
+    },
+    "goose": {
+      "name": "Goose",
+      "description": "Block's open-source AI coding agent",
+      "url": "https://github.com/block/goose",
+      "install": "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash",
+      "launch": "goose",
+      "env": {
+        "GOOSE_PROVIDER": "openrouter",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Model-agnostic agent by Block (formerly Square), supports OpenRouter as a provider"
     }
   },
   "clouds": {
@@ -138,6 +150,9 @@
     "digitalocean/nanoclaw": "implemented",
     "sprite/aider": "implemented",
     "hetzner/aider": "implemented",
-    "digitalocean/aider": "implemented"
+    "digitalocean/aider": "implemented",
+    "sprite/goose": "implemented",
+    "hetzner/goose": "implemented",
+    "digitalocean/goose": "implemented"
   }
 }
