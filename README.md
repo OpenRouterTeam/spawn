@@ -348,3 +348,67 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 - `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
 - `LINODE_TYPE` - Instance type (default: `g6-standard-1`)
 - `LINODE_REGION` - Datacenter region (default: `us-east`)
+
+---
+
+## AWS Lightsail
+
+Spawn agents on [AWS Lightsail](https://aws.amazon.com/lightsail/) instances. Requires AWS CLI installed and configured (`aws configure`).
+
+### Usage
+
+#### Claude Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/claude.sh)
+```
+
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/nanoclaw.sh)
+```
+
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/aider.sh)
+```
+
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/goose.sh)
+```
+
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/codex.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/interpreter.sh)
+```
+
+### Non-Interactive Mode
+
+```bash
+LIGHTSAIL_SERVER_NAME=dev-mk1 \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/claude.sh)
+```
+
+**Environment Variables:**
+- `LIGHTSAIL_SERVER_NAME` - Name for the instance (skips prompt)
+- `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
+- `LIGHTSAIL_BUNDLE` - Instance bundle (default: `medium_3_0`)
+- `LIGHTSAIL_REGION` - AWS region (default: `us-east-1`)

@@ -192,6 +192,22 @@
         "region": "us-east",
         "image": "linode/ubuntu24.04"
       }
+    },
+    "aws-lightsail": {
+      "name": "AWS Lightsail",
+      "description": "AWS Lightsail instances via AWS CLI",
+      "url": "https://aws.amazon.com/lightsail/",
+      "type": "cli",
+      "auth": "aws configure (AWS credentials)",
+      "provision_method": "aws lightsail create-instances with --user-data",
+      "exec_method": "ssh ubuntu@IP",
+      "interactive_method": "ssh -t ubuntu@IP",
+      "defaults": {
+        "bundle": "medium_3_0",
+        "region": "us-east-1",
+        "blueprint": "ubuntu_24_04"
+      },
+      "notes": "Uses 'ubuntu' user instead of 'root'. Requires AWS CLI installed and configured."
     }
   },
   "matrix": {
@@ -229,6 +245,13 @@
     "hetzner/interpreter": "implemented",
     "digitalocean/interpreter": "implemented",
     "vultr/interpreter": "implemented",
-    "linode/interpreter": "implemented"
+    "linode/interpreter": "implemented",
+    "aws-lightsail/claude": "implemented",
+    "aws-lightsail/openclaw": "implemented",
+    "aws-lightsail/nanoclaw": "implemented",
+    "aws-lightsail/aider": "implemented",
+    "aws-lightsail/goose": "implemented",
+    "aws-lightsail/codex": "implemented",
+    "aws-lightsail/interpreter": "implemented"
   }
 }
