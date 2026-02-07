@@ -149,6 +149,18 @@ EOF
     rm "$bash_temp"
 }
 
+# Listen on a port with netcat (handles busybox/Termux nc requiring -p flag)
+nc_listen() {
+    local port=$1
+    shift
+    # Detect if nc requires -p flag (busybox nc on Termux)
+    if nc --help 2>&1 | grep -q "BusyBox\|busybox" || nc --help 2>&1 | grep -q "\-p "; then
+        nc -l -p "$port" "$@"
+    else
+        nc -l "$port" "$@"
+    fi
+}
+
 # Manually prompt for API key
 get_openrouter_api_key_manual() {
     echo ""
@@ -208,7 +220,7 @@ try_oauth_flow() {
             local response_file=$(mktemp)
             echo -e "$success_response" > "$response_file"
 
-            local request=$(nc -l "$callback_port" < "$response_file" 2>/dev/null | head -1)
+            local request=$(nc_listen "$callback_port" < "$response_file" 2>/dev/null | head -1)
             local nc_status=$?
             rm -f "$response_file"
 
@@ -238,13 +250,7 @@ try_oauth_flow() {
 
     # Open browser
     log_warn "Opening browser to authenticate with OpenRouter..."
-    if command -v open &> /dev/null; then
-        open "$auth_url" </dev/null
-    elif command -v xdg-open &> /dev/null; then
-        xdg-open "$auth_url" </dev/null
-    else
-        log_warn "Please open: ${auth_url}"
-    fi
+    open_browser "$auth_url"
 
     # Wait for the code file to be created (timeout after 2 minutes)
     local timeout=120
@@ -317,10 +323,12 @@ get_openrouter_api_key_oauth() {
     fi
 }
 
-# Open browser to URL
+# Open browser to URL (supports macOS, Linux, Termux)
 open_browser() {
     local url=$1
-    if command -v open &> /dev/null; then
+    if command -v termux-open-url &> /dev/null; then
+        termux-open-url "$url" </dev/null
+    elif command -v open &> /dev/null; then
         open "$url" </dev/null
     elif command -v xdg-open &> /dev/null; then
         xdg-open "$url" </dev/null
