@@ -531,28 +531,48 @@ generic_cloud_api() {
 # SSH connectivity helpers
 # ============================================================
 
-# Generic SSH wait function - polls until a remote command succeeds
-# Usage: generic_ssh_wait IP SSH_OPTS TEST_CMD DESCRIPTION MAX_ATTEMPTS INTERVAL
+# Generic SSH wait function - polls until a remote command succeeds with exponential backoff
+# Usage: generic_ssh_wait IP SSH_OPTS TEST_CMD DESCRIPTION MAX_ATTEMPTS [INITIAL_INTERVAL]
+# Implements exponential backoff: starts at INITIAL_INTERVAL (default 5s), doubles up to max 30s
+# Adds jitter (±20%) to prevent thundering herd when multiple instances retry simultaneously
 generic_ssh_wait() {
     local ip="$1"
     local ssh_opts="$2"
     local test_cmd="$3"
     local description="$4"
     local max_attempts="${5:-30}"
-    local interval="${6:-5}"
+    local initial_interval="${6:-5}"
+
     local attempt=1
+    local interval="$initial_interval"
+    local max_interval=30
+    local elapsed_time=0
 
     log_warn "Waiting for $description to $ip..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
         if ssh $ssh_opts "root@$ip" "$test_cmd" >/dev/null 2>&1; then
-            log_info "$description ready"
+            log_info "$description ready after ${elapsed_time}s (attempt $attempt)"
             return 0
         fi
-        log_warn "Waiting for $description... ($attempt/$max_attempts)"
-        sleep "$interval"
+
+        # Calculate next interval with exponential backoff
+        local next_interval=$((interval * 2))
+        if [[ "$next_interval" -gt "$max_interval" ]]; then
+            next_interval="$max_interval"
+        fi
+
+        # Add jitter: ±20% randomization to prevent thundering herd
+        # Generates random number between 0.8 and 1.2 times the interval
+        local jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+
+        log_warn "Waiting for $description... (attempt $attempt/$max_attempts, elapsed ${elapsed_time}s, retry in ${jitter}s)"
+        sleep "$jitter"
+
+        elapsed_time=$((elapsed_time + jitter))
+        interval="$next_interval"
         ((attempt++))
     done
 
-    log_error "$description failed after $max_attempts attempts"
+    log_error "$description failed after $max_attempts attempts (${elapsed_time}s elapsed)"
     return 1
 }
