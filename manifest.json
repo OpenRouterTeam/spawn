@@ -279,6 +279,34 @@
         "image_family": "ubuntu-2404-lts-amd64"
       },
       "notes": "Uses current username for SSH. Requires gcloud CLI installed and configured."
+    },
+    "e2b": {
+      "name": "E2B",
+      "description": "E2B sandboxed cloud containers via CLI/SDK",
+      "url": "https://e2b.dev",
+      "type": "sandbox",
+      "auth": "E2B_API_KEY",
+      "provision_method": "e2b sandbox create",
+      "exec_method": "e2b sandbox exec",
+      "interactive_method": "e2b sandbox exec (PTY)",
+      "defaults": {
+        "template": "base"
+      },
+      "notes": "No SSH — uses E2B CLI for exec. Sandboxes start in ~150ms. Requires npm install -g @e2b/cli."
+    },
+    "modal": {
+      "name": "Modal",
+      "description": "Modal sandboxed containers via Python SDK",
+      "url": "https://modal.com",
+      "type": "sandbox",
+      "auth": "modal setup",
+      "provision_method": "modal.Sandbox.create() via Python SDK",
+      "exec_method": "sandbox.exec() via Python SDK",
+      "interactive_method": "sandbox.exec(pty=True)",
+      "defaults": {
+        "image": "debian_slim"
+      },
+      "notes": "No SSH — uses Modal Python SDK for exec. Sub-second cold starts. Requires pip install modal."
     }
   },
   "matrix": {
@@ -361,6 +389,26 @@
     "gcp/interpreter": "implemented",
     "gcp/gemini": "implemented",
     "gcp/amazonq": "implemented",
-    "gcp/cline": "implemented"
+    "gcp/cline": "implemented",
+    "e2b/claude": "implemented",
+    "e2b/openclaw": "implemented",
+    "e2b/nanoclaw": "implemented",
+    "e2b/aider": "implemented",
+    "e2b/goose": "implemented",
+    "e2b/codex": "implemented",
+    "e2b/interpreter": "implemented",
+    "e2b/gemini": "implemented",
+    "e2b/amazonq": "implemented",
+    "e2b/cline": "implemented",
+    "modal/claude": "implemented",
+    "modal/openclaw": "implemented",
+    "modal/nanoclaw": "implemented",
+    "modal/aider": "implemented",
+    "modal/goose": "implemented",
+    "modal/codex": "implemented",
+    "modal/interpreter": "implemented",
+    "modal/gemini": "implemented",
+    "modal/amazonq": "implemented",
+    "modal/cline": "implemented"
   }
 }
