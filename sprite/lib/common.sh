@@ -137,24 +137,4 @@ inject_env_vars_sprite() {
     rm "$env_temp"
 }
 
-# Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers) are now in shared/common.sh
-
-# Validate model ID to prevent command injection
-# Model IDs should only contain alphanumeric, slash, dash, underscore, colon, dot
-validate_model_id() {
-    local model_id="$1"
-
-    # Allow empty (will use default)
-    if [[ -z "$model_id" ]]; then
-        return 0
-    fi
-
-    # Check for valid characters only: a-z A-Z 0-9 / - _ : .
-    if [[ ! "$model_id" =~ ^[a-zA-Z0-9/_:.-]+$ ]]; then
-        log_error "Invalid model ID: contains unsafe characters"
-        log_error "Model IDs should only contain: letters, numbers, /, -, _, :, ."
-        return 1
-    fi
-
-    return 0
-}
+# Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers, validate_model_id) are now in shared/common.sh
