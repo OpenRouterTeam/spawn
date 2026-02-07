@@ -26,20 +26,8 @@ readonly HETZNER_API_BASE="https://api.hetzner.cloud/v1"
 hetzner_api() {
     local method="$1"
     local endpoint="$2"
-    local body="$3"
-
-    local args=(
-        -s
-        -X "$method"
-        -H "Authorization: Bearer ${HCLOUD_TOKEN}"
-        -H "Content-Type: application/json"
-    )
-
-    if [[ -n "$body" ]]; then
-        args+=(-d "$body")
-    fi
-
-    curl "${args[@]}" "${HETZNER_API_BASE}${endpoint}"
+    local body="${3:-}"
+    generic_cloud_api "$HETZNER_API_BASE" "$HCLOUD_TOKEN" "$method" "$endpoint" "$body"
 }
 
 # Ensure HCLOUD_TOKEN is available (env var → config file → prompt+save)

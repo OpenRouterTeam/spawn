@@ -28,20 +28,8 @@ readonly DO_API_BASE="https://api.digitalocean.com/v2"
 do_api() {
     local method="$1"
     local endpoint="$2"
-    local body="$3"
-
-    local args=(
-        -s
-        -X "$method"
-        -H "Authorization: Bearer ${DO_API_TOKEN}"
-        -H "Content-Type: application/json"
-    )
-
-    if [[ -n "$body" ]]; then
-        args+=(-d "$body")
-    fi
-
-    curl "${args[@]}" "${DO_API_BASE}${endpoint}"
+    local body="${3:-}"
+    generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" "$method" "$endpoint" "$body"
 }
 
 # Ensure DO_API_TOKEN is available (env var -> config file -> prompt+save)

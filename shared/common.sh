@@ -499,6 +499,35 @@ CLOUD_INIT_EOF
 }
 
 # ============================================================
+# Cloud API helpers
+# ============================================================
+
+# Generic cloud API wrapper - centralized curl wrapper for all cloud providers
+# Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY]
+# Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" GET "/account"
+# Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" POST "/droplets" "$body"
+generic_cloud_api() {
+    local base_url="$1"
+    local auth_token="$2"
+    local method="$3"
+    local endpoint="$4"
+    local body="${5:-}"
+
+    local args=(
+        -s
+        -X "$method"
+        -H "Authorization: Bearer ${auth_token}"
+        -H "Content-Type: application/json"
+    )
+
+    if [[ -n "$body" ]]; then
+        args+=(-d "$body")
+    fi
+
+    curl "${args[@]}" "${base_url}${endpoint}"
+}
+
+# ============================================================
 # SSH connectivity helpers
 # ============================================================
 

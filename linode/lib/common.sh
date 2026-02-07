@@ -25,10 +25,8 @@ readonly LINODE_API_BASE="https://api.linode.com/v4"
 # SSH_OPTS is now defined in shared/common.sh
 
 linode_api() {
-    local method="$1" endpoint="$2" body="$3"
-    local args=(-s -X "$method" -H "Authorization: Bearer ${LINODE_API_TOKEN}" -H "Content-Type: application/json")
-    if [[ -n "$body" ]]; then args+=(-d "$body"); fi
-    curl "${args[@]}" "${LINODE_API_BASE}${endpoint}"
+    local method="$1" endpoint="$2" body="${3:-}"
+    generic_cloud_api "$LINODE_API_BASE" "$LINODE_API_TOKEN" "$method" "$endpoint" "$body"
 }
 
 ensure_linode_token() {

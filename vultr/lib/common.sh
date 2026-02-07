@@ -27,10 +27,8 @@ readonly VULTR_API_BASE="https://api.vultr.com/v2"
 vultr_api() {
     local method="$1"
     local endpoint="$2"
-    local body="$3"
-    local args=(-s -X "$method" -H "Authorization: Bearer ${VULTR_API_KEY}" -H "Content-Type: application/json")
-    if [[ -n "$body" ]]; then args+=(-d "$body"); fi
-    curl "${args[@]}" "${VULTR_API_BASE}${endpoint}"
+    local body="${3:-}"
+    generic_cloud_api "$VULTR_API_BASE" "$VULTR_API_KEY" "$method" "$endpoint" "$body"
 }
 
 ensure_vultr_token() {
