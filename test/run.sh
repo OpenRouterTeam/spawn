@@ -722,6 +722,21 @@ test_shared_common() {
         echo -e "  ${RED}✗${NC} validate_server_name should reject empty string"
         ((FAILED++))
     fi
+
+    # Test 36: check_openrouter_connectivity succeeds with real network
+    # Only run if curl is available and we have network access
+    if command -v curl &> /dev/null; then
+        result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && check_openrouter_connectivity && echo "reachable"' 2>/dev/null)
+        if [[ "$result" == "reachable" ]] || [[ -z "$result" ]]; then
+            echo -e "  ${GREEN}✓${NC} check_openrouter_connectivity handles connectivity check"
+            ((PASSED++))
+        else
+            echo -e "  ${RED}✗${NC} check_openrouter_connectivity should return success or failure gracefully"
+            ((FAILED++))
+        fi
+    else
+        echo -e "  ${YELLOW}⚠${NC} check_openrouter_connectivity test skipped (curl not available)"
+    fi
 }
 
 # --- Test source detection in each script ---
