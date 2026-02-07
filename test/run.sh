@@ -388,6 +388,251 @@ test_shared_common() {
         echo -e "  ${RED}✗${NC} extract_ssh_key_ids should return [123, 456], got '$result'"
         ((FAILED++))
     fi
+
+    # Test 11: nc_listen detects busybox nc and adds -p flag
+    result=$(bash -c '
+        source "'"$REPO_ROOT"'/shared/common.sh"
+        # Mock nc command that returns busybox help
+        nc() {
+            if [[ "$1" == "--help" ]]; then
+                echo "BusyBox nc"
+                return 0
+            fi
+            echo "nc_args: $*"
+        }
+        export -f nc
+        nc_listen 8080
+    ' 2>/dev/null)
+    if [[ "$result" == *"-l -p 8080"* ]]; then
+        echo -e "  ${GREEN}✓${NC} nc_listen adds -p flag for busybox nc"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} nc_listen should add -p flag for busybox, got '$result'"
+        ((FAILED++))
+    fi
+
+    # Test 12: nc_listen uses standard nc without -p flag
+    result=$(bash -c '
+        source "'"$REPO_ROOT"'/shared/common.sh"
+        # Mock nc command that returns non-busybox help
+        nc() {
+            if [[ "$1" == "--help" ]]; then
+                echo "OpenBSD netcat"
+                return 1
+            fi
+            echo "nc_args: $*"
+        }
+        export -f nc
+        nc_listen 8080
+    ' 2>/dev/null)
+    if [[ "$result" == *"-l 8080"* ]] && [[ "$result" != *"-p"* ]]; then
+        echo -e "  ${GREEN}✓${NC} nc_listen uses standard nc without -p flag"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} nc_listen should omit -p flag for standard nc, got '$result'"
+        ((FAILED++))
+    fi
+
+    # Test 13: open_browser detects termux-open-url
+    result=$(bash -c '
+        source "'"$REPO_ROOT"'/shared/common.sh"
+        termux-open-url() { echo "termux: $*"; }
+        export -f termux-open-url
+        open_browser "https://example.com"
+    ' 2>/dev/null)
+    if [[ "$result" == "termux: https://example.com" ]]; then
+        echo -e "  ${GREEN}✓${NC} open_browser detects termux-open-url"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} open_browser should use termux-open-url, got '$result'"
+        ((FAILED++))
+    fi
+
+    # Test 14: open_browser detects macOS open
+    result=$(bash -c '
+        source "'"$REPO_ROOT"'/shared/common.sh"
+        open() { echo "macOS: $*"; }
+        export -f open
+        open_browser "https://example.com"
+    ' 2>/dev/null)
+    if [[ "$result" == "macOS: https://example.com" ]]; then
+        echo -e "  ${GREEN}✓${NC} open_browser detects macOS open"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} open_browser should use macOS open, got '$result'"
+        ((FAILED++))
+    fi
+
+    # Test 15: open_browser detects xdg-open
+    result=$(bash -c '
+        source "'"$REPO_ROOT"'/shared/common.sh"
+        xdg-open() { echo "xdg: $*"; }
+        export -f xdg-open
+        open_browser "https://example.com"
+    ' 2>/dev/null)
+    if [[ "$result" == "xdg: https://example.com" ]]; then
+        echo -e "  ${GREEN}✓${NC} open_browser detects xdg-open"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} open_browser should use xdg-open, got '$result'"
+        ((FAILED++))
+    fi
+
+    # Test 16: get_cloud_init_userdata returns valid YAML
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && get_cloud_init_userdata' 2>/dev/null)
+    if [[ "$result" == *"#cloud-config"* ]] && [[ "$result" == *"package_update"* ]]; then
+        echo -e "  ${GREEN}✓${NC} get_cloud_init_userdata returns valid YAML"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} get_cloud_init_userdata should return cloud-init YAML"
+        ((FAILED++))
+    fi
+
+    # Test 17: get_cloud_init_userdata includes required packages
+    if [[ "$result" == *"curl"* ]] && [[ "$result" == *"git"* ]] && [[ "$result" == *"zsh"* ]]; then
+        echo -e "  ${GREEN}✓${NC} get_cloud_init_userdata includes required packages"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} get_cloud_init_userdata should include curl, git, zsh"
+        ((FAILED++))
+    fi
+
+    # Test 18: get_cloud_init_userdata includes Bun and Claude installation
+    if [[ "$result" == *"bun.sh/install"* ]] && [[ "$result" == *"claude.ai/install"* ]]; then
+        echo -e "  ${GREEN}✓${NC} get_cloud_init_userdata includes Bun and Claude installation"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} get_cloud_init_userdata should include Bun and Claude install"
+        ((FAILED++))
+    fi
+
+    # Test 19: create_oauth_response_html returns valid HTTP response
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && create_oauth_response_html' 2>/dev/null)
+    if [[ "$result" == *"HTTP/1.1 200 OK"* ]] && [[ "$result" == *"Authentication Successful"* ]]; then
+        echo -e "  ${GREEN}✓${NC} create_oauth_response_html returns valid HTTP response"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} create_oauth_response_html should return HTTP 200 response"
+        ((FAILED++))
+    fi
+
+    # Test 20: wait_for_oauth_code returns success when file exists
+    local code_test_file="$TEST_DIR/oauth_code_test"
+    echo "test_code" > "$code_test_file"
+    rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && wait_for_oauth_code "'"$code_test_file"'" 1' >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} wait_for_oauth_code returns success when file exists"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} wait_for_oauth_code should return 0 when file exists"
+        ((FAILED++))
+    fi
+
+    # Test 21: wait_for_oauth_code returns failure on timeout
+    local missing_file="$TEST_DIR/missing_oauth_code"
+    rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && wait_for_oauth_code "'"$missing_file"'" 1' >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} wait_for_oauth_code returns failure on timeout"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} wait_for_oauth_code should return non-zero on timeout"
+        ((FAILED++))
+    fi
+
+    # Test 22: cleanup_oauth_session removes directory
+    local cleanup_test_dir="$TEST_DIR/oauth_cleanup_test"
+    mkdir -p "$cleanup_test_dir"
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && cleanup_oauth_session "" "'"$cleanup_test_dir"'"' >/dev/null 2>&1
+    if [[ ! -d "$cleanup_test_dir" ]]; then
+        echo -e "  ${GREEN}✓${NC} cleanup_oauth_session removes directory"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} cleanup_oauth_session should remove directory"
+        ((FAILED++))
+    fi
+
+    # Test 23: generic_ssh_wait succeeds when command passes
+    result=$(bash -c '
+        source "'"$REPO_ROOT"'/shared/common.sh"
+        # Mock ssh that always succeeds
+        ssh() { return 0; }
+        export -f ssh
+        generic_ssh_wait "1.2.3.4" "-o Test" "true" "test" 2 1 2>&1
+        echo $?
+    ' 2>/dev/null | tail -1)
+    if [[ "$result" == "0" ]]; then
+        echo -e "  ${GREEN}✓${NC} generic_ssh_wait succeeds when command passes"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} generic_ssh_wait should return 0 on success, got '$result'"
+        ((FAILED++))
+    fi
+
+    # Test 24: generic_ssh_wait fails after max attempts
+    result=$(bash -c '
+        source "'"$REPO_ROOT"'/shared/common.sh"
+        # Mock ssh that always fails
+        ssh() { return 1; }
+        export -f ssh
+        generic_ssh_wait "1.2.3.4" "-o Test" "false" "test" 2 1 2>&1
+        echo $?
+    ' 2>/dev/null | tail -1)
+    if [[ "$result" == "1" ]]; then
+        echo -e "  ${GREEN}✓${NC} generic_ssh_wait fails after max attempts"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} generic_ssh_wait should return 1 after max attempts, got '$result'"
+        ((FAILED++))
+    fi
+
+    # Test 25: safe_read fails when no TTY available
+    rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && safe_read "test: "' </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} safe_read fails when no TTY available"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} safe_read should fail without TTY"
+        ((FAILED++))
+    fi
+
+    # Test 26: validate_model_id accepts openrouter/auto
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_model_id "openrouter/auto" && echo "valid"' 2>/dev/null)
+    if [[ "$result" == "valid" ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_model_id accepts openrouter/auto"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_model_id should accept 'openrouter/auto'"
+        ((FAILED++))
+    fi
+
+    # Test 27: validate_model_id accepts model IDs with colons
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_model_id "provider/model:version" && echo "valid"' 2>/dev/null)
+    if [[ "$result" == "valid" ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_model_id accepts model IDs with colons"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_model_id should accept colons in model IDs"
+        ((FAILED++))
+    fi
+
+    # Test 28: validate_model_id rejects shell metacharacters
+    local dangerous_chars=('$' '&' '|' '`' '>' '<' '(' ')' '{' '}')
+    local rejected_count=0
+    for char in "${dangerous_chars[@]}"; do
+        rc=0
+        bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_model_id "bad'"$char"'model"' </dev/null >/dev/null 2>&1 || rc=$?
+        [[ "$rc" -ne 0 ]] && ((rejected_count++))
+    done
+    if [[ "$rejected_count" -eq "${#dangerous_chars[@]}" ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_model_id rejects shell metacharacters"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_model_id should reject all shell metacharacters ($rejected_count/${#dangerous_chars[@]})"
+        ((FAILED++))
+    fi
 }
 
 # --- Test source detection in each script ---
