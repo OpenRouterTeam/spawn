@@ -1,0 +1,105 @@
+{
+  "agents": {
+    "claude": {
+      "name": "Claude Code",
+      "description": "Anthropic's CLI coding agent",
+      "url": "https://claude.ai",
+      "install": "curl -fsSL https://claude.ai/install.sh | bash",
+      "launch": "claude",
+      "env": {
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+        "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}",
+        "ANTHROPIC_API_KEY": "",
+        "CLAUDE_CODE_SKIP_ONBOARDING": "1",
+        "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
+      },
+      "config_files": {
+        "~/.claude/settings.json": {
+          "theme": "dark",
+          "permissions": {
+            "defaultMode": "bypassPermissions",
+            "dangerouslySkipPermissions": true
+          }
+        },
+        "~/.claude.json": {
+          "hasCompletedOnboarding": true,
+          "bypassPermissionsModeAccepted": true
+        }
+      }
+    },
+    "openclaw": {
+      "name": "OpenClaw",
+      "description": "OpenRouter's agent framework with gateway + TUI",
+      "url": "https://github.com/OpenRouterTeam/openclaw",
+      "install": "bun install -g openclaw",
+      "launch": "openclaw tui",
+      "pre_launch": "nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "ANTHROPIC_API_KEY": "${OPENROUTER_API_KEY}",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "interactive_prompts": {
+        "model_id": {
+          "prompt": "Enter model ID",
+          "default": "openrouter/auto"
+        }
+      }
+    },
+    "nanoclaw": {
+      "name": "NanoClaw",
+      "description": "WhatsApp-based AI agent",
+      "url": "https://github.com/gavrielc/nanoclaw",
+      "install": "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build",
+      "launch": "cd ~/nanoclaw && npm run dev",
+      "deps": ["tsx"],
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "ANTHROPIC_API_KEY": "${OPENROUTER_API_KEY}",
+        "ANTHROPIC_BASE_URL": "https://openrouter.ai/api"
+      },
+      "dotenv": {
+        "path": "~/nanoclaw/.env",
+        "values": {
+          "ANTHROPIC_API_KEY": "${OPENROUTER_API_KEY}"
+        }
+      },
+      "notes": "Requires WhatsApp QR code scan for authentication"
+    }
+  },
+  "clouds": {
+    "sprite": {
+      "name": "Sprite",
+      "description": "Sprites.dev managed VMs with CLI",
+      "url": "https://sprites.dev",
+      "type": "cli",
+      "auth": "sprite login",
+      "provision_method": "sprite create",
+      "exec_method": "sprite exec",
+      "interactive_method": "sprite exec -tty"
+    },
+    "hetzner": {
+      "name": "Hetzner Cloud",
+      "description": "Hetzner Cloud servers via REST API",
+      "url": "https://www.hetzner.com/cloud/",
+      "type": "api",
+      "auth": "HCLOUD_TOKEN",
+      "provision_method": "POST /v1/servers with cloud-init",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "server_type": "cx22",
+        "location": "fsn1",
+        "image": "ubuntu-24.04"
+      }
+    }
+  },
+  "matrix": {
+    "sprite/claude": "implemented",
+    "sprite/openclaw": "implemented",
+    "sprite/nanoclaw": "implemented",
+    "hetzner/claude": "implemented",
+    "hetzner/openclaw": "missing",
+    "hetzner/nanoclaw": "missing"
+  }
+}
