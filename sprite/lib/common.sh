@@ -1,11 +1,14 @@
 #!/bin/bash
 # Common bash functions shared between spawn scripts
 
+# Bash safety flags
+set -euo pipefail
+
 # Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly NC='\033[0m' # No Color
 
 # Print colored message (to stderr so they don't pollute command substitution output)
 log_info() {
