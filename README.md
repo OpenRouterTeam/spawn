@@ -67,6 +67,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/amazonq.sh)
 ```
 For automation or CI/CD, set environment variables:
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/cline.sh)
+```
 #### Claude Code
 
 ```bash
@@ -164,6 +169,11 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/claude.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/cline.sh)
+```
 **Environment Variables:**
 - `HETZNER_SERVER_NAME` - Name for the server (skips prompt)
 - `HCLOUD_TOKEN` - Hetzner Cloud API token (skips prompt, saved to `~/.config/spawn/hetzner.json`)
@@ -240,6 +250,11 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/claude.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/cline.sh)
+```
 **Environment Variables:**
 - `DO_DROPLET_NAME` - Name for the droplet (skips prompt)
 - `DO_API_TOKEN` - DigitalOcean API token (skips prompt, saved to `~/.config/spawn/digitalocean.json`)
@@ -316,6 +331,11 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/claude.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/cline.sh)
+```
 **Environment Variables:**
 - `VULTR_SERVER_NAME` - Name for the instance (skips prompt)
 - `VULTR_API_KEY` - Vultr API key (skips prompt, saved to `~/.config/spawn/vultr.json`)
@@ -392,6 +412,11 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/claude.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/cline.sh)
+```
 **Environment Variables:**
 - `LINODE_SERVER_NAME` - Label for the Linode (skips prompt)
 - `LINODE_API_TOKEN` - Linode API token (skips prompt, saved to `~/.config/spawn/linode.json`)
@@ -467,6 +492,11 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/claude.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/cline.sh)
+```
 **Environment Variables:**
 - `LIGHTSAIL_SERVER_NAME` - Name for the instance (skips prompt)
 - `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
@@ -536,6 +566,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/amazonq.sh)
 ```
 ### Non-Interactive Mode
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/cline.sh)
+```
 ```bash
 LAMBDA_SERVER_NAME=dev-mk1 \
 LAMBDA_API_KEY=your-lambda-api-key \
