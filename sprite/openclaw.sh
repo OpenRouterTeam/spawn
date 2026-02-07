@@ -65,26 +65,33 @@ run_sprite "$SPRITE_NAME" "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
 # Generate a random gateway token
 GATEWAY_TOKEN=$(openssl rand -hex 16)
 
-OPENCLAW_CONFIG='{
+# Create config file locally first, then upload
+OPENCLAW_CONFIG_TEMP=$(mktemp)
+chmod 600 "$OPENCLAW_CONFIG_TEMP"
+cat > "$OPENCLAW_CONFIG_TEMP" << EOF
+{
   "env": {
-    "OPENROUTER_API_KEY": "'"$OPENROUTER_API_KEY"'"
+    "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
   },
   "gateway": {
     "mode": "local",
     "auth": {
-      "token": "'"$GATEWAY_TOKEN"'"
+      "token": "${GATEWAY_TOKEN}"
     }
   },
   "agents": {
     "defaults": {
       "model": {
-        "primary": "openrouter/'"$MODEL_ID"'"
+        "primary": "openrouter/${MODEL_ID}"
       }
     }
   }
-}'
+}
+EOF
 
-run_sprite "$SPRITE_NAME" "echo '$OPENCLAW_CONFIG' > ~/.openclaw/openclaw.json"
+# Upload config file securely
+sprite exec -s "$SPRITE_NAME" -file "$OPENCLAW_CONFIG_TEMP:/tmp/openclaw_config.json" -- bash -c "mv /tmp/openclaw_config.json ~/.openclaw/openclaw.json"
+rm "$OPENCLAW_CONFIG_TEMP"
 
 echo ""
 log_info "✅ Sprite setup completed successfully!"

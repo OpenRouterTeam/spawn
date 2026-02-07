@@ -37,6 +37,7 @@ log_warn "Configuring openclaw..."
 run_server "$LINODE_SERVER_IP" "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
 GATEWAY_TOKEN=$(openssl rand -hex 16)
 OPENCLAW_CONFIG_TEMP=$(mktemp)
+chmod 600 "$OPENCLAW_CONFIG_TEMP"
 cat > "$OPENCLAW_CONFIG_TEMP" << EOF
 {
   "env": { "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}" },
