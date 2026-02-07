@@ -53,6 +53,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/interpreter.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/gemini.sh)
+```
 ### Non-Interactive Mode
 
 For automation or CI/CD, set environment variables:
@@ -135,6 +140,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/interpreter.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/gemini.sh)
+```
 ### Non-Interactive Mode
 
 ```bash
@@ -201,6 +211,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/interpreter.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/gemini.sh)
+```
 ### Non-Interactive Mode
 
 ```bash
@@ -267,6 +282,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/interpreter.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/gemini.sh)
+```
 ### Non-Interactive Mode
 
 ```bash
@@ -333,6 +353,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/interpreter.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/gemini.sh)
+```
 ### Non-Interactive Mode
 
 ```bash
@@ -399,6 +424,11 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/interpreter.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/aws-lightsail/gemini.sh)
+```
 ### Non-Interactive Mode
 
 ```bash
