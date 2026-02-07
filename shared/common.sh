@@ -340,13 +340,50 @@ inject_env_vars_ssh() {
 
     local env_temp=$(mktemp)
     chmod 600 "$env_temp"
+    track_temp_file "$env_temp"
 
     generate_env_config "$@" > "$env_temp"
 
     # Upload and append to .zshrc
     "$upload_func" "$server_ip" "$env_temp" "/tmp/env_config"
     "$run_func" "$server_ip" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-    rm "$env_temp"
+
+    # Note: temp file will be cleaned up by trap handler
+}
+
+# ============================================================
+# Resource cleanup trap handlers
+# ============================================================
+
+# Array to track temporary files for cleanup
+CLEANUP_TEMP_FILES=()
+
+# Track a temporary file for cleanup on exit
+# Usage: track_temp_file PATH
+track_temp_file() {
+    local temp_file="$1"
+    CLEANUP_TEMP_FILES+=("$temp_file")
+}
+
+# Cleanup function for temporary files
+# Called automatically on EXIT, INT, TERM signals
+cleanup_temp_files() {
+    local exit_code=$?
+
+    for temp_file in "${CLEANUP_TEMP_FILES[@]}"; do
+        if [[ -f "$temp_file" ]]; then
+            # Securely remove temp files (may contain credentials)
+            shred -f -u "$temp_file" 2>/dev/null || rm -f "$temp_file"
+        fi
+    done
+
+    return $exit_code
+}
+
+# Register cleanup trap handler
+# Call this at the start of scripts that create temp files
+register_cleanup_trap() {
+    trap cleanup_temp_files EXIT INT TERM
 }
 
 # ============================================================
