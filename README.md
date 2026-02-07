@@ -29,6 +29,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/nanoclaw.sh)
 ```
 
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/aider.sh)
+```
+
 ### Non-Interactive Mode
 
 For automation or CI/CD, set environment variables:
@@ -87,6 +93,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/nanoclaw.sh)
 ```
 
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/aider.sh)
+```
+
 ### Non-Interactive Mode
 
 ```bash
@@ -127,6 +139,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/openclaw.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/nanoclaw.sh)
+```
+
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/aider.sh)
 ```
 
 ### Non-Interactive Mode
