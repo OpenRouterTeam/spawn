@@ -291,6 +291,51 @@ get_openrouter_api_key_oauth() {
 }
 
 # ============================================================
+# SSH key management helpers
+# ============================================================
+
+# Generate SSH key if it doesn't exist
+# Usage: generate_ssh_key_if_missing KEY_PATH
+generate_ssh_key_if_missing() {
+    local key_path="$1"
+    if [[ -f "$key_path" ]]; then
+        return 0
+    fi
+    log_warn "Generating SSH key..."
+    mkdir -p "$(dirname "$key_path")"
+    ssh-keygen -t ed25519 -f "$key_path" -N "" -q
+    log_info "SSH key generated at $key_path"
+}
+
+# Get MD5 fingerprint of SSH public key
+# Usage: get_ssh_fingerprint PUB_KEY_PATH
+get_ssh_fingerprint() {
+    local pub_path="$1"
+    ssh-keygen -lf "$pub_path" -E md5 2>/dev/null | awk '{print $2}' | sed 's/MD5://'
+}
+
+# JSON-escape a string (for embedding in JSON bodies)
+# Usage: json_escape STRING
+json_escape() {
+    local string="$1"
+    python3 -c "import json; print(json.dumps('$string'))" 2>/dev/null || echo "\"$string\""
+}
+
+# Extract SSH key IDs from cloud provider API response
+# Usage: extract_ssh_key_ids API_RESPONSE KEY_FIELD
+# KEY_FIELD: "ssh_keys" (DigitalOcean/Vultr) or "data" (Linode)
+extract_ssh_key_ids() {
+    local api_response="$1"
+    local key_field="${2:-ssh_keys}"
+    python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+ids = [k['id'] for k in data.get('$key_field', [])]
+print(json.dumps(ids))
+" <<< "$api_response"
+}
+
+# ============================================================
 # SSH connectivity helpers
 # ============================================================
 

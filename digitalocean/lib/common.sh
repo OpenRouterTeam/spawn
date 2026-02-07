@@ -103,29 +103,22 @@ ensure_ssh_key() {
     local key_path="$HOME/.ssh/id_ed25519"
     local pub_path="${key_path}.pub"
 
-    # Generate SSH key if it doesn't exist
-    if [[ ! -f "$key_path" ]]; then
-        log_warn "Generating SSH key..."
-        mkdir -p "$HOME/.ssh"
-        ssh-keygen -t ed25519 -f "$key_path" -N "" -q
-        log_info "SSH key generated at $key_path"
-    fi
+    # Generate key if needed
+    generate_ssh_key_if_missing "$key_path"
 
-    local pub_key=$(cat "$pub_path")
-    local key_name="spawn-$(hostname)-$(date +%s)"
-
-    # Check if this key is already registered
-    local existing_fingerprint=$(ssh-keygen -lf "$pub_path" -E md5 2>/dev/null | awk '{print $2}' | sed 's/MD5://')
+    # Check if already registered
+    local fingerprint=$(get_ssh_fingerprint "$pub_path")
     local existing_keys=$(do_api GET "/account/keys")
-
-    if echo "$existing_keys" | grep -q "$existing_fingerprint"; then
+    if echo "$existing_keys" | grep -q "$fingerprint"; then
         log_info "SSH key already registered with DigitalOcean"
         return 0
     fi
 
     # Register the key
     log_warn "Registering SSH key with DigitalOcean..."
-    local json_pub_key=$(python3 -c "import json; print(json.dumps('$pub_key'))" 2>/dev/null || echo "\"$pub_key\"")
+    local key_name="spawn-$(hostname)-$(date +%s)"
+    local pub_key=$(cat "$pub_path")
+    local json_pub_key=$(json_escape "$pub_key")
     local register_body="{\"name\":\"$key_name\",\"public_key\":$json_pub_key}"
     local register_response=$(do_api POST "/account/keys" "$register_body")
 
@@ -192,12 +185,7 @@ create_server() {
 
     # Get all SSH key IDs
     local ssh_keys_response=$(do_api GET "/account/keys")
-    local ssh_key_ids=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-ids = [k['id'] for k in data.get('ssh_keys', [])]
-print(json.dumps(ids))
-" <<< "$ssh_keys_response")
+    local ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
     # JSON-escape the cloud-init userdata
     local userdata=$(get_cloud_init_userdata)

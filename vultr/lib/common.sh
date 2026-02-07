@@ -79,24 +79,26 @@ EOF
 ensure_ssh_key() {
     local key_path="$HOME/.ssh/id_ed25519"
     local pub_path="${key_path}.pub"
-    if [[ ! -f "$key_path" ]]; then
-        log_warn "Generating SSH key..."
-        mkdir -p "$HOME/.ssh"
-        ssh-keygen -t ed25519 -f "$key_path" -N "" -q
-        log_info "SSH key generated at $key_path"
-    fi
-    local pub_key=$(cat "$pub_path")
+
+    # Generate key if needed
+    generate_ssh_key_if_missing "$key_path"
+
+    # Check if already registered
+    local fingerprint=$(get_ssh_fingerprint "$pub_path")
     local existing_keys=$(vultr_api GET "/ssh-keys")
-    local existing_fingerprint=$(ssh-keygen -lf "$pub_path" -E md5 2>/dev/null | awk '{print $2}' | sed 's/MD5://')
-    if echo "$existing_keys" | grep -q "$existing_fingerprint"; then
+    if echo "$existing_keys" | grep -q "$fingerprint"; then
         log_info "SSH key already registered with Vultr"
         return 0
     fi
+
+    # Register the key
     log_warn "Registering SSH key with Vultr..."
     local key_name="spawn-$(hostname)-$(date +%s)"
-    local json_pub_key=$(python3 -c "import json; print(json.dumps('$pub_key'))" 2>/dev/null || echo "\"$pub_key\"")
+    local pub_key=$(cat "$pub_path")
+    local json_pub_key=$(json_escape "$pub_key")
     local register_body="{\"name\":\"$key_name\",\"ssh_key\":$json_pub_key}"
     local register_response=$(vultr_api POST "/ssh-keys" "$register_body")
+
     if echo "$register_response" | grep -q '"ssh_key"'; then
         log_info "SSH key registered with Vultr"
     else
@@ -150,12 +152,7 @@ create_server() {
 
     # Get all SSH key IDs
     local ssh_keys_response=$(vultr_api GET "/ssh-keys")
-    local ssh_key_ids=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-ids = [k['id'] for k in data.get('ssh_keys', [])]
-print(json.dumps(ids))
-" <<< "$ssh_keys_response")
+    local ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
     local userdata=$(get_cloud_init_userdata)
     local userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
