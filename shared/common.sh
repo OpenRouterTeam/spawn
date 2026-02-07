@@ -291,6 +291,14 @@ get_openrouter_api_key_oauth() {
 }
 
 # ============================================================
+# SSH configuration
+# ============================================================
+
+# Default SSH options for all cloud providers
+# Clouds can override this if they need provider-specific settings
+readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
+
+# ============================================================
 # SSH key management helpers
 # ============================================================
 

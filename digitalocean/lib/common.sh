@@ -22,7 +22,7 @@ source "$SCRIPT_DIR/../../shared/common.sh" || {
 # ============================================================
 
 readonly DO_API_BASE="https://api.digitalocean.com/v2"
-readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
+# SSH_OPTS is now defined in shared/common.sh
 
 # Centralized curl wrapper for DigitalOcean API
 do_api() {

@@ -22,7 +22,7 @@ source "$SCRIPT_DIR/../../shared/common.sh" || {
 # ============================================================
 
 readonly VULTR_API_BASE="https://api.vultr.com/v2"
-readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
+# SSH_OPTS is now defined in shared/common.sh
 
 vultr_api() {
     local method="$1"

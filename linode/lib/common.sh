@@ -22,7 +22,7 @@ source "$SCRIPT_DIR/../../shared/common.sh" || {
 # ============================================================
 
 readonly LINODE_API_BASE="https://api.linode.com/v4"
-readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
+# SSH_OPTS is now defined in shared/common.sh
 
 linode_api() {
     local method="$1" endpoint="$2" body="$3"
