@@ -272,6 +272,124 @@ test_common_source() {
     fi
 }
 
+# --- Test shared/common.sh functions ---
+test_shared_common() {
+    echo ""
+    echo -e "${YELLOW}━━━ Testing shared/common.sh ━━━${NC}"
+
+    # Test 1: validate_model_id accepts valid model IDs
+    local result
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_model_id "anthropic/claude-3.5-sonnet" && echo "valid"' 2>/dev/null)
+    if [[ "$result" == "valid" ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_model_id accepts valid model IDs"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_model_id should accept 'anthropic/claude-3.5-sonnet'"
+        ((FAILED++))
+    fi
+
+    # Test 2: validate_model_id rejects invalid characters
+    local rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_model_id "bad;model"' </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_model_id rejects invalid characters"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_model_id should reject 'bad;model'"
+        ((FAILED++))
+    fi
+
+    # Test 3: validate_model_id accepts empty string
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_model_id "" && echo "valid"' 2>/dev/null)
+    if [[ "$result" == "valid" ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_model_id accepts empty string"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_model_id should accept empty string"
+        ((FAILED++))
+    fi
+
+    # Test 4: json_escape handles special characters
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && json_escape "test\"quote"' 2>/dev/null)
+    if [[ "$result" == *'\\"'* ]] || [[ "$result" == *'\"'* ]]; then
+        echo -e "  ${GREEN}✓${NC} json_escape handles special characters"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} json_escape should escape quotes"
+        ((FAILED++))
+    fi
+
+    # Test 5: generate_ssh_key_if_missing creates key if missing
+    local test_key="$TEST_DIR/test_id_ed25519"
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && generate_ssh_key_if_missing "'"$test_key"'"' >/dev/null 2>&1
+    if [[ -f "$test_key" && -f "${test_key}.pub" ]]; then
+        echo -e "  ${GREEN}✓${NC} generate_ssh_key_if_missing creates key"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} generate_ssh_key_if_missing should create key at $test_key"
+        ((FAILED++))
+    fi
+
+    # Test 6: generate_ssh_key_if_missing skips if key exists
+    local mtime_before=$(stat -c %Y "$test_key" 2>/dev/null || stat -f %m "$test_key" 2>/dev/null)
+    sleep 1
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && generate_ssh_key_if_missing "'"$test_key"'"' >/dev/null 2>&1
+    local mtime_after=$(stat -c %Y "$test_key" 2>/dev/null || stat -f %m "$test_key" 2>/dev/null)
+    if [[ "$mtime_before" == "$mtime_after" ]]; then
+        echo -e "  ${GREEN}✓${NC} generate_ssh_key_if_missing skips existing key"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} generate_ssh_key_if_missing should not recreate existing key"
+        ((FAILED++))
+    fi
+
+    # Test 7: get_ssh_fingerprint returns fingerprint
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && get_ssh_fingerprint "'"${test_key}.pub"'"' 2>/dev/null)
+    if [[ -n "$result" && "$result" =~ ^[a-f0-9:]+$ ]]; then
+        echo -e "  ${GREEN}✓${NC} get_ssh_fingerprint returns valid fingerprint"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} get_ssh_fingerprint should return hex fingerprint, got '$result'"
+        ((FAILED++))
+    fi
+
+    # Test 8: Syntax check for shared/common.sh
+    if bash -n "$REPO_ROOT/shared/common.sh" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${NC} shared/common.sh syntax valid"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} shared/common.sh has syntax errors"
+        ((FAILED++))
+    fi
+
+    # Test 9: All logging functions exist in shared/common.sh
+    output=$(bash -c '
+        source "'"$REPO_ROOT"'/shared/common.sh"
+        for fn in log_info log_warn log_error; do
+            type "$fn" &>/dev/null && echo "OK:$fn" || echo "MISSING:$fn"
+        done
+    ' 2>/dev/null)
+    missing=$(echo "$output" | grep "^MISSING:" || true)
+    if [[ -z "$missing" ]]; then
+        echo -e "  ${GREEN}✓${NC} All logging functions exist in shared/common.sh"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} Missing logging functions: $missing"
+        ((FAILED++))
+    fi
+
+    # Test 10: extract_ssh_key_ids parses JSON correctly
+    local mock_json='{"ssh_keys":[{"id":123},{"id":456}]}'
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && echo '"'$mock_json'"' | extract_ssh_key_ids "$(cat)" "ssh_keys"' 2>/dev/null)
+    if [[ "$result" == "[123, 456]" ]] || [[ "$result" == "[123,456]" ]]; then
+        echo -e "  ${GREEN}✓${NC} extract_ssh_key_ids parses JSON correctly"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} extract_ssh_key_ids should return [123, 456], got '$result'"
+        ((FAILED++))
+    fi
+}
+
 # --- Test source detection in each script ---
 test_source_detection() {
     echo ""
@@ -315,6 +433,7 @@ setup_mocks
 setup_extra_mocks
 
 test_common_source
+test_shared_common
 test_source_detection
 
 # Run per-script tests

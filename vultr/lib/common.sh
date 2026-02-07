@@ -125,24 +125,7 @@ get_server_name() {
     echo "$server_name"
 }
 
-get_cloud_init_userdata() {
-    cat << 'CLOUD_INIT_EOF'
-#cloud-config
-package_update: true
-packages:
-  - curl
-  - unzip
-  - git
-  - zsh
-
-runcmd:
-  - su - root -c 'curl -fsSL https://bun.sh/install | bash'
-  - su - root -c 'curl -fsSL https://claude.ai/install.sh | bash'
-  - echo 'export PATH="$HOME/.claude/local/bin:$HOME/.bun/bin:$PATH"' >> /root/.bashrc
-  - echo 'export PATH="$HOME/.claude/local/bin:$HOME/.bun/bin:$PATH"' >> /root/.zshrc
-  - touch /root/.cloud-init-complete
-CLOUD_INIT_EOF
-}
+# get_cloud_init_userdata is now defined in shared/common.sh
 
 create_server() {
     local name="$1"

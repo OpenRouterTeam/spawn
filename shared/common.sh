@@ -344,6 +344,37 @@ print(json.dumps(ids))
 }
 
 # ============================================================
+# Cloud provisioning helpers
+# ============================================================
+
+# Generate cloud-init userdata YAML for server provisioning
+# This is the default userdata used by all cloud providers
+# Clouds can override this function if they need provider-specific cloud-init config
+get_cloud_init_userdata() {
+    cat << 'CLOUD_INIT_EOF'
+#cloud-config
+package_update: true
+packages:
+  - curl
+  - unzip
+  - git
+  - zsh
+
+runcmd:
+  # Install Bun
+  - su - root -c 'curl -fsSL https://bun.sh/install | bash'
+  # Install Claude Code
+  - su - root -c 'curl -fsSL https://claude.ai/install.sh | bash'
+  # Configure PATH in .bashrc
+  - echo 'export PATH="$HOME/.claude/local/bin:$HOME/.bun/bin:$PATH"' >> /root/.bashrc
+  # Configure PATH in .zshrc
+  - echo 'export PATH="$HOME/.claude/local/bin:$HOME/.bun/bin:$PATH"' >> /root/.zshrc
+  # Signal completion
+  - touch /root/.cloud-init-complete
+CLOUD_INIT_EOF
+}
+
+# ============================================================
 # SSH connectivity helpers
 # ============================================================
 
