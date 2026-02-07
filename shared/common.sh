@@ -554,28 +554,106 @@ CLOUD_INIT_EOF
 # ============================================================
 
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
-# Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY]
+# Includes automatic retry logic with exponential backoff for transient failures
+# Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY] [MAX_RETRIES]
 # Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" GET "/account"
 # Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" POST "/droplets" "$body"
+# Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" GET "/account" "" 5
+# Retries on: 429 (rate limit), 503 (service unavailable), network errors
 generic_cloud_api() {
     local base_url="$1"
     local auth_token="$2"
     local method="$3"
     local endpoint="$4"
     local body="${5:-}"
+    local max_retries="${6:-3}"
 
-    local args=(
-        -s
-        -X "$method"
-        -H "Authorization: Bearer ${auth_token}"
-        -H "Content-Type: application/json"
-    )
+    local attempt=1
+    local interval=2
+    local max_interval=30
 
-    if [[ -n "$body" ]]; then
-        args+=(-d "$body")
-    fi
+    while [[ "$attempt" -le "$max_retries" ]]; do
+        local args=(
+            -s
+            -w "\n%{http_code}"
+            -X "$method"
+            -H "Authorization: Bearer ${auth_token}"
+            -H "Content-Type: application/json"
+        )
 
-    curl "${args[@]}" "${base_url}${endpoint}"
+        if [[ -n "$body" ]]; then
+            args+=(-d "$body")
+        fi
+
+        local response=$(curl "${args[@]}" "${base_url}${endpoint}" 2>&1)
+        local curl_exit_code=$?
+
+        # Extract HTTP status code (last line) and response body (everything else)
+        local http_code=$(echo "$response" | tail -1)
+        local response_body=$(echo "$response" | head -n -1)
+
+        # Check for network errors (curl exit code != 0)
+        if [[ $curl_exit_code -ne 0 ]]; then
+            if [[ "$attempt" -ge "$max_retries" ]]; then
+                log_error "Cloud API network error after $max_retries attempts: curl exit code $curl_exit_code"
+                return 1
+            fi
+
+            # Calculate next interval with exponential backoff
+            local next_interval=$((interval * 2))
+            if [[ "$next_interval" -gt "$max_interval" ]]; then
+                next_interval="$max_interval"
+            fi
+
+            # Add jitter: ±20% randomization
+            local jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+
+            log_warn "Cloud API network error (attempt $attempt/$max_retries), retrying in ${jitter}s..."
+            sleep "$jitter"
+
+            interval="$next_interval"
+            ((attempt++))
+            continue
+        fi
+
+        # Check for transient HTTP errors that should be retried
+        if [[ "$http_code" == "429" ]] || [[ "$http_code" == "503" ]]; then
+            if [[ "$attempt" -ge "$max_retries" ]]; then
+                log_error "Cloud API returned HTTP $http_code after $max_retries attempts"
+                echo "$response_body"
+                return 1
+            fi
+
+            # Calculate next interval with exponential backoff
+            local next_interval=$((interval * 2))
+            if [[ "$next_interval" -gt "$max_interval" ]]; then
+                next_interval="$max_interval"
+            fi
+
+            # Add jitter: ±20% randomization
+            local jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+
+            local error_msg="rate limit"
+            if [[ "$http_code" == "503" ]]; then
+                error_msg="service unavailable"
+            fi
+
+            log_warn "Cloud API returned $error_msg (HTTP $http_code, attempt $attempt/$max_retries), retrying in ${jitter}s..."
+            sleep "$jitter"
+
+            interval="$next_interval"
+            ((attempt++))
+            continue
+        fi
+
+        # Success or non-retryable error - return response body
+        echo "$response_body"
+        return 0
+    done
+
+    # Should not reach here, but fail safe
+    log_error "Cloud API retry logic exhausted"
+    return 1
 }
 
 # ============================================================

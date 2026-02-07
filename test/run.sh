@@ -645,6 +645,83 @@ test_shared_common() {
         echo -e "  ${RED}✗${NC} validate_model_id should reject all shell metacharacters ($rejected_count/${#dangerous_chars[@]})"
         ((FAILED++))
     fi
+
+    # Test 29: validate_server_name accepts valid names
+    result=$(bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_server_name "dev-server-01" && echo "valid"' 2>/dev/null)
+    if [[ "$result" == "valid" ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_server_name accepts valid names"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_server_name should accept 'dev-server-01'"
+        ((FAILED++))
+    fi
+
+    # Test 30: validate_server_name rejects names too short
+    rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_server_name "ab"' </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_server_name rejects names too short"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_server_name should reject names < 3 characters"
+        ((FAILED++))
+    fi
+
+    # Test 31: validate_server_name rejects names too long
+    rc=0
+    local long_name=$(printf 'a%.0s' {1..64})
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_server_name "'"$long_name"'"' </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_server_name rejects names too long"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_server_name should reject names > 63 characters"
+        ((FAILED++))
+    fi
+
+    # Test 32: validate_server_name rejects leading dash
+    rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_server_name "-server"' </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_server_name rejects leading dash"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_server_name should reject names starting with dash"
+        ((FAILED++))
+    fi
+
+    # Test 33: validate_server_name rejects trailing dash
+    rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_server_name "server-"' </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_server_name rejects trailing dash"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_server_name should reject names ending with dash"
+        ((FAILED++))
+    fi
+
+    # Test 34: validate_server_name rejects invalid characters
+    rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_server_name "server_01"' </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_server_name rejects invalid characters"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_server_name should reject underscore and special characters"
+        ((FAILED++))
+    fi
+
+    # Test 35: validate_server_name rejects empty string
+    rc=0
+    bash -c 'source "'"$REPO_ROOT"'/shared/common.sh" && validate_server_name ""' </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} validate_server_name rejects empty string"
+        ((PASSED++))
+    else
+        echo -e "  ${RED}✗${NC} validate_server_name should reject empty string"
+        ((FAILED++))
+    fi
 }
 
 # --- Test source detection in each script ---
