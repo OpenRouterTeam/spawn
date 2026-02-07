@@ -66,6 +66,18 @@ open_browser() {
     fi
 }
 
+# Validate model ID to prevent command injection
+validate_model_id() {
+    local model_id="$1"
+    if [[ -z "$model_id" ]]; then return 0; fi
+    if [[ ! "$model_id" =~ ^[a-zA-Z0-9/_:.-]+$ ]]; then
+        log_error "Invalid model ID: contains unsafe characters"
+        log_error "Model IDs should only contain: letters, numbers, /, -, _, :, ."
+        return 1
+    fi
+    return 0
+}
+
 # Manually prompt for API key
 get_openrouter_api_key_manual() {
     echo ""
