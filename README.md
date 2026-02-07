@@ -41,6 +41,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/goose.sh)
 ```
 
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/codex.sh)
+```
+
 ### Non-Interactive Mode
 
 For automation or CI/CD, set environment variables:
@@ -111,6 +117,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/goose.sh)
 ```
 
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/codex.sh)
+```
+
 ### Non-Interactive Mode
 
 ```bash
@@ -165,6 +177,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/goose.sh)
 ```
 
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/codex.sh)
+```
+
 ### Non-Interactive Mode
 
 ```bash
@@ -217,6 +235,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/aider.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/goose.sh)
+```
+
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/codex.sh)
 ```
 
 ### Non-Interactive Mode

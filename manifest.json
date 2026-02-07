@@ -94,6 +94,19 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Model-agnostic agent by Block (formerly Square), supports OpenRouter as a provider"
+    },
+    "codex": {
+      "name": "Codex CLI",
+      "description": "OpenAI's open-source coding agent",
+      "url": "https://github.com/openai/codex",
+      "install": "npm install -g @openai/codex",
+      "launch": "codex",
+      "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1"
     }
   },
   "clouds": {
@@ -173,6 +186,10 @@
     "vultr/openclaw": "implemented",
     "vultr/nanoclaw": "implemented",
     "vultr/aider": "implemented",
-    "vultr/goose": "implemented"
+    "vultr/goose": "implemented",
+    "sprite/codex": "implemented",
+    "hetzner/codex": "implemented",
+    "digitalocean/codex": "implemented",
+    "vultr/codex": "implemented"
   }
 }
