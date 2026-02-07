@@ -99,7 +99,7 @@
     "sprite/openclaw": "implemented",
     "sprite/nanoclaw": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/openclaw": "missing",
-    "hetzner/nanoclaw": "missing"
+    "hetzner/openclaw": "implemented",
+    "hetzner/nanoclaw": "implemented"
   }
 }
