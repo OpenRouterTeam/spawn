@@ -2,6 +2,13 @@
 
 Conjure your agents!
 
+## Features
+
+- 🔐 **Automatic OAuth** - Seamless authentication with OpenRouter
+- 🔄 **Smart Fallback** - Manual API key entry if OAuth fails
+- 🚀 **One Command Setup** - Get running in minutes
+- 🔧 **Environment Ready** - Pre-configured shell and dependencies
+
 ## Usage
 
 ### Claude Code Setup
