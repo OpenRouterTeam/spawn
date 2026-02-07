@@ -45,6 +45,7 @@ log_warn "Browse models at: https://openrouter.ai/models"
 log_warn "Which model would you like to use?"
 MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
+if ! validate_model_id "$MODEL_ID"; then log_error "Exiting due to invalid model ID"; exit 1; fi
 
 # 8. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."

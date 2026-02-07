@@ -37,6 +37,17 @@ open_browser() {
     else log_warn "Please open: ${url}"; fi
 }
 
+validate_model_id() {
+    local model_id="$1"
+    if [[ -z "$model_id" ]]; then return 0; fi
+    if [[ ! "$model_id" =~ ^[a-zA-Z0-9/_:.-]+$ ]]; then
+        log_error "Invalid model ID: contains unsafe characters"
+        log_error "Model IDs should only contain: letters, numbers, /, -, _, :, ."
+        return 1
+    fi
+    return 0
+}
+
 get_openrouter_api_key_manual() {
     echo ""; log_warn "Manual API Key Entry"
     echo -e "${YELLOW}Get your API key from: https://openrouter.ai/settings/keys${NC}"; echo ""

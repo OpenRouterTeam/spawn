@@ -1,15 +1,18 @@
 #!/bin/bash
 # Common bash functions for DigitalOcean spawn scripts
 
+# Bash safety flags
+set -euo pipefail
+
 # ============================================================
 # Provider-agnostic functions (shared with sprite/lib/common.sh)
 # ============================================================
 
 # Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly NC='\033[0m' # No Color
 
 # Print colored message (to stderr so they don't pollute command substitution output)
 log_info() {
@@ -136,7 +139,7 @@ try_oauth_flow() {
             local nc_status=$?
             rm -f "$response_file"
 
-            if [[ $nc_status -ne 0 ]]; then
+            if [[ "$nc_status" -ne 0 ]]; then
                 break
             fi
 
@@ -151,7 +154,7 @@ try_oauth_flow() {
 
     sleep 1
 
-    if ! kill -0 $server_pid 2>/dev/null; then
+    if ! kill -0 "$server_pid" 2>/dev/null; then
         log_warn "Failed to start OAuth server (port may be in use)"
         rm -rf "$oauth_dir"
         return 1
@@ -162,13 +165,13 @@ try_oauth_flow() {
 
     local timeout=120
     local elapsed=0
-    while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do
+    while [[ ! -f "$code_file" ]] && [[ "$elapsed" -lt "$timeout" ]]; do
         sleep 1
         ((elapsed++))
     done
 
-    kill $server_pid 2>/dev/null || true
-    wait $server_pid 2>/dev/null || true
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
 
     if [[ ! -f "$code_file" ]]; then
         log_warn "OAuth timeout - no response received"
@@ -230,8 +233,8 @@ get_openrouter_api_key_oauth() {
 # DigitalOcean specific functions
 # ============================================================
 
-DO_API_BASE="https://api.digitalocean.com/v2"
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
+readonly DO_API_BASE="https://api.digitalocean.com/v2"
+readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
 
 # Centralized curl wrapper for DigitalOcean API
 do_api() {
@@ -478,7 +481,7 @@ verify_server_connectivity() {
     local attempt=1
 
     log_warn "Waiting for SSH connectivity to $ip..."
-    while [[ $attempt -le $max_attempts ]]; do
+    while [[ "$attempt" -le "$max_attempts" ]]; do
         if ssh $SSH_OPTS -o ConnectTimeout=5 "root@$ip" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"
             return 0
