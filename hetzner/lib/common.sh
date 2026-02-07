@@ -140,6 +140,9 @@ ensure_ssh_key() {
 get_server_name() {
     if [[ -n "$HETZNER_SERVER_NAME" ]]; then
         log_info "Using server name from environment: $HETZNER_SERVER_NAME"
+        if ! validate_server_name "$HETZNER_SERVER_NAME"; then
+            return 1
+        fi
         echo "$HETZNER_SERVER_NAME"
         return 0
     fi
@@ -149,6 +152,10 @@ get_server_name() {
         log_error "Server name is required"
         log_warn "Set HETZNER_SERVER_NAME environment variable for non-interactive usage:"
         log_warn "  HETZNER_SERVER_NAME=dev-mk1 curl ... | bash"
+        return 1
+    fi
+
+    if ! validate_server_name "$server_name"; then
         return 1
     fi
 
@@ -220,13 +227,6 @@ verify_server_connectivity() {
     local ip="$1"
     local max_attempts=${2:-30}
     generic_ssh_wait "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
-}
-
-# Wait for cloud-init to complete
-wait_for_cloud_init() {
-    local ip="$1"
-    local max_attempts=${2:-60}
-    generic_ssh_wait "$ip" "$SSH_OPTS" "test -f /root/.cloud-init-complete" "cloud-init" "$max_attempts" 5
 }
 
 # Run a command on the server

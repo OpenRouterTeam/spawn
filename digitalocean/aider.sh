@@ -29,7 +29,14 @@ wait_for_cloud_init "$DO_SERVER_IP"
 # 5. Install Aider
 log_warn "Installing Aider..."
 run_server "$DO_SERVER_IP" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
-log_info "Aider installed"
+
+# Verify installation succeeded
+if ! run_server "$DO_SERVER_IP" "command -v aider &> /dev/null && aider --version &> /dev/null"; then
+    log_error "Aider installation verification failed"
+    log_error "The 'aider' command is not available or not working properly on server $DO_SERVER_IP"
+    exit 1
+fi
+log_info "Aider installation verified successfully"
 
 # 6. Get OpenRouter API key
 echo ""

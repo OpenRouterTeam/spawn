@@ -29,6 +29,14 @@ setup_shell_environment "$SPRITE_NAME"
 log_warn "Installing Claude Code..."
 run_sprite "$SPRITE_NAME" "claude install > /dev/null 2>&1"
 
+# Verify installation succeeded
+if ! run_sprite "$SPRITE_NAME" "command -v claude &> /dev/null && claude --version &> /dev/null"; then
+    log_error "Claude Code installation verification failed"
+    log_error "The 'claude' command is not available or not working properly"
+    exit 1
+fi
+log_info "Claude Code installation verified successfully"
+
 # Get OpenRouter API key via OAuth
 echo ""
 OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)

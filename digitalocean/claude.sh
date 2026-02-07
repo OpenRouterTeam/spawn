@@ -35,7 +35,14 @@ if ! run_server "$DO_SERVER_IP" "command -v claude" >/dev/null 2>&1; then
     log_warn "Claude Code not found, installing manually..."
     run_server "$DO_SERVER_IP" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
-log_info "Claude Code is installed"
+
+# Verify installation succeeded
+if ! run_server "$DO_SERVER_IP" "command -v claude &> /dev/null && claude --version &> /dev/null"; then
+    log_error "Claude Code installation verification failed"
+    log_error "The 'claude' command is not available or not working properly on server $DO_SERVER_IP"
+    exit 1
+fi
+log_info "Claude Code installation verified successfully"
 
 # 6. Get OpenRouter API key
 echo ""

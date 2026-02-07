@@ -144,6 +144,9 @@ ensure_ssh_key() {
 get_server_name() {
     if [[ -n "$DO_DROPLET_NAME" ]]; then
         log_info "Using droplet name from environment: $DO_DROPLET_NAME"
+        if ! validate_server_name "$DO_DROPLET_NAME"; then
+            return 1
+        fi
         echo "$DO_DROPLET_NAME"
         return 0
     fi
@@ -153,6 +156,10 @@ get_server_name() {
         log_error "Droplet name is required"
         log_warn "Set DO_DROPLET_NAME environment variable for non-interactive usage:"
         log_warn "  DO_DROPLET_NAME=dev-mk1 curl ... | bash"
+        return 1
+    fi
+
+    if ! validate_server_name "$server_name"; then
         return 1
     fi
 
@@ -254,12 +261,6 @@ verify_server_connectivity() {
     generic_ssh_wait "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
 }
 
-# Wait for cloud-init to complete
-wait_for_cloud_init() {
-    local ip="$1"
-    local max_attempts=${2:-60}
-    generic_ssh_wait "$ip" "$SSH_OPTS" "test -f /root/.cloud-init-complete" "cloud-init" "$max_attempts" 5
-}
 
 # Run a command on the server
 run_server() {

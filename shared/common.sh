@@ -117,6 +117,57 @@ validate_model_id() {
     return 0
 }
 
+# Validate server/sprite name to prevent injection and ensure cloud provider compatibility
+# Server names must be 3-63 characters, alphanumeric + dash, no leading/trailing dash
+validate_server_name() {
+    local server_name="$1"
+
+    if [[ -z "$server_name" ]]; then
+        log_error "Server name cannot be empty"
+        return 1
+    fi
+
+    # Check length (3-63 characters)
+    local name_length=${#server_name}
+    if [[ $name_length -lt 3 ]]; then
+        log_error "Server name too short: '$server_name' (minimum 3 characters)"
+        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        return 1
+    fi
+
+    if [[ $name_length -gt 63 ]]; then
+        log_error "Server name too long: '$server_name' (maximum 63 characters)"
+        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        return 1
+    fi
+
+    # Check for valid characters (alphanumeric + dash only)
+    if [[ ! "$server_name" =~ ^[a-zA-Z0-9-]+$ ]]; then
+        log_error "Invalid server name: '$server_name'"
+        log_error "Server names must contain only alphanumeric characters and dashes"
+        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        return 1
+    fi
+
+    # Check no leading dash
+    if [[ "$server_name" =~ ^- ]]; then
+        log_error "Invalid server name: '$server_name'"
+        log_error "Server names cannot start with a dash"
+        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        return 1
+    fi
+
+    # Check no trailing dash
+    if [[ "$server_name" =~ -$ ]]; then
+        log_error "Invalid server name: '$server_name'"
+        log_error "Server names cannot end with a dash"
+        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        return 1
+    fi
+
+    return 0
+}
+
 # Interactively prompt for model ID with validation
 # Usage: get_model_id_interactive [default_model] [agent_name]
 # Returns: Model ID via stdout
@@ -528,6 +579,40 @@ generic_cloud_api() {
 }
 
 # ============================================================
+# Agent verification helpers
+# ============================================================
+
+# Verify that an agent is properly installed by checking if its command exists
+# Usage: verify_agent_installed AGENT_COMMAND [VERIFICATION_ARG] [ERROR_MESSAGE]
+# Examples:
+#   verify_agent_installed "claude" "--version" "Claude Code"
+#   verify_agent_installed "aider" "--help" "Aider"
+#   verify_agent_installed "goose" "--version" "Goose"
+# Returns 0 if agent is installed and working, 1 otherwise
+verify_agent_installed() {
+    local agent_cmd="$1"
+    local verify_arg="${2:---version}"
+    local agent_name="${3:-$agent_cmd}"
+
+    log_warn "Verifying $agent_name installation..."
+
+    if ! command -v "$agent_cmd" &> /dev/null; then
+        log_error "$agent_name installation failed: command '$agent_cmd' not found in PATH"
+        log_error "PATH: $PATH"
+        return 1
+    fi
+
+    if ! "$agent_cmd" "$verify_arg" &> /dev/null; then
+        log_error "$agent_name installation failed: '$agent_cmd $verify_arg' returned an error"
+        log_error "The command exists but does not execute properly"
+        return 1
+    fi
+
+    log_info "$agent_name installation verified successfully"
+    return 0
+}
+
+# ============================================================
 # SSH connectivity helpers
 # ============================================================
 
@@ -575,4 +660,13 @@ generic_ssh_wait() {
 
     log_error "$description failed after $max_attempts attempts (${elapsed_time}s elapsed)"
     return 1
+}
+
+# Wait for cloud-init to complete on a server
+# Usage: wait_for_cloud_init <ip> [max_attempts]
+# Default max_attempts is 60 (~5 minutes with exponential backoff)
+wait_for_cloud_init() {
+    local ip="$1"
+    local max_attempts=${2:-60}
+    generic_ssh_wait "$ip" "$SSH_OPTS" "test -f /root/.cloud-init-complete" "cloud-init" "$max_attempts" 5
 }

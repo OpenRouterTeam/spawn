@@ -114,12 +114,18 @@ ensure_ssh_key() {
 get_server_name() {
     if [[ -n "$LINODE_SERVER_NAME" ]]; then
         log_info "Using server name from environment: $LINODE_SERVER_NAME"
+        if ! validate_server_name "$LINODE_SERVER_NAME"; then
+            return 1
+        fi
         echo "$LINODE_SERVER_NAME"; return 0
     fi
     local server_name=$(safe_read "Enter Linode label: ")
     if [[ -z "$server_name" ]]; then
         log_error "Server name is required"
         log_warn "Set LINODE_SERVER_NAME environment variable for non-interactive usage"; return 1
+    fi
+    if ! validate_server_name "$server_name"; then
+        return 1
     fi
     echo "$server_name"
 }
@@ -217,10 +223,6 @@ verify_server_connectivity() {
     generic_ssh_wait "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
 }
 
-wait_for_cloud_init() {
-    local ip="$1" max_attempts=${2:-60}
-    generic_ssh_wait "$ip" "$SSH_OPTS" "test -f /root/.cloud-init-complete" "cloud-init" "$max_attempts" 5
-}
 
 run_server() { local ip="$1" cmd="$2"; ssh $SSH_OPTS "root@$ip" "$cmd"; }
 upload_file() { local ip="$1" local_path="$2" remote_path="$3"; scp $SSH_OPTS "$local_path" "root@$ip:$remote_path"; }
