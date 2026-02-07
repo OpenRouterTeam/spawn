@@ -207,6 +207,21 @@
         "image": "linode/ubuntu24.04"
       }
     },
+    "lambda": {
+      "name": "Lambda Cloud",
+      "description": "Lambda GPU Cloud instances via REST API",
+      "url": "https://lambdalabs.com/",
+      "type": "api",
+      "auth": "LAMBDA_API_KEY",
+      "provision_method": "POST /v1/instance-operations/launch",
+      "exec_method": "ssh ubuntu@IP",
+      "interactive_method": "ssh -t ubuntu@IP",
+      "defaults": {
+        "instance_type": "gpu_1x_a10",
+        "region": "us-east-1"
+      },
+      "notes": "GPU cloud, uses 'ubuntu' user. Manual tool install (no cloud-init)."
+    },
     "aws-lightsail": {
       "name": "AWS Lightsail",
       "description": "AWS Lightsail instances via AWS CLI",
@@ -272,6 +287,14 @@
     "digitalocean/gemini": "implemented",
     "vultr/gemini": "implemented",
     "linode/gemini": "implemented",
-    "aws-lightsail/gemini": "implemented"
+    "aws-lightsail/gemini": "implemented",
+    "lambda/claude": "implemented",
+    "lambda/openclaw": "implemented",
+    "lambda/nanoclaw": "implemented",
+    "lambda/aider": "implemented",
+    "lambda/goose": "implemented",
+    "lambda/codex": "implemented",
+    "lambda/interpreter": "implemented",
+    "lambda/gemini": "implemented"
   }
 }
