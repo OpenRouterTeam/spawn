@@ -75,6 +75,18 @@ Spawn agents on [Hetzner Cloud](https://www.hetzner.com/cloud/) servers. No `hcl
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/claude.sh)
 ```
 
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/nanoclaw.sh)
+```
+
 ### Non-Interactive Mode
 
 ```bash
