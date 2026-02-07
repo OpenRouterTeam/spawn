@@ -676,6 +676,63 @@ test_source_detection() {
     done
 }
 
+# --- Static analysis with shellcheck ---
+run_shellcheck() {
+    echo ""
+    echo -e "${YELLOW}━━━ Running shellcheck (static analysis) ━━━${NC}"
+
+    # Check if shellcheck is available
+    if ! command -v shellcheck &> /dev/null; then
+        echo -e "  ${YELLOW}⚠${NC} shellcheck not found (install with: apt install shellcheck / brew install shellcheck)"
+        echo -e "  ${YELLOW}⚠${NC} Skipping static analysis"
+        return 0
+    fi
+
+    # Find all shell scripts
+    local all_scripts=(
+        "$REPO_ROOT"/sprite/*.sh
+        "$REPO_ROOT"/sprite/lib/common.sh
+        "$REPO_ROOT"/shared/common.sh
+        "$REPO_ROOT"/digitalocean/*.sh
+        "$REPO_ROOT"/digitalocean/lib/common.sh
+        "$REPO_ROOT"/hetzner/*.sh
+        "$REPO_ROOT"/hetzner/lib/common.sh
+        "$REPO_ROOT"/linode/*.sh
+        "$REPO_ROOT"/linode/lib/common.sh
+        "$REPO_ROOT"/vultr/*.sh
+        "$REPO_ROOT"/vultr/lib/common.sh
+        "$REPO_ROOT"/test/run.sh
+    )
+
+    local issue_count=0
+    local checked_count=0
+
+    for script in "${all_scripts[@]}"; do
+        [[ -f "$script" ]] || continue
+        ((checked_count++))
+
+        # Run shellcheck with warning severity, exclude some noisy checks
+        # SC1090: Can't follow non-constant source
+        # SC2312: Consider invoking this command separately to avoid masking its return value
+        local output
+        output=$(shellcheck --severity=warning --exclude=SC1090,SC2312 "$script" 2>&1)
+
+        if [[ -n "$output" ]]; then
+            ((issue_count++))
+            echo -e "  ${YELLOW}⚠${NC} $(basename "$script"): found issues"
+            echo "$output" | sed 's/^/    /'
+        fi
+    done
+
+    if [[ "$issue_count" -eq 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} No issues found in $checked_count scripts"
+        ((PASSED++))
+    else
+        echo -e "  ${YELLOW}⚠${NC} Found issues in $issue_count/$checked_count scripts (advisory only)"
+        # Don't fail the build, just warn
+    fi
+}
+
 # --- Main ---
 echo "==============================="
 echo " Spawn Script Test Suite"
@@ -689,6 +746,7 @@ echo "Remote:   $REMOTE"
 setup_mocks
 setup_extra_mocks
 
+run_shellcheck
 test_common_source
 test_shared_common
 test_source_detection
