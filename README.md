@@ -442,3 +442,75 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 - `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
 - `LIGHTSAIL_BUNDLE` - Instance bundle (default: `medium_3_0`)
 - `LIGHTSAIL_REGION` - AWS region (default: `us-east-1`)
+
+---
+
+## Lambda Cloud
+
+Spawn agents on [Lambda Cloud](https://lambdalabs.com/) GPU instances via REST API. Great for GPU-accelerated AI workloads.
+
+### Usage
+
+#### Claude Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/claude.sh)
+```
+
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/nanoclaw.sh)
+```
+
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/aider.sh)
+```
+
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/goose.sh)
+```
+
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/codex.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/interpreter.sh)
+```
+
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/gemini.sh)
+```
+
+### Non-Interactive Mode
+
+```bash
+LAMBDA_SERVER_NAME=dev-mk1 \
+LAMBDA_API_KEY=your-lambda-api-key \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/lambda/claude.sh)
+```
+
+**Environment Variables:**
+- `LAMBDA_SERVER_NAME` - Name for the instance (skips prompt)
+- `LAMBDA_API_KEY` - Lambda API key (skips prompt, saved to `~/.config/spawn/lambda.json`)
+- `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
+- `LAMBDA_INSTANCE_TYPE` - Instance type (default: `gpu_1x_a10`)
+- `LAMBDA_REGION` - Region (default: `us-east-1`)
