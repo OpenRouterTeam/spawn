@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Common bash functions for Hetzner Cloud spawn scripts
 
 # ============================================================
@@ -19,7 +20,7 @@ source "$SCRIPT_DIR/../../shared/common.sh" || {
 # ============================================================
 
 readonly HETZNER_API_BASE="https://api.hetzner.cloud/v1"
-readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
+# SSH_OPTS is now defined in shared/common.sh
 
 # Centralized curl wrapper for Hetzner API
 hetzner_api() {
