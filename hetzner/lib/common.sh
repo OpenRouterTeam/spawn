@@ -44,6 +44,9 @@ hetzner_api() {
 
 # Ensure HCLOUD_TOKEN is available (env var → config file → prompt+save)
 ensure_hcloud_token() {
+    # Check Python 3 is available (required for JSON parsing)
+    check_python_available || return 1
+
     # 1. Check environment variable
     if [[ -n "$HCLOUD_TOKEN" ]]; then
         log_info "Using Hetzner API token from environment"

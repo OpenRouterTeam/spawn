@@ -32,6 +32,9 @@ linode_api() {
 }
 
 ensure_linode_token() {
+    # Check Python 3 is available (required for JSON parsing)
+    check_python_available || return 1
+
     if [[ -n "$LINODE_API_TOKEN" ]]; then
         log_info "Using Linode API token from environment"; return 0
     fi

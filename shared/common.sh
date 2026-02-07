@@ -30,6 +30,28 @@ log_error() {
 }
 
 # ============================================================
+# Dependency checks
+# ============================================================
+
+# Check if Python 3 is available (required for JSON parsing throughout Spawn)
+check_python_available() {
+    if ! command -v python3 &> /dev/null; then
+        log_error "Python 3 is required but not installed"
+        log_error ""
+        log_error "Spawn uses Python 3 for JSON parsing and API interactions."
+        log_error "Please install Python 3 before continuing:"
+        log_error ""
+        log_error "  Ubuntu/Debian:  sudo apt-get update && sudo apt-get install -y python3"
+        log_error "  Fedora/RHEL:    sudo dnf install -y python3"
+        log_error "  macOS:          brew install python3"
+        log_error "  Arch Linux:     sudo pacman -S python"
+        log_error ""
+        return 1
+    fi
+    return 0
+}
+
+# ============================================================
 # Input handling
 # ============================================================
 
@@ -288,6 +310,43 @@ get_openrouter_api_key_oauth() {
         log_error "Authentication cancelled by user"
         return 1
     fi
+}
+
+# ============================================================
+# Environment injection helpers
+# ============================================================
+
+# Generate environment variable config content
+# Usage: generate_env_config KEY1=val1 KEY2=val2 ...
+# Outputs the env config to stdout
+generate_env_config() {
+    echo ""
+    echo "# [spawn:env]"
+    for env_pair in "$@"; do
+        echo "export $env_pair"
+    done
+}
+
+# Inject environment variables into remote server's shell config (SSH-based clouds)
+# Usage: inject_env_vars_ssh SERVER_IP UPLOAD_FUNC RUN_FUNC KEY1=val1 KEY2=val2 ...
+# Example: inject_env_vars_ssh "$DO_SERVER_IP" upload_file run_server \
+#            "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+#            "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+inject_env_vars_ssh() {
+    local server_ip="$1"
+    local upload_func="$2"
+    local run_func="$3"
+    shift 3
+
+    local env_temp=$(mktemp)
+    chmod 600 "$env_temp"
+
+    generate_env_config "$@" > "$env_temp"
+
+    # Upload and append to .zshrc
+    "$upload_func" "$server_ip" "$env_temp" "/tmp/env_config"
+    "$run_func" "$server_ip" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    rm "$env_temp"
 }
 
 # ============================================================

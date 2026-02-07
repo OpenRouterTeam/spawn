@@ -46,6 +46,9 @@ do_api() {
 
 # Ensure DO_API_TOKEN is available (env var -> config file -> prompt+save)
 ensure_do_token() {
+    # Check Python 3 is available (required for JSON parsing)
+    check_python_available || return 1
+
     # 1. Check environment variable
     if [[ -n "$DO_API_TOKEN" ]]; then
         log_info "Using DigitalOcean API token from environment"

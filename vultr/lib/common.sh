@@ -34,6 +34,9 @@ vultr_api() {
 }
 
 ensure_vultr_token() {
+    # Check Python 3 is available (required for JSON parsing)
+    check_python_available || return 1
+
     if [[ -n "$VULTR_API_KEY" ]]; then
         log_info "Using Vultr API key from environment"
         return 0
