@@ -107,6 +107,19 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1"
+    },
+    "interpreter": {
+      "name": "Open Interpreter",
+      "description": "Natural language interface for computer control",
+      "url": "https://github.com/OpenInterpreter/open-interpreter",
+      "install": "pip install open-interpreter",
+      "launch": "interpreter",
+      "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
     }
   },
   "clouds": {
@@ -211,6 +224,11 @@
     "linode/nanoclaw": "implemented",
     "linode/aider": "implemented",
     "linode/goose": "implemented",
-    "linode/codex": "implemented"
+    "linode/codex": "implemented",
+    "sprite/interpreter": "implemented",
+    "hetzner/interpreter": "implemented",
+    "digitalocean/interpreter": "implemented",
+    "vultr/interpreter": "implemented",
+    "linode/interpreter": "implemented"
   }
 }

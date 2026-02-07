@@ -47,6 +47,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/goose.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/codex.sh)
 ```
 
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/interpreter.sh)
+```
+
 ### Non-Interactive Mode
 
 For automation or CI/CD, set environment variables:
@@ -123,6 +129,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/goose.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/codex.sh)
 ```
 
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/interpreter.sh)
+```
+
 ### Non-Interactive Mode
 
 ```bash
@@ -181,6 +193,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/goose.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/codex.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/interpreter.sh)
 ```
 
 ### Non-Interactive Mode
@@ -243,6 +261,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/goose.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/codex.sh)
 ```
 
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/vultr/interpreter.sh)
+```
+
 ### Non-Interactive Mode
 
 ```bash
@@ -301,6 +325,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/goose.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/codex.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/interpreter.sh)
 ```
 
 ### Non-Interactive Mode
