@@ -258,3 +258,63 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 - `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
 - `VULTR_PLAN` - Instance plan (default: `vc2-1c-2gb`)
 - `VULTR_REGION` - Datacenter region (default: `ewr`)
+
+---
+
+## Linode (Akamai)
+
+Spawn agents on [Linode](https://www.linode.com/) instances via REST API.
+
+### Usage
+
+#### Claude Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/claude.sh)
+```
+
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/nanoclaw.sh)
+```
+
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/aider.sh)
+```
+
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/goose.sh)
+```
+
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/codex.sh)
+```
+
+### Non-Interactive Mode
+
+```bash
+LINODE_SERVER_NAME=dev-mk1 \
+LINODE_API_TOKEN=your-linode-api-token \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/linode/claude.sh)
+```
+
+**Environment Variables:**
+- `LINODE_SERVER_NAME` - Label for the Linode (skips prompt)
+- `LINODE_API_TOKEN` - Linode API token (skips prompt, saved to `~/.config/spawn/linode.json`)
+- `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
+- `LINODE_TYPE` - Instance type (default: `g6-standard-1`)
+- `LINODE_REGION` - Datacenter region (default: `us-east`)
