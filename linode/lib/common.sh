@@ -1,14 +1,17 @@
 #!/bin/bash
 # Common bash functions for Linode (Akamai) spawn scripts
 
+# Bash safety flags
+set -euo pipefail
+
 # ============================================================
 # Provider-agnostic functions
 # ============================================================
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly NC='\033[0m'
 
 log_info() { echo -e "${GREEN}$1${NC}" >&2; }
 log_warn() { echo -e "${YELLOW}$1${NC}" >&2; }
@@ -78,18 +81,18 @@ try_oauth_flow() {
             local response_file=$(mktemp); echo -e "$success_response" > "$response_file"
             local request=$(nc_listen "$callback_port" < "$response_file" 2>/dev/null | head -1)
             local nc_status=$?; rm -f "$response_file"
-            if [[ $nc_status -ne 0 ]]; then break; fi
+            if [[ "$nc_status" -ne 0 ]]; then break; fi
             if [[ "$request" == *"/callback?code="* ]]; then
                 echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p' > "$code_file"; break
             fi
         done
     ) </dev/null &
     local server_pid=$!; sleep 1
-    if ! kill -0 $server_pid 2>/dev/null; then log_warn "Failed to start OAuth server"; rm -rf "$oauth_dir"; return 1; fi
+    if ! kill -0 "$server_pid" 2>/dev/null; then log_warn "Failed to start OAuth server"; rm -rf "$oauth_dir"; return 1; fi
     log_warn "Opening browser to authenticate with OpenRouter..."; open_browser "$auth_url"
     local timeout=120 elapsed=0
-    while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do sleep 1; ((elapsed++)); done
-    kill $server_pid 2>/dev/null || true; wait $server_pid 2>/dev/null || true
+    while [[ ! -f "$code_file" ]] && [[ "$elapsed" -lt "$timeout" ]]; do sleep 1; ((elapsed++)); done
+    kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true
     if [[ ! -f "$code_file" ]]; then log_warn "OAuth timeout"; rm -rf "$oauth_dir"; return 1; fi
     local oauth_code=$(cat "$code_file"); rm -rf "$oauth_dir"
     log_warn "Exchanging OAuth code for API key..."
@@ -119,8 +122,8 @@ get_openrouter_api_key_oauth() {
 # Linode (Akamai) specific functions
 # ============================================================
 
-LINODE_API_BASE="https://api.linode.com/v4"
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
+readonly LINODE_API_BASE="https://api.linode.com/v4"
+readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
 
 linode_api() {
     local method="$1" endpoint="$2" body="$3"
@@ -276,7 +279,7 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
     # Wait for Linode to become running and get IP
     log_warn "Waiting for Linode to become active..."
     local max_attempts=60 attempt=1
-    while [[ $attempt -le $max_attempts ]]; do
+    while [[ "$attempt" -le "$max_attempts" ]]; do
         local status_response=$(linode_api GET "/linode/instances/$LINODE_SERVER_ID")
         local status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['status'])")
 
@@ -295,7 +298,7 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
 verify_server_connectivity() {
     local ip="$1" max_attempts=${2:-30} attempt=1
     log_warn "Waiting for SSH connectivity to $ip..."
-    while [[ $attempt -le $max_attempts ]]; do
+    while [[ "$attempt" -le "$max_attempts" ]]; do
         if ssh $SSH_OPTS -o ConnectTimeout=5 "root@$ip" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi
@@ -307,7 +310,7 @@ verify_server_connectivity() {
 wait_for_cloud_init() {
     local ip="$1" max_attempts=${2:-60} attempt=1
     log_warn "Waiting for cloud-init to complete..."
-    while [[ $attempt -le $max_attempts ]]; do
+    while [[ "$attempt" -le "$max_attempts" ]]; do
         if ssh $SSH_OPTS "root@$ip" "test -f /root/.cloud-init-complete" >/dev/null 2>&1; then
             log_info "Cloud-init completed"; return 0
         fi
