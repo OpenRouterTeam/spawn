@@ -263,6 +263,22 @@
         "blueprint": "ubuntu_24_04"
       },
       "notes": "Uses 'ubuntu' user instead of 'root'. Requires AWS CLI installed and configured."
+    },
+    "gcp": {
+      "name": "GCP Compute Engine",
+      "description": "Google Cloud Compute Engine instances via gcloud CLI",
+      "url": "https://cloud.google.com/compute",
+      "type": "cli",
+      "auth": "gcloud auth login",
+      "provision_method": "gcloud compute instances create with --metadata startup-script",
+      "exec_method": "ssh user@IP",
+      "interactive_method": "ssh -t user@IP",
+      "defaults": {
+        "machine_type": "e2-medium",
+        "zone": "us-central1-a",
+        "image_family": "ubuntu-2404-lts-amd64"
+      },
+      "notes": "Uses current username for SSH. Requires gcloud CLI installed and configured."
     }
   },
   "matrix": {
@@ -335,6 +351,16 @@
     "vultr/cline": "implemented",
     "linode/cline": "implemented",
     "lambda/cline": "implemented",
-    "aws-lightsail/cline": "implemented"
+    "aws-lightsail/cline": "implemented",
+    "gcp/claude": "implemented",
+    "gcp/openclaw": "implemented",
+    "gcp/nanoclaw": "implemented",
+    "gcp/aider": "implemented",
+    "gcp/goose": "implemented",
+    "gcp/codex": "implemented",
+    "gcp/interpreter": "implemented",
+    "gcp/gemini": "implemented",
+    "gcp/amazonq": "implemented",
+    "gcp/cline": "implemented"
   }
 }
