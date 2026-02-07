@@ -88,14 +88,73 @@ Research cloud providers with API-based provisioning. To add one:
 
 ```
 spawn/
+  shared/
+    common.sh                    # Provider-agnostic shared utilities
   {cloud}/
-    lib/common.sh     # Cloud-specific shared functions
-    {agent}.sh        # One script per agent
-  manifest.json       # The matrix (source of truth)
-  improve.sh          # Run this to trigger one improvement cycle
-  test/run.sh         # Test harness
-  README.md           # User-facing docs
+    lib/common.sh                # Cloud-specific functions (sources shared/common.sh)
+    {agent}.sh                   # Agent deployment scripts
+  manifest.json                  # The matrix (source of truth)
+  improve.sh                     # Run this to trigger one improvement cycle
+  test/run.sh                    # Test harness
+  README.md                      # User-facing docs
+  CLAUDE.md                      # This file - contributor guide
 ```
+
+### Architecture: Shared Library Pattern
+
+**`shared/common.sh`** - Core utilities used by all clouds:
+- **Logging**: `log_info`, `log_warn`, `log_error` (colored output)
+- **Input handling**: `safe_read` (works in interactive and piped contexts)
+- **OAuth flow**: `try_oauth_flow`, `get_openrouter_api_key_oauth` (browser-based auth)
+- **Network utilities**: `nc_listen` (cross-platform netcat wrapper), `open_browser`
+- **SSH helpers**: `generate_ssh_key_if_missing`, `get_ssh_fingerprint`, `generic_ssh_wait`
+- **Security**: `validate_model_id`, `json_escape`
+
+**`{cloud}/lib/common.sh`** - Cloud-specific extensions:
+- Sources `shared/common.sh` at the top
+- Adds provider-specific functions:
+  - **Sprite**: `ensure_sprite_installed`, `get_sprite_name`, `run_sprite`, etc.
+  - **Hetzner**: API wrappers for server creation, SSH key management, etc.
+  - **DigitalOcean**: Droplet provisioning, API calls, etc.
+  - **Vultr**: Instance management via REST API
+  - **Linode**: Linode-specific provisioning functions
+
+**Agent scripts** (`{cloud}/{agent}.sh`):
+1. Source their cloud's `lib/common.sh` (which auto-sources `shared/common.sh`)
+2. Use shared functions for logging, OAuth, SSH setup
+3. Use cloud functions for provisioning and connecting to servers
+4. Deploy the specific agent with its configuration
+
+### Why This Structure?
+
+- **DRY principle**: OAuth, logging, SSH logic written once in `shared/common.sh`
+- **Consistency**: All scripts use same authentication and error handling patterns
+- **Maintainability**: Bug fixes in shared code benefit all providers automatically
+- **Extensibility**: New clouds only need to implement provider-specific logic
+- **Testability**: Shared functions can be tested independently
+
+### Source Pattern
+
+Every cloud's `lib/common.sh` starts with:
+
+```bash
+#!/bin/bash
+# Cloud-specific functions for {provider}
+
+# Source shared provider-agnostic functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../shared/common.sh" || {
+    echo "ERROR: Failed to load shared/common.sh" >&2
+    exit 1
+}
+
+# ... cloud-specific functions below ...
+```
+
+This pattern ensures:
+- Shared utilities are always available
+- Path resolution works when sourced from any location
+- Script fails fast if shared library is missing
 
 ## Script Conventions
 
