@@ -447,7 +447,7 @@ print(json.dumps(body))
     log_warn "Waiting for droplet to become active..."
     local max_attempts=60
     local attempt=1
-    while [[ $attempt -le $max_attempts ]]; do
+    while [[ "$attempt" -le "$max_attempts" ]]; do
         local status_response=$(do_api GET "/droplets/$DO_DROPLET_ID")
         local status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['status'])")
 
@@ -502,7 +502,7 @@ wait_for_cloud_init() {
     local attempt=1
 
     log_warn "Waiting for cloud-init to complete..."
-    while [[ $attempt -le $max_attempts ]]; do
+    while [[ "$attempt" -le "$max_attempts" ]]; do
         if ssh $SSH_OPTS "root@$ip" "test -f /root/.cloud-init-complete" >/dev/null 2>&1; then
             log_info "Cloud-init completed"
             return 0
