@@ -110,5 +110,48 @@ spawn/
 
 1. Update `manifest.json` matrix status to `"implemented"`
 2. Update `README.md` with usage instructions
-3. Run `bash test/run.sh` if tests exist for the cloud
+3. Run `bash -n {file}` to syntax-check your scripts
 4. Commit with a descriptive message
+
+## Agent Team Roles
+
+When running as part of an agent team (`./improve.sh`), teammates are assigned specific roles:
+
+### Gap Filler
+You're assigned a specific `{cloud}/{agent}` entry to implement. Steps:
+1. Read `{cloud}/lib/common.sh` — understand the cloud's primitives
+2. Read an existing `{agent}.sh` on another cloud — understand the install steps
+3. Write `{cloud}/{agent}.sh` combining the two
+4. Update `manifest.json` matrix entry to `"implemented"`
+5. Add usage entry to `README.md` under the cloud's section
+6. `bash -n` syntax check
+7. Commit your changes only (don't touch other teammates' files)
+
+### Agent Scout
+Research and add ONE new AI coding agent. Requirements:
+- Must be installable via a single command (`npm install -g`, `pip install`, `curl | bash`, etc.)
+- Must accept API keys via environment variables (`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
+- OpenRouter compatibility: either native `OPENROUTER_API_KEY` support, or `OPENAI_BASE_URL=https://openrouter.ai/api/v1` override
+- Add to `manifest.json` → `agents` with full metadata including `env` field
+- Add `"missing"` entries in the matrix for ALL existing clouds
+- Implement on at least 2 clouds to prove the pattern
+- Update `README.md`
+
+### Cloud Scout
+Research and add ONE new cloud provider. Requirements:
+- REST API or CLI for provisioning VMs/instances
+- SSH access to created servers
+- Cloud-init, userdata, or startup-script support
+- Pay-per-hour pricing
+- Create `{cloud}/lib/common.sh` with ALL primitives (see existing clouds for the pattern)
+- Add to `manifest.json` → `clouds`
+- Add `"missing"` entries for ALL existing agents
+- Implement at least 2 agents to prove the lib works
+- Update `README.md`
+
+### Coordination Rules
+- **Never edit the same file as another teammate** — coordinate via the shared task list
+- **manifest.json conflicts**: only ONE teammate should update manifest.json at a time. If you're a Gap Filler, update just your entry. If you're a Scout, add your block and your matrix entries.
+- **README.md**: append your section, don't rewrite others' sections
+- **Commit early**: commit your work as soon as it's done so other teammates can see it
+- **Self-claim**: when you finish your assigned task, check the task list for the next unblocked item
