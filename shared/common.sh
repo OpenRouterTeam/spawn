@@ -117,6 +117,34 @@ validate_model_id() {
     return 0
 }
 
+# Interactively prompt for model ID with validation
+# Usage: get_model_id_interactive [default_model] [agent_name]
+# Returns: Model ID via stdout
+# Example: MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider")
+get_model_id_interactive() {
+    local default_model="${1:-openrouter/auto}"
+    local agent_name="${2:-}"
+
+    echo ""
+    log_warn "Browse models at: https://openrouter.ai/models"
+    if [[ -n "$agent_name" ]]; then
+        log_warn "Which model would you like to use with $agent_name?"
+    else
+        log_warn "Which model would you like to use?"
+    fi
+
+    local model_id=""
+    model_id=$(safe_read "Enter model ID [$default_model]: ") || model_id=""
+    model_id="${model_id:-$default_model}"
+
+    if ! validate_model_id "$model_id"; then
+        log_error "Exiting due to invalid model ID"
+        return 1
+    fi
+
+    echo "$model_id"
+}
+
 # ============================================================
 # OpenRouter authentication
 # ============================================================

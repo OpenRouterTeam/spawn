@@ -30,11 +30,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-echo ""
-log_warn "Browse models at: https://openrouter.ai/models"
-MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
-if ! validate_model_id "$MODEL_ID"; then log_error "Exiting due to invalid model ID"; exit 1; fi
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
 log_warn "Setting up environment variables..."
 inject_env_vars_ssh "$VULTR_SERVER_IP" upload_file run_server \

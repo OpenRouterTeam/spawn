@@ -38,17 +38,7 @@ else
 fi
 
 # Get model preference
-echo ""
-log_warn "Browse models at: https://openrouter.ai/models"
-log_warn "Which model would you like to use with Aider?"
-MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
-
-# Validate model ID for security
-if ! validate_model_id "$MODEL_ID"; then
-    log_error "Exiting due to invalid model ID"
-    exit 1
-fi
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
 log_warn "Setting up environment variables..."
 inject_env_vars_sprite "$SPRITE_NAME" \
