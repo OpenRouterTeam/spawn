@@ -1,46 +1,11 @@
 #!/bin/bash
 # Common bash functions shared between spawn scripts
 
-# Bash safety flags
-set -euo pipefail
-
-# Colors for output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly NC='\033[0m' # No Color
-
-# Print colored message (to stderr so they don't pollute command substitution output)
-log_info() {
-    echo -e "${GREEN}$1${NC}" >&2
-}
-
-log_warn() {
-    echo -e "${YELLOW}$1${NC}" >&2
-}
-
-log_error() {
-    echo -e "${RED}$1${NC}" >&2
-}
-
-# Safe read function that works in both interactive and non-interactive modes
-safe_read() {
-    local prompt="$1"
-    local result=""
-
-    if [[ -t 0 ]]; then
-        # stdin is a terminal - read directly
-        read -p "$prompt" result
-    elif echo -n "" > /dev/tty 2>/dev/null; then
-        # /dev/tty is functional - use it
-        read -p "$prompt" result < /dev/tty
-    else
-        # No interactive input available
-        log_error "Cannot read input: no TTY available"
-        return 1
-    fi
-
-    echo "$result"
+# Source shared provider-agnostic functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../shared/common.sh" || {
+    echo "ERROR: Failed to load shared/common.sh" >&2
+    exit 1
 }
 
 # Check if sprite CLI is installed, install if not
@@ -103,7 +68,7 @@ verify_sprite_connectivity() {
     local attempt=1
 
     log_warn "Verifying sprite connectivity..."
-    while [[ $attempt -le $max_attempts ]]; do
+    while [[ "$attempt" -le "$max_attempts" ]]; do
         if sprite exec -s "$sprite_name" -- echo "ok" >/dev/null 2>&1; then
             log_info "Sprite '$sprite_name' is ready"
             return 0
@@ -228,7 +193,7 @@ try_oauth_flow() {
             rm -f "$response_file"
 
             # If nc failed, exit the loop
-            if [[ $nc_status -ne 0 ]]; then
+            if [[ "$nc_status" -ne 0 ]]; then
                 break
             fi
 
@@ -245,7 +210,7 @@ try_oauth_flow() {
     sleep 1
 
     # Check if the background process is still running
-    if ! kill -0 $server_pid 2>/dev/null; then
+    if ! kill -0 "$server_pid" 2>/dev/null; then
         log_warn "Failed to start OAuth server (port may be in use)"
         rm -rf "$oauth_dir"
         return 1
@@ -258,14 +223,14 @@ try_oauth_flow() {
     # Wait for the code file to be created (timeout after 2 minutes)
     local timeout=120
     local elapsed=0
-    while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do
+    while [[ ! -f "$code_file" ]] && [[ "$elapsed" -lt "$timeout" ]]; do
         sleep 1
         ((elapsed++))
     done
 
     # Kill the background server process
-    kill $server_pid 2>/dev/null || true
-    wait $server_pid 2>/dev/null || true
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
 
     if [[ ! -f "$code_file" ]]; then
         log_warn "OAuth timeout - no response received"
