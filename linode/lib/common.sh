@@ -46,12 +46,22 @@ ensure_linode_token() {
     echo ""; log_warn "Linode API Token Required"
     echo -e "${YELLOW}Get your token from: https://cloud.linode.com/profile/tokens${NC}"; echo ""
     local token=$(safe_read "Enter your Linode API token: ") || return 1
-    if [[ -z "$token" ]]; then log_error "API token is required"; return 1; fi
+    if [[ -z "$token" ]]; then
+        log_error "API token cannot be empty"
+        log_warn "For non-interactive usage, set: LINODE_API_TOKEN=your-token"
+        return 1
+    fi
     export LINODE_API_TOKEN="$token"
     local test_response=$(linode_api GET "/profile")
     if echo "$test_response" | grep -q '"username"'; then
         log_info "API token validated"
-    else log_error "Invalid API token"; unset LINODE_API_TOKEN; return 1; fi
+    else
+        log_error "Authentication failed: Invalid Linode API token"
+        log_warn "Verify your token at: https://cloud.linode.com/profile/tokens"
+        log_warn "Ensure the token has read/write permissions"
+        unset LINODE_API_TOKEN
+        return 1
+    fi
     mkdir -p "$config_dir"
     cat > "$config_file" << EOF
 {

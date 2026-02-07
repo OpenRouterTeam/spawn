@@ -54,7 +54,8 @@ ensure_vultr_token() {
     echo ""
     local api_key=$(safe_read "Enter your Vultr API key: ") || return 1
     if [[ -z "$api_key" ]]; then
-        log_error "API key is required"
+        log_error "API key cannot be empty"
+        log_warn "For non-interactive usage, set: VULTR_API_KEY=your-key"
         return 1
     fi
     export VULTR_API_KEY="$api_key"
@@ -62,7 +63,9 @@ ensure_vultr_token() {
     if echo "$test_response" | grep -q '"account"'; then
         log_info "API key validated"
     else
-        log_error "Invalid API key"
+        log_error "Authentication failed: Invalid Vultr API key"
+        log_warn "Verify your API key at: https://my.vultr.com/settings/#settingsapi"
+        log_warn "Ensure the key has appropriate permissions"
         unset VULTR_API_KEY
         return 1
     fi

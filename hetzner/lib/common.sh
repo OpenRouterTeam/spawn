@@ -70,7 +70,8 @@ ensure_hcloud_token() {
 
     local token=$(safe_read "Enter your Hetzner API token: ") || return 1
     if [[ -z "$token" ]]; then
-        log_error "API token is required"
+        log_error "API token cannot be empty"
+        log_warn "For non-interactive usage, set: HCLOUD_TOKEN=your-token"
         return 1
     fi
 
@@ -78,7 +79,9 @@ ensure_hcloud_token() {
     export HCLOUD_TOKEN="$token"
     local test_response=$(hetzner_api GET "/servers?per_page=1")
     if echo "$test_response" | grep -q '"error"'; then
-        log_error "Invalid API token"
+        log_error "Authentication failed: Invalid Hetzner API token"
+        log_warn "Verify your token at: https://console.hetzner.cloud/projects → API Tokens"
+        log_warn "Ensure the token has read/write permissions"
         unset HCLOUD_TOKEN
         return 1
     fi
@@ -145,30 +148,7 @@ get_server_name() {
     echo "$server_name"
 }
 
-# Generate cloud-init userdata YAML
-get_cloud_init_userdata() {
-    cat << 'CLOUD_INIT_EOF'
-#cloud-config
-package_update: true
-packages:
-  - curl
-  - unzip
-  - git
-  - zsh
-
-runcmd:
-  # Install Bun
-  - su - root -c 'curl -fsSL https://bun.sh/install | bash'
-  # Install Claude Code
-  - su - root -c 'curl -fsSL https://claude.ai/install.sh | bash'
-  # Configure PATH in .bashrc
-  - echo 'export PATH="$HOME/.claude/local/bin:$HOME/.bun/bin:$PATH"' >> /root/.bashrc
-  # Configure PATH in .zshrc
-  - echo 'export PATH="$HOME/.claude/local/bin:$HOME/.bun/bin:$PATH"' >> /root/.zshrc
-  # Signal completion
-  - touch /root/.cloud-init-complete
-CLOUD_INIT_EOF
-}
+# get_cloud_init_userdata is now defined in shared/common.sh
 
 # Create a Hetzner server with cloud-init
 create_server() {
