@@ -92,6 +92,21 @@
         "location": "fsn1",
         "image": "ubuntu-24.04"
       }
+    },
+    "digitalocean": {
+      "name": "DigitalOcean",
+      "description": "DigitalOcean Droplets via REST API",
+      "url": "https://www.digitalocean.com/",
+      "type": "api",
+      "auth": "DO_API_TOKEN",
+      "provision_method": "POST /v2/droplets with user_data",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "size": "s-2vcpu-2gb",
+        "region": "nyc3",
+        "image": "ubuntu-24-04-x64"
+      }
     }
   },
   "matrix": {
@@ -100,6 +115,9 @@
     "sprite/nanoclaw": "implemented",
     "hetzner/claude": "implemented",
     "hetzner/openclaw": "implemented",
-    "hetzner/nanoclaw": "implemented"
+    "hetzner/nanoclaw": "implemented",
+    "digitalocean/claude": "implemented",
+    "digitalocean/openclaw": "implemented",
+    "digitalocean/nanoclaw": "implemented"
   }
 }
