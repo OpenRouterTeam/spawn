@@ -102,3 +102,45 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 - `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
 - `HETZNER_SERVER_TYPE` - Server type (default: `cx22`)
 - `HETZNER_LOCATION` - Datacenter location (default: `fsn1`)
+
+---
+
+## DigitalOcean
+
+Spawn agents on [DigitalOcean](https://www.digitalocean.com/) Droplets via REST API.
+
+### Usage
+
+#### Claude Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/claude.sh)
+```
+
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/nanoclaw.sh)
+```
+
+### Non-Interactive Mode
+
+```bash
+DO_DROPLET_NAME=dev-mk1 \
+DO_API_TOKEN=your-digitalocean-api-token \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/claude.sh)
+```
+
+**Environment Variables:**
+- `DO_DROPLET_NAME` - Name for the droplet (skips prompt)
+- `DO_API_TOKEN` - DigitalOcean API token (skips prompt, saved to `~/.config/spawn/digitalocean.json`)
+- `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
+- `DO_DROPLET_SIZE` - Droplet size (default: `s-2vcpu-2gb`)
+- `DO_REGION` - Datacenter region (default: `nyc3`)
