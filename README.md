@@ -351,6 +351,51 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 
 ---
 
+## Architecture
+
+Spawn uses a **shared library pattern** to reduce code duplication across cloud providers:
+
+### Library Structure
+
+```
+spawn/
+  shared/
+    common.sh         # Provider-agnostic utilities (logging, OAuth, SSH helpers)
+  {cloud}/
+    lib/common.sh     # Cloud-specific functions (sources shared/common.sh)
+    {agent}.sh        # Agent deployment scripts
+```
+
+### How It Works
+
+1. **`shared/common.sh`** - Core utilities used by all clouds:
+   - Color logging (`log_info`, `log_warn`, `log_error`)
+   - Safe input handling (`safe_read`)
+   - OAuth flow for OpenRouter authentication
+   - Network utilities (`nc_listen`, `open_browser`)
+   - SSH key management and connectivity helpers
+   - Security validation (`validate_model_id`, `json_escape`)
+
+2. **`{cloud}/lib/common.sh`** - Cloud-specific extensions:
+   - Sources `shared/common.sh` first
+   - Adds provider-specific functions (API wrappers, provisioning logic)
+   - Examples: `sprite/lib/common.sh` adds Sprite CLI functions, `hetzner/lib/common.sh` adds Hetzner API functions
+
+3. **Agent scripts** - Combine shared utilities with cloud-specific provisioning:
+   - Source their cloud's `lib/common.sh`
+   - Use shared functions for authentication and setup
+   - Use cloud functions for server provisioning
+   - Deploy and configure the specific agent
+
+### Benefits
+
+- **DRY (Don't Repeat Yourself)** - OAuth, logging, and SSH logic are written once
+- **Consistency** - All scripts use the same patterns for authentication and error handling
+- **Maintainability** - Bug fixes in `shared/common.sh` benefit all cloud providers
+- **Extensibility** - Adding a new cloud only requires writing provider-specific logic
+
+---
+
 ## Security
 
 ### API Token Storage
