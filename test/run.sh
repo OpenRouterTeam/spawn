@@ -568,7 +568,7 @@ test_shared_common() {
         # Mock ssh that always succeeds
         ssh() { return 0; }
         export -f ssh
-        generic_ssh_wait "1.2.3.4" "-o Test" "true" "test" 2 1 2>&1
+        generic_ssh_wait "root" "1.2.3.4" "-o Test" "true" "test" 2 1 2>&1
         echo $?
     ' 2>/dev/null | tail -1)
     if [[ "$result" == "0" ]]; then
@@ -585,7 +585,7 @@ test_shared_common() {
         # Mock ssh that always fails
         ssh() { return 1; }
         export -f ssh
-        generic_ssh_wait "1.2.3.4" "-o Test" "false" "test" 2 1 2>&1
+        generic_ssh_wait "root" "1.2.3.4" "-o Test" "false" "test" 2 1 2>&1
         echo $?
     ' 2>/dev/null | tail -1)
     if [[ "$result" == "1" ]]; then

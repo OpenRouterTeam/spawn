@@ -233,7 +233,7 @@ verify_server_connectivity() {
     local max_attempts=${2:-30}
     # SSH_OPTS is defined in shared/common.sh
     # shellcheck disable=SC2154
-    generic_ssh_wait "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
+    generic_ssh_wait "root" "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
 }
 
 

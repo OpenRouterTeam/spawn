@@ -849,16 +849,17 @@ verify_agent_installed() {
 # ============================================================
 
 # Generic SSH wait function - polls until a remote command succeeds with exponential backoff
-# Usage: generic_ssh_wait IP SSH_OPTS TEST_CMD DESCRIPTION MAX_ATTEMPTS [INITIAL_INTERVAL]
+# Usage: generic_ssh_wait USERNAME IP SSH_OPTS TEST_CMD DESCRIPTION MAX_ATTEMPTS [INITIAL_INTERVAL]
 # Implements exponential backoff: starts at INITIAL_INTERVAL (default 5s), doubles up to max 30s
 # Adds jitter (±20%) to prevent thundering herd when multiple instances retry simultaneously
 generic_ssh_wait() {
-    local ip="${1}"
-    local ssh_opts="${2}"
-    local test_cmd="${3}"
-    local description="${4}"
-    local max_attempts="${5:-30}"
-    local initial_interval="${6:-5}"
+    local username="${1}"
+    local ip="${2}"
+    local ssh_opts="${3}"
+    local test_cmd="${4}"
+    local description="${5}"
+    local max_attempts="${6:-30}"
+    local initial_interval="${7:-5}"
 
     local attempt=1
     local interval="${initial_interval}"
@@ -867,7 +868,7 @@ generic_ssh_wait() {
 
     log_warn "Waiting for ${description} to ${ip}..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
-        if ssh ${ssh_opts} "root@${ip}" "${test_cmd}" >/dev/null 2>&1; then
+        if ssh ${ssh_opts} "${username}@${ip}" "${test_cmd}" >/dev/null 2>&1; then
             log_info "${description} ready after ${elapsed_time}s (attempt ${attempt})"
             return 0
         fi
@@ -901,7 +902,7 @@ generic_ssh_wait() {
 wait_for_cloud_init() {
     local ip="${1}"
     local max_attempts=${2:-60}
-    generic_ssh_wait "${ip}" "${SSH_OPTS}" "test -f /root/.cloud-init-complete" "cloud-init" "${max_attempts}" 5
+    generic_ssh_wait "root" "${ip}" "${SSH_OPTS}" "test -f /root/.cloud-init-complete" "cloud-init" "${max_attempts}" 5
 }
 
 # ============================================================
