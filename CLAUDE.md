@@ -164,18 +164,60 @@ This pattern ensures:
 - Path resolution works when sourced from any location
 - Script fails fast if shared library is missing
 
-## Script Conventions
+## Shell Script Rules
 
-- `#!/bin/bash` + `set -e`
-- Source `lib/common.sh` with local-first, remote-fallback pattern
-- Use `OPENROUTER_API_KEY` env var to skip OAuth when set
-- All env vars documented in README.md under the relevant section
+These rules are **non-negotiable** — violating them breaks remote execution for all users.
+
+### curl|bash Compatibility
+Every script MUST work when executed via `bash <(curl -fsSL URL)`:
+- **NEVER** use relative paths for sourcing (`source ./lib/...`, `source ../shared/...`)
+- **NEVER** rely on `$0`, `dirname $0`, or `BASH_SOURCE` resolving to a real filesystem path
+- **ALWAYS** use the local-or-remote fallback pattern:
+  ```bash
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+  if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
+      source "$SCRIPT_DIR/lib/common.sh"
+  else
+      eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/{cloud}/lib/common.sh)"
+  fi
+  ```
+- Similarly, `{cloud}/lib/common.sh` MUST use the same fallback for `shared/common.sh`
+
+### macOS bash 3.x Compatibility
+macOS ships bash 3.2. All scripts MUST work on it:
+- **NO** `echo -e` — use `printf` for escape sequences
+- **NO** `source <(cmd)` inside `bash <(curl ...)` — use `eval "$(cmd)"` instead
+- **NO** `((var++))` with `set -e` — use `var=$((var + 1))` (avoids falsy-zero exit)
+- **NO** `local` keyword inside `( ... ) &` subshells — not function scope
+- **NO** `set -u` (nounset) — use `${VAR:-}` for optional env var checks instead
+
+### Conventions
+- `#!/bin/bash` + `set -eo pipefail` (no `u` flag)
+- Use `${VAR:-}` for all optional env var checks (`OPENROUTER_API_KEY`, cloud tokens, etc.)
 - Remote fallback URL: `https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/{path}`
-- Scripts must be runnable via: `bash <(curl -fsSL https://openrouter.ai/lab/spawn/{cloud}/{agent}.sh)`
+- All env vars documented in the cloud's README.md
+
+## Autonomous Loops
+
+When running autonomous improvement/refactoring loops (`./improve.sh --loop`):
+
+- **Run `bash -n` on every changed .sh file** before committing — syntax errors break everything
+- **NEVER revert a prior fix** — if `shared/common.sh` was changed to fix macOS compat, don't undo it
+- **NEVER re-introduce deleted functions** — if `write_oauth_response_file` was removed, don't call it
+- **NEVER change the source/eval fallback pattern** in lib/common.sh files — it's load-bearing for curl|bash
+- **Test after EACH iteration** — don't batch multiple changes without verification
+- **If a change breaks tests, STOP** — revert and ask for guidance rather than compounding the regression
+
+## Git Workflow
+
+- Always work on a feature branch — never commit directly to main (except urgent one-line fixes)
+- Before creating a PR, check `git status` and `git log` to verify branch state
+- Use `gh pr create` from the feature branch, then `gh pr merge --squash`
+- Never rebase main or use `--force` unless explicitly asked
 
 ## After Each Change
 
-1. Update `manifest.json` matrix status to `"implemented"`
-2. Update `README.md` with usage instructions
-3. Run `bash test/run.sh` if tests exist for the cloud
+1. `bash -n {file}` syntax check on all modified scripts
+2. Update `manifest.json` matrix status to `"implemented"`
+3. Update the cloud's `README.md` with usage instructions
 4. Commit with a descriptive message

@@ -161,6 +161,23 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
+    },
+    "gptme": {
+      "name": "gptme",
+      "description": "Personal AI agent in the terminal with tools for code, terminal, browser, and more",
+      "url": "https://github.com/gptme/gptme",
+      "install": "pip install gptme",
+      "launch": "gptme -m openrouter/${MODEL_ID}",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "interactive_prompts": {
+        "model_id": {
+          "prompt": "Enter model ID",
+          "default": "openrouter/auto"
+        }
+      },
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and -m openrouter/... flag"
     }
   },
   "clouds": {
@@ -308,6 +325,23 @@
         "image": "debian_slim"
       },
       "notes": "No SSH — uses Modal Python SDK for exec. Sub-second cold starts. Requires pip install modal."
+    },
+    "fly": {
+      "name": "Fly.io",
+      "description": "Fly.io Machines via REST API and flyctl CLI",
+      "url": "https://fly.io",
+      "type": "api+cli",
+      "auth": "FLY_API_TOKEN",
+      "provision_method": "POST /v1/apps + POST /v1/apps/{app}/machines",
+      "exec_method": "fly ssh console -C",
+      "interactive_method": "fly ssh console",
+      "defaults": {
+        "region": "iad",
+        "vm_size": "shared-cpu-1x",
+        "vm_memory": 1024,
+        "image": "ubuntu:24.04"
+      },
+      "notes": "Uses Machines API for provisioning and flyctl SSH for exec. Docker-based, pay-per-second pricing. Requires flyctl CLI."
     }
   },
   "matrix": {
@@ -410,6 +444,27 @@
     "modal/interpreter": "implemented",
     "modal/gemini": "implemented",
     "modal/amazonq": "implemented",
-    "modal/cline": "implemented"
+    "modal/cline": "implemented",
+    "sprite/gptme": "implemented",
+    "hetzner/gptme": "implemented",
+    "digitalocean/gptme": "implemented",
+    "vultr/gptme": "implemented",
+    "linode/gptme": "implemented",
+    "lambda/gptme": "implemented",
+    "aws-lightsail/gptme": "implemented",
+    "gcp/gptme": "implemented",
+    "e2b/gptme": "implemented",
+    "modal/gptme": "implemented",
+    "fly/claude": "implemented",
+    "fly/aider": "implemented",
+    "fly/openclaw": "implemented",
+    "fly/nanoclaw": "implemented",
+    "fly/goose": "implemented",
+    "fly/codex": "implemented",
+    "fly/interpreter": "implemented",
+    "fly/gemini": "implemented",
+    "fly/amazonq": "implemented",
+    "fly/cline": "implemented",
+    "fly/gptme": "implemented"
   }
 }
