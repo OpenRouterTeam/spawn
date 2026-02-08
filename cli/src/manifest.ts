@@ -45,6 +45,7 @@ const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/main`;
 const CACHE_DIR = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "spawn");
 const CACHE_FILE = join(CACHE_DIR, "manifest.json");
 const CACHE_TTL = 3600; // 1 hour in seconds
+const FETCH_TIMEOUT = 10_000; // 10 seconds
 
 // ── Cache helpers ──────────────────────────────────────────────────────────────
 
@@ -58,12 +59,17 @@ function cacheAge(): number {
   }
 }
 
+function logError(message: string, err?: unknown): void {
+  const errMsg = err instanceof Error ? err.message : String(err);
+  console.error(err ? `${message}: ${errMsg}` : message);
+}
+
 function readCache(): Manifest | null {
   try {
     return JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
   } catch (err) {
     // Cache file missing, corrupted, or unreadable
-    console.error(`Failed to read cache from ${CACHE_FILE}:`, err instanceof Error ? err.message : String(err));
+    logError(`Failed to read cache from ${CACHE_FILE}`, err);
     return null;
   }
 }
@@ -73,14 +79,42 @@ function writeCache(data: Manifest): void {
   writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
 }
 
+// ── Fetching ───────────────────────────────────────────────────────────────────
+
+function isValidManifest(data: any): data is Manifest {
+  return data && data.agents && data.clouds && data.matrix;
+}
+
+async function fetchManifestFromGitHub(): Promise<Manifest | null> {
+  try {
+    const res = await fetch(`${RAW_BASE}/manifest.json`, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    });
+    if (!res.ok) {
+      logError(`Failed to fetch manifest from GitHub: HTTP ${res.status} ${res.statusText}`);
+      return null;
+    }
+    const data = (await res.json()) as Manifest;
+    if (!isValidManifest(data)) {
+      logError("Manifest structure validation failed: missing required fields (agents, clouds, or matrix)");
+      return null;
+    }
+    return data;
+  } catch (err) {
+    logError("Network error fetching manifest", err);
+    return null;
+  }
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 let _cached: Manifest | null = null;
 
 export async function loadManifest(forceRefresh = false): Promise<Manifest> {
+  // Return in-memory cache if available and not forcing refresh
   if (_cached && !forceRefresh) return _cached;
 
-  // Check disk cache first
+  // Check disk cache first if not forcing refresh
   if (!forceRefresh && cacheAge() < CACHE_TTL) {
     const cached = readCache();
     if (cached) {
@@ -90,26 +124,11 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
   }
 
   // Fetch from GitHub
-  try {
-    const res = await fetch(`${RAW_BASE}/manifest.json`, {
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (res.ok) {
-      const data = (await res.json()) as Manifest;
-      // Validate basic structure
-      if (data.agents && data.clouds && data.matrix) {
-        writeCache(data);
-        _cached = data;
-        return data;
-      } else {
-        console.error("Manifest structure validation failed: missing required fields (agents, clouds, or matrix)");
-      }
-    } else {
-      console.error(`Failed to fetch manifest from GitHub: HTTP ${res.status} ${res.statusText}`);
-    }
-  } catch (err) {
-    // Network error — fall through to cache
-    console.error("Network error fetching manifest:", err instanceof Error ? err.message : String(err));
+  const fetched = await fetchManifestFromGitHub();
+  if (fetched) {
+    writeCache(fetched);
+    _cached = fetched;
+    return fetched;
   }
 
   // Offline fallback: use stale cache
