@@ -223,7 +223,7 @@ print(json.dumps(body))
         fi
 
         log_warn "Instance status: $status/$power ($attempt/$max_attempts)"
-        sleep ${INSTANCE_STATUS_POLL_DELAY}
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
         ((attempt++))
     done
 

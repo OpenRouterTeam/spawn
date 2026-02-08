@@ -208,7 +208,7 @@ for net in data['droplet']['networks']['v4']:
         fi
 
         log_warn "Droplet status: $status ($attempt/$max_attempts)"
-        sleep ${INSTANCE_STATUS_POLL_DELAY}
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
         ((attempt++))
     done
 

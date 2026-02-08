@@ -228,7 +228,7 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
             return 0
         fi
         log_warn "Linode status: $status ($attempt/$max_attempts)"
-        sleep ${INSTANCE_STATUS_POLL_DELAY}; ((attempt++))
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"; ((attempt++))
     done
     log_error "Linode did not become active in time"; return 1
 }

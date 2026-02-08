@@ -130,7 +130,7 @@ create_server() {
             return 0
         fi
         log_warn "Instance state: ${state} (${attempt}/${max_attempts})"
-        sleep ${INSTANCE_STATUS_POLL_DELAY}; attempt=$((attempt + 1))
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"; attempt=$((attempt + 1))
     done
     log_error "Instance did not become running in time"; return 1
 }
