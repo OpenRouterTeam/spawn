@@ -79,8 +79,8 @@ wait_for_cloud_init() {
     log_warn "Installing tools in sandbox..."
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"" >> ~/.zshrc' >/dev/null 2>&1 || true
+    run_server 'echo "export PATH=\"${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true
+    run_server 'echo "export PATH=\"${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.zshrc' >/dev/null 2>&1 || true
     log_info "Tools installed"
 }
 
