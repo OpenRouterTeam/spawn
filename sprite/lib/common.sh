@@ -144,7 +144,8 @@ upload_file_sprite() {
     local remote_path="${3}"
 
     # Generate a unique temp path to avoid collisions
-    local temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_$$"
+    local temp_remote
+    temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_$$"
 
     sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
 }
