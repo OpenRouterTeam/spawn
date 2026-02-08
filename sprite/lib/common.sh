@@ -10,6 +10,9 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
 fi
 
+# Configurable timeout/delay constants
+SPRITE_CONNECTIVITY_POLL_DELAY=${SPRITE_CONNECTIVITY_POLL_DELAY:-5}  # Delay between sprite connectivity checks
+
 # Check if sprite CLI is installed, install if not
 ensure_sprite_installed() {
     if ! command -v sprite &> /dev/null; then
@@ -67,7 +70,7 @@ verify_sprite_connectivity() {
             return 0
         fi
         log_warn "Sprite not ready, retrying (${attempt}/${max_attempts})..."
-        sleep 5
+        sleep ${SPRITE_CONNECTIVITY_POLL_DELAY}
         ((attempt++))
     done
 

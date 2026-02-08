@@ -25,6 +25,9 @@ fi
 readonly LINODE_API_BASE="https://api.linode.com/v4"
 # SSH_OPTS is now defined in shared/common.sh
 
+# Configurable timeout/delay constants
+INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}  # Delay between instance status checks
+
 linode_api() {
     local method="$1" endpoint="$2" body="${3:-}"
     generic_cloud_api "$LINODE_API_BASE" "$LINODE_API_TOKEN" "$method" "$endpoint" "$body"
@@ -224,7 +227,7 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
             return 0
         fi
         log_warn "Linode status: $status ($attempt/$max_attempts)"
-        sleep 5; ((attempt++))
+        sleep ${INSTANCE_STATUS_POLL_DELAY}; ((attempt++))
     done
     log_error "Linode did not become active in time"; return 1
 }

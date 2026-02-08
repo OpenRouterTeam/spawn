@@ -25,6 +25,9 @@ fi
 readonly DO_API_BASE="https://api.digitalocean.com/v2"
 # SSH_OPTS is now defined in shared/common.sh
 
+# Configurable timeout/delay constants
+INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}  # Delay between instance status checks
+
 # Centralized curl wrapper for DigitalOcean API
 do_api() {
     local method="$1"
@@ -204,7 +207,7 @@ for net in data['droplet']['networks']['v4']:
         fi
 
         log_warn "Droplet status: $status ($attempt/$max_attempts)"
-        sleep 5
+        sleep ${INSTANCE_STATUS_POLL_DELAY}
         ((attempt++))
     done
 

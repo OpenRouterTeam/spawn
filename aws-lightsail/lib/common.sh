@@ -25,6 +25,9 @@ fi
 
 # SSH_OPTS is now defined in shared/common.sh
 
+# Configurable timeout/delay constants
+INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}  # Delay between instance status checks
+
 ensure_aws_cli() {
     if ! command -v aws &>/dev/null; then
         log_error "AWS CLI is required. Install: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
@@ -127,7 +130,7 @@ create_server() {
             return 0
         fi
         log_warn "Instance state: ${state} (${attempt}/${max_attempts})"
-        sleep 5; attempt=$((attempt + 1))
+        sleep ${INSTANCE_STATUS_POLL_DELAY}; attempt=$((attempt + 1))
     done
     log_error "Instance did not become running in time"; return 1
 }

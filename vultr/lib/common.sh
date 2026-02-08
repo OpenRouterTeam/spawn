@@ -25,6 +25,9 @@ fi
 readonly VULTR_API_BASE="https://api.vultr.com/v2"
 # SSH_OPTS is now defined in shared/common.sh
 
+# Configurable timeout/delay constants
+INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}  # Delay between instance status checks
+
 vultr_api() {
     local method="$1"
     local endpoint="$2"
@@ -220,7 +223,7 @@ print(json.dumps(body))
         fi
 
         log_warn "Instance status: $status/$power ($attempt/$max_attempts)"
-        sleep 5
+        sleep ${INSTANCE_STATUS_POLL_DELAY}
         ((attempt++))
     done
 
