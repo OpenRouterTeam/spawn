@@ -1,9 +1,11 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 # shellcheck source=lambda/lib/common.sh
+
 if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
     source "${SCRIPT_DIR}/lib/common.sh"
 else
@@ -43,19 +45,11 @@ fi
 # 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
 
-ENV_TEMP=$(mktemp)
-trap 'rm -f "${ENV_TEMP}"' EXIT
-cat > "${ENV_TEMP}" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export GEMINI_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-EOF
-
-upload_file "${LAMBDA_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
-run_server "${LAMBDA_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+inject_env_vars_ssh "${LAMBDA_INSTANCE_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "Lambda Cloud instance setup completed successfully!"
