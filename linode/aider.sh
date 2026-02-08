@@ -15,7 +15,7 @@ log_warn "Installing Aider..."
 run_server "$LINODE_SERVER_IP" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 log_info "Aider installed"
 echo ""
-if [[ -n "$OPENROUTER_API_KEY" ]]; then log_info "Using OpenRouter API key from environment"
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 log_warn "Setting up environment variables..."

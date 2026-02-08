@@ -151,7 +151,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    if [[ -n "$GCP_INSTANCE_NAME" ]]; then
+    if [[ -n "${GCP_INSTANCE_NAME:-}" ]]; then
         log_info "Using instance name from environment: $GCP_INSTANCE_NAME"
         echo "$GCP_INSTANCE_NAME"; return 0
     fi

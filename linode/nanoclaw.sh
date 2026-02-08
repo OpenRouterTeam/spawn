@@ -17,7 +17,7 @@ log_warn "Cloning and building nanoclaw..."
 run_server "$LINODE_SERVER_IP" "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
 log_info "NanoClaw installed"
 echo ""
-if [[ -n "$OPENROUTER_API_KEY" ]]; then log_info "Using OpenRouter API key from environment"
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 log_warn "Setting up environment variables..."
 inject_env_vars_ssh "$LINODE_SERVER_IP" upload_file run_server \

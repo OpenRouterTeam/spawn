@@ -158,7 +158,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    if [[ -n "$LIGHTSAIL_SERVER_NAME" ]]; then
+    if [[ -n "${LIGHTSAIL_SERVER_NAME:-}" ]]; then
         log_info "Using instance name from environment: $LIGHTSAIL_SERVER_NAME"
         echo "$LIGHTSAIL_SERVER_NAME"; return 0
     fi

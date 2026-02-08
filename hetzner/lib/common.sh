@@ -37,7 +37,7 @@ ensure_hcloud_token() {
     check_python_available || return 1
 
     # 1. Check environment variable
-    if [[ -n "$HCLOUD_TOKEN" ]]; then
+    if [[ -n "${HCLOUD_TOKEN:-}" ]]; then
         log_info "Using Hetzner API token from environment"
         return 0
     fi
@@ -139,7 +139,7 @@ ensure_ssh_key() {
 
 # Get server name from env var or prompt
 get_server_name() {
-    if [[ -n "$HETZNER_SERVER_NAME" ]]; then
+    if [[ -n "${HETZNER_SERVER_NAME:-}" ]]; then
         log_info "Using server name from environment: $HETZNER_SERVER_NAME"
         if ! validate_server_name "$HETZNER_SERVER_NAME"; then
             return 1

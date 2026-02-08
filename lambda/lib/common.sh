@@ -126,7 +126,7 @@ lambda_api() {
 }
 
 ensure_lambda_token() {
-    if [[ -n "$LAMBDA_API_KEY" ]]; then
+    if [[ -n "${LAMBDA_API_KEY:-}" ]]; then
         log_info "Using Lambda API key from environment"; return 0
     fi
     local config_dir="$HOME/.config/spawn" config_file="$config_dir/lambda.json"
@@ -182,7 +182,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    if [[ -n "$LAMBDA_SERVER_NAME" ]]; then
+    if [[ -n "${LAMBDA_SERVER_NAME:-}" ]]; then
         log_info "Using server name from environment: $LAMBDA_SERVER_NAME"
         echo "$LAMBDA_SERVER_NAME"; return 0
     fi

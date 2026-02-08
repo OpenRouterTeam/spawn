@@ -15,7 +15,7 @@ log_warn "Installing Codex CLI..."
 run_server "$LINODE_SERVER_IP" "npm install -g @openai/codex"
 log_info "Codex CLI installed"
 echo ""
-if [[ -n "$OPENROUTER_API_KEY" ]]; then log_info "Using OpenRouter API key from environment"
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 log_warn "Setting up environment variables..."
 inject_env_vars_ssh "$LINODE_SERVER_IP" upload_file run_server \
