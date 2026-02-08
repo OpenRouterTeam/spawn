@@ -80,8 +80,10 @@ print(sum(1 for v in m.get('matrix', {}).values() if v == 'missing'))
 
 # Build the team prompt — this is what the lead sees
 build_team_prompt() {
-    local gaps=$(count_gaps)
-    local summary=$(get_matrix_summary)
+    local gaps
+    gaps=$(count_gaps)
+    local summary
+    summary=$(get_matrix_summary)
 
     cat <<EOF
 You are the lead of a spawn improvement team. Read CLAUDE.md and manifest.json first.
@@ -125,7 +127,8 @@ EOF
 
 # Build prompt for old single-agent mode
 build_single_prompt() {
-    local gap=$(python3 -c "
+    local gap
+    gap=$(python3 -c "
 import json
 m = json.load(open('$MANIFEST'))
 for key, status in m.get('matrix', {}).items():
@@ -155,7 +158,8 @@ EOF
 }
 
 run_team_cycle() {
-    local prompt=$(build_team_prompt)
+    local prompt
+    prompt=$(build_team_prompt)
     log_info "Launching agent team..."
     echo ""
     (cd "$REPO_ROOT" && claude -p "$prompt" --dangerously-skip-permissions)
@@ -163,7 +167,8 @@ run_team_cycle() {
 }
 
 run_single_cycle() {
-    local prompt=$(build_single_prompt)
+    local prompt
+    prompt=$(build_single_prompt)
     log_info "Launching single agent..."
     echo ""
     (cd "$REPO_ROOT" && claude --print -p "$prompt")
