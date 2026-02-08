@@ -122,6 +122,8 @@ verify_server_connectivity() {
     local username=$(whoami)
     log_warn "Waiting for SSH connectivity to $ip..."
     while [[ $attempt -le $max_attempts ]]; do
+        # SSH_OPTS is defined in shared/common.sh
+        # shellcheck disable=SC2154
         if ssh $SSH_OPTS -o ConnectTimeout=5 "${username}@$ip" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi

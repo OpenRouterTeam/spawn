@@ -136,6 +136,8 @@ verify_server_connectivity() {
     local ip="$1" max_attempts=${2:-30} attempt=1
     log_warn "Waiting for SSH connectivity to $ip..."
     while [[ $attempt -le $max_attempts ]]; do
+        # SSH_OPTS is defined in shared/common.sh
+        # shellcheck disable=SC2154
         if ssh $SSH_OPTS -o ConnectTimeout=5 "ubuntu@$ip" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi

@@ -209,6 +209,8 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
 
 verify_server_connectivity() {
     local ip="$1" max_attempts=${2:-30}
+    # SSH_OPTS is defined in shared/common.sh
+    # shellcheck disable=SC2154
     generic_ssh_wait "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
 }
 
