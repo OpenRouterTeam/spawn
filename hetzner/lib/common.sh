@@ -28,6 +28,7 @@ hetzner_api() {
     local method="$1"
     local endpoint="$2"
     local body="${3:-}"
+    # shellcheck disable=SC2154
     generic_cloud_api "$HETZNER_API_BASE" "$HCLOUD_TOKEN" "$method" "$endpoint" "$body"
 }
 

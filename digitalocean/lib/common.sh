@@ -33,6 +33,7 @@ do_api() {
     local method="$1"
     local endpoint="$2"
     local body="${3:-}"
+    # shellcheck disable=SC2154
     generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" "$method" "$endpoint" "$body"
 }
 
