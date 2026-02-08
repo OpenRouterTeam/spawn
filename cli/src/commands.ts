@@ -34,12 +34,29 @@ async function withSpinner<T>(msg: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function loadManifestWithSpinner(): Promise<Manifest> {
+  return withSpinner("Loading manifest...", loadManifest);
+}
+
+function validateNonEmptyString(value: string, fieldName: string, helpCommand: string): void {
+  if (!value || value.trim() === "") {
+    p.log.error(`${fieldName} cannot be empty`);
+    p.log.info(`Run ${pc.cyan(helpCommand)} to see available ${fieldName.toLowerCase()}s.`);
+    process.exit(1);
+  }
+}
+
+function errorMessage(message: string): never {
+  p.log.error(message);
+  process.exit(1);
+}
+
 // ── Interactive ────────────────────────────────────────────────────────────────
 
 export async function cmdInteractive() {
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
-  const manifest = await withSpinner("Loading manifest...", loadManifest);
+  const manifest = await loadManifestWithSpinner();
 
   const agents = agentKeys(manifest);
   const agentChoice = await p.select({
@@ -84,18 +101,10 @@ export async function cmdInteractive() {
 
 export async function cmdRun(agent: string, cloud: string) {
   // Validate input arguments
-  if (!agent || agent.trim() === "") {
-    p.log.error("Agent name cannot be empty");
-    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
-    process.exit(1);
-  }
-  if (!cloud || cloud.trim() === "") {
-    p.log.error("Cloud name cannot be empty");
-    p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
-    process.exit(1);
-  }
+  validateNonEmptyString(agent, "Agent name", "spawn agents");
+  validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
 
-  const manifest = await withSpinner("Loading manifest...", loadManifest);
+  const manifest = await loadManifestWithSpinner();
 
   if (!manifest.agents[agent]) {
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
@@ -166,7 +175,7 @@ function runBash(script: string): Promise<void> {
 // ── List ───────────────────────────────────────────────────────────────────────
 
 export async function cmdList() {
-  const manifest = await withSpinner("Loading manifest...", loadManifest);
+  const manifest = await loadManifestWithSpinner();
 
   const agents = agentKeys(manifest);
   const clouds = cloudKeys(manifest);
@@ -218,7 +227,7 @@ export async function cmdList() {
 // ── Agents ─────────────────────────────────────────────────────────────────────
 
 export async function cmdAgents() {
-  const manifest = await withSpinner("Loading manifest...", loadManifest);
+  const manifest = await loadManifestWithSpinner();
 
   console.log();
   console.log(pc.bold("Agents"));
@@ -233,7 +242,7 @@ export async function cmdAgents() {
 // ── Clouds ─────────────────────────────────────────────────────────────────────
 
 export async function cmdClouds() {
-  const manifest = await withSpinner("Loading manifest...", loadManifest);
+  const manifest = await loadManifestWithSpinner();
 
   console.log();
   console.log(pc.bold("Cloud Providers"));
@@ -249,13 +258,9 @@ export async function cmdClouds() {
 
 export async function cmdAgentInfo(agent: string) {
   // Validate input argument
-  if (!agent || agent.trim() === "") {
-    p.log.error("Agent name cannot be empty");
-    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
-    process.exit(1);
-  }
+  validateNonEmptyString(agent, "Agent name", "spawn agents");
 
-  const manifest = await withSpinner("Loading manifest...", loadManifest);
+  const manifest = await loadManifestWithSpinner();
 
   if (!manifest.agents[agent]) {
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
