@@ -174,49 +174,64 @@ function runBash(script: string): Promise<void> {
 
 // ── List ───────────────────────────────────────────────────────────────────────
 
+const MIN_AGENT_COL_WIDTH = 16;
+const MIN_CLOUD_COL_WIDTH = 10;
+const COL_PADDING = 2;
+
+function calculateColumnWidth(items: string[], minWidth: number): number {
+  return Math.max(minWidth, ...items.map((item) => item.length + COL_PADDING));
+}
+
+function renderMatrixHeader(clouds: string[], manifest: Manifest, agentColWidth: number, cloudColWidth: number): string {
+  let header = "".padEnd(agentColWidth);
+  for (const c of clouds) {
+    header += pc.bold(manifest.clouds[c].name.padEnd(cloudColWidth));
+  }
+  return header;
+}
+
+function renderMatrixSeparator(clouds: string[], agentColWidth: number, cloudColWidth: number): string {
+  let sep = "".padEnd(agentColWidth);
+  for (const _ of clouds) {
+    sep += pc.dim("─".repeat(cloudColWidth - COL_PADDING) + "  ");
+  }
+  return sep;
+}
+
+function renderMatrixRow(agent: string, clouds: string[], manifest: Manifest, agentColWidth: number, cloudColWidth: number): string {
+  let row = pc.bold(manifest.agents[agent].name.padEnd(agentColWidth));
+  for (const c of clouds) {
+    const status = matrixStatus(manifest, c, agent);
+    const icon = status === "implemented" ? "  \u2713" : "  \u2013";
+    const colorFn = status === "implemented" ? pc.green : pc.dim;
+    row += colorFn(icon.padEnd(cloudColWidth));
+  }
+  return row;
+}
+
 export async function cmdList() {
   const manifest = await loadManifestWithSpinner();
 
   const agents = agentKeys(manifest);
   const clouds = cloudKeys(manifest);
 
-  // Calculate column widths
-  const agentColWidth = Math.max(16, ...agents.map((a) => manifest.agents[a].name.length + 2));
-  const cloudColWidth = Math.max(
-    10,
-    ...clouds.map((c) => manifest.clouds[c].name.length + 2)
+  const agentColWidth = calculateColumnWidth(
+    agents.map((a) => manifest.agents[a].name),
+    MIN_AGENT_COL_WIDTH
+  );
+  const cloudColWidth = calculateColumnWidth(
+    clouds.map((c) => manifest.clouds[c].name),
+    MIN_CLOUD_COL_WIDTH
   );
 
-  // Header
-  let header = "".padEnd(agentColWidth);
-  for (const c of clouds) {
-    header += pc.bold(manifest.clouds[c].name.padEnd(cloudColWidth));
-  }
   console.log();
-  console.log(header);
+  console.log(renderMatrixHeader(clouds, manifest, agentColWidth, cloudColWidth));
+  console.log(renderMatrixSeparator(clouds, agentColWidth, cloudColWidth));
 
-  // Separator
-  let sep = "".padEnd(agentColWidth);
-  for (const _ of clouds) {
-    sep += pc.dim("─".repeat(cloudColWidth - 2) + "  ");
-  }
-  console.log(sep);
-
-  // Rows
   for (const a of agents) {
-    let row = pc.bold(manifest.agents[a].name.padEnd(agentColWidth));
-    for (const c of clouds) {
-      const status = matrixStatus(manifest, c, a);
-      if (status === "implemented") {
-        row += pc.green("  \u2713".padEnd(cloudColWidth));
-      } else {
-        row += pc.dim("  \u2013".padEnd(cloudColWidth));
-      }
-    }
-    console.log(row);
+    console.log(renderMatrixRow(a, clouds, manifest, agentColWidth, cloudColWidth));
   }
 
-  // Summary
   const impl = countImplemented(manifest);
   const total = agents.length * clouds.length;
   console.log();
