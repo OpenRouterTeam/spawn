@@ -154,12 +154,23 @@ git checkout main && git pull --rebase origin main
 2. Do the work, commit
 3. Push: `git push -u origin {branch-name}`
 4. Create PR: `gh pr create --title "..." --body "..."`
-5. Merge immediately: `gh pr merge --squash`
-6. Switch back: `git checkout main && git pull --rebase origin main`
-7. Delete branch: `git push origin --delete {branch-name}`
+5. Try to merge: `gh pr merge --squash --delete-branch`
+6. **If merge fails** (conflicts, CI, etc.):
+   - Comment on the PR explaining WHY it cannot be merged
+   - Close with: `gh pr close {number} --comment "Closing: {reason}"`
+   - Acceptable reasons: merge conflict with a concurrent PR, superseded by another PR, implementation found to be incorrect after review
+   - NEVER close a PR silently — every closed PR MUST have a comment
+7. Switch back: `git checkout main && git pull --rebase origin main`
+
+### PR Policy (MANDATORY):
+Every PR must reach one of these terminal states:
+- **MERGED** — the happy path, always preferred
+- **CLOSED with comment** — only when merge is impossible, with a clear explanation
 
 ### NEVER:
 - Push directly to main
+- Close a PR without a comment explaining why
+- Leave PRs open/abandoned — resolve them in the same cycle
 - Leave branches hanging after merge
 - Work on a stale checkout — always pull latest main before each unit of work
 
@@ -196,6 +207,7 @@ Copy the output and replace the matrix table between `## Matrix` and `## Develop
 - `bash -n {file}` syntax-check before committing
 - Each teammate works on DIFFERENT files
 - Each unit of work gets its own branch → PR → merge → cleanup
+- **Every PR must be merged OR closed with a comment** — no silent closes, no abandoned PRs
 - Update manifest.json, the cloud's README.md, AND the root README.md matrix
 - NEVER revert prior macOS/curl-bash compatibility fixes
 PROMPT_EOF

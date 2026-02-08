@@ -247,6 +247,8 @@ When running autonomous improvement/refactoring loops (`./improve.sh --loop`):
 - Always work on a feature branch — never commit directly to main (except urgent one-line fixes)
 - Before creating a PR, check `git status` and `git log` to verify branch state
 - Use `gh pr create` from the feature branch, then `gh pr merge --squash`
+- **Every PR must be MERGED or CLOSED with a comment** — never close silently
+- If a PR can't be merged (conflicts, superseded, wrong approach), close it with `gh pr close {number} --comment "Reason"`
 - Never rebase main or use `--force` unless explicitly asked
 
 ## After Each Change
