@@ -1,0 +1,20 @@
+{
+  "name": "@openrouter/spawn",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "spawn": "cli.js"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outfile cli.js --target node --minify",
+    "compile": "bun build src/index.ts --compile --outfile spawn"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0"
+  }
+}

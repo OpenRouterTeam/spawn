@@ -2,7 +2,7 @@
 # Common bash functions for Linode (Akamai) spawn scripts
 
 # Bash safety flags
-set -euo pipefail
+set -eo pipefail
 
 # ============================================================
 # Provider-agnostic functions

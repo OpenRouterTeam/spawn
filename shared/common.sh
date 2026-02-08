@@ -3,7 +3,7 @@
 # Provider-agnostic utilities for logging, input, OAuth, etc.
 #
 # This file is meant to be sourced by cloud provider-specific common.sh files.
-# It does not set bash flags (like set -euo pipefail) as those should be set
+# It does not set bash flags (like set -eo pipefail) as those should be set
 # by the scripts that source this file.
 
 # ============================================================

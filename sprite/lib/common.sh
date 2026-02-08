@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
 # Common bash functions shared between spawn scripts
 
 # Source shared provider-agnostic functions (local or remote fallback)
