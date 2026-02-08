@@ -33,9 +33,13 @@ run_sprite "${SPRITE_NAME}" "/.sprite/languages/bun/bin/bun install -g tsx"
 log_warn "Cloning nanoclaw..."
 run_sprite "${SPRITE_NAME}" "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
 
-# Get OpenRouter API key via OAuth
+# Get OpenRouter API key
 echo ""
-OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+    log_info "Using OpenRouter API key from environment"
+else
+    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
+fi
 
 log_warn "Setting up environment variables..."
 inject_env_vars_sprite "${SPRITE_NAME}" \

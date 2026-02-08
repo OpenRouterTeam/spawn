@@ -28,9 +28,13 @@ setup_shell_environment "${SPRITE_NAME}"
 log_warn "Installing openclaw..."
 run_sprite "${SPRITE_NAME}" "/.sprite/languages/bun/bin/bun install -g openclaw"
 
-# Get OpenRouter API key via OAuth
+# Get OpenRouter API key
 echo ""
-OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+    log_info "Using OpenRouter API key from environment"
+else
+    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
+fi
 
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1

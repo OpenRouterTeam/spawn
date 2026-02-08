@@ -19,15 +19,15 @@ NC='\033[0m' # No Color
 
 # Print colored messages (to stderr so they don't pollute command substitution output)
 log_info() {
-    echo -e "${GREEN}${1}${NC}" >&2
+    printf '%b\n' "${GREEN}${1}${NC}" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}${1}${NC}" >&2
+    printf '%b\n' "${YELLOW}${1}${NC}" >&2
 }
 
 log_error() {
-    echo -e "${RED}${1}${NC}" >&2
+    printf '%b\n' "${RED}${1}${NC}" >&2
 }
 
 # ============================================================
@@ -317,7 +317,7 @@ get_model_id_interactive() {
 get_openrouter_api_key_manual() {
     echo ""
     log_warn "Manual API Key Entry"
-    echo -e "${YELLOW}Get your API key from: https://openrouter.ai/settings/keys${NC}"
+    printf '%b\n' "${YELLOW}Get your API key from: https://openrouter.ai/settings/keys${NC}"
     echo ""
 
     local api_key=""
@@ -1109,7 +1109,8 @@ setup_claude_code_config() {
 }
 EOF
 
-    ${upload_callback} "${settings_temp}" "/root/.claude/settings.json"
+    ${upload_callback} "${settings_temp}" "/tmp/claude_settings_$$"
+    ${run_callback} "mv /tmp/claude_settings_$$ ~/.claude/settings.json"
 
     # Create .claude.json global state
     local global_state_temp
@@ -1124,7 +1125,8 @@ EOF
 }
 EOF
 
-    ${upload_callback} "${global_state_temp}" "/root/.claude.json"
+    ${upload_callback} "${global_state_temp}" "/tmp/claude_global_$$"
+    ${run_callback} "mv /tmp/claude_global_$$ ~/.claude.json"
 
     # Create empty CLAUDE.md
     ${run_callback} "touch ~/.claude/CLAUDE.md"
@@ -1195,7 +1197,8 @@ setup_openclaw_config() {
 }
 EOF
 
-    ${upload_callback} "${config_temp}" "/root/.openclaw/openclaw.json"
+    ${upload_callback} "${config_temp}" "/tmp/openclaw_config_$$"
+    ${run_callback} "mv /tmp/openclaw_config_$$ ~/.openclaw/openclaw.json"
 }
 
 # ============================================================
