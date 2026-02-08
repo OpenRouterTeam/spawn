@@ -53,7 +53,9 @@
       "url": "https://github.com/gavrielc/nanoclaw",
       "install": "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build",
       "launch": "cd ~/nanoclaw && npm run dev",
-      "deps": ["tsx"],
+      "deps": [
+        "tsx"
+      ],
       "env": {
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
         "ANTHROPIC_API_KEY": "${OPENROUTER_API_KEY}",
@@ -332,7 +334,7 @@
       "defaults": {
         "template": "base"
       },
-      "notes": "No SSH — uses E2B CLI for exec. Sandboxes start in ~150ms. Requires npm install -g @e2b/cli."
+      "notes": "No SSH \u2014 uses E2B CLI for exec. Sandboxes start in ~150ms. Requires npm install -g @e2b/cli."
     },
     "modal": {
       "name": "Modal",
@@ -346,7 +348,7 @@
       "defaults": {
         "image": "debian_slim"
       },
-      "notes": "No SSH — uses Modal Python SDK for exec. Sub-second cold starts. Requires pip install modal."
+      "notes": "No SSH \u2014 uses Modal Python SDK for exec. Sub-second cold starts. Requires pip install modal."
     },
     "fly": {
       "name": "Fly.io",
@@ -412,6 +414,39 @@
         "disk": 5
       },
       "notes": "Sub-90ms sandbox creation. True SSH support via daytona ssh. Requires DAYTONA_API_KEY from https://app.daytona.io."
+    },
+    "runpod": {
+      "name": "RunPod",
+      "description": "RunPod GPU cloud pods via GraphQL API",
+      "url": "https://www.runpod.io/",
+      "type": "api",
+      "auth": "RUNPOD_API_KEY",
+      "provision_method": "GraphQL mutation podFindAndDeployOnDemand",
+      "exec_method": "ssh root@IP -p PORT or ssh PODID@ssh.runpod.io",
+      "interactive_method": "ssh -t root@IP -p PORT",
+      "defaults": {
+        "gpu_type": "NVIDIA RTX A4000",
+        "gpu_count": 1,
+        "image": "runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04",
+        "volume_gb": 50
+      },
+      "notes": "GPU cloud provider. Uses GraphQL API, SSH via TCP port mapping or proxy. Docker-based pods with CUDA pre-installed."
+    },
+    "upcloud": {
+      "name": "UpCloud",
+      "description": "UpCloud cloud servers via REST API with MaxIOPS storage",
+      "url": "https://upcloud.com/",
+      "type": "api",
+      "auth": "UPCLOUD_USERNAME + UPCLOUD_PASSWORD",
+      "provision_method": "POST /1.3/server with login_user SSH keys",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "plan": "1xCPU-2GB",
+        "zone": "de-fra1",
+        "image": "Ubuntu Server 24.04 LTS"
+      },
+      "notes": "European cloud provider with MaxIOPS storage. Uses HTTP Basic Auth (username:password). Requires UPCLOUD_USERNAME and UPCLOUD_PASSWORD."
     }
   },
   "matrix": {
@@ -596,6 +631,32 @@
     "fly/plandex": "implemented",
     "civo/plandex": "implemented",
     "scaleway/plandex": "implemented",
-    "daytona/plandex": "implemented"
+    "daytona/plandex": "implemented",
+    "runpod/claude": "implemented",
+    "runpod/openclaw": "implemented",
+    "runpod/nanoclaw": "implemented",
+    "runpod/aider": "implemented",
+    "runpod/goose": "implemented",
+    "runpod/codex": "implemented",
+    "runpod/interpreter": "implemented",
+    "runpod/gemini": "implemented",
+    "runpod/amazonq": "implemented",
+    "runpod/cline": "implemented",
+    "runpod/gptme": "implemented",
+    "runpod/opencode": "implemented",
+    "runpod/plandex": "implemented",
+    "upcloud/claude": "implemented",
+    "upcloud/openclaw": "implemented",
+    "upcloud/nanoclaw": "implemented",
+    "upcloud/aider": "implemented",
+    "upcloud/goose": "implemented",
+    "upcloud/codex": "implemented",
+    "upcloud/interpreter": "implemented",
+    "upcloud/gemini": "implemented",
+    "upcloud/amazonq": "implemented",
+    "upcloud/cline": "implemented",
+    "upcloud/gptme": "implemented",
+    "upcloud/opencode": "implemented",
+    "upcloud/plandex": "implemented"
   }
 }
