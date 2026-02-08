@@ -28,7 +28,9 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
   // Allowlist validation: only safe characters
   if (!IDENTIFIER_PATTERN.test(identifier)) {
     throw new Error(
-      `${fieldName} contains invalid characters. Only lowercase letters, numbers, hyphens, and underscores are allowed.`
+      `${fieldName} "${identifier}" contains invalid characters.\n` +
+      `Only lowercase letters, numbers, hyphens, and underscores are allowed.\n` +
+      `Run 'spawn agents' or 'spawn clouds' to see valid names.`
     );
   }
 
@@ -106,7 +108,11 @@ export function validatePrompt(prompt: string): void {
   for (const { pattern, description } of dangerousPatterns) {
     if (pattern.test(prompt)) {
       throw new Error(
-        `Prompt blocked: contains potentially dangerous pattern (${description}). If this is a false positive, please use --prompt-file instead.`
+        `Prompt blocked: contains potentially dangerous pattern (${description}).\n` +
+        `\n` +
+        `If this is a false positive, use --prompt-file instead:\n` +
+        `  echo "your prompt" > prompt.txt\n` +
+        `  spawn <agent> <cloud> --prompt-file prompt.txt`
       );
     }
   }

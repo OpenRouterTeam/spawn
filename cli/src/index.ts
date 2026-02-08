@@ -28,7 +28,13 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   const manifest = await loadManifest();
   if (!manifest.agents[agent]) {
     console.error(`Error: Unknown agent "${agent}"`);
-    console.error(`\nRun 'spawn agents' to see all available agents.`);
+    console.error(`\nAvailable agents:`);
+    const agentNames = Object.values(manifest.agents).map(a => a.name).slice(0, 5);
+    agentNames.forEach(name => console.error(`  - ${name}`));
+    if (Object.keys(manifest.agents).length > 5) {
+      console.error(`  ... and ${Object.keys(manifest.agents).length - 5} more`);
+    }
+    console.error(`\nRun 'spawn agents' to see all agents.`);
     console.error(`Run 'spawn help' for complete usage.`);
     process.exit(1);
   }
