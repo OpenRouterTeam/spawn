@@ -68,6 +68,23 @@ function errorMessage(message: string): never {
   process.exit(1);
 }
 
+function mapToSelectOptions<T extends { name: string; description: string }>(
+  keys: string[],
+  items: Record<string, T>
+) {
+  return keys.map((key) => ({
+    value: key,
+    label: items[key].name,
+    hint: items[key].description,
+  }));
+}
+
+function getImplementedClouds(manifest: Manifest, agent: string): string[] {
+  return cloudKeys(manifest).filter(
+    (c) => matrixStatus(manifest, c, agent) === "implemented"
+  );
+}
+
 // ── Interactive ────────────────────────────────────────────────────────────────
 
 export async function cmdInteractive() {
@@ -78,18 +95,11 @@ export async function cmdInteractive() {
   const agents = agentKeys(manifest);
   const agentChoice = await p.select({
     message: "Select an agent",
-    options: agents.map((key) => ({
-      value: key,
-      label: manifest.agents[key].name,
-      hint: manifest.agents[key].description,
-    })),
+    options: mapToSelectOptions(agents, manifest.agents),
   });
   if (p.isCancel(agentChoice)) handleCancel();
 
-  // Only show clouds where this agent is implemented
-  const clouds = cloudKeys(manifest).filter(
-    (c) => matrixStatus(manifest, c, agentChoice) === "implemented"
-  );
+  const clouds = getImplementedClouds(manifest, agentChoice);
 
   if (clouds.length === 0) {
     p.log.error(`No clouds available for ${manifest.agents[agentChoice].name}`);
@@ -98,11 +108,7 @@ export async function cmdInteractive() {
 
   const cloudChoice = await p.select({
     message: "Select a cloud provider",
-    options: clouds.map((key) => ({
-      value: key,
-      label: manifest.clouds[key].name,
-      hint: manifest.clouds[key].description,
-    })),
+    options: mapToSelectOptions(clouds, manifest.clouds),
   });
   if (p.isCancel(cloudChoice)) handleCancel();
 
