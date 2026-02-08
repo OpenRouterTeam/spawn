@@ -31,7 +31,7 @@ wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}" 60
 
 # 5. Install OpenCode
 log_warn "Installing OpenCode..."
-run_server "${LIGHTSAIL_SERVER_IP}" "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
+run_server "${LIGHTSAIL_SERVER_IP}" "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 
 # 6. Get OpenRouter API key

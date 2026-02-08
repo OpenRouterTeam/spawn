@@ -21,7 +21,7 @@ verify_server_connectivity "${SCALEWAY_SERVER_IP}"
 install_base_packages "${SCALEWAY_SERVER_IP}"
 
 log_warn "Installing OpenCode..."
-run_server "${SCALEWAY_SERVER_IP}" "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
+run_server "${SCALEWAY_SERVER_IP}" "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 
 echo ""

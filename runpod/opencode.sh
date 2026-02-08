@@ -22,7 +22,7 @@ verify_server_connectivity
 install_base_tools
 
 log_warn "Installing OpenCode..."
-run_server "${RUNPOD_POD_ID}" "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
+run_server "${RUNPOD_POD_ID}" "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 
 echo ""
