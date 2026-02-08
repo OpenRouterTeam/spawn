@@ -13,8 +13,8 @@ set -eo pipefail
 
 # Source shared provider-agnostic functions (local or remote fallback)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../shared/common.sh" ]]; then
-    source "$SCRIPT_DIR/../../shared/common.sh"
+if [[ -n "${SCRIPT_DIR}" && -f "${SCRIPT_DIR}/../../shared/common.sh" ]]; then
+    source "${SCRIPT_DIR}/../../shared/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
 fi
@@ -46,10 +46,10 @@ get_server_name() {
 }
 
 create_server() {
-    local name="$1"
+    local name="${1}"
     local image="${MODAL_IMAGE:-debian_slim}"
 
-    log_warn "Creating Modal sandbox '$name'..."
+    log_warn "Creating Modal sandbox '${name}'..."
 
     # Create sandbox via Python SDK (Modal CLI doesn't have direct sandbox create)
     MODAL_SANDBOX_ID=$(python3 -c "
@@ -64,15 +64,15 @@ sb = modal.Sandbox.create(
 print(sb.object_id)
 " 2>/dev/null)
 
-    if [[ -z "$MODAL_SANDBOX_ID" ]]; then
+    if [[ -z "${MODAL_SANDBOX_ID}" ]]; then
         log_error "Failed to create Modal sandbox"
         return 1
     fi
 
     export MODAL_SANDBOX_ID
     export MODAL_APP_NAME="spawn-${name}"
-    export MODAL_SANDBOX_NAME_ACTUAL="$name"
-    log_info "Sandbox created: ID=$MODAL_SANDBOX_ID"
+    export MODAL_SANDBOX_NAME_ACTUAL="${name}"
+    log_info "Sandbox created: ID=${MODAL_SANDBOX_ID}"
 }
 
 wait_for_cloud_init() {
@@ -86,11 +86,11 @@ wait_for_cloud_init() {
 
 # Modal uses Python SDK for exec
 run_server() {
-    local cmd="$1"
+    local cmd="${1}"
     python3 -c "
 import modal
-sb = modal.Sandbox.from_id('$MODAL_SANDBOX_ID')
-p = sb.exec('bash', '-c', '''$cmd''')
+sb = modal.Sandbox.from_id('${MODAL_SANDBOX_ID}')
+p = sb.exec('bash', '-c', '''${cmd}''')
 print(p.stdout.read(), end='')
 if p.stderr.read():
     import sys; print(p.stderr.read(), end='', file=sys.stderr)
@@ -99,18 +99,18 @@ p.wait()
 }
 
 upload_file() {
-    local local_path="$1"
-    local remote_path="$2"
-    local content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
-    run_server "echo '$content' | base64 -d > '$remote_path'"
+    local local_path="${1}"
+    local remote_path="${2}"
+    local content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
+    run_server "echo '${content}' | base64 -d > '${remote_path}'"
 }
 
 interactive_session() {
-    local cmd="$1"
+    local cmd="${1}"
     python3 -c "
 import modal, sys
-sb = modal.Sandbox.from_id('$MODAL_SANDBOX_ID')
-p = sb.exec('bash', '-c', '''$cmd''', pty=True)
+sb = modal.Sandbox.from_id('${MODAL_SANDBOX_ID}')
+p = sb.exec('bash', '-c', '''${cmd}''', pty=True)
 for line in p.stdout:
     print(line, end='')
 p.wait()
@@ -118,11 +118,11 @@ p.wait()
 }
 
 destroy_server() {
-    local sandbox_id="${1:-$MODAL_SANDBOX_ID}"
+    local sandbox_id="${1:-${MODAL_SANDBOX_ID}}"
     log_warn "Terminating sandbox..."
     python3 -c "
 import modal
-sb = modal.Sandbox.from_id('$sandbox_id')
+sb = modal.Sandbox.from_id('${sandbox_id}')
 sb.terminate()
 " 2>/dev/null || true
     log_info "Sandbox terminated"
