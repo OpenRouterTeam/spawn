@@ -1,6 +1,8 @@
 # Spawn
 
-Launch any agent on any cloud, powered by [OpenRouter](https://openrouter.ai).
+Launch any AI coding agent on any cloud with a single command. All models powered by [OpenRouter](https://openrouter.ai).
+
+**13 agents. 18 clouds. 234 combinations. Zero config.**
 
 ## Install
 
@@ -21,9 +23,9 @@ spawn list                    # Show the full matrix
 ```bash
 spawn                                    # Interactive picker
 spawn claude sprite                      # Claude Code on Sprite
-spawn aider hetzner                      # Aider on Hetzner Cloud
-spawn claude sprite --prompt "Fix bugs"  # Execute with prompt (non-interactive)
-spawn aider sprite -p "Add tests"        # Short form of --prompt
+spawn aider hetzner                      # Aider on Hetzner
+spawn claude sprite --prompt "Fix bugs"  # Non-interactive with prompt
+spawn aider sprite -p "Add tests"        # Short form
 spawn claude                             # Show clouds available for Claude
 ```
 
@@ -33,19 +35,17 @@ spawn claude                             # Show clouds available for Claude
 |---------|-------------|
 | `spawn` | Interactive agent + cloud picker |
 | `spawn <agent> <cloud>` | Launch agent on cloud directly |
-| `spawn <agent> <cloud> --prompt "text"` | Execute agent with prompt (non-interactive) |
-| `spawn <agent> <cloud> --prompt-file file.txt` | Execute agent with prompt from file |
+| `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
+| `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
 | `spawn <agent>` | Show available clouds for an agent |
 | `spawn list` | Full agent x cloud matrix |
 | `spawn agents` | List all agents |
 | `spawn clouds` | List all cloud providers |
-| `spawn improve` | Run improvement system |
 | `spawn update` | Check for CLI updates |
-| `spawn version` | Show version |
 
 ### Without the CLI
 
-Every combination also works as a one-liner:
+Every combination works as a one-liner — no install required:
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/{cloud}/{agent}.sh)
@@ -56,11 +56,10 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/{cloud}/{agent}.sh)
 Skip all prompts with environment variables:
 
 ```bash
-OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  spawn claude sprite
+OPENROUTER_API_KEY=sk-or-v1-xxxxx spawn claude sprite
 ```
 
-Each cloud has its own env vars for auth — see the cloud's [README](sprite/README.md).
+Each cloud has its own env vars for auth — see the cloud's README.
 
 ## Matrix
 
@@ -80,6 +79,17 @@ Each cloud has its own env vars for auth — see the cloud's [README](sprite/REA
 | [**OpenCode**](https://github.com/opencode-ai/opencode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Plandex**](https://github.com/plandex-ai/plandex) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
+### How it works
+
+Each cell in the matrix is a self-contained bash script that:
+
+1. Provisions a server on the cloud provider
+2. Installs the coding agent
+3. Injects your [OpenRouter](https://openrouter.ai) API key so every agent uses the same billing
+4. Drops you into an interactive session
+
+Scripts work standalone (`bash <(curl ...)`) or through the CLI.
+
 ## Development
 
 ```bash
@@ -87,3 +97,30 @@ git clone https://github.com/OpenRouterTeam/spawn.git
 cd spawn
 git config core.hooksPath .githooks
 ```
+
+### Structure
+
+```
+{cloud}/lib/common.sh    # Cloud provider primitives (provision, SSH, cleanup)
+{cloud}/{agent}.sh        # Agent deployment script
+shared/common.sh          # Shared utilities (OAuth, logging, SSH helpers)
+cli/                      # TypeScript CLI (bun)
+manifest.json             # Source of truth for the matrix
+```
+
+### Adding a new cloud
+
+1. Create `{cloud}/lib/common.sh` with provisioning primitives
+2. Add to `manifest.json`
+3. Implement agent scripts using the cloud's primitives
+4. See [CLAUDE.md](CLAUDE.md) for full contributor guide
+
+### Adding a new agent
+
+1. Add to `manifest.json`
+2. Implement on 1+ cloud by adapting an existing agent script
+3. Must support OpenRouter via env var injection
+
+## License
+
+[Apache 2.0](LICENSE)
