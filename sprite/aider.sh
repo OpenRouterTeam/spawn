@@ -56,8 +56,20 @@ echo ""
 log_info "Sprite setup completed successfully!"
 echo ""
 
-# Start Aider interactively
-log_warn "Starting Aider..."
-sleep 1
-clear
-sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"
+# Check if running in non-interactive mode
+if [[ -n "${SPAWN_PROMPT:-}" ]]; then
+    # Non-interactive mode: execute prompt and exit
+    log_warn "Executing Aider with prompt..."
+
+    # Escape prompt for safe shell execution
+    escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
+
+    # Execute without -tty flag, using -m (message) for non-interactive execution
+    sprite exec -s "${SPRITE_NAME}" -- zsh -c "source ~/.zshrc && aider --model openrouter/${MODEL_ID} -m ${escaped_prompt}"
+else
+    # Interactive mode: start Aider normally
+    log_warn "Starting Aider..."
+    sleep 1
+    clear
+    sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"
+fi

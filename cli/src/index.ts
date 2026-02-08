@@ -24,7 +24,7 @@ function handleError(err: unknown): never {
   process.exit(1);
 }
 
-async function handleDefaultCommand(agent: string, cloud: string | undefined): Promise<void> {
+async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
   const manifest = await loadManifest();
   if (!manifest.agents[agent]) {
     console.error(`Unknown command or agent: ${agent}`);
@@ -33,7 +33,7 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined): P
   }
 
   if (cloud) {
-    await cmdRun(agent, cloud);
+    await cmdRun(agent, cloud, prompt);
   } else {
     await cmdAgentInfo(agent);
   }
@@ -41,7 +41,33 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined): P
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const cmd = args[0];
+
+  // Extract --prompt or -p flag
+  let prompt: string | undefined;
+  let filteredArgs = [...args];
+
+  const promptIndex = args.findIndex(arg => arg === "--prompt" || arg === "-p");
+  if (promptIndex !== -1 && args[promptIndex + 1]) {
+    prompt = args[promptIndex + 1];
+    // Remove --prompt and its value from args
+    filteredArgs.splice(promptIndex, 2);
+  }
+
+  // Extract --prompt-file flag
+  const promptFileIndex = args.findIndex(arg => arg === "--prompt-file");
+  if (promptFileIndex !== -1 && args[promptFileIndex + 1]) {
+    const { readFileSync } = await import("fs");
+    try {
+      prompt = readFileSync(args[promptFileIndex + 1], "utf-8");
+      // Remove --prompt-file and its value from args
+      filteredArgs.splice(promptFileIndex, 2);
+    } catch (err) {
+      console.error(`Error reading prompt file: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  }
+
+  const cmd = filteredArgs[0];
 
   try {
     if (!cmd) {
@@ -81,7 +107,7 @@ async function main(): Promise<void> {
         break;
 
       case "improve":
-        await cmdImprove(args.slice(1));
+        await cmdImprove(filteredArgs.slice(1));
         break;
 
       case "update":
@@ -89,7 +115,7 @@ async function main(): Promise<void> {
         break;
 
       default:
-        await handleDefaultCommand(args[0], args[1]);
+        await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt);
         break;
     }
   } catch (err) {
