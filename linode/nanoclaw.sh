@@ -2,6 +2,7 @@
 set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=linode/lib/common.sh
 else eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/linode/lib/common.sh)"; fi
 log_info "NanoClaw on Linode"
 echo ""
