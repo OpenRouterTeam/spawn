@@ -344,10 +344,13 @@ get_openrouter_api_key_manual() {
 
 # Start OAuth callback server using Node.js/Bun HTTP server
 # Proper HTTP server — handles multiple connections, favicon requests, etc.
-# $1=port $2=code_file
+# Tries a range of ports if the initial port is busy
+# $1=starting_port $2=code_file $3=port_file (writes actual port used)
+# Returns: server PID
 start_oauth_server() {
-    local port="${1}"
+    local starting_port="${1}"
     local code_file="${2}"
+    local port_file="${3}"
     local runtime
     runtime=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
 
@@ -368,11 +371,29 @@ const server = http.createServer((req, res) => {
     res.end('<html><body>Waiting for OAuth callback...</body></html>');
   }
 });
-server.listen(${port}, '127.0.0.1', () => {
-  fs.writeFileSync('/dev/fd/1', '');
+
+// Try port range: starting_port, starting_port+1, ..., starting_port+10
+let currentPort = ${starting_port};
+const maxPort = ${starting_port} + 10;
+
+function tryListen() {
+  server.listen(currentPort, '127.0.0.1', () => {
+    fs.writeFileSync('${port_file}', currentPort.toString());
+    fs.writeFileSync('/dev/fd/1', '');
+  });
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE' && currentPort < maxPort) {
+    currentPort++;
+    tryListen();
+  } else {
+    process.exit(1);
+  }
 });
-server.on('error', () => process.exit(1));
+
 setTimeout(() => process.exit(0), 300000);
+tryListen();
 " </dev/null >/dev/null 2>&1 &
 
     echo $!
@@ -476,22 +497,41 @@ try_oauth_flow() {
         return 1
     fi
 
-    local callback_url="http://localhost:${callback_port}/callback"
-    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
     local oauth_dir
     oauth_dir=$(mktemp -d)
     local code_file="${oauth_dir}/code"
+    local port_file="${oauth_dir}/port"
 
-    log_warn "Starting local OAuth server on port ${callback_port}..."
+    log_warn "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
     local server_pid
-    server_pid=$(start_oauth_server "${callback_port}" "${code_file}")
+    server_pid=$(start_oauth_server "${callback_port}" "${code_file}" "${port_file}")
 
     sleep "${POLL_INTERVAL}"
     if ! kill -0 "${server_pid}" 2>/dev/null; then
-        log_warn "Failed to start OAuth server (port may be in use)"
+        log_warn "Failed to start OAuth server (all ports in range may be in use)"
         cleanup_oauth_session "" "${oauth_dir}"
         return 1
     fi
+
+    # Wait for port file to be created (server successfully bound to a port)
+    local wait_count=0
+    while [[ ! -f "${port_file}" ]] && [[ ${wait_count} -lt 10 ]]; do
+        sleep 0.2
+        wait_count=$((wait_count + 1))
+    done
+
+    if [[ ! -f "${port_file}" ]]; then
+        log_warn "OAuth server failed to allocate a port"
+        cleanup_oauth_session "${server_pid}" "${oauth_dir}"
+        return 1
+    fi
+
+    local actual_port
+    actual_port=$(cat "${port_file}")
+    log_info "OAuth server listening on port ${actual_port}"
+
+    local callback_url="http://localhost:${actual_port}/callback"
+    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
 
     log_warn "Opening browser to authenticate with OpenRouter..."
     open_browser "${auth_url}"
