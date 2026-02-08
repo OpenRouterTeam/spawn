@@ -50,8 +50,6 @@ bash binarylane/claude.sh
 - `claude.sh` - Claude Code (Anthropic's CLI agent)
 - `goose.sh` - Goose (Block's open-source agent)
 - `plandex.sh` - Plandex (AI coding agent for complex tasks)
-
-### Not Yet Implemented
 - `openclaw.sh` - OpenClaw (OpenRouter's agent framework)
 - `nanoclaw.sh` - NanoClaw (WhatsApp-based agent)
 - `aider.sh` - Aider (AI pair programming)
