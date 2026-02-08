@@ -166,7 +166,7 @@ print(d.get('error', {}).get('message', d.get('error', 'Unknown error')))
             return 0
         fi
         log_warn "Instance status: ${status} (${attempt}/${max_attempts})"
-        sleep ${INSTANCE_STATUS_POLL_DELAY}; attempt=$((attempt + 1))
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"; attempt=$((attempt + 1))
     done
     log_error "Instance did not become active in time"; return 1
 }
@@ -180,7 +180,7 @@ verify_server_connectivity() {
         if ssh ${SSH_OPTS} -o ConnectTimeout=5 "ubuntu@${ip}" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi
-        log_warn "Waiting for SSH... (${attempt}/${max_attempts})"; sleep ${SSH_RETRY_DELAY}; attempt=$((attempt + 1))
+        log_warn "Waiting for SSH... (${attempt}/${max_attempts})"; sleep "${SSH_RETRY_DELAY}"; attempt=$((attempt + 1))
     done
     log_error "Server failed to respond via SSH after ${max_attempts} attempts"; return 1
 }

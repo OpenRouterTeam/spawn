@@ -70,7 +70,7 @@ verify_sprite_connectivity() {
             return 0
         fi
         log_warn "Sprite not ready, retrying (${attempt}/${max_attempts})..."
-        sleep ${SPRITE_CONNECTIVITY_POLL_DELAY}
+        sleep "${SPRITE_CONNECTIVITY_POLL_DELAY}"
         ((attempt++))
     done
 
