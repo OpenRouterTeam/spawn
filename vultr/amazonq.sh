@@ -1,10 +1,10 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 # shellcheck source=vultr/lib/common.sh
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/vultr/lib/common.sh)"
 fi
@@ -16,12 +16,12 @@ ensure_vultr_token
 ensure_ssh_key
 
 SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
-verify_server_connectivity "$VULTR_SERVER_IP"
-wait_for_cloud_init "$VULTR_SERVER_IP"
+create_server "${SERVER_NAME}"
+verify_server_connectivity "${VULTR_SERVER_IP}"
+wait_for_cloud_init "${VULTR_SERVER_IP}"
 
 log_warn "Installing Amazon Q CLI..."
-run_server "$VULTR_SERVER_IP" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
+run_server "${VULTR_SERVER_IP}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 log_info "Amazon Q CLI installed"
 
 echo ""
@@ -33,23 +33,23 @@ fi
 
 log_warn "Setting up environment variables..."
 ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
+cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
 export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
 EOF
-upload_file "$VULTR_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$VULTR_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+upload_file "${VULTR_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
+run_server "${VULTR_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+rm "${ENV_TEMP}"
 
 echo ""
 log_info "Vultr instance setup completed successfully!"
-log_info "Server: $SERVER_NAME (ID: $VULTR_SERVER_ID, IP: $VULTR_SERVER_IP)"
+log_info "Server: ${SERVER_NAME} (ID: ${VULTR_SERVER_ID}, IP: ${VULTR_SERVER_IP})"
 echo ""
 
 log_warn "Starting Amazon Q..."
 sleep 1
 clear
-interactive_session "$VULTR_SERVER_IP" "source ~/.zshrc && q chat"
+interactive_session "${VULTR_SERVER_IP}" "source ~/.zshrc && q chat"

@@ -3,8 +3,8 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 # shellcheck source=hetzner/lib/common.sh
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hetzner/lib/common.sh)"
 fi
@@ -16,12 +16,12 @@ ensure_hcloud_token
 ensure_ssh_key
 
 SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
-verify_server_connectivity "$HETZNER_SERVER_IP"
-wait_for_cloud_init "$HETZNER_SERVER_IP"
+create_server "${SERVER_NAME}"
+verify_server_connectivity "${HETZNER_SERVER_IP}"
+wait_for_cloud_init "${HETZNER_SERVER_IP}"
 
 log_warn "Installing Codex CLI..."
-run_server "$HETZNER_SERVER_IP" "npm install -g @openai/codex"
+run_server "${HETZNER_SERVER_IP}" "npm install -g @openai/codex"
 log_info "Codex CLI installed"
 
 echo ""
@@ -32,17 +32,17 @@ else
 fi
 
 log_warn "Setting up environment variables..."
-inject_env_vars_ssh "$HETZNER_SERVER_IP" upload_file run_server \
-    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
-    "OPENAI_API_KEY=$OPENROUTER_API_KEY" \
+inject_env_vars_ssh "${HETZNER_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "Hetzner server setup completed successfully!"
-log_info "Server: $SERVER_NAME (ID: $HETZNER_SERVER_ID, IP: $HETZNER_SERVER_IP)"
+log_info "Server: ${SERVER_NAME} (ID: ${HETZNER_SERVER_ID}, IP: ${HETZNER_SERVER_IP})"
 echo ""
 
 log_warn "Starting Codex..."
 sleep 1
 clear
-interactive_session "$HETZNER_SERVER_IP" "source ~/.zshrc && codex"
+interactive_session "${HETZNER_SERVER_IP}" "source ~/.zshrc && codex"

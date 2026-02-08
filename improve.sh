@@ -19,7 +19,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MANIFEST="$REPO_ROOT/manifest.json"
+MANIFEST="${REPO_ROOT}/manifest.json"
 MODE="${1:-once}"
 
 RED='\033[0;31m'
@@ -42,8 +42,8 @@ if ! command -v python3 &>/dev/null; then
     exit 1
 fi
 
-if [[ ! -f "$MANIFEST" ]]; then
-    log_error "manifest.json not found at $MANIFEST"
+if [[ ! -f "${MANIFEST}" ]]; then
+    log_error "manifest.json not found at ${MANIFEST}"
     exit 1
 fi
 
@@ -54,7 +54,7 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 get_matrix_summary() {
     python3 -c "
 import json
-m = json.load(open('$MANIFEST'))
+m = json.load(open('${MANIFEST}'))
 agents = list(m['agents'].keys())
 clouds = list(m['clouds'].keys())
 gaps = [k for k, v in m.get('matrix', {}).items() if v == 'missing']
@@ -73,7 +73,7 @@ print(f'Clouds: {', '.join(clouds)}')
 count_gaps() {
     python3 -c "
 import json
-m = json.load(open('$MANIFEST'))
+m = json.load(open('${MANIFEST}'))
 print(sum(1 for v in m.get('matrix', {}).values() if v == 'missing'))
 "
 }
@@ -89,7 +89,7 @@ build_team_prompt() {
 You are the lead of a spawn improvement team. Read CLAUDE.md and manifest.json first.
 
 Current state:
-$summary
+${summary}
 
 Your job: coordinate teammates to expand the spawn matrix. Use delegate mode — do NOT implement anything yourself. Only coordinate.
 
@@ -130,22 +130,22 @@ build_single_prompt() {
     local gap
     gap=$(python3 -c "
 import json
-m = json.load(open('$MANIFEST'))
+m = json.load(open('${MANIFEST}'))
 for key, status in m.get('matrix', {}).items():
     if status == 'missing':
         print(key)
         break
 ")
 
-    if [[ -n "$gap" && "$MODE" != "--discover" ]]; then
+    if [[ -n "${gap}" && "${MODE}" != "--discover" ]]; then
         local cloud="${gap%%/*}"
         local agent="${gap##*/}"
         cat <<EOF
-Read CLAUDE.md and manifest.json. Implement "$cloud/$agent.sh":
-1. Read $cloud/lib/common.sh for cloud primitives
-2. Read an existing $agent.sh on another cloud for the install pattern
-3. Write $cloud/$agent.sh combining the two
-4. Update manifest.json to mark "$cloud/$agent" as "implemented"
+Read CLAUDE.md and manifest.json. Implement "${cloud}/${agent}.sh":
+1. Read ${cloud}/lib/common.sh for cloud primitives
+2. Read an existing ${agent}.sh on another cloud for the install pattern
+3. Write ${cloud}/${agent}.sh combining the two
+4. Update manifest.json to mark "${cloud}/${agent}" as "implemented"
 5. Update README.md
 6. Commit
 OpenRouter injection is mandatory.
@@ -162,7 +162,7 @@ run_team_cycle() {
     prompt=$(build_team_prompt)
     log_info "Launching agent team..."
     echo ""
-    (cd "$REPO_ROOT" && claude -p "$prompt" --dangerously-skip-permissions)
+    (cd "${REPO_ROOT}" && claude -p "${prompt}" --dangerously-skip-permissions)
     return $?
 }
 
@@ -171,23 +171,23 @@ run_single_cycle() {
     prompt=$(build_single_prompt)
     log_info "Launching single agent..."
     echo ""
-    (cd "$REPO_ROOT" && claude --print -p "$prompt")
+    (cd "${REPO_ROOT}" && claude --print -p "${prompt}")
     return $?
 }
 
 # Main
 log_info "Spawn Improvement System"
-log_info "Mode: $MODE"
+log_info "Mode: ${MODE}"
 get_matrix_summary
 echo ""
 
-case "$MODE" in
+case "${MODE}" in
     --loop)
         cycle=1
         while true; do
-            log_info "=== Team Cycle $cycle ==="
+            log_info "=== Team Cycle ${cycle} ==="
             run_team_cycle || {
-                log_error "Cycle $cycle failed, pausing 10s..."
+                log_error "Cycle ${cycle} failed, pausing 10s..."
                 sleep 10
             }
             ((cycle++))

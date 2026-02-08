@@ -200,7 +200,7 @@ wait_for_cloud_init() {
 
     # Configure PATH
     # shellcheck disable=SC2086
-    ssh ${SSH_OPTS} "ubuntu@${ip}" "echo 'export PATH=\"\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH\"' >> ~/.bashrc && echo 'export PATH=\"\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH\"' >> ~/.zshrc" >/dev/null 2>&1
+    ssh ${SSH_OPTS} "ubuntu@${ip}" "echo 'export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.bashrc && echo 'export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.zshrc" >/dev/null 2>&1
 
     log_info "Base tools installed"
 }

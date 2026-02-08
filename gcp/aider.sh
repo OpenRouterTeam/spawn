@@ -1,11 +1,11 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 # shellcheck source=gcp/lib/common.sh
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/gcp/lib/common.sh)"
 fi
@@ -21,15 +21,15 @@ ensure_ssh_key
 
 # 3. Get server name and create server
 SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
+create_server "${SERVER_NAME}"
 
 # 4. Wait for SSH and cloud-init
-verify_server_connectivity "$GCP_SERVER_IP"
-wait_for_cloud_init "$GCP_SERVER_IP"
+verify_server_connectivity "${GCP_SERVER_IP}"
+wait_for_cloud_init "${GCP_SERVER_IP}"
 
 # 5. Install Aider
 log_warn "Installing Aider..."
-run_server "$GCP_SERVER_IP" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
+run_server "${GCP_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 log_info "Aider installed"
 
 # 6. Get OpenRouter API key
@@ -51,23 +51,23 @@ MODEL_ID="${MODEL_ID:-openrouter/auto}"
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
+cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 EOF
 
-upload_file "$GCP_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$GCP_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+upload_file "${GCP_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
+run_server "${GCP_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+rm "${ENV_TEMP}"
 
 echo ""
 log_info "GCP instance setup completed successfully!"
-log_info "Instance: $GCP_INSTANCE_NAME_ACTUAL (Zone: $GCP_ZONE, IP: $GCP_SERVER_IP)"
+log_info "Instance: ${GCP_INSTANCE_NAME_ACTUAL} (Zone: ${GCP_ZONE}, IP: ${GCP_SERVER_IP})"
 echo ""
 
 # 9. Start Aider interactively
 log_warn "Starting Aider..."
 sleep 1
 clear
-interactive_session "$GCP_SERVER_IP" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"
+interactive_session "${GCP_SERVER_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

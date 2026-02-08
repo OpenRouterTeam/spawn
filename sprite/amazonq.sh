@@ -1,9 +1,9 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)"
 fi
@@ -15,14 +15,14 @@ ensure_sprite_installed
 ensure_sprite_authenticated
 
 SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "$SPRITE_NAME" 5
-verify_sprite_connectivity "$SPRITE_NAME"
+ensure_sprite_exists "${SPRITE_NAME}" 5
+verify_sprite_connectivity "${SPRITE_NAME}"
 
 log_warn "Setting up sprite environment..."
-setup_shell_environment "$SPRITE_NAME"
+setup_shell_environment "${SPRITE_NAME}"
 
 log_warn "Installing Amazon Q CLI..."
-run_sprite "$SPRITE_NAME" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
+run_sprite "${SPRITE_NAME}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
@@ -33,15 +33,15 @@ fi
 
 log_warn "Setting up environment variables..."
 ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
+cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
 export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
 EOF
-sprite exec -s "$SPRITE_NAME" -file "$ENV_TEMP:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+sprite exec -s "${SPRITE_NAME}" -file "${ENV_TEMP}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+rm "${ENV_TEMP}"
 
 echo ""
 log_info "Sprite setup completed successfully!"
@@ -50,4 +50,4 @@ echo ""
 log_warn "Starting Amazon Q..."
 sleep 1
 clear
-sprite exec -s "$SPRITE_NAME" -tty -- zsh -c "source ~/.zshrc && q chat"
+sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && q chat"

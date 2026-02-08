@@ -2,8 +2,8 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)"
 fi
@@ -15,14 +15,14 @@ ensure_sprite_installed
 ensure_sprite_authenticated
 
 SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "$SPRITE_NAME" 5
-verify_sprite_connectivity "$SPRITE_NAME"
+ensure_sprite_exists "${SPRITE_NAME}" 5
+verify_sprite_connectivity "${SPRITE_NAME}"
 
 log_warn "Setting up sprite environment..."
-setup_shell_environment "$SPRITE_NAME"
+setup_shell_environment "${SPRITE_NAME}"
 
 log_warn "Installing Open Interpreter..."
-run_sprite "$SPRITE_NAME" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
+run_sprite "${SPRITE_NAME}" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
@@ -32,9 +32,9 @@ else
 fi
 
 log_warn "Setting up environment variables..."
-inject_env_vars_sprite "$SPRITE_NAME" \
-    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
-    "OPENAI_API_KEY=$OPENROUTER_API_KEY" \
+inject_env_vars_sprite "${SPRITE_NAME}" \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
@@ -44,4 +44,4 @@ echo ""
 log_warn "Starting Open Interpreter..."
 sleep 1
 clear
-sprite exec -s "$SPRITE_NAME" -tty -- zsh -c "source ~/.zshrc && interpreter"
+sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && interpreter"

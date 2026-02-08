@@ -93,7 +93,7 @@ setup_shell_environment() {
     cat > "${path_temp}" << 'EOF'
 
 # [spawn:path]
-export PATH="$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH"
+export PATH="${HOME}/.bun/bin:/.sprite/languages/bun/bin:${PATH}"
 EOF
 
     # Upload and append to shell configs

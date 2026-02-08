@@ -1,11 +1,11 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 # shellcheck source=e2b/lib/common.sh
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/e2b/lib/common.sh)"
 fi
@@ -19,7 +19,7 @@ ensure_e2b_token
 
 # 2. Get sandbox name and create sandbox
 SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
+create_server "${SERVER_NAME}"
 
 # 3. Wait for base tools
 wait_for_cloud_init
@@ -44,7 +44,7 @@ MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
+cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
@@ -52,18 +52,18 @@ export ANTHROPIC_API_KEY="${OPENROUTER_API_KEY}"
 export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
 EOF
 
-upload_file "$ENV_TEMP" "/tmp/env_config"
+upload_file "${ENV_TEMP}" "/tmp/env_config"
 run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+rm "${ENV_TEMP}"
 
 # 8. Configure openclaw
-setup_openclaw_config "$OPENROUTER_API_KEY" "$MODEL_ID" \
+setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" \
     upload_file \
     run_server
 
 echo ""
 log_info "E2B sandbox setup completed successfully!"
-log_info "Sandbox: $SERVER_NAME (ID: $E2B_SANDBOX_ID)"
+log_info "Sandbox: ${SERVER_NAME} (ID: ${E2B_SANDBOX_ID})"
 echo ""
 
 # 9. Start openclaw gateway in background and launch TUI

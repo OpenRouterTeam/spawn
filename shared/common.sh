@@ -692,9 +692,9 @@ runcmd:
   # Install Claude Code
   - su - root -c 'curl -fsSL https://claude.ai/install.sh | bash'
   # Configure PATH in .bashrc
-  - echo 'export PATH="$HOME/.claude/local/bin:$HOME/.bun/bin:$PATH"' >> /root/.bashrc
+  - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
   # Configure PATH in .zshrc
-  - echo 'export PATH="$HOME/.claude/local/bin:$HOME/.bun/bin:$PATH"' >> /root/.zshrc
+  - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
   # Signal completion
   - touch /root/.cloud-init-complete
 CLOUD_INIT_EOF

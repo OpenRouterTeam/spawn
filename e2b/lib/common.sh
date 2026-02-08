@@ -98,8 +98,8 @@ wait_for_cloud_init() {
     run_server "apt-get update -y && apt-get install -y curl unzip git zsh" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' >/dev/null 2>&1 || true
+    run_server 'echo "export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true
+    run_server 'echo "export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"" >> ~/.zshrc' >/dev/null 2>&1 || true
     log_info "Base tools installed"
 }
 

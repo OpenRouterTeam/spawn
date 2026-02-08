@@ -1,11 +1,11 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 # shellcheck source=modal/lib/common.sh
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/modal/lib/common.sh)"
 fi
@@ -18,11 +18,11 @@ ensure_modal_cli
 
 # 2. Get sandbox name and create sandbox
 SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME" || {
+create_server "${SERVER_NAME}" || {
     log_error "Failed to create Modal sandbox"
     exit 1
 }
-if [[ -z "$MODAL_SANDBOX_ID" ]]; then
+if [[ -z "${MODAL_SANDBOX_ID}" ]]; then
     log_error "MODAL_SANDBOX_ID not set after create_server"
     exit 1
 fi
@@ -54,19 +54,19 @@ MODEL_ID="${MODEL_ID:-openrouter/auto}"
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
+cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 EOF
 
-upload_file "$ENV_TEMP" "/tmp/env_config"
+upload_file "${ENV_TEMP}" "/tmp/env_config"
 run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+rm "${ENV_TEMP}"
 
 echo ""
 log_info "Modal sandbox setup completed successfully!"
-log_info "Sandbox: $SERVER_NAME (ID: $MODAL_SANDBOX_ID)"
+log_info "Sandbox: ${SERVER_NAME} (ID: ${MODAL_SANDBOX_ID})"
 echo ""
 
 # 8. Start Aider interactively

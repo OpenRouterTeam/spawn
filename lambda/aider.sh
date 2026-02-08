@@ -1,11 +1,11 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 # shellcheck source=lambda/lib/common.sh
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/lambda/lib/common.sh)"
 fi
@@ -21,15 +21,15 @@ ensure_ssh_key
 
 # 3. Get instance name and create server
 SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
+create_server "${SERVER_NAME}"
 
 # 4. Wait for SSH and cloud-init
-verify_server_connectivity "$LAMBDA_SERVER_IP"
-wait_for_cloud_init "$LAMBDA_SERVER_IP"
+verify_server_connectivity "${LAMBDA_SERVER_IP}"
+wait_for_cloud_init "${LAMBDA_SERVER_IP}"
 
 # 5. Install Aider
 log_warn "Installing Aider..."
-run_server "$LAMBDA_SERVER_IP" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
+run_server "${LAMBDA_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 log_info "Aider installed"
 
 # 6. Get OpenRouter API key
@@ -51,23 +51,23 @@ MODEL_ID="${MODEL_ID:-openrouter/auto}"
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
+cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 EOF
 
-upload_file "$LAMBDA_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$LAMBDA_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+upload_file "${LAMBDA_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
+run_server "${LAMBDA_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+rm "${ENV_TEMP}"
 
 echo ""
 log_info "Lambda Cloud instance setup completed successfully!"
-log_info "Instance: $SERVER_NAME (IP: $LAMBDA_SERVER_IP)"
+log_info "Instance: ${SERVER_NAME} (IP: ${LAMBDA_SERVER_IP})"
 echo ""
 
 # 9. Start Aider interactively
 log_warn "Starting Aider..."
 sleep 1
 clear
-interactive_session "$LAMBDA_SERVER_IP" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"
+interactive_session "${LAMBDA_SERVER_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

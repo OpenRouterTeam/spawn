@@ -1,10 +1,10 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 # shellcheck source=digitalocean/lib/common.sh
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/digitalocean/lib/common.sh)"
 fi
@@ -16,12 +16,12 @@ ensure_do_token
 ensure_ssh_key
 
 DROPLET_NAME=$(get_server_name)
-create_server "$DROPLET_NAME"
-verify_server_connectivity "$DO_SERVER_IP"
-wait_for_cloud_init "$DO_SERVER_IP"
+create_server "${DROPLET_NAME}"
+verify_server_connectivity "${DO_SERVER_IP}"
+wait_for_cloud_init "${DO_SERVER_IP}"
 
 log_warn "Installing Gemini CLI..."
-run_server "$DO_SERVER_IP" "npm install -g @google/gemini-cli"
+run_server "${DO_SERVER_IP}" "npm install -g @google/gemini-cli"
 log_info "Gemini CLI installed"
 
 echo ""
@@ -33,7 +33,7 @@ fi
 
 log_warn "Setting up environment variables..."
 ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
+cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
 export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
@@ -41,16 +41,16 @@ export GEMINI_API_KEY="${OPENROUTER_API_KEY}"
 export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
 export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
 EOF
-upload_file "$DO_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$DO_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+upload_file "${DO_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
+run_server "${DO_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+rm "${ENV_TEMP}"
 
 echo ""
 log_info "DigitalOcean droplet setup completed successfully!"
-log_info "Droplet: $DROPLET_NAME (ID: $DO_DROPLET_ID, IP: $DO_SERVER_IP)"
+log_info "Droplet: ${DROPLET_NAME} (ID: ${DO_DROPLET_ID}, IP: ${DO_SERVER_IP})"
 echo ""
 
 log_warn "Starting Gemini..."
 sleep 1
 clear
-interactive_session "$DO_SERVER_IP" "source ~/.zshrc && gemini"
+interactive_session "${DO_SERVER_IP}" "source ~/.zshrc && gemini"
