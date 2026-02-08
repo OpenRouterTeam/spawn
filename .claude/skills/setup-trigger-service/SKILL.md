@@ -38,24 +38,20 @@ You can use this file directly, or copy it to your repo if needed. The file cont
 
 ```typescript
 const PORT = 8080;
-const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const TARGET_SCRIPT = process.env.TARGET_SCRIPT ?? "";
-
-if (!TRIGGER_SECRET) {
-  console.error("ERROR: TRIGGER_SECRET env var is required");
-  process.exit(1);
-}
+const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT ?? "3", 10);
 
 if (!TARGET_SCRIPT) {
   console.error("ERROR: TARGET_SCRIPT env var is required");
   process.exit(1);
 }
 
-let running = false;
+let runningCount = 0;
 
 async function runScript(reason: string) {
+  runningCount++;
   try {
-    console.log(`[trigger] Running ${TARGET_SCRIPT} (reason=${reason})`);
+    console.log(`[trigger] Running ${TARGET_SCRIPT} (reason=${reason}, concurrent=${runningCount}/${MAX_CONCURRENT})`);
     const proc = Bun.spawn(["bash", TARGET_SCRIPT], {
       cwd: TARGET_SCRIPT.substring(0, TARGET_SCRIPT.lastIndexOf("/")) || ".",
       stdout: "inherit",
@@ -66,7 +62,7 @@ async function runScript(reason: string) {
   } catch (e) {
     console.error(`[trigger] ${TARGET_SCRIPT} failed:`, e);
   } finally {
-    running = false;
+    runningCount--;
   }
 }
 
@@ -80,19 +76,12 @@ const server = Bun.serve({
     }
 
     if (req.method === "POST" && url.pathname === "/trigger") {
-      const auth = req.headers.get("Authorization") ?? "";
-      if (auth !== `Bearer ${TRIGGER_SECRET}`) {
-        return Response.json({ error: "unauthorized" }, { status: 401 });
+      if (runningCount >= MAX_CONCURRENT) {
+        return Response.json({ error: "max concurrent runs reached", running: runningCount, max: MAX_CONCURRENT }, { status: 429 });
       }
-
-      if (running) {
-        return Response.json({ error: "already running" }, { status: 409 });
-      }
-
-      running = true;
       const reason = url.searchParams.get("reason") ?? "manual";
       runScript(reason);
-      return Response.json({ triggered: true, reason });
+      return Response.json({ triggered: true, reason, running: runningCount, max: MAX_CONCURRENT });
     }
 
     return Response.json({ error: "not found" }, { status: 404 });
@@ -101,36 +90,28 @@ const server = Bun.serve({
 
 console.log(`[trigger] Listening on port ${server.port}`);
 console.log(`[trigger] TARGET_SCRIPT=${TARGET_SCRIPT}`);
+console.log(`[trigger] MAX_CONCURRENT=${MAX_CONCURRENT}`);
 ```
 
 **Key behaviors:**
-- `GET /health` -> `{"status":"ok"}` (no auth, for health checks)
-- `POST /trigger` -> validates `Authorization: Bearer <secret>`, runs target script in background
-- Returns `409` if script is already running (prevents overlapping executions)
+- `GET /health` -> `{"status":"ok"}` (for health checks)
+- `POST /trigger` -> runs target script in background (auth handled at Sprite API level)
+- Returns `429` if max concurrent runs reached (default 3, configurable via `MAX_CONCURRENT`)
 - Zero npm dependencies — uses only Bun built-ins
 
-## Step 2: Generate a secret
+## Step 2: Create the wrapper script
 
-Generate a random secret for this service:
-
-```bash
-openssl rand -hex 32
-```
-
-Save the output — you'll need it in steps 3 and 5.
-
-## Step 3: Create the wrapper script
-
-Create a **gitignored** wrapper script that sets env vars and launches the server. This file contains secrets and MUST NOT be committed.
+Create a **gitignored** wrapper script that sets env vars and launches the server.
 
 Create `start-<service-name>.sh` in the skill directory (e.g., `start-improve.sh`, `start-refactor.sh`):
 
 ```bash
 #!/bin/bash
-export TRIGGER_SECRET="<secret-from-step-2>"
 export TARGET_SCRIPT="/home/sprite/spawn/.claude/skills/setup-trigger-service/<target-script>.sh"
 exec bun run /home/sprite/spawn/.claude/skills/setup-trigger-service/trigger-server.ts
 ```
+
+**Note:** Authentication is handled at the Sprite API level (via `SPRITE_TOKEN`), so no secret is needed in the wrapper script.
 
 Make it executable:
 
@@ -144,9 +125,9 @@ chmod +x /home/sprite/spawn/.claude/skills/setup-trigger-service/start-<service-
 .claude/skills/setup-trigger-service/start-*.sh
 ```
 
-All `start-*.sh` files in the skill directory should be gitignored since they contain secrets.
+All `start-*.sh` files in the skill directory should be gitignored.
 
-## Step 4: Create the Sprite service
+## Step 3: Create the Sprite service
 
 Register the trigger server as a Sprite service with HTTP port forwarding:
 
@@ -171,14 +152,9 @@ sprite-env services list
 curl -sf http://localhost:8080/health
 # Expected: {"status":"ok"}
 
-# Test auth rejection
-curl -sf -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/trigger
-# Expected: 401
-
-# Test valid trigger
-curl -sf -X POST "http://localhost:8080/trigger?reason=test" \
-  -H "Authorization: Bearer <secret>"
-# Expected: {"triggered":true,"reason":"test"}
+# Test trigger (no auth needed — auth is at the Sprite API level)
+curl -sf -X POST "http://localhost:8080/trigger?reason=test"
+# Expected: {"triggered":true,"reason":"test","running":1,"max":3}
 ```
 
 ### Service management commands
@@ -191,7 +167,7 @@ sprite-env services restart <service-name>     # Restart
 sprite-env services delete <service-name>      # Delete entirely
 ```
 
-## Step 5: Create the GitHub Actions workflow
+## Step 4: Create the GitHub Actions workflow
 
 Create `.github/workflows/<service-name>.yml`:
 
@@ -234,11 +210,11 @@ jobs:
 - `'0 0 * * *'`   — daily at midnight
 - `'*/30 * * * *'` — every 30 minutes
 
-## Step 6: Set GitHub Actions secrets
+## Step 5: Set GitHub Actions secrets
 
 Set three secrets per Sprite service. Use **namespaced** secret names to avoid collisions:
 
-### 6a. Get the Sprite name and service name
+### 5a. Get the Sprite name and service name
 
 The Sprite name and service name are needed to use the [Sprite start service API](https://docs.sprites.dev/api/v001-rc30/services/#start-service).
 
@@ -248,10 +224,10 @@ The Sprite name and service name are needed to use the [Sprite start service API
 
 # Get the service name (from Step 4)
 sprite-env services list
-# Use the name you registered in Step 4 (e.g., "improve-trigger")
+# Use the name you registered in Step 3 (e.g., "improve-trigger")
 ```
 
-### 6b. Set the secrets
+### 5b. Set the secrets
 
 ```bash
 # Set the sprite name (one per Sprite)
@@ -274,9 +250,9 @@ gh secret set SPRITE_TOKEN --repo <owner>/<repo>
 |--------|---------|---------|
 | `SPRITE_TOKEN` | `SPRITE_TOKEN` | Sprite API bearer token (shared across all services) |
 | `<SERVICE>_SPRITE_NAME` | `IMPROVE_SPRITE_NAME` | Name of the Sprite running this service |
-| `<SERVICE>_SERVICE_NAME` | `IMPROVE_SERVICE_NAME` | Name of the service registered in Step 4 |
+| `<SERVICE>_SERVICE_NAME` | `IMPROVE_SERVICE_NAME` | Name of the service registered in Step 3 |
 
-## Step 7: Ensure the target script is single-cycle
+## Step 6: Ensure the target script is single-cycle
 
 The target script (e.g., `refactor.sh`, `improve.sh`) MUST:
 
@@ -292,7 +268,7 @@ If converting from a looping script, remove the `while true` / `sleep` and keep 
 
 To create a new service script, add it to `/home/sprite/spawn/.claude/skills/setup-trigger-service/` and follow the same pattern.
 
-## Step 8: Commit and push
+## Step 7: Commit and push
 
 Commit the workflow file and .gitignore changes (but NOT the wrapper script):
 
@@ -304,7 +280,7 @@ git push origin main
 
 Note: The trigger-server.ts and service scripts are already in the skill directory and don't need to be committed again.
 
-## Step 9: Test end-to-end
+## Step 8: Test end-to-end
 
 1. Go to the GitHub Actions tab
 2. Select the workflow
@@ -314,9 +290,10 @@ Note: The trigger-server.ts and service scripts are already in the skill directo
 ## Multiple Services on Different Sprites
 
 Each Sprite gets its own:
-- `start-<service-name>.sh` in the skill directory with its own `TRIGGER_SECRET` and `TARGET_SCRIPT`
+- `start-<service-name>.sh` in the skill directory with its own `TARGET_SCRIPT`
 - GitHub Actions workflow file
-- Pair of GitHub secrets (`<SERVICE>_SPRITE_URL` + `<SERVICE>_SPRITE_SECRET`)
+- Pair of GitHub secrets (`<SERVICE>_SPRITE_NAME` + `<SERVICE>_SERVICE_NAME`)
+- All services share the `SPRITE_TOKEN` secret
 
 The `trigger-server.ts` file is **shared** — same code runs on every Sprite, configured only by env vars.
 
@@ -349,4 +326,4 @@ This skill assumes:
 | Sprite doesn't wake | Verify `<SERVICE>_SPRITE_NAME` and `<SERVICE>_SERVICE_NAME` secrets are correct |
 | `{"error":"max concurrent runs reached"}` | Max concurrent limit reached (default 3) — wait for runs to finish or increase MAX_CONCURRENT |
 | env vars not passed | Use the wrapper script pattern (not `--env` flag with commas in values) |
-| Service not found | Verify the service name matches what you registered in Step 4 with `sprite-env services create` |
+| Service not found | Verify the service name matches what you registered in Step 3 with `sprite-env services create` |
