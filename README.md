@@ -1,6 +1,6 @@
 # Spawn
 
-Launch any AI coding agent on any cloud with a single command. All models powered by [OpenRouter](https://openrouter.ai).
+Launch any AI coding agent on any cloud with a single command. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
 **13 agents. 18 clouds. 234 combinations. Zero config.**
 
