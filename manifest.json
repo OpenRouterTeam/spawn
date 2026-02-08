@@ -412,6 +412,23 @@
         "disk": 5
       },
       "notes": "Sub-90ms sandbox creation. True SSH support via daytona ssh. Requires DAYTONA_API_KEY from https://app.daytona.io."
+    },
+    "runpod": {
+      "name": "RunPod",
+      "description": "RunPod GPU cloud pods via GraphQL API",
+      "url": "https://www.runpod.io/",
+      "type": "api",
+      "auth": "RUNPOD_API_KEY",
+      "provision_method": "GraphQL mutation podFindAndDeployOnDemand",
+      "exec_method": "ssh root@IP -p PORT or ssh PODID@ssh.runpod.io",
+      "interactive_method": "ssh -t root@IP -p PORT",
+      "defaults": {
+        "gpu_type": "NVIDIA RTX A4000",
+        "gpu_count": 1,
+        "image": "runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04",
+        "volume_gb": 50
+      },
+      "notes": "GPU cloud provider. Uses GraphQL API, SSH via TCP port mapping or proxy. Docker-based pods with CUDA pre-installed."
     }
   },
   "matrix": {
@@ -596,6 +613,19 @@
     "fly/plandex": "implemented",
     "civo/plandex": "implemented",
     "scaleway/plandex": "implemented",
-    "daytona/plandex": "implemented"
+    "daytona/plandex": "implemented",
+    "runpod/claude": "implemented",
+    "runpod/openclaw": "implemented",
+    "runpod/nanoclaw": "implemented",
+    "runpod/aider": "implemented",
+    "runpod/goose": "implemented",
+    "runpod/codex": "implemented",
+    "runpod/interpreter": "implemented",
+    "runpod/gemini": "implemented",
+    "runpod/amazonq": "implemented",
+    "runpod/cline": "implemented",
+    "runpod/gptme": "implemented",
+    "runpod/opencode": "implemented",
+    "runpod/plandex": "implemented"
   }
 }
