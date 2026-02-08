@@ -40,10 +40,11 @@ ensure_e2b_token() {
     if [[ -n "$E2B_API_KEY" ]]; then
         log_info "Using E2B API key from environment"; return 0
     fi
-    local config_dir="$HOME/.config/spawn" config_file="$config_dir/e2b.json"
+    local config_dir="$HOME/.config/spawn"
+    local config_file="$config_dir/e2b.json"
     if [[ -f "$config_file" ]]; then
-        local saved_key 2>/dev/null)
-        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))"
+        local saved_key
+        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))" 2>/dev/null)
         if [[ -n "$saved_key" ]]; then
             export E2B_API_KEY="$saved_key"
             log_info "Using E2B API key from $config_file"; return 0
