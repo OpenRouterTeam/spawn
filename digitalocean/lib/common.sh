@@ -246,6 +246,7 @@ upload_file() {
 interactive_session() {
     local ip="$1"
     local cmd="$2"
+    # shellcheck disable=SC2086
     ssh -t $SSH_OPTS "root@$ip" "$cmd"
 }
 
