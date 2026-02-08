@@ -15,8 +15,9 @@ jobs:
     steps:
       - name: Trigger improve sprite
         env:
-          SPRITE_URL: ${{ secrets.IMPROVE_SPRITE_URL }}
-          SPRITE_SECRET: ${{ secrets.IMPROVE_SPRITE_SECRET }}
+          SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+          SPRITE_NAME: ${{ secrets.IMPROVE_SPRITE_NAME }}
+          SERVICE_NAME: ${{ secrets.IMPROVE_SERVICE_NAME }}
         run: |
-          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
-            -H "Authorization: Bearer ${SPRITE_SECRET}" --max-time 30
+          curl -sf -X POST "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SERVICE_NAME}/start" \
+            -H "Authorization: Bearer ${SPRITE_TOKEN}" --max-time 30

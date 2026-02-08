@@ -16,16 +16,18 @@ The user wants to set up a trigger service for: **$ARGUMENTS**
 
 ## Overview
 
-Sprites pause when idle to save resources. This creates a pattern:
+Sprites pause when idle to save resources. This skill uses the [Sprite start service API](https://docs.sprites.dev/api/v001-rc30/services/#start-service) to wake the Sprite and run a service on demand:
 
 ```
 GitHub Actions (cron / events / manual)
-  -> curl POST $SPRITE_URL/trigger
-    -> Sprite auto-wakes from pause
-      -> trigger-server.ts validates Bearer token
-        -> target script runs (single cycle, then exits)
+  -> POST https://api.sprites.dev/v1/sprites/{name}/services/{service}/start
+    -> Sprite API wakes the Sprite from pause
+      -> Sprite starts the specified service (trigger-server.ts)
+        -> trigger-server.ts runs the target script (single cycle, then exits)
           -> Sprite goes idle again until next trigger
 ```
+
+The trigger server is configured with `--http-port 8080`, which makes the service auto-start when the Sprite receives incoming HTTP traffic.
 
 ## Step 1: Ensure trigger-server.ts exists
 
@@ -206,18 +208,25 @@ on:
   #   branches: [main]
   workflow_dispatch:            # Always include for manual testing
 
+concurrency:
+  group: <service-name>-sprite-trigger
+  cancel-in-progress: false
+
 jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger <service-name> sprite
         env:
-          SPRITE_URL: ${{ secrets.<SERVICE_NAME>_SPRITE_URL }}
-          SPRITE_SECRET: ${{ secrets.<SERVICE_NAME>_SPRITE_SECRET }}
+          SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+          SPRITE_NAME: ${{ secrets.<SERVICE_NAME>_SPRITE_NAME }}
+          SERVICE_NAME: ${{ secrets.<SERVICE_NAME>_SERVICE_NAME }}
         run: |
-          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
-            -H "Authorization: Bearer ${SPRITE_SECRET}" --max-time 30
+          curl -sf -X POST "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SERVICE_NAME}/start" \
+            -H "Authorization: Bearer ${SPRITE_TOKEN}" --max-time 30
 ```
+
+**Note:** This uses the [Sprite start service API](https://docs.sprites.dev/api/v001-rc30/services/#start-service) which wakes the Sprite and starts the specified service automatically.
 
 **Cron examples:**
 - `'0 */2 * * *'` — every 2 hours
@@ -227,43 +236,45 @@ jobs:
 
 ## Step 6: Set GitHub Actions secrets
 
-Set two secrets per Sprite service. Use **namespaced** secret names to avoid collisions:
+Set three secrets per Sprite service. Use **namespaced** secret names to avoid collisions:
 
-### 6a. Get the Sprite URL
+### 6a. Get the Sprite name and service name
 
-Since you're running inside Sprite, you can get the public URL using:
+The Sprite name and service name are needed to use the [Sprite start service API](https://docs.sprites.dev/api/v001-rc30/services/#start-service).
 
 ```bash
-# The Sprite URL is the public endpoint that wakes the Sprite
-# It's typically shown when you first create the Sprite, or in the Sprite dashboard
+# Get the sprite name (ask user if not available programmatically)
+# The sprite name is what you used when creating the Sprite
 
-# Try these methods to find it:
-# 1. Check if it's in environment variables
-env | grep -i url
-
-# 2. Ask the user if sprite-env doesn't expose it directly
-# The URL format is typically: https://<sprite-id>.sprites.dev
+# Get the service name (from Step 4)
+sprite-env services list
+# Use the name you registered in Step 4 (e.g., "improve-trigger")
 ```
-
-If the URL isn't available programmatically, prompt the user to provide it from the Sprite dashboard.
 
 ### 6b. Set the secrets
 
 ```bash
-# Set the secret (from step 2)
-echo "<secret-from-step-2>" | gh secret set <SERVICE_NAME>_SPRITE_SECRET --repo <owner>/<repo>
+# Set the sprite name (one per Sprite)
+gh secret set <SERVICE_NAME>_SPRITE_NAME --repo <owner>/<repo>
+# When prompted, enter the sprite name (e.g., "improve-sprite")
 
-# Set the URL (interactively if needed)
-gh secret set <SERVICE_NAME>_SPRITE_URL --repo <owner>/<repo>
-# When prompted, paste the Sprite's public URL
+# Set the service name (matches the name from Step 4)
+gh secret set <SERVICE_NAME>_SERVICE_NAME --repo <owner>/<repo>
+# When prompted, enter the service name (e.g., "improve-trigger")
+
+# Set the Sprite API token (shared across all services)
+# This should already be set as SPRITE_TOKEN
+gh secret set SPRITE_TOKEN --repo <owner>/<repo>
+# When prompted, paste your Sprite API token from https://sprites.dev
 ```
 
 **Secret naming convention:**
 
 | Secret | Example | Purpose |
 |--------|---------|---------|
-| `<SERVICE>_SPRITE_URL` | `REFACTOR_SPRITE_URL` | Public URL of the Sprite |
-| `<SERVICE>_SPRITE_SECRET` | `REFACTOR_SPRITE_SECRET` | Bearer token for auth |
+| `SPRITE_TOKEN` | `SPRITE_TOKEN` | Sprite API bearer token (shared across all services) |
+| `<SERVICE>_SPRITE_NAME` | `IMPROVE_SPRITE_NAME` | Name of the Sprite running this service |
+| `<SERVICE>_SERVICE_NAME` | `IMPROVE_SERVICE_NAME` | Name of the service registered in Step 4 |
 
 ## Step 7: Ensure the target script is single-cycle
 
@@ -333,9 +344,9 @@ This skill assumes:
 | Problem | Fix |
 |---------|-----|
 | Service won't start | Check `sprite-env services list` — is another service using `--http-port 8080`? |
-| 401 on trigger | Verify `TRIGGER_SECRET` matches between wrapper script and GitHub secret |
+| 401 on API call | Verify `SPRITE_TOKEN` is set correctly in GitHub secrets |
 | Script runs but nothing happens | Check the target script works standalone: `bash /path/to/script.sh` |
-| Sprite doesn't wake | Verify `SPRITE_URL` secret is the correct public Sprite URL |
+| Sprite doesn't wake | Verify `<SERVICE>_SPRITE_NAME` and `<SERVICE>_SERVICE_NAME` secrets are correct |
 | `{"error":"max concurrent runs reached"}` | Max concurrent limit reached (default 3) — wait for runs to finish or increase MAX_CONCURRENT |
 | env vars not passed | Use the wrapper script pattern (not `--env` flag with commas in values) |
-| Can't find Sprite URL | Check Sprite dashboard or the output from when you created the Sprite |
+| Service not found | Verify the service name matches what you registered in Step 4 with `sprite-env services create` |
