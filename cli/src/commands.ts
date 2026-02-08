@@ -210,6 +210,7 @@ function runBash(script: string): Promise<void> {
 const MIN_AGENT_COL_WIDTH = 16;
 const MIN_CLOUD_COL_WIDTH = 10;
 const COL_PADDING = 2;
+const NAME_COLUMN_WIDTH = 18;
 
 function calculateColumnWidth(items: string[], minWidth: number): number {
   return Math.max(minWidth, ...items.map((item) => item.length + COL_PADDING));
@@ -282,7 +283,7 @@ export async function cmdAgents() {
   console.log();
   for (const key of agentKeys(manifest)) {
     const a = manifest.agents[key];
-    console.log(`  ${pc.green(a.name.padEnd(18))} ${pc.dim(a.description)}`);
+    console.log(`  ${pc.green(a.name.padEnd(NAME_COLUMN_WIDTH))} ${pc.dim(a.description)}`);
   }
   console.log();
 }
@@ -297,7 +298,7 @@ export async function cmdClouds() {
   console.log();
   for (const key of cloudKeys(manifest)) {
     const c = manifest.clouds[key];
-    console.log(`  ${pc.green(c.name.padEnd(18))} ${pc.dim(c.description)}`);
+    console.log(`  ${pc.green(c.name.padEnd(NAME_COLUMN_WIDTH))} ${pc.dim(c.description)}`);
   }
   console.log();
 }
@@ -324,7 +325,7 @@ export async function cmdAgentInfo(agent: string) {
     const status = matrixStatus(manifest, cloud, agent);
     if (status === "implemented") {
       const c = manifest.clouds[cloud];
-      console.log(`  ${pc.green(c.name.padEnd(18))} ${pc.dim("spawn " + agent + " " + cloud)}`);
+      console.log(`  ${pc.green(c.name.padEnd(NAME_COLUMN_WIDTH))} ${pc.dim("spawn " + agent + " " + cloud)}`);
       found = true;
     }
   }
