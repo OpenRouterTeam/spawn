@@ -13,7 +13,7 @@ import {
   type Manifest,
 } from "./manifest.js";
 import { VERSION } from "./version.js";
-import { validateIdentifier, validateScriptContent } from "./security.js";
+import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -152,11 +152,14 @@ export async function cmdInteractive(): Promise<void> {
 
 // ── Run ────────────────────────────────────────────────────────────────────────
 
-export async function cmdRun(agent: string, cloud: string): Promise<void> {
+export async function cmdRun(agent: string, cloud: string, prompt?: string): Promise<void> {
   // SECURITY: Validate input arguments for injection attacks
   try {
     validateIdentifier(agent, "Agent name");
     validateIdentifier(cloud, "Cloud name");
+    if (prompt) {
+      validatePrompt(prompt);
+    }
   } catch (err) {
     p.log.error(getErrorMessage(err));
     process.exit(1);
@@ -173,9 +176,14 @@ export async function cmdRun(agent: string, cloud: string): Promise<void> {
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
-  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}...`);
 
-  await execScript(cloud, agent);
+  if (prompt) {
+    p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)} with prompt...`);
+  } else {
+    p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}...`);
+  }
+
+  await execScript(cloud, agent, prompt);
 }
 
 async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: string): Promise<string> {
@@ -194,13 +202,13 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
   return ghRes.text();
 }
 
-async function execScript(cloud: string, agent: string): Promise<void> {
+async function execScript(cloud: string, agent: string, prompt?: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
   try {
     const scriptContent = await downloadScriptWithFallback(url, ghUrl);
-    await runBash(scriptContent);
+    await runBash(scriptContent, prompt);
   } catch (err) {
     p.log.error("Failed to download or execute spawn script");
     console.error("Error:", getErrorMessage(err));
@@ -208,14 +216,21 @@ async function execScript(cloud: string, agent: string): Promise<void> {
   }
 }
 
-function runBash(script: string): Promise<void> {
+function runBash(script: string, prompt?: string): Promise<void> {
   // SECURITY: Validate script content before execution
   validateScriptContent(script);
+
+  // Set environment variables for non-interactive mode
+  const env = { ...process.env };
+  if (prompt) {
+    env.SPAWN_PROMPT = prompt;
+    env.SPAWN_MODE = "non-interactive";
+  }
 
   return new Promise<void>((resolve, reject) => {
     const child = spawn("bash", ["-c", script], {
       stdio: "inherit",
-      env: process.env,
+      env,
     });
     child.on("close", (code: number | null) => {
       if (code === 0) resolve();
@@ -462,22 +477,29 @@ export function cmdHelp(): void {
 ${pc.bold("spawn")} \u2014 Launch any AI coding agent on any cloud
 
 ${pc.bold("USAGE")}
-  spawn                       Interactive agent + cloud picker
-  spawn <agent> <cloud>       Launch agent on cloud directly
-  spawn <agent>               Show available clouds for agent
-  spawn list                  Full matrix table
-  spawn agents                List all agents with descriptions
-  spawn clouds                List all cloud providers
-  spawn improve [--loop]      Run improvement system
-  spawn update                Check for CLI updates
-  spawn version               Show version
+  spawn                              Interactive agent + cloud picker
+  spawn <agent> <cloud>              Launch agent on cloud directly
+  spawn <agent> <cloud> --prompt     Execute agent with prompt (non-interactive)
+  spawn <agent> <cloud> --prompt-file Execute agent with prompt from file
+  spawn <agent>                      Show available clouds for agent
+  spawn list                         Full matrix table
+  spawn agents                       List all agents with descriptions
+  spawn clouds                       List all cloud providers
+  spawn improve [--loop]             Run improvement system
+  spawn update                       Check for CLI updates
+  spawn version                      Show version
 
 ${pc.bold("EXAMPLES")}
-  spawn                       ${pc.dim("# Pick interactively")}
-  spawn claude sprite         ${pc.dim("# Launch Claude Code on Sprite")}
-  spawn aider hetzner         ${pc.dim("# Launch Aider on Hetzner Cloud")}
-  spawn claude                ${pc.dim("# Show which clouds support Claude")}
-  spawn list                  ${pc.dim("# See the full agent x cloud matrix")}
+  spawn                              ${pc.dim("# Pick interactively")}
+  spawn claude sprite                ${pc.dim("# Launch Claude Code on Sprite")}
+  spawn aider hetzner                ${pc.dim("# Launch Aider on Hetzner Cloud")}
+  spawn claude sprite --prompt "Fix all linter errors"
+                                     ${pc.dim("# Execute Claude with prompt and exit")}
+  spawn aider sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
+  spawn claude sprite --prompt-file instructions.txt
+                                     ${pc.dim("# Read prompt from file")}
+  spawn claude                       ${pc.dim("# Show which clouds support Claude")}
+  spawn list                         ${pc.dim("# See the full agent x cloud matrix")}
 
 ${pc.bold("INSTALL")}
   curl -fsSL ${RAW_BASE}/cli/install.sh | bash

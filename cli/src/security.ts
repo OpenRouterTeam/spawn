@@ -74,3 +74,40 @@ export function validateScriptContent(script: string): void {
     throw new Error("Script must start with a valid shebang (e.g., #!/bin/bash)");
   }
 }
+
+/**
+ * Validates a prompt string for non-interactive agent execution.
+ * SECURITY-CRITICAL: Prevents command injection via prompt parameter.
+ *
+ * @param prompt - The user-provided prompt to validate
+ * @throws Error if validation fails
+ */
+export function validatePrompt(prompt: string): void {
+  if (!prompt || prompt.trim() === "") {
+    throw new Error("Prompt cannot be empty");
+  }
+
+  // Check length constraints (10KB max to prevent DoS)
+  const MAX_PROMPT_LENGTH = 10 * 1024;
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    throw new Error(`Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters`);
+  }
+
+  // Check for obvious command injection patterns
+  // These patterns would break out of the shell quoting used in bash scripts
+  const dangerousPatterns: Array<{ pattern: RegExp; description: string }> = [
+    { pattern: /\$\(.*\)/, description: "command substitution $()" },
+    { pattern: /`[^`]*`/, description: "command substitution backticks" },
+    { pattern: /;\s*rm\s+-rf/, description: "command chaining with rm -rf" },
+    { pattern: /\|\s*bash/, description: "piping to bash" },
+    { pattern: /\|\s*sh/, description: "piping to sh" },
+  ];
+
+  for (const { pattern, description } of dangerousPatterns) {
+    if (pattern.test(prompt)) {
+      throw new Error(
+        `Prompt blocked: contains potentially dangerous pattern (${description}). If this is a false positive, please use --prompt-file instead.`
+      );
+    }
+  }
+}

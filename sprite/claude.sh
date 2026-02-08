@@ -63,8 +63,20 @@ echo ""
 log_info "✅ Sprite setup completed successfully!"
 echo ""
 
-# Start Claude Code immediately
-log_warn "Starting Claude Code..."
-sleep 1
-clear
-sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && claude"
+# Check if running in non-interactive mode
+if [[ -n "${SPAWN_PROMPT:-}" ]]; then
+    # Non-interactive mode: execute prompt and exit
+    log_warn "Executing Claude Code with prompt..."
+
+    # Escape prompt for safe shell execution
+    escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
+
+    # Execute without -tty flag
+    sprite exec -s "${SPRITE_NAME}" -- zsh -c "source ~/.zshrc && claude -p ${escaped_prompt}"
+else
+    # Interactive mode: start Claude Code normally
+    log_warn "Starting Claude Code..."
+    sleep 1
+    clear
+    sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && claude"
+fi

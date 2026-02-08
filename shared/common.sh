@@ -921,6 +921,48 @@ verify_agent_installed() {
 }
 
 # ============================================================
+# Non-interactive agent execution
+# ============================================================
+
+# Execute an agent in non-interactive mode with a prompt
+# Usage: execute_agent_non_interactive SPRITE_NAME AGENT_NAME AGENT_FLAGS PROMPT
+# Arguments:
+#   SPRITE_NAME    - Name of the sprite/server to execute on
+#   AGENT_NAME     - Name of the agent command (e.g., "claude", "aider")
+#   AGENT_FLAGS    - Agent-specific flags for non-interactive execution (e.g., "-p" for claude, "-m" for aider)
+#   PROMPT         - User prompt to execute
+#   EXEC_CALLBACK  - Function to execute commands: func(sprite_name, command)
+#
+# Example (Sprite):
+#   execute_agent_non_interactive "$SPRITE_NAME" "claude" "-p" "$PROMPT" "sprite_exec"
+#
+# Example (SSH):
+#   execute_agent_non_interactive "$SERVER_IP" "aider" "-m" "$PROMPT" "ssh_exec"
+execute_agent_non_interactive() {
+    local sprite_name="${1}"
+    local agent_name="${2}"
+    local agent_flags="${3}"
+    local prompt="${4}"
+    local exec_callback="${5}"
+
+    log_info "Executing ${agent_name} with prompt in non-interactive mode..."
+
+    # Escape the prompt for safe shell execution
+    # We use printf %q which properly escapes special characters for bash
+    local escaped_prompt
+    escaped_prompt=$(printf '%q' "${prompt}")
+
+    # Build the command based on exec callback type
+    if [[ "${exec_callback}" == *"sprite"* ]]; then
+        # Sprite execution (no -tty flag for non-interactive)
+        sprite exec -s "${sprite_name}" -- zsh -c "source ~/.zshrc && ${agent_name} ${agent_flags} ${escaped_prompt}"
+    else
+        # Generic SSH execution
+        ${exec_callback} "${sprite_name}" "source ~/.zshrc && ${agent_name} ${agent_flags} ${escaped_prompt}"
+    fi
+}
+
+# ============================================================
 # SSH connectivity helpers
 # ============================================================
 
