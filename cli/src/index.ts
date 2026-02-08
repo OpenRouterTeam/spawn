@@ -27,8 +27,9 @@ function handleError(err: unknown): never {
 async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
   const manifest = await loadManifest();
   if (!manifest.agents[agent]) {
-    console.error(`Unknown command or agent: ${agent}`);
-    console.error(`Run 'spawn help' for usage.`);
+    console.error(`Error: Unknown agent "${agent}"`);
+    console.error(`\nRun 'spawn agents' to see all available agents.`);
+    console.error(`Run 'spawn help' for complete usage.`);
     process.exit(1);
   }
 

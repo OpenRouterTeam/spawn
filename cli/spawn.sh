@@ -67,7 +67,7 @@ json_validate() {
     if ${HAS_JQ}; then
         jq empty "${file}" 2>/dev/null
     elif ${HAS_PYTHON3}; then
-        python3 -c "import json; json.load(open('${file}'))" 2>/dev/null
+        python3 -c "import json, sys; json.load(open(sys.argv[1]))" "${file}" 2>/dev/null
     fi
 }
 

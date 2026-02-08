@@ -82,7 +82,8 @@ ensure_fly_token() {
     local config_dir="$HOME/.config/spawn"
     local config_file="$config_dir/fly.json"
     if [[ -f "$config_file" ]]; then
-        local saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))" 2>/dev/null)
+        local saved_token
+        saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
         if [[ -n "$saved_token" ]]; then
             export FLY_API_TOKEN="$saved_token"
             log_info "Using Fly.io API token from $config_file"
@@ -94,7 +95,8 @@ ensure_fly_token() {
     if command -v fly &>/dev/null || command -v flyctl &>/dev/null; then
         local fly_cmd="fly"
         command -v fly &>/dev/null || fly_cmd="flyctl"
-        local token=$("$fly_cmd" auth token 2>/dev/null || true)
+        local token
+        token=$("$fly_cmd" auth token 2>/dev/null || true)
         if [[ -n "$token" ]]; then
             export FLY_API_TOKEN="$token"
             log_info "Using Fly.io API token from flyctl auth"
@@ -117,7 +119,8 @@ EOF
     echo -e "${YELLOW}Or create one at: https://fly.io/dashboard → Tokens${NC}"
     echo ""
 
-    local token=$(safe_read "Enter your Fly.io API token: ") || return 1
+    local token
+    token=$(safe_read "Enter your Fly.io API token: ") || return 1
     if [[ -z "$token" ]]; then
         log_error "API token cannot be empty"
         log_warn "For non-interactive usage, set: FLY_API_TOKEN=your-token"
@@ -126,11 +129,13 @@ EOF
 
     # Validate token by making a test API call
     export FLY_API_TOKEN="$token"
-    local response=$(fly_api GET "/apps?org_slug=personal")
+    local response
+    response=$(fly_api GET "/apps?org_slug=personal")
     if echo "$response" | grep -q '"error"'; then
         log_error "Authentication failed: Invalid Fly.io API token"
 
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
 
         log_warn "Remediation steps:"

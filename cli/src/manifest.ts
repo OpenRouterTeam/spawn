@@ -121,9 +121,37 @@ function updateCache(manifest: Manifest): Manifest {
   return manifest;
 }
 
+function tryLoadLocalManifest(): Manifest | null {
+  // Skip local manifest in test environment
+  if (process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test") {
+    return null;
+  }
+
+  try {
+    // Try loading manifest.json from current directory (development mode)
+    const localPath = join(process.cwd(), "manifest.json");
+    if (existsSync(localPath)) {
+      const data = JSON.parse(readFileSync(localPath, "utf-8"));
+      if (isValidManifest(data)) {
+        return data as Manifest;
+      }
+    }
+  } catch (err) {
+    // Local manifest not found or invalid - not an error, just continue
+  }
+  return null;
+}
+
 export async function loadManifest(forceRefresh = false): Promise<Manifest> {
   // Return in-memory cache if available and not forcing refresh
   if (_cached && !forceRefresh) return _cached;
+
+  // Try local manifest first (for development/testing, but not in test environment)
+  const local = tryLoadLocalManifest();
+  if (local) {
+    _cached = local;
+    return local;
+  }
 
   // Check disk cache first if not forcing refresh
   if (!forceRefresh) {

@@ -19,10 +19,12 @@ spawn list                    # Show the full matrix
 ### Examples
 
 ```bash
-spawn claude sprite           # Claude Code on Sprite
-spawn aider hetzner           # Aider on Hetzner Cloud
-spawn goose digitalocean      # Goose on DigitalOcean
-spawn codex vultr             # Codex CLI on Vultr
+spawn                                    # Interactive picker
+spawn claude sprite                      # Claude Code on Sprite
+spawn aider hetzner                      # Aider on Hetzner Cloud
+spawn claude sprite --prompt "Fix bugs"  # Execute with prompt (non-interactive)
+spawn aider sprite -p "Add tests"        # Short form of --prompt
+spawn claude                             # Show clouds available for Claude
 ```
 
 ### Commands
@@ -31,10 +33,15 @@ spawn codex vultr             # Codex CLI on Vultr
 |---------|-------------|
 | `spawn` | Interactive agent + cloud picker |
 | `spawn <agent> <cloud>` | Launch agent on cloud directly |
+| `spawn <agent> <cloud> --prompt "text"` | Execute agent with prompt (non-interactive) |
+| `spawn <agent> <cloud> --prompt-file file.txt` | Execute agent with prompt from file |
 | `spawn <agent>` | Show available clouds for an agent |
 | `spawn list` | Full agent x cloud matrix |
 | `spawn agents` | List all agents |
 | `spawn clouds` | List all cloud providers |
+| `spawn improve` | Run improvement system |
+| `spawn update` | Check for CLI updates |
+| `spawn version` | Show version |
 
 ### Without the CLI
 

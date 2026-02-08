@@ -47,7 +47,7 @@ ensure_vultr_token() {
     local config_file="$config_dir/vultr.json"
     if [[ -f "$config_file" ]]; then
         local saved_key
-        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))" 2>/dev/null)
+        saved_key=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_key',''))" "$config_file" 2>/dev/null)
         if [[ -n "$saved_key" ]]; then
             export VULTR_API_KEY="$saved_key"
             log_info "Using Vultr API key from $config_file"

@@ -47,7 +47,7 @@ ensure_binarylane_token() {
     local config_file="$config_dir/binarylane.json"
     if [[ -f "$config_file" ]]; then
         local saved_key
-        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_token',''))" 2>/dev/null)
+        saved_key=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_token',''))" "$config_file" 2>/dev/null)
         if [[ -n "$saved_key" ]]; then
             export BINARYLANE_API_TOKEN="$saved_key"
             log_info "Using BinaryLane API token from $config_file"

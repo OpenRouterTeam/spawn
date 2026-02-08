@@ -136,8 +136,8 @@ ensure_upcloud_credentials() {
     local config_file="$HOME/.config/spawn/upcloud.json"
     if [[ -f "${config_file}" ]]; then
         local saved_username saved_password
-        saved_username=$(python3 -c "import json; print(json.load(open('${config_file}')).get('username',''))" 2>/dev/null)
-        saved_password=$(python3 -c "import json; print(json.load(open('${config_file}')).get('password',''))" 2>/dev/null)
+        saved_username=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('username',''))" "${config_file}" 2>/dev/null)
+        saved_password=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('password',''))" "${config_file}" 2>/dev/null)
         if [[ -n "${saved_username}" ]] && [[ -n "${saved_password}" ]]; then
             export UPCLOUD_USERNAME="${saved_username}"
             export UPCLOUD_PASSWORD="${saved_password}"

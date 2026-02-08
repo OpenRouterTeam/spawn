@@ -44,7 +44,7 @@ ensure_linode_token() {
     local config_file="$config_dir/linode.json"
     if [[ -f "$config_file" ]]; then
         local saved_token
-        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))" 2>/dev/null)
+        saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
         if [[ -n "$saved_token" ]]; then
             export LINODE_API_TOKEN="$saved_token"
             log_info "Using Linode API token from $config_file"; return 0

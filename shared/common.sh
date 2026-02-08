@@ -122,6 +122,11 @@ validate_model_id() {
     return 0
 }
 
+# Helper to show server name validation requirements
+show_server_name_requirements() {
+    log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+}
+
 # Validate server/sprite name to prevent injection and ensure cloud provider compatibility
 # Server names must be 3-63 characters, alphanumeric + dash, no leading/trailing dash
 validate_server_name() {
@@ -136,13 +141,13 @@ validate_server_name() {
     local name_length=${#server_name}
     if [[ ${name_length} -lt 3 ]]; then
         log_error "Server name too short: '${server_name}' (minimum 3 characters)"
-        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        show_server_name_requirements
         return 1
     fi
 
     if [[ ${name_length} -gt 63 ]]; then
         log_error "Server name too long: '${server_name}' (maximum 63 characters)"
-        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        show_server_name_requirements
         return 1
     fi
 
@@ -150,7 +155,7 @@ validate_server_name() {
     if [[ ! "${server_name}" =~ ^[a-zA-Z0-9-]+$ ]]; then
         log_error "Invalid server name: '${server_name}'"
         log_error "Server names must contain only alphanumeric characters and dashes"
-        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        show_server_name_requirements
         return 1
     fi
 
@@ -158,7 +163,7 @@ validate_server_name() {
     if [[ "${server_name}" =~ ^- ]]; then
         log_error "Invalid server name: '${server_name}'"
         log_error "Server names cannot start with a dash"
-        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        show_server_name_requirements
         return 1
     fi
 
@@ -166,7 +171,7 @@ validate_server_name() {
     if [[ "${server_name}" =~ -$ ]]; then
         log_error "Invalid server name: '${server_name}'"
         log_error "Server names cannot end with a dash"
-        log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+        show_server_name_requirements
         return 1
     fi
 
@@ -478,6 +483,35 @@ check_openrouter_connectivity() {
     return 1
 }
 
+# Start OAuth server and wait for it to be ready
+# Returns: "port_number" on success, "" on failure (cleanup handled by caller)
+start_and_verify_oauth_server() {
+    local callback_port="${1}"
+    local code_file="${2}"
+    local port_file="${3}"
+    local server_pid="${4}"
+
+    sleep "${POLL_INTERVAL}"
+    if ! kill -0 "${server_pid}" 2>/dev/null; then
+        log_warn "Failed to start OAuth server (all ports in range may be in use)"
+        return 1
+    fi
+
+    # Wait for port file to be created (server successfully bound to a port)
+    local wait_count=0
+    while [[ ! -f "${port_file}" ]] && [[ ${wait_count} -lt 10 ]]; do
+        sleep 0.2
+        wait_count=$((wait_count + 1))
+    done
+
+    if [[ ! -f "${port_file}" ]]; then
+        log_warn "OAuth server failed to allocate a port"
+        return 1
+    fi
+
+    cat "${port_file}"
+}
+
 # Try OAuth flow (orchestrates the helper functions above)
 try_oauth_flow() {
     local callback_port=${1:-5180}
@@ -507,28 +541,13 @@ try_oauth_flow() {
     local server_pid
     server_pid=$(start_oauth_server "${callback_port}" "${code_file}" "${port_file}")
 
-    sleep "${POLL_INTERVAL}"
-    if ! kill -0 "${server_pid}" 2>/dev/null; then
-        log_warn "Failed to start OAuth server (all ports in range may be in use)"
-        cleanup_oauth_session "" "${oauth_dir}"
-        return 1
-    fi
-
-    # Wait for port file to be created (server successfully bound to a port)
-    local wait_count=0
-    while [[ ! -f "${port_file}" ]] && [[ ${wait_count} -lt 10 ]]; do
-        sleep 0.2
-        wait_count=$((wait_count + 1))
-    done
-
-    if [[ ! -f "${port_file}" ]]; then
-        log_warn "OAuth server failed to allocate a port"
+    local actual_port
+    actual_port=$(start_and_verify_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${server_pid}")
+    if [[ -z "${actual_port}" ]]; then
         cleanup_oauth_session "${server_pid}" "${oauth_dir}"
         return 1
     fi
 
-    local actual_port
-    actual_port=$(cat "${port_file}")
     log_info "OAuth server listening on port ${actual_port}"
 
     local callback_url="http://localhost:${actual_port}/callback"
@@ -726,7 +745,12 @@ get_ssh_fingerprint() {
 # Usage: json_escape STRING
 json_escape() {
     local string="${1}"
-    python3 -c "import json; print(json.dumps('${string}'))" 2>/dev/null || echo "\"${string}\""
+    python3 -c "import json, sys; print(json.dumps(sys.stdin.read().rstrip('\n')))" <<< "${string}" 2>/dev/null || {
+        # Fallback: manually escape quotes and backslashes
+        local escaped="${string//\\/\\\\}"
+        escaped="${escaped//\"/\\\"}"
+        echo "\"${escaped}\""
+    }
 }
 
 # Extract SSH key IDs from cloud provider API response
@@ -778,6 +802,23 @@ CLOUD_INIT_EOF
 # Cloud API helpers
 # ============================================================
 
+# Calculate exponential backoff with jitter for retry logic
+# Usage: calculate_retry_backoff CURRENT_INTERVAL MAX_INTERVAL
+# Returns: backoff interval with ±20% jitter
+calculate_retry_backoff() {
+    local interval="${1}"
+    local max_interval="${2}"
+
+    # Calculate next interval with exponential backoff
+    local next_interval=$((interval * 2))
+    if [[ "${next_interval}" -gt "${max_interval}" ]]; then
+        next_interval="${max_interval}"
+    fi
+
+    # Add jitter: ±20% randomization to prevent thundering herd
+    python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}"
+}
+
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
 # Includes automatic retry logic with exponential backoff for transient failures
 # Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY] [MAX_RETRIES]
@@ -827,20 +868,15 @@ generic_cloud_api() {
                 return 1
             fi
 
-            # Calculate next interval with exponential backoff
-            local next_interval=$((interval * 2))
-            if [[ "${next_interval}" -gt "${max_interval}" ]]; then
-                next_interval="${max_interval}"
-            fi
-
-            # Add jitter: ±20% randomization
             local jitter
-            jitter=$(python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}")
-
+            jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
             log_warn "Cloud API network error (attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
             sleep "${jitter}"
 
-            interval="${next_interval}"
+            interval=$((interval * 2))
+            if [[ "${interval}" -gt "${max_interval}" ]]; then
+                interval="${max_interval}"
+            fi
             attempt=$((attempt + 1))
             continue
         fi
@@ -853,25 +889,20 @@ generic_cloud_api() {
                 return 1
             fi
 
-            # Calculate next interval with exponential backoff
-            local next_interval=$((interval * 2))
-            if [[ "${next_interval}" -gt "${max_interval}" ]]; then
-                next_interval="${max_interval}"
-            fi
-
-            # Add jitter: ±20% randomization
-            local jitter
-            jitter=$(python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}")
-
             local error_msg="rate limit"
             if [[ "${http_code}" == "503" ]]; then
                 error_msg="service unavailable"
             fi
 
+            local jitter
+            jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
             log_warn "Cloud API returned ${error_msg} (HTTP ${http_code}, attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
             sleep "${jitter}"
 
-            interval="${next_interval}"
+            interval=$((interval * 2))
+            if [[ "${interval}" -gt "${max_interval}" ]]; then
+                interval="${max_interval}"
+            fi
             attempt=$((attempt + 1))
             continue
         fi
@@ -992,22 +1023,18 @@ generic_ssh_wait() {
             return 0
         fi
 
-        # Calculate next interval with exponential backoff
-        local next_interval=$((interval * 2))
-        if [[ "${next_interval}" -gt "${max_interval}" ]]; then
-            next_interval="${max_interval}"
-        fi
-
-        # Add jitter: ±20% randomization to prevent thundering herd
-        # Generates random number between 0.8 and 1.2 times the interval
+        # Calculate next interval with exponential backoff and jitter
         local jitter
-        jitter=$(python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}")
+        jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
 
         log_warn "Waiting for ${description}... (attempt ${attempt}/${max_attempts}, elapsed ${elapsed_time}s, retry in ${jitter}s)"
         sleep "${jitter}"
 
         elapsed_time=$((elapsed_time + jitter))
-        interval="${next_interval}"
+        interval=$((interval * 2))
+        if [[ "${interval}" -gt "${max_interval}" ]]; then
+            interval="${max_interval}"
+        fi
         attempt=$((attempt + 1))
     done
 
@@ -1054,7 +1081,7 @@ ensure_api_token_with_provider() {
     # 2. Check config file
     if [[ -f "${config_file}" ]]; then
         local saved_token
-        saved_token=$(python3 -c "import json; print(json.load(open('${config_file}')).get('api_key','') or json.load(open('${config_file}')).get('token',''))" 2>/dev/null)
+        saved_token=$(python3 -c "import json, sys; data=json.load(open(sys.argv[1])); print(data.get('api_key','') or data.get('token',''))" "${config_file}" 2>/dev/null)
         if [[ -n "${saved_token}" ]]; then
             export "${env_var_name}=${saved_token}"
             log_info "Using ${provider_name} API token from ${config_file}"
@@ -1098,6 +1125,31 @@ EOF
 }
 
 # ============================================================
+# Configuration file helpers
+# ============================================================
+
+# Helper to create, upload, and install a config file from a heredoc or string
+# Usage: upload_config_file UPLOAD_CALLBACK RUN_CALLBACK CONTENT REMOTE_PATH
+# Example: upload_config_file "$upload_func" "$run_func" "$json_content" "~/.config/app.json"
+upload_config_file() {
+    local upload_callback="${1}"
+    local run_callback="${2}"
+    local content="${3}"
+    local remote_path="${4}"
+
+    local temp_file
+    temp_file=$(mktemp)
+    chmod 600 "${temp_file}"
+    track_temp_file "${temp_file}"
+
+    printf '%s\n' "${content}" > "${temp_file}"
+
+    local temp_remote="/tmp/spawn_config_$$_$(basename "${remote_path}")"
+    ${upload_callback} "${temp_file}" "${temp_remote}"
+    ${run_callback} "mv ${temp_remote} ${remote_path}"
+}
+
+# ============================================================
 # Claude Code configuration setup
 # ============================================================
 
@@ -1130,12 +1182,8 @@ setup_claude_code_config() {
     ${run_callback} "mkdir -p ~/.claude"
 
     # Create settings.json
-    local settings_temp
-    settings_temp=$(mktemp)
-    chmod 600 "${settings_temp}"
-    track_temp_file "${settings_temp}"
-
-    cat > "${settings_temp}" << EOF
+    local settings_json
+    settings_json=$(cat << EOF
 {
   "theme": "dark",
   "editor": "vim",
@@ -1150,25 +1198,19 @@ setup_claude_code_config() {
   }
 }
 EOF
-
-    ${upload_callback} "${settings_temp}" "/tmp/claude_settings_$$"
-    ${run_callback} "mv /tmp/claude_settings_$$ ~/.claude/settings.json"
+)
+    upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "~/.claude/settings.json"
 
     # Create .claude.json global state
-    local global_state_temp
-    global_state_temp=$(mktemp)
-    chmod 600 "${global_state_temp}"
-    track_temp_file "${global_state_temp}"
-
-    cat > "${global_state_temp}" << EOF
+    local global_state_json
+    global_state_json=$(cat << EOF
 {
   "hasCompletedOnboarding": true,
   "bypassPermissionsModeAccepted": true
 }
 EOF
-
-    ${upload_callback} "${global_state_temp}" "/tmp/claude_global_$$"
-    ${run_callback} "mv /tmp/claude_global_$$ ~/.claude.json"
+)
+    upload_config_file "${upload_callback}" "${run_callback}" "${global_state_json}" "~/.claude.json"
 
     # Create empty CLAUDE.md
     ${run_callback} "touch ~/.claude/CLAUDE.md"
@@ -1213,12 +1255,8 @@ setup_openclaw_config() {
     gateway_token=$(openssl rand -hex 16)
 
     # Create openclaw.json config
-    local config_temp
-    config_temp=$(mktemp)
-    chmod 600 "${config_temp}"
-    track_temp_file "${config_temp}"
-
-    cat > "${config_temp}" << EOF
+    local openclaw_json
+    openclaw_json=$(cat << EOF
 {
   "env": {
     "OPENROUTER_API_KEY": "${openrouter_key}"
@@ -1238,9 +1276,8 @@ setup_openclaw_config() {
   }
 }
 EOF
-
-    ${upload_callback} "${config_temp}" "/tmp/openclaw_config_$$"
-    ${run_callback} "mv /tmp/openclaw_config_$$ ~/.openclaw/openclaw.json"
+)
+    upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "~/.openclaw/openclaw.json"
 }
 
 # ============================================================

@@ -195,8 +195,17 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
   // Fallback to GitHub raw
   const ghRes = await fetch(fallbackUrl);
   if (!ghRes.ok) {
-    p.log.error(`Failed to download script from both ${primaryUrl} and ${fallbackUrl}`);
-    console.error(`Primary URL returned: HTTP ${res.status}, Fallback URL returned: HTTP ${ghRes.status}`);
+    const primaryStatus = res.status === 404 ? "not found" : `HTTP ${res.status}`;
+    const fallbackStatus = ghRes.status === 404 ? "not found" : `HTTP ${ghRes.status}`;
+
+    p.log.error("Script download failed");
+    console.error(`\nPrimary source (${primaryUrl}): ${primaryStatus}`);
+    console.error(`Fallback source (${fallbackUrl}): ${fallbackStatus}`);
+
+    if (res.status === 404 && ghRes.status === 404) {
+      console.error("\nThis combination may not be implemented yet.");
+      console.error("Run 'spawn list' to see all available combinations.");
+    }
     process.exit(1);
   }
   return ghRes.text();
@@ -211,7 +220,11 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
     await runBash(scriptContent, prompt);
   } catch (err) {
     p.log.error("Failed to download or execute spawn script");
-    console.error("Error:", getErrorMessage(err));
+    console.error("\nError:", getErrorMessage(err));
+    console.error("\nTroubleshooting steps:");
+    console.error("  1. Check your internet connection");
+    console.error("  2. Verify the combination is implemented: spawn list");
+    console.error(`  3. Try the direct link: ${ghUrl}`);
     process.exit(1);
   }
 }
@@ -479,8 +492,10 @@ ${pc.bold("spawn")} \u2014 Launch any AI coding agent on any cloud
 ${pc.bold("USAGE")}
   spawn                              Interactive agent + cloud picker
   spawn <agent> <cloud>              Launch agent on cloud directly
-  spawn <agent> <cloud> --prompt     Execute agent with prompt (non-interactive)
-  spawn <agent> <cloud> --prompt-file Execute agent with prompt from file
+  spawn <agent> <cloud> --prompt "text"
+                                     Execute agent with prompt (non-interactive)
+  spawn <agent> <cloud> --prompt-file <file>
+                                     Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
   spawn list                         Full matrix table
   spawn agents                       List all agents with descriptions

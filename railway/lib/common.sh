@@ -69,7 +69,7 @@ ensure_railway_token() {
     local config_dir="$HOME/.config/spawn"
     local config_file="$config_dir/railway.json"
     if [[ -f "$config_file" ]]; then
-        local saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))" 2>/dev/null)
+        local saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
         if [[ -n "$saved_token" ]]; then
             export RAILWAY_TOKEN="$saved_token"
             log_info "Using Railway token from $config_file"
