@@ -96,16 +96,14 @@ create_server() {
     local userdata
     userdata=$(get_cloud_init_userdata)
 
-    aws lightsail create-instances \
+    if ! aws lightsail create-instances \
         --instance-names "$name" \
         --availability-zone "$az" \
         --blueprint-id "$blueprint" \
         --bundle-id "$bundle" \
         --key-pair-name "spawn-key" \
         --user-data "$userdata" \
-        >/dev/null
-
-    if [[ $? -ne 0 ]]; then
+        >/dev/null; then
         log_error "Failed to create Lightsail instance"
         return 1
     fi

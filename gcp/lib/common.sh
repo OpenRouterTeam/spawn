@@ -92,7 +92,7 @@ create_server() {
     local username
     username=$(whoami)
 
-    gcloud compute instances create "$name" \
+    if ! gcloud compute instances create "$name" \
         --zone="$zone" \
         --machine-type="$machine_type" \
         --image-family="$image_family" \
@@ -100,9 +100,7 @@ create_server() {
         --metadata="startup-script=$userdata,ssh-keys=${username}:${pub_key}" \
         --project="$GCP_PROJECT" \
         --quiet \
-        >/dev/null 2>&1
-
-    if [[ $? -ne 0 ]]; then
+        >/dev/null 2>&1; then
         log_error "Failed to create GCP instance"
         return 1
     fi
@@ -127,7 +125,7 @@ verify_server_connectivity() {
     log_warn "Waiting for SSH connectivity to $ip..."
     while [[ $attempt -le $max_attempts ]]; do
         # SSH_OPTS is defined in shared/common.sh
-        # shellcheck disable=SC2154
+        # shellcheck disable=SC2154,SC2086
         if ssh $SSH_OPTS -o ConnectTimeout=5 "${username}@$ip" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi
@@ -142,6 +140,7 @@ wait_for_cloud_init() {
     username=$(whoami)
     log_warn "Waiting for startup script to complete..."
     while [[ $attempt -le $max_attempts ]]; do
+        # shellcheck disable=SC2086
         if ssh $SSH_OPTS "${username}@$ip" "test -f /tmp/.cloud-init-complete" >/dev/null 2>&1; then
             log_info "Startup script completed"; return 0
         fi
@@ -155,6 +154,7 @@ run_server() {
     local ip="$1" cmd="$2"
     local username
     username=$(whoami)
+    # shellcheck disable=SC2086
     ssh $SSH_OPTS "${username}@$ip" "$cmd"
 }
 
@@ -162,6 +162,7 @@ upload_file() {
     local ip="$1" local_path="$2" remote_path="$3"
     local username
     username=$(whoami)
+    # shellcheck disable=SC2086
     scp $SSH_OPTS "$local_path" "${username}@$ip:$remote_path"
 }
 
