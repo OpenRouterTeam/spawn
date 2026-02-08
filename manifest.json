@@ -462,9 +462,9 @@
     "fly/goose": "missing",
     "fly/codex": "missing",
     "fly/interpreter": "missing",
-    "fly/gemini": "missing",
-    "fly/amazonq": "missing",
-    "fly/cline": "missing",
-    "fly/gptme": "missing"
+    "fly/gemini": "implemented",
+    "fly/amazonq": "implemented",
+    "fly/cline": "implemented",
+    "fly/gptme": "implemented"
   }
 }
