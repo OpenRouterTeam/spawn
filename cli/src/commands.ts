@@ -83,6 +83,18 @@ export async function cmdInteractive() {
 // ── Run ────────────────────────────────────────────────────────────────────────
 
 export async function cmdRun(agent: string, cloud: string) {
+  // Validate input arguments
+  if (!agent || agent.trim() === "") {
+    p.log.error("Agent name cannot be empty");
+    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
+    process.exit(1);
+  }
+  if (!cloud || cloud.trim() === "") {
+    p.log.error("Cloud name cannot be empty");
+    p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
+    process.exit(1);
+  }
+
   const manifest = await withSpinner("Loading manifest...", loadManifest);
 
   if (!manifest.agents[agent]) {
@@ -115,19 +127,26 @@ async function execScript(cloud: string, agent: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
 
   // Download script then execute, preserving stdin/stdout/stderr for interactive use
-  const res = await fetch(url);
-  if (!res.ok) {
-    // Fallback to GitHub raw
-    const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
-    const ghRes = await fetch(ghUrl);
-    if (!ghRes.ok) {
-      p.log.error(`Failed to download script from ${url}`);
-      process.exit(1);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      // Fallback to GitHub raw
+      const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
+      const ghRes = await fetch(ghUrl);
+      if (!ghRes.ok) {
+        p.log.error(`Failed to download script from both ${url} and ${ghUrl}`);
+        console.error(`Primary URL returned: HTTP ${res.status}, Fallback URL returned: HTTP ${ghRes.status}`);
+        process.exit(1);
+      }
+      await runBash(await ghRes.text());
+      return;
     }
-    await runBash(await ghRes.text());
-    return;
+    await runBash(await res.text());
+  } catch (err) {
+    p.log.error("Failed to download or execute spawn script");
+    console.error("Error:", err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
-  await runBash(await res.text());
 }
 
 function runBash(script: string): Promise<void> {
@@ -229,6 +248,13 @@ export async function cmdClouds() {
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
 export async function cmdAgentInfo(agent: string) {
+  // Validate input argument
+  if (!agent || agent.trim() === "") {
+    p.log.error("Agent name cannot be empty");
+    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
+    process.exit(1);
+  }
+
   const manifest = await withSpinner("Loading manifest...", loadManifest);
 
   if (!manifest.agents[agent]) {
@@ -279,8 +305,9 @@ export async function cmdImprove(args: string[]) {
       const { execSync } = await import("child_process");
       try {
         execSync("git pull --ff-only", { cwd: repoDir, stdio: "pipe" });
-      } catch {
-        // ignore pull failures
+      } catch (err) {
+        // Git pull failed (network issue, merge conflict, etc.) - continue with existing repo
+        console.error("Warning: Failed to update repo:", err instanceof Error ? err.message : String(err));
       }
     } else {
       p.log.step("Cloning spawn repo...");
@@ -336,8 +363,9 @@ export async function cmdUpdate() {
       `  ${pc.cyan(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`)}`
     );
     console.log();
-  } catch {
+  } catch (err) {
     s.stop(pc.red("Failed to check for updates"));
+    console.error("Error:", err instanceof Error ? err.message : String(err));
   }
 }
 

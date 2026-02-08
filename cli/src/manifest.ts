@@ -52,7 +52,8 @@ function cacheAge(): number {
   try {
     const st = statSync(CACHE_FILE);
     return (Date.now() - st.mtimeMs) / 1000;
-  } catch {
+  } catch (err) {
+    // Cache file doesn't exist or is inaccessible - treat as infinitely old
     return Infinity;
   }
 }
@@ -60,7 +61,9 @@ function cacheAge(): number {
 function readCache(): Manifest | null {
   try {
     return JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
-  } catch {
+  } catch (err) {
+    // Cache file missing, corrupted, or unreadable
+    console.error(`Failed to read cache from ${CACHE_FILE}:`, err instanceof Error ? err.message : String(err));
     return null;
   }
 }
@@ -98,10 +101,15 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
         writeCache(data);
         _cached = data;
         return data;
+      } else {
+        console.error("Manifest structure validation failed: missing required fields (agents, clouds, or matrix)");
       }
+    } else {
+      console.error(`Failed to fetch manifest from GitHub: HTTP ${res.status} ${res.statusText}`);
     }
-  } catch {
+  } catch (err) {
     // Network error — fall through to cache
+    console.error("Network error fetching manifest:", err instanceof Error ? err.message : String(err));
   }
 
   // Offline fallback: use stale cache
