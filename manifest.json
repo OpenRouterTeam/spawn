@@ -121,6 +121,46 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
+    },
+    "gemini": {
+      "name": "Gemini CLI",
+      "description": "Google's open-source coding agent",
+      "url": "https://github.com/google-gemini/gemini-cli",
+      "install": "npm install -g @google/gemini-cli",
+      "launch": "gemini",
+      "env": {
+        "GEMINI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override and GEMINI_API_KEY"
+    },
+    "amazonq": {
+      "name": "Amazon Q CLI",
+      "description": "AWS's AI coding assistant CLI",
+      "url": "https://aws.amazon.com/q/developer/",
+      "install": "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash",
+      "launch": "q chat",
+      "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
+    },
+    "cline": {
+      "name": "Cline",
+      "description": "Open-source AI coding agent for the terminal",
+      "url": "https://github.com/cline/cline",
+      "install": "npm install -g cline",
+      "launch": "cline",
+      "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
     }
   },
   "clouds": {
@@ -193,6 +233,81 @@
         "region": "us-east",
         "image": "linode/ubuntu24.04"
       }
+    },
+    "lambda": {
+      "name": "Lambda Cloud",
+      "description": "Lambda GPU Cloud instances via REST API",
+      "url": "https://lambdalabs.com/",
+      "type": "api",
+      "auth": "LAMBDA_API_KEY",
+      "provision_method": "POST /v1/instance-operations/launch",
+      "exec_method": "ssh ubuntu@IP",
+      "interactive_method": "ssh -t ubuntu@IP",
+      "defaults": {
+        "instance_type": "gpu_1x_a10",
+        "region": "us-east-1"
+      },
+      "notes": "GPU cloud, uses 'ubuntu' user. Manual tool install (no cloud-init)."
+    },
+    "aws-lightsail": {
+      "name": "AWS Lightsail",
+      "description": "AWS Lightsail instances via AWS CLI",
+      "url": "https://aws.amazon.com/lightsail/",
+      "type": "cli",
+      "auth": "aws configure (AWS credentials)",
+      "provision_method": "aws lightsail create-instances with --user-data",
+      "exec_method": "ssh ubuntu@IP",
+      "interactive_method": "ssh -t ubuntu@IP",
+      "defaults": {
+        "bundle": "medium_3_0",
+        "region": "us-east-1",
+        "blueprint": "ubuntu_24_04"
+      },
+      "notes": "Uses 'ubuntu' user instead of 'root'. Requires AWS CLI installed and configured."
+    },
+    "gcp": {
+      "name": "GCP Compute Engine",
+      "description": "Google Cloud Compute Engine instances via gcloud CLI",
+      "url": "https://cloud.google.com/compute",
+      "type": "cli",
+      "auth": "gcloud auth login",
+      "provision_method": "gcloud compute instances create with --metadata startup-script",
+      "exec_method": "ssh user@IP",
+      "interactive_method": "ssh -t user@IP",
+      "defaults": {
+        "machine_type": "e2-medium",
+        "zone": "us-central1-a",
+        "image_family": "ubuntu-2404-lts-amd64"
+      },
+      "notes": "Uses current username for SSH. Requires gcloud CLI installed and configured."
+    },
+    "e2b": {
+      "name": "E2B",
+      "description": "E2B sandboxed cloud containers via CLI/SDK",
+      "url": "https://e2b.dev",
+      "type": "sandbox",
+      "auth": "E2B_API_KEY",
+      "provision_method": "e2b sandbox create",
+      "exec_method": "e2b sandbox exec",
+      "interactive_method": "e2b sandbox exec (PTY)",
+      "defaults": {
+        "template": "base"
+      },
+      "notes": "No SSH — uses E2B CLI for exec. Sandboxes start in ~150ms. Requires npm install -g @e2b/cli."
+    },
+    "modal": {
+      "name": "Modal",
+      "description": "Modal sandboxed containers via Python SDK",
+      "url": "https://modal.com",
+      "type": "sandbox",
+      "auth": "modal setup",
+      "provision_method": "modal.Sandbox.create() via Python SDK",
+      "exec_method": "sandbox.exec() via Python SDK",
+      "interactive_method": "sandbox.exec(pty=True)",
+      "defaults": {
+        "image": "debian_slim"
+      },
+      "notes": "No SSH — uses Modal Python SDK for exec. Sub-second cold starts. Requires pip install modal."
     }
   },
   "matrix": {
@@ -230,6 +345,71 @@
     "hetzner/interpreter": "implemented",
     "digitalocean/interpreter": "implemented",
     "vultr/interpreter": "implemented",
-    "linode/interpreter": "implemented"
+    "linode/interpreter": "implemented",
+    "aws-lightsail/claude": "implemented",
+    "aws-lightsail/openclaw": "implemented",
+    "aws-lightsail/nanoclaw": "implemented",
+    "aws-lightsail/aider": "implemented",
+    "aws-lightsail/goose": "implemented",
+    "aws-lightsail/codex": "implemented",
+    "aws-lightsail/interpreter": "implemented",
+    "sprite/gemini": "implemented",
+    "hetzner/gemini": "implemented",
+    "digitalocean/gemini": "implemented",
+    "vultr/gemini": "implemented",
+    "linode/gemini": "implemented",
+    "aws-lightsail/gemini": "implemented",
+    "lambda/claude": "implemented",
+    "lambda/openclaw": "implemented",
+    "lambda/nanoclaw": "implemented",
+    "lambda/aider": "implemented",
+    "lambda/goose": "implemented",
+    "lambda/codex": "implemented",
+    "lambda/interpreter": "implemented",
+    "lambda/gemini": "implemented",
+    "sprite/amazonq": "implemented",
+    "hetzner/amazonq": "implemented",
+    "digitalocean/amazonq": "implemented",
+    "vultr/amazonq": "implemented",
+    "linode/amazonq": "implemented",
+    "lambda/amazonq": "implemented",
+    "aws-lightsail/amazonq": "implemented",
+    "sprite/cline": "implemented",
+    "hetzner/cline": "implemented",
+    "digitalocean/cline": "implemented",
+    "vultr/cline": "implemented",
+    "linode/cline": "implemented",
+    "lambda/cline": "implemented",
+    "aws-lightsail/cline": "implemented",
+    "gcp/claude": "implemented",
+    "gcp/openclaw": "implemented",
+    "gcp/nanoclaw": "implemented",
+    "gcp/aider": "implemented",
+    "gcp/goose": "implemented",
+    "gcp/codex": "implemented",
+    "gcp/interpreter": "implemented",
+    "gcp/gemini": "implemented",
+    "gcp/amazonq": "implemented",
+    "gcp/cline": "implemented",
+    "e2b/claude": "implemented",
+    "e2b/openclaw": "implemented",
+    "e2b/nanoclaw": "implemented",
+    "e2b/aider": "implemented",
+    "e2b/goose": "implemented",
+    "e2b/codex": "implemented",
+    "e2b/interpreter": "implemented",
+    "e2b/gemini": "implemented",
+    "e2b/amazonq": "implemented",
+    "e2b/cline": "implemented",
+    "modal/claude": "implemented",
+    "modal/openclaw": "implemented",
+    "modal/nanoclaw": "implemented",
+    "modal/aider": "implemented",
+    "modal/goose": "implemented",
+    "modal/codex": "implemented",
+    "modal/interpreter": "implemented",
+    "modal/gemini": "implemented",
+    "modal/amazonq": "implemented",
+    "modal/cline": "implemented"
   }
 }
