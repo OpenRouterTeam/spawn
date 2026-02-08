@@ -11,8 +11,8 @@ set -eo pipefail
 
 # Source shared provider-agnostic functions (local or remote fallback)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../shared/common.sh" ]]; then
-    source "$SCRIPT_DIR/../../shared/common.sh"
+if [[ -n "${SCRIPT_DIR}" && -f "${SCRIPT_DIR}/../../shared/common.sh" ]]; then
+    source "${SCRIPT_DIR}/../../shared/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
 fi
@@ -38,19 +38,19 @@ ensure_gcloud() {
     fi
     # Set project
     local project="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
-    if [[ -z "$project" || "$project" == "(unset)" ]]; then
+    if [[ -z "${project}" || "${project}" == "(unset)" ]]; then
         log_error "No GCP project set. Run: gcloud config set project YOUR_PROJECT"
         return 1
     fi
-    export GCP_PROJECT="$project"
-    log_info "Using GCP project: $project"
+    export GCP_PROJECT="${project}"
+    log_info "Using GCP project: ${project}"
 }
 
 ensure_ssh_key() {
-    local key_path="$HOME/.ssh/id_ed25519"
+    local key_path="${HOME}/.ssh/id_ed25519"
 
     # Generate key if needed
-    generate_ssh_key_if_missing "$key_path"
+    generate_ssh_key_if_missing "${key_path}"
 
     # GCP handles SSH keys via project/instance metadata, added during create
     log_info "SSH key ready"
@@ -77,110 +77,110 @@ CLOUD_INIT_EOF
 }
 
 create_server() {
-    local name="$1"
+    local name="${1}"
     local machine_type="${GCP_MACHINE_TYPE:-e2-medium}"
     local zone="${GCP_ZONE:-us-central1-a}"
     local image_family="ubuntu-2404-lts-amd64"
     local image_project="ubuntu-os-cloud"
 
-    log_warn "Creating GCP instance '$name' (type: $machine_type, zone: $zone)..."
+    log_warn "Creating GCP instance '${name}' (type: ${machine_type}, zone: ${zone})..."
 
     local userdata
     userdata=$(get_cloud_init_userdata)
     local pub_key
-    pub_key=$(cat "$HOME/.ssh/id_ed25519.pub")
+    pub_key=$(cat "${HOME}/.ssh/id_ed25519.pub")
     local username
     username=$(whoami)
 
-    if ! gcloud compute instances create "$name" \
-        --zone="$zone" \
-        --machine-type="$machine_type" \
-        --image-family="$image_family" \
-        --image-project="$image_project" \
-        --metadata="startup-script=$userdata,ssh-keys=${username}:${pub_key}" \
-        --project="$GCP_PROJECT" \
+    if ! gcloud compute instances create "${name}" \
+        --zone="${zone}" \
+        --machine-type="${machine_type}" \
+        --image-family="${image_family}" \
+        --image-project="${image_project}" \
+        --metadata="startup-script=${userdata},ssh-keys=${username}:${pub_key}" \
+        --project="${GCP_PROJECT}" \
         --quiet \
         >/dev/null 2>&1; then
         log_error "Failed to create GCP instance"
         return 1
     fi
 
-    export GCP_INSTANCE_NAME_ACTUAL="$name"
-    export GCP_ZONE="$zone"
+    export GCP_INSTANCE_NAME_ACTUAL="${name}"
+    export GCP_ZONE="${zone}"
 
     # Get external IP
-    GCP_SERVER_IP=$(gcloud compute instances describe "$name" \
-        --zone="$zone" \
-        --project="$GCP_PROJECT" \
+    GCP_SERVER_IP=$(gcloud compute instances describe "${name}" \
+        --zone="${zone}" \
+        --project="${GCP_PROJECT}" \
         --format='get(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null)
     export GCP_SERVER_IP
 
-    log_info "Instance created: IP=$GCP_SERVER_IP"
+    log_info "Instance created: IP=${GCP_SERVER_IP}"
 }
 
 verify_server_connectivity() {
-    local ip="$1" max_attempts=${2:-30} attempt=1
+    local ip="${1}" max_attempts=${2:-30} attempt=1
     local username
     username=$(whoami)
-    log_warn "Waiting for SSH connectivity to $ip..."
-    while [[ $attempt -le $max_attempts ]]; do
+    log_warn "Waiting for SSH connectivity to ${ip}..."
+    while [[ ${attempt} -le ${max_attempts} ]]; do
         # SSH_OPTS is defined in shared/common.sh
         # shellcheck disable=SC2154,SC2086
-        if ssh $SSH_OPTS -o ConnectTimeout=5 "${username}@$ip" "echo ok" >/dev/null 2>&1; then
+        if ssh ${SSH_OPTS} -o ConnectTimeout=5 "${username}@${ip}" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi
-        log_warn "Waiting for SSH... ($attempt/$max_attempts)"; sleep 5; attempt=$((attempt + 1))
+        log_warn "Waiting for SSH... (${attempt}/${max_attempts})"; sleep 5; attempt=$((attempt + 1))
     done
-    log_error "Server failed to respond via SSH after $max_attempts attempts"; return 1
+    log_error "Server failed to respond via SSH after ${max_attempts} attempts"; return 1
 }
 
 wait_for_cloud_init() {
-    local ip="$1" max_attempts=${2:-60} attempt=1
+    local ip="${1}" max_attempts=${2:-60} attempt=1
     local username
     username=$(whoami)
     log_warn "Waiting for startup script to complete..."
-    while [[ $attempt -le $max_attempts ]]; do
+    while [[ ${attempt} -le ${max_attempts} ]]; do
         # shellcheck disable=SC2086
-        if ssh $SSH_OPTS "${username}@$ip" "test -f /tmp/.cloud-init-complete" >/dev/null 2>&1; then
+        if ssh ${SSH_OPTS} "${username}@${ip}" "test -f /tmp/.cloud-init-complete" >/dev/null 2>&1; then
             log_info "Startup script completed"; return 0
         fi
-        log_warn "Startup script in progress... ($attempt/$max_attempts)"; sleep 5; attempt=$((attempt + 1))
+        log_warn "Startup script in progress... (${attempt}/${max_attempts})"; sleep 5; attempt=$((attempt + 1))
     done
-    log_error "Startup script did not complete after $max_attempts attempts"; return 1
+    log_error "Startup script did not complete after ${max_attempts} attempts"; return 1
 }
 
 # GCP uses current username
 run_server() {
-    local ip="$1" cmd="$2"
+    local ip="${1}" cmd="${2}"
     local username
     username=$(whoami)
     # shellcheck disable=SC2086
-    ssh $SSH_OPTS "${username}@$ip" "$cmd"
+    ssh ${SSH_OPTS} "${username}@${ip}" "${cmd}"
 }
 
 upload_file() {
-    local ip="$1" local_path="$2" remote_path="$3"
+    local ip="${1}" local_path="${2}" remote_path="${3}"
     local username
     username=$(whoami)
     # shellcheck disable=SC2086
-    scp $SSH_OPTS "$local_path" "${username}@$ip:$remote_path"
+    scp ${SSH_OPTS} "${local_path}" "${username}@${ip}:${remote_path}"
 }
 
 interactive_session() {
-    local ip="$1" cmd="$2"
+    local ip="${1}" cmd="${2}"
     local username
     username=$(whoami)
-    ssh -t $SSH_OPTS "${username}@$ip" "$cmd"
+    ssh -t ${SSH_OPTS} "${username}@${ip}" "${cmd}"
 }
 
 destroy_server() {
-    local name="$1"
+    local name="${1}"
     local zone="${GCP_ZONE:-us-central1-a}"
-    log_warn "Destroying GCP instance $name..."
-    gcloud compute instances delete "$name" --zone="$zone" --project="$GCP_PROJECT" --quiet >/dev/null 2>&1
-    log_info "Instance $name destroyed"
+    log_warn "Destroying GCP instance ${name}..."
+    gcloud compute instances delete "${name}" --zone="${zone}" --project="${GCP_PROJECT}" --quiet >/dev/null 2>&1
+    log_info "Instance ${name} destroyed"
 }
 
 list_servers() {
-    gcloud compute instances list --project="$GCP_PROJECT" --format='table(name,zone,status,networkInterfaces[0].accessConfigs[0].natIP:label=EXTERNAL_IP,machineType.basename())'
+    gcloud compute instances list --project="${GCP_PROJECT}" --format='table(name,zone,status,networkInterfaces[0].accessConfigs[0].natIP:label=EXTERNAL_IP,machineType.basename())'
 }
