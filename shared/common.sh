@@ -512,13 +512,9 @@ start_and_verify_oauth_server() {
     cat "${port_file}"
 }
 
-# Try OAuth flow (orchestrates the helper functions above)
-try_oauth_flow() {
-    local callback_port=${1:-5180}
-
-    log_warn "Attempting OAuth authentication..."
-
-    # Check network connectivity before starting OAuth flow
+# Validate OAuth prerequisites (network, Node.js runtime)
+# Returns 0 if all checks pass, 1 otherwise
+_check_oauth_prerequisites() {
     if ! check_openrouter_connectivity; then
         log_warn "Cannot reach openrouter.ai - network may be unavailable"
         log_warn "Please check your internet connection and try again"
@@ -532,10 +528,15 @@ try_oauth_flow() {
         return 1
     fi
 
-    local oauth_dir
-    oauth_dir=$(mktemp -d)
-    local code_file="${oauth_dir}/code"
-    local port_file="${oauth_dir}/port"
+    return 0
+}
+
+# Start OAuth server and return actual port, cleanup on failure
+# Sets server_pid and returns 0 on success, 1 on failure
+_setup_oauth_server() {
+    local callback_port="${1}"
+    local code_file="${2}"
+    local port_file="${3}"
 
     log_warn "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
     local server_pid
@@ -544,20 +545,61 @@ try_oauth_flow() {
     local actual_port
     actual_port=$(start_and_verify_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${server_pid}")
     if [[ -z "${actual_port}" ]]; then
-        cleanup_oauth_session "${server_pid}" "${oauth_dir}"
         return 1
     fi
 
     log_info "OAuth server listening on port ${actual_port}"
+    echo "${actual_port}"
+    return 0
+}
 
-    local callback_url="http://localhost:${actual_port}/callback"
-    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
-
-    log_warn "Opening browser to authenticate with OpenRouter..."
-    open_browser "${auth_url}"
+# Wait for OAuth code with timeout and cleanup on failure
+# Returns 0 on success, 1 on failure
+_wait_for_oauth() {
+    local code_file="${1}"
 
     if ! wait_for_oauth_code "${code_file}" 120; then
         log_warn "OAuth timeout - no response received"
+        return 1
+    fi
+    return 0
+}
+
+# Try OAuth flow (orchestrates the helper functions above)
+try_oauth_flow() {
+    local callback_port=${1:-5180}
+
+    log_warn "Attempting OAuth authentication..."
+
+    # Check prerequisites
+    if ! _check_oauth_prerequisites; then
+        return 1
+    fi
+
+    local oauth_dir
+    oauth_dir=$(mktemp -d)
+    local code_file="${oauth_dir}/code"
+    local port_file="${oauth_dir}/port"
+
+    # Start server
+    local actual_port
+    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${port_file}") || {
+        cleanup_oauth_session "" "${oauth_dir}"
+        return 1
+    }
+
+    # Get server PID from the port file
+    local server_pid
+    server_pid=$(pgrep -f "start_oauth_server" | tail -1)
+
+    # Open browser
+    local callback_url="http://localhost:${actual_port}/callback"
+    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
+    log_warn "Opening browser to authenticate with OpenRouter..."
+    open_browser "${auth_url}"
+
+    # Wait for code
+    if ! _wait_for_oauth "${code_file}"; then
         cleanup_oauth_session "${server_pid}" "${oauth_dir}"
         return 1
     fi
@@ -566,6 +608,7 @@ try_oauth_flow() {
     oauth_code=$(cat "${code_file}")
     cleanup_oauth_session "${server_pid}" "${oauth_dir}"
 
+    # Exchange code for API key
     log_warn "Exchanging OAuth code for API key..."
     local api_key
     api_key=$(exchange_oauth_code "${oauth_code}") || return 1
@@ -1055,6 +1098,80 @@ wait_for_cloud_init() {
 # API token management helpers
 # ============================================================
 
+# Try to load API token from environment variable
+# Returns 0 if found and sets env var, 1 otherwise
+_load_token_from_env() {
+    local env_var_name="${1}"
+    local provider_name="${2}"
+
+    local env_value="${!env_var_name}"
+    if [[ -n "${env_value}" ]]; then
+        log_info "Using ${provider_name} API token from environment"
+        return 0
+    fi
+    return 1
+}
+
+# Try to load API token from config file
+# Returns 0 if found and exports env var, 1 otherwise
+_load_token_from_config() {
+    local config_file="${1}"
+    local env_var_name="${2}"
+    local provider_name="${3}"
+
+    if [[ ! -f "${config_file}" ]]; then
+        return 1
+    fi
+
+    local saved_token
+    saved_token=$(python3 -c "import json, sys; data=json.load(open(sys.argv[1])); print(data.get('api_key','') or data.get('token',''))" "${config_file}" 2>/dev/null)
+    if [[ -z "${saved_token}" ]]; then
+        return 1
+    fi
+
+    export "${env_var_name}=${saved_token}"
+    log_info "Using ${provider_name} API token from ${config_file}"
+    return 0
+}
+
+# Validate token with provider API if test function provided
+# Returns 0 on success, 1 on validation failure
+_validate_token_with_provider() {
+    local test_func="${1}"
+    local env_var_name="${2}"
+    local provider_name="${3}"
+
+    if [[ -z "${test_func}" ]]; then
+        return 0  # No validation needed
+    fi
+
+    if ! "${test_func}"; then
+        log_error "Authentication failed: Invalid ${provider_name} API token"
+        unset "${env_var_name}"
+        return 1
+    fi
+    return 0
+}
+
+# Save API token to config file
+_save_token_to_config() {
+    local config_file="${1}"
+    local token="${2}"
+
+    local config_dir
+    config_dir=$(dirname "${config_file}")
+    mkdir -p "${config_dir}"
+
+    cat > "${config_file}" << EOF
+{
+  "api_key": "${token}",
+  "token": "${token}"
+}
+EOF
+    chmod 600 "${config_file}"
+    log_info "API token saved to ${config_file}"
+}
+
 # Generic ensure API token function - eliminates duplication across providers
 # Usage: ensure_api_token_with_provider PROVIDER_NAME ENV_VAR_NAME CONFIG_FILE HELP_URL TEST_FUNC
 # Example: ensure_api_token_with_provider "Lambda" "LAMBDA_API_KEY" "$HOME/.config/spawn/lambda.json" \
@@ -1068,28 +1185,19 @@ ensure_api_token_with_provider() {
     local help_url="${4}"
     local test_func="${5:-}"
 
-    # Check Python 3 is available (required for JSON parsing)
     check_python_available || return 1
 
-    # 1. Check environment variable
-    local env_value="${!env_var_name}"
-    if [[ -n "${env_value}" ]]; then
-        log_info "Using ${provider_name} API token from environment"
+    # Try environment variable
+    if _load_token_from_env "${env_var_name}" "${provider_name}"; then
         return 0
     fi
 
-    # 2. Check config file
-    if [[ -f "${config_file}" ]]; then
-        local saved_token
-        saved_token=$(python3 -c "import json, sys; data=json.load(open(sys.argv[1])); print(data.get('api_key','') or data.get('token',''))" "${config_file}" 2>/dev/null)
-        if [[ -n "${saved_token}" ]]; then
-            export "${env_var_name}=${saved_token}"
-            log_info "Using ${provider_name} API token from ${config_file}"
-            return 0
-        fi
+    # Try config file
+    if _load_token_from_config "${config_file}" "${env_var_name}" "${provider_name}"; then
+        return 0
     fi
 
-    # 3. Prompt and save
+    # Prompt for new token
     echo ""
     log_warn "${provider_name} API Token Required"
     log_warn "Get your token from: ${help_url}"
@@ -1098,30 +1206,16 @@ ensure_api_token_with_provider() {
     local token
     token=$(validated_read "Enter your ${provider_name} API token: " validate_api_token) || return 1
 
-    # Validate token with provider API if test function provided
     export "${env_var_name}=${token}"
-    if [[ -n "${test_func}" ]]; then
-        if ! "${test_func}"; then
-            log_error "Authentication failed: Invalid ${provider_name} API token"
-            unset "${env_var_name}"
-            return 1
-        fi
+
+    # Validate with provider API
+    if ! _validate_token_with_provider "${test_func}" "${env_var_name}" "${provider_name}"; then
+        return 1
     fi
 
     # Save to config file
-    local config_dir
-    config_dir=$(dirname "${config_file}")
-    mkdir -p "${config_dir}"
-
-    # Save with both "api_key" and "token" for compatibility
-    cat > "${config_file}" << EOF
-{
-  "api_key": "${token}",
-  "token": "${token}"
-}
-EOF
-    chmod 600 "${config_file}"
-    log_info "API token saved to ${config_file}"
+    _save_token_to_config "${config_file}" "${token}"
+    return 0
 }
 
 # ============================================================
