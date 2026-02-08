@@ -1,6 +1,6 @@
 # Spawn
 
-Launch any AI coding agent on any cloud, pre-configured with [OpenRouter](https://openrouter.ai).
+Launch any agent on any cloud, powered by [OpenRouter](https://openrouter.ai).
 
 ## Install
 
