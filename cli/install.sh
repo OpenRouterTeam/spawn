@@ -81,9 +81,19 @@ if command -v npm &>/dev/null && command -v node &>/dev/null; then
     cd "${tmpdir}/cli"
     npm install
     npm install -g . 2>/dev/null || {
-        log_warn "npm global install requires permissions. Try:"
+        log_warn "npm global install requires elevated permissions."
         echo ""
-        echo "  sudo npm install -g ."
+        echo "Choose one of these options:"
+        echo ""
+        echo "  1. Install with sudo (recommended):"
+        echo "     ${tmpdir}/cli$ sudo npm install -g ."
+        echo ""
+        echo "  2. Install bun instead (no sudo needed):"
+        echo "     curl -fsSL https://bun.sh/install | bash"
+        echo "     Then re-run: curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
+        echo ""
+        echo "  3. Use the bash fallback (limited functionality):"
+        echo "     SPAWN_INSTALL_DIR=~/.local/bin curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
         echo ""
         exit 1
     }
@@ -116,14 +126,30 @@ log_info "Installed spawn (bash) to ${INSTALL_DIR}/spawn"
 if ! echo "${PATH}" | tr ':' '\n' | grep -qx "${INSTALL_DIR}"; then
     log_warn "${INSTALL_DIR} is not in your PATH"
     echo ""
-    echo "Add it by running one of:"
+    echo "Add it to your PATH to use spawn from anywhere:"
     echo ""
     case "${SHELL:-/bin/bash}" in
-        */zsh)  echo "  echo 'export PATH=\"${INSTALL_DIR}:\${PATH}\"' >> ~/.zshrc && source ~/.zshrc" ;;
-        */fish) echo "  fish_add_path ${INSTALL_DIR}" ;;
-        *)      echo "  echo 'export PATH=\"${INSTALL_DIR}:\${PATH}\"' >> ~/.bashrc && source ~/.bashrc" ;;
+        */zsh)
+            echo "  echo 'export PATH=\"${INSTALL_DIR}:\${PATH}\"' >> ~/.zshrc"
+            echo "  source ~/.zshrc"
+            ;;
+        */fish)
+            echo "  fish_add_path ${INSTALL_DIR}"
+            ;;
+        *)
+            echo "  echo 'export PATH=\"${INSTALL_DIR}:\${PATH}\"' >> ~/.bashrc"
+            echo "  source ~/.bashrc"
+            ;;
     esac
     echo ""
+    echo "Or run directly: ${INSTALL_DIR}/spawn"
+    echo ""
 else
-    log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
+    log_info "Installation complete!"
+    echo ""
+    echo "Try these commands:"
+    echo "  ${BOLD}spawn${NC}           - Interactive mode"
+    echo "  ${BOLD}spawn --help${NC}    - Show all commands"
+    echo "  ${BOLD}spawn list${NC}      - View the full matrix"
+    echo ""
 fi

@@ -187,28 +187,40 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
 }
 
 async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: string): Promise<string> {
-  const res = await fetch(primaryUrl);
-  if (res.ok) {
-    return res.text();
-  }
+  const s = p.spinner();
+  s.start("Downloading spawn script...");
 
-  // Fallback to GitHub raw
-  const ghRes = await fetch(fallbackUrl);
-  if (!ghRes.ok) {
-    const primaryStatus = res.status === 404 ? "not found" : `HTTP ${res.status}`;
-    const fallbackStatus = ghRes.status === 404 ? "not found" : `HTTP ${ghRes.status}`;
-
-    p.log.error("Script download failed");
-    console.error(`\nPrimary source (${primaryUrl}): ${primaryStatus}`);
-    console.error(`Fallback source (${fallbackUrl}): ${fallbackStatus}`);
-
-    if (res.status === 404 && ghRes.status === 404) {
-      console.error("\nThis combination may not be implemented yet.");
-      console.error("Run 'spawn list' to see all available combinations.");
+  try {
+    const res = await fetch(primaryUrl);
+    if (res.ok) {
+      s.stop("Script downloaded");
+      return res.text();
     }
-    process.exit(1);
+
+    // Fallback to GitHub raw
+    s.message("Trying fallback source...");
+    const ghRes = await fetch(fallbackUrl);
+    if (!ghRes.ok) {
+      s.stop(pc.red("Download failed"));
+      const primaryStatus = res.status === 404 ? "not found" : `HTTP ${res.status}`;
+      const fallbackStatus = ghRes.status === 404 ? "not found" : `HTTP ${ghRes.status}`;
+
+      p.log.error("Script download failed");
+      console.error(`\nPrimary source (${primaryUrl}): ${primaryStatus}`);
+      console.error(`Fallback source (${fallbackUrl}): ${fallbackStatus}`);
+
+      if (res.status === 404 && ghRes.status === 404) {
+        console.error("\nThis combination may not be implemented yet.");
+        console.error(`Run ${pc.cyan("spawn list")} to see all available combinations.`);
+      }
+      process.exit(1);
+    }
+    s.stop("Script downloaded (fallback)");
+    return ghRes.text();
+  } catch (err) {
+    s.stop(pc.red("Download failed"));
+    throw err;
   }
-  return ghRes.text();
 }
 
 async function execScript(cloud: string, agent: string, prompt?: string): Promise<void> {
@@ -516,7 +528,26 @@ ${pc.bold("EXAMPLES")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn list                         ${pc.dim("# See the full agent x cloud matrix")}
 
+${pc.bold("AUTHENTICATION")}
+  All agents use OpenRouter for LLM access. Get your API key at:
+  ${pc.cyan("https://openrouter.ai/settings/keys")}
+
+  For non-interactive use, set environment variables:
+  ${pc.dim("OPENROUTER_API_KEY")}=sk-or-v1-... spawn claude sprite
+
+  Each cloud provider has its own auth requirements.
+  Run ${pc.cyan("spawn <agent> <cloud>")} to see specific instructions.
+
 ${pc.bold("INSTALL")}
   curl -fsSL ${RAW_BASE}/cli/install.sh | bash
+
+${pc.bold("TROUBLESHOOTING")}
+  ${pc.dim("\u2022")} Script not found: Run ${pc.cyan("spawn list")} to verify the combination exists
+  ${pc.dim("\u2022")} Missing credentials: Check cloud-specific READMEs in the repo
+  ${pc.dim("\u2022")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
+
+${pc.bold("MORE INFO")}
+  Repository:  https://github.com/${REPO}
+  OpenRouter:  https://openrouter.ai
 `);
 }

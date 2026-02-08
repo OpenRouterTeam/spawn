@@ -10,6 +10,12 @@ Launch any AI coding agent on any cloud with a single command. All models powere
 curl -fsSL https://openrouter.ai/lab/spawn/cli/install.sh | bash
 ```
 
+Or install directly from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
+```
+
 ## Usage
 
 ```bash
@@ -51,15 +57,32 @@ Every combination works as a one-liner — no install required:
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/{cloud}/{agent}.sh)
 ```
 
-### Non-Interactive
+### Non-Interactive Mode
 
-Skip all prompts with environment variables:
+Skip prompts by providing environment variables:
+
+```bash
+# OpenRouter API key (required for all agents)
+export OPENROUTER_API_KEY=sk-or-v1-xxxxx
+
+# Cloud-specific credentials (varies by provider)
+export SPRITE_API_KEY=...        # For Sprite
+export HCLOUD_TOKEN=...           # For Hetzner
+export DIGITALOCEAN_TOKEN=...     # For DigitalOcean
+
+# Run non-interactively
+spawn claude sprite
+```
+
+You can also use inline environment variables:
 
 ```bash
 OPENROUTER_API_KEY=sk-or-v1-xxxxx spawn claude sprite
 ```
 
-Each cloud has its own env vars for auth — see the cloud's README.
+Get your OpenRouter API key at: https://openrouter.ai/settings/keys
+
+For cloud-specific auth, see each cloud's README in this repository.
 
 ## Matrix
 
