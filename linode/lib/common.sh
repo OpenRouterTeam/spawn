@@ -42,8 +42,8 @@ ensure_linode_token() {
     fi
     local config_dir="$HOME/.config/spawn" config_file="$config_dir/linode.json"
     if [[ -f "$config_file" ]]; then
-        local saved_token 2>/dev/null)
-        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))"
+        local saved_token
+        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))" 2>/dev/null)
         if [[ -n "$saved_token" ]]; then
             export LINODE_API_TOKEN="$saved_token"
             log_info "Using Linode API token from $config_file"; return 0
@@ -62,8 +62,8 @@ ensure_linode_token() {
         log_error "Authentication failed: Invalid Linode API token"
 
         # Parse error details
-        local error_msg print(errs[0].get('reason','No details') if errs else 'Unable to parse')" 2>/dev/null || echo "Unable to parse error")
-        error_msg=$(echo "$response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]);
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print(errs[0].get('reason','No details') if errs else 'Unable to parse')" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
 
         log_warn "Remediation steps:"
@@ -107,8 +107,8 @@ linode_register_ssh_key() {
         return 0
     else
         # Parse error details
-        local error_msg print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')" 2>/dev/null || echo "$register_response")
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]);
+        local error_msg
+        error_msg=$(echo "$register_response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')" 2>/dev/null || echo "$register_response")
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -161,8 +161,8 @@ print(json.dumps(keys))
     userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
 
     # Generate a root password (required by Linode API)
-    local root_pass for _ in range(32)))")
-    root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#$')
+    local root_pass
+    root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#$') for _ in range(32)))")
 
     local body
     body=$(python3 -c "
