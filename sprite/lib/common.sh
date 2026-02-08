@@ -93,6 +93,7 @@ setup_shell_environment() {
     # Create temp file with path config
     local path_temp
     path_temp=$(mktemp)
+    trap 'rm -f "${path_temp}"' EXIT
     cat > "${path_temp}" << 'EOF'
 
 # [spawn:path]
@@ -101,18 +102,17 @@ EOF
 
     # Upload and append to shell configs
     sprite exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.zprofile && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
-    rm "${path_temp}"
 
     # Switch bash to zsh
     local bash_temp
     bash_temp=$(mktemp)
+    trap 'rm -f "${path_temp}" "${bash_temp}"' EXIT
     cat > "${bash_temp}" << 'EOF'
 # [spawn:bash]
 exec /usr/bin/zsh -l
 EOF
 
     sprite exec -s "${sprite_name}" -file "${bash_temp}:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
-    rm "${bash_temp}"
 }
 
 # Inject environment variables into sprite's shell config
@@ -126,13 +126,14 @@ inject_env_vars_sprite() {
 
     local env_temp
     env_temp=$(mktemp)
+    trap 'rm -f "${env_temp}"' EXIT
     chmod 600 "${env_temp}"
 
     generate_env_config "$@" > "${env_temp}"
 
     # Upload and append to .zshrc using sprite exec with -file flag
     sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-    rm "${env_temp}"
+    trap - EXIT
 }
 
 # Upload file to sprite (for use with setup_claude_code_config callback)
