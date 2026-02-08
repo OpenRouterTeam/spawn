@@ -234,6 +234,7 @@ verify_server_connectivity() {
 run_server() {
     local ip="$1"
     local cmd="$2"
+    # shellcheck disable=SC2086
     ssh $SSH_OPTS "root@$ip" "$cmd"
 }
 
@@ -242,6 +243,7 @@ upload_file() {
     local ip="$1"
     local local_path="$2"
     local remote_path="$3"
+    # shellcheck disable=SC2086
     scp $SSH_OPTS "$local_path" "root@$ip:$remote_path"
 }
 

@@ -137,7 +137,7 @@ verify_server_connectivity() {
     log_warn "Waiting for SSH connectivity to $ip..."
     while [[ $attempt -le $max_attempts ]]; do
         # SSH_OPTS is defined in shared/common.sh
-        # shellcheck disable=SC2154
+        # shellcheck disable=SC2154,SC2086
         if ssh $SSH_OPTS -o ConnectTimeout=5 "ubuntu@$ip" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi
@@ -150,6 +150,7 @@ wait_for_cloud_init() {
     local ip="$1" max_attempts=${2:-60} attempt=1
     log_warn "Waiting for cloud-init to complete..."
     while [[ $attempt -le $max_attempts ]]; do
+        # shellcheck disable=SC2086
         if ssh $SSH_OPTS "ubuntu@$ip" "test -f /home/ubuntu/.cloud-init-complete" >/dev/null 2>&1; then
             log_info "Cloud-init completed"; return 0
         fi
@@ -159,8 +160,11 @@ wait_for_cloud_init() {
 }
 
 # Note: Lightsail uses 'ubuntu' user, not 'root'
+# shellcheck disable=SC2086
 run_server() { local ip="$1" cmd="$2"; ssh $SSH_OPTS "ubuntu@$ip" "$cmd"; }
+# shellcheck disable=SC2086
 upload_file() { local ip="$1" local_path="$2" remote_path="$3"; scp $SSH_OPTS "$local_path" "ubuntu@$ip:$remote_path"; }
+# shellcheck disable=SC2086
 interactive_session() { local ip="$1" cmd="$2"; ssh -t $SSH_OPTS "ubuntu@$ip" "$cmd"; }
 
 destroy_server() {

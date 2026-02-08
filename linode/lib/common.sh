@@ -234,8 +234,11 @@ verify_server_connectivity() {
 }
 
 
+# shellcheck disable=SC2086
 run_server() { local ip="$1" cmd="$2"; ssh $SSH_OPTS "root@$ip" "$cmd"; }
+# shellcheck disable=SC2086
 upload_file() { local ip="$1" local_path="$2" remote_path="$3"; scp $SSH_OPTS "$local_path" "root@$ip:$remote_path"; }
+# shellcheck disable=SC2086
 interactive_session() { local ip="$1" cmd="$2"; ssh -t $SSH_OPTS "root@$ip" "$cmd"; }
 
 destroy_server() {

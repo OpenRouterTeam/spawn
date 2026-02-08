@@ -188,7 +188,7 @@ verify_server_connectivity() {
     log_warn "Waiting for SSH connectivity to $ip..."
     while [[ $attempt -le $max_attempts ]]; do
         # SSH_OPTS is defined in shared/common.sh
-        # shellcheck disable=SC2154
+        # shellcheck disable=SC2154,SC2086
         if ssh $SSH_OPTS -o ConnectTimeout=5 "ubuntu@$ip" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi
@@ -201,25 +201,32 @@ wait_for_cloud_init() {
     local ip="$1"
     # Lambda instances come pre-provisioned, install tools manually
     log_warn "Installing base tools..."
+    # shellcheck disable=SC2086
     ssh $SSH_OPTS "ubuntu@$ip" "sudo apt-get update -y && sudo apt-get install -y curl unzip git zsh" >/dev/null 2>&1
 
     # Install Bun
     log_warn "Installing Bun..."
+    # shellcheck disable=SC2086
     ssh $SSH_OPTS "ubuntu@$ip" "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1
 
     # Install Claude Code
     log_warn "Installing Claude Code..."
+    # shellcheck disable=SC2086
     ssh $SSH_OPTS "ubuntu@$ip" "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1
 
     # Configure PATH
+    # shellcheck disable=SC2086
     ssh $SSH_OPTS "ubuntu@$ip" "echo 'export PATH=\"\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH\"' >> ~/.bashrc && echo 'export PATH=\"\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH\"' >> ~/.zshrc" >/dev/null 2>&1
 
     log_info "Base tools installed"
 }
 
 # Lambda uses 'ubuntu' user
+# shellcheck disable=SC2086
 run_server() { local ip="$1" cmd="$2"; ssh $SSH_OPTS "ubuntu@$ip" "$cmd"; }
+# shellcheck disable=SC2086
 upload_file() { local ip="$1" local_path="$2" remote_path="$3"; scp $SSH_OPTS "$local_path" "ubuntu@$ip:$remote_path"; }
+# shellcheck disable=SC2086
 interactive_session() { local ip="$1" cmd="$2"; ssh -t $SSH_OPTS "ubuntu@$ip" "$cmd"; }
 
 destroy_server() {
