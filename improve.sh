@@ -140,12 +140,35 @@ Check the repo's GitHub issues for user requests:
 ### Gap Filler (spawn remaining)
 After scouts commit new entries, pick up the newly-created "missing" matrix entries and implement them.
 
+## Git Workflow (CRITICAL)
+
+Every teammate MUST follow this workflow. NO exceptions.
+
+### Before starting work:
+```bash
+git checkout main && git pull --rebase origin main
+```
+
+### For each unit of work:
+1. Create a feature branch: `git checkout -b {descriptive-name}`
+2. Do the work, commit
+3. Push: `git push -u origin {branch-name}`
+4. Create PR: `gh pr create --title "..." --body "..."`
+5. Merge immediately: `gh pr merge --squash`
+6. Switch back: `git checkout main && git pull --rebase origin main`
+7. Delete branch: `git push origin --delete {branch-name}`
+
+### NEVER:
+- Push directly to main
+- Leave branches hanging after merge
+- Work on a stale checkout — always pull latest main before each unit of work
+
 ## Rules for ALL teammates:
 - Read CLAUDE.md Shell Script Rules before writing ANY code
 - OpenRouter injection is MANDATORY in every script
 - `bash -n {file}` syntax-check before committing
 - Each teammate works on DIFFERENT files
-- Commit after each completed script (don't batch)
+- Each unit of work gets its own branch → PR → merge → cleanup
 - Update manifest.json and the cloud's README.md
 - NEVER revert prior macOS/curl-bash compatibility fixes
 PROMPT_EOF
@@ -196,27 +219,62 @@ EOF
     fi
 }
 
+cleanup_between_cycles() {
+    log_info "Cleaning up between cycles..."
+
+    # Ensure we're on main and up to date
+    cd "${REPO_ROOT}"
+    git checkout main 2>/dev/null || true
+    git pull --rebase origin main 2>/dev/null || true
+
+    # Delete merged remote branches (not main)
+    local merged_branches
+    merged_branches=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ')
+    for branch in $merged_branches; do
+        if [[ -n "$branch" && "$branch" != "main" ]]; then
+            git push origin --delete "$branch" 2>/dev/null && log_info "Deleted merged branch: $branch" || true
+        fi
+    done
+
+    # Delete local branches that are merged
+    git branch --merged main | grep -v 'main' | grep -v '^\*' | xargs -r git branch -d 2>/dev/null || true
+
+    log_info "Cleanup complete"
+}
+
 run_team_cycle() {
+    # Always start fresh from latest main
+    cd "${REPO_ROOT}"
+    git checkout main 2>/dev/null || true
+    git pull --rebase origin main 2>/dev/null || true
+
     local prompt
     prompt=$(build_team_prompt)
     log_info "Launching agent team..."
     echo ""
-    (cd "${REPO_ROOT}" && claude -p "${prompt}" --dangerously-skip-permissions)
+    claude -p "${prompt}" --dangerously-skip-permissions
     return $?
 }
 
 run_single_cycle() {
+    cd "${REPO_ROOT}"
+    git checkout main 2>/dev/null || true
+    git pull --rebase origin main 2>/dev/null || true
+
     local prompt
     prompt=$(build_single_prompt)
     log_info "Launching single agent..."
     echo ""
-    (cd "${REPO_ROOT}" && claude --print -p "${prompt}")
+    claude --print -p "${prompt}"
     return $?
 }
 
 # Main
 log_info "Spawn Improvement System"
 log_info "Mode: ${MODE}"
+cd "${REPO_ROOT}"
+git checkout main 2>/dev/null || true
+git pull --rebase origin main 2>/dev/null || true
 get_matrix_summary
 echo ""
 
@@ -229,6 +287,8 @@ case "${MODE}" in
                 log_error "Cycle ${cycle} failed, pausing 10s..."
                 sleep 10
             }
+            # Clean up merged branches and sync main between cycles
+            cleanup_between_cycles
             cycle=$((cycle + 1))
             log_info "Pausing 5s before next cycle..."
             sleep 5
