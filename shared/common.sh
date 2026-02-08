@@ -253,7 +253,7 @@ start_oauth_server() {
                     ;;
             esac
         done
-    ) </dev/null &
+    ) </dev/null >/dev/null 2>&1 &
 
     echo $!
 }
