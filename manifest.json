@@ -715,6 +715,6 @@
     "genesiscloud/cline": "implemented",
     "genesiscloud/gptme": "implemented",
     "genesiscloud/opencode": "implemented",
-    "genesiscloud/plandex": "missing"
+    "genesiscloud/plandex": "implemented"
   }
 }
