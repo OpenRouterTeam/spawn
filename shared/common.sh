@@ -83,8 +83,8 @@ safe_read() {
 nc_listen() {
     local port=$1
     shift
-    # Detect if nc requires -p flag (busybox nc on Termux)
-    if nc --help 2>&1 | grep -q "BusyBox\|busybox" || nc --help 2>&1 | grep -q "\-p "; then
+    # BusyBox nc (Termux) requires -p flag; macOS/Linux do not
+    if nc --help 2>&1 | grep -q "BusyBox\|busybox"; then
         nc -l -p "$port" "$@"
     else
         nc -l "$port" "$@"
@@ -229,37 +229,29 @@ get_openrouter_api_key_manual() {
     echo "$api_key"
 }
 
-# Generate OAuth success response HTML
-create_oauth_response_html() {
-    cat << 'HTML_EOF'
-HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>@keyframes checkmark{0%{transform:scale(0) rotate(-45deg);opacity:0}60%{transform:scale(1.2) rotate(-45deg);opacity:1}100%{transform:scale(1) rotate(-45deg);opacity:1}}@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}.check{width:80px;height:80px;border-radius:50%;background:#00d4aa22;display:flex;align-items:center;justify-content:center;margin:0 auto 24px}.check::after{content:"";display:block;width:28px;height:14px;border-left:4px solid #00d4aa;border-bottom:4px solid #00d4aa;animation:checkmark .5s ease forwards}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}.sub{color:#ffffff66;font-size:.85rem;animation:fadein .5s ease .5s both}</style></head><body><div class="card"><div class="check"></div><h1>Authentication Successful!</h1><p>Redirecting back to terminal...</p><p class="sub">This tab will close automatically</p></div><script>setTimeout(function(){try{window.close()}catch(e){}setTimeout(function(){document.querySelector(".sub").textContent="You can safely close this tab"},500)},3000)</script></body></html>
-HTML_EOF
+# Write OAuth success response HTTP file (uses printf for macOS bash 3.x compat)
+write_oauth_response_file() {
+    local dest="$1"
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class="card"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>' > "$dest"
 }
 
 # Start OAuth callback server in background, returns server PID
+# $1=port $2=code_file $3=response_file (must already exist)
 start_oauth_server() {
     local port="$1"
     local code_file="$2"
-    local success_response=$(create_oauth_response_html)
+    local response_file="$3"
 
     (
         while true; do
-            local response_file=$(mktemp)
-            echo -e "$success_response" > "$response_file"
+            request=$(nc_listen "$port" < "$response_file" 2>/dev/null | head -1) || break
 
-            local request=$(nc_listen "$port" < "$response_file" 2>/dev/null | head -1)
-            local nc_status=$?
-            rm -f "$response_file"
-
-            if [[ $nc_status -ne 0 ]]; then
-                break
-            fi
-
-            if [[ "$request" == *"/callback?code="* ]]; then
-                local code=$(echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p')
-                echo "$code" > "$code_file"
-                break
-            fi
+            case "$request" in
+                *"/callback?code="*)
+                    echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p' > "$code_file"
+                    break
+                    ;;
+            esac
         done
     ) </dev/null &
 
@@ -274,7 +266,7 @@ wait_for_oauth_code() {
 
     while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do
         sleep 1
-        ((elapsed++))
+        elapsed=$((elapsed + 1))
     done
 
     [[ -f "$code_file" ]]
@@ -366,7 +358,9 @@ try_oauth_flow() {
     local code_file="$oauth_dir/code"
 
     log_warn "Starting local OAuth server on port ${callback_port}..."
-    local server_pid=$(start_oauth_server "$callback_port" "$code_file")
+    local response_file="$oauth_dir/response.http"
+    write_oauth_response_file "$response_file"
+    local server_pid=$(start_oauth_server "$callback_port" "$code_file" "$response_file")
 
     sleep 1
     if ! kill -0 "$server_pid" 2>/dev/null; then
@@ -648,7 +642,7 @@ generic_cloud_api() {
             sleep "$jitter"
 
             interval="$next_interval"
-            ((attempt++))
+            attempt=$((attempt + 1))
             continue
         fi
 
@@ -678,7 +672,7 @@ generic_cloud_api() {
             sleep "$jitter"
 
             interval="$next_interval"
-            ((attempt++))
+            attempt=$((attempt + 1))
             continue
         fi
 
@@ -769,7 +763,7 @@ generic_ssh_wait() {
 
         elapsed_time=$((elapsed_time + jitter))
         interval="$next_interval"
-        ((attempt++))
+        attempt=$((attempt + 1))
     done
 
     log_error "$description failed after $max_attempts attempts (${elapsed_time}s elapsed)"
