@@ -42,14 +42,15 @@ ensure_e2b_token() {
     fi
     local config_dir="$HOME/.config/spawn" config_file="$config_dir/e2b.json"
     if [[ -f "$config_file" ]]; then
-        local saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))" 2>/dev/null)
+        local saved_key 2>/dev/null)
+        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))"
         if [[ -n "$saved_key" ]]; then
             export E2B_API_KEY="$saved_key"
             log_info "Using E2B API key from $config_file"; return 0
         fi
     fi
     echo ""; log_warn "E2B API Key Required"
-    echo -e "${YELLOW}Get your API key from: https://e2b.dev/dashboard${NC}"; echo ""
+    log_warn "Get your API key from: https://e2b.dev/dashboard"; echo ""
     local api_key
     api_key=$(validated_read "Enter your E2B API key: " validate_api_token) || return 1
     export E2B_API_KEY="$api_key"
@@ -74,7 +75,8 @@ create_server() {
     log_warn "Creating E2B sandbox '$name' (template: $template)..."
 
     # Create sandbox and capture ID
-    local output=$(e2b sandbox create --template "$template" --name "$name" 2>&1)
+    local output
+    output=$(e2b sandbox create --template "$template" --name "$name" 2>&1)
     E2B_SANDBOX_ID=$(echo "$output" | grep -oE '[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}' | head -1)
 
     if [[ -z "$E2B_SANDBOX_ID" ]]; then
@@ -111,7 +113,8 @@ upload_file() {
     local local_path="$1"
     local remote_path="$2"
     # Upload via base64 encoding through exec
-    local content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
+    local content
+    content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
     e2b sandbox exec "$E2B_SANDBOX_ID" -- bash -c "echo '$content' | base64 -d > '$remote_path'"
 }
 

@@ -43,7 +43,8 @@ ensure_vultr_token() {
     local config_dir="$HOME/.config/spawn"
     local config_file="$config_dir/vultr.json"
     if [[ -f "$config_file" ]]; then
-        local saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))" 2>/dev/null)
+        local saved_key 2>/dev/null)
+        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))"
         if [[ -n "$saved_key" ]]; then
             export VULTR_API_KEY="$saved_key"
             log_info "Using Vultr API key from $config_file"
@@ -52,19 +53,21 @@ ensure_vultr_token() {
     fi
     echo ""
     log_warn "Vultr API Key Required"
-    echo -e "${YELLOW}Get your API key from: https://my.vultr.com/settings/#settingsapi${NC}"
+    log_warn "Get your API key from: https://my.vultr.com/settings/#settingsapi"
     echo ""
     local api_key
     api_key=$(validated_read "Enter your Vultr API key: " validate_api_token) || return 1
     export VULTR_API_KEY="$api_key"
-    local response=$(vultr_api GET "/account")
+    local response
+    response=$(vultr_api GET "/account")
     if echo "$response" | grep -q '"account"'; then
         log_info "API key validated"
     else
         log_error "Authentication failed: Invalid Vultr API key"
 
         # Parse error details
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        local error_msg print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
         log_error "API Error: $error_msg"
 
         log_warn "Remediation steps:"
@@ -92,8 +95,10 @@ ensure_ssh_key() {
     generate_ssh_key_if_missing "$key_path"
 
     # Check if already registered
-    local fingerprint=$(get_ssh_fingerprint "$pub_path")
-    local existing_keys=$(vultr_api GET "/ssh-keys")
+    local fingerprint
+    fingerprint=$(get_ssh_fingerprint "$pub_path")
+    local existing_keys
+    existing_keys=$(vultr_api GET "/ssh-keys")
     if echo "$existing_keys" | grep -q "$fingerprint"; then
         log_info "SSH key already registered with Vultr"
         return 0
@@ -102,10 +107,13 @@ ensure_ssh_key() {
     # Register the key
     log_warn "Registering SSH key with Vultr..."
     local key_name="spawn-$(hostname)-$(date +%s)"
-    local pub_key=$(cat "$pub_path")
-    local json_pub_key=$(json_escape "$pub_key")
+    local pub_key
+    pub_key=$(cat "$pub_path")
+    local json_pub_key
+    json_pub_key=$(json_escape "$pub_key")
     local register_body="{\"name\":\"$key_name\",\"ssh_key\":$json_pub_key}"
-    local register_response=$(vultr_api POST "/ssh-keys" "$register_body")
+    local register_response
+    register_response=$(vultr_api POST "/ssh-keys" "$register_body")
 
     if echo "$register_response" | grep -q '"ssh_key"'; then
         log_info "SSH key registered with Vultr"
@@ -113,7 +121,8 @@ ensure_ssh_key() {
         log_error "Failed to register SSH key with Vultr"
 
         # Parse error details
-        local error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$register_response")
+        local error_msg print(d.get('error','Unknown error'))" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -147,13 +156,18 @@ create_server() {
     log_warn "Creating Vultr instance '$name' (plan: $plan, region: $region)..."
 
     # Get all SSH key IDs
-    local ssh_keys_response=$(vultr_api GET "/ssh-keys")
-    local ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
+    local ssh_keys_response
+    ssh_keys_response=$(vultr_api GET "/ssh-keys")
+    local ssh_key_ids
+    ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
-    local userdata=$(get_cloud_init_userdata)
-    local userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+    local userdata_b64
+    userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
 
-    local body=$(python3 -c "
+    local body
+    body=$(python3 -c "
 import json
 body = {
     'label': '$name',
@@ -168,7 +182,8 @@ body = {
 print(json.dumps(body))
 ")
 
-    local response=$(vultr_api POST "/instances" "$body")
+    local response
+    response=$(vultr_api POST "/instances" "$body")
 
     if echo "$response" | grep -q '"instance"'; then
         VULTR_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['id'])")
@@ -178,7 +193,8 @@ print(json.dumps(body))
         log_error "Failed to create Vultr instance"
 
         # Parse error details
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
+        local error_msg print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
         log_error "API Error: $error_msg"
 
         log_warn "Common issues:"
@@ -195,9 +211,12 @@ print(json.dumps(body))
     local max_attempts=60
     local attempt=1
     while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response=$(vultr_api GET "/instances/$VULTR_SERVER_ID")
-        local status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
-        local power=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['power_status'])")
+        local status_response
+        status_response=$(vultr_api GET "/instances/$VULTR_SERVER_ID")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
+        local power
+        power=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['power_status'])")
 
         if [[ "$status" == "active" && "$power" == "running" ]]; then
             VULTR_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['main_ip'])")
@@ -247,7 +266,8 @@ destroy_server() {
 }
 
 list_servers() {
-    local response=$(vultr_api GET "/instances")
+    local response
+    response=$(vultr_api GET "/instances")
     python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())

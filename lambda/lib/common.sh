@@ -39,18 +39,20 @@ ensure_lambda_token() {
     fi
     local config_dir="$HOME/.config/spawn" config_file="$config_dir/lambda.json"
     if [[ -f "$config_file" ]]; then
-        local saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))" 2>/dev/null)
+        local saved_key 2>/dev/null)
+        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))"
         if [[ -n "$saved_key" ]]; then
             export LAMBDA_API_KEY="$saved_key"
             log_info "Using Lambda API key from $config_file"; return 0
         fi
     fi
     echo ""; log_warn "Lambda Cloud API Key Required"
-    echo -e "${YELLOW}Get your API key from: https://cloud.lambdalabs.com/api-keys${NC}"; echo ""
+    log_warn "Get your API key from: https://cloud.lambdalabs.com/api-keys"; echo ""
     local api_key
     api_key=$(validated_read "Enter your Lambda API key: " validate_api_token) || return 1
     export LAMBDA_API_KEY="$api_key"
-    local test_response=$(lambda_api GET "/instances")
+    local test_response
+    test_response=$(lambda_api GET "/instances")
     if echo "$test_response" | grep -q '"error"'; then
         log_error "Invalid API key"; unset LAMBDA_API_KEY; return 1
     fi
@@ -71,10 +73,13 @@ ensure_ssh_key() {
     # Generate key if needed
     generate_ssh_key_if_missing "$key_path"
 
-    local pub_key=$(cat "$pub_path")
+    local pub_key
+    pub_key=$(cat "$pub_path")
     # Check if key is already registered
-    local existing_keys=$(lambda_api GET "/ssh-keys")
-    local fingerprint=$(get_ssh_fingerprint "$pub_path")
+    local existing_keys
+    existing_keys=$(lambda_api GET "/ssh-keys")
+    local fingerprint
+    fingerprint=$(get_ssh_fingerprint "$pub_path")
     if echo "$existing_keys" | grep -q "$fingerprint"; then
         log_info "SSH key already registered with Lambda Cloud"
         return 0
@@ -82,9 +87,11 @@ ensure_ssh_key() {
 
     log_warn "Registering SSH key with Lambda Cloud..."
     local key_name="spawn-$(hostname)-$(date +%s)"
-    local json_pub_key=$(json_escape "$pub_key")
+    local json_pub_key
+    json_pub_key=$(json_escape "$pub_key")
     local register_body="{\"name\":\"$key_name\",\"public_key\":$json_pub_key}"
-    local register_response=$(lambda_api POST "/ssh-keys" "$register_body")
+    local register_response
+    register_response=$(lambda_api POST "/ssh-keys" "$register_body")
     if echo "$register_response" | grep -q '"id"'; then
         log_info "SSH key registered with Lambda Cloud"
     else
@@ -98,7 +105,8 @@ get_server_name() {
         log_info "Using server name from environment: $LAMBDA_SERVER_NAME"
         echo "$LAMBDA_SERVER_NAME"; return 0
     fi
-    local server_name=$(safe_read "Enter instance name: ")
+    local server_name
+    server_name=$(safe_read "Enter instance name: ")
     if [[ -z "$server_name" ]]; then
         log_error "Instance name is required"
         log_warn "Set LAMBDA_SERVER_NAME environment variable for non-interactive usage"; return 1
@@ -114,15 +122,18 @@ create_server() {
     log_warn "Creating Lambda instance '$name' (type: $instance_type, region: $region)..."
 
     # Get all SSH key IDs
-    local ssh_keys_response=$(lambda_api GET "/ssh-keys")
-    local ssh_key_names=$(python3 -c "
+    local ssh_keys_response
+    ssh_keys_response=$(lambda_api GET "/ssh-keys")
+    local ssh_key_names
+    ssh_key_names=$(python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
 names = [k['name'] for k in data.get('data', [])]
 print(json.dumps(names))
 " <<< "$ssh_keys_response")
 
-    local body=$(python3 -c "
+    local body
+    body=$(python3 -c "
 import json
 body = {
     'name': '$name',
@@ -133,14 +144,16 @@ body = {
 print(json.dumps(body))
 ")
 
-    local response=$(lambda_api POST "/instance-operations/launch" "$body")
+    local response
+    response=$(lambda_api POST "/instance-operations/launch" "$body")
 
     if echo "$response" | grep -q '"instance_ids"'; then
         LAMBDA_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['data']['instance_ids'][0])")
         export LAMBDA_SERVER_ID
         log_info "Instance launched: ID=$LAMBDA_SERVER_ID"
     else
-        local error_msg=$(echo "$response" | python3 -c "
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "
 import json,sys
 d = json.loads(sys.stdin.read())
 print(d.get('error', {}).get('message', d.get('error', 'Unknown error')))
@@ -153,8 +166,10 @@ print(d.get('error', {}).get('message', d.get('error', 'Unknown error')))
     log_warn "Waiting for instance to become active..."
     local max_attempts=60 attempt=1
     while [[ $attempt -le $max_attempts ]]; do
-        local status_response=$(lambda_api GET "/instances/$LAMBDA_SERVER_ID")
-        local status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['data']['status'])" 2>/dev/null)
+        local status_response
+        status_response=$(lambda_api GET "/instances/$LAMBDA_SERVER_ID")
+        local status 2>/dev/null)
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['data']['status'])"
 
         if [[ "$status" == "active" ]]; then
             LAMBDA_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['data']['ip'])")
@@ -215,7 +230,8 @@ destroy_server() {
 }
 
 list_servers() {
-    local response=$(lambda_api GET "/instances")
+    local response
+    response=$(lambda_api GET "/instances")
     python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())

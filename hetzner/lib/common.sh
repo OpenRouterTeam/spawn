@@ -46,7 +46,8 @@ ensure_hcloud_token() {
     local config_dir="$HOME/.config/spawn"
     local config_file="$config_dir/hetzner.json"
     if [[ -f "$config_file" ]]; then
-        local saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))" 2>/dev/null)
+        local saved_token 2>/dev/null)
+        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))"
         if [[ -n "$saved_token" ]]; then
             export HCLOUD_TOKEN="$saved_token"
             log_info "Using Hetzner API token from $config_file"
@@ -57,7 +58,7 @@ ensure_hcloud_token() {
     # 3. Prompt and save
     echo ""
     log_warn "Hetzner Cloud API Token Required"
-    echo -e "${YELLOW}Get your token from: https://console.hetzner.cloud/projects → API Tokens${NC}"
+    log_warn "Get your token from: https://console.hetzner.cloud/projects → API Tokens"
     echo ""
 
     local token
@@ -65,12 +66,14 @@ ensure_hcloud_token() {
 
     # Validate token by making a test API call
     export HCLOUD_TOKEN="$token"
-    local response=$(hetzner_api GET "/servers?per_page=1")
+    local response
+    response=$(hetzner_api GET "/servers?per_page=1")
     if echo "$response" | grep -q '"error"'; then
         log_error "Authentication failed: Invalid Hetzner API token"
 
         # Parse error details
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        local error_msg print(d.get('error',{}).get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
         log_error "API Error: $error_msg"
 
         log_warn "Remediation steps:"
@@ -101,8 +104,10 @@ ensure_ssh_key() {
     generate_ssh_key_if_missing "$key_path"
 
     # Check if already registered
-    local fingerprint=$(get_ssh_fingerprint "$pub_path")
-    local existing_keys=$(hetzner_api GET "/ssh_keys")
+    local fingerprint
+    fingerprint=$(get_ssh_fingerprint "$pub_path")
+    local existing_keys
+    existing_keys=$(hetzner_api GET "/ssh_keys")
     if echo "$existing_keys" | grep -q "$fingerprint"; then
         log_info "SSH key already registered with Hetzner"
         return 0
@@ -111,16 +116,20 @@ ensure_ssh_key() {
     # Register the key
     log_warn "Registering SSH key with Hetzner..."
     local key_name="spawn-$(hostname)-$(date +%s)"
-    local pub_key=$(cat "$pub_path")
-    local json_pub_key=$(json_escape "$pub_key")
+    local pub_key
+    pub_key=$(cat "$pub_path")
+    local json_pub_key
+    json_pub_key=$(json_escape "$pub_key")
     local register_body="{\"name\":\"$key_name\",\"public_key\":$json_pub_key}"
-    local register_response=$(hetzner_api POST "/ssh_keys" "$register_body")
+    local register_response
+    register_response=$(hetzner_api POST "/ssh_keys" "$register_body")
 
     if echo "$register_response" | grep -q '"error"'; then
         log_error "Failed to register SSH key with Hetzner"
 
         # Parse error details
-        local error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        local error_msg print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -157,14 +166,19 @@ create_server() {
     log_warn "Creating Hetzner server '$name' (type: $server_type, location: $location)..."
 
     # Get all SSH key IDs
-    local ssh_keys_response=$(hetzner_api GET "/ssh_keys")
-    local ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
+    local ssh_keys_response
+    ssh_keys_response=$(hetzner_api GET "/ssh_keys")
+    local ssh_key_ids
+    ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
     # JSON-escape the cloud-init userdata
-    local userdata=$(get_cloud_init_userdata)
-    local userdata_json=$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <<< "$userdata")
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+    local userdata_json <<< "$userdata")
+    userdata_json=$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))"
 
-    local body=$(python3 -c "
+    local body
+    body=$(python3 -c "
 import json
 body = {
     'name': '$name',
@@ -178,14 +192,16 @@ body = {
 print(json.dumps(body))
 ")
 
-    local response=$(hetzner_api POST "/servers" "$body")
+    local response
+    response=$(hetzner_api POST "/servers" "$body")
 
     # Check for errors
     if echo "$response" | grep -q '"error"'; then
         log_error "Failed to create Hetzner server"
 
         # Parse error details
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('error',{}).get('message','Unknown error'))")
+        local error_msg error'))")
+        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('error',{}).get('message','Unknown
         log_error "API Error: $error_msg"
 
         log_warn "Common issues:"
@@ -241,7 +257,8 @@ destroy_server() {
     local server_id="$1"
 
     log_warn "Destroying server $server_id..."
-    local response=$(hetzner_api DELETE "/servers/$server_id")
+    local response
+    response=$(hetzner_api DELETE "/servers/$server_id")
 
     if echo "$response" | grep -q '"error"'; then
         log_error "Failed to destroy server: $response"
@@ -253,7 +270,8 @@ destroy_server() {
 
 # List all Hetzner servers
 list_servers() {
-    local response=$(hetzner_api GET "/servers")
+    local response
+    response=$(hetzner_api GET "/servers")
 
     python3 -c "
 import json, sys

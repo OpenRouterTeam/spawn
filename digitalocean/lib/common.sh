@@ -48,7 +48,8 @@ ensure_do_token() {
     local config_dir="$HOME/.config/spawn"
     local config_file="$config_dir/digitalocean.json"
     if [[ -f "$config_file" ]]; then
-        local saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))" 2>/dev/null)
+        local saved_token 2>/dev/null)
+        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))"
         if [[ -n "$saved_token" ]]; then
             export DO_API_TOKEN="$saved_token"
             log_info "Using DigitalOcean API token from $config_file"
@@ -59,7 +60,7 @@ ensure_do_token() {
     # 3. Prompt and save
     echo ""
     log_warn "DigitalOcean API Token Required"
-    echo -e "${YELLOW}Get your token from: https://cloud.digitalocean.com/account/api/tokens${NC}"
+    log_warn "Get your token from: https://cloud.digitalocean.com/account/api/tokens"
     echo ""
 
     local token
@@ -67,14 +68,16 @@ ensure_do_token() {
 
     # Validate token
     export DO_API_TOKEN="$token"
-    local response=$(do_api GET "/account")
+    local response
+    response=$(do_api GET "/account")
     if echo "$response" | grep -q '"id"'; then
         log_info "API token validated"
     else
         log_error "Authentication failed: Invalid DigitalOcean API token"
 
         # Parse error details if available
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        local error_msg print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
         log_error "API Error: $error_msg"
 
         log_warn "Remediation steps:"
@@ -105,8 +108,10 @@ ensure_ssh_key() {
     generate_ssh_key_if_missing "$key_path"
 
     # Check if already registered
-    local fingerprint=$(get_ssh_fingerprint "$pub_path")
-    local existing_keys=$(do_api GET "/account/keys")
+    local fingerprint
+    fingerprint=$(get_ssh_fingerprint "$pub_path")
+    local existing_keys
+    existing_keys=$(do_api GET "/account/keys")
     if echo "$existing_keys" | grep -q "$fingerprint"; then
         log_info "SSH key already registered with DigitalOcean"
         return 0
@@ -115,10 +120,13 @@ ensure_ssh_key() {
     # Register the key
     log_warn "Registering SSH key with DigitalOcean..."
     local key_name="spawn-$(hostname)-$(date +%s)"
-    local pub_key=$(cat "$pub_path")
-    local json_pub_key=$(json_escape "$pub_key")
+    local pub_key
+    pub_key=$(cat "$pub_path")
+    local json_pub_key
+    json_pub_key=$(json_escape "$pub_key")
     local register_body="{\"name\":\"$key_name\",\"public_key\":$json_pub_key}"
-    local register_response=$(do_api POST "/account/keys" "$register_body")
+    local register_response
+    register_response=$(do_api POST "/account/keys" "$register_body")
 
     if echo "$register_response" | grep -q '"id"'; then
         log_info "SSH key registered with DigitalOcean"
@@ -126,7 +134,8 @@ ensure_ssh_key() {
         log_error "Failed to register SSH key with DigitalOcean"
 
         # Parse error details
-        local error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        local error_msg print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -161,14 +170,19 @@ create_server() {
     log_warn "Creating DigitalOcean droplet '$name' (size: $size, region: $region)..."
 
     # Get all SSH key IDs
-    local ssh_keys_response=$(do_api GET "/account/keys")
-    local ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
+    local ssh_keys_response
+    ssh_keys_response=$(do_api GET "/account/keys")
+    local ssh_key_ids
+    ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
     # JSON-escape the cloud-init userdata
-    local userdata=$(get_cloud_init_userdata)
-    local userdata_json=$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <<< "$userdata")
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+    local userdata_json <<< "$userdata")
+    userdata_json=$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))"
 
-    local body=$(python3 -c "
+    local body
+    body=$(python3 -c "
 import json
 body = {
     'name': '$name',
@@ -183,7 +197,8 @@ body = {
 print(json.dumps(body))
 ")
 
-    local response=$(do_api POST "/droplets" "$body")
+    local response
+    response=$(do_api POST "/droplets" "$body")
 
     # Check for errors
     if echo "$response" | grep -q '"id"' && echo "$response" | grep -q '"droplet"'; then
@@ -194,7 +209,8 @@ print(json.dumps(body))
         log_error "Failed to create DigitalOcean droplet"
 
         # Parse error details
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        local error_msg error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown
         log_error "API Error: $error_msg"
 
         log_warn "Common issues:"
@@ -211,8 +227,10 @@ print(json.dumps(body))
     local max_attempts=60
     local attempt=1
     while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response=$(do_api GET "/droplets/$DO_DROPLET_ID")
-        local status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['status'])")
+        local status_response
+        status_response=$(do_api GET "/droplets/$DO_DROPLET_ID")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['status'])")
 
         if [[ "$status" == "active" ]]; then
             DO_SERVER_IP=$(echo "$status_response" | python3 -c "
@@ -274,7 +292,8 @@ destroy_server() {
     local droplet_id="$1"
 
     log_warn "Destroying droplet $droplet_id..."
-    local response=$(do_api DELETE "/droplets/$droplet_id")
+    local response
+    response=$(do_api DELETE "/droplets/$droplet_id")
 
     # DELETE returns 204 No Content on success (empty body)
     log_info "Droplet $droplet_id destroyed"
@@ -282,7 +301,8 @@ destroy_server() {
 
 # List all DigitalOcean droplets
 list_servers() {
-    local response=$(do_api GET "/droplets")
+    local response
+    response=$(do_api GET "/droplets")
 
     python3 -c "
 import json, sys

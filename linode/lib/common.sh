@@ -39,25 +39,28 @@ ensure_linode_token() {
     fi
     local config_dir="$HOME/.config/spawn" config_file="$config_dir/linode.json"
     if [[ -f "$config_file" ]]; then
-        local saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))" 2>/dev/null)
+        local saved_token 2>/dev/null)
+        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))"
         if [[ -n "$saved_token" ]]; then
             export LINODE_API_TOKEN="$saved_token"
             log_info "Using Linode API token from $config_file"; return 0
         fi
     fi
     echo ""; log_warn "Linode API Token Required"
-    echo -e "${YELLOW}Get your token from: https://cloud.linode.com/profile/tokens${NC}"; echo ""
+    log_warn "Get your token from: https://cloud.linode.com/profile/tokens"; echo ""
     local token
     token=$(validated_read "Enter your Linode API token: " validate_api_token) || return 1
     export LINODE_API_TOKEN="$token"
-    local response=$(linode_api GET "/profile")
+    local response
+    response=$(linode_api GET "/profile")
     if echo "$response" | grep -q '"username"'; then
         log_info "API token validated"
     else
         log_error "Authentication failed: Invalid Linode API token"
 
         # Parse error details
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print(errs[0].get('reason','No details') if errs else 'Unable to parse')" 2>/dev/null || echo "Unable to parse error")
+        local error_msg print(errs[0].get('reason','No details') if errs else 'Unable to parse')" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]);
         log_error "API Error: $error_msg"
 
         log_warn "Remediation steps:"
@@ -80,24 +83,30 @@ EOF
 ensure_ssh_key() {
     local key_path="$HOME/.ssh/id_ed25519" pub_path="${key_path}.pub"
     generate_ssh_key_if_missing "$key_path"
-    local fingerprint=$(get_ssh_fingerprint "$pub_path")
-    local existing_keys=$(linode_api GET "/profile/sshkeys")
+    local fingerprint
+    fingerprint=$(get_ssh_fingerprint "$pub_path")
+    local existing_keys
+    existing_keys=$(linode_api GET "/profile/sshkeys")
     if echo "$existing_keys" | grep -q "$fingerprint"; then
         log_info "SSH key already registered with Linode"; return 0
     fi
     log_warn "Registering SSH key with Linode..."
     local key_name="spawn-$(hostname)-$(date +%s)"
-    local pub_key=$(cat "$pub_path")
-    local json_pub_key=$(json_escape "$pub_key")
+    local pub_key
+    pub_key=$(cat "$pub_path")
+    local json_pub_key
+    json_pub_key=$(json_escape "$pub_key")
     local register_body="{\"label\":\"$key_name\",\"ssh_key\":$json_pub_key}"
-    local register_response=$(linode_api POST "/profile/sshkeys" "$register_body")
+    local register_response
+    register_response=$(linode_api POST "/profile/sshkeys" "$register_body")
     if echo "$register_response" | grep -q '"id"'; then
         log_info "SSH key registered with Linode"
     else
         log_error "Failed to register SSH key with Linode"
 
         # Parse error details
-        local error_msg=$(echo "$register_response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')" 2>/dev/null || echo "$register_response")
+        local error_msg print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]);
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -130,21 +139,27 @@ create_server() {
     log_warn "Creating Linode '$name' (type: $type, region: $region)..."
 
     # Get all SSH key IDs
-    local ssh_keys_response=$(linode_api GET "/profile/sshkeys")
-    local authorized_keys=$(python3 -c "
+    local ssh_keys_response
+    ssh_keys_response=$(linode_api GET "/profile/sshkeys")
+    local authorized_keys
+    authorized_keys=$(python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
 keys = [k['ssh_key'] for k in data.get('data', [])]
 print(json.dumps(keys))
 " <<< "$ssh_keys_response")
 
-    local userdata=$(get_cloud_init_userdata)
-    local userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+    local userdata_b64
+    userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
 
     # Generate a root password (required by Linode API)
-    local root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#$') for _ in range(32)))")
+    local root_pass for _ in range(32)))")
+    root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#$')
 
-    local body=$(python3 -c "
+    local body
+    body=$(python3 -c "
 import json
 body = {
     'label': '$name',
@@ -161,7 +176,8 @@ body = {
 print(json.dumps(body))
 ")
 
-    local response=$(linode_api POST "/linode/instances" "$body")
+    local response
+    response=$(linode_api POST "/linode/instances" "$body")
 
     if echo "$response" | grep -q '"id"' && ! echo "$response" | grep -q '"errors"'; then
         LINODE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
@@ -171,7 +187,8 @@ print(json.dumps(body))
         log_error "Failed to create Linode instance"
 
         # Parse error details
-        local error_msg=$(echo "$response" | python3 -c "
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "
 import json,sys
 d = json.loads(sys.stdin.read())
 errs = d.get('errors', [])
@@ -192,8 +209,10 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
     log_warn "Waiting for Linode to become active..."
     local max_attempts=60 attempt=1
     while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response=$(linode_api GET "/linode/instances/$LINODE_SERVER_ID")
-        local status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['status'])")
+        local status_response
+        status_response=$(linode_api GET "/linode/instances/$LINODE_SERVER_ID")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['status'])")
 
         if [[ "$status" == "running" ]]; then
             LINODE_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['ipv4'][0])")
@@ -227,7 +246,8 @@ destroy_server() {
 }
 
 list_servers() {
-    local response=$(linode_api GET "/linode/instances")
+    local response
+    response=$(linode_api GET "/linode/instances")
     python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
