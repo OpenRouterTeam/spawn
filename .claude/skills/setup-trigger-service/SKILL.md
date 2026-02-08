@@ -27,7 +27,10 @@ GitHub Actions (cron / events / manual)
 
 ## Step 1: Ensure trigger-server.ts exists
 
-Check if `trigger-server.ts` already exists in the repo root. If not, create it:
+The trigger server is included in this skill directory at:
+`/home/sprite/spawn/.claude/skills/setup-trigger-service/trigger-server.ts`
+
+You can use this file directly, or copy it to your repo if needed. The file contents are:
 
 ```typescript
 const PORT = 8080;
@@ -116,37 +119,37 @@ Save the output — you'll need it in steps 3 and 5.
 
 Create a **gitignored** wrapper script that sets env vars and launches the server. This file contains secrets and MUST NOT be committed.
 
-Create `start-trigger-server.sh` (or a service-specific name like `start-<service-name>.sh`):
+Create `start-<service-name>.sh` in the skill directory (e.g., `start-improve.sh`, `start-refactor.sh`):
 
 ```bash
 #!/bin/bash
 export TRIGGER_SECRET="<secret-from-step-2>"
-export TARGET_SCRIPT="/home/sprite/<repo>/<target-script>.sh"
-exec bun run /home/sprite/<repo>/trigger-server.ts
+export TARGET_SCRIPT="/home/sprite/spawn/.claude/skills/setup-trigger-service/<target-script>.sh"
+exec bun run /home/sprite/spawn/.claude/skills/setup-trigger-service/trigger-server.ts
 ```
 
 Make it executable:
 
 ```bash
-chmod +x start-trigger-server.sh
+chmod +x /home/sprite/spawn/.claude/skills/setup-trigger-service/start-<service-name>.sh
 ```
 
-**IMPORTANT:** Verify that `.gitignore` includes this file:
+**IMPORTANT:** Verify that `.gitignore` includes wrapper scripts:
 
 ```
-start-trigger-server.sh
+.claude/skills/setup-trigger-service/start-*.sh
 ```
 
-If multiple sprites use different wrapper scripts, add each one to `.gitignore`.
+All `start-*.sh` files in the skill directory should be gitignored since they contain secrets.
 
 ## Step 4: Create the Sprite service
 
 Register the trigger server as a Sprite service with HTTP port forwarding:
 
 ```bash
-sprite-env services create trigger-server \
-  --cmd bash --args /home/sprite/<repo>/start-trigger-server.sh \
-  --http-port 8080 --dir /home/sprite/<repo>
+sprite-env services create <service-name> \
+  --cmd bash --args /home/sprite/spawn/.claude/skills/setup-trigger-service/start-<service-name>.sh \
+  --http-port 8080 --dir /home/sprite/spawn/.claude/skills/setup-trigger-service
 ```
 
 **Key flags:**
@@ -177,11 +180,11 @@ curl -sf -X POST "http://localhost:8080/trigger?reason=test" \
 ### Service management commands
 
 ```bash
-sprite-env services list                    # List all services
-sprite-env services stop trigger-server     # Stop
-sprite-env services start trigger-server    # Start
-sprite-env services restart trigger-server  # Restart
-sprite-env services delete trigger-server   # Delete entirely
+sprite-env services list                       # List all services
+sprite-env services stop <service-name>        # Stop
+sprite-env services start <service-name>       # Start
+sprite-env services restart <service-name>     # Restart
+sprite-env services delete <service-name>      # Delete entirely
 ```
 
 ## Step 5: Create the GitHub Actions workflow
@@ -252,15 +255,23 @@ The target script (e.g., `refactor.sh`, `improve.sh`) MUST:
 
 If converting from a looping script, remove the `while true` / `sleep` and keep only the body of one iteration.
 
+**Included scripts in this skill directory:**
+- `improve.sh` — Continuous improvement loop for spawn (already single-cycle ready)
+- `refactor.sh` — Refactoring team service (already single-cycle ready)
+
+To create a new service script, add it to `/home/sprite/spawn/.claude/skills/setup-trigger-service/` and follow the same pattern.
+
 ## Step 8: Commit and push
 
-Commit the workflow file and trigger-server.ts (but NOT the wrapper script):
+Commit the workflow file and .gitignore changes (but NOT the wrapper script):
 
 ```bash
-git add trigger-server.ts .github/workflows/<service-name>.yml .gitignore
+git add .github/workflows/<service-name>.yml .gitignore
 git commit -m "feat: Add GitHub Actions trigger for <service-name>"
 git push origin main
 ```
+
+Note: The trigger-server.ts and service scripts are already in the skill directory and don't need to be committed again.
 
 ## Step 9: Test end-to-end
 
@@ -272,11 +283,21 @@ git push origin main
 ## Multiple Services on Different Sprites
 
 Each Sprite gets its own:
-- `start-trigger-server.sh` with its own `TRIGGER_SECRET` and `TARGET_SCRIPT`
+- `start-<service-name>.sh` in the skill directory with its own `TRIGGER_SECRET` and `TARGET_SCRIPT`
 - GitHub Actions workflow file
 - Pair of GitHub secrets (`<SERVICE>_SPRITE_URL` + `<SERVICE>_SPRITE_SECRET`)
 
 The `trigger-server.ts` file is **shared** — same code runs on every Sprite, configured only by env vars.
+
+## Adding New Service Scripts
+
+To add a new automation script (beyond improve.sh and refactor.sh):
+
+1. Create the script in `/home/sprite/spawn/.claude/skills/setup-trigger-service/<script-name>.sh`
+2. Make it executable: `chmod +x <script-name>.sh`
+3. Ensure it follows the single-cycle pattern (sync with origin, run once, exit)
+4. Create a corresponding `start-<script-name>.sh` wrapper with the appropriate env vars
+5. Follow the setup steps above to register the service and create the GitHub Actions workflow
 
 ## Troubleshooting
 

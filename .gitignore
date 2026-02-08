@@ -1,4 +1,4 @@
 node_modules/
 .docs/
 __pycache__/
-start-trigger-server.sh
+.claude/skills/setup-trigger-service/start-*.sh
