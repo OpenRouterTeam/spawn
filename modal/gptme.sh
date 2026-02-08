@@ -45,16 +45,8 @@ MODEL_ID="${MODEL_ID:-openrouter/auto}"
 # 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
 
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-
-upload_file "$ENV_TEMP" "/tmp/env_config"
-run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_local upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
 log_info "Modal sandbox setup completed successfully!"

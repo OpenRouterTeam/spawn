@@ -49,15 +49,8 @@ MODEL_ID="${MODEL_ID:-openrouter/auto}"
 # 8. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
 
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-
-upload_file "$GCP_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$GCP_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 rm "$ENV_TEMP"
 
 echo ""

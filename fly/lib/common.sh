@@ -345,6 +345,24 @@ if isinstance(data, list):
     log_info "App '$app_name' destroyed"
 }
 
+# Inject environment variables into both .bashrc and .zshrc (Fly.io specific)
+# Fly uses both bash and zsh, so we append to both rc files
+# Usage: inject_env_vars_fly KEY1=VAL1 KEY2=VAL2 ...
+inject_env_vars_fly() {
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    generate_env_config "$@" > "${env_temp}"
+
+    # Upload and append to both .bashrc and .zshrc
+    upload_file "${env_temp}" "/tmp/env_config"
+    run_server "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+
+    # Note: temp file will be cleaned up by trap handler
+}
+
 # List all Fly.io apps and machines
 list_servers() {
     local org=$(get_fly_org)

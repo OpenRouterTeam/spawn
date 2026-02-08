@@ -45,23 +45,14 @@ fi
 # 6. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
 
-ENV_TEMP=$(mktemp)
-chmod 600 "$ENV_TEMP"
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-export ANTHROPIC_AUTH_TOKEN="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY=""
-export CLAUDE_CODE_SKIP_ONBOARDING="1"
-export CLAUDE_CODE_ENABLE_TELEMETRY="0"
-export PATH="\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH"
-EOF
-
-upload_file "$ENV_TEMP" "/tmp/env_config"
-run_server "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_fly \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
+    "ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}" \
+    "ANTHROPIC_API_KEY=" \
+    "CLAUDE_CODE_SKIP_ONBOARDING=1" \
+    "CLAUDE_CODE_ENABLE_TELEMETRY=0" \
+    "PATH=\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH"
 
 # 7. Configure Claude Code settings
 log_warn "Configuring Claude Code..."

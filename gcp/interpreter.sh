@@ -48,18 +48,10 @@ fi
 # 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
 
-ENV_TEMP=$(mktemp)
-trap 'rm -f "${ENV_TEMP}"' EXIT
-cat > "${ENV_TEMP}" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-EOF
-
-upload_file "${GCP_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
-run_server "${GCP_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "GCP instance setup completed successfully!"
