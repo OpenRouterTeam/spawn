@@ -106,15 +106,18 @@ create_server() {
         return 1
     fi
 
+    # Export instance metadata for use by calling script
+    # shellcheck disable=SC2034  # Variables exported for use by sourcing scripts
     export GCP_INSTANCE_NAME_ACTUAL="${name}"
     export GCP_ZONE="${zone}"
 
     # Get external IP
-    GCP_SERVER_IP=$(gcloud compute instances describe "${name}" \
+    local server_ip
+    server_ip=$(gcloud compute instances describe "${name}" \
         --zone="${zone}" \
         --project="${GCP_PROJECT}" \
         --format='get(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null)
-    export GCP_SERVER_IP
+    export GCP_SERVER_IP="${server_ip}"
 
     log_info "Instance created: IP=${GCP_SERVER_IP}"
 }
