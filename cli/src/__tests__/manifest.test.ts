@@ -221,7 +221,7 @@ describe("manifest", () => {
       global.fetch = mock(() => Promise.resolve({
         ok: true,
         json: async () => mockManifest,
-      });
+      }) as any);
 
       const manifest = await loadManifest();
 
@@ -240,7 +240,7 @@ describe("manifest", () => {
       global.fetch = mock(() => Promise.resolve({
         ok: true,
         json: async () => updatedManifest,
-      });
+      }) as any);
 
       const manifest = await loadManifest(true);
 
@@ -301,7 +301,7 @@ describe("manifest", () => {
       global.fetch = mock(() => Promise.resolve({
         ok: true,
         json: async () => ({ agents: {} }), // missing clouds and matrix
-      });
+      }) as any);
 
       // Write valid cache as fallback
       mkdirSync(join(testCacheDir, "spawn"), { recursive: true });
