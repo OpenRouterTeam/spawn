@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 # Test harness for spawn scripts
 #
 # Mocks the `sprite` CLI and runs each script end-to-end to verify:
@@ -173,6 +174,9 @@ run_script_test() {
         nanoclaw)
             assert_contains "${MOCK_LOG}" "sprite exec.*git clone.*nanoclaw" "Clones nanoclaw repo"
             assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/nanoclaw_env" "Uploads nanoclaw .env"
+            ;;
+        *)
+            # No agent-specific assertions for other agents
             ;;
     esac
 
