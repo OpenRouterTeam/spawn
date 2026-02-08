@@ -132,4 +132,18 @@ inject_env_vars_sprite() {
     rm "${env_temp}"
 }
 
+# Upload file to sprite (for use with setup_claude_code_config callback)
+# Usage: upload_file_sprite SPRITE_NAME LOCAL_PATH REMOTE_PATH
+# Example: upload_file_sprite "$SPRITE_NAME" "/tmp/settings.json" "/root/.claude/settings.json"
+upload_file_sprite() {
+    local sprite_name="${1}"
+    local local_path="${2}"
+    local remote_path="${3}"
+
+    # Generate a unique temp path to avoid collisions
+    local temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_$$"
+
+    sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
+}
+
 # Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers, validate_model_id) are now in shared/common.sh

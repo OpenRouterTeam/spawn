@@ -60,45 +60,9 @@ run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 rm "$ENV_TEMP"
 
 # 7. Configure Claude Code settings
-log_warn "Configuring Claude Code..."
-
-run_server "mkdir -p ~/.claude"
-
-# Upload settings.json
-SETTINGS_TEMP=$(mktemp)
-cat > "$SETTINGS_TEMP" << EOF
-{
-  "theme": "dark",
-  "editor": "vim",
-  "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
-    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-    "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}"
-  },
-  "permissions": {
-    "defaultMode": "bypassPermissions",
-    "dangerouslySkipPermissions": true
-  }
-}
-EOF
-
-upload_file "$SETTINGS_TEMP" ~/.claude/settings.json
-rm "$SETTINGS_TEMP"
-
-# Upload ~/.claude.json global state
-GLOBAL_STATE_TEMP=$(mktemp)
-cat > "$GLOBAL_STATE_TEMP" << EOF
-{
-  "hasCompletedOnboarding": true,
-  "bypassPermissionsModeAccepted": true
-}
-EOF
-
-upload_file "$GLOBAL_STATE_TEMP" ~/.claude.json
-rm "$GLOBAL_STATE_TEMP"
-
-# Create empty CLAUDE.md
-run_server "touch ~/.claude/CLAUDE.md"
+setup_claude_code_config "$OPENROUTER_API_KEY" \
+    "upload_file" \
+    "run_server"
 
 echo ""
 log_info "E2B sandbox setup completed successfully!"

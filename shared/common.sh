@@ -981,6 +981,81 @@ EOF
 }
 
 # ============================================================
+# Claude Code configuration setup
+# ============================================================
+
+# Setup Claude Code configuration files (settings.json, .claude.json, CLAUDE.md)
+# This consolidates the config setup pattern used by all claude.sh scripts
+# Usage: setup_claude_code_config OPENROUTER_KEY UPLOAD_CALLBACK RUN_CALLBACK
+#
+# Arguments:
+#   OPENROUTER_KEY    - OpenRouter API key to inject into config
+#   UPLOAD_CALLBACK   - Function to upload files: func(local_path, remote_path)
+#   RUN_CALLBACK      - Function to run commands: func(command)
+#
+# Example (SSH-based clouds):
+#   setup_claude_code_config "$OPENROUTER_API_KEY" \
+#     "upload_file $SERVER_IP" \
+#     "run_server $SERVER_IP"
+#
+# Example (Sprite):
+#   setup_claude_code_config "$OPENROUTER_API_KEY" \
+#     "upload_file_sprite $SPRITE_NAME" \
+#     "run_sprite $SPRITE_NAME"
+setup_claude_code_config() {
+    local openrouter_key="${1}"
+    local upload_callback="${2}"
+    local run_callback="${3}"
+
+    log_warn "Configuring Claude Code..."
+
+    # Create ~/.claude directory
+    ${run_callback} "mkdir -p ~/.claude"
+
+    # Create settings.json
+    local settings_temp
+    settings_temp=$(mktemp)
+    chmod 600 "${settings_temp}"
+    track_temp_file "${settings_temp}"
+
+    cat > "${settings_temp}" << EOF
+{
+  "theme": "dark",
+  "editor": "vim",
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "ANTHROPIC_AUTH_TOKEN": "${openrouter_key}"
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "dangerouslySkipPermissions": true
+  }
+}
+EOF
+
+    ${upload_callback} "${settings_temp}" "/root/.claude/settings.json"
+
+    # Create .claude.json global state
+    local global_state_temp
+    global_state_temp=$(mktemp)
+    chmod 600 "${global_state_temp}"
+    track_temp_file "${global_state_temp}"
+
+    cat > "${global_state_temp}" << EOF
+{
+  "hasCompletedOnboarding": true,
+  "bypassPermissionsModeAccepted": true
+}
+EOF
+
+    ${upload_callback} "${global_state_temp}" "/root/.claude.json"
+
+    # Create empty CLAUDE.md
+    ${run_callback} "touch ~/.claude/CLAUDE.md"
+}
+
+# ============================================================
 # SSH key registration helpers
 # ============================================================
 

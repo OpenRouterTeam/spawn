@@ -63,45 +63,9 @@ run_server "$LIGHTSAIL_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/en
 rm "$ENV_TEMP"
 
 # 8. Configure Claude Code settings
-log_warn "Configuring Claude Code..."
-
-run_server "$LIGHTSAIL_SERVER_IP" "mkdir -p ~/.claude"
-
-# Upload settings.json
-SETTINGS_TEMP=$(mktemp)
-cat > "$SETTINGS_TEMP" << EOF
-{
-  "theme": "dark",
-  "editor": "vim",
-  "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
-    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-    "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}"
-  },
-  "permissions": {
-    "defaultMode": "bypassPermissions",
-    "dangerouslySkipPermissions": true
-  }
-}
-EOF
-
-upload_file "$LIGHTSAIL_SERVER_IP" "$SETTINGS_TEMP" "/home/ubuntu/.claude/settings.json"
-rm "$SETTINGS_TEMP"
-
-# Upload ~/.claude.json global state
-GLOBAL_STATE_TEMP=$(mktemp)
-cat > "$GLOBAL_STATE_TEMP" << EOF
-{
-  "hasCompletedOnboarding": true,
-  "bypassPermissionsModeAccepted": true
-}
-EOF
-
-upload_file "$LIGHTSAIL_SERVER_IP" "$GLOBAL_STATE_TEMP" "/home/ubuntu/.claude.json"
-rm "$GLOBAL_STATE_TEMP"
-
-# Create empty CLAUDE.md
-run_server "$LIGHTSAIL_SERVER_IP" "touch ~/.claude/CLAUDE.md"
+setup_claude_code_config "$OPENROUTER_API_KEY" \
+    "upload_file $LIGHTSAIL_SERVER_IP" \
+    "run_server $LIGHTSAIL_SERVER_IP"
 
 echo ""
 log_info "Lightsail instance setup completed successfully!"

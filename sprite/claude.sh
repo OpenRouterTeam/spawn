@@ -51,47 +51,9 @@ inject_env_vars_sprite "$SPRITE_NAME" \
     "CLAUDE_CODE_ENABLE_TELEMETRY=0"
 
 # Setup Claude Code settings to bypass initial setup
-log_warn "Configuring Claude Code..."
-
-run_sprite "$SPRITE_NAME" "mkdir -p ~/.claude"
-
-# Create Claude settings.json via file upload
-SETTINGS_TEMP=$(mktemp)
-chmod 600 "$SETTINGS_TEMP"
-cat > "$SETTINGS_TEMP" << EOF
-{
-  "theme": "dark",
-  "editor": "vim",
-  "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
-    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-    "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}"
-  },
-  "permissions": {
-    "defaultMode": "bypassPermissions",
-    "dangerouslySkipPermissions": true
-  }
-}
-EOF
-
-sprite exec -s "$SPRITE_NAME" -file "$SETTINGS_TEMP:/tmp/claude_settings" -- bash -c "mv /tmp/claude_settings ~/.claude/settings.json"
-rm "$SETTINGS_TEMP"
-
-# Create ~/.claude.json global state to skip onboarding and trust dialogs
-GLOBAL_STATE_TEMP=$(mktemp)
-chmod 600 "$GLOBAL_STATE_TEMP"
-cat > "$GLOBAL_STATE_TEMP" << EOF
-{
-  "hasCompletedOnboarding": true,
-  "bypassPermissionsModeAccepted": true
-}
-EOF
-
-sprite exec -s "$SPRITE_NAME" -file "$GLOBAL_STATE_TEMP:/tmp/claude_global" -- bash -c "mv /tmp/claude_global ~/.claude.json"
-rm "$GLOBAL_STATE_TEMP"
-
-# Create empty CLAUDE.md to prevent first-run prompts
-run_sprite "$SPRITE_NAME" "touch ~/.claude/CLAUDE.md"
+setup_claude_code_config "$OPENROUTER_API_KEY" \
+    "upload_file_sprite $SPRITE_NAME" \
+    "run_sprite $SPRITE_NAME"
 
 echo ""
 log_info "✅ Sprite setup completed successfully!"
