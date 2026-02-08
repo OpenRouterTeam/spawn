@@ -101,7 +101,8 @@ p.wait()
 upload_file() {
     local local_path="${1}"
     local remote_path="${2}"
-    local content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
+    local content
+    content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
     run_server "echo '${content}' | base64 -d > '${remote_path}'"
 }
 

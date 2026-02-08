@@ -92,7 +92,7 @@ cat > "$OPENCLAW_CONFIG_TEMP" << EOF
 }
 EOF
 
-upload_file "$GCP_SERVER_IP" "$OPENCLAW_CONFIG_TEMP" "~/.openclaw/openclaw.json"
+upload_file "$GCP_SERVER_IP" "$OPENCLAW_CONFIG_TEMP" "$HOME/.openclaw/openclaw.json"
 rm "$OPENCLAW_CONFIG_TEMP"
 
 echo ""

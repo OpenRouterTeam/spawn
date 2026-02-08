@@ -66,7 +66,7 @@ cat > "$DOTENV_TEMP" << EOF
 ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
 EOF
 
-upload_file "$GCP_SERVER_IP" "$DOTENV_TEMP" "~/nanoclaw/.env"
+upload_file "$GCP_SERVER_IP" "$DOTENV_TEMP" "$HOME/nanoclaw/.env"
 rm "$DOTENV_TEMP"
 
 echo ""

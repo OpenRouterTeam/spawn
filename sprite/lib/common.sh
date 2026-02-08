@@ -88,7 +88,8 @@ setup_shell_environment() {
     log_warn "Configuring shell environment..."
 
     # Create temp file with path config
-    local path_temp=$(mktemp)
+    local path_temp
+    path_temp=$(mktemp)
     cat > "${path_temp}" << 'EOF'
 
 # [spawn:path]
@@ -100,7 +101,8 @@ EOF
     rm "${path_temp}"
 
     # Switch bash to zsh
-    local bash_temp=$(mktemp)
+    local bash_temp
+    bash_temp=$(mktemp)
     cat > "${bash_temp}" << 'EOF'
 # [spawn:bash]
 exec /usr/bin/zsh -l
@@ -119,7 +121,8 @@ inject_env_vars_sprite() {
     local sprite_name="${1}"
     shift
 
-    local env_temp=$(mktemp)
+    local env_temp
+    env_temp=$(mktemp)
     chmod 600 "${env_temp}"
 
     generate_env_config "$@" > "${env_temp}"

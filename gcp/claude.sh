@@ -84,7 +84,7 @@ cat > "$SETTINGS_TEMP" << EOF
 }
 EOF
 
-upload_file "$GCP_SERVER_IP" "$SETTINGS_TEMP" "~/.claude/settings.json"
+upload_file "$GCP_SERVER_IP" "$SETTINGS_TEMP" "$HOME/.claude/settings.json"
 rm "$SETTINGS_TEMP"
 
 # Upload ~/.claude.json global state
@@ -96,7 +96,7 @@ cat > "$GLOBAL_STATE_TEMP" << EOF
 }
 EOF
 
-upload_file "$GCP_SERVER_IP" "$GLOBAL_STATE_TEMP" "~/.claude.json"
+upload_file "$GCP_SERVER_IP" "$GLOBAL_STATE_TEMP" "$HOME/.claude.json"
 rm "$GLOBAL_STATE_TEMP"
 
 # Create empty CLAUDE.md

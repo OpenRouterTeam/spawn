@@ -340,7 +340,8 @@ get_openrouter_api_key_manual() {
 start_oauth_server() {
     local port="${1}"
     local code_file="${2}"
-    local runtime=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
+    local runtime
+    runtime=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
 
     "${runtime}" -e "
 const http = require('http');
@@ -460,7 +461,8 @@ try_oauth_flow() {
         return 1
     fi
 
-    local runtime=$(find_node_runtime)
+    local runtime
+    runtime=$(find_node_runtime)
     if [[ -z "${runtime}" ]]; then
         log_warn "No Node.js runtime (bun/node) found - OAuth server unavailable"
         return 1
@@ -1031,7 +1033,8 @@ ensure_ssh_key_with_provider() {
 
     # Register the key (provider-specific)
     log_warn "Registering SSH key with ${provider_name}..."
-    local key_name="spawn-$(hostname)-$(date +%s)"
+    local key_name
+    key_name="spawn-$(hostname)-$(date +%s)"
 
     if "${register_callback}" "${key_name}" "${pub_path}"; then
         log_info "SSH key registered with ${provider_name}"
