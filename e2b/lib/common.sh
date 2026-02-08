@@ -104,9 +104,12 @@ wait_for_cloud_init() {
 }
 
 # E2B uses sandbox exec instead of SSH
+# SECURITY: Uses printf %q to properly escape commands to prevent injection
 run_server() {
     local cmd="${1}"
-    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "${cmd}"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "${cmd}")
+    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "${escaped_cmd}"
 }
 
 upload_file() {
@@ -115,12 +118,19 @@ upload_file() {
     # Upload via base64 encoding through exec
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
-    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "echo '${content}' | base64 -d > '${remote_path}'"
+    # SECURITY: Properly escape the remote path
+    local escaped_path
+    escaped_path=$(printf '%q' "${remote_path}")
+    local escaped_content
+    escaped_content=$(printf '%q' "${content}")
+    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "echo ${escaped_content} | base64 -d > ${escaped_path}"
 }
 
 interactive_session() {
     local cmd="${1}"
-    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "${cmd}"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "${cmd}")
+    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "${escaped_cmd}"
 }
 
 destroy_server() {

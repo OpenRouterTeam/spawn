@@ -79,10 +79,14 @@ verify_sprite_connectivity() {
 }
 
 # Helper function to run commands on sprite
+# SECURITY: Uses printf %q to properly escape commands to prevent injection
 run_sprite() {
     local sprite_name=${1}
     local command=${2}
-    sprite exec -s "${sprite_name}" -- bash -c "${command}"
+    # Use printf %q for proper shell escaping to prevent command injection
+    local escaped_command
+    escaped_command=$(printf '%q' "${command}")
+    sprite exec -s "${sprite_name}" -- bash -c "${escaped_command}"
 }
 
 # Configure shell environment (PATH, zsh setup)
@@ -139,6 +143,7 @@ inject_env_vars_sprite() {
 # Upload file to sprite (for use with setup_claude_code_config callback)
 # Usage: upload_file_sprite SPRITE_NAME LOCAL_PATH REMOTE_PATH
 # Example: upload_file_sprite "$SPRITE_NAME" "/tmp/settings.json" "/root/.claude/settings.json"
+# SECURITY: Uses proper quoting to prevent path injection
 upload_file_sprite() {
     local sprite_name="${1}"
     local local_path="${2}"
@@ -148,7 +153,13 @@ upload_file_sprite() {
     local temp_remote
     temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_$$"
 
-    sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
+    # Use printf %q for proper shell escaping of paths to prevent injection
+    local escaped_remote
+    escaped_remote=$(printf '%q' "${remote_path}")
+    local escaped_temp
+    escaped_temp=$(printf '%q' "${temp_remote}")
+
+    sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname ${escaped_remote}) && mv ${escaped_temp} ${escaped_remote}"
 }
 
 # Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers, validate_model_id) are now in shared/common.sh

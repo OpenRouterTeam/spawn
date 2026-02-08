@@ -227,10 +227,13 @@ wait_for_cloud_init() {
 }
 
 # Run a command on the Railway service via railway run
+# SECURITY: Uses printf %q to properly escape commands to prevent injection
 run_server() {
     local cmd="$1"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$cmd")
     cd "$RAILWAY_PROJECT_DIR"
-    railway run bash -c "$cmd" 2>/dev/null
+    railway run bash -c "$escaped_cmd" 2>/dev/null
 }
 
 # Upload a file to the service via base64 encoding through exec
@@ -238,14 +241,21 @@ upload_file() {
     local local_path="$1"
     local remote_path="$2"
     local content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
-    run_server "printf '%s' '$content' | base64 -d > '$remote_path'"
+    # SECURITY: Properly escape paths and content
+    local escaped_path
+    escaped_path=$(printf '%q' "$remote_path")
+    local escaped_content
+    escaped_content=$(printf '%q' "$content")
+    run_server "printf '%s' $escaped_content | base64 -d > $escaped_path"
 }
 
 # Start an interactive SSH session on the Railway service
 interactive_session() {
     local cmd="$1"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$cmd")
     cd "$RAILWAY_PROJECT_DIR"
-    railway run bash -c "$cmd"
+    railway run bash -c "$escaped_cmd"
 }
 
 # Destroy a Railway project
