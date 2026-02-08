@@ -13,7 +13,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
 wait_for_cloud_init "${LINODE_SERVER_IP}" 60
 log_warn "Installing OpenCode..."
-run_server "${LINODE_SERVER_IP}" "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
+run_server "${LINODE_SERVER_IP}" "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"

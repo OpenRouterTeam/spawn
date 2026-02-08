@@ -33,7 +33,7 @@ wait_for_cloud_init
 
 # 4. Install OpenCode
 log_warn "Installing OpenCode..."
-run_server "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
+run_server "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 
 # 5. Get OpenRouter API key

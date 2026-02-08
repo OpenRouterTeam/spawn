@@ -20,7 +20,7 @@ verify_server_connectivity "${UPCLOUD_SERVER_IP}"
 install_base_tools "${UPCLOUD_SERVER_IP}"
 
 log_warn "Installing OpenCode..."
-run_server "${UPCLOUD_SERVER_IP}" "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
+run_server "${UPCLOUD_SERVER_IP}" "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 
 echo ""
