@@ -148,9 +148,12 @@ wait_for_cloud_init() {
 }
 
 # Daytona uses `daytona exec` for running commands in sandboxes
+# SECURITY: Uses printf %q to properly escape commands to prevent injection
 run_server() {
     local cmd="${1}"
-    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${cmd}"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "${cmd}")
+    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${escaped_cmd}"
 }
 
 upload_file() {
@@ -159,7 +162,12 @@ upload_file() {
     # Upload via base64 encoding through exec (no native CLI file upload)
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
-    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "printf '%s' '${content}' | base64 -d > '${remote_path}'"
+    # SECURITY: Properly escape paths and content
+    local escaped_path
+    escaped_path=$(printf '%q' "${remote_path}")
+    local escaped_content
+    escaped_content=$(printf '%q' "${content}")
+    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "printf '%s' ${escaped_content} | base64 -d > ${escaped_path}"
 }
 
 # Daytona has true SSH support — much better than exec-only providers
@@ -170,7 +178,10 @@ interactive_session() {
         daytona ssh "${DAYTONA_SANDBOX_ID}"
     else
         # Run a specific command interactively via exec
-        daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${cmd}"
+        # SECURITY: Properly escape command
+        local escaped_cmd
+        escaped_cmd=$(printf '%q' "${cmd}")
+        daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${escaped_cmd}"
     fi
 }
 
