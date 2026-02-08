@@ -50,38 +50,9 @@ inject_env_vars_ssh "$HETZNER_SERVER_IP" upload_file run_server \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 9. Configure openclaw
-log_warn "Configuring openclaw..."
-
-run_server "$HETZNER_SERVER_IP" "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
-
-# Generate a random gateway token
-GATEWAY_TOKEN=$(openssl rand -hex 16)
-
-OPENCLAW_CONFIG_TEMP=$(mktemp)
-chmod 600 "$OPENCLAW_CONFIG_TEMP"
-cat > "$OPENCLAW_CONFIG_TEMP" << EOF
-{
-  "env": {
-    "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
-  },
-  "gateway": {
-    "mode": "local",
-    "auth": {
-      "token": "${GATEWAY_TOKEN}"
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "openrouter/${MODEL_ID}"
-      }
-    }
-  }
-}
-EOF
-
-upload_file "$HETZNER_SERVER_IP" "$OPENCLAW_CONFIG_TEMP" "/root/.openclaw/openclaw.json"
-rm "$OPENCLAW_CONFIG_TEMP"
+setup_openclaw_config "$OPENROUTER_API_KEY" "$MODEL_ID" \
+    "upload_file $HETZNER_SERVER_IP" \
+    "run_server $HETZNER_SERVER_IP"
 
 echo ""
 log_info "Hetzner server setup completed successfully!"

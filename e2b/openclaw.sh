@@ -38,11 +38,7 @@ else
 fi
 
 # 6. Get model preference
-echo ""
-log_warn "Browse models at: https://openrouter.ai/models"
-log_warn "Which model would you like to use?"
-MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
 # 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
@@ -61,37 +57,9 @@ run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 rm "$ENV_TEMP"
 
 # 8. Configure openclaw
-log_warn "Configuring openclaw..."
-
-run_server "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
-
-# Generate a random gateway token
-GATEWAY_TOKEN=$(openssl rand -hex 16)
-
-OPENCLAW_CONFIG_TEMP=$(mktemp)
-cat > "$OPENCLAW_CONFIG_TEMP" << EOF
-{
-  "env": {
-    "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
-  },
-  "gateway": {
-    "mode": "local",
-    "auth": {
-      "token": "${GATEWAY_TOKEN}"
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "openrouter/${MODEL_ID}"
-      }
-    }
-  }
-}
-EOF
-
-upload_file "$OPENCLAW_CONFIG_TEMP" ~/.openclaw/openclaw.json
-rm "$OPENCLAW_CONFIG_TEMP"
+setup_openclaw_config "$OPENROUTER_API_KEY" "$MODEL_ID" \
+    upload_file \
+    run_server
 
 echo ""
 log_info "E2B sandbox setup completed successfully!"

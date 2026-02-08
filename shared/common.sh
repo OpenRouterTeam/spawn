@@ -1056,6 +1056,74 @@ EOF
 }
 
 # ============================================================
+# OpenClaw configuration setup
+# ============================================================
+
+# Setup OpenClaw configuration files (openclaw.json)
+# This consolidates the config setup pattern used by all openclaw.sh scripts
+# Usage: setup_openclaw_config OPENROUTER_KEY MODEL_ID UPLOAD_CALLBACK RUN_CALLBACK
+#
+# Arguments:
+#   OPENROUTER_KEY    - OpenRouter API key to inject into config
+#   MODEL_ID          - Model ID to use (e.g., "openrouter/auto", "anthropic/claude-3.5-sonnet")
+#   UPLOAD_CALLBACK   - Function to upload files: func(local_path, remote_path)
+#   RUN_CALLBACK      - Function to run commands: func(command)
+#
+# Example (SSH-based clouds):
+#   setup_openclaw_config "$OPENROUTER_API_KEY" "$MODEL_ID" \
+#     "upload_file $SERVER_IP" \
+#     "run_server $SERVER_IP"
+#
+# Example (Sprite):
+#   setup_openclaw_config "$OPENROUTER_API_KEY" "$MODEL_ID" \
+#     "upload_file_sprite $SPRITE_NAME" \
+#     "run_sprite $SPRITE_NAME"
+setup_openclaw_config() {
+    local openrouter_key="${1}"
+    local model_id="${2}"
+    local upload_callback="${3}"
+    local run_callback="${4}"
+
+    log_warn "Configuring openclaw..."
+
+    # Create ~/.openclaw directory
+    ${run_callback} "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
+
+    # Generate a random gateway token
+    local gateway_token
+    gateway_token=$(openssl rand -hex 16)
+
+    # Create openclaw.json config
+    local config_temp
+    config_temp=$(mktemp)
+    chmod 600 "${config_temp}"
+    track_temp_file "${config_temp}"
+
+    cat > "${config_temp}" << EOF
+{
+  "env": {
+    "OPENROUTER_API_KEY": "${openrouter_key}"
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "token": "${gateway_token}"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/${model_id}"
+      }
+    }
+  }
+}
+EOF
+
+    ${upload_callback} "${config_temp}" "/root/.openclaw/openclaw.json"
+}
+
+# ============================================================
 # SSH key registration helpers
 # ============================================================
 

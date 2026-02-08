@@ -41,60 +41,19 @@ else
 fi
 
 # 7. Get model preference
-echo ""
-log_warn "Browse models at: https://openrouter.ai/models"
-log_warn "Which model would you like to use?"
-MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
 # 8. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-EOF
-
-upload_file "$LIGHTSAIL_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$LIGHTSAIL_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$LIGHTSAIL_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 9. Configure openclaw
-log_warn "Configuring openclaw..."
-
-run_server "$LIGHTSAIL_SERVER_IP" "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
-
-# Generate a random gateway token
-GATEWAY_TOKEN=$(openssl rand -hex 16)
-
-OPENCLAW_CONFIG_TEMP=$(mktemp)
-cat > "$OPENCLAW_CONFIG_TEMP" << EOF
-{
-  "env": {
-    "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
-  },
-  "gateway": {
-    "mode": "local",
-    "auth": {
-      "token": "${GATEWAY_TOKEN}"
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "openrouter/${MODEL_ID}"
-      }
-    }
-  }
-}
-EOF
-
-upload_file "$LIGHTSAIL_SERVER_IP" "$OPENCLAW_CONFIG_TEMP" "/home/ubuntu/.openclaw/openclaw.json"
-rm "$OPENCLAW_CONFIG_TEMP"
+setup_openclaw_config "$OPENROUTER_API_KEY" "$MODEL_ID" \
+    "upload_file $LIGHTSAIL_SERVER_IP" \
+    "run_server $LIGHTSAIL_SERVER_IP"
 
 echo ""
 log_info "Lightsail instance setup completed successfully!"
