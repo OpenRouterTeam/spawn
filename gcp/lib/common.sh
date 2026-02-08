@@ -122,7 +122,7 @@ create_server() {
 verify_server_connectivity() {
     local ip="${1}" max_attempts=${2:-30}
     # Use shared generic_ssh_wait with exponential backoff
-    # shellcheck disable=SC2086
+    # shellcheck disable=SC2086,SC2154
     generic_ssh_wait "${GCP_USERNAME}" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" "${max_attempts}"
 }
 
