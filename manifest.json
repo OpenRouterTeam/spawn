@@ -385,6 +385,22 @@
         "image": "Ubuntu 24.04"
       },
       "notes": "European cloud provider. Requires SCW_SECRET_KEY and optionally SCW_DEFAULT_PROJECT_ID."
+    },
+    "daytona": {
+      "name": "Daytona",
+      "description": "Daytona sandboxed environments for AI code execution",
+      "url": "https://www.daytona.io/",
+      "type": "sandbox",
+      "auth": "DAYTONA_API_KEY",
+      "provision_method": "daytona create",
+      "exec_method": "daytona exec",
+      "interactive_method": "daytona ssh",
+      "defaults": {
+        "cpu": 2,
+        "memory": 2048,
+        "disk": 5
+      },
+      "notes": "Sub-90ms sandbox creation. True SSH support via daytona ssh. Requires DAYTONA_API_KEY from https://app.daytona.io."
     }
   },
   "matrix": {
@@ -543,6 +559,18 @@
     "scaleway/amazonq": "implemented",
     "scaleway/cline": "implemented",
     "scaleway/gptme": "implemented",
-    "scaleway/opencode": "implemented"
+    "scaleway/opencode": "implemented",
+    "daytona/claude": "implemented",
+    "daytona/openclaw": "implemented",
+    "daytona/nanoclaw": "implemented",
+    "daytona/aider": "implemented",
+    "daytona/goose": "implemented",
+    "daytona/codex": "implemented",
+    "daytona/interpreter": "implemented",
+    "daytona/gemini": "implemented",
+    "daytona/amazonq": "implemented",
+    "daytona/cline": "implemented",
+    "daytona/gptme": "implemented",
+    "daytona/opencode": "implemented"
   }
 }
