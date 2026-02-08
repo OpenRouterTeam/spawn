@@ -40,42 +40,51 @@ Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 - Set provider-specific env vars (e.g., `ANTHROPIC_BASE_URL=https://openrouter.ai/api`)
 - These come from the agent's `env` field in `manifest.json`
 
-### 2. Add a new agent
+### 2. Add a new cloud provider (PRIORITY)
 
-Research coding agents, AI CLI tools, or AI-powered dev tools. To add one:
-
-1. Add an entry to `manifest.json` → `agents` with: name, description, url, install command, launch command, and env vars needed for OpenRouter
-2. Add `"missing"` entries to the matrix for every existing cloud
-3. Implement the script for at least one cloud
-4. Update `README.md`
-
-**Where to find new agents:**
-- GitHub trending in AI/coding categories
-- OpenRouter's ecosystem
-- HuggingFace agent frameworks
-- CLI tools that accept `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (these work with OpenRouter via base URL override)
-
-### 3. Add a new cloud provider
-
-Research cloud providers with API-based provisioning. To add one:
+We bias heavily toward adding more clouds/sandboxes over more agents. To add one:
 
 1. Create `{cloud}/lib/common.sh` with the provider's primitives:
    - Auth/token management (env var → config file → prompt)
-   - Server creation (API call or CLI)
+   - Server/container creation (API call or CLI)
    - SSH/exec connectivity
    - File upload
    - Interactive session
    - Server destruction
 2. Add an entry to `manifest.json` → `clouds`
 3. Add `"missing"` entries to the matrix for every existing agent
-4. Implement at least one agent script
-5. Update `README.md`
+4. Implement at least 2-3 agent scripts to prove the lib works
+5. Update the cloud's `README.md`
 
-**Good candidate clouds** have:
-- REST API or simple CLI for provisioning
-- SSH access to the created server
-- Cloud-init or similar userdata support
-- Pay-per-hour pricing (so users can destroy after use)
+**Good candidate clouds:**
+- Container/sandbox platforms (fast spin-up, developer-friendly)
+- GPU clouds (CoreWeave, RunPod, Vast.ai, Together AI)
+- Regional providers with simple APIs (OVH, Scaleway, UpCloud)
+- Any provider with REST API or CLI + SSH/exec + pay-per-hour pricing
+
+### 3. Add a new agent (only with community demand)
+
+Do NOT add agents speculatively. Only add one if there's **real community buzz**:
+
+**Required evidence (at least 2 of these):**
+- 1000+ GitHub stars on the agent's repo
+- Hacker News post with 50+ points (search: `https://hn.algolia.com/api/v1/search?query=AGENT_NAME`)
+- Reddit post with 100+ upvotes in r/LocalLLaMA, r/MachineLearning, or r/ChatGPT
+- Explicit user request in this repo's GitHub issues
+
+**Technical requirements:**
+- Installable via a single command (npm, pip, curl)
+- Accepts API keys via env vars (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY`)
+- Works with OpenRouter (natively or via `OPENAI_BASE_URL` override)
+
+To add: same steps as before (manifest.json entry, matrix entries, implement on 1+ cloud, README).
+
+### 4. Respond to GitHub issues
+
+Check `gh issue list --repo OpenRouterTeam/spawn --state open` for user requests:
+- If someone requests an agent or cloud, implement it and comment with the PR link
+- If something is already implemented, close the issue with a note
+- If a bug is reported, fix it
 
 ### 4. Extend tests
 
