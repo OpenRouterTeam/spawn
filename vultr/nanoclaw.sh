@@ -36,7 +36,7 @@ log_warn "Setting up environment variables..."
 inject_env_vars_ssh "$VULTR_SERVER_IP" upload_file run_server \
     "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
     "ANTHROPIC_API_KEY=$OPENROUTER_API_KEY" \
-    "ANTHROPIC_BASE_URL="https://openrouter.ai/api""
+    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 log_warn "Configuring nanoclaw..."
 DOTENV_TEMP=$(mktemp)

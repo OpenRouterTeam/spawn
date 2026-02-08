@@ -39,7 +39,7 @@ log_warn "Setting up environment variables..."
 inject_env_vars_sprite "$SPRITE_NAME" \
     "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
     "ANTHROPIC_API_KEY=$OPENROUTER_API_KEY" \
-    "ANTHROPIC_BASE_URL="https://openrouter.ai/api""
+    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # Setup openclaw to bypass initial settings
 log_warn "Configuring openclaw..."

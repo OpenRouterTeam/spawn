@@ -44,11 +44,11 @@ OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 log_warn "Setting up environment variables..."
 inject_env_vars_sprite "$SPRITE_NAME" \
     "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
-    "ANTHROPIC_BASE_URL="https://openrouter.ai/api"" \
+    "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
     "ANTHROPIC_AUTH_TOKEN=$OPENROUTER_API_KEY" \
-    "ANTHROPIC_API_KEY=""" \
-    "CLAUDE_CODE_SKIP_ONBOARDING="1"" \
-    "CLAUDE_CODE_ENABLE_TELEMETRY="0""
+    "ANTHROPIC_API_KEY=" \
+    "CLAUDE_CODE_SKIP_ONBOARDING=1" \
+    "CLAUDE_CODE_ENABLE_TELEMETRY=0"
 
 # Setup Claude Code settings to bypass initial setup
 log_warn "Configuring Claude Code..."

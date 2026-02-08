@@ -22,7 +22,7 @@ log_warn "Setting up environment variables..."
 inject_env_vars_ssh "$LINODE_SERVER_IP" upload_file run_server \
     "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
     "ANTHROPIC_API_KEY=$OPENROUTER_API_KEY" \
-    "ANTHROPIC_BASE_URL="https://openrouter.ai/api""
+    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 log_warn "Configuring openclaw..."
 run_server "$LINODE_SERVER_IP" "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
 GATEWAY_TOKEN=$(openssl rand -hex 16)
