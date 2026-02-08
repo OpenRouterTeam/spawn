@@ -1,0 +1,36 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck on all bash scripts
+        run: |
+          # Find all .sh files, excluding node_modules and other irrelevant directories
+          # Note: Using || true temporarily - 3,598 existing warnings need gradual fixes
+          find . -name "*.sh" \
+            ! -path "*/node_modules/*" \
+            ! -path "*/.git/*" \
+            ! -path "*/dist/*" \
+            ! -path "*/build/*" \
+            -print0 | xargs -0 shellcheck || true
+
+      - name: ShellCheck version info
+        if: always()
+        run: shellcheck --version

@@ -396,6 +396,44 @@ spawn/
 
 ---
 
+## Development
+
+### Running ShellCheck Locally
+
+Spawn uses [ShellCheck](https://www.shellcheck.net/) to lint all bash scripts and catch common mistakes.
+
+**Install ShellCheck:**
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install shellcheck
+
+# macOS
+brew install shellcheck
+
+# Fedora
+sudo dnf install ShellCheck
+```
+
+**Run on all scripts:**
+
+```bash
+find . -name "*.sh" \
+  ! -path "*/node_modules/*" \
+  ! -path "*/.git/*" \
+  -exec shellcheck {} +
+```
+
+**Run on a single file:**
+
+```bash
+shellcheck shared/common.sh
+```
+
+The CI pipeline automatically runs shellcheck on all pull requests. See `.shellcheckrc` for configuration.
+
+---
+
 ## Security
 
 ### API Token Storage

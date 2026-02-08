@@ -1,0 +1,6 @@
+# shellcheck configuration for spawn
+# Enable all optional checks for maximum code quality
+enable=all
+
+# Disable specific warnings that conflict with spawn's design patterns
+# (Add suppressions here after initial run if needed)
