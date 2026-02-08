@@ -53,6 +53,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/interpreter.sh)
 ```
 
+#### gptme
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/gptme.sh)
+```
+
 ### Non-Interactive Mode
 
 For automation or CI/CD, set environment variables:
@@ -133,6 +139,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/codex.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/interpreter.sh)
+```
+
+#### gptme
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/gptme.sh)
 ```
 
 ### Non-Interactive Mode
