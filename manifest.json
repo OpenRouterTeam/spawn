@@ -189,6 +189,17 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea."
+    },
+    "plandex": {
+      "name": "Plandex",
+      "description": "Open source AI coding agent for complex tasks",
+      "url": "https://github.com/plandex-ai/plandex",
+      "install": "curl -sL https://plandex.ai/install.sh | bash",
+      "launch": "plandex",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based CLI with sandbox and version control for AI changes."
     }
   },
   "clouds": {
@@ -571,6 +582,20 @@
     "daytona/amazonq": "implemented",
     "daytona/cline": "implemented",
     "daytona/gptme": "implemented",
-    "daytona/opencode": "implemented"
+    "daytona/opencode": "implemented",
+    "sprite/plandex": "implemented",
+    "hetzner/plandex": "implemented",
+    "digitalocean/plandex": "implemented",
+    "vultr/plandex": "implemented",
+    "linode/plandex": "implemented",
+    "lambda/plandex": "implemented",
+    "aws-lightsail/plandex": "implemented",
+    "gcp/plandex": "implemented",
+    "e2b/plandex": "implemented",
+    "modal/plandex": "implemented",
+    "fly/plandex": "implemented",
+    "civo/plandex": "implemented",
+    "scaleway/plandex": "implemented",
+    "daytona/plandex": "implemented"
   }
 }
