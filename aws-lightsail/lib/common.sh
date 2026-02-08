@@ -64,16 +64,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    if [[ -n "${LIGHTSAIL_SERVER_NAME:-}" ]]; then
-        log_info "Using instance name from environment: $LIGHTSAIL_SERVER_NAME"
-        echo "$LIGHTSAIL_SERVER_NAME"; return 0
-    fi
-    local server_name=$(safe_read "Enter Lightsail instance name: ")
-    if [[ -z "$server_name" ]]; then
-        log_error "Instance name is required"
-        log_warn "Set LIGHTSAIL_SERVER_NAME environment variable for non-interactive usage"; return 1
-    fi
-    echo "$server_name"
+    get_resource_name "LIGHTSAIL_SERVER_NAME" "Enter Lightsail instance name: "
 }
 
 get_cloud_init_userdata() {

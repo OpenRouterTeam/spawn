@@ -60,12 +60,8 @@ ensure_hcloud_token() {
     echo -e "${YELLOW}Get your token from: https://console.hetzner.cloud/projects → API Tokens${NC}"
     echo ""
 
-    local token=$(safe_read "Enter your Hetzner API token: ") || return 1
-    if [[ -z "$token" ]]; then
-        log_error "API token cannot be empty"
-        log_warn "For non-interactive usage, set: HCLOUD_TOKEN=your-token"
-        return 1
-    fi
+    local token
+    token=$(validated_read "Enter your Hetzner API token: " validate_api_token) || return 1
 
     # Validate token by making a test API call
     export HCLOUD_TOKEN="$token"
@@ -139,22 +135,8 @@ ensure_ssh_key() {
 
 # Get server name from env var or prompt
 get_server_name() {
-    if [[ -n "${HETZNER_SERVER_NAME:-}" ]]; then
-        log_info "Using server name from environment: $HETZNER_SERVER_NAME"
-        if ! validate_server_name "$HETZNER_SERVER_NAME"; then
-            return 1
-        fi
-        echo "$HETZNER_SERVER_NAME"
-        return 0
-    fi
-
-    local server_name=$(safe_read "Enter server name: ")
-    if [[ -z "$server_name" ]]; then
-        log_error "Server name is required"
-        log_warn "Set HETZNER_SERVER_NAME environment variable for non-interactive usage:"
-        log_warn "  HETZNER_SERVER_NAME=dev-mk1 curl ... | bash"
-        return 1
-    fi
+    local server_name
+    server_name=$(get_resource_name "HETZNER_SERVER_NAME" "Enter server name: ") || return 1
 
     if ! validate_server_name "$server_name"; then
         return 1

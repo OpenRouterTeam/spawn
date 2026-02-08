@@ -62,12 +62,8 @@ ensure_do_token() {
     echo -e "${YELLOW}Get your token from: https://cloud.digitalocean.com/account/api/tokens${NC}"
     echo ""
 
-    local token=$(safe_read "Enter your DigitalOcean API token: ") || return 1
-    if [[ -z "$token" ]]; then
-        log_error "API token cannot be empty"
-        log_warn "For non-interactive usage, set: DO_API_TOKEN=your-token"
-        return 1
-    fi
+    local token
+    token=$(validated_read "Enter your DigitalOcean API token: " validate_api_token) || return 1
 
     # Validate token
     export DO_API_TOKEN="$token"
@@ -143,22 +139,8 @@ ensure_ssh_key() {
 
 # Get server name from env var or prompt
 get_server_name() {
-    if [[ -n "${DO_DROPLET_NAME:-}" ]]; then
-        log_info "Using droplet name from environment: $DO_DROPLET_NAME"
-        if ! validate_server_name "$DO_DROPLET_NAME"; then
-            return 1
-        fi
-        echo "$DO_DROPLET_NAME"
-        return 0
-    fi
-
-    local server_name=$(safe_read "Enter droplet name: ")
-    if [[ -z "$server_name" ]]; then
-        log_error "Droplet name is required"
-        log_warn "Set DO_DROPLET_NAME environment variable for non-interactive usage:"
-        log_warn "  DO_DROPLET_NAME=dev-mk1 curl ... | bash"
-        return 1
-    fi
+    local server_name
+    server_name=$(get_resource_name "DO_DROPLET_NAME" "Enter droplet name: ") || return 1
 
     if ! validate_server_name "$server_name"; then
         return 1

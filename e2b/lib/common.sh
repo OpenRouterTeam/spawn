@@ -64,16 +64,7 @@ EOF
 }
 
 get_server_name() {
-    if [[ -n "$E2B_SANDBOX_NAME" ]]; then
-        log_info "Using sandbox name from environment: $E2B_SANDBOX_NAME"
-        echo "$E2B_SANDBOX_NAME"; return 0
-    fi
-    local name=$(safe_read "Enter sandbox name: ")
-    if [[ -z "$name" ]]; then
-        log_error "Sandbox name is required"
-        log_warn "Set E2B_SANDBOX_NAME environment variable for non-interactive usage"; return 1
-    fi
-    echo "$name"
+    get_resource_name "E2B_SANDBOX_NAME" "Enter sandbox name: "
 }
 
 create_server() {

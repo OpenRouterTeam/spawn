@@ -164,6 +164,114 @@ validate_server_name() {
     return 0
 }
 
+# Validate API token to prevent command injection
+# Allows alphanumeric, dashes, underscores, and common token separators
+# Blocks shell metacharacters: ; ' " < > | & $ ` \ ( )
+validate_api_token() {
+    local token="$1"
+
+    if [[ -z "$token" ]]; then
+        log_error "API token cannot be empty"
+        return 1
+    fi
+
+    # Block shell metacharacters that could enable command injection
+    if [[ "$token" =~ [\;\'\"\<\>\|\&\$\`\\\(\)] ]]; then
+        log_error "Invalid token format: contains shell metacharacters"
+        log_error "Tokens should not contain: ; ' \" < > | & \$ \` \\ ( )"
+        return 1
+    fi
+
+    return 0
+}
+
+# Validate region/location name (cloud provider regions, datacenters, zones)
+# Alphanumeric, hyphens, underscores only, 1-63 chars
+validate_region_name() {
+    local region="$1"
+
+    if [[ -z "$region" ]]; then
+        log_error "Region name cannot be empty"
+        return 1
+    fi
+
+    if [[ ! "$region" =~ ^[a-zA-Z0-9_-]{1,63}$ ]]; then
+        log_error "Invalid region name: '$region'"
+        log_error "Region names must be 1-63 characters: alphanumeric, hyphens, underscores only"
+        return 1
+    fi
+
+    return 0
+}
+
+# Validate resource name (generic: server types, sizes, plans, etc.)
+# Alphanumeric, hyphens, underscores, dots, 1-63 chars
+validate_resource_name() {
+    local name="$1"
+
+    if [[ -z "$name" ]]; then
+        log_error "Resource name cannot be empty"
+        return 1
+    fi
+
+    if [[ ! "$name" =~ ^[a-zA-Z0-9_.-]{1,63}$ ]]; then
+        log_error "Invalid resource name: '$name'"
+        log_error "Resource names must be 1-63 characters: alphanumeric, hyphens, underscores, dots only"
+        return 1
+    fi
+
+    return 0
+}
+
+# Validated read wrapper - reads input and validates it with a validator function
+# Usage: validated_read "prompt" validator_function_name
+# Returns: Validated input via stdout, or exits on error/empty input
+# Example: api_key=$(validated_read "Enter API key: " validate_api_token)
+validated_read() {
+    local prompt="$1"
+    local validator="$2"
+    local value
+
+    while true; do
+        value=$(safe_read "$prompt") || return 1
+
+        if [[ -z "$value" ]]; then
+            return 1
+        fi
+
+        if "$validator" "$value"; then
+            echo "$value"
+            return 0
+        fi
+
+        log_warn "Invalid input. Please try again."
+    done
+}
+
+# Generic function to get resource name from environment or prompt
+# Usage: get_resource_name ENV_VAR_NAME PROMPT_TEXT
+# Returns: Resource name via stdout
+# Example: get_resource_name "LIGHTSAIL_SERVER_NAME" "Enter Lightsail instance name: "
+get_resource_name() {
+    local env_var_name="$1"
+    local prompt_text="$2"
+    local resource_value="${!env_var_name}"
+
+    if [[ -n "$resource_value" ]]; then
+        log_info "Using ${prompt_text%:*} from environment: $resource_value"
+        echo "$resource_value"
+        return 0
+    fi
+
+    local name
+    name=$(safe_read "$prompt_text")
+    if [[ -z "$name" ]]; then
+        log_error "${prompt_text%:*} is required"
+        log_warn "Set $env_var_name environment variable for non-interactive usage"
+        return 1
+    fi
+    echo "$name"
+}
 # Interactively prompt for model ID with validation
 # Usage: get_model_id_interactive [default_model] [agent_name]
 # Returns: Model ID via stdout

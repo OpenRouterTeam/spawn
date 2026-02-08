@@ -54,12 +54,8 @@ ensure_vultr_token() {
     log_warn "Vultr API Key Required"
     echo -e "${YELLOW}Get your API key from: https://my.vultr.com/settings/#settingsapi${NC}"
     echo ""
-    local api_key=$(safe_read "Enter your Vultr API key: ") || return 1
-    if [[ -z "$api_key" ]]; then
-        log_error "API key cannot be empty"
-        log_warn "For non-interactive usage, set: VULTR_API_KEY=your-key"
-        return 1
-    fi
+    local api_key
+    api_key=$(validated_read "Enter your Vultr API key: " validate_api_token) || return 1
     export VULTR_API_KEY="$api_key"
     local response=$(vultr_api GET "/account")
     if echo "$response" | grep -q '"account"'; then
@@ -129,23 +125,13 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    if [[ -n "${VULTR_SERVER_NAME:-}" ]]; then
-        log_info "Using server name from environment: $VULTR_SERVER_NAME"
-        if ! validate_server_name "$VULTR_SERVER_NAME"; then
-            return 1
-        fi
-        echo "$VULTR_SERVER_NAME"
-        return 0
-    fi
-    local server_name=$(safe_read "Enter server name: ")
-    if [[ -z "$server_name" ]]; then
-        log_error "Server name is required"
-        log_warn "Set VULTR_SERVER_NAME environment variable for non-interactive usage"
-        return 1
-    fi
+    local server_name
+    server_name=$(get_resource_name "VULTR_SERVER_NAME" "Enter server name: ") || return 1
+
     if ! validate_server_name "$server_name"; then
         return 1
     fi
+
     echo "$server_name"
 }
 

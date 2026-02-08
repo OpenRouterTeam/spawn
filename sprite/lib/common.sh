@@ -29,24 +29,8 @@ ensure_sprite_authenticated() {
 
 # Prompt for sprite name
 get_sprite_name() {
-    # Check if SPRITE_NAME is already set in environment
-    if [[ -n "${SPRITE_NAME:-}" ]]; then
-        log_info "Using sprite name from environment: $SPRITE_NAME"
-        if ! validate_server_name "$SPRITE_NAME"; then
-            return 1
-        fi
-        echo "$SPRITE_NAME"
-        return 0
-    fi
-
-    # Try to read interactively
-    local sprite_name=$(safe_read "Enter sprite name: ")
-    if [[ -z "$sprite_name" ]]; then
-        log_error "Sprite name is required"
-        log_warn "Set SPRITE_NAME environment variable for non-interactive usage:"
-        log_warn "  SPRITE_NAME=dev-mk1 curl ... | bash"
-        return 1
-    fi
+    local sprite_name
+    sprite_name=$(get_resource_name "SPRITE_NAME" "Enter sprite name: ") || return 1
 
     if ! validate_server_name "$sprite_name"; then
         return 1

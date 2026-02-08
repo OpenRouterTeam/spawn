@@ -47,12 +47,8 @@ ensure_linode_token() {
     fi
     echo ""; log_warn "Linode API Token Required"
     echo -e "${YELLOW}Get your token from: https://cloud.linode.com/profile/tokens${NC}"; echo ""
-    local token=$(safe_read "Enter your Linode API token: ") || return 1
-    if [[ -z "$token" ]]; then
-        log_error "API token cannot be empty"
-        log_warn "For non-interactive usage, set: LINODE_API_TOKEN=your-token"
-        return 1
-    fi
+    local token
+    token=$(validated_read "Enter your Linode API token: " validate_api_token) || return 1
     export LINODE_API_TOKEN="$token"
     local response=$(linode_api GET "/profile")
     if echo "$response" | grep -q '"username"'; then
@@ -113,21 +109,13 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    if [[ -n "${LINODE_SERVER_NAME:-}" ]]; then
-        log_info "Using server name from environment: $LINODE_SERVER_NAME"
-        if ! validate_server_name "$LINODE_SERVER_NAME"; then
-            return 1
-        fi
-        echo "$LINODE_SERVER_NAME"; return 0
-    fi
-    local server_name=$(safe_read "Enter Linode label: ")
-    if [[ -z "$server_name" ]]; then
-        log_error "Server name is required"
-        log_warn "Set LINODE_SERVER_NAME environment variable for non-interactive usage"; return 1
-    fi
+    local server_name
+    server_name=$(get_resource_name "LINODE_SERVER_NAME" "Enter Linode label: ") || return 1
+
     if ! validate_server_name "$server_name"; then
         return 1
     fi
+
     echo "$server_name"
 }
 

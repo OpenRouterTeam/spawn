@@ -57,16 +57,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    if [[ -n "${GCP_INSTANCE_NAME:-}" ]]; then
-        log_info "Using instance name from environment: $GCP_INSTANCE_NAME"
-        echo "$GCP_INSTANCE_NAME"; return 0
-    fi
-    local server_name=$(safe_read "Enter instance name: ")
-    if [[ -z "$server_name" ]]; then
-        log_error "Instance name is required"
-        log_warn "Set GCP_INSTANCE_NAME environment variable for non-interactive usage"; return 1
-    fi
-    echo "$server_name"
+    get_resource_name "GCP_INSTANCE_NAME" "Enter instance name: "
 }
 
 get_cloud_init_userdata() {

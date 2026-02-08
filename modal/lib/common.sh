@@ -42,16 +42,7 @@ ensure_modal_cli() {
 }
 
 get_server_name() {
-    if [[ -n "${MODAL_SANDBOX_NAME:-}" ]]; then
-        log_info "Using sandbox name from environment: $MODAL_SANDBOX_NAME"
-        echo "$MODAL_SANDBOX_NAME"; return 0
-    fi
-    local name=$(safe_read "Enter sandbox name: ")
-    if [[ -z "$name" ]]; then
-        log_error "Sandbox name is required"
-        log_warn "Set MODAL_SANDBOX_NAME environment variable for non-interactive usage"; return 1
-    fi
-    echo "$name"
+    get_resource_name "MODAL_SANDBOX_NAME" "Enter sandbox name: "
 }
 
 create_server() {
