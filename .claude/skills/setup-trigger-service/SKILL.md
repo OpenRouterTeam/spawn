@@ -198,7 +198,7 @@ jobs:
           SPRITE_NAME: ${{ secrets.<SERVICE_NAME>_SPRITE_NAME }}
           SERVICE_NAME: ${{ secrets.<SERVICE_NAME>_SERVICE_NAME }}
         run: |
-          curl -sf -X POST "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SERVICE_NAME}/start" \
+          curl -s -X POST "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SERVICE_NAME}/start?duration=0s" \
             -H "Authorization: Bearer ${SPRITE_TOKEN}"
 ```
 
