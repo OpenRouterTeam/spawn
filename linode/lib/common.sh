@@ -80,18 +80,18 @@ EOF
     log_info "API token saved to $config_file"
 }
 
-ensure_ssh_key() {
-    local key_path="$HOME/.ssh/id_ed25519" pub_path="${key_path}.pub"
-    generate_ssh_key_if_missing "$key_path"
-    local fingerprint
-    fingerprint=$(get_ssh_fingerprint "$pub_path")
+# Check if SSH key is registered with Linode
+linode_check_ssh_key() {
+    local fingerprint="$1"
     local existing_keys
     existing_keys=$(linode_api GET "/profile/sshkeys")
-    if echo "$existing_keys" | grep -q "$fingerprint"; then
-        log_info "SSH key already registered with Linode"; return 0
-    fi
-    log_warn "Registering SSH key with Linode..."
-    local key_name="spawn-$(hostname)-$(date +%s)"
+    echo "$existing_keys" | grep -q "$fingerprint"
+}
+
+# Register SSH key with Linode
+linode_register_ssh_key() {
+    local key_name="$1"
+    local pub_path="$2"
     local pub_key
     pub_key=$(cat "$pub_path")
     local json_pub_key
@@ -99,11 +99,10 @@ ensure_ssh_key() {
     local register_body="{\"label\":\"$key_name\",\"ssh_key\":$json_pub_key}"
     local register_response
     register_response=$(linode_api POST "/profile/sshkeys" "$register_body")
-    if echo "$register_response" | grep -q '"id"'; then
-        log_info "SSH key registered with Linode"
-    else
-        log_error "Failed to register SSH key with Linode"
 
+    if echo "$register_response" | grep -q '"id"'; then
+        return 0
+    else
         # Parse error details
         local error_msg print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')" 2>/dev/null || echo "$register_response")
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]);
@@ -115,6 +114,10 @@ ensure_ssh_key() {
         log_warn "  - API token lacks write permissions"
         return 1
     fi
+}
+
+ensure_ssh_key() {
+    ensure_ssh_key_with_provider linode_check_ssh_key linode_register_ssh_key "Linode"
 }
 
 get_server_name() {

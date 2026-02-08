@@ -31,91 +31,45 @@ hetzner_api() {
     generic_cloud_api "$HETZNER_API_BASE" "$HCLOUD_TOKEN" "$method" "$endpoint" "$body"
 }
 
-# Ensure HCLOUD_TOKEN is available (env var → config file → prompt+save)
-ensure_hcloud_token() {
-    # Check Python 3 is available (required for JSON parsing)
-    check_python_available || return 1
-
-    # 1. Check environment variable
-    if [[ -n "${HCLOUD_TOKEN:-}" ]]; then
-        log_info "Using Hetzner API token from environment"
-        return 0
-    fi
-
-    # 2. Check config file
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/hetzner.json"
-    if [[ -f "$config_file" ]]; then
-        local saved_token 2>/dev/null)
-        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))"
-        if [[ -n "$saved_token" ]]; then
-            export HCLOUD_TOKEN="$saved_token"
-            log_info "Using Hetzner API token from $config_file"
-            return 0
-        fi
-    fi
-
-    # 3. Prompt and save
-    echo ""
-    log_warn "Hetzner Cloud API Token Required"
-    log_warn "Get your token from: https://console.hetzner.cloud/projects → API Tokens"
-    echo ""
-
-    local token
-    token=$(validated_read "Enter your Hetzner API token: " validate_api_token) || return 1
-
-    # Validate token by making a test API call
-    export HCLOUD_TOKEN="$token"
+test_hcloud_token() {
     local response
     response=$(hetzner_api GET "/servers?per_page=1")
     if echo "$response" | grep -q '"error"'; then
-        log_error "Authentication failed: Invalid Hetzner API token"
-
         # Parse error details
-        local error_msg print(d.get('error',{}).get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-
         log_warn "Remediation steps:"
         log_warn "  1. Verify token at: https://console.hetzner.cloud/projects → API Tokens"
         log_warn "  2. Ensure the token has read/write permissions"
         log_warn "  3. Check token hasn't expired"
-        unset HCLOUD_TOKEN
         return 1
     fi
-
-    # Save to config file
-    mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "token": "$token"
-}
-EOF
-    chmod 600 "$config_file"
-    log_info "API token saved to $config_file"
+    return 0
 }
 
-# Ensure SSH key exists locally and is registered with Hetzner
-ensure_ssh_key() {
-    local key_path="$HOME/.ssh/id_ed25519"
-    local pub_path="${key_path}.pub"
+# Ensure HCLOUD_TOKEN is available (env var → config file → prompt+save)
+ensure_hcloud_token() {
+    ensure_api_token_with_provider \
+        "Hetzner Cloud" \
+        "HCLOUD_TOKEN" \
+        "$HOME/.config/spawn/hetzner.json" \
+        "https://console.hetzner.cloud/projects → API Tokens" \
+        "test_hcloud_token"
+}
 
-    # Generate key if needed
-    generate_ssh_key_if_missing "$key_path"
-
-    # Check if already registered
-    local fingerprint
-    fingerprint=$(get_ssh_fingerprint "$pub_path")
+# Check if SSH key is registered with Hetzner
+hetzner_check_ssh_key() {
+    local fingerprint="$1"
     local existing_keys
     existing_keys=$(hetzner_api GET "/ssh_keys")
-    if echo "$existing_keys" | grep -q "$fingerprint"; then
-        log_info "SSH key already registered with Hetzner"
-        return 0
-    fi
+    echo "$existing_keys" | grep -q "$fingerprint"
+}
 
-    # Register the key
-    log_warn "Registering SSH key with Hetzner..."
-    local key_name="spawn-$(hostname)-$(date +%s)"
+# Register SSH key with Hetzner
+hetzner_register_ssh_key() {
+    local key_name="$1"
+    local pub_path="$2"
     local pub_key
     pub_key=$(cat "$pub_path")
     local json_pub_key
@@ -125,8 +79,6 @@ ensure_ssh_key() {
     register_response=$(hetzner_api POST "/ssh_keys" "$register_body")
 
     if echo "$register_response" | grep -q '"error"'; then
-        log_error "Failed to register SSH key with Hetzner"
-
         # Parse error details
         local error_msg print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
@@ -139,7 +91,12 @@ ensure_ssh_key() {
         return 1
     fi
 
-    log_info "SSH key registered with Hetzner"
+    return 0
+}
+
+# Ensure SSH key exists locally and is registered with Hetzner
+ensure_ssh_key() {
+    ensure_ssh_key_with_provider hetzner_check_ssh_key hetzner_register_ssh_key "Hetzner"
 }
 
 # Get server name from env var or prompt

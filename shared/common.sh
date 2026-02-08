@@ -903,3 +903,140 @@ wait_for_cloud_init() {
     local max_attempts=${2:-60}
     generic_ssh_wait "$ip" "$SSH_OPTS" "test -f /root/.cloud-init-complete" "cloud-init" "$max_attempts" 5
 }
+
+# ============================================================
+# API token management helpers
+# ============================================================
+
+# Generic ensure API token function - eliminates duplication across providers
+# Usage: ensure_api_token_with_provider PROVIDER_NAME ENV_VAR_NAME CONFIG_FILE HELP_URL TEST_FUNC
+# Example: ensure_api_token_with_provider "Lambda" "LAMBDA_API_KEY" "$HOME/.config/spawn/lambda.json" \
+#            "https://cloud.lambdalabs.com/api-keys" test_lambda_token
+# TEST_FUNC should be a function that validates the token and returns 0 on success, 1 on failure
+# TEST_FUNC is optional - if empty, no validation is performed
+ensure_api_token_with_provider() {
+    local provider_name="$1"
+    local env_var_name="$2"
+    local config_file="$3"
+    local help_url="$4"
+    local test_func="${5:-}"
+
+    # Check Python 3 is available (required for JSON parsing)
+    check_python_available || return 1
+
+    # 1. Check environment variable
+    local env_value="${!env_var_name}"
+    if [[ -n "$env_value" ]]; then
+        log_info "Using $provider_name API token from environment"
+        return 0
+    fi
+
+    # 2. Check config file
+    if [[ -f "$config_file" ]]; then
+        local saved_token
+        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key','') or json.load(open('$config_file')).get('token',''))" 2>/dev/null)
+        if [[ -n "$saved_token" ]]; then
+            export "$env_var_name=$saved_token"
+            log_info "Using $provider_name API token from $config_file"
+            return 0
+        fi
+    fi
+
+    # 3. Prompt and save
+    echo ""
+    log_warn "$provider_name API Token Required"
+    log_warn "Get your token from: $help_url"
+    echo ""
+
+    local token
+    token=$(validated_read "Enter your $provider_name API token: " validate_api_token) || return 1
+
+    # Validate token with provider API if test function provided
+    export "$env_var_name=$token"
+    if [[ -n "$test_func" ]]; then
+        if ! "$test_func"; then
+            log_error "Authentication failed: Invalid $provider_name API token"
+            unset "$env_var_name"
+            return 1
+        fi
+    fi
+
+    # Save to config file
+    local config_dir
+    config_dir=$(dirname "$config_file")
+    mkdir -p "$config_dir"
+
+    # Save with both "api_key" and "token" for compatibility
+    cat > "$config_file" << EOF
+{
+  "api_key": "$token",
+  "token": "$token"
+}
+EOF
+    chmod 600 "$config_file"
+    log_info "API token saved to $config_file"
+}
+
+# ============================================================
+# SSH key registration helpers
+# ============================================================
+
+# Generic SSH key registration pattern used by all cloud providers
+# Eliminates ~220 lines of duplicate code across 5 provider libraries
+#
+# Usage: ensure_ssh_key_with_provider \
+#          CHECK_CALLBACK \
+#          REGISTER_CALLBACK \
+#          PROVIDER_NAME \
+#          [KEY_PATH]
+#
+# Arguments:
+#   CHECK_CALLBACK    - Function that checks if SSH key exists with provider
+#                       Should return 0 if key exists, 1 if not
+#                       Function receives: fingerprint, pub_key_path
+#   REGISTER_CALLBACK - Function that registers SSH key with provider
+#                       Should return 0 on success, 1 on error
+#                       Function receives: key_name, pub_key_path
+#   PROVIDER_NAME     - Display name of the provider (for logging)
+#   KEY_PATH          - Optional: Path to SSH private key (default: $HOME/.ssh/id_ed25519)
+#
+# Example:
+#   ensure_ssh_key_with_provider \
+#     hetzner_check_ssh_key \
+#     hetzner_register_ssh_key \
+#     "Hetzner"
+#
+# Callback implementations should use provider-specific API calls but follow
+# this contract to enable shared logic for key generation and registration flow.
+ensure_ssh_key_with_provider() {
+    local check_callback="$1"
+    local register_callback="$2"
+    local provider_name="$3"
+    local key_path="${4:-$HOME/.ssh/id_ed25519}"
+    local pub_path="${key_path}.pub"
+
+    # Generate key if needed (shared function)
+    generate_ssh_key_if_missing "$key_path"
+
+    # Get fingerprint (shared function)
+    local fingerprint
+    fingerprint=$(get_ssh_fingerprint "$pub_path")
+
+    # Check if already registered (provider-specific)
+    if "$check_callback" "$fingerprint" "$pub_path"; then
+        log_info "SSH key already registered with $provider_name"
+        return 0
+    fi
+
+    # Register the key (provider-specific)
+    log_warn "Registering SSH key with $provider_name..."
+    local key_name="spawn-$(hostname)-$(date +%s)"
+
+    if "$register_callback" "$key_name" "$pub_path"; then
+        log_info "SSH key registered with $provider_name"
+        return 0
+    else
+        log_error "Failed to register SSH key with $provider_name"
+        return 1
+    fi
+}

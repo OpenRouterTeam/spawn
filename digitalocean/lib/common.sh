@@ -33,93 +33,47 @@ do_api() {
     generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" "$method" "$endpoint" "$body"
 }
 
-# Ensure DO_API_TOKEN is available (env var -> config file -> prompt+save)
-ensure_do_token() {
-    # Check Python 3 is available (required for JSON parsing)
-    check_python_available || return 1
-
-    # 1. Check environment variable
-    if [[ -n "${DO_API_TOKEN:-}" ]]; then
-        log_info "Using DigitalOcean API token from environment"
-        return 0
-    fi
-
-    # 2. Check config file
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/digitalocean.json"
-    if [[ -f "$config_file" ]]; then
-        local saved_token 2>/dev/null)
-        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))"
-        if [[ -n "$saved_token" ]]; then
-            export DO_API_TOKEN="$saved_token"
-            log_info "Using DigitalOcean API token from $config_file"
-            return 0
-        fi
-    fi
-
-    # 3. Prompt and save
-    echo ""
-    log_warn "DigitalOcean API Token Required"
-    log_warn "Get your token from: https://cloud.digitalocean.com/account/api/tokens"
-    echo ""
-
-    local token
-    token=$(validated_read "Enter your DigitalOcean API token: " validate_api_token) || return 1
-
-    # Validate token
-    export DO_API_TOKEN="$token"
+test_do_token() {
     local response
     response=$(do_api GET "/account")
     if echo "$response" | grep -q '"id"'; then
         log_info "API token validated"
+        return 0
     else
-        log_error "Authentication failed: Invalid DigitalOcean API token"
-
         # Parse error details if available
-        local error_msg print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-
         log_warn "Remediation steps:"
         log_warn "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
         log_warn "  2. Ensure the token has read/write permissions"
         log_warn "  3. Check token hasn't expired or been revoked"
-        unset DO_API_TOKEN
         return 1
     fi
-
-    # Save to config file
-    mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "token": "$token"
-}
-EOF
-    chmod 600 "$config_file"
-    log_info "API token saved to $config_file"
 }
 
-# Ensure SSH key exists locally and is registered with DigitalOcean
-ensure_ssh_key() {
-    local key_path="$HOME/.ssh/id_ed25519"
-    local pub_path="${key_path}.pub"
+# Ensure DO_API_TOKEN is available (env var -> config file -> prompt+save)
+ensure_do_token() {
+    ensure_api_token_with_provider \
+        "DigitalOcean" \
+        "DO_API_TOKEN" \
+        "$HOME/.config/spawn/digitalocean.json" \
+        "https://cloud.digitalocean.com/account/api/tokens" \
+        "test_do_token"
+}
 
-    # Generate key if needed
-    generate_ssh_key_if_missing "$key_path"
-
-    # Check if already registered
-    local fingerprint
-    fingerprint=$(get_ssh_fingerprint "$pub_path")
+# Check if SSH key is registered with DigitalOcean
+do_check_ssh_key() {
+    local fingerprint="$1"
     local existing_keys
     existing_keys=$(do_api GET "/account/keys")
-    if echo "$existing_keys" | grep -q "$fingerprint"; then
-        log_info "SSH key already registered with DigitalOcean"
-        return 0
-    fi
+    echo "$existing_keys" | grep -q "$fingerprint"
+}
 
-    # Register the key
-    log_warn "Registering SSH key with DigitalOcean..."
-    local key_name="spawn-$(hostname)-$(date +%s)"
+# Register SSH key with DigitalOcean
+do_register_ssh_key() {
+    local key_name="$1"
+    local pub_path="$2"
     local pub_key
     pub_key=$(cat "$pub_path")
     local json_pub_key
@@ -129,10 +83,8 @@ ensure_ssh_key() {
     register_response=$(do_api POST "/account/keys" "$register_body")
 
     if echo "$register_response" | grep -q '"id"'; then
-        log_info "SSH key registered with DigitalOcean"
+        return 0
     else
-        log_error "Failed to register SSH key with DigitalOcean"
-
         # Parse error details
         local error_msg print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
@@ -144,6 +96,11 @@ ensure_ssh_key() {
         log_warn "  - API token lacks write permissions"
         return 1
     fi
+}
+
+# Ensure SSH key exists locally and is registered with DigitalOcean
+ensure_ssh_key() {
+    ensure_ssh_key_with_provider do_check_ssh_key do_register_ssh_key "DigitalOcean"
 }
 
 # Get server name from env var or prompt

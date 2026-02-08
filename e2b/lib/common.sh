@@ -37,32 +37,12 @@ ensure_e2b_cli() {
 }
 
 ensure_e2b_token() {
-    if [[ -n "$E2B_API_KEY" ]]; then
-        log_info "Using E2B API key from environment"; return 0
-    fi
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/e2b.json"
-    if [[ -f "$config_file" ]]; then
-        local saved_key
-        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))" 2>/dev/null)
-        if [[ -n "$saved_key" ]]; then
-            export E2B_API_KEY="$saved_key"
-            log_info "Using E2B API key from $config_file"; return 0
-        fi
-    fi
-    echo ""; log_warn "E2B API Key Required"
-    log_warn "Get your API key from: https://e2b.dev/dashboard"; echo ""
-    local api_key
-    api_key=$(validated_read "Enter your E2B API key: " validate_api_token) || return 1
-    export E2B_API_KEY="$api_key"
-    mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "api_key": "$api_key"
-}
-EOF
-    chmod 600 "$config_file"
-    log_info "API key saved to $config_file"
+    ensure_api_token_with_provider \
+        "E2B" \
+        "E2B_API_KEY" \
+        "$HOME/.config/spawn/e2b.json" \
+        "https://e2b.dev/dashboard" \
+        ""
 }
 
 get_server_name() {

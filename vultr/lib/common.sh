@@ -87,26 +87,18 @@ EOF
     log_info "API key saved to $config_file"
 }
 
-ensure_ssh_key() {
-    local key_path="$HOME/.ssh/id_ed25519"
-    local pub_path="${key_path}.pub"
-
-    # Generate key if needed
-    generate_ssh_key_if_missing "$key_path"
-
-    # Check if already registered
-    local fingerprint
-    fingerprint=$(get_ssh_fingerprint "$pub_path")
+# Check if SSH key is registered with Vultr
+vultr_check_ssh_key() {
+    local fingerprint="$1"
     local existing_keys
     existing_keys=$(vultr_api GET "/ssh-keys")
-    if echo "$existing_keys" | grep -q "$fingerprint"; then
-        log_info "SSH key already registered with Vultr"
-        return 0
-    fi
+    echo "$existing_keys" | grep -q "$fingerprint"
+}
 
-    # Register the key
-    log_warn "Registering SSH key with Vultr..."
-    local key_name="spawn-$(hostname)-$(date +%s)"
+# Register SSH key with Vultr
+vultr_register_ssh_key() {
+    local key_name="$1"
+    local pub_path="$2"
     local pub_key
     pub_key=$(cat "$pub_path")
     local json_pub_key
@@ -116,10 +108,8 @@ ensure_ssh_key() {
     register_response=$(vultr_api POST "/ssh-keys" "$register_body")
 
     if echo "$register_response" | grep -q '"ssh_key"'; then
-        log_info "SSH key registered with Vultr"
+        return 0
     else
-        log_error "Failed to register SSH key with Vultr"
-
         # Parse error details
         local error_msg print(d.get('error','Unknown error'))" 2>/dev/null || echo "$register_response")
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
@@ -131,6 +121,10 @@ ensure_ssh_key() {
         log_warn "  - API key lacks write permissions"
         return 1
     fi
+}
+
+ensure_ssh_key() {
+    ensure_ssh_key_with_provider vultr_check_ssh_key vultr_register_ssh_key "Vultr"
 }
 
 get_server_name() {

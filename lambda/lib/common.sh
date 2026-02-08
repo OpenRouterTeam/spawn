@@ -33,71 +33,55 @@ lambda_api() {
     curl "${args[@]}" "${LAMBDA_API_BASE}${endpoint}"
 }
 
-ensure_lambda_token() {
-    if [[ -n "${LAMBDA_API_KEY:-}" ]]; then
-        log_info "Using Lambda API key from environment"; return 0
-    fi
-    local config_dir="$HOME/.config/spawn" config_file="$config_dir/lambda.json"
-    if [[ -f "$config_file" ]]; then
-        local saved_key 2>/dev/null)
-        saved_key=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))"
-        if [[ -n "$saved_key" ]]; then
-            export LAMBDA_API_KEY="$saved_key"
-            log_info "Using Lambda API key from $config_file"; return 0
-        fi
-    fi
-    echo ""; log_warn "Lambda Cloud API Key Required"
-    log_warn "Get your API key from: https://cloud.lambdalabs.com/api-keys"; echo ""
-    local api_key
-    api_key=$(validated_read "Enter your Lambda API key: " validate_api_token) || return 1
-    export LAMBDA_API_KEY="$api_key"
+test_lambda_token() {
     local test_response
     test_response=$(lambda_api GET "/instances")
     if echo "$test_response" | grep -q '"error"'; then
-        log_error "Invalid API key"; unset LAMBDA_API_KEY; return 1
+        log_error "Invalid API key"
+        return 1
     fi
-    mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "api_key": "$api_key"
-}
-EOF
-    chmod 600 "$config_file"
-    log_info "API key saved to $config_file"
+    return 0
 }
 
-ensure_ssh_key() {
-    local key_path="$HOME/.ssh/id_ed25519"
-    local pub_path="${key_path}.pub"
+ensure_lambda_token() {
+    ensure_api_token_with_provider \
+        "Lambda Cloud" \
+        "LAMBDA_API_KEY" \
+        "$HOME/.config/spawn/lambda.json" \
+        "https://cloud.lambdalabs.com/api-keys" \
+        "test_lambda_token"
+}
 
-    # Generate key if needed
-    generate_ssh_key_if_missing "$key_path"
-
-    local pub_key
-    pub_key=$(cat "$pub_path")
-    # Check if key is already registered
+# Check if SSH key is registered with Lambda Cloud
+lambda_check_ssh_key() {
+    local fingerprint="$1"
     local existing_keys
     existing_keys=$(lambda_api GET "/ssh-keys")
-    local fingerprint
-    fingerprint=$(get_ssh_fingerprint "$pub_path")
-    if echo "$existing_keys" | grep -q "$fingerprint"; then
-        log_info "SSH key already registered with Lambda Cloud"
-        return 0
-    fi
+    echo "$existing_keys" | grep -q "$fingerprint"
+}
 
-    log_warn "Registering SSH key with Lambda Cloud..."
-    local key_name="spawn-$(hostname)-$(date +%s)"
+# Register SSH key with Lambda Cloud
+lambda_register_ssh_key() {
+    local key_name="$1"
+    local pub_path="$2"
+    local pub_key
+    pub_key=$(cat "$pub_path")
     local json_pub_key
     json_pub_key=$(json_escape "$pub_key")
     local register_body="{\"name\":\"$key_name\",\"public_key\":$json_pub_key}"
     local register_response
     register_response=$(lambda_api POST "/ssh-keys" "$register_body")
+
     if echo "$register_response" | grep -q '"id"'; then
-        log_info "SSH key registered with Lambda Cloud"
+        return 0
     else
         log_error "Failed to register SSH key: $register_response"
         return 1
     fi
+}
+
+ensure_ssh_key() {
+    ensure_ssh_key_with_provider lambda_check_ssh_key lambda_register_ssh_key "Lambda Cloud"
 }
 
 get_server_name() {
