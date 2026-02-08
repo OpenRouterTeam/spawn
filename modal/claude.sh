@@ -17,7 +17,14 @@ ensure_modal_cli
 
 # 2. Get sandbox name and create sandbox
 SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
+create_server "$SERVER_NAME" || {
+    log_error "Failed to create Modal sandbox"
+    exit 1
+}
+if [[ -z "$MODAL_SANDBOX_ID" ]]; then
+    log_error "MODAL_SANDBOX_ID not set after create_server"
+    exit 1
+fi
 
 # 3. Wait for base tools
 wait_for_cloud_init
