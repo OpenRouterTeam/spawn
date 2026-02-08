@@ -96,6 +96,8 @@ When fixing a bug reported in a GitHub issue:
 7. Switch back to main: git checkout main && git pull origin main
 
 NEVER leave an issue open after the fix is merged. NEVER leave a PR unmerged.
+If a PR cannot be merged (conflicts, superseded, etc.), close it WITH a comment explaining why.
+NEVER close a PR silently — every closed PR MUST have a comment.
 The full cycle is: branch -> fix -> PR (references issue) -> merge PR -> close issue.
 
 ## Workflow
