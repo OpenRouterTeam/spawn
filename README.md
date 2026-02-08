@@ -447,6 +447,16 @@ spawn/
 
 ## Development
 
+### Setup
+
+```bash
+git clone https://github.com/OpenRouterTeam/spawn.git
+cd spawn
+git config core.hooksPath .githooks
+```
+
+The pre-commit hook validates all staged `.sh` files: syntax check, no relative sources, no `echo -e`, no `set -u`, no references to deleted functions.
+
 ### Running ShellCheck Locally
 
 Spawn uses [ShellCheck](https://www.shellcheck.net/) to lint all bash scripts and catch common mistakes.
