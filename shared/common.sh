@@ -70,10 +70,10 @@ safe_read() {
 
     if [[ -t 0 ]]; then
         # stdin is a terminal - read directly
-        read -p "${prompt}" result
+        read -r -p "${prompt}" result
     elif echo -n "" > /dev/tty 2>/dev/null; then
         # /dev/tty is functional - use it
-        read -p "${prompt}" result < /dev/tty
+        read -r -p "${prompt}" result < /dev/tty
     else
         # No interactive input available
         log_error "Cannot read input: no TTY available"
@@ -655,7 +655,7 @@ cleanup_temp_files() {
         fi
     done
 
-    return ${exit_code}
+    return "${exit_code}"
 }
 
 # Register cleanup trap handler
@@ -918,6 +918,7 @@ generic_ssh_wait() {
 
     log_warn "Waiting for ${description} to ${ip}..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
+        # shellcheck disable=SC2086
         if ssh ${ssh_opts} "${username}@${ip}" "${test_cmd}" >/dev/null 2>&1; then
             log_info "${description} ready after ${elapsed_time}s (attempt ${attempt})"
             return 0

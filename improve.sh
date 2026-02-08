@@ -80,8 +80,6 @@ print(sum(1 for v in m.get('matrix', {}).values() if v == 'missing'))
 
 # Build the team prompt — this is what the lead sees
 build_team_prompt() {
-    local gaps
-    gaps=$(count_gaps)
     local summary
     summary=$(get_matrix_summary)
 
