@@ -30,6 +30,14 @@ log_error() {
 }
 
 # ============================================================
+# Configurable timing constants
+# ============================================================
+
+# Polling interval for OAuth code waiting and other wait loops
+# Set SPAWN_POLL_INTERVAL=0.1 for faster testing, or higher for slow networks
+POLL_INTERVAL="${SPAWN_POLL_INTERVAL:-1}"
+
+# ============================================================
 # Dependency checks
 # ============================================================
 
@@ -377,8 +385,8 @@ wait_for_oauth_code() {
     local elapsed=0
 
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
-        sleep 1
-        elapsed=$((elapsed + 1))
+        sleep "${POLL_INTERVAL}"
+        elapsed=$((elapsed + POLL_INTERVAL))
     done
 
     [[ -f "${code_file}" ]]
@@ -478,7 +486,7 @@ try_oauth_flow() {
     local server_pid
     server_pid=$(start_oauth_server "${callback_port}" "${code_file}")
 
-    sleep 1
+    sleep "${POLL_INTERVAL}"
     if ! kill -0 "${server_pid}" 2>/dev/null; then
         log_warn "Failed to start OAuth server (port may be in use)"
         cleanup_oauth_session "" "${oauth_dir}"
