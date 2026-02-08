@@ -28,7 +28,7 @@ create_server "${DROPLET_NAME}"
 
 # 4. Wait for SSH and cloud-init
 verify_server_connectivity "${DO_SERVER_IP}"
-wait_for_cloud_init "${DO_SERVER_IP}"
+wait_for_cloud_init "${DO_SERVER_IP}" 60
 
 # 5. Verify Claude Code is installed (fallback to manual install)
 log_warn "Verifying Claude Code installation..."

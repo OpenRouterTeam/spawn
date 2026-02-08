@@ -11,7 +11,7 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
-wait_for_cloud_init "${LINODE_SERVER_IP}"
+wait_for_cloud_init "${LINODE_SERVER_IP}" 60
 log_warn "Installing Cline..."
 run_server "${LINODE_SERVER_IP}" "npm install -g cline"
 log_info "Cline installed"

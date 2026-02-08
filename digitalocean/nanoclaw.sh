@@ -25,7 +25,7 @@ create_server "${DROPLET_NAME}"
 
 # 4. Wait for SSH and cloud-init
 verify_server_connectivity "${DO_SERVER_IP}"
-wait_for_cloud_init "${DO_SERVER_IP}"
+wait_for_cloud_init "${DO_SERVER_IP}" 60
 
 # 5. Install Node.js deps and clone nanoclaw
 log_warn "Installing tsx..."

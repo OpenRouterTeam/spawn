@@ -18,7 +18,7 @@ ensure_ssh_key
 DROPLET_NAME=$(get_server_name)
 create_server "${DROPLET_NAME}"
 verify_server_connectivity "${DO_SERVER_IP}"
-wait_for_cloud_init "${DO_SERVER_IP}"
+wait_for_cloud_init "${DO_SERVER_IP}" 60
 
 log_warn "Installing Gemini CLI..."
 run_server "${DO_SERVER_IP}" "npm install -g @google/gemini-cli"

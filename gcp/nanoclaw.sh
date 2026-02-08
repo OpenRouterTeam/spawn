@@ -25,7 +25,7 @@ create_server "${SERVER_NAME}"
 
 # 4. Wait for SSH and cloud-init
 verify_server_connectivity "${GCP_SERVER_IP}"
-wait_for_cloud_init "${GCP_SERVER_IP}"
+wait_for_cloud_init "${GCP_SERVER_IP}" 60
 
 # 5. Install Node.js deps and clone nanoclaw
 log_warn "Installing tsx..."

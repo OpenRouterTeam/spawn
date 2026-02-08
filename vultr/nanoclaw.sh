@@ -18,7 +18,7 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${VULTR_SERVER_IP}"
-wait_for_cloud_init "${VULTR_SERVER_IP}"
+wait_for_cloud_init "${VULTR_SERVER_IP}" 60
 
 log_warn "Installing tsx..."
 run_server "${VULTR_SERVER_IP}" "source ~/.bashrc && bun install -g tsx"

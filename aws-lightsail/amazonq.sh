@@ -25,7 +25,7 @@ create_server "${SERVER_NAME}"
 
 # 4. Wait for SSH and cloud-init
 verify_server_connectivity "${LIGHTSAIL_SERVER_IP}"
-wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}"
+wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}" 60
 
 # 5. Install Amazon Q CLI
 log_warn "Installing Amazon Q CLI..."

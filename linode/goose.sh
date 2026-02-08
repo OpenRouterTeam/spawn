@@ -11,7 +11,7 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
-wait_for_cloud_init "${LINODE_SERVER_IP}"
+wait_for_cloud_init "${LINODE_SERVER_IP}" 60
 log_warn "Installing Goose..."
 run_server "${LINODE_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 log_info "Goose installed"

@@ -18,7 +18,7 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${VULTR_SERVER_IP}"
-wait_for_cloud_init "${VULTR_SERVER_IP}"
+wait_for_cloud_init "${VULTR_SERVER_IP}" 60
 
 log_warn "Verifying Claude Code installation..."
 if ! run_server "${VULTR_SERVER_IP}" "command -v claude" >/dev/null 2>&1; then

@@ -11,7 +11,7 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
-wait_for_cloud_init "${LINODE_SERVER_IP}"
+wait_for_cloud_init "${LINODE_SERVER_IP}" 60
 log_warn "Installing Aider..."
 run_server "${LINODE_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 log_info "Aider installed"

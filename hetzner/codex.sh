@@ -18,7 +18,7 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${HETZNER_SERVER_IP}"
-wait_for_cloud_init "${HETZNER_SERVER_IP}"
+wait_for_cloud_init "${HETZNER_SERVER_IP}" 60
 
 log_warn "Installing Codex CLI..."
 run_server "${HETZNER_SERVER_IP}" "npm install -g @openai/codex"

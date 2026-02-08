@@ -18,7 +18,7 @@ ensure_ssh_key
 DROPLET_NAME=$(get_server_name)
 create_server "${DROPLET_NAME}"
 verify_server_connectivity "${DO_SERVER_IP}"
-wait_for_cloud_init "${DO_SERVER_IP}"
+wait_for_cloud_init "${DO_SERVER_IP}" 60
 
 log_warn "Installing Amazon Q CLI..."
 run_server "${DO_SERVER_IP}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"

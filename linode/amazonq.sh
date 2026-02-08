@@ -11,7 +11,7 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
-wait_for_cloud_init "${LINODE_SERVER_IP}"
+wait_for_cloud_init "${LINODE_SERVER_IP}" 60
 log_warn "Installing Amazon Q CLI..."
 run_server "${LINODE_SERVER_IP}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 log_info "Amazon Q CLI installed"
