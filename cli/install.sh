@@ -43,6 +43,7 @@ if command -v bun &>/dev/null; then
 
     cd "${tmpdir}/cli"
     bun install
+    bun run build
     bun link 2>/dev/null || bun install -g . 2>/dev/null || {
         # If global install fails, build and copy binary
         log_warn "Global install failed, building binary..."
@@ -80,13 +81,24 @@ if command -v npm &>/dev/null && command -v node &>/dev/null; then
 
     cd "${tmpdir}/cli"
     npm install
+
+    # Build cli.js — package.json bin points to it, so it must exist before linking
+    log_info "Building CLI..."
+    npx -y esbuild src/index.ts --bundle --outfile=cli.js --platform=node --format=esm --banner:js='#!/usr/bin/env node' 2>/dev/null || {
+        log_error "Failed to build cli.js. Install bun instead (recommended):"
+        echo "  curl -fsSL https://bun.sh/install | bash"
+        echo "  Then re-run: curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
+        exit 1
+    }
+    chmod +x cli.js
+
     npm install -g . 2>/dev/null || {
         log_warn "npm global install requires elevated permissions."
         echo ""
         echo "Choose one of these options:"
         echo ""
         echo "  1. Install with sudo (recommended):"
-        echo "     ${tmpdir}/cli$ sudo npm install -g ."
+        echo "     cd ${tmpdir}/cli && sudo npm install -g ."
         echo ""
         echo "  2. Install bun instead (no sudo needed):"
         echo "     curl -fsSL https://bun.sh/install | bash"
