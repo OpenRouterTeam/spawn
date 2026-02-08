@@ -418,7 +418,7 @@ exchange_oauth_code() {
     local oauth_code="${1}"
 
     local key_response
-    key_response=$(curl -s -X POST "https://openrouter.ai/api/v1/auth/keys" \
+    key_response=$(curl -s --max-time 30 -X POST "https://openrouter.ai/api/v1/auth/keys" \
         -H "Content-Type: application/json" \
         -d "{\"code\": \"${oauth_code}\"}")
 
