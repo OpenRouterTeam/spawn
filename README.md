@@ -5,7 +5,7 @@ Launch any AI coding agent on any cloud, pre-configured with [OpenRouter](https:
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
+curl -fsSL https://openrouter.ai/lab/spawn/cli/install.sh | bash
 ```
 
 ## Usage
