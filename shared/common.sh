@@ -212,7 +212,8 @@ get_openrouter_api_key_manual() {
             log_error "API key cannot be empty"
         elif [[ ! "$api_key" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
             log_warn "Warning: API key format doesn't match expected pattern (sk-or-v1-...)"
-            local confirm=$(safe_read "Use this key anyway? (y/N): ") || return 1
+            local confirm
+            confirm=$(safe_read "Use this key anyway? (y/N): ") || return 1
             if [[ "$confirm" =~ ^[Yy]$ ]]; then
                 break
             else
@@ -278,11 +279,13 @@ wait_for_oauth_code() {
 exchange_oauth_code() {
     local oauth_code="$1"
 
-    local key_response=$(curl -s -X POST "https://openrouter.ai/api/v1/auth/keys" \
+    local key_response
+    key_response=$(curl -s -X POST "https://openrouter.ai/api/v1/auth/keys" \
         -H "Content-Type: application/json" \
         -d "{\"code\": \"$oauth_code\"}")
 
-    local api_key=$(echo "$key_response" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
+    local api_key
+    api_key=$(echo "$key_response" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
 
     if [[ -z "$api_key" ]]; then
         log_error "Failed to exchange OAuth code: ${key_response}"
@@ -357,11 +360,15 @@ try_oauth_flow() {
 
     local callback_url="http://localhost:${callback_port}/callback"
     local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
-    local oauth_dir=$(mktemp -d)
+    local oauth_dir
+    oauth_dir=$(mktemp -d)
     local code_file="$oauth_dir/code"
 
     log_warn "Starting local OAuth server on port ${callback_port}..."
-    local server_pid=$(start_oauth_server "$callback_port" "$code_file")
+    local response_file="$oauth_dir/response.http"
+    write_oauth_response_file "$response_file"
+    local server_pid
+    server_pid=$(start_oauth_server "$callback_port" "$code_file" "$response_file")
 
     sleep 1
     if ! kill -0 "$server_pid" 2>/dev/null; then
@@ -379,11 +386,13 @@ try_oauth_flow() {
         return 1
     fi
 
-    local oauth_code=$(cat "$code_file")
+    local oauth_code
+    oauth_code=$(cat "$code_file")
     cleanup_oauth_session "$server_pid" "$oauth_dir"
 
     log_warn "Exchanging OAuth code for API key..."
-    local api_key=$(exchange_oauth_code "$oauth_code") || return 1
+    local api_key
+    api_key=$(exchange_oauth_code "$oauth_code") || return 1
 
     log_info "Successfully obtained OpenRouter API key via OAuth!"
     echo "$api_key"
@@ -394,7 +403,8 @@ get_openrouter_api_key_oauth() {
     local callback_port=${1:-5180}
 
     # Try OAuth flow first
-    local api_key=$(try_oauth_flow "$callback_port")
+    local api_key
+    api_key=$(try_oauth_flow "$callback_port")
 
     if [[ -n "$api_key" ]]; then
         echo "$api_key"
@@ -406,7 +416,8 @@ get_openrouter_api_key_oauth() {
     log_warn "OAuth authentication failed or unavailable"
     log_warn "You can enter your API key manually instead"
     echo ""
-    local manual_choice=$(safe_read "Would you like to enter your API key manually? (Y/n): ") || {
+    local manual_choice
+    manual_choice=$(safe_read "Would you like to enter your API key manually? (Y/n): ") || {
         log_error "Cannot prompt for manual entry in non-interactive mode"
         log_warn "Set OPENROUTER_API_KEY environment variable for non-interactive usage"
         return 1
@@ -448,7 +459,8 @@ inject_env_vars_ssh() {
     local run_func="$3"
     shift 3
 
-    local env_temp=$(mktemp)
+    local env_temp
+    env_temp=$(mktemp)
     chmod 600 "$env_temp"
     track_temp_file "$env_temp"
 
@@ -616,12 +628,15 @@ generic_cloud_api() {
             args+=(-d "$body")
         fi
 
-        local response=$(curl "${args[@]}" "${base_url}${endpoint}" 2>&1)
+        local response
+        response=$(curl "${args[@]}" "${base_url}${endpoint}" 2>&1)
         local curl_exit_code=$?
 
         # Extract HTTP status code (last line) and response body (everything else)
-        local http_code=$(echo "$response" | tail -1)
-        local response_body=$(echo "$response" | head -n -1)
+        local http_code
+        http_code=$(echo "$response" | tail -1)
+        local response_body
+        response_body=$(echo "$response" | head -n -1)
 
         # Check for network errors (curl exit code != 0)
         if [[ $curl_exit_code -ne 0 ]]; then
@@ -637,7 +652,8 @@ generic_cloud_api() {
             fi
 
             # Add jitter: ±20% randomization
-            local jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+            local jitter
+            jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
 
             log_warn "Cloud API network error (attempt $attempt/$max_retries), retrying in ${jitter}s..."
             sleep "$jitter"
@@ -662,7 +678,8 @@ generic_cloud_api() {
             fi
 
             # Add jitter: ±20% randomization
-            local jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+            local jitter
+            jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
 
             local error_msg="rate limit"
             if [[ "$http_code" == "503" ]]; then
@@ -757,7 +774,8 @@ generic_ssh_wait() {
 
         # Add jitter: ±20% randomization to prevent thundering herd
         # Generates random number between 0.8 and 1.2 times the interval
-        local jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+        local jitter
+        jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
 
         log_warn "Waiting for $description... (attempt $attempt/$max_attempts, elapsed ${elapsed_time}s, retry in ${jitter}s)"
         sleep "$jitter"
