@@ -47,6 +47,7 @@ fi
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
+trap 'rm -f "${ENV_TEMP}"' EXIT
 cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
@@ -60,7 +61,6 @@ EOF
 
 upload_file "${LAMBDA_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
 run_server "${LAMBDA_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "${ENV_TEMP}"
 
 # 8. Configure Claude Code settings
 setup_claude_code_config "${OPENROUTER_API_KEY}" \

@@ -41,12 +41,12 @@ inject_env_vars_ssh "${VULTR_SERVER_IP}" upload_file run_server \
 
 log_warn "Configuring nanoclaw..."
 DOTENV_TEMP=$(mktemp)
+trap 'rm -f "${ENV_TEMP}" "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
 cat > "${DOTENV_TEMP}" << EOF
 ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
 EOF
 upload_file "${VULTR_SERVER_IP}" "${DOTENV_TEMP}" "/root/nanoclaw/.env"
-rm "${DOTENV_TEMP}"
 
 echo ""
 log_info "Vultr instance setup completed successfully!"

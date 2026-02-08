@@ -50,6 +50,7 @@ MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
+trap 'rm -f "${ENV_TEMP}"' EXIT
 cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
@@ -60,7 +61,6 @@ EOF
 
 upload_file "${ENV_TEMP}" "/tmp/env_config"
 run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "${ENV_TEMP}"
 
 # 8. Configure openclaw
 setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" \

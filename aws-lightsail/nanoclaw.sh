@@ -47,6 +47,7 @@ fi
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
+trap 'rm -f "${ENV_TEMP}" "${DOTENV_TEMP}"' EXIT
 cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
@@ -57,7 +58,6 @@ EOF
 
 upload_file "${LIGHTSAIL_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
 run_server "${LIGHTSAIL_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "${ENV_TEMP}"
 
 # 8. Create nanoclaw .env file
 log_warn "Configuring nanoclaw..."
@@ -68,7 +68,6 @@ ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
 EOF
 
 upload_file "${LIGHTSAIL_SERVER_IP}" "${DOTENV_TEMP}" "/home/ubuntu/nanoclaw/.env"
-rm "${DOTENV_TEMP}"
 
 echo ""
 log_info "Lightsail instance setup completed successfully!"

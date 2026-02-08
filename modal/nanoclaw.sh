@@ -50,6 +50,7 @@ fi
 log_warn "Setting up environment variables..."
 
 ENV_TEMP=$(mktemp)
+trap 'rm -f "${ENV_TEMP}" "${DOTENV_TEMP}"' EXIT
 cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
@@ -60,7 +61,6 @@ EOF
 
 upload_file "${ENV_TEMP}" "/tmp/env_config"
 run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "${ENV_TEMP}"
 
 # 7. Create nanoclaw .env file
 log_warn "Configuring nanoclaw..."
@@ -71,7 +71,6 @@ ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
 EOF
 
 upload_file "${DOTENV_TEMP}" ~/nanoclaw/.env
-rm "${DOTENV_TEMP}"
 
 echo ""
 log_info "Modal sandbox setup completed successfully!"

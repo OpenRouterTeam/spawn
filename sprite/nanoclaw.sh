@@ -47,13 +47,13 @@ inject_env_vars_sprite "${SPRITE_NAME}" \
 log_warn "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
+trap 'rm -f "${ENV_TEMP}" "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
 cat > "${DOTENV_TEMP}" << EOF
 ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
 EOF
 
 sprite exec -s "${SPRITE_NAME}" -file "${DOTENV_TEMP}:/tmp/nanoclaw_env" -- bash -c "mv /tmp/nanoclaw_env ~/nanoclaw/.env"
-rm "${DOTENV_TEMP}"
 
 echo ""
 log_info "✅ Sprite setup completed successfully!"

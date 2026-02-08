@@ -33,6 +33,7 @@ fi
 
 log_warn "Setting up environment variables..."
 ENV_TEMP=$(mktemp)
+trap 'rm -f "${ENV_TEMP}"' EXIT
 cat > "${ENV_TEMP}" << EOF
 
 # [spawn:env]
@@ -42,7 +43,6 @@ export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
 EOF
 upload_file "${VULTR_SERVER_IP}" "${ENV_TEMP}" "/tmp/env_config"
 run_server "${VULTR_SERVER_IP}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "${ENV_TEMP}"
 
 echo ""
 log_info "Vultr instance setup completed successfully!"
