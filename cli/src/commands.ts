@@ -13,6 +13,7 @@ import {
   type Manifest,
 } from "./manifest.js";
 import { VERSION } from "./version.js";
+import { validateIdentifier, validateScriptContent } from "./security.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
