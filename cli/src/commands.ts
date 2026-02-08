@@ -85,6 +85,31 @@ function getImplementedClouds(manifest: Manifest, agent: string): string[] {
   );
 }
 
+function validateAgent(manifest: Manifest, agent: string): void {
+  if (!manifest.agents[agent]) {
+    p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
+    process.exit(1);
+  }
+}
+
+function validateCloud(manifest: Manifest, cloud: string): void {
+  if (!manifest.clouds[cloud]) {
+    p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
+    p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
+    process.exit(1);
+  }
+}
+
+function validateImplementation(manifest: Manifest, cloud: string, agent: string): void {
+  const status = matrixStatus(manifest, cloud, agent);
+  if (status !== "implemented") {
+    errorMessage(
+      `${manifest.agents[agent].name} on ${manifest.clouds[cloud].name} is not yet implemented.`
+    );
+  }
+}
+
 // ── Interactive ────────────────────────────────────────────────────────────────
 
 export async function cmdInteractive() {
@@ -129,24 +154,9 @@ export async function cmdRun(agent: string, cloud: string) {
 
   const manifest = await loadManifestWithSpinner();
 
-  if (!manifest.agents[agent]) {
-    p.log.error(`Unknown agent: ${pc.bold(agent)}`);
-    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
-    process.exit(1);
-  }
-  if (!manifest.clouds[cloud]) {
-    p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
-    p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
-    process.exit(1);
-  }
-
-  const status = matrixStatus(manifest, cloud, agent);
-  if (status !== "implemented") {
-    p.log.error(
-      `${manifest.agents[agent].name} on ${manifest.clouds[cloud].name} is not yet implemented.`
-    );
-    process.exit(1);
-  }
+  validateAgent(manifest, agent);
+  validateCloud(manifest, cloud);
+  validateImplementation(manifest, cloud, agent);
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
@@ -300,11 +310,7 @@ export async function cmdAgentInfo(agent: string) {
 
   const manifest = await loadManifestWithSpinner();
 
-  if (!manifest.agents[agent]) {
-    p.log.error(`Unknown agent: ${pc.bold(agent)}`);
-    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
-    process.exit(1);
-  }
+  validateAgent(manifest, agent);
 
   const a = manifest.agents[agent];
   console.log();
