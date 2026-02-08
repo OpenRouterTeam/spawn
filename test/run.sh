@@ -38,7 +38,7 @@ NC='\033[0m'
 cleanup() {
     rm -rf "$TEST_DIR"
 }
-trap cleanup EXIT
+trap 'cleanup' EXIT
 
 # --- Mock sprite CLI ---
 # Records every call to a log, returns success for expected commands

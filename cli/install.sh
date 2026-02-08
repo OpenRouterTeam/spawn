@@ -31,7 +31,7 @@ if command -v bun &>/dev/null; then
     log_info "Installing spawn via bun..."
     # Clone/download the cli directory and install from it
     tmpdir=$(mktemp -d)
-    trap "rm -rf '$tmpdir'" EXIT
+    trap 'rm -rf "$tmpdir"' EXIT
 
     log_info "Downloading CLI package..."
     mkdir -p "$tmpdir/cli/src"
@@ -68,7 +68,7 @@ fi
 if command -v npm &>/dev/null && command -v node &>/dev/null; then
     log_info "Installing spawn via npm..."
     tmpdir=$(mktemp -d)
-    trap "rm -rf '$tmpdir'" EXIT
+    trap 'rm -rf "$tmpdir"' EXIT
 
     log_info "Downloading CLI package..."
     mkdir -p "$tmpdir/cli/src"
