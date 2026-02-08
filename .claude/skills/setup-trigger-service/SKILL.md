@@ -199,7 +199,7 @@ jobs:
           SERVICE_NAME: ${{ secrets.<SERVICE_NAME>_SERVICE_NAME }}
         run: |
           curl -sf -X POST "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SERVICE_NAME}/start" \
-            -H "Authorization: Bearer ${SPRITE_TOKEN}" --max-time 30
+            -H "Authorization: Bearer ${SPRITE_TOKEN}"
 ```
 
 **Note:** This uses the [Sprite start service API](https://docs.sprites.dev/api/v001-rc30/services/#start-service) which wakes the Sprite and starts the specified service automatically.

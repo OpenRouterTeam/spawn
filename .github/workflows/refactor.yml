@@ -22,4 +22,4 @@ jobs:
           SERVICE_NAME: ${{ secrets.REFACTOR_SERVICE_NAME }}
         run: |
           curl -sf -X POST "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SERVICE_NAME}/start" \
-            -H "Authorization: Bearer ${SPRITE_TOKEN}" --max-time 30
+            -H "Authorization: Bearer ${SPRITE_TOKEN}"
