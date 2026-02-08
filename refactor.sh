@@ -1,7 +1,8 @@
 #!/bin/bash
 set -eo pipefail
 
-# Continuous Refactoring Team Service
+# Refactoring Team Service — Single Cycle
+# Triggered by trigger-server.ts via GitHub Actions
 # Spawns a Claude Code agent team to maintain and improve the spawn codebase
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,7 +10,6 @@ cd "${SCRIPT_DIR}"
 
 LOG_FILE="/home/sprite/spawn/.docs/refactor.log"
 TEAM_NAME="spawn-refactor"
-CYCLE=0
 
 # Ensure .docs directory exists
 mkdir -p "$(dirname "${LOG_FILE}")"
@@ -18,29 +18,23 @@ log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
 }
 
-log "=== Starting Continuous Refactoring Team Service ==="
+log "=== Starting Refactoring Cycle ==="
 log "Working directory: ${SCRIPT_DIR}"
 log "Team name: ${TEAM_NAME}"
 log "Log file: ${LOG_FILE}"
 
-# Main loop
-while true; do
-    CYCLE=$((CYCLE + 1))
-    log ""
-    log "=== Refactoring Cycle ${CYCLE} ==="
+# Ensure we're on latest main
+log "Syncing with origin/main..."
+git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
+git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
-    # Ensure we're on latest main
-    log "Syncing with origin/main..."
-    git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
-    git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
+# Launch Claude Code with team instructions
+log "Launching refactoring team..."
 
-    # Launch Claude Code with team instructions
-    log "Launching refactoring team..."
-
-    # Write prompt to a temp file to avoid shell escaping issues
-    PROMPT_FILE=$(mktemp /tmp/refactor-prompt-XXXXXX.md)
-    cat > "${PROMPT_FILE}" << PROMPT_EOF
-You are the Team Lead for the spawn continuous refactoring service (Cycle ${CYCLE}).
+# Write prompt to a temp file to avoid shell escaping issues
+PROMPT_FILE=$(mktemp /tmp/refactor-prompt-XXXXXX.md)
+cat > "${PROMPT_FILE}" << 'PROMPT_EOF'
+You are the Team Lead for the spawn continuous refactoring service.
 
 Your mission: Spawn a team of specialized agents to maintain and improve the spawn codebase autonomously.
 
@@ -133,37 +127,33 @@ Score tasks: (Impact x Confidence) / Risk
 
 Target autonomous score: >30
 
-Begin Cycle ${CYCLE} now. Spawn the team and start working.
+Begin now. Spawn the team and start working.
 PROMPT_EOF
 
-    # Run Claude Code with the prompt file
-    if claude -p "$(cat "${PROMPT_FILE}")" 2>&1 | tee -a "${LOG_FILE}"; then
-        log "Cycle ${CYCLE} completed successfully"
+# Run Claude Code with the prompt file
+if claude -p "$(cat "${PROMPT_FILE}")" 2>&1 | tee -a "${LOG_FILE}"; then
+    log "Cycle completed successfully"
 
-        # Commit any changes made during the cycle
-        if [[ -n "$(git status --porcelain)" ]]; then
-            log "Committing changes from cycle ${CYCLE}..."
-            git add -A
-            git commit -m "refactor: Automated improvements from cycle ${CYCLE}
+    # Commit any changes made during the cycle
+    if [[ -n "$(git status --porcelain)" ]]; then
+        log "Committing changes from cycle..."
+        git add -A
+        git commit -m "refactor: Automated improvements
 
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" 2>&1 | tee -a "${LOG_FILE}" || true
 
-            # Push to main
-            git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
-        fi
-
-        # Create checkpoint
-        log "Creating checkpoint after cycle ${CYCLE}..."
-        sprite-env checkpoint create --comment "Refactor cycle ${CYCLE} complete" 2>&1 | tee -a "${LOG_FILE}" || true
-
-        # Brief pause before next cycle
-        log "Pausing 30 seconds before next cycle..."
-        sleep 30
-    else
-        log "Cycle ${CYCLE} failed, pausing 5 minutes before retry..."
-        sleep 300
+        # Push to main
+        git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
     fi
 
-    # Clean up prompt file
-    rm -f "${PROMPT_FILE}"
-done
+    # Create checkpoint
+    log "Creating checkpoint..."
+    sprite-env checkpoint create --comment "Refactor cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+else
+    log "Cycle failed"
+fi
+
+# Clean up prompt file
+rm -f "${PROMPT_FILE}"
+
+log "=== Refactoring Cycle Done ==="

@@ -1,0 +1,20 @@
+name: Trigger Refactor
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  issues:
+    types: [opened, reopened]
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger refactor sprite
+        env:
+          SPRITE_URL: ${{ secrets.REFACTOR_SPRITE_URL }}
+          SPRITE_SECRET: ${{ secrets.REFACTOR_SPRITE_SECRET }}
+        run: |
+          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            -H "Authorization: Bearer ${SPRITE_SECRET}" --max-time 30
