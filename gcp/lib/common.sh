@@ -120,30 +120,20 @@ create_server() {
 }
 
 verify_server_connectivity() {
-    local ip="${1}" max_attempts=${2:-30} attempt=1
-    log_warn "Waiting for SSH connectivity to ${ip}..."
-    while [[ ${attempt} -le ${max_attempts} ]]; do
-        # SSH_OPTS is defined in shared/common.sh
-        # shellcheck disable=SC2154,SC2086
-        if ssh ${SSH_OPTS} -o ConnectTimeout=5 "${GCP_USERNAME}@${ip}" "echo ok" >/dev/null 2>&1; then
-            log_info "SSH connection established"; return 0
-        fi
-        log_warn "Waiting for SSH... (${attempt}/${max_attempts})"; sleep 5; attempt=$((attempt + 1))
-    done
-    log_error "Server failed to respond via SSH after ${max_attempts} attempts"; return 1
+    local ip="${1}" max_attempts=${2:-30}
+    # Use shared generic_ssh_wait with exponential backoff
+    # shellcheck disable=SC2086
+    generic_ssh_wait "${GCP_USERNAME}" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" "${max_attempts}"
 }
 
 wait_for_cloud_init() {
-    local ip="${1}" max_attempts=${2:-60} attempt=1
-    log_warn "Waiting for startup script to complete..."
-    while [[ ${attempt} -le ${max_attempts} ]]; do
-        # shellcheck disable=SC2086
-        if ssh ${SSH_OPTS} "${GCP_USERNAME}@${ip}" "test -f /tmp/.cloud-init-complete" >/dev/null 2>&1; then
-            log_info "Startup script completed"; return 0
-        fi
-        log_warn "Startup script in progress... (${attempt}/${max_attempts})"; sleep 5; attempt=$((attempt + 1))
-    done
-    log_error "Startup script did not complete after ${max_attempts} attempts"; return 1
+    local ip="${1}" max_attempts=${2:-60}
+
+    # First establish SSH connectivity using generic_ssh_wait
+    generic_ssh_wait "${GCP_USERNAME}" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" 30 5
+
+    # Then wait for cloud-init completion marker
+    generic_ssh_wait "${GCP_USERNAME}" "${ip}" "${SSH_OPTS}" "test -f /tmp/.cloud-init-complete" "startup script completion" "${max_attempts}" 5
 }
 
 # GCP uses current username
@@ -161,9 +151,7 @@ upload_file() {
 
 interactive_session() {
     local ip="${1}" cmd="${2}"
-    local username
-    username=$(whoami)
-    ssh -t ${SSH_OPTS} "${username}@${ip}" "${cmd}"
+    ssh -t ${SSH_OPTS} "${GCP_USERNAME}@${ip}" "${cmd}"
 }
 
 destroy_server() {
