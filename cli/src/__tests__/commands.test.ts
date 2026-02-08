@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import {
   cmdRun,
   cmdList,
@@ -7,79 +7,14 @@ import {
   cmdAgentInfo,
   cmdHelp,
 } from "../commands";
-import type { Manifest } from "../manifest";
+import {
+  createConsoleMocks,
+  createProcessExitMock,
+  restoreMocks,
+  createMockManifest,
+} from "./test-helpers";
 
-// Test helpers
-function createConsoleMocks() {
-  return {
-    log: spyOn(console, "log").mockImplementation(() => {}),
-    error: spyOn(console, "error").mockImplementation(() => {}),
-  };
-}
-
-function createProcessExitMock() {
-  return spyOn(process, "exit").mockImplementation((() => {
-    throw new Error("process.exit");
-  }) as any);
-}
-
-function restoreMocks(...mocks: Array<{ mockRestore?: () => void } | undefined>) {
-  mocks.forEach(mock => mock?.mockRestore());
-}
-
-// Mock manifest data
-const mockManifest: Manifest = {
-  agents: {
-    claude: {
-      name: "Claude Code",
-      description: "AI coding assistant",
-      url: "https://claude.ai",
-      install: "npm install -g claude",
-      launch: "claude",
-      env: {
-        ANTHROPIC_API_KEY: "test-key",
-      },
-    },
-    aider: {
-      name: "Aider",
-      description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
-      env: {
-        OPENAI_API_KEY: "test-key",
-      },
-    },
-  },
-  clouds: {
-    sprite: {
-      name: "Sprite",
-      description: "Lightweight VMs",
-      url: "https://sprite.sh",
-      type: "vm",
-      auth: "token",
-      provision_method: "api",
-      exec_method: "ssh",
-      interactive_method: "ssh",
-    },
-    hetzner: {
-      name: "Hetzner Cloud",
-      description: "European cloud provider",
-      url: "https://hetzner.com",
-      type: "cloud",
-      auth: "token",
-      provision_method: "api",
-      exec_method: "ssh",
-      interactive_method: "ssh",
-    },
-  },
-  matrix: {
-    "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
-    "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
-  },
-};
+const mockManifest = createMockManifest();
 
 // Note: Bun test doesn't support module mocking the same way as vitest
 // These tests require refactoring commands.ts to use dependency injection

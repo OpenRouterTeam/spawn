@@ -1,9 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { spawn } from "child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import type { Manifest } from "../manifest";
+import {
+  mockSuccessfulFetch,
+  mockFailedFetch,
+  setupTestEnvironment,
+  teardownTestEnvironment,
+  type TestEnvironment,
+} from "./test-helpers";
 
 describe("CLI Integration Tests", () => {
   let testDir: string;
