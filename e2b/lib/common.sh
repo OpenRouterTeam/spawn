@@ -50,8 +50,8 @@ ensure_e2b_token() {
     fi
     echo ""; log_warn "E2B API Key Required"
     echo -e "${YELLOW}Get your API key from: https://e2b.dev/dashboard${NC}"; echo ""
-    local api_key=$(safe_read "Enter your E2B API key: ") || return 1
-    if [[ -z "$api_key" ]]; then log_error "API key is required"; return 1; fi
+    local api_key
+    api_key=$(validated_read "Enter your E2B API key: " validate_api_token) || return 1
     export E2B_API_KEY="$api_key"
     mkdir -p "$config_dir"
     cat > "$config_file" << EOF

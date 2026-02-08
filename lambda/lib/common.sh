@@ -47,8 +47,8 @@ ensure_lambda_token() {
     fi
     echo ""; log_warn "Lambda Cloud API Key Required"
     echo -e "${YELLOW}Get your API key from: https://cloud.lambdalabs.com/api-keys${NC}"; echo ""
-    local api_key=$(safe_read "Enter your Lambda API key: ") || return 1
-    if [[ -z "$api_key" ]]; then log_error "API key is required"; return 1; fi
+    local api_key
+    api_key=$(validated_read "Enter your Lambda API key: " validate_api_token) || return 1
     export LAMBDA_API_KEY="$api_key"
     local test_response=$(lambda_api GET "/instances")
     if echo "$test_response" | grep -q '"error"'; then
