@@ -23,6 +23,9 @@ fi
 # GCP Compute Engine specific functions
 # ============================================================
 
+# Cache username to avoid repeated subprocess calls
+GCP_USERNAME=$(whoami)
+
 # SSH_OPTS is now defined in shared/common.sh
 
 ensure_gcloud() {
@@ -89,15 +92,13 @@ create_server() {
     userdata=$(get_cloud_init_userdata)
     local pub_key
     pub_key=$(cat "${HOME}/.ssh/id_ed25519.pub")
-    local username
-    username=$(whoami)
 
     if ! gcloud compute instances create "${name}" \
         --zone="${zone}" \
         --machine-type="${machine_type}" \
         --image-family="${image_family}" \
         --image-project="${image_project}" \
-        --metadata="startup-script=${userdata},ssh-keys=${username}:${pub_key}" \
+        --metadata="startup-script=${userdata},ssh-keys=${GCP_USERNAME}:${pub_key}" \
         --project="${GCP_PROJECT}" \
         --quiet \
         >/dev/null 2>&1; then
@@ -120,13 +121,11 @@ create_server() {
 
 verify_server_connectivity() {
     local ip="${1}" max_attempts=${2:-30} attempt=1
-    local username
-    username=$(whoami)
     log_warn "Waiting for SSH connectivity to ${ip}..."
     while [[ ${attempt} -le ${max_attempts} ]]; do
         # SSH_OPTS is defined in shared/common.sh
         # shellcheck disable=SC2154,SC2086
-        if ssh ${SSH_OPTS} -o ConnectTimeout=5 "${username}@${ip}" "echo ok" >/dev/null 2>&1; then
+        if ssh ${SSH_OPTS} -o ConnectTimeout=5 "${GCP_USERNAME}@${ip}" "echo ok" >/dev/null 2>&1; then
             log_info "SSH connection established"; return 0
         fi
         log_warn "Waiting for SSH... (${attempt}/${max_attempts})"; sleep 5; attempt=$((attempt + 1))
@@ -136,12 +135,10 @@ verify_server_connectivity() {
 
 wait_for_cloud_init() {
     local ip="${1}" max_attempts=${2:-60} attempt=1
-    local username
-    username=$(whoami)
     log_warn "Waiting for startup script to complete..."
     while [[ ${attempt} -le ${max_attempts} ]]; do
         # shellcheck disable=SC2086
-        if ssh ${SSH_OPTS} "${username}@${ip}" "test -f /tmp/.cloud-init-complete" >/dev/null 2>&1; then
+        if ssh ${SSH_OPTS} "${GCP_USERNAME}@${ip}" "test -f /tmp/.cloud-init-complete" >/dev/null 2>&1; then
             log_info "Startup script completed"; return 0
         fi
         log_warn "Startup script in progress... (${attempt}/${max_attempts})"; sleep 5; attempt=$((attempt + 1))
@@ -152,18 +149,14 @@ wait_for_cloud_init() {
 # GCP uses current username
 run_server() {
     local ip="${1}" cmd="${2}"
-    local username
-    username=$(whoami)
     # shellcheck disable=SC2086
-    ssh ${SSH_OPTS} "${username}@${ip}" "${cmd}"
+    ssh ${SSH_OPTS} "${GCP_USERNAME}@${ip}" "${cmd}"
 }
 
 upload_file() {
     local ip="${1}" local_path="${2}" remote_path="${3}"
-    local username
-    username=$(whoami)
     # shellcheck disable=SC2086
-    scp ${SSH_OPTS} "${local_path}" "${username}@${ip}:${remote_path}"
+    scp ${SSH_OPTS} "${local_path}" "${GCP_USERNAME}@${ip}:${remote_path}"
 }
 
 interactive_session() {

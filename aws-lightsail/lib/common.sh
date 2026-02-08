@@ -147,16 +147,16 @@ verify_server_connectivity() {
 }
 
 wait_for_cloud_init() {
-    local ip="${1}" max_attempts=${2:-60} attempt=1
-    log_warn "Waiting for cloud-init to complete..."
-    while [[ ${attempt} -le ${max_attempts} ]]; do
-        # shellcheck disable=SC2086
-        if ssh ${SSH_OPTS} "ubuntu@${ip}" "test -f /home/ubuntu/.cloud-init-complete" >/dev/null 2>&1; then
-            log_info "Cloud-init completed"; return 0
-        fi
-        log_warn "Cloud-init in progress... (${attempt}/${max_attempts})"; sleep 5; attempt=$((attempt + 1))
-    done
-    log_error "Cloud-init did not complete after ${max_attempts} attempts"; return 1
+    local ip="${1}"
+    local max_attempts=${2:-60}
+
+    # First ensure SSH connectivity is established
+    # shellcheck disable=SC2086
+    generic_ssh_wait "ubuntu" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" 30 5 || return 1
+
+    # Then wait for cloud-init completion marker
+    # shellcheck disable=SC2086
+    generic_ssh_wait "ubuntu" "${ip}" "${SSH_OPTS}" "test -f /home/ubuntu/.cloud-init-complete" "cloud-init" "${max_attempts}" 5
 }
 
 # Note: Lightsail uses 'ubuntu' user, not 'root'
