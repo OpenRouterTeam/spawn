@@ -8,13 +8,17 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --outfile cli.js --target node --minify",
-    "compile": "bun build src/index.ts --compile --outfile spawn"
+    "compile": "bun build src/index.ts --compile --outfile spawn",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@clack/prompts": "^0.10.0",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
-    "@types/bun": "^1.2.0"
+    "@types/bun": "^1.2.0",
+    "vitest": "^1.6.0",
+    "@vitest/ui": "^1.6.0"
   }
 }
