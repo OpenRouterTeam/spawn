@@ -13,6 +13,7 @@
 const PORT = 8080;
 const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const TARGET_SCRIPT = process.env.TARGET_SCRIPT ?? "";
+const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT ?? "3", 10);
 
 if (!TRIGGER_SECRET) {
   console.error("ERROR: TRIGGER_SECRET env var is required");
@@ -24,11 +25,14 @@ if (!TARGET_SCRIPT) {
   process.exit(1);
 }
 
-let running = false;
+let runningCount = 0;
 
 async function runScript(reason: string) {
+  runningCount++;
+  console.log(
+    `[trigger] Running ${TARGET_SCRIPT} (reason=${reason}, concurrent=${runningCount}/${MAX_CONCURRENT})`
+  );
   try {
-    console.log(`[trigger] Running ${TARGET_SCRIPT} (reason=${reason})`);
     const proc = Bun.spawn(["bash", TARGET_SCRIPT], {
       cwd: TARGET_SCRIPT.substring(0, TARGET_SCRIPT.lastIndexOf("/")) || ".",
       stdout: "inherit",
@@ -36,12 +40,12 @@ async function runScript(reason: string) {
     });
     await proc.exited;
     console.log(
-      `[trigger] ${TARGET_SCRIPT} finished (exit=${proc.exitCode})`
+      `[trigger] ${TARGET_SCRIPT} finished (exit=${proc.exitCode}, concurrent=${runningCount - 1}/${MAX_CONCURRENT})`
     );
   } catch (e) {
     console.error(`[trigger] ${TARGET_SCRIPT} failed:`, e);
   } finally {
-    running = false;
+    runningCount--;
   }
 }
 
@@ -60,17 +64,28 @@ const server = Bun.serve({
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
 
-      if (running) {
-        return Response.json({ error: "already running" }, { status: 409 });
+      if (runningCount >= MAX_CONCURRENT) {
+        return Response.json(
+          {
+            error: "max concurrent runs reached",
+            running: runningCount,
+            max: MAX_CONCURRENT,
+          },
+          { status: 429 }
+        );
       }
 
-      running = true;
       const reason = url.searchParams.get("reason") ?? "manual";
 
       // Fire and forget
       runScript(reason);
 
-      return Response.json({ triggered: true, reason });
+      return Response.json({
+        triggered: true,
+        reason,
+        running: runningCount,
+        max: MAX_CONCURRENT,
+      });
     }
 
     return Response.json({ error: "not found" }, { status: 404 });
@@ -79,3 +94,4 @@ const server = Bun.serve({
 
 console.log(`[trigger] Listening on port ${server.port}`);
 console.log(`[trigger] TARGET_SCRIPT=${TARGET_SCRIPT}`);
+console.log(`[trigger] MAX_CONCURRENT=${MAX_CONCURRENT}`);
