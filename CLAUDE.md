@@ -206,6 +206,13 @@ macOS ships bash 3.2. All scripts MUST work on it:
 - Remote fallback URL: `https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/{path}`
 - All env vars documented in the cloud's README.md
 
+## Testing
+
+- **NEVER use vitest** — use Bun's built-in test runner (`bun:test`) exclusively
+- Test files go in `cli/src/__tests__/`
+- Run tests with `bun test`
+- Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
+
 ## Autonomous Loops
 
 When running autonomous improvement/refactoring loops (`./improve.sh --loop`):

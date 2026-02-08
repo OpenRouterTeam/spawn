@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import {
   loadManifest,
   agentKeys,
@@ -184,15 +184,15 @@ describe("manifest", () => {
         rmSync(testCacheDir, { recursive: true, force: true });
       }
 
-      vi.restoreAllMocks();
+      mock.restore();
     });
 
     it("should fetch from network when cache is missing", async () => {
       // Mock successful fetch
-      global.fetch = vi.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         json: async () => mockManifest,
-      });
+      }) as any);
 
       const manifest = await loadManifest(true); // Force refresh
 
@@ -218,7 +218,7 @@ describe("manifest", () => {
       writeFileSync(testCacheFile, JSON.stringify(mockManifest));
 
       // Mock fetch (should not be called for fresh cache)
-      global.fetch = vi.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         json: async () => mockManifest,
       });
@@ -237,7 +237,7 @@ describe("manifest", () => {
 
       // Mock successful fetch with different data
       const updatedManifest = { ...mockManifest, agents: {} };
-      global.fetch = vi.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         json: async () => updatedManifest,
       });
@@ -258,7 +258,7 @@ describe("manifest", () => {
       utimesSync(testCacheFile, new Date(oldTime), new Date(oldTime));
 
       // Mock network failure
-      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
+      global.fetch = mock(() => Promise.reject(new Error("Network error")));
 
       const manifest = await loadManifest(true);
 
@@ -281,7 +281,7 @@ describe("manifest", () => {
       }
 
       // Mock network failure
-      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
+      global.fetch = mock(() => Promise.reject(new Error("Network error")));
 
       // Note: In the spawn project directory, there's a local manifest.json that serves as fallback
       // So this test will pass in isolation but may use local fallback when run in project
@@ -298,7 +298,7 @@ describe("manifest", () => {
 
     it("should validate manifest structure", async () => {
       // Mock fetch with invalid data (missing required fields)
-      global.fetch = vi.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         json: async () => ({ agents: {} }), // missing clouds and matrix
       });
@@ -320,11 +320,11 @@ describe("manifest", () => {
 
     it("should handle fetch timeout", async () => {
       // Mock timeout
-      global.fetch = vi.fn().mockImplementation(async () => {
+      global.fetch = mock(async () => {
         await new Promise((_, reject) =>
           setTimeout(() => reject(new Error("Timeout")), 100)
         );
-      });
+      }) as any;
 
       // Write cache as fallback
       mkdirSync(join(testCacheDir, "spawn"), { recursive: true });
@@ -343,10 +343,10 @@ describe("manifest", () => {
 
     it("should return cached instance on subsequent calls", async () => {
       // Mock successful fetch
-      global.fetch = vi.fn().mockResolvedValue({
+      global.fetch = mock(() => Promise.resolve({
         ok: true,
         json: async () => mockManifest,
-      });
+      }) as any);
 
       const manifest1 = await loadManifest(true);
       const manifest2 = await loadManifest(); // Should use in-memory cache
