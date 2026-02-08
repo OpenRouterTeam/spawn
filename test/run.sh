@@ -135,7 +135,7 @@ run_script_test() {
     echo -e "${YELLOW}━━━ Testing ${script_name}.sh ━━━${NC}"
 
     # Reset mock log
-    > "${MOCK_LOG}"
+    : > "${MOCK_LOG}"
 
     # Run the script with mocked PATH and env vars (timeout 30s)
     local exit_code=0
@@ -177,7 +177,8 @@ run_script_test() {
     esac
 
     # Check no temp files leaked
-    local leaked_temps=$(find /tmp -maxdepth 1 -name "tmp.*" -newer "${MOCK_LOG}" 2>/dev/null | wc -l)
+    local leaked_temps
+    leaked_temps=$(find /tmp -maxdepth 1 -name "tmp.*" -newer "${MOCK_LOG}" 2>/dev/null | wc -l)
     if [[ "${leaked_temps}" -eq 0 ]]; then
         echo -e "  ${GREEN}✓${NC} No temp files leaked"
         ((PASSED++))
@@ -203,7 +204,8 @@ test_common_source() {
         done
     ' 2>/dev/null)
 
-    local missing=$(echo "${output}" | grep "^MISSING:" || true)
+    local missing
+    missing=$(echo "${output}" | grep "^MISSING:" || true)
     if [[ -z "${missing}" ]]; then
         echo -e "  ${GREEN}✓${NC} All functions defined"
         ((PASSED++))
@@ -331,10 +333,12 @@ test_shared_common() {
     fi
 
     # Test 6: generate_ssh_key_if_missing skips if key exists
-    local mtime_before=$(stat -c %Y "${test_key}" 2>/dev/null || stat -f %m "${test_key}" 2>/dev/null)
+    local mtime_before
+    mtime_before=$(stat -c %Y "${test_key}" 2>/dev/null || stat -f %m "${test_key}" 2>/dev/null)
     sleep 1
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && generate_ssh_key_if_missing "'"${test_key}"'"' >/dev/null 2>&1
-    local mtime_after=$(stat -c %Y "${test_key}" 2>/dev/null || stat -f %m "${test_key}" 2>/dev/null)
+    local mtime_after
+    mtime_after=$(stat -c %Y "${test_key}" 2>/dev/null || stat -f %m "${test_key}" 2>/dev/null)
     if [[ "${mtime_before}" == "${mtime_after}" ]]; then
         echo -e "  ${GREEN}✓${NC} generate_ssh_key_if_missing skips existing key"
         ((PASSED++))
@@ -634,7 +638,8 @@ test_shared_common() {
     for char in "${dangerous_chars[@]}"; do
         rc=0
         # Use printf %q to properly escape the character
-        local test_str=$(printf 'bad%smodel' "${char}")
+        local test_str
+        test_str=$(printf 'bad%smodel' "${char}")
         bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id '"$(printf '%q' "${test_str}")" </dev/null >/dev/null 2>&1 || rc=$?
         [[ "${rc}" -ne 0 ]] && ((rejected_count++))
     done
@@ -669,7 +674,8 @@ test_shared_common() {
 
     # Test 31: validate_server_name rejects names too long
     rc=0
-    local long_name=$(printf 'a%.0s' {1..64})
+    local long_name
+    long_name=$(printf 'a%.0s' {1..64})
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_server_name "'"${long_name}"'"' </dev/null >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         echo -e "  ${GREEN}✓${NC} validate_server_name rejects names too long"
