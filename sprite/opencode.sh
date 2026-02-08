@@ -23,14 +23,23 @@ verify_sprite_connectivity "${SPRITE_NAME}"
 log_warn "Setting up sprite environment..."
 setup_shell_environment "${SPRITE_NAME}"
 
-# Install OpenCode
+# Install OpenCode directly (bypass upstream install script - it fails in piped/sandbox contexts)
 log_warn "Installing OpenCode..."
-run_sprite "${SPRITE_NAME}" "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
+OPENCODE_INSTALL_CMD='
+INSTALL_DIR=$HOME/.opencode/bin
+mkdir -p $INSTALL_DIR
+curl -fsSL -o /tmp/opencode.tar.gz https://github.com/opencode-ai/opencode/releases/latest/download/opencode-linux-x86_64.tar.gz
+tar xzf /tmp/opencode.tar.gz -C $INSTALL_DIR
+rm -f /tmp/opencode.tar.gz
+grep -q ".opencode/bin" $HOME/.zshrc 2>/dev/null || echo "export PATH=\$HOME/.opencode/bin:\$PATH" >> $HOME/.zshrc
+grep -q ".opencode/bin" $HOME/.bashrc 2>/dev/null || echo "export PATH=\$HOME/.opencode/bin:\$PATH" >> $HOME/.bashrc
+'
+run_sprite "${SPRITE_NAME}" "${OPENCODE_INSTALL_CMD}"
 
 # Verify installation succeeded
-if ! run_sprite "${SPRITE_NAME}" "command -v opencode &> /dev/null"; then
+if ! run_sprite "${SPRITE_NAME}" "\$HOME/.opencode/bin/opencode --help &> /dev/null"; then
     log_error "OpenCode installation verification failed"
-    log_error "The 'opencode' command is not available"
+    log_error "The 'opencode' binary is not available"
     exit 1
 fi
 log_info "OpenCode installation verified successfully"
