@@ -178,6 +178,17 @@
         }
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and -m openrouter/... flag"
+    },
+    "opencode": {
+      "name": "OpenCode",
+      "description": "AI coding agent built for the terminal with TUI",
+      "url": "https://github.com/opencode-ai/opencode",
+      "install": "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash",
+      "launch": "opencode",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea."
     }
   },
   "clouds": {
@@ -342,6 +353,38 @@
         "image": "ubuntu:24.04"
       },
       "notes": "Uses Machines API for provisioning and flyctl SSH for exec. Docker-based, pay-per-second pricing. Requires flyctl CLI."
+    },
+    "civo": {
+      "name": "Civo",
+      "description": "Civo cloud-native instances via REST API",
+      "url": "https://www.civo.com/",
+      "type": "api",
+      "auth": "CIVO_API_TOKEN",
+      "provision_method": "POST /v2/instances with script",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "size": "g3.medium",
+        "region": "NYC1",
+        "image": "ubuntu-jammy"
+      },
+      "notes": "Fast provisioning (~45s), free data transfer, hourly billing. NVMe storage."
+    },
+    "scaleway": {
+      "name": "Scaleway",
+      "description": "Scaleway Cloud instances via REST API",
+      "url": "https://www.scaleway.com/",
+      "type": "api",
+      "auth": "SCW_SECRET_KEY",
+      "provision_method": "POST /instance/v1/zones/{zone}/servers",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "commercial_type": "DEV1-S",
+        "zone": "fr-par-1",
+        "image": "Ubuntu 24.04"
+      },
+      "notes": "European cloud provider. Requires SCW_SECRET_KEY and optionally SCW_DEFAULT_PROJECT_ID."
     }
   },
   "matrix": {
@@ -465,6 +508,41 @@
     "fly/gemini": "implemented",
     "fly/amazonq": "implemented",
     "fly/cline": "implemented",
-    "fly/gptme": "implemented"
+    "fly/gptme": "implemented",
+    "civo/claude": "implemented",
+    "civo/aider": "implemented",
+    "civo/codex": "implemented",
+    "civo/openclaw": "missing",
+    "civo/nanoclaw": "missing",
+    "civo/goose": "missing",
+    "civo/interpreter": "missing",
+    "civo/gemini": "missing",
+    "civo/amazonq": "missing",
+    "civo/cline": "missing",
+    "civo/gptme": "missing",
+    "sprite/opencode": "implemented",
+    "hetzner/opencode": "implemented",
+    "digitalocean/opencode": "missing",
+    "vultr/opencode": "missing",
+    "linode/opencode": "missing",
+    "lambda/opencode": "missing",
+    "aws-lightsail/opencode": "missing",
+    "gcp/opencode": "missing",
+    "e2b/opencode": "missing",
+    "modal/opencode": "missing",
+    "fly/opencode": "missing",
+    "civo/opencode": "missing",
+    "scaleway/claude": "implemented",
+    "scaleway/openclaw": "implemented",
+    "scaleway/nanoclaw": "implemented",
+    "scaleway/aider": "implemented",
+    "scaleway/goose": "implemented",
+    "scaleway/codex": "implemented",
+    "scaleway/interpreter": "implemented",
+    "scaleway/gemini": "implemented",
+    "scaleway/amazonq": "implemented",
+    "scaleway/cline": "implemented",
+    "scaleway/gptme": "implemented",
+    "scaleway/opencode": "implemented"
   }
 }
