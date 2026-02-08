@@ -25,7 +25,7 @@ log_warn "Installing Amazon Q CLI..."
 run_sprite "$SPRITE_NAME" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 
 echo ""
-if [[ -n "$OPENROUTER_API_KEY" ]]; then
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
     log_info "Using OpenRouter API key from environment"
 else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)

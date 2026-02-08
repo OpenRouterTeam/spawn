@@ -39,7 +39,7 @@ ensure_do_token() {
     check_python_available || return 1
 
     # 1. Check environment variable
-    if [[ -n "$DO_API_TOKEN" ]]; then
+    if [[ -n "${DO_API_TOKEN:-}" ]]; then
         log_info "Using DigitalOcean API token from environment"
         return 0
     fi
@@ -143,7 +143,7 @@ ensure_ssh_key() {
 
 # Get server name from env var or prompt
 get_server_name() {
-    if [[ -n "$DO_DROPLET_NAME" ]]; then
+    if [[ -n "${DO_DROPLET_NAME:-}" ]]; then
         log_info "Using droplet name from environment: $DO_DROPLET_NAME"
         if ! validate_server_name "$DO_DROPLET_NAME"; then
             return 1

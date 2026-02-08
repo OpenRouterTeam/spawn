@@ -29,7 +29,7 @@ log_info "Open Interpreter installed"
 
 # 5. Get OpenRouter API key
 echo ""
-if [[ -n "$OPENROUTER_API_KEY" ]]; then
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
     log_info "Using OpenRouter API key from environment"
 else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)

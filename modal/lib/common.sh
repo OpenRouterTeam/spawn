@@ -134,7 +134,7 @@ ensure_modal_cli() {
 }
 
 get_server_name() {
-    if [[ -n "$MODAL_SANDBOX_NAME" ]]; then
+    if [[ -n "${MODAL_SANDBOX_NAME:-}" ]]; then
         log_info "Using sandbox name from environment: $MODAL_SANDBOX_NAME"
         echo "$MODAL_SANDBOX_NAME"; return 0
     fi

@@ -30,7 +30,7 @@ ensure_sprite_authenticated() {
 # Prompt for sprite name
 get_sprite_name() {
     # Check if SPRITE_NAME is already set in environment
-    if [[ -n "$SPRITE_NAME" ]]; then
+    if [[ -n "${SPRITE_NAME:-}" ]]; then
         log_info "Using sprite name from environment: $SPRITE_NAME"
         if ! validate_server_name "$SPRITE_NAME"; then
             return 1

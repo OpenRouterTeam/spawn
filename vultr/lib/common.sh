@@ -36,7 +36,7 @@ ensure_vultr_token() {
     # Check Python 3 is available (required for JSON parsing)
     check_python_available || return 1
 
-    if [[ -n "$VULTR_API_KEY" ]]; then
+    if [[ -n "${VULTR_API_KEY:-}" ]]; then
         log_info "Using Vultr API key from environment"
         return 0
     fi
@@ -129,7 +129,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    if [[ -n "$VULTR_SERVER_NAME" ]]; then
+    if [[ -n "${VULTR_SERVER_NAME:-}" ]]; then
         log_info "Using server name from environment: $VULTR_SERVER_NAME"
         if ! validate_server_name "$VULTR_SERVER_NAME"; then
             return 1
