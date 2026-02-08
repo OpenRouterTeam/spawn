@@ -93,7 +93,8 @@ create_server() {
 
     log_warn "Creating Lightsail instance '$name' (bundle: $bundle, AZ: $az)..."
 
-    local userdata=$(get_cloud_init_userdata)
+    local userdata
+    userdata=$(get_cloud_init_userdata)
 
     aws lightsail create-instances \
         --instance-names "$name" \
@@ -116,7 +117,8 @@ create_server() {
     log_warn "Waiting for instance to become running..."
     local max_attempts=60 attempt=1
     while [[ $attempt -le $max_attempts ]]; do
-        local state=$(aws lightsail get-instance --instance-name "$name" \
+        local state
+        state=$(aws lightsail get-instance --instance-name "$name" \
             --query 'instance.state.name' --output text 2>/dev/null)
 
         if [[ "$state" == "running" ]]; then

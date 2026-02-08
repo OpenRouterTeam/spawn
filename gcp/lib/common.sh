@@ -85,9 +85,12 @@ create_server() {
 
     log_warn "Creating GCP instance '$name' (type: $machine_type, zone: $zone)..."
 
-    local userdata=$(get_cloud_init_userdata)
-    local pub_key=$(cat "$HOME/.ssh/id_ed25519.pub")
-    local username=$(whoami)
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+    local pub_key
+    pub_key=$(cat "$HOME/.ssh/id_ed25519.pub")
+    local username
+    username=$(whoami)
 
     gcloud compute instances create "$name" \
         --zone="$zone" \
@@ -119,7 +122,8 @@ create_server() {
 
 verify_server_connectivity() {
     local ip="$1" max_attempts=${2:-30} attempt=1
-    local username=$(whoami)
+    local username
+    username=$(whoami)
     log_warn "Waiting for SSH connectivity to $ip..."
     while [[ $attempt -le $max_attempts ]]; do
         # SSH_OPTS is defined in shared/common.sh
@@ -134,7 +138,8 @@ verify_server_connectivity() {
 
 wait_for_cloud_init() {
     local ip="$1" max_attempts=${2:-60} attempt=1
-    local username=$(whoami)
+    local username
+    username=$(whoami)
     log_warn "Waiting for startup script to complete..."
     while [[ $attempt -le $max_attempts ]]; do
         if ssh $SSH_OPTS "${username}@$ip" "test -f /tmp/.cloud-init-complete" >/dev/null 2>&1; then
@@ -148,19 +153,22 @@ wait_for_cloud_init() {
 # GCP uses current username
 run_server() {
     local ip="$1" cmd="$2"
-    local username=$(whoami)
+    local username
+    username=$(whoami)
     ssh $SSH_OPTS "${username}@$ip" "$cmd"
 }
 
 upload_file() {
     local ip="$1" local_path="$2" remote_path="$3"
-    local username=$(whoami)
+    local username
+    username=$(whoami)
     scp $SSH_OPTS "$local_path" "${username}@$ip:$remote_path"
 }
 
 interactive_session() {
     local ip="$1" cmd="$2"
-    local username=$(whoami)
+    local username
+    username=$(whoami)
     ssh -t $SSH_OPTS "${username}@$ip" "$cmd"
 }
 
