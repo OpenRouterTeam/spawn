@@ -123,4 +123,4 @@ manifest.json             # Source of truth for the matrix
 
 ## License
 
-MIT
+[Apache 2.0](LICENSE)
