@@ -1236,3 +1236,10 @@ ensure_ssh_key_with_provider() {
         return 1
     fi
 }
+
+# ============================================================
+# Auto-initialization
+# ============================================================
+
+# Auto-register cleanup trap when this file is sourced
+register_cleanup_trap

@@ -217,16 +217,16 @@ ensure_manifest() {
     log_info "Fetching manifest..."
     local tmp
     tmp=$(mktemp)
+    trap 'rm -f "${tmp}"' EXIT
     if curl -fsSL "${SPAWN_RAW_BASE}/manifest.json" -o "${tmp}" 2>/dev/null; then
         if json_validate "${tmp}"; then
             mv "${tmp}" "${SPAWN_MANIFEST}"
+            trap - EXIT  # Clear trap after successful move
             return 0
         else
-            rm -f "${tmp}"
             log_warn "Downloaded manifest is invalid JSON"
         fi
     else
-        rm -f "${tmp}"
         log_warn "Failed to fetch manifest"
     fi
 
@@ -535,29 +535,29 @@ cmd_update() {
     log_info "Checking for updates..."
     local tmp
     tmp=$(mktemp)
+    trap 'rm -f "${tmp}"' EXIT
     if curl -fsSL "${SPAWN_RAW_BASE}/cli/spawn.sh" -o "${tmp}" 2>/dev/null; then
         local remote_version
         remote_version=$(grep '^SPAWN_VERSION=' "${tmp}" | head -1 | cut -d'"' -f2)
         if [[ -z "${remote_version}" ]]; then
-            rm -f "${tmp}"
             log_error "Could not determine remote version"
             exit 1
         fi
 
         if [[ "${remote_version}" == "${SPAWN_VERSION}" ]]; then
-            rm -f "${tmp}"
+            trap - EXIT  # Clear trap, file already cleaned
             log_info "Already up to date (v${SPAWN_VERSION})"
             return 0
         fi
 
         chmod +x "${tmp}"
         mv "${tmp}" "${self}"
+        trap - EXIT  # Clear trap after successful move
         log_info "Updated: v${SPAWN_VERSION} → v${remote_version}"
 
         # Invalidate manifest cache on update
         rm -f "${SPAWN_MANIFEST}"
     else
-        rm -f "${tmp}"
         log_error "Failed to download update"
         exit 1
     fi
