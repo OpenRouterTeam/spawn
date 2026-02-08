@@ -77,6 +77,6 @@ else
     # Interactive mode: start Claude Code normally
     log_warn "Starting Claude Code..."
     sleep 1
-    clear
+    clear 2>/dev/null || true
     sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && claude"
 fi

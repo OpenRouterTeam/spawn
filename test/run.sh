@@ -164,8 +164,8 @@ run_script_test() {
     case "${script_name}" in
         claude)
             assert_contains "${MOCK_LOG}" "claude install" "Installs Claude Code"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/claude_settings" "Uploads Claude settings"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/claude_global" "Uploads Claude global state"
+            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*settings.json" "Uploads Claude settings"
+            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*\.claude\.json" "Uploads Claude global state"
             ;;
         openclaw)
             assert_contains "${MOCK_LOG}" "sprite exec.*bun install -g openclaw" "Installs openclaw via bun"
