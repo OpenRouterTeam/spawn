@@ -36,13 +36,32 @@ ensure_e2b_cli() {
     log_info "E2B CLI available"
 }
 
+test_e2b_token() {
+    local test_response
+    # Test token by listing sandboxes (lightweight API call)
+    test_response=$(e2b sandbox list 2>&1)
+    local exit_code=$?
+
+    if [[ ${exit_code} -ne 0 ]]; then
+        if echo "${test_response}" | grep -qi "unauthorized\|invalid.*key\|authentication"; then
+            log_error "Invalid API key"
+            log_warn "Remediation steps:"
+            log_warn "  1. Verify API key at: https://e2b.dev/dashboard"
+            log_warn "  2. Ensure the key has appropriate permissions"
+            log_warn "  3. Check key hasn't been revoked"
+            return 1
+        fi
+    fi
+    return 0
+}
+
 ensure_e2b_token() {
     ensure_api_token_with_provider \
         "E2B" \
         "E2B_API_KEY" \
         "${HOME}/.config/spawn/e2b.json" \
         "https://e2b.dev/dashboard" \
-        ""
+        "test_e2b_token"
 }
 
 get_server_name() {
