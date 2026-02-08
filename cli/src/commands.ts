@@ -16,9 +16,26 @@ import { VERSION } from "./version.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+const FETCH_TIMEOUT = 10_000; // 10 seconds
+
 function handleCancel(): never {
   p.cancel("Cancelled.");
   process.exit(0);
+}
+
+function spawnBashScript(script: string, args: string[], cwd?: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("bash", [script, ...args], {
+      cwd: cwd || process.cwd(),
+      stdio: "inherit",
+      env: process.env,
+    });
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${script} exited with code ${code}`));
+    });
+    child.on("error", reject);
+  });
 }
 
 async function withSpinner<T>(msg: string, fn: () => Promise<T>): Promise<T> {
@@ -336,18 +353,7 @@ export async function cmdImprove(args: string[]) {
     }
   }
 
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn("bash", ["improve.sh", ...args], {
-      cwd: repoDir,
-      stdio: "inherit",
-      env: process.env,
-    });
-    child.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`improve.sh exited with code ${code}`));
-    });
-    child.on("error", reject);
-  });
+  return spawnBashScript("improve.sh", args, repoDir);
 }
 
 // ── Update ─────────────────────────────────────────────────────────────────────
@@ -358,7 +364,7 @@ export async function cmdUpdate() {
 
   try {
     const res = await fetch(`${RAW_BASE}/cli/package.json`, {
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
     if (!res.ok) throw new Error("fetch failed");
     const pkg = (await res.json()) as { version: string };
