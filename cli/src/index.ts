@@ -13,14 +13,39 @@ import {
 import { loadManifest } from "./manifest.js";
 import { VERSION } from "./version.js";
 
+function isInteractiveTTY(): boolean {
+  return process.stdin.isTTY && process.stdout.isTTY;
+}
+
+function handleError(err: unknown): never {
+  if (err instanceof Error) {
+    console.error(`Error: ${err.message}`);
+  }
+  process.exit(1);
+}
+
+async function handleDefaultCommand(agent: string, cloud: string | undefined): Promise<void> {
+  const manifest = await loadManifest();
+  if (!manifest.agents[agent]) {
+    console.error(`Unknown command or agent: ${agent}`);
+    console.error(`Run 'spawn help' for usage.`);
+    process.exit(1);
+  }
+
+  if (cloud) {
+    await cmdRun(agent, cloud);
+  } else {
+    await cmdAgentInfo(agent);
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const cmd = args[0];
 
   try {
     if (!cmd) {
-      // No args + interactive terminal → picker
-      if (process.stdin.isTTY && process.stdout.isTTY) {
+      if (isInteractiveTTY()) {
         await cmdInteractive();
       } else {
         cmdHelp();
@@ -63,32 +88,12 @@ async function main() {
         await cmdUpdate();
         break;
 
-      default: {
-        // spawn <agent> or spawn <agent> <cloud>
-        const agent = args[0];
-        const cloud = args[1];
-
-        // Quick check: is this a known agent?
-        const manifest = await loadManifest();
-        if (!manifest.agents[agent]) {
-          console.error(`Unknown command or agent: ${agent}`);
-          console.error(`Run 'spawn help' for usage.`);
-          process.exit(1);
-        }
-
-        if (cloud) {
-          await cmdRun(agent, cloud);
-        } else {
-          await cmdAgentInfo(agent);
-        }
+      default:
+        await handleDefaultCommand(args[0], args[1]);
         break;
-      }
     }
   } catch (err) {
-    if (err instanceof Error) {
-      console.error(`Error: ${err.message}`);
-    }
-    process.exit(1);
+    handleError(err);
   }
 }
 
