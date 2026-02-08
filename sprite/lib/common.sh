@@ -2,12 +2,13 @@
 set -euo pipefail
 # Common bash functions shared between spawn scripts
 
-# Source shared provider-agnostic functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../shared/common.sh" || {
-    echo "ERROR: Failed to load shared/common.sh" >&2
-    exit 1
-}
+# Source shared provider-agnostic functions (local or remote fallback)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../shared/common.sh" ]]; then
+    source "$SCRIPT_DIR/../../shared/common.sh"
+else
+    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
+fi
 
 # Check if sprite CLI is installed, install if not
 ensure_sprite_installed() {
