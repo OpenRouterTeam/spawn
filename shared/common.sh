@@ -473,10 +473,8 @@ try_oauth_flow() {
     local code_file="$oauth_dir/code"
 
     log_warn "Starting local OAuth server on port ${callback_port}..."
-    local response_file="$oauth_dir/response.http"
-    write_oauth_response_file "$response_file"
     local server_pid
-    server_pid=$(start_oauth_server "$callback_port" "$code_file" "$response_file")
+    server_pid=$(start_oauth_server "$callback_port" "$code_file")
 
     sleep 1
     if ! kill -0 "$server_pid" 2>/dev/null; then
