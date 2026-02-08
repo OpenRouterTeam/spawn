@@ -53,7 +53,7 @@ inject_env_vars_ssh "${HETZNER_SERVER_IP}" upload_file run_server \
 log_warn "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
-trap 'rm -f "${ENV_TEMP}" "${DOTENV_TEMP}"' EXIT
+trap 'rm -f "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
 cat > "${DOTENV_TEMP}" << EOF
 ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
