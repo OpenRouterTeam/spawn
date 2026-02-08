@@ -363,6 +363,43 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 
 ---
 
+## Fly.io
+
+Spawn agents on [Fly.io](https://fly.io) Machines via REST API and flyctl CLI. Docker-based VMs with pay-per-second pricing.
+
+### Usage
+
+#### Claude Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/claude.sh)
+```
+
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/aider.sh)
+```
+
+### Non-Interactive Mode
+
+```bash
+FLY_APP_NAME=dev-mk1 \
+FLY_API_TOKEN=your-fly-api-token \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/claude.sh)
+```
+
+**Environment Variables:**
+- `FLY_APP_NAME` - Name for the Fly app (skips prompt)
+- `FLY_API_TOKEN` - Fly.io API token (skips prompt, saved to `~/.config/spawn/fly.json`)
+- `OPENROUTER_API_KEY` - Skip OAuth and use this API key directly
+- `FLY_REGION` - Deployment region (default: `iad`)
+- `FLY_VM_MEMORY` - VM memory in MB (default: `1024`)
+- `FLY_ORG` - Fly.io organization slug (default: `personal`)
+
+---
+
 ## Architecture
 
 Spawn uses a **shared library pattern** to reduce code duplication across cloud providers:
@@ -456,6 +493,7 @@ Spawn stores cloud provider API tokens and OpenRouter API keys locally in JSON f
 - `digitalocean.json` - DigitalOcean API token
 - `vultr.json` - Vultr API key
 - `linode.json` - Linode API token
+- `fly.json` - Fly.io API token
 - OpenRouter API keys stored in shell config files (`~/.bashrc`, `~/.zshrc`)
 
 **Security Posture:**
