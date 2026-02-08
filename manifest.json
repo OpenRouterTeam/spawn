@@ -447,6 +447,38 @@
         "image": "Ubuntu Server 24.04 LTS"
       },
       "notes": "European cloud provider with MaxIOPS storage. Uses HTTP Basic Auth (username:password). Requires UPCLOUD_USERNAME and UPCLOUD_PASSWORD."
+    },
+    "binarylane": {
+      "name": "BinaryLane",
+      "description": "BinaryLane Australian cloud servers via REST API",
+      "url": "https://www.binarylane.com.au/",
+      "type": "api",
+      "auth": "BINARYLANE_API_TOKEN",
+      "provision_method": "POST /v2/servers with user_data",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "size": "std-1vcpu",
+        "region": "syd",
+        "image": "ubuntu-24.04"
+      },
+      "notes": "Australian cloud provider. Hourly billing prorated from monthly rates. API documentation at api.binarylane.com.au/reference/"
+    },
+    "genesiscloud": {
+      "name": "Genesis Cloud",
+      "description": "Genesis Cloud GPU instances via REST API",
+      "url": "https://www.genesiscloud.com/",
+      "type": "api",
+      "auth": "GENESIS_API_KEY",
+      "provision_method": "POST /compute/v1/instances with ssh_keys",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "instance_type": "vcpu-4_memory-12g_nvidia-rtx-3080-1",
+        "region": "ARC-IS-HAF-1",
+        "image": "Ubuntu 24.04"
+      },
+      "notes": "GPU cloud provider with NVIDIA RTX 3080/3090, A100, and H100 instances. European data centers (Iceland, Norway). Requires GENESIS_API_KEY from https://developers.genesiscloud.com/"
     }
   },
   "matrix": {
@@ -657,6 +689,32 @@
     "upcloud/cline": "implemented",
     "upcloud/gptme": "implemented",
     "upcloud/opencode": "implemented",
-    "upcloud/plandex": "implemented"
+    "upcloud/plandex": "implemented",
+    "binarylane/claude": "implemented",
+    "binarylane/openclaw": "missing",
+    "binarylane/nanoclaw": "missing",
+    "binarylane/aider": "missing",
+    "binarylane/goose": "implemented",
+    "binarylane/codex": "missing",
+    "binarylane/interpreter": "missing",
+    "binarylane/gemini": "missing",
+    "binarylane/amazonq": "missing",
+    "binarylane/cline": "missing",
+    "binarylane/gptme": "missing",
+    "binarylane/opencode": "missing",
+    "binarylane/plandex": "implemented",
+    "genesiscloud/claude": "implemented",
+    "genesiscloud/openclaw": "implemented",
+    "genesiscloud/nanoclaw": "missing",
+    "genesiscloud/aider": "implemented",
+    "genesiscloud/goose": "missing",
+    "genesiscloud/codex": "missing",
+    "genesiscloud/interpreter": "missing",
+    "genesiscloud/gemini": "missing",
+    "genesiscloud/amazonq": "missing",
+    "genesiscloud/cline": "missing",
+    "genesiscloud/gptme": "missing",
+    "genesiscloud/opencode": "missing",
+    "genesiscloud/plandex": "missing"
   }
 }
