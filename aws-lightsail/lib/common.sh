@@ -133,17 +133,10 @@ create_server() {
 }
 
 verify_server_connectivity() {
-    local ip="${1}" max_attempts=${2:-30} attempt=1
-    log_warn "Waiting for SSH connectivity to ${ip}..."
-    while [[ ${attempt} -le ${max_attempts} ]]; do
-        # SSH_OPTS is defined in shared/common.sh
-        # shellcheck disable=SC2154,SC2086
-        if ssh ${SSH_OPTS} -o ConnectTimeout=5 "ubuntu@${ip}" "echo ok" >/dev/null 2>&1; then
-            log_info "SSH connection established"; return 0
-        fi
-        log_warn "Waiting for SSH... (${attempt}/${max_attempts})"; sleep 5; attempt=$((attempt + 1))
-    done
-    log_error "Server failed to respond via SSH after ${max_attempts} attempts"; return 1
+    local ip="${1}" max_attempts=${2:-30}
+    # Use shared generic_ssh_wait with exponential backoff
+    # shellcheck disable=SC2086,SC2154
+    generic_ssh_wait "ubuntu" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" "${max_attempts}"
 }
 
 wait_for_cloud_init() {
