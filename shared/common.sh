@@ -18,15 +18,15 @@ NC='\033[0m' # No Color
 
 # Print colored messages (to stderr so they don't pollute command substitution output)
 log_info() {
-    echo -e "${GREEN}$1${NC}" >&2
+    echo -e "${GREEN}${1}${NC}" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}$1${NC}" >&2
+    echo -e "${YELLOW}${1}${NC}" >&2
 }
 
 log_error() {
-    echo -e "${RED}$1${NC}" >&2
+    echo -e "${RED}${1}${NC}" >&2
 }
 
 # ============================================================
@@ -57,22 +57,22 @@ check_python_available() {
 
 # Safe read function that works in both interactive and non-interactive modes
 safe_read() {
-    local prompt="$1"
+    local prompt="${1}"
     local result=""
 
     if [[ -t 0 ]]; then
         # stdin is a terminal - read directly
-        read -p "$prompt" result
+        read -p "${prompt}" result
     elif echo -n "" > /dev/tty 2>/dev/null; then
         # /dev/tty is functional - use it
-        read -p "$prompt" result < /dev/tty
+        read -p "${prompt}" result < /dev/tty
     else
         # No interactive input available
         log_error "Cannot read input: no TTY available"
         return 1
     fi
 
-    echo "$result"
+    echo "${result}"
 }
 
 # ============================================================
@@ -89,13 +89,13 @@ find_node_runtime() {
 
 # Open browser to URL (supports macOS, Linux, Termux)
 open_browser() {
-    local url=$1
+    local url=${1}
     if command -v termux-open-url &> /dev/null; then
-        termux-open-url "$url" </dev/null
+        termux-open-url "${url}" </dev/null
     elif command -v open &> /dev/null; then
-        open "$url" </dev/null
+        open "${url}" </dev/null
     elif command -v xdg-open &> /dev/null; then
-        xdg-open "$url" </dev/null
+        xdg-open "${url}" </dev/null
     else
         log_warn "Please open: ${url}"
     fi
@@ -103,9 +103,9 @@ open_browser() {
 
 # Validate model ID to prevent command injection
 validate_model_id() {
-    local model_id="$1"
-    if [[ -z "$model_id" ]]; then return 0; fi
-    if [[ ! "$model_id" =~ ^[a-zA-Z0-9/_:.-]+$ ]]; then
+    local model_id="${1}"
+    if [[ -z "${model_id}" ]]; then return 0; fi
+    if [[ ! "${model_id}" =~ ^[a-zA-Z0-9/_:.-]+$ ]]; then
         log_error "Invalid model ID: contains unsafe characters"
         log_error "Model IDs should only contain: letters, numbers, /, -, _, :, ."
         return 1
@@ -116,46 +116,46 @@ validate_model_id() {
 # Validate server/sprite name to prevent injection and ensure cloud provider compatibility
 # Server names must be 3-63 characters, alphanumeric + dash, no leading/trailing dash
 validate_server_name() {
-    local server_name="$1"
+    local server_name="${1}"
 
-    if [[ -z "$server_name" ]]; then
+    if [[ -z "${server_name}" ]]; then
         log_error "Server name cannot be empty"
         return 1
     fi
 
     # Check length (3-63 characters)
     local name_length=${#server_name}
-    if [[ $name_length -lt 3 ]]; then
-        log_error "Server name too short: '$server_name' (minimum 3 characters)"
+    if [[ ${name_length} -lt 3 ]]; then
+        log_error "Server name too short: '${server_name}' (minimum 3 characters)"
         log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
         return 1
     fi
 
-    if [[ $name_length -gt 63 ]]; then
-        log_error "Server name too long: '$server_name' (maximum 63 characters)"
+    if [[ ${name_length} -gt 63 ]]; then
+        log_error "Server name too long: '${server_name}' (maximum 63 characters)"
         log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
         return 1
     fi
 
     # Check for valid characters (alphanumeric + dash only)
-    if [[ ! "$server_name" =~ ^[a-zA-Z0-9-]+$ ]]; then
-        log_error "Invalid server name: '$server_name'"
+    if [[ ! "${server_name}" =~ ^[a-zA-Z0-9-]+$ ]]; then
+        log_error "Invalid server name: '${server_name}'"
         log_error "Server names must contain only alphanumeric characters and dashes"
         log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
         return 1
     fi
 
     # Check no leading dash
-    if [[ "$server_name" =~ ^- ]]; then
-        log_error "Invalid server name: '$server_name'"
+    if [[ "${server_name}" =~ ^- ]]; then
+        log_error "Invalid server name: '${server_name}'"
         log_error "Server names cannot start with a dash"
         log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
         return 1
     fi
 
     # Check no trailing dash
-    if [[ "$server_name" =~ -$ ]]; then
-        log_error "Invalid server name: '$server_name'"
+    if [[ "${server_name}" =~ -$ ]]; then
+        log_error "Invalid server name: '${server_name}'"
         log_error "Server names cannot end with a dash"
         log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
         return 1
@@ -168,15 +168,15 @@ validate_server_name() {
 # Allows alphanumeric, dashes, underscores, and common token separators
 # Blocks shell metacharacters: ; ' " < > | & $ ` \ ( )
 validate_api_token() {
-    local token="$1"
+    local token="${1}"
 
-    if [[ -z "$token" ]]; then
+    if [[ -z "${token}" ]]; then
         log_error "API token cannot be empty"
         return 1
     fi
 
     # Block shell metacharacters that could enable command injection
-    if [[ "$token" =~ [\;\'\"\<\>\|\&\$\`\\\(\)] ]]; then
+    if [[ "${token}" =~ [\;\'\"\<\>\|\&\$\`\\\(\)] ]]; then
         log_error "Invalid token format: contains shell metacharacters"
         log_error "Tokens should not contain: ; ' \" < > | & \$ \` \\ ( )"
         return 1
@@ -188,15 +188,15 @@ validate_api_token() {
 # Validate region/location name (cloud provider regions, datacenters, zones)
 # Alphanumeric, hyphens, underscores only, 1-63 chars
 validate_region_name() {
-    local region="$1"
+    local region="${1}"
 
-    if [[ -z "$region" ]]; then
+    if [[ -z "${region}" ]]; then
         log_error "Region name cannot be empty"
         return 1
     fi
 
-    if [[ ! "$region" =~ ^[a-zA-Z0-9_-]{1,63}$ ]]; then
-        log_error "Invalid region name: '$region'"
+    if [[ ! "${region}" =~ ^[a-zA-Z0-9_-]{1,63}$ ]]; then
+        log_error "Invalid region name: '${region}'"
         log_error "Region names must be 1-63 characters: alphanumeric, hyphens, underscores only"
         return 1
     fi
@@ -207,15 +207,15 @@ validate_region_name() {
 # Validate resource name (generic: server types, sizes, plans, etc.)
 # Alphanumeric, hyphens, underscores, dots, 1-63 chars
 validate_resource_name() {
-    local name="$1"
+    local name="${1}"
 
-    if [[ -z "$name" ]]; then
+    if [[ -z "${name}" ]]; then
         log_error "Resource name cannot be empty"
         return 1
     fi
 
-    if [[ ! "$name" =~ ^[a-zA-Z0-9_.-]{1,63}$ ]]; then
-        log_error "Invalid resource name: '$name'"
+    if [[ ! "${name}" =~ ^[a-zA-Z0-9_.-]{1,63}$ ]]; then
+        log_error "Invalid resource name: '${name}'"
         log_error "Resource names must be 1-63 characters: alphanumeric, hyphens, underscores, dots only"
         return 1
     fi
@@ -228,19 +228,19 @@ validate_resource_name() {
 # Returns: Validated input via stdout, or exits on error/empty input
 # Example: api_key=$(validated_read "Enter API key: " validate_api_token)
 validated_read() {
-    local prompt="$1"
-    local validator="$2"
+    local prompt="${1}"
+    local validator="${2}"
     local value
 
     while true; do
-        value=$(safe_read "$prompt") || return 1
+        value=$(safe_read "${prompt}") || return 1
 
-        if [[ -z "$value" ]]; then
+        if [[ -z "${value}" ]]; then
             return 1
         fi
 
-        if "$validator" "$value"; then
-            echo "$value"
+        if "${validator}" "${value}"; then
+            echo "${value}"
             return 0
         fi
 
@@ -253,24 +253,24 @@ validated_read() {
 # Returns: Resource name via stdout
 # Example: get_resource_name "LIGHTSAIL_SERVER_NAME" "Enter Lightsail instance name: "
 get_resource_name() {
-    local env_var_name="$1"
-    local prompt_text="$2"
+    local env_var_name="${1}"
+    local prompt_text="${2}"
     local resource_value="${!env_var_name}"
 
-    if [[ -n "$resource_value" ]]; then
-        log_info "Using ${prompt_text%:*} from environment: $resource_value"
-        echo "$resource_value"
+    if [[ -n "${resource_value}" ]]; then
+        log_info "Using ${prompt_text%:*} from environment: ${resource_value}"
+        echo "${resource_value}"
         return 0
     fi
 
     local name
-    name=$(safe_read "$prompt_text")
-    if [[ -z "$name" ]]; then
+    name=$(safe_read "${prompt_text}")
+    if [[ -z "${name}" ]]; then
         log_error "${prompt_text%:*} is required"
-        log_warn "Set $env_var_name environment variable for non-interactive usage"
+        log_warn "Set ${env_var_name} environment variable for non-interactive usage"
         return 1
     fi
-    echo "$name"
+    echo "${name}"
 }
 # Interactively prompt for model ID with validation
 # Usage: get_model_id_interactive [default_model] [agent_name]
@@ -282,22 +282,22 @@ get_model_id_interactive() {
 
     echo ""
     log_warn "Browse models at: https://openrouter.ai/models"
-    if [[ -n "$agent_name" ]]; then
-        log_warn "Which model would you like to use with $agent_name?"
+    if [[ -n "${agent_name}" ]]; then
+        log_warn "Which model would you like to use with ${agent_name}?"
     else
         log_warn "Which model would you like to use?"
     fi
 
     local model_id=""
-    model_id=$(safe_read "Enter model ID [$default_model]: ") || model_id=""
-    model_id="${model_id:-$default_model}"
+    model_id=$(safe_read "Enter model ID [${default_model}]: ") || model_id=""
+    model_id="${model_id:-${default_model}}"
 
-    if ! validate_model_id "$model_id"; then
+    if ! validate_model_id "${model_id}"; then
         log_error "Exiting due to invalid model ID"
         return 1
     fi
 
-    echo "$model_id"
+    echo "${model_id}"
 }
 
 # ============================================================
@@ -312,17 +312,17 @@ get_openrouter_api_key_manual() {
     echo ""
 
     local api_key=""
-    while [[ -z "$api_key" ]]; do
+    while [[ -z "${api_key}" ]]; do
         api_key=$(safe_read "Enter your OpenRouter API key: ") || return 1
 
         # Basic validation - OpenRouter keys typically start with "sk-or-"
-        if [[ -z "$api_key" ]]; then
+        if [[ -z "${api_key}" ]]; then
             log_error "API key cannot be empty"
-        elif [[ ! "$api_key" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
+        elif [[ ! "${api_key}" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
             log_warn "Warning: API key format doesn't match expected pattern (sk-or-v1-...)"
             local confirm
             confirm=$(safe_read "Use this key anyway? (y/N): ") || return 1
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            if [[ "${confirm}" =~ ^[Yy]$ ]]; then
                 break
             else
                 api_key=""
@@ -331,18 +331,18 @@ get_openrouter_api_key_manual() {
     done
 
     log_info "API key accepted!"
-    echo "$api_key"
+    echo "${api_key}"
 }
 
 # Start OAuth callback server using Node.js/Bun HTTP server
 # Proper HTTP server — handles multiple connections, favicon requests, etc.
 # $1=port $2=code_file
 start_oauth_server() {
-    local port="$1"
-    local code_file="$2"
+    local port="${1}"
+    local code_file="${2}"
     local runtime=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
 
-    "$runtime" -e "
+    "${runtime}" -e "
 const http = require('http');
 const fs = require('fs');
 const url = require('url');
@@ -350,7 +350,7 @@ const html = '<html><head><style>body{font-family:system-ui,-apple-system,sans-s
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url, true);
   if (parsed.pathname === '/callback' && parsed.query.code) {
-    fs.writeFileSync('$code_file', parsed.query.code);
+    fs.writeFileSync('${code_file}', parsed.query.code);
     res.writeHead(200, {'Content-Type':'text/html','Connection':'close'});
     res.end(html);
     setTimeout(() => { server.close(); process.exit(0); }, 500);
@@ -359,7 +359,7 @@ const server = http.createServer((req, res) => {
     res.end('<html><body>Waiting for OAuth callback...</body></html>');
   }
 });
-server.listen($port, '127.0.0.1', () => {
+server.listen(${port}, '127.0.0.1', () => {
   fs.writeFileSync('/dev/fd/1', '');
 });
 server.on('error', () => process.exit(1));
@@ -371,50 +371,50 @@ setTimeout(() => process.exit(0), 300000);
 
 # Wait for OAuth code with timeout, returns 0 if code received
 wait_for_oauth_code() {
-    local code_file="$1"
+    local code_file="${1}"
     local timeout="${2:-120}"
     local elapsed=0
 
-    while [[ ! -f "$code_file" ]] && [[ $elapsed -lt $timeout ]]; do
+    while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep 1
         elapsed=$((elapsed + 1))
     done
 
-    [[ -f "$code_file" ]]
+    [[ -f "${code_file}" ]]
 }
 
 # Exchange OAuth code for API key
 exchange_oauth_code() {
-    local oauth_code="$1"
+    local oauth_code="${1}"
 
     local key_response
     key_response=$(curl -s -X POST "https://openrouter.ai/api/v1/auth/keys" \
         -H "Content-Type: application/json" \
-        -d "{\"code\": \"$oauth_code\"}")
+        -d "{\"code\": \"${oauth_code}\"}")
 
     local api_key
-    api_key=$(echo "$key_response" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
+    api_key=$(echo "${key_response}" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
 
-    if [[ -z "$api_key" ]]; then
+    if [[ -z "${api_key}" ]]; then
         log_error "Failed to exchange OAuth code: ${key_response}"
         return 1
     fi
 
-    echo "$api_key"
+    echo "${api_key}"
 }
 
 # Clean up OAuth session resources
 cleanup_oauth_session() {
-    local server_pid="$1"
-    local oauth_dir="$2"
+    local server_pid="${1}"
+    local oauth_dir="${2}"
 
-    if [[ -n "$server_pid" ]]; then
-        kill "$server_pid" 2>/dev/null || true
-        wait "$server_pid" 2>/dev/null || true
+    if [[ -n "${server_pid}" ]]; then
+        kill "${server_pid}" 2>/dev/null || true
+        wait "${server_pid}" 2>/dev/null || true
     fi
 
-    if [[ -n "$oauth_dir" && -d "$oauth_dir" ]]; then
-        rm -rf "$oauth_dir"
+    if [[ -n "${oauth_dir}" && -d "${oauth_dir}" ]]; then
+        rm -rf "${oauth_dir}"
     fi
 }
 
@@ -427,19 +427,19 @@ check_openrouter_connectivity() {
 
     # Try curl with short timeout if available
     if command -v curl &> /dev/null; then
-        if curl -s --connect-timeout "$timeout" --max-time "$timeout" "https://$host" -o /dev/null 2>/dev/null; then
+        if curl -s --connect-timeout "${timeout}" --max-time "${timeout}" "https://${host}" -o /dev/null 2>/dev/null; then
             return 0
         fi
     fi
 
     # Fallback to nc/telnet test
     if command -v nc &> /dev/null; then
-        if timeout "$timeout" nc -z "$host" "$port" 2>/dev/null; then
+        if timeout "${timeout}" nc -z "${host}" "${port}" 2>/dev/null; then
             return 0
         fi
     elif command -v timeout &> /dev/null && command -v bash &> /dev/null; then
         # Bash TCP socket test as last resort
-        if timeout "$timeout" bash -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null; then
+        if timeout "${timeout}" bash -c "exec 3<>/dev/tcp/${host}/${port}" 2>/dev/null; then
             return 0
         fi
     fi
@@ -461,7 +461,7 @@ try_oauth_flow() {
     fi
 
     local runtime=$(find_node_runtime)
-    if [[ -z "$runtime" ]]; then
+    if [[ -z "${runtime}" ]]; then
         log_warn "No Node.js runtime (bun/node) found - OAuth server unavailable"
         return 1
     fi
@@ -470,38 +470,38 @@ try_oauth_flow() {
     local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
     local oauth_dir
     oauth_dir=$(mktemp -d)
-    local code_file="$oauth_dir/code"
+    local code_file="${oauth_dir}/code"
 
     log_warn "Starting local OAuth server on port ${callback_port}..."
     local server_pid
-    server_pid=$(start_oauth_server "$callback_port" "$code_file")
+    server_pid=$(start_oauth_server "${callback_port}" "${code_file}")
 
     sleep 1
-    if ! kill -0 "$server_pid" 2>/dev/null; then
+    if ! kill -0 "${server_pid}" 2>/dev/null; then
         log_warn "Failed to start OAuth server (port may be in use)"
-        cleanup_oauth_session "" "$oauth_dir"
+        cleanup_oauth_session "" "${oauth_dir}"
         return 1
     fi
 
     log_warn "Opening browser to authenticate with OpenRouter..."
-    open_browser "$auth_url"
+    open_browser "${auth_url}"
 
-    if ! wait_for_oauth_code "$code_file" 120; then
+    if ! wait_for_oauth_code "${code_file}" 120; then
         log_warn "OAuth timeout - no response received"
-        cleanup_oauth_session "$server_pid" "$oauth_dir"
+        cleanup_oauth_session "${server_pid}" "${oauth_dir}"
         return 1
     fi
 
     local oauth_code
-    oauth_code=$(cat "$code_file")
-    cleanup_oauth_session "$server_pid" "$oauth_dir"
+    oauth_code=$(cat "${code_file}")
+    cleanup_oauth_session "${server_pid}" "${oauth_dir}"
 
     log_warn "Exchanging OAuth code for API key..."
     local api_key
-    api_key=$(exchange_oauth_code "$oauth_code") || return 1
+    api_key=$(exchange_oauth_code "${oauth_code}") || return 1
 
     log_info "Successfully obtained OpenRouter API key via OAuth!"
-    echo "$api_key"
+    echo "${api_key}"
 }
 
 # Main function: Try OAuth, fallback to manual entry
@@ -510,10 +510,10 @@ get_openrouter_api_key_oauth() {
 
     # Try OAuth flow first
     local api_key
-    api_key=$(try_oauth_flow "$callback_port")
+    api_key=$(try_oauth_flow "${callback_port}")
 
-    if [[ -n "$api_key" ]]; then
-        echo "$api_key"
+    if [[ -n "${api_key}" ]]; then
+        echo "${api_key}"
         return 0
     fi
 
@@ -529,9 +529,9 @@ get_openrouter_api_key_oauth() {
         return 1
     }
 
-    if [[ ! "$manual_choice" =~ ^[Nn]$ ]]; then
+    if [[ ! "${manual_choice}" =~ ^[Nn]$ ]]; then
         api_key=$(get_openrouter_api_key_manual)
-        echo "$api_key"
+        echo "${api_key}"
         return 0
     else
         log_error "Authentication cancelled by user"
@@ -550,7 +550,7 @@ generate_env_config() {
     echo ""
     echo "# [spawn:env]"
     for env_pair in "$@"; do
-        echo "export $env_pair"
+        echo "export ${env_pair}"
     done
 }
 
@@ -560,21 +560,21 @@ generate_env_config() {
 #            "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
 #            "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 inject_env_vars_ssh() {
-    local server_ip="$1"
-    local upload_func="$2"
-    local run_func="$3"
+    local server_ip="${1}"
+    local upload_func="${2}"
+    local run_func="${3}"
     shift 3
 
     local env_temp
     env_temp=$(mktemp)
-    chmod 600 "$env_temp"
-    track_temp_file "$env_temp"
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
 
-    generate_env_config "$@" > "$env_temp"
+    generate_env_config "$@" > "${env_temp}"
 
     # Upload and append to .zshrc
-    "$upload_func" "$server_ip" "$env_temp" "/tmp/env_config"
-    "$run_func" "$server_ip" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
+    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 }
@@ -589,8 +589,8 @@ CLEANUP_TEMP_FILES=()
 # Track a temporary file for cleanup on exit
 # Usage: track_temp_file PATH
 track_temp_file() {
-    local temp_file="$1"
-    CLEANUP_TEMP_FILES+=("$temp_file")
+    local temp_file="${1}"
+    CLEANUP_TEMP_FILES+=("${temp_file}")
 }
 
 # Cleanup function for temporary files
@@ -599,13 +599,13 @@ cleanup_temp_files() {
     local exit_code=$?
 
     for temp_file in "${CLEANUP_TEMP_FILES[@]}"; do
-        if [[ -f "$temp_file" ]]; then
+        if [[ -f "${temp_file}" ]]; then
             # Securely remove temp files (may contain credentials)
-            shred -f -u "$temp_file" 2>/dev/null || rm -f "$temp_file"
+            shred -f -u "${temp_file}" 2>/dev/null || rm -f "${temp_file}"
         fi
     done
 
-    return $exit_code
+    return ${exit_code}
 }
 
 # Register cleanup trap handler
@@ -620,7 +620,7 @@ register_cleanup_trap() {
 
 # Default SSH options for all cloud providers
 # Clouds can override this if they need provider-specific settings
-readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i $HOME/.ssh/id_ed25519"
+readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i ${HOME}/.ssh/id_ed25519"
 
 # ============================================================
 # SSH key management helpers
@@ -629,42 +629,42 @@ readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -
 # Generate SSH key if it doesn't exist
 # Usage: generate_ssh_key_if_missing KEY_PATH
 generate_ssh_key_if_missing() {
-    local key_path="$1"
-    if [[ -f "$key_path" ]]; then
+    local key_path="${1}"
+    if [[ -f "${key_path}" ]]; then
         return 0
     fi
     log_warn "Generating SSH key..."
-    mkdir -p "$(dirname "$key_path")"
-    ssh-keygen -t ed25519 -f "$key_path" -N "" -q
-    log_info "SSH key generated at $key_path"
+    mkdir -p "$(dirname "${key_path}")"
+    ssh-keygen -t ed25519 -f "${key_path}" -N "" -q
+    log_info "SSH key generated at ${key_path}"
 }
 
 # Get MD5 fingerprint of SSH public key
 # Usage: get_ssh_fingerprint PUB_KEY_PATH
 get_ssh_fingerprint() {
-    local pub_path="$1"
-    ssh-keygen -lf "$pub_path" -E md5 2>/dev/null | awk '{print $2}' | sed 's/MD5://'
+    local pub_path="${1}"
+    ssh-keygen -lf "${pub_path}" -E md5 2>/dev/null | awk '{print $2}' | sed 's/MD5://'
 }
 
 # JSON-escape a string (for embedding in JSON bodies)
 # Usage: json_escape STRING
 json_escape() {
-    local string="$1"
-    python3 -c "import json; print(json.dumps('$string'))" 2>/dev/null || echo "\"$string\""
+    local string="${1}"
+    python3 -c "import json; print(json.dumps('${string}'))" 2>/dev/null || echo "\"${string}\""
 }
 
 # Extract SSH key IDs from cloud provider API response
 # Usage: extract_ssh_key_ids API_RESPONSE KEY_FIELD
 # KEY_FIELD: "ssh_keys" (DigitalOcean/Vultr) or "data" (Linode)
 extract_ssh_key_ids() {
-    local api_response="$1"
+    local api_response="${1}"
     local key_field="${2:-ssh_keys}"
     python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
-ids = [k['id'] for k in data.get('$key_field', [])]
+ids = [k['id'] for k in data.get('${key_field}', [])]
 print(json.dumps(ids))
-" <<< "$api_response"
+" <<< "${api_response}"
 }
 
 # ============================================================
@@ -710,10 +710,10 @@ CLOUD_INIT_EOF
 # Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" GET "/account" "" 5
 # Retries on: 429 (rate limit), 503 (service unavailable), network errors
 generic_cloud_api() {
-    local base_url="$1"
-    local auth_token="$2"
-    local method="$3"
-    local endpoint="$4"
+    local base_url="${1}"
+    local auth_token="${2}"
+    local method="${3}"
+    local endpoint="${4}"
     local body="${5:-}"
     local max_retries="${6:-3}"
 
@@ -721,17 +721,17 @@ generic_cloud_api() {
     local interval=2
     local max_interval=30
 
-    while [[ "$attempt" -le "$max_retries" ]]; do
+    while [[ "${attempt}" -le "${max_retries}" ]]; do
         local args=(
             -s
             -w "\n%{http_code}"
-            -X "$method"
+            -X "${method}"
             -H "Authorization: Bearer ${auth_token}"
             -H "Content-Type: application/json"
         )
 
-        if [[ -n "$body" ]]; then
-            args+=(-d "$body")
+        if [[ -n "${body}" ]]; then
+            args+=(-d "${body}")
         fi
 
         local response
@@ -740,68 +740,68 @@ generic_cloud_api() {
 
         # Extract HTTP status code (last line) and response body (everything else)
         local http_code
-        http_code=$(echo "$response" | tail -1)
+        http_code=$(echo "${response}" | tail -1)
         local response_body
-        response_body=$(echo "$response" | head -n -1)
+        response_body=$(echo "${response}" | head -n -1)
 
         # Check for network errors (curl exit code != 0)
-        if [[ $curl_exit_code -ne 0 ]]; then
-            if [[ "$attempt" -ge "$max_retries" ]]; then
-                log_error "Cloud API network error after $max_retries attempts: curl exit code $curl_exit_code"
+        if [[ ${curl_exit_code} -ne 0 ]]; then
+            if [[ "${attempt}" -ge "${max_retries}" ]]; then
+                log_error "Cloud API network error after ${max_retries} attempts: curl exit code ${curl_exit_code}"
                 return 1
             fi
 
             # Calculate next interval with exponential backoff
             local next_interval=$((interval * 2))
-            if [[ "$next_interval" -gt "$max_interval" ]]; then
-                next_interval="$max_interval"
+            if [[ "${next_interval}" -gt "${max_interval}" ]]; then
+                next_interval="${max_interval}"
             fi
 
             # Add jitter: ±20% randomization
             local jitter
-            jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+            jitter=$(python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}")
 
-            log_warn "Cloud API network error (attempt $attempt/$max_retries), retrying in ${jitter}s..."
-            sleep "$jitter"
+            log_warn "Cloud API network error (attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
+            sleep "${jitter}"
 
-            interval="$next_interval"
+            interval="${next_interval}"
             attempt=$((attempt + 1))
             continue
         fi
 
         # Check for transient HTTP errors that should be retried
-        if [[ "$http_code" == "429" ]] || [[ "$http_code" == "503" ]]; then
-            if [[ "$attempt" -ge "$max_retries" ]]; then
-                log_error "Cloud API returned HTTP $http_code after $max_retries attempts"
-                echo "$response_body"
+        if [[ "${http_code}" == "429" ]] || [[ "${http_code}" == "503" ]]; then
+            if [[ "${attempt}" -ge "${max_retries}" ]]; then
+                log_error "Cloud API returned HTTP ${http_code} after ${max_retries} attempts"
+                echo "${response_body}"
                 return 1
             fi
 
             # Calculate next interval with exponential backoff
             local next_interval=$((interval * 2))
-            if [[ "$next_interval" -gt "$max_interval" ]]; then
-                next_interval="$max_interval"
+            if [[ "${next_interval}" -gt "${max_interval}" ]]; then
+                next_interval="${max_interval}"
             fi
 
             # Add jitter: ±20% randomization
             local jitter
-            jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+            jitter=$(python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}")
 
             local error_msg="rate limit"
-            if [[ "$http_code" == "503" ]]; then
+            if [[ "${http_code}" == "503" ]]; then
                 error_msg="service unavailable"
             fi
 
-            log_warn "Cloud API returned $error_msg (HTTP $http_code, attempt $attempt/$max_retries), retrying in ${jitter}s..."
-            sleep "$jitter"
+            log_warn "Cloud API returned ${error_msg} (HTTP ${http_code}, attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
+            sleep "${jitter}"
 
-            interval="$next_interval"
+            interval="${next_interval}"
             attempt=$((attempt + 1))
             continue
         fi
 
         # Success or non-retryable error - return response body
-        echo "$response_body"
+        echo "${response_body}"
         return 0
     done
 
@@ -822,25 +822,25 @@ generic_cloud_api() {
 #   verify_agent_installed "goose" "--version" "Goose"
 # Returns 0 if agent is installed and working, 1 otherwise
 verify_agent_installed() {
-    local agent_cmd="$1"
+    local agent_cmd="${1}"
     local verify_arg="${2:---version}"
-    local agent_name="${3:-$agent_cmd}"
+    local agent_name="${3:-${agent_cmd}}"
 
-    log_warn "Verifying $agent_name installation..."
+    log_warn "Verifying ${agent_name} installation..."
 
-    if ! command -v "$agent_cmd" &> /dev/null; then
-        log_error "$agent_name installation failed: command '$agent_cmd' not found in PATH"
-        log_error "PATH: $PATH"
+    if ! command -v "${agent_cmd}" &> /dev/null; then
+        log_error "${agent_name} installation failed: command '${agent_cmd}' not found in PATH"
+        log_error "PATH: ${PATH}"
         return 1
     fi
 
-    if ! "$agent_cmd" "$verify_arg" &> /dev/null; then
-        log_error "$agent_name installation failed: '$agent_cmd $verify_arg' returned an error"
+    if ! "${agent_cmd}" "${verify_arg}" &> /dev/null; then
+        log_error "${agent_name} installation failed: '${agent_cmd} ${verify_arg}' returned an error"
         log_error "The command exists but does not execute properly"
         return 1
     fi
 
-    log_info "$agent_name installation verified successfully"
+    log_info "${agent_name} installation verified successfully"
     return 0
 }
 
@@ -853,45 +853,45 @@ verify_agent_installed() {
 # Implements exponential backoff: starts at INITIAL_INTERVAL (default 5s), doubles up to max 30s
 # Adds jitter (±20%) to prevent thundering herd when multiple instances retry simultaneously
 generic_ssh_wait() {
-    local ip="$1"
-    local ssh_opts="$2"
-    local test_cmd="$3"
-    local description="$4"
+    local ip="${1}"
+    local ssh_opts="${2}"
+    local test_cmd="${3}"
+    local description="${4}"
     local max_attempts="${5:-30}"
     local initial_interval="${6:-5}"
 
     local attempt=1
-    local interval="$initial_interval"
+    local interval="${initial_interval}"
     local max_interval=30
     local elapsed_time=0
 
-    log_warn "Waiting for $description to $ip..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        if ssh $ssh_opts "root@$ip" "$test_cmd" >/dev/null 2>&1; then
-            log_info "$description ready after ${elapsed_time}s (attempt $attempt)"
+    log_warn "Waiting for ${description} to ${ip}..."
+    while [[ "${attempt}" -le "${max_attempts}" ]]; do
+        if ssh ${ssh_opts} "root@${ip}" "${test_cmd}" >/dev/null 2>&1; then
+            log_info "${description} ready after ${elapsed_time}s (attempt ${attempt})"
             return 0
         fi
 
         # Calculate next interval with exponential backoff
         local next_interval=$((interval * 2))
-        if [[ "$next_interval" -gt "$max_interval" ]]; then
-            next_interval="$max_interval"
+        if [[ "${next_interval}" -gt "${max_interval}" ]]; then
+            next_interval="${max_interval}"
         fi
 
         # Add jitter: ±20% randomization to prevent thundering herd
         # Generates random number between 0.8 and 1.2 times the interval
         local jitter
-        jitter=$(python3 -c "import random; print(int($interval * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "$interval")
+        jitter=$(python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}")
 
-        log_warn "Waiting for $description... (attempt $attempt/$max_attempts, elapsed ${elapsed_time}s, retry in ${jitter}s)"
-        sleep "$jitter"
+        log_warn "Waiting for ${description}... (attempt ${attempt}/${max_attempts}, elapsed ${elapsed_time}s, retry in ${jitter}s)"
+        sleep "${jitter}"
 
         elapsed_time=$((elapsed_time + jitter))
-        interval="$next_interval"
+        interval="${next_interval}"
         attempt=$((attempt + 1))
     done
 
-    log_error "$description failed after $max_attempts attempts (${elapsed_time}s elapsed)"
+    log_error "${description} failed after ${max_attempts} attempts (${elapsed_time}s elapsed)"
     return 1
 }
 
@@ -899,9 +899,9 @@ generic_ssh_wait() {
 # Usage: wait_for_cloud_init <ip> [max_attempts]
 # Default max_attempts is 60 (~5 minutes with exponential backoff)
 wait_for_cloud_init() {
-    local ip="$1"
+    local ip="${1}"
     local max_attempts=${2:-60}
-    generic_ssh_wait "$ip" "$SSH_OPTS" "test -f /root/.cloud-init-complete" "cloud-init" "$max_attempts" 5
+    generic_ssh_wait "${ip}" "${SSH_OPTS}" "test -f /root/.cloud-init-complete" "cloud-init" "${max_attempts}" 5
 }
 
 # ============================================================
@@ -915,10 +915,10 @@ wait_for_cloud_init() {
 # TEST_FUNC should be a function that validates the token and returns 0 on success, 1 on failure
 # TEST_FUNC is optional - if empty, no validation is performed
 ensure_api_token_with_provider() {
-    local provider_name="$1"
-    local env_var_name="$2"
-    local config_file="$3"
-    local help_url="$4"
+    local provider_name="${1}"
+    local env_var_name="${2}"
+    local config_file="${3}"
+    local help_url="${4}"
     local test_func="${5:-}"
 
     # Check Python 3 is available (required for JSON parsing)
@@ -926,55 +926,55 @@ ensure_api_token_with_provider() {
 
     # 1. Check environment variable
     local env_value="${!env_var_name}"
-    if [[ -n "$env_value" ]]; then
-        log_info "Using $provider_name API token from environment"
+    if [[ -n "${env_value}" ]]; then
+        log_info "Using ${provider_name} API token from environment"
         return 0
     fi
 
     # 2. Check config file
-    if [[ -f "$config_file" ]]; then
+    if [[ -f "${config_file}" ]]; then
         local saved_token
-        saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key','') or json.load(open('$config_file')).get('token',''))" 2>/dev/null)
-        if [[ -n "$saved_token" ]]; then
-            export "$env_var_name=$saved_token"
-            log_info "Using $provider_name API token from $config_file"
+        saved_token=$(python3 -c "import json; print(json.load(open('${config_file}')).get('api_key','') or json.load(open('${config_file}')).get('token',''))" 2>/dev/null)
+        if [[ -n "${saved_token}" ]]; then
+            export "${env_var_name}=${saved_token}"
+            log_info "Using ${provider_name} API token from ${config_file}"
             return 0
         fi
     fi
 
     # 3. Prompt and save
     echo ""
-    log_warn "$provider_name API Token Required"
-    log_warn "Get your token from: $help_url"
+    log_warn "${provider_name} API Token Required"
+    log_warn "Get your token from: ${help_url}"
     echo ""
 
     local token
-    token=$(validated_read "Enter your $provider_name API token: " validate_api_token) || return 1
+    token=$(validated_read "Enter your ${provider_name} API token: " validate_api_token) || return 1
 
     # Validate token with provider API if test function provided
-    export "$env_var_name=$token"
-    if [[ -n "$test_func" ]]; then
-        if ! "$test_func"; then
-            log_error "Authentication failed: Invalid $provider_name API token"
-            unset "$env_var_name"
+    export "${env_var_name}=${token}"
+    if [[ -n "${test_func}" ]]; then
+        if ! "${test_func}"; then
+            log_error "Authentication failed: Invalid ${provider_name} API token"
+            unset "${env_var_name}"
             return 1
         fi
     fi
 
     # Save to config file
     local config_dir
-    config_dir=$(dirname "$config_file")
-    mkdir -p "$config_dir"
+    config_dir=$(dirname "${config_file}")
+    mkdir -p "${config_dir}"
 
     # Save with both "api_key" and "token" for compatibility
-    cat > "$config_file" << EOF
+    cat > "${config_file}" << EOF
 {
-  "api_key": "$token",
-  "token": "$token"
+  "api_key": "${token}",
+  "token": "${token}"
 }
 EOF
-    chmod 600 "$config_file"
-    log_info "API token saved to $config_file"
+    chmod 600 "${config_file}"
+    log_info "API token saved to ${config_file}"
 }
 
 # ============================================================
@@ -1009,34 +1009,34 @@ EOF
 # Callback implementations should use provider-specific API calls but follow
 # this contract to enable shared logic for key generation and registration flow.
 ensure_ssh_key_with_provider() {
-    local check_callback="$1"
-    local register_callback="$2"
-    local provider_name="$3"
-    local key_path="${4:-$HOME/.ssh/id_ed25519}"
+    local check_callback="${1}"
+    local register_callback="${2}"
+    local provider_name="${3}"
+    local key_path="${4:-${HOME}/.ssh/id_ed25519}"
     local pub_path="${key_path}.pub"
 
     # Generate key if needed (shared function)
-    generate_ssh_key_if_missing "$key_path"
+    generate_ssh_key_if_missing "${key_path}"
 
     # Get fingerprint (shared function)
     local fingerprint
-    fingerprint=$(get_ssh_fingerprint "$pub_path")
+    fingerprint=$(get_ssh_fingerprint "${pub_path}")
 
     # Check if already registered (provider-specific)
-    if "$check_callback" "$fingerprint" "$pub_path"; then
-        log_info "SSH key already registered with $provider_name"
+    if "${check_callback}" "${fingerprint}" "${pub_path}"; then
+        log_info "SSH key already registered with ${provider_name}"
         return 0
     fi
 
     # Register the key (provider-specific)
-    log_warn "Registering SSH key with $provider_name..."
+    log_warn "Registering SSH key with ${provider_name}..."
     local key_name="spawn-$(hostname)-$(date +%s)"
 
-    if "$register_callback" "$key_name" "$pub_path"; then
-        log_info "SSH key registered with $provider_name"
+    if "${register_callback}" "${key_name}" "${pub_path}"; then
+        log_info "SSH key registered with ${provider_name}"
         return 0
     else
-        log_error "Failed to register SSH key with $provider_name"
+        log_error "Failed to register SSH key with ${provider_name}"
         return 1
     fi
 }
