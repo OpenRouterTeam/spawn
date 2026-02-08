@@ -40,7 +40,8 @@ ensure_linode_token() {
     if [[ -n "${LINODE_API_TOKEN:-}" ]]; then
         log_info "Using Linode API token from environment"; return 0
     fi
-    local config_dir="$HOME/.config/spawn" config_file="$config_dir/linode.json"
+    local config_dir="$HOME/.config/spawn"
+    local config_file="$config_dir/linode.json"
     if [[ -f "$config_file" ]]; then
         local saved_token
         saved_token=$(python3 -c "import json; print(json.load(open('$config_file')).get('token',''))" 2>/dev/null)
