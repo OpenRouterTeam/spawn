@@ -88,6 +88,14 @@ Research cloud providers with API-based provisioning. To add one:
 
 ```
 spawn/
+  cli/
+    src/index.ts                 # CLI entry point (bun/TypeScript)
+    src/manifest.ts              # Manifest fetch + cache logic
+    src/commands.ts              # All subcommands (interactive, list, run, etc.)
+    src/version.ts               # Version constant
+    package.json                 # npm package (@openrouter/spawn)
+    install.sh                   # One-liner installer (bun → npm → bash fallback)
+    spawn.sh                     # Bash fallback CLI (no bun/node required)
   shared/
     common.sh                    # Provider-agnostic shared utilities
   {cloud}/

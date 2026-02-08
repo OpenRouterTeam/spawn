@@ -1,0 +1,371 @@
+import * as p from "@clack/prompts";
+import pc from "picocolors";
+import { spawn } from "child_process";
+import {
+  loadManifest,
+  agentKeys,
+  cloudKeys,
+  matrixStatus,
+  countImplemented,
+  RAW_BASE,
+  REPO,
+  CACHE_DIR,
+  type Manifest,
+} from "./manifest.js";
+import { VERSION } from "./version.js";
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function handleCancel(): never {
+  p.cancel("Cancelled.");
+  process.exit(0);
+}
+
+async function withSpinner<T>(msg: string, fn: () => Promise<T>): Promise<T> {
+  const s = p.spinner();
+  s.start(msg);
+  try {
+    const result = await fn();
+    s.stop(msg);
+    return result;
+  } catch (err) {
+    s.stop(pc.red("Failed"));
+    throw err;
+  }
+}
+
+// ── Interactive ────────────────────────────────────────────────────────────────
+
+export async function cmdInteractive() {
+  p.intro(pc.inverse(` spawn v${VERSION} `));
+
+  const manifest = await withSpinner("Loading manifest...", loadManifest);
+
+  const agents = agentKeys(manifest);
+  const agentChoice = await p.select({
+    message: "Select an agent",
+    options: agents.map((key) => ({
+      value: key,
+      label: manifest.agents[key].name,
+      hint: manifest.agents[key].description,
+    })),
+  });
+  if (p.isCancel(agentChoice)) handleCancel();
+
+  // Only show clouds where this agent is implemented
+  const clouds = cloudKeys(manifest).filter(
+    (c) => matrixStatus(manifest, c, agentChoice) === "implemented"
+  );
+
+  if (clouds.length === 0) {
+    p.log.error(`No clouds available for ${manifest.agents[agentChoice].name}`);
+    process.exit(1);
+  }
+
+  const cloudChoice = await p.select({
+    message: "Select a cloud provider",
+    options: clouds.map((key) => ({
+      value: key,
+      label: manifest.clouds[key].name,
+      hint: manifest.clouds[key].description,
+    })),
+  });
+  if (p.isCancel(cloudChoice)) handleCancel();
+
+  const agentName = manifest.agents[agentChoice].name;
+  const cloudName = manifest.clouds[cloudChoice].name;
+  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
+  p.outro("Handing off to spawn script...");
+
+  await execScript(cloudChoice, agentChoice);
+}
+
+// ── Run ────────────────────────────────────────────────────────────────────────
+
+export async function cmdRun(agent: string, cloud: string) {
+  const manifest = await withSpinner("Loading manifest...", loadManifest);
+
+  if (!manifest.agents[agent]) {
+    p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
+    process.exit(1);
+  }
+  if (!manifest.clouds[cloud]) {
+    p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
+    p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
+    process.exit(1);
+  }
+
+  const status = matrixStatus(manifest, cloud, agent);
+  if (status !== "implemented") {
+    p.log.error(
+      `${manifest.agents[agent].name} on ${manifest.clouds[cloud].name} is not yet implemented.`
+    );
+    process.exit(1);
+  }
+
+  const agentName = manifest.agents[agent].name;
+  const cloudName = manifest.clouds[cloud].name;
+  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}...`);
+
+  await execScript(cloud, agent);
+}
+
+async function execScript(cloud: string, agent: string): Promise<void> {
+  const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
+
+  // Download script then execute, preserving stdin/stdout/stderr for interactive use
+  const res = await fetch(url);
+  if (!res.ok) {
+    // Fallback to GitHub raw
+    const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
+    const ghRes = await fetch(ghUrl);
+    if (!ghRes.ok) {
+      p.log.error(`Failed to download script from ${url}`);
+      process.exit(1);
+    }
+    await runBash(await ghRes.text());
+    return;
+  }
+  await runBash(await res.text());
+}
+
+function runBash(script: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("bash", ["-c", script], {
+      stdio: "inherit",
+      env: process.env,
+    });
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Script exited with code ${code}`));
+    });
+    child.on("error", reject);
+  });
+}
+
+// ── List ───────────────────────────────────────────────────────────────────────
+
+export async function cmdList() {
+  const manifest = await withSpinner("Loading manifest...", loadManifest);
+
+  const agents = agentKeys(manifest);
+  const clouds = cloudKeys(manifest);
+
+  // Calculate column widths
+  const agentColWidth = Math.max(16, ...agents.map((a) => manifest.agents[a].name.length + 2));
+  const cloudColWidth = Math.max(
+    10,
+    ...clouds.map((c) => manifest.clouds[c].name.length + 2)
+  );
+
+  // Header
+  let header = "".padEnd(agentColWidth);
+  for (const c of clouds) {
+    header += pc.bold(manifest.clouds[c].name.padEnd(cloudColWidth));
+  }
+  console.log();
+  console.log(header);
+
+  // Separator
+  let sep = "".padEnd(agentColWidth);
+  for (const _ of clouds) {
+    sep += pc.dim("─".repeat(cloudColWidth - 2) + "  ");
+  }
+  console.log(sep);
+
+  // Rows
+  for (const a of agents) {
+    let row = pc.bold(manifest.agents[a].name.padEnd(agentColWidth));
+    for (const c of clouds) {
+      const status = matrixStatus(manifest, c, a);
+      if (status === "implemented") {
+        row += pc.green("  \u2713".padEnd(cloudColWidth));
+      } else {
+        row += pc.dim("  \u2013".padEnd(cloudColWidth));
+      }
+    }
+    console.log(row);
+  }
+
+  // Summary
+  const impl = countImplemented(manifest);
+  const total = agents.length * clouds.length;
+  console.log();
+  console.log(pc.green(`${impl}/${total} combinations implemented`));
+  console.log();
+}
+
+// ── Agents ─────────────────────────────────────────────────────────────────────
+
+export async function cmdAgents() {
+  const manifest = await withSpinner("Loading manifest...", loadManifest);
+
+  console.log();
+  console.log(pc.bold("Agents"));
+  console.log();
+  for (const key of agentKeys(manifest)) {
+    const a = manifest.agents[key];
+    console.log(`  ${pc.green(a.name.padEnd(18))} ${pc.dim(a.description)}`);
+  }
+  console.log();
+}
+
+// ── Clouds ─────────────────────────────────────────────────────────────────────
+
+export async function cmdClouds() {
+  const manifest = await withSpinner("Loading manifest...", loadManifest);
+
+  console.log();
+  console.log(pc.bold("Cloud Providers"));
+  console.log();
+  for (const key of cloudKeys(manifest)) {
+    const c = manifest.clouds[key];
+    console.log(`  ${pc.green(c.name.padEnd(18))} ${pc.dim(c.description)}`);
+  }
+  console.log();
+}
+
+// ── Agent Info ─────────────────────────────────────────────────────────────────
+
+export async function cmdAgentInfo(agent: string) {
+  const manifest = await withSpinner("Loading manifest...", loadManifest);
+
+  if (!manifest.agents[agent]) {
+    p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
+    process.exit(1);
+  }
+
+  const a = manifest.agents[agent];
+  console.log();
+  console.log(`${pc.bold(a.name)} ${pc.dim("\u2014")} ${a.description}`);
+  console.log();
+  console.log(pc.bold("Available clouds:"));
+  console.log();
+
+  let found = false;
+  for (const cloud of cloudKeys(manifest)) {
+    const status = matrixStatus(manifest, cloud, agent);
+    if (status === "implemented") {
+      const c = manifest.clouds[cloud];
+      console.log(`  ${pc.green(c.name.padEnd(18))} ${pc.dim("spawn " + agent + " " + cloud)}`);
+      found = true;
+    }
+  }
+
+  if (!found) {
+    console.log(pc.dim("  No implemented clouds yet."));
+  }
+  console.log();
+}
+
+// ── Improve ────────────────────────────────────────────────────────────────────
+
+export async function cmdImprove(args: string[]) {
+  const { existsSync: exists } = await import("fs");
+
+  let repoDir: string;
+
+  // Check if we're in a spawn checkout
+  if (exists("./improve.sh") && exists("./manifest.json")) {
+    repoDir = ".";
+  } else {
+    const { join } = await import("path");
+    repoDir = join(CACHE_DIR, "repo");
+
+    if (exists(join(repoDir, ".git"))) {
+      p.log.step("Updating spawn repo...");
+      const { execSync } = await import("child_process");
+      try {
+        execSync("git pull --ff-only", { cwd: repoDir, stdio: "pipe" });
+      } catch {
+        // ignore pull failures
+      }
+    } else {
+      p.log.step("Cloning spawn repo...");
+      const { execSync } = await import("child_process");
+      execSync(`git clone https://github.com/${REPO}.git ${repoDir}`, { stdio: "inherit" });
+    }
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn("bash", ["improve.sh", ...args], {
+      cwd: repoDir,
+      stdio: "inherit",
+      env: process.env,
+    });
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`improve.sh exited with code ${code}`));
+    });
+    child.on("error", reject);
+  });
+}
+
+// ── Update ─────────────────────────────────────────────────────────────────────
+
+export async function cmdUpdate() {
+  const s = p.spinner();
+  s.start("Checking for updates...");
+
+  try {
+    const res = await fetch(`${RAW_BASE}/cli/package.json`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error("fetch failed");
+    const pkg = (await res.json()) as { version: string };
+    const remoteVersion = pkg.version;
+
+    if (remoteVersion === VERSION) {
+      s.stop(`Already up to date ${pc.dim(`(v${VERSION})`)}`);
+      return;
+    }
+
+    s.message(`Updating v${VERSION} \u2192 v${remoteVersion}...`);
+
+    // Run the install script to update
+    const installRes = await fetch(`${RAW_BASE}/cli/install.sh`);
+    if (!installRes.ok) throw new Error("fetch install.sh failed");
+    const installScript = await installRes.text();
+
+    s.stop(`Update available: v${VERSION} \u2192 v${remoteVersion}`);
+    p.log.info(`Run this to update:`);
+    console.log();
+    console.log(
+      `  ${pc.cyan(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`)}`
+    );
+    console.log();
+  } catch {
+    s.stop(pc.red("Failed to check for updates"));
+  }
+}
+
+// ── Help ───────────────────────────────────────────────────────────────────────
+
+export function cmdHelp() {
+  console.log(`
+${pc.bold("spawn")} \u2014 Launch any AI coding agent on any cloud
+
+${pc.bold("USAGE")}
+  spawn                       Interactive agent + cloud picker
+  spawn <agent> <cloud>       Launch agent on cloud directly
+  spawn <agent>               Show available clouds for agent
+  spawn list                  Full matrix table
+  spawn agents                List all agents with descriptions
+  spawn clouds                List all cloud providers
+  spawn improve [--loop]      Run improvement system
+  spawn update                Check for CLI updates
+  spawn version               Show version
+
+${pc.bold("EXAMPLES")}
+  spawn                       ${pc.dim("# Pick interactively")}
+  spawn claude sprite         ${pc.dim("# Launch Claude Code on Sprite")}
+  spawn aider hetzner         ${pc.dim("# Launch Aider on Hetzner Cloud")}
+  spawn claude                ${pc.dim("# Show which clouds support Claude")}
+  spawn list                  ${pc.dim("# See the full agent x cloud matrix")}
+
+${pc.bold("INSTALL")}
+  curl -fsSL ${RAW_BASE}/cli/install.sh | bash
+`);
+}

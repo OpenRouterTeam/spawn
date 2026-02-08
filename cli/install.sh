@@ -4,42 +4,114 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
 #
-# Override install directory:
+# This installs spawn via bun (preferred) or npm. If neither is available,
+# it falls back to downloading the bundled JS file and creating a runner script.
+#
+# Override install directory (for fallback method):
 #   SPAWN_INSTALL_DIR=/usr/local/bin curl -fsSL ... | bash
 
-set -euo pipefail
+set -eo pipefail
 
 SPAWN_REPO="OpenRouterTeam/spawn"
 SPAWN_RAW_BASE="https://raw.githubusercontent.com/$SPAWN_REPO/main"
-INSTALL_DIR="${SPAWN_INSTALL_DIR:-$HOME/.local/bin}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m'
 
 log_info()  { echo -e "${GREEN}[spawn]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[spawn]${NC} $1"; }
 log_error() { echo -e "${RED}[spawn]${NC} $1"; }
 
-# Check curl
-if ! command -v curl &>/dev/null; then
-    log_error "curl is required but not found"
-    exit 1
+# --- Method 1: bun install -g (preferred) ---
+if command -v bun &>/dev/null; then
+    log_info "Installing spawn via bun..."
+    # Clone/download the cli directory and install from it
+    tmpdir=$(mktemp -d)
+    trap "rm -rf '$tmpdir'" EXIT
+
+    log_info "Downloading CLI package..."
+    mkdir -p "$tmpdir/cli/src"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/package.json"    -o "$tmpdir/cli/package.json"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/tsconfig.json"    -o "$tmpdir/cli/tsconfig.json"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/src/index.ts"     -o "$tmpdir/cli/src/index.ts"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/src/manifest.ts"  -o "$tmpdir/cli/src/manifest.ts"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/src/commands.ts"   -o "$tmpdir/cli/src/commands.ts"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/src/version.ts"    -o "$tmpdir/cli/src/version.ts"
+
+    cd "$tmpdir/cli"
+    bun install
+    bun link 2>/dev/null || bun install -g . 2>/dev/null || {
+        # If global install fails, build and copy binary
+        log_warn "Global install failed, building binary..."
+        bun build src/index.ts --compile --outfile spawn
+        INSTALL_DIR="${SPAWN_INSTALL_DIR:-$HOME/.local/bin}"
+        mkdir -p "$INSTALL_DIR"
+        mv spawn "$INSTALL_DIR/spawn"
+        log_info "Installed spawn binary to $INSTALL_DIR/spawn"
+    }
+
+    log_info "spawn installed successfully!"
+    echo ""
+    if command -v spawn &>/dev/null; then
+        spawn version
+        echo ""
+        log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
+    fi
+    exit 0
 fi
 
-# Create install directory
+# --- Method 2: npm install -g ---
+if command -v npm &>/dev/null && command -v node &>/dev/null; then
+    log_info "Installing spawn via npm..."
+    tmpdir=$(mktemp -d)
+    trap "rm -rf '$tmpdir'" EXIT
+
+    log_info "Downloading CLI package..."
+    mkdir -p "$tmpdir/cli/src"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/package.json"    -o "$tmpdir/cli/package.json"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/tsconfig.json"    -o "$tmpdir/cli/tsconfig.json"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/src/index.ts"     -o "$tmpdir/cli/src/index.ts"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/src/manifest.ts"  -o "$tmpdir/cli/src/manifest.ts"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/src/commands.ts"   -o "$tmpdir/cli/src/commands.ts"
+    curl -fsSL "$SPAWN_RAW_BASE/cli/src/version.ts"    -o "$tmpdir/cli/src/version.ts"
+
+    cd "$tmpdir/cli"
+    npm install
+    npm install -g . 2>/dev/null || {
+        log_warn "npm global install requires permissions. Try:"
+        echo ""
+        echo "  sudo npm install -g ."
+        echo ""
+        exit 1
+    }
+
+    log_info "spawn installed successfully!"
+    echo ""
+    if command -v spawn &>/dev/null; then
+        spawn version
+        echo ""
+        log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
+    fi
+    exit 0
+fi
+
+# --- Method 3: Direct download fallback (bash wrapper) ---
+log_warn "Neither bun nor npm found. Installing bash fallback..."
+
+INSTALL_DIR="${SPAWN_INSTALL_DIR:-$HOME/.local/bin}"
 mkdir -p "$INSTALL_DIR"
 
-# Download spawn CLI
-log_info "Downloading spawn CLI..."
 if ! curl -fsSL "$SPAWN_RAW_BASE/cli/spawn.sh" -o "$INSTALL_DIR/spawn"; then
     log_error "Failed to download spawn CLI"
     exit 1
 fi
 
 chmod +x "$INSTALL_DIR/spawn"
-log_info "Installed spawn to $INSTALL_DIR/spawn"
+log_info "Installed spawn (bash) to $INSTALL_DIR/spawn"
 
 # Check if install dir is in PATH
 if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
@@ -47,20 +119,12 @@ if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
     echo ""
     echo "Add it by running one of:"
     echo ""
-
-    # Detect shell and suggest appropriate config
     case "${SHELL:-/bin/bash}" in
-        */zsh)
-            echo "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.zshrc && source ~/.zshrc"
-            ;;
-        */fish)
-            echo "  fish_add_path $INSTALL_DIR"
-            ;;
-        *)
-            echo "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.bashrc && source ~/.bashrc"
-            ;;
+        */zsh)  echo "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.zshrc && source ~/.zshrc" ;;
+        */fish) echo "  fish_add_path $INSTALL_DIR" ;;
+        *)      echo "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.bashrc && source ~/.bashrc" ;;
     esac
     echo ""
 else
-    log_info "Run 'spawn' to get started"
+    log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
 fi

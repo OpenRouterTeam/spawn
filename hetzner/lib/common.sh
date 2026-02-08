@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
 # Common bash functions for Hetzner Cloud spawn scripts
 
 # ============================================================

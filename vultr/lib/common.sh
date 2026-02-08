@@ -2,7 +2,7 @@
 # Common bash functions for Vultr spawn scripts
 
 # Bash safety flags
-set -euo pipefail
+set -eo pipefail
 
 # ============================================================
 # Provider-agnostic functions
