@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
@@ -46,17 +47,9 @@ fi
 # 6. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
 
-ENV_TEMP=$(mktemp)
-trap 'rm -f "${ENV_TEMP}"' EXIT
-cat > "${ENV_TEMP}" << EOF
-
-# [spawn:env]
-export GOOSE_PROVIDER=openrouter
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-
-upload_file "${ENV_TEMP}" "/tmp/env_config"
-run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+inject_env_vars_local upload_file run_server \
+    "GOOSE_PROVIDER=openrouter" \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
 log_info "Modal sandbox setup completed successfully!"

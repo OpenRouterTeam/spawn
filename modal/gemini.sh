@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
@@ -46,19 +47,11 @@ fi
 # 6. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
 
-ENV_TEMP=$(mktemp)
-trap 'rm -f "${ENV_TEMP}"' EXIT
-cat > "${ENV_TEMP}" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export GEMINI_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-EOF
-
-upload_file "${ENV_TEMP}" "/tmp/env_config"
-run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+inject_env_vars_local upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "Modal sandbox setup completed successfully!"

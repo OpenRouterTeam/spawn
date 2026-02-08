@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 # Shared bash functions used across all spawn scripts
 # Provider-agnostic utilities for logging, input, OAuth, etc.
 #
@@ -625,6 +626,31 @@ inject_env_vars_ssh() {
     # Upload and append to .zshrc
     "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
     "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+
+    # Note: temp file will be cleaned up by trap handler
+}
+
+# Inject environment variables for providers without SSH (modal, e2b, sprite)
+# For providers where upload_file and run_server don't take server_ip as first arg
+# Usage: inject_env_vars_local upload_file run_server KEY1=VAL1 KEY2=VAL2 ...
+# Example: inject_env_vars_local upload_file run_server \
+#            "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+#            "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+inject_env_vars_local() {
+    local upload_func="${1}"
+    local run_func="${2}"
+    shift 2
+
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    generate_env_config "$@" > "${env_temp}"
+
+    # Upload and append to .zshrc
+    "${upload_func}" "${env_temp}" "/tmp/env_config"
+    "${run_func}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 }

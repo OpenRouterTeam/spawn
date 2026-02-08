@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
@@ -49,18 +50,10 @@ MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 # 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
 
-ENV_TEMP=$(mktemp)
-trap 'rm -f "${ENV_TEMP}"' EXIT
-cat > "${ENV_TEMP}" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-EOF
-
-upload_file "${ENV_TEMP}" "/tmp/env_config"
-run_server "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+inject_env_vars_local upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
+    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 8. Configure openclaw
 setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" \
