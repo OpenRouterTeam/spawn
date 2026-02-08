@@ -80,8 +80,8 @@ hetzner_register_ssh_key() {
 
     if echo "$register_response" | grep -q '"error"'; then
         # Parse error details
-        local error_msg print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read());
+        local error_msg
+        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -131,8 +131,8 @@ create_server() {
     # JSON-escape the cloud-init userdata
     local userdata
     userdata=$(get_cloud_init_userdata)
-    local userdata_json <<< "$userdata")
-    userdata_json=$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))"
+    local userdata_json
+    userdata_json=$(echo "$userdata" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
 
     local body
     body=$(python3 -c "
