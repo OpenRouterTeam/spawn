@@ -28,13 +28,13 @@ function handleCancel(): never {
 }
 
 function spawnBashScript(script: string, args: string[], cwd?: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const child = spawn("bash", [script, ...args], {
       cwd: cwd || process.cwd(),
       stdio: "inherit",
       env: process.env,
     });
-    child.on("close", (code) => {
+    child.on("close", (code: number | null) => {
       if (code === 0) resolve();
       else reject(new Error(`${script} exited with code ${code}`));
     });
@@ -75,7 +75,7 @@ function errorMessage(message: string): never {
 function mapToSelectOptions<T extends { name: string; description: string }>(
   keys: string[],
   items: Record<string, T>
-) {
+): Array<{ value: string; label: string; hint: string }> {
   return keys.map((key) => ({
     value: key,
     label: items[key].name,
@@ -85,11 +85,11 @@ function mapToSelectOptions<T extends { name: string; description: string }>(
 
 function getImplementedClouds(manifest: Manifest, agent: string): string[] {
   return cloudKeys(manifest).filter(
-    (c) => matrixStatus(manifest, c, agent) === "implemented"
+    (c: string): boolean => matrixStatus(manifest, c, agent) === "implemented"
   );
 }
 
-function validateAgent(manifest: Manifest, agent: string): void {
+function validateAgent(manifest: Manifest, agent: string): asserts agent is keyof typeof manifest.agents {
   if (!manifest.agents[agent]) {
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
     p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
@@ -97,7 +97,7 @@ function validateAgent(manifest: Manifest, agent: string): void {
   }
 }
 
-function validateCloud(manifest: Manifest, cloud: string): void {
+function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyof typeof manifest.clouds {
   if (!manifest.clouds[cloud]) {
     p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
     p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
@@ -116,7 +116,7 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
 
 // ── Interactive ────────────────────────────────────────────────────────────────
 
-export async function cmdInteractive() {
+export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
   const manifest = await loadManifestWithSpinner();
@@ -151,7 +151,7 @@ export async function cmdInteractive() {
 
 // ── Run ────────────────────────────────────────────────────────────────────────
 
-export async function cmdRun(agent: string, cloud: string) {
+export async function cmdRun(agent: string, cloud: string): Promise<void> {
   // Validate input arguments
   validateNonEmptyString(agent, "Agent name", "spawn agents");
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
@@ -196,12 +196,12 @@ async function execScript(cloud: string, agent: string): Promise<void> {
 }
 
 function runBash(script: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const child = spawn("bash", ["-c", script], {
       stdio: "inherit",
       env: process.env,
     });
-    child.on("close", (code) => {
+    child.on("close", (code: number | null) => {
       if (code === 0) resolve();
       else reject(new Error(`Script exited with code ${code}`));
     });
@@ -247,7 +247,7 @@ function renderMatrixRow(agent: string, clouds: string[], manifest: Manifest, ag
   return row;
 }
 
-export async function cmdList() {
+export async function cmdList(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   const agents = agentKeys(manifest);
@@ -279,7 +279,7 @@ export async function cmdList() {
 
 // ── Agents ─────────────────────────────────────────────────────────────────────
 
-export async function cmdAgents() {
+export async function cmdAgents(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   console.log();
@@ -294,7 +294,7 @@ export async function cmdAgents() {
 
 // ── Clouds ─────────────────────────────────────────────────────────────────────
 
-export async function cmdClouds() {
+export async function cmdClouds(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   console.log();
@@ -309,7 +309,7 @@ export async function cmdClouds() {
 
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
-export async function cmdAgentInfo(agent: string) {
+export async function cmdAgentInfo(agent: string): Promise<void> {
   // Validate input argument
   validateNonEmptyString(agent, "Agent name", "spawn agents");
 
@@ -342,7 +342,7 @@ export async function cmdAgentInfo(agent: string) {
 
 // ── Improve ────────────────────────────────────────────────────────────────────
 
-export async function cmdImprove(args: string[]) {
+export async function cmdImprove(args: string[]): Promise<void> {
   const { existsSync: exists } = await import("fs");
 
   let repoDir: string;
@@ -375,7 +375,7 @@ export async function cmdImprove(args: string[]) {
 
 // ── Update ─────────────────────────────────────────────────────────────────────
 
-export async function cmdUpdate() {
+export async function cmdUpdate(): Promise<void> {
   const s = p.spinner();
   s.start("Checking for updates...");
 
@@ -414,7 +414,7 @@ export async function cmdUpdate() {
 
 // ── Help ───────────────────────────────────────────────────────────────────────
 
-export function cmdHelp() {
+export function cmdHelp(): void {
   console.log(`
 ${pc.bold("spawn")} \u2014 Launch any AI coding agent on any cloud
 

@@ -9,6 +9,24 @@ import {
 } from "../commands";
 import type { Manifest } from "../manifest";
 
+// Test helpers
+function createConsoleMocks() {
+  return {
+    log: spyOn(console, "log").mockImplementation(() => {}),
+    error: spyOn(console, "error").mockImplementation(() => {}),
+  };
+}
+
+function createProcessExitMock() {
+  return spyOn(process, "exit").mockImplementation((() => {
+    throw new Error("process.exit");
+  }) as any);
+}
+
+function restoreMocks(...mocks: Array<{ mockRestore?: () => void } | undefined>) {
+  mocks.forEach(mock => mock?.mockRestore());
+}
+
 // Mock manifest data
 const mockManifest: Manifest = {
   agents: {
@@ -67,30 +85,23 @@ const mockManifest: Manifest = {
 // These tests require refactoring commands.ts to use dependency injection
 
 describe("commands", () => {
-  let consoleLogSpy: any;
-  let consoleErrorSpy: any;
-  let processExitSpy: any;
+  let consoleMocks: ReturnType<typeof createConsoleMocks>;
+  let processExitSpy: ReturnType<typeof createProcessExitMock>;
 
   beforeEach(() => {
-    // Mock console methods with bun:test spyOn
-    consoleLogSpy = spyOn(console, "log").mockImplementation(() => {});
-    consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {});
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
-      throw new Error(`process.exit`);
-    }) as any);
+    consoleMocks = createConsoleMocks();
+    processExitSpy = createProcessExitMock();
   });
 
   afterEach(() => {
-    consoleLogSpy?.mockRestore();
-    consoleErrorSpy?.mockRestore();
-    processExitSpy?.mockRestore();
+    restoreMocks(consoleMocks.log, consoleMocks.error, processExitSpy);
   });
 
   describe("cmdHelp", () => {
     it("should print help text", () => {
       cmdHelp();
-      expect(consoleLogSpy).toHaveBeenCalled();
-      const helpText = consoleLogSpy.mock.calls.join("\n");
+      expect(consoleMocks.log).toHaveBeenCalled();
+      const helpText = consoleMocks.log.mock.calls.join("\n");
       expect(helpText).toContain("spawn");
       expect(helpText).toContain("USAGE");
       expect(helpText).toContain("EXAMPLES");

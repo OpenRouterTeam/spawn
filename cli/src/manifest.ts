@@ -51,7 +51,7 @@ const FETCH_TIMEOUT = 10_000; // 10 seconds
 
 function cacheAge(): number {
   try {
-    const st = statSync(CACHE_FILE);
+    const st: ReturnType<typeof statSync> = statSync(CACHE_FILE);
     return (Date.now() - st.mtimeMs) / 1000;
   } catch (err) {
     // Cache file doesn't exist or is inaccessible - treat as infinitely old
@@ -66,7 +66,7 @@ function logError(message: string, err?: unknown): void {
 
 function readCache(): Manifest | null {
   try {
-    return JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
+    return JSON.parse(readFileSync(CACHE_FILE, "utf-8")) as Manifest;
   } catch (err) {
     // Cache file missing, corrupted, or unreadable
     logError(`Failed to read cache from ${CACHE_FILE}`, err);
@@ -76,7 +76,7 @@ function readCache(): Manifest | null {
 
 function writeCache(data: Manifest): void {
   mkdirSync(CACHE_DIR, { recursive: true });
-  writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
+  writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
 // ── Fetching ───────────────────────────────────────────────────────────────────
@@ -110,13 +110,24 @@ async function fetchManifestFromGitHub(): Promise<Manifest | null> {
 
 let _cached: Manifest | null = null;
 
+function tryLoadFromDiskCache(): Manifest | null {
+  if (cacheAge() >= CACHE_TTL) return null;
+  return readCache();
+}
+
+function updateCache(manifest: Manifest): Manifest {
+  writeCache(manifest);
+  _cached = manifest;
+  return manifest;
+}
+
 export async function loadManifest(forceRefresh = false): Promise<Manifest> {
   // Return in-memory cache if available and not forcing refresh
   if (_cached && !forceRefresh) return _cached;
 
   // Check disk cache first if not forcing refresh
-  if (!forceRefresh && cacheAge() < CACHE_TTL) {
-    const cached = readCache();
+  if (!forceRefresh) {
+    const cached = tryLoadFromDiskCache();
     if (cached) {
       _cached = cached;
       return cached;
@@ -126,9 +137,7 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
   // Fetch from GitHub
   const fetched = await fetchManifestFromGitHub();
   if (fetched) {
-    writeCache(fetched);
-    _cached = fetched;
-    return fetched;
+    return updateCache(fetched);
   }
 
   // Offline fallback: use stale cache

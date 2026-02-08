@@ -39,7 +39,7 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined): P
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const cmd = args[0];
 
