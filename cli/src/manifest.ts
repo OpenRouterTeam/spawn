@@ -163,7 +163,13 @@ export function matrixStatus(m: Manifest, cloud: string, agent: string): string 
 }
 
 export function countImplemented(m: Manifest): number {
-  return Object.values(m.matrix).filter((v) => v === "implemented").length;
+  let count = 0;
+  for (const value of Object.values(m.matrix)) {
+    if (value === "implemented") {
+      count++;
+    }
+  }
+  return count;
 }
 
 export { RAW_BASE, REPO, CACHE_DIR };

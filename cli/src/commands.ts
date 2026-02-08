@@ -233,7 +233,14 @@ const COL_PADDING = 2;
 const NAME_COLUMN_WIDTH = 18;
 
 function calculateColumnWidth(items: string[], minWidth: number): number {
-  return Math.max(minWidth, ...items.map((item) => item.length + COL_PADDING));
+  let maxWidth = minWidth;
+  for (const item of items) {
+    const width = item.length + COL_PADDING;
+    if (width > maxWidth) {
+      maxWidth = width;
+    }
+  }
+  return maxWidth;
 }
 
 function renderMatrixHeader(clouds: string[], manifest: Manifest, agentColWidth: number, cloudColWidth: number): string {
@@ -269,14 +276,22 @@ export async function cmdList(): Promise<void> {
   const agents = agentKeys(manifest);
   const clouds = cloudKeys(manifest);
 
-  const agentColWidth = calculateColumnWidth(
-    agents.map((a) => manifest.agents[a].name),
-    MIN_AGENT_COL_WIDTH
-  );
-  const cloudColWidth = calculateColumnWidth(
-    clouds.map((c) => manifest.clouds[c].name),
-    MIN_CLOUD_COL_WIDTH
-  );
+  // Calculate column widths without creating intermediate arrays
+  let agentColWidth = MIN_AGENT_COL_WIDTH;
+  for (const a of agents) {
+    const width = manifest.agents[a].name.length + COL_PADDING;
+    if (width > agentColWidth) {
+      agentColWidth = width;
+    }
+  }
+
+  let cloudColWidth = MIN_CLOUD_COL_WIDTH;
+  for (const c of clouds) {
+    const width = manifest.clouds[c].name.length + COL_PADDING;
+    if (width > cloudColWidth) {
+      cloudColWidth = width;
+    }
+  }
 
   console.log();
   console.log(renderMatrixHeader(clouds, manifest, agentColWidth, cloudColWidth));
