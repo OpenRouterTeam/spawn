@@ -10,6 +10,8 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 
 Set up a **Bun-based HTTP trigger server** on a Sprite VM and configure a **GitHub Actions workflow** to wake the Sprite on a cron schedule, GitHub events, or manual dispatch.
 
+**IMPORTANT: This skill is designed to be run INSIDE a Sprite VM.** The Claude Code instance invoking this skill should already be running inside Sprite, with access to `sprite-env` commands.
+
 The user wants to set up a trigger service for: **$ARGUMENTS**
 
 ## Overview
@@ -227,15 +229,33 @@ jobs:
 
 Set two secrets per Sprite service. Use **namespaced** secret names to avoid collisions:
 
+### 6a. Get the Sprite URL
+
+Since you're running inside Sprite, you can get the public URL using:
+
 ```bash
-# Get the Sprite URL (this is the public URL that auto-wakes the Sprite)
-# It's the URL shown when you created the Sprite or in the Sprite dashboard
+# The Sprite URL is the public endpoint that wakes the Sprite
+# It's typically shown when you first create the Sprite, or in the Sprite dashboard
 
+# Try these methods to find it:
+# 1. Check if it's in environment variables
+env | grep -i url
+
+# 2. Ask the user if sprite-env doesn't expose it directly
+# The URL format is typically: https://<sprite-id>.sprites.dev
+```
+
+If the URL isn't available programmatically, prompt the user to provide it from the Sprite dashboard.
+
+### 6b. Set the secrets
+
+```bash
+# Set the secret (from step 2)
+echo "<secret-from-step-2>" | gh secret set <SERVICE_NAME>_SPRITE_SECRET --repo <owner>/<repo>
+
+# Set the URL (interactively if needed)
 gh secret set <SERVICE_NAME>_SPRITE_URL --repo <owner>/<repo>
-# Paste the Sprite's public URL (e.g., https://<sprite-id>.sprites.dev)
-
-gh secret set <SERVICE_NAME>_SPRITE_SECRET --repo <owner>/<repo>
-# Paste the secret from step 2
+# When prompted, paste the Sprite's public URL
 ```
 
 **Secret naming convention:**
@@ -299,6 +319,15 @@ To add a new automation script (beyond improve.sh and refactor.sh):
 4. Create a corresponding `start-<script-name>.sh` wrapper with the appropriate env vars
 5. Follow the setup steps above to register the service and create the GitHub Actions workflow
 
+## Prerequisites
+
+This skill assumes:
+- You are running Claude Code **inside a Sprite VM**
+- `sprite-env` commands are available
+- `bun` is installed (comes with Sprite by default)
+- `gh` CLI is installed and authenticated
+- Repository has write access for setting secrets
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -307,5 +336,6 @@ To add a new automation script (beyond improve.sh and refactor.sh):
 | 401 on trigger | Verify `TRIGGER_SECRET` matches between wrapper script and GitHub secret |
 | Script runs but nothing happens | Check the target script works standalone: `bash /path/to/script.sh` |
 | Sprite doesn't wake | Verify `SPRITE_URL` secret is the correct public Sprite URL |
-| `{"error":"already running"}` | Previous run hasn't finished — check logs or wait |
+| `{"error":"max concurrent runs reached"}` | Max concurrent limit reached (default 3) — wait for runs to finish or increase MAX_CONCURRENT |
 | env vars not passed | Use the wrapper script pattern (not `--env` flag with commas in values) |
+| Can't find Sprite URL | Check Sprite dashboard or the output from when you created the Sprite |
