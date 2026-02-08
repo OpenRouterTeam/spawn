@@ -80,15 +80,11 @@ safe_read() {
 # ============================================================
 
 # Listen on a port with netcat (handles busybox/Termux nc requiring -p flag)
-nc_listen() {
-    local port=$1
-    shift
-    # BusyBox nc (Termux) requires -p flag; macOS/Linux do not
-    if nc --help 2>&1 | grep -q "BusyBox\|busybox"; then
-        nc -l -p "$port" "$@"
-    else
-        nc -l "$port" "$@"
-    fi
+# Find a working Node.js runtime (bun preferred, then node)
+find_node_runtime() {
+    if command -v bun &>/dev/null; then echo "bun"; return 0; fi
+    if command -v node &>/dev/null; then echo "node"; return 0; fi
+    return 1
 }
 
 # Open browser to URL (supports macOS, Linux, Termux)
@@ -229,31 +225,37 @@ get_openrouter_api_key_manual() {
     echo "$api_key"
 }
 
-# Write OAuth success response HTTP file (uses printf for macOS bash 3.x compat)
-write_oauth_response_file() {
-    local dest="$1"
-    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><head><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class="card"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>' > "$dest"
-}
-
-# Start OAuth callback server in background, returns server PID
-# $1=port $2=code_file $3=response_file (must already exist)
+# Start OAuth callback server using Node.js/Bun HTTP server
+# Proper HTTP server — handles multiple connections, favicon requests, etc.
+# $1=port $2=code_file
 start_oauth_server() {
     local port="$1"
     local code_file="$2"
-    local response_file="$3"
+    local runtime=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
 
-    (
-        while true; do
-            request=$(nc_listen "$port" < "$response_file" 2>/dev/null | head -1) || break
-
-            case "$request" in
-                *"/callback?code="*)
-                    echo "$request" | sed -n 's/.*code=\([^ &]*\).*/\1/p' > "$code_file"
-                    break
-                    ;;
-            esac
-        done
-    ) </dev/null >/dev/null 2>&1 &
+    "$runtime" -e "
+const http = require('http');
+const fs = require('fs');
+const url = require('url');
+const html = '<html><head><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class=\"card\"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>';
+const server = http.createServer((req, res) => {
+  const parsed = url.parse(req.url, true);
+  if (parsed.pathname === '/callback' && parsed.query.code) {
+    fs.writeFileSync('$code_file', parsed.query.code);
+    res.writeHead(200, {'Content-Type':'text/html','Connection':'close'});
+    res.end(html);
+    setTimeout(() => { server.close(); process.exit(0); }, 500);
+  } else {
+    res.writeHead(200, {'Content-Type':'text/html'});
+    res.end('<html><body>Waiting for OAuth callback...</body></html>');
+  }
+});
+server.listen($port, '127.0.0.1', () => {
+  fs.writeFileSync('/dev/fd/1', '');
+});
+server.on('error', () => process.exit(1));
+setTimeout(() => process.exit(0), 300000);
+" </dev/null >/dev/null 2>&1 &
 
     echo $!
 }
@@ -347,8 +349,9 @@ try_oauth_flow() {
         return 1
     fi
 
-    if ! command -v nc &> /dev/null; then
-        log_warn "netcat (nc) not found - OAuth server unavailable"
+    local runtime=$(find_node_runtime)
+    if [[ -z "$runtime" ]]; then
+        log_warn "No Node.js runtime (bun/node) found - OAuth server unavailable"
         return 1
     fi
 
@@ -358,9 +361,7 @@ try_oauth_flow() {
     local code_file="$oauth_dir/code"
 
     log_warn "Starting local OAuth server on port ${callback_port}..."
-    local response_file="$oauth_dir/response.http"
-    write_oauth_response_file "$response_file"
-    local server_pid=$(start_oauth_server "$callback_port" "$code_file" "$response_file")
+    local server_pid=$(start_oauth_server "$callback_port" "$code_file")
 
     sleep 1
     if ! kill -0 "$server_pid" 2>/dev/null; then
