@@ -342,34 +342,39 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
 
 // ── Improve ────────────────────────────────────────────────────────────────────
 
+function isLocalSpawnCheckout(exists: (path: string) => boolean): boolean {
+  return exists("./improve.sh") && exists("./manifest.json");
+}
+
+async function ensureRepoExists(repoDir: string, exists: (path: string) => boolean): Promise<void> {
+  const { join } = await import("path");
+  const { execSync } = await import("child_process");
+
+  if (exists(join(repoDir, ".git"))) {
+    p.log.step("Updating spawn repo...");
+    try {
+      execSync("git pull --ff-only", { cwd: repoDir, stdio: "pipe" });
+    } catch (err) {
+      // Git pull failed (network issue, merge conflict, etc.) - continue with existing repo
+      console.error("Warning: Failed to update repo:", getErrorMessage(err));
+    }
+  } else {
+    p.log.step("Cloning spawn repo...");
+    execSync(`git clone https://github.com/${REPO}.git ${repoDir}`, { stdio: "inherit" });
+  }
+}
+
 export async function cmdImprove(args: string[]): Promise<void> {
   const { existsSync: exists } = await import("fs");
 
-  let repoDir: string;
-
   // Check if we're in a spawn checkout
-  if (exists("./improve.sh") && exists("./manifest.json")) {
-    repoDir = ".";
-  } else {
-    const { join } = await import("path");
-    repoDir = join(CACHE_DIR, "repo");
-
-    if (exists(join(repoDir, ".git"))) {
-      p.log.step("Updating spawn repo...");
-      const { execSync } = await import("child_process");
-      try {
-        execSync("git pull --ff-only", { cwd: repoDir, stdio: "pipe" });
-      } catch (err) {
-        // Git pull failed (network issue, merge conflict, etc.) - continue with existing repo
-        console.error("Warning: Failed to update repo:", getErrorMessage(err));
-      }
-    } else {
-      p.log.step("Cloning spawn repo...");
-      const { execSync } = await import("child_process");
-      execSync(`git clone https://github.com/${REPO}.git ${repoDir}`, { stdio: "inherit" });
-    }
+  if (isLocalSpawnCheckout(exists)) {
+    return spawnBashScript("improve.sh", args, ".");
   }
 
+  const { join } = await import("path");
+  const repoDir = join(CACHE_DIR, "repo");
+  await ensureRepoExists(repoDir, exists);
   return spawnBashScript("improve.sh", args, repoDir);
 }
 
