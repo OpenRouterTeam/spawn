@@ -34,7 +34,7 @@ log_warn "Setting up environment variables..."
 inject_env_vars_ssh "$HETZNER_SERVER_IP" upload_file run_server \
     "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
     "OPENAI_API_KEY=$OPENROUTER_API_KEY" \
-    "OPENAI_BASE_URL="https://openrouter.ai/api/v1""
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "Hetzner server setup completed successfully!"
