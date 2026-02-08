@@ -153,7 +153,15 @@ export async function cmdInteractive(): Promise<void> {
 // ── Run ────────────────────────────────────────────────────────────────────────
 
 export async function cmdRun(agent: string, cloud: string): Promise<void> {
-  // Validate input arguments
+  // SECURITY: Validate input arguments for injection attacks
+  try {
+    validateIdentifier(agent, "Agent name");
+    validateIdentifier(cloud, "Cloud name");
+  } catch (err) {
+    p.log.error(getErrorMessage(err));
+    process.exit(1);
+  }
+
   validateNonEmptyString(agent, "Agent name", "spawn agents");
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
 
@@ -170,25 +178,29 @@ export async function cmdRun(agent: string, cloud: string): Promise<void> {
   await execScript(cloud, agent);
 }
 
+async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: string): Promise<string> {
+  const res = await fetch(primaryUrl);
+  if (res.ok) {
+    return res.text();
+  }
+
+  // Fallback to GitHub raw
+  const ghRes = await fetch(fallbackUrl);
+  if (!ghRes.ok) {
+    p.log.error(`Failed to download script from both ${primaryUrl} and ${fallbackUrl}`);
+    console.error(`Primary URL returned: HTTP ${res.status}, Fallback URL returned: HTTP ${ghRes.status}`);
+    process.exit(1);
+  }
+  return ghRes.text();
+}
+
 async function execScript(cloud: string, agent: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
+  const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
-  // Download script then execute, preserving stdin/stdout/stderr for interactive use
   try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      // Fallback to GitHub raw
-      const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
-      const ghRes = await fetch(ghUrl);
-      if (!ghRes.ok) {
-        p.log.error(`Failed to download script from both ${url} and ${ghUrl}`);
-        console.error(`Primary URL returned: HTTP ${res.status}, Fallback URL returned: HTTP ${ghRes.status}`);
-        process.exit(1);
-      }
-      await runBash(await ghRes.text());
-      return;
-    }
-    await runBash(await res.text());
+    const scriptContent = await downloadScriptWithFallback(url, ghUrl);
+    await runBash(scriptContent);
   } catch (err) {
     p.log.error("Failed to download or execute spawn script");
     console.error("Error:", getErrorMessage(err));
@@ -197,6 +209,9 @@ async function execScript(cloud: string, agent: string): Promise<void> {
 }
 
 function runBash(script: string): Promise<void> {
+  // SECURITY: Validate script content before execution
+  validateScriptContent(script);
+
   return new Promise<void>((resolve, reject) => {
     const child = spawn("bash", ["-c", script], {
       stdio: "inherit",
@@ -311,7 +326,14 @@ export async function cmdClouds(): Promise<void> {
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
 export async function cmdAgentInfo(agent: string): Promise<void> {
-  // Validate input argument
+  // SECURITY: Validate input argument for injection attacks
+  try {
+    validateIdentifier(agent, "Agent name");
+  } catch (err) {
+    p.log.error(getErrorMessage(err));
+    process.exit(1);
+  }
+
   validateNonEmptyString(agent, "Agent name", "spawn agents");
 
   const manifest = await loadManifestWithSpinner();
