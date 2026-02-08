@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
@@ -8,6 +8,9 @@ if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/digitalocean/lib/common.sh)"
 fi
+
+# Register cleanup trap handler for temp files
+register_cleanup_trap
 
 log_info "Claude Code on DigitalOcean"
 echo ""
@@ -32,7 +35,14 @@ if ! run_server "$DO_SERVER_IP" "command -v claude" >/dev/null 2>&1; then
     log_warn "Claude Code not found, installing manually..."
     run_server "$DO_SERVER_IP" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
-log_info "Claude Code is installed"
+
+# Verify installation succeeded
+if ! run_server "$DO_SERVER_IP" "command -v claude &> /dev/null && claude --version &> /dev/null"; then
+    log_error "Claude Code installation verification failed"
+    log_error "The 'claude' command is not available or not working properly on server $DO_SERVER_IP"
+    exit 1
+fi
+log_info "Claude Code installation verified successfully"
 
 # 6. Get OpenRouter API key
 echo ""
@@ -44,22 +54,13 @@ fi
 
 # 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-export ANTHROPIC_AUTH_TOKEN="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY=""
-export CLAUDE_CODE_SKIP_ONBOARDING="1"
-export CLAUDE_CODE_ENABLE_TELEMETRY="0"
-EOF
-
-upload_file "$DO_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$DO_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$DO_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
+    "ANTHROPIC_AUTH_TOKEN=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_API_KEY=" \
+    "CLAUDE_CODE_SKIP_ONBOARDING=1" \
+    "CLAUDE_CODE_ENABLE_TELEMETRY=0"
 
 # 8. Configure Claude Code settings
 log_warn "Configuring Claude Code..."
@@ -67,6 +68,8 @@ log_warn "Configuring Claude Code..."
 run_server "$DO_SERVER_IP" "mkdir -p ~/.claude"
 
 SETTINGS_TEMP=$(mktemp)
+chmod 600 "$SETTINGS_TEMP"
+track_temp_file "$SETTINGS_TEMP"
 cat > "$SETTINGS_TEMP" << EOF
 {
   "theme": "dark",
@@ -84,9 +87,10 @@ cat > "$SETTINGS_TEMP" << EOF
 EOF
 
 upload_file "$DO_SERVER_IP" "$SETTINGS_TEMP" "/root/.claude/settings.json"
-rm "$SETTINGS_TEMP"
 
 GLOBAL_STATE_TEMP=$(mktemp)
+chmod 600 "$GLOBAL_STATE_TEMP"
+track_temp_file "$GLOBAL_STATE_TEMP"
 cat > "$GLOBAL_STATE_TEMP" << EOF
 {
   "hasCompletedOnboarding": true,
@@ -95,7 +99,7 @@ cat > "$GLOBAL_STATE_TEMP" << EOF
 EOF
 
 upload_file "$DO_SERVER_IP" "$GLOBAL_STATE_TEMP" "/root/.claude.json"
-rm "$GLOBAL_STATE_TEMP"
+# Note: temp files will be cleaned up by trap handler
 
 run_server "$DO_SERVER_IP" "touch ~/.claude/CLAUDE.md"
 

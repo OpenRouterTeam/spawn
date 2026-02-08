@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
@@ -29,6 +29,14 @@ setup_shell_environment "$SPRITE_NAME"
 log_warn "Installing Goose..."
 run_sprite "$SPRITE_NAME" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 
+# Verify installation succeeded
+if ! run_sprite "$SPRITE_NAME" "command -v goose &> /dev/null && goose --version &> /dev/null"; then
+    log_error "Goose installation verification failed"
+    log_error "The 'goose' command is not available or not working properly"
+    exit 1
+fi
+log_info "Goose installation verified successfully"
+
 # Get OpenRouter API key via OAuth
 echo ""
 if [[ -n "$OPENROUTER_API_KEY" ]]; then
@@ -37,19 +45,10 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-# Inject environment variables
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export GOOSE_PROVIDER=openrouter
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-
-sprite exec -s "$SPRITE_NAME" -file "$ENV_TEMP:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_sprite "$SPRITE_NAME" \
+    "GOOSE_PROVIDER=openrouter" \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 
 echo ""
 log_info "Sprite setup completed successfully!"

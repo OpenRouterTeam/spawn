@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
@@ -29,7 +29,14 @@ wait_for_cloud_init "$HETZNER_SERVER_IP"
 # 5. Install Aider
 log_warn "Installing Aider..."
 run_server "$HETZNER_SERVER_IP" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
-log_info "Aider installed"
+
+# Verify installation succeeded
+if ! run_server "$HETZNER_SERVER_IP" "command -v aider &> /dev/null && aider --version &> /dev/null"; then
+    log_error "Aider installation verification failed"
+    log_error "The 'aider' command is not available or not working properly on server $HETZNER_SERVER_IP"
+    exit 1
+fi
+log_info "Aider installation verified successfully"
 
 # 6. Get OpenRouter API key
 echo ""
@@ -39,26 +46,12 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-# 7. Get model preference
-echo ""
-log_warn "Browse models at: https://openrouter.ai/models"
-log_warn "Which model would you like to use with Aider?"
-MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
+# Get model preference
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
-# 8. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-
-upload_file "$HETZNER_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$HETZNER_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$HETZNER_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 
 echo ""
 log_info "Hetzner server setup completed successfully!"

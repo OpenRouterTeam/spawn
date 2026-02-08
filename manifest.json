@@ -7,6 +7,7 @@
       "install": "curl -fsSL https://claude.ai/install.sh | bash",
       "launch": "claude",
       "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
         "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
         "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}",
         "ANTHROPIC_API_KEY": "",

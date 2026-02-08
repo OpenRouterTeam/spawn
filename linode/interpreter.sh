@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then source "$SCRIPT_DIR/lib/common.sh"
 else eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/linode/lib/common.sh)"; fi
@@ -18,17 +18,10 @@ echo ""
 if [[ -n "$OPENROUTER_API_KEY" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 log_warn "Setting up environment variables..."
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-EOF
-upload_file "$LINODE_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$LINODE_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$LINODE_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "OPENAI_API_KEY=$OPENROUTER_API_KEY" \
+    "OPENAI_BASE_URL="https://openrouter.ai/api/v1""
 echo ""
 log_info "Linode setup completed successfully!"
 echo ""

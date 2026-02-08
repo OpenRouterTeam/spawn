@@ -88,24 +88,73 @@ Research cloud providers with API-based provisioning. To add one:
 
 ```
 spawn/
-  cli/
-    spawn.sh          # Main CLI binary (interactive picker, matrix viewer, launcher)
-    install.sh        # One-liner installer (downloads spawn.sh to ~/.local/bin)
+  shared/
+    common.sh                    # Provider-agnostic shared utilities
   {cloud}/
-    lib/common.sh     # Cloud-specific shared functions
-    {agent}.sh        # One script per agent
-  manifest.json       # The matrix (source of truth)
-  improve.sh          # Run this to trigger one improvement cycle
-  test/run.sh         # Test harness
-  README.md           # User-facing docs
+    lib/common.sh                # Cloud-specific functions (sources shared/common.sh)
+    {agent}.sh                   # Agent deployment scripts
+  manifest.json                  # The matrix (source of truth)
+  improve.sh                     # Run this to trigger one improvement cycle
+  test/run.sh                    # Test harness
+  README.md                      # User-facing docs
+  CLAUDE.md                      # This file - contributor guide
 ```
 
-## CLI (`cli/`)
+### Architecture: Shared Library Pattern
 
-The `spawn` CLI is a pure-bash binary that provides a unified entry point for the matrix.
+**`shared/common.sh`** - Core utilities used by all clouds:
+- **Logging**: `log_info`, `log_warn`, `log_error` (colored output)
+- **Input handling**: `safe_read` (works in interactive and piped contexts)
+- **OAuth flow**: `try_oauth_flow`, `get_openrouter_api_key_oauth` (browser-based auth)
+- **Network utilities**: `nc_listen` (cross-platform netcat wrapper), `open_browser`
+- **SSH helpers**: `generate_ssh_key_if_missing`, `get_ssh_fingerprint`, `generic_ssh_wait`
+- **Security**: `validate_model_id`, `json_escape`
 
-- **`cli/spawn.sh`** — Main binary. Fetches manifest.json from GitHub (cached for 1hr at `~/.cache/spawn/`), parses it with `jq` or `python3` fallback, and provides: interactive picker (`spawn`), direct launch (`spawn <agent> <cloud>`), agent info (`spawn <agent>`), matrix table (`spawn list`), and self-update (`spawn update`). Installed to `~/.local/bin/spawn`.
-- **`cli/install.sh`** — One-liner installer. Downloads `spawn.sh` to `~/.local/bin/spawn`, sets executable bit, and prints PATH instructions if needed. Override install dir with `SPAWN_INSTALL_DIR` env var.
+**`{cloud}/lib/common.sh`** - Cloud-specific extensions:
+- Sources `shared/common.sh` at the top
+- Adds provider-specific functions:
+  - **Sprite**: `ensure_sprite_installed`, `get_sprite_name`, `run_sprite`, etc.
+  - **Hetzner**: API wrappers for server creation, SSH key management, etc.
+  - **DigitalOcean**: Droplet provisioning, API calls, etc.
+  - **Vultr**: Instance management via REST API
+  - **Linode**: Linode-specific provisioning functions
+
+**Agent scripts** (`{cloud}/{agent}.sh`):
+1. Source their cloud's `lib/common.sh` (which auto-sources `shared/common.sh`)
+2. Use shared functions for logging, OAuth, SSH setup
+3. Use cloud functions for provisioning and connecting to servers
+4. Deploy the specific agent with its configuration
+
+### Why This Structure?
+
+- **DRY principle**: OAuth, logging, SSH logic written once in `shared/common.sh`
+- **Consistency**: All scripts use same authentication and error handling patterns
+- **Maintainability**: Bug fixes in shared code benefit all providers automatically
+- **Extensibility**: New clouds only need to implement provider-specific logic
+- **Testability**: Shared functions can be tested independently
+
+### Source Pattern
+
+Every cloud's `lib/common.sh` starts with:
+
+```bash
+#!/bin/bash
+# Cloud-specific functions for {provider}
+
+# Source shared provider-agnostic functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../shared/common.sh" || {
+    echo "ERROR: Failed to load shared/common.sh" >&2
+    exit 1
+}
+
+# ... cloud-specific functions below ...
+```
+
+This pattern ensures:
+- Shared utilities are always available
+- Path resolution works when sourced from any location
+- Script fails fast if shared library is missing
 
 ## Script Conventions
 
@@ -120,48 +169,5 @@ The `spawn` CLI is a pure-bash binary that provides a unified entry point for th
 
 1. Update `manifest.json` matrix status to `"implemented"`
 2. Update `README.md` with usage instructions
-3. Run `bash -n {file}` to syntax-check your scripts
+3. Run `bash test/run.sh` if tests exist for the cloud
 4. Commit with a descriptive message
-
-## Agent Team Roles
-
-When running as part of an agent team (`./improve.sh`), teammates are assigned specific roles:
-
-### Gap Filler
-You're assigned a specific `{cloud}/{agent}` entry to implement. Steps:
-1. Read `{cloud}/lib/common.sh` — understand the cloud's primitives
-2. Read an existing `{agent}.sh` on another cloud — understand the install steps
-3. Write `{cloud}/{agent}.sh` combining the two
-4. Update `manifest.json` matrix entry to `"implemented"`
-5. Add usage entry to `README.md` under the cloud's section
-6. `bash -n` syntax check
-7. Commit your changes only (don't touch other teammates' files)
-
-### Agent Scout
-Research and add ONE new AI coding agent. Requirements:
-- Must be installable via a single command (`npm install -g`, `pip install`, `curl | bash`, etc.)
-- Must accept API keys via environment variables (`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
-- OpenRouter compatibility: either native `OPENROUTER_API_KEY` support, or `OPENAI_BASE_URL=https://openrouter.ai/api/v1` override
-- Add to `manifest.json` → `agents` with full metadata including `env` field
-- Add `"missing"` entries in the matrix for ALL existing clouds
-- Implement on at least 2 clouds to prove the pattern
-- Update `README.md`
-
-### Cloud Scout
-Research and add ONE new cloud provider. Requirements:
-- REST API or CLI for provisioning VMs/instances
-- SSH access to created servers
-- Cloud-init, userdata, or startup-script support
-- Pay-per-hour pricing
-- Create `{cloud}/lib/common.sh` with ALL primitives (see existing clouds for the pattern)
-- Add to `manifest.json` → `clouds`
-- Add `"missing"` entries for ALL existing agents
-- Implement at least 2 agents to prove the lib works
-- Update `README.md`
-
-### Coordination Rules
-- **Never edit the same file as another teammate** — coordinate via the shared task list
-- **manifest.json conflicts**: only ONE teammate should update manifest.json at a time. If you're a Gap Filler, update just your entry. If you're a Scout, add your block and your matrix entries.
-- **README.md**: append your section, don't rewrite others' sections
-- **Commit early**: commit your work as soon as it's done so other teammates can see it
-- **Self-claim**: when you finish your assigned task, check the task list for the next unblocked item

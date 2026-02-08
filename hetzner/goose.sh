@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
@@ -29,7 +29,14 @@ wait_for_cloud_init "$HETZNER_SERVER_IP"
 # 5. Install Goose
 log_warn "Installing Goose..."
 run_server "$HETZNER_SERVER_IP" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
-log_info "Goose installed"
+
+# Verify installation succeeded
+if ! run_server "$HETZNER_SERVER_IP" "command -v goose &> /dev/null && goose --version &> /dev/null"; then
+    log_error "Goose installation verification failed"
+    log_error "The 'goose' command is not available or not working properly on server $HETZNER_SERVER_IP"
+    exit 1
+fi
+log_info "Goose installation verified successfully"
 
 # 6. Get OpenRouter API key
 echo ""
@@ -39,20 +46,10 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-# 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
-
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export GOOSE_PROVIDER=openrouter
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-EOF
-
-upload_file "$HETZNER_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$HETZNER_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$HETZNER_SERVER_IP" upload_file run_server \
+    "GOOSE_PROVIDER=openrouter" \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 
 echo ""
 log_info "Hetzner server setup completed successfully!"

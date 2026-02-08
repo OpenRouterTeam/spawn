@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then source "$SCRIPT_DIR/lib/common.sh"
 else eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/linode/lib/common.sh)"; fi
@@ -21,23 +21,17 @@ echo ""
 if [[ -n "$OPENROUTER_API_KEY" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 log_warn "Setting up environment variables..."
-ENV_TEMP=$(mktemp)
-cat > "$ENV_TEMP" << EOF
-
-# [spawn:env]
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export ANTHROPIC_BASE_URL="https://openrouter.ai/api"
-export ANTHROPIC_AUTH_TOKEN="${OPENROUTER_API_KEY}"
-export ANTHROPIC_API_KEY=""
-export CLAUDE_CODE_SKIP_ONBOARDING="1"
-export CLAUDE_CODE_ENABLE_TELEMETRY="0"
-EOF
-upload_file "$LINODE_SERVER_IP" "$ENV_TEMP" "/tmp/env_config"
-run_server "$LINODE_SERVER_IP" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-rm "$ENV_TEMP"
+inject_env_vars_ssh "$LINODE_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_BASE_URL="https://openrouter.ai/api"" \
+    "ANTHROPIC_AUTH_TOKEN=$OPENROUTER_API_KEY" \
+    "ANTHROPIC_API_KEY=""" \
+    "CLAUDE_CODE_SKIP_ONBOARDING="1"" \
+    "CLAUDE_CODE_ENABLE_TELEMETRY="0""
 log_warn "Configuring Claude Code..."
 run_server "$LINODE_SERVER_IP" "mkdir -p ~/.claude"
 SETTINGS_TEMP=$(mktemp)
+chmod 600 "$SETTINGS_TEMP"
 cat > "$SETTINGS_TEMP" << EOF
 {
   "theme": "dark",
@@ -56,6 +50,7 @@ EOF
 upload_file "$LINODE_SERVER_IP" "$SETTINGS_TEMP" "/root/.claude/settings.json"
 rm "$SETTINGS_TEMP"
 GLOBAL_STATE_TEMP=$(mktemp)
+chmod 600 "$GLOBAL_STATE_TEMP"
 cat > "$GLOBAL_STATE_TEMP" << EOF
 {
   "hasCompletedOnboarding": true,
