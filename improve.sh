@@ -16,7 +16,7 @@
 #   ./improve.sh --single         # old single-agent mode (no teams)
 #   ./improve.sh --discover       # focus on discovering new agents/clouds only
 
-set -uo pipefail
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="${REPO_ROOT}/manifest.json"
