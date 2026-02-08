@@ -18,6 +18,10 @@ import { VERSION } from "./version.js";
 
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 function handleCancel(): never {
   p.cancel("Cancelled.");
   process.exit(0);
@@ -186,7 +190,7 @@ async function execScript(cloud: string, agent: string): Promise<void> {
     await runBash(await res.text());
   } catch (err) {
     p.log.error("Failed to download or execute spawn script");
-    console.error("Error:", err instanceof Error ? err.message : String(err));
+    console.error("Error:", getErrorMessage(err));
     process.exit(1);
   }
 }
@@ -357,7 +361,7 @@ export async function cmdImprove(args: string[]) {
         execSync("git pull --ff-only", { cwd: repoDir, stdio: "pipe" });
       } catch (err) {
         // Git pull failed (network issue, merge conflict, etc.) - continue with existing repo
-        console.error("Warning: Failed to update repo:", err instanceof Error ? err.message : String(err));
+        console.error("Warning: Failed to update repo:", getErrorMessage(err));
       }
     } else {
       p.log.step("Cloning spawn repo...");
@@ -404,7 +408,7 @@ export async function cmdUpdate() {
     console.log();
   } catch (err) {
     s.stop(pc.red("Failed to check for updates"));
-    console.error("Error:", err instanceof Error ? err.message : String(err));
+    console.error("Error:", getErrorMessage(err));
   }
 }
 
