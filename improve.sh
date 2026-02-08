@@ -163,13 +163,40 @@ git checkout main && git pull --rebase origin main
 - Leave branches hanging after merge
 - Work on a stale checkout — always pull latest main before each unit of work
 
+## After EVERY change (MANDATORY):
+
+After each PR is merged, one teammate MUST update the root `README.md` matrix table to reflect the current state. The matrix table in README.md must always match manifest.json. Run this to regenerate it:
+
+```bash
+python3 -c "
+import json
+m = json.load(open('manifest.json'))
+agents = list(m['agents'].keys())
+clouds = list(m['clouds'].keys())
+agent_meta = m['agents']
+cloud_meta = m['clouds']
+# Header
+cols = ' | '.join(f'[{cloud_meta[c][\"name\"]}]({c}/)' for c in clouds)
+print(f'| | {cols} |')
+print(f'|---|{\"|---\" * len(clouds)}|')
+# Rows
+for a in agents:
+    name = agent_meta[a]['name']
+    url = agent_meta[a].get('url','')
+    cells = ' | '.join('✓' if m['matrix'].get(f'{c}/{a}') == 'implemented' else ' ' for c in clouds)
+    print(f'| [**{name}**]({url}) | {cells} |')
+"
+```
+
+Copy the output and replace the matrix table between `## Matrix` and `## Development` in README.md. Include this update in the same PR or as a follow-up PR immediately after.
+
 ## Rules for ALL teammates:
 - Read CLAUDE.md Shell Script Rules before writing ANY code
 - OpenRouter injection is MANDATORY in every script
 - `bash -n {file}` syntax-check before committing
 - Each teammate works on DIFFERENT files
 - Each unit of work gets its own branch → PR → merge → cleanup
-- Update manifest.json and the cloud's README.md
+- Update manifest.json, the cloud's README.md, AND the root README.md matrix
 - NEVER revert prior macOS/curl-bash compatibility fixes
 PROMPT_EOF
 }
