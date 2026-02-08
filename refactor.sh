@@ -37,8 +37,10 @@ while true; do
     # Launch Claude Code with team instructions
     log "Launching refactoring team..."
 
-    # Create the prompt for Claude Code
-    PROMPT="You are the Team Lead for the spawn continuous refactoring service (Cycle ${CYCLE}).
+    # Write prompt to a temp file to avoid shell escaping issues
+    PROMPT_FILE=$(mktemp /tmp/refactor-prompt-XXXXXX.md)
+    cat > "${PROMPT_FILE}" << PROMPT_EOF
+You are the Team Lead for the spawn continuous refactoring service (Cycle ${CYCLE}).
 
 Your mission: Spawn a team of specialized agents to maintain and improve the spawn codebase autonomously.
 
@@ -53,7 +55,7 @@ Create these teammates:
    - Fix vulnerabilities immediately
 
 2. **ux-engineer** (Sonnet)
-   - Test end-to-end user flows (spawn cli → cloud → agent launch)
+   - Test end-to-end user flows (spawn cli -> cloud -> agent launch)
    - Improve error messages (make them actionable and clear)
    - Fix UX papercuts (confusing prompts, unclear help text, broken workflows)
    - Verify all usage examples in READMEs work
@@ -72,13 +74,29 @@ Create these teammates:
 
 5. **issue-triager** (Sonnet)
    - Run: gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,createdAt
-   - For each issue:
+   - For each open issue:
      * Read the error log provided
      * Attempt to reproduce locally
-     * If reproducible: assign to relevant teammate to fix
-     * If not reproducible or user error: close with helpful comment
+     * If reproducible: create a fix branch, fix the bug, then follow the Issue Fix Workflow below
+     * If not reproducible or user error: comment explaining why, then close with gh issue close
      * If feature request: label as 'enhancement' and close (point to discussions)
-   - Respond within 1 hour of issue creation
+   - EVERY open issue must be resolved by end of cycle. No dangling issues.
+
+## Issue Fix Workflow (CRITICAL follow exactly)
+
+When fixing a bug reported in a GitHub issue:
+
+1. Create a fix branch: git checkout -b fix/issue-NUMBER
+2. Implement the fix and commit
+3. Push the branch: git push -u origin fix/issue-NUMBER
+4. Create a PR that references the issue:
+   gh pr create --title "Fix: description" --body "Fixes #NUMBER"
+5. Merge the PR immediately: gh pr merge --squash --delete-branch
+6. Close the issue: gh issue close NUMBER --comment "Fixed in PR_URL. The fix is now on main."
+7. Switch back to main: git checkout main && git pull origin main
+
+NEVER leave an issue open after the fix is merged. NEVER leave a PR unmerged.
+The full cycle is: branch -> fix -> PR (references issue) -> merge PR -> close issue.
 
 ## Workflow
 
@@ -88,12 +106,12 @@ Create these teammates:
    - UX test of main user flows
    - Complexity reduction in top 5 longest functions
    - Test coverage for recent changes
-   - GitHub issue triage
+   - GitHub issue triage: check ALL open issues and resolve each one
 3. Spawn teammates with Task tool using subagent_type='general-purpose'
 4. Assign tasks to teammates using TaskUpdate
 5. Monitor teammate progress via their messages
 6. Create Sprite checkpoint after successful changes: sprite-env checkpoint create --comment 'Description'
-7. When cycle completes, summarize what was fixed/improved
+7. When cycle completes, verify: zero open issues, all PRs merged, summarize what was fixed/improved
 
 ## Safety Rules
 
@@ -106,18 +124,19 @@ Create these teammates:
 
 ## Priority Scoring
 
-Score tasks: (Impact × Confidence) / Risk
+Score tasks: (Impact x Confidence) / Risk
 - Impact: 1-10 (how much better will this make spawn?)
-- Confidence: 1-10 (how sure are you it's correct?)
+- Confidence: 1-10 (how sure are you it is correct?)
 - Risk: 1-10 (how likely to break things?)
 
 Target autonomous score: >30
 
-Begin Cycle ${CYCLE} now. Spawn the team and start working."
+Begin Cycle ${CYCLE} now. Spawn the team and start working.
+PROMPT_EOF
 
-    # Run Claude Code with the prompt
-    if echo "${PROMPT}" | claude -p "$(cat)" 2>&1 | tee -a "${LOG_FILE}"; then
-        log "✓ Cycle ${CYCLE} completed successfully"
+    # Run Claude Code with the prompt file
+    if claude -p "$(cat "${PROMPT_FILE}")" 2>&1 | tee -a "${LOG_FILE}"; then
+        log "Cycle ${CYCLE} completed successfully"
 
         # Commit any changes made during the cycle
         if [[ -n "$(git status --porcelain)" ]]; then
@@ -139,7 +158,10 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" 2>&1 | tee -a "${LOG_
         log "Pausing 30 seconds before next cycle..."
         sleep 30
     else
-        log "✗ Cycle ${CYCLE} failed, pausing 5 minutes before retry..."
+        log "Cycle ${CYCLE} failed, pausing 5 minutes before retry..."
         sleep 300
     fi
+
+    # Clean up prompt file
+    rm -f "${PROMPT_FILE}"
 done
