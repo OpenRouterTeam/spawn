@@ -169,8 +169,8 @@ print(json.dumps(body))
         log_error "Failed to create DigitalOcean droplet"
 
         # Parse error details
-        local error_msg error'))" 2>/dev/null || echo "$response")
-        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown error'))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
 
         log_warn "Common issues:"
