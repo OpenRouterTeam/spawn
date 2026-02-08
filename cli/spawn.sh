@@ -16,7 +16,7 @@
 #   spawn version               Show version
 #   spawn help                  Show this help
 
-set -uo pipefail
+set -eo pipefail
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
