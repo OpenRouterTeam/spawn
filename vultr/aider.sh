@@ -2,9 +2,9 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+# shellcheck source=vultr/lib/common.sh
 if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
     source "$SCRIPT_DIR/lib/common.sh"
-# shellcheck source=vultr/lib/common.sh
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/vultr/lib/common.sh)"
 fi

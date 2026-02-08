@@ -3,9 +3,9 @@ set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+# shellcheck source=hetzner/lib/common.sh
 if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
     source "$SCRIPT_DIR/lib/common.sh"
-# shellcheck source=hetzner/lib/common.sh
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hetzner/lib/common.sh)"
 fi
