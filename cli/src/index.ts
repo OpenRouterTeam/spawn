@@ -18,8 +18,11 @@ function isInteractiveTTY(): boolean {
 }
 
 function handleError(err: unknown): never {
-  if (err instanceof Error) {
+  // Use duck typing instead of instanceof to avoid prototype chain issues
+  if (err && typeof err === "object" && "message" in err) {
     console.error(`Error: ${err.message}`);
+  } else {
+    console.error(`Error: ${String(err)}`);
   }
   process.exit(1);
 }
@@ -69,7 +72,8 @@ async function main(): Promise<void> {
       // Remove --prompt-file and its value from args
       filteredArgs.splice(promptFileIndex, 2);
     } catch (err) {
-      console.error(`Error reading prompt file: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`Error reading prompt file '${args[promptFileIndex + 1]}': ${err && typeof err === "object" && "message" in err ? err.message : String(err)}`);
+      console.error(`\nMake sure the file exists and is readable.`);
       process.exit(1);
     }
   }
