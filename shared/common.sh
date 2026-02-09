@@ -914,6 +914,24 @@ _api_handle_transient_http_error() {
     return 0
 }
 
+# Helper to update retry interval with backoff
+# Usage: _update_retry_interval INTERVAL_VAR MAX_INTERVAL_VAR
+# This eliminates repeated interval update logic across API wrappers
+_update_retry_interval() {
+    local interval_var="${1}"
+    local max_interval_var="${2}"
+
+    local current_interval=${!interval_var}
+    local max_interval=${!max_interval_var}
+
+    current_interval=$((current_interval * 2))
+    if [[ "${current_interval}" -gt "${max_interval}" ]]; then
+        current_interval="${max_interval}"
+    fi
+
+    eval "${interval_var}=${current_interval}"
+}
+
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
 # Includes automatic retry logic with exponential backoff for transient failures
 # Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY] [MAX_RETRIES]
@@ -962,10 +980,7 @@ generic_cloud_api() {
                 log_error "Cloud API network error after ${max_retries} attempts: curl exit code ${curl_exit_code}"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "${interval}" -gt "${max_interval}" ]]; then
-                interval="${max_interval}"
-            fi
+            _update_retry_interval "interval" "max_interval"
             attempt=$((attempt + 1))
             continue
         fi
@@ -976,10 +991,7 @@ generic_cloud_api() {
                 echo "${response_body}"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "${interval}" -gt "${max_interval}" ]]; then
-                interval="${max_interval}"
-            fi
+            _update_retry_interval "interval" "max_interval"
             attempt=$((attempt + 1))
             continue
         fi
