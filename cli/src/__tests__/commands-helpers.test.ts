@@ -199,14 +199,14 @@ describe("Command Helpers", () => {
   describe("renderMatrixRow color logic", () => {
     it("should select green color for implemented status", () => {
       const status = "implemented";
-      const icon = "✓";
+      const icon = "+";
       const useGreen = status === "implemented";
       expect(useGreen).toBe(true);
     });
 
     it("should select dim color for missing status", () => {
       const status = "missing";
-      const icon = "–";
+      const icon = "-";
       const useGreen = status === "implemented";
       expect(useGreen).toBe(false);
     });

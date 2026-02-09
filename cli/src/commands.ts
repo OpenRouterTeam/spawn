@@ -253,7 +253,7 @@ function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryS
     console.error("\nThis agent + cloud combination doesn't exist yet.");
     console.error(`\nWhat to do:`);
     console.error(`  1. Check the matrix: ${pc.cyan("spawn list")}`);
-    console.error(`  2. Verify the combination is implemented (marked with ✓)`);
+    console.error(`  2. Verify the combination is implemented (marked with +)`);
     console.error(`  3. Check for typos in agent or cloud name`);
   } else {
     console.error(`\nNetwork or server error - try again in a few moments.`);
@@ -331,7 +331,7 @@ function renderMatrixHeader(clouds: string[], manifest: Manifest, agentColWidth:
 function renderMatrixSeparator(clouds: string[], agentColWidth: number, cloudColWidth: number): string {
   let sep = "".padEnd(agentColWidth);
   for (const _ of clouds) {
-    sep += pc.dim("─".repeat(cloudColWidth - COL_PADDING) + "  ");
+    sep += pc.dim("-".repeat(cloudColWidth - COL_PADDING) + "  ");
   }
   return sep;
 }
@@ -340,7 +340,7 @@ function renderMatrixRow(agent: string, clouds: string[], manifest: Manifest, ag
   let row = pc.bold(manifest.agents[agent].name.padEnd(agentColWidth));
   for (const c of clouds) {
     const status = matrixStatus(manifest, c, agent);
-    const icon = status === "implemented" ? "  \u2713" : "  \u2013";
+    const icon = status === "implemented" ? "  +" : "  -";
     const colorFn = status === "implemented" ? pc.green : pc.dim;
     row += colorFn(icon.padEnd(cloudColWidth));
   }
@@ -415,7 +415,7 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
 
   const a = manifest.agents[agentKey];
   console.log();
-  console.log(`${pc.bold(a.name)} ${pc.dim("\u2014")} ${a.description}`);
+  console.log(`${pc.bold(a.name)} ${pc.dim("--")} ${a.description}`);
   console.log();
   console.log(pc.bold("Available clouds:"));
   console.log();
@@ -493,14 +493,14 @@ export async function cmdUpdate(): Promise<void> {
       return;
     }
 
-    s.message(`Updating v${VERSION} \u2192 v${remoteVersion}...`);
+    s.message(`Updating v${VERSION} -> v${remoteVersion}...`);
 
     // Run the install script to update
     const installRes = await fetch(`${RAW_BASE}/cli/install.sh`);
     if (!installRes.ok) throw new Error("fetch install.sh failed");
     const installScript = await installRes.text();
 
-    s.stop(`Update available: v${VERSION} \u2192 v${remoteVersion}`);
+    s.stop(`Update available: v${VERSION} -> v${remoteVersion}`);
     p.log.info(`Run this to update:`);
     console.log();
     console.log(
@@ -517,7 +517,7 @@ export async function cmdUpdate(): Promise<void> {
 
 export function cmdHelp(): void {
   console.log(`
-${pc.bold("spawn")} \u2014 Launch any AI coding agent on any cloud
+${pc.bold("spawn")} -- Launch any AI coding agent on any cloud
 
 ${pc.bold("USAGE")}
   spawn                              Interactive agent + cloud picker
@@ -560,9 +560,9 @@ ${pc.bold("INSTALL")}
   curl -fsSL ${RAW_BASE}/cli/install.sh | bash
 
 ${pc.bold("TROUBLESHOOTING")}
-  ${pc.dim("\u2022")} Script not found: Run ${pc.cyan("spawn list")} to verify the combination exists
-  ${pc.dim("\u2022")} Missing credentials: Check cloud-specific READMEs in the repo
-  ${pc.dim("\u2022")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
+  ${pc.dim("*")} Script not found: Run ${pc.cyan("spawn list")} to verify the combination exists
+  ${pc.dim("*")} Missing credentials: Check cloud-specific READMEs in the repo
+  ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
 
 ${pc.bold("MORE INFO")}
   Repository:  https://github.com/${REPO}
