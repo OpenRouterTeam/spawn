@@ -128,9 +128,19 @@ function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyo
 function validateImplementation(manifest: Manifest, cloud: string, agent: string): void {
   const status = matrixStatus(manifest, cloud, agent);
   if (status !== "implemented") {
-    errorMessage(
-      `${manifest.agents[agent].name} on ${manifest.clouds[cloud].name} is not yet implemented.`
-    );
+    const agentName = manifest.agents[agent].name;
+    const cloudName = manifest.clouds[cloud].name;
+    p.log.error(`${agentName} on ${cloudName} is not yet implemented.`);
+
+    const availableClouds = getImplementedClouds(manifest, agent);
+    if (availableClouds.length > 0) {
+      const cloudNames = availableClouds.slice(0, 5).map((c) => manifest.clouds[c].name);
+      p.log.info(`${agentName} is available on: ${cloudNames.join(", ")}${availableClouds.length > 5 ? `, and ${availableClouds.length - 5} more` : ""}`);
+      p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all available clouds.`);
+    } else {
+      p.log.info(`Run ${pc.cyan("spawn list")} to see the full availability matrix.`);
+    }
+    process.exit(1);
   }
 }
 
@@ -152,6 +162,8 @@ export async function cmdInteractive(): Promise<void> {
 
   if (clouds.length === 0) {
     p.log.error(`No clouds available for ${manifest.agents[agentChoice].name}`);
+    p.log.info(`This agent has no implemented cloud providers yet.`);
+    p.log.info(`Run ${pc.cyan("spawn list")} to see the full availability matrix.`);
     process.exit(1);
   }
 
