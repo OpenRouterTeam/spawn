@@ -15,6 +15,7 @@ SPRITE_CONNECTIVITY_POLL_DELAY=${SPRITE_CONNECTIVITY_POLL_DELAY:-5}  # Delay bet
 
 # Check if sprite CLI is installed, install if not
 ensure_sprite_installed() {
+    # Check if sprite is already in PATH
     if command -v sprite &> /dev/null; then
         # sprite is already installed, check version
         local installed_version
@@ -22,6 +23,27 @@ ensure_sprite_installed() {
         log_info "sprite ${installed_version} already installed, skipping installation"
         return 0
     fi
+
+    # Check common installation paths (especially for Termux)
+    local common_paths=(
+        "${HOME}/.local/bin/sprite"
+        "/data/data/com.termux/files/usr/bin/sprite"
+        "/usr/local/bin/sprite"
+        "/usr/bin/sprite"
+    )
+
+    for sprite_path in "${common_paths[@]}"; do
+        if [[ -x "${sprite_path}" ]]; then
+            # Found sprite binary, add its directory to PATH
+            local sprite_dir
+            sprite_dir=$(dirname "${sprite_path}")
+            export PATH="${sprite_dir}:${PATH}"
+            local installed_version
+            installed_version=$(sprite version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || echo "unknown")
+            log_info "sprite ${installed_version} already installed at ${sprite_path}, skipping installation"
+            return 0
+        fi
+    done
 
     # sprite not found, install it
     log_warn "Installing sprite CLI..."
