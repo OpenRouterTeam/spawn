@@ -137,30 +137,109 @@ Check the repo's GitHub issues for user requests:
 - Comment on the issue with the PR link when done
 - If a request is already implemented, close the issue with a comment
 
+### Branch Cleaner (spawn 1)
+Clean up stale remote branches before and after the cycle:
+- List all remote branches: `git branch -r --format='%(refname:short) %(committerdate:unix)'`
+- For each branch (excluding main):
+  * Check if there's an open PR: `gh pr list --head BRANCH --state open --json number,title`
+  * If open PR and branch is stale (last commit >4 hours ago):
+    - Mergeable → merge with `gh pr merge NUMBER --squash --delete-branch`
+    - Conflicts/failing → close with `gh pr close NUMBER --comment "Auto-closing: stale branch. Please reopen if still needed."`
+  * If no open PR and stale >4 hours → delete with `git push origin --delete BRANCH`
+  * If fresh (<4 hours) → leave alone
+- Run again at end of cycle to catch branches created during the cycle
+
 ### Gap Filler (spawn remaining)
 After scouts commit new entries, pick up the newly-created "missing" matrix entries and implement them.
 
-## Git Workflow (CRITICAL)
+## Commit Markers (MANDATORY)
 
-Every teammate MUST follow this workflow. NO exceptions.
+Every teammate MUST include an `Agent:` trailer in commit messages to identify the author.
+Format: `Agent: <role>` as the last trailer line before Co-Authored-By.
 
-### Before starting work:
-```bash
-git checkout main && git pull --rebase origin main
+Example:
+```
+feat: Add RunPod cloud provider
+
+Agent: cloud-scout
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 ```
 
+Marker values: `cloud-scout`, `agent-scout`, `issue-responder`, `branch-cleaner`, `gap-filler`, `team-lead`.
+NEVER omit the Agent trailer. EVERY commit from a teammate must have one.
+
+## Git Worktrees (MANDATORY for parallel work)
+
+Multiple agents working simultaneously MUST use git worktrees instead of switching branches in the main checkout. This prevents agents from clobbering each other's uncommitted changes.
+
+### Setup (Team Lead does this at cycle start)
+```bash
+mkdir -p /tmp/spawn-worktrees
+```
+
+### Per-Agent Worktree Pattern
+
+CRITICAL: Always fetch latest main before creating a worktree.
+
+```bash
+# 1. Fetch latest main (from the main checkout)
+git fetch origin main
+
+# 2. Create a worktree for the branch off latest origin/main
+git worktree add /tmp/spawn-worktrees/BRANCH-NAME -b BRANCH-NAME origin/main
+
+# 3. Do all work inside the worktree
+cd /tmp/spawn-worktrees/BRANCH-NAME
+# ... make changes, run bash -n, run tests ...
+
+# 4. Commit with Agent marker
+git add FILES
+git commit -m "description
+
+Agent: role-name
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+# 5. Push
+git push -u origin BRANCH-NAME
+
+# 6. Create and merge PR (can be done from anywhere)
+gh pr create --title "title" --body "body"
+gh pr merge NUMBER --squash --delete-branch
+
+# 7. Clean up worktree
+git worktree remove /tmp/spawn-worktrees/BRANCH-NAME
+```
+
+### Why Worktrees?
+- Multiple agents work on different branches simultaneously without conflicts
+- No risk of `git checkout` clobbering another agent's uncommitted changes
+- Each agent gets a clean, isolated working directory
+- The main checkout stays on `main` and is never switched away
+
+### Rules
+- NEVER use `git checkout -b` or `git switch` in the main repo when other agents are active
+- ALWAYS `git fetch origin main` before `git worktree add` to ensure the branch starts from latest main
+- ALWAYS clean up worktrees after PR is merged: `git worktree remove PATH`
+- At end of cycle, team lead runs: `git worktree prune`
+
+## Git Workflow (CRITICAL)
+
+Every teammate MUST follow this workflow using worktrees. NO exceptions.
+
 ### For each unit of work:
-1. Create a feature branch: `git checkout -b {descriptive-name}`
-2. Do the work, commit
-3. Push: `git push -u origin {branch-name}`
-4. Create PR: `gh pr create --title "..." --body "..."`
-5. Try to merge: `gh pr merge --squash --delete-branch`
-6. **If merge fails** (conflicts, CI, etc.):
+1. Fetch latest: `git fetch origin main`
+2. Create worktree: `git worktree add /tmp/spawn-worktrees/{branch-name} -b {branch-name} origin/main`
+3. Work inside worktree: `cd /tmp/spawn-worktrees/{branch-name}`
+4. Do the work, commit (with Agent: marker)
+5. Push: `git push -u origin {branch-name}`
+6. Create PR: `gh pr create --title "..." --body "..."`
+7. Try to merge: `gh pr merge --squash --delete-branch`
+8. **If merge fails** (conflicts, CI, etc.):
    - Comment on the PR explaining WHY it cannot be merged
    - Close with: `gh pr close {number} --comment "Closing: {reason}"`
    - Acceptable reasons: merge conflict with a concurrent PR, superseded by another PR, implementation found to be incorrect after review
    - NEVER close a PR silently — every closed PR MUST have a comment
-7. Switch back: `git checkout main && git pull --rebase origin main`
+9. Clean up worktree: `git worktree remove /tmp/spawn-worktrees/{branch-name}`
 
 ### PR Policy (MANDATORY):
 Every PR must reach one of these terminal states:
@@ -169,10 +248,11 @@ Every PR must reach one of these terminal states:
 
 ### NEVER:
 - Push directly to main
+- Use `git checkout -b` when other agents are active — use worktrees
 - Close a PR without a comment explaining why
 - Leave PRs open/abandoned — resolve them in the same cycle
-- Leave branches hanging after merge
-- Work on a stale checkout — always pull latest main before each unit of work
+- Leave branches or worktrees hanging after merge
+- Work on a stale base — always `git fetch origin main` before creating a worktree
 
 ## After EVERY change (MANDATORY):
 
@@ -205,10 +285,14 @@ Copy the output and replace the matrix table between `## Matrix` and `## Develop
 - Read CLAUDE.md Shell Script Rules before writing ANY code
 - OpenRouter injection is MANDATORY in every script
 - `bash -n {file}` syntax-check before committing
+- ALWAYS include `Agent: <role>` trailer in commit messages
+- ALWAYS use worktrees — never `git checkout -b` in the main repo
+- ALWAYS `git fetch origin main` before creating a worktree
 - Each teammate works on DIFFERENT files
-- Each unit of work gets its own branch → PR → merge → cleanup
+- Each unit of work gets its own worktree → branch → PR → merge → cleanup worktree
 - **Every PR must be merged OR closed with a comment** — no silent closes, no abandoned PRs
 - Update manifest.json, the cloud's README.md, AND the root README.md matrix
+- Clean up worktrees after every PR: `git worktree remove PATH`
 - NEVER revert prior macOS/curl-bash compatibility fixes
 PROMPT_EOF
 }
@@ -266,6 +350,10 @@ cleanup_between_cycles() {
     git checkout main 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
+    # Prune stale worktrees
+    git worktree prune 2>/dev/null || true
+    rm -rf /tmp/spawn-worktrees 2>/dev/null || true
+
     # Delete merged remote branches (not main)
     local merged_branches
     merged_branches=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ')
@@ -287,12 +375,21 @@ run_team_cycle() {
     git checkout main 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
+    # Set up worktree directory for parallel agent work
+    mkdir -p /tmp/spawn-worktrees
+
     local prompt
     prompt=$(build_team_prompt)
     log_info "Launching agent team..."
     echo ""
     claude -p "${prompt}" --dangerously-skip-permissions
-    return $?
+    local rc=$?
+
+    # Clean up worktrees after cycle
+    git worktree prune 2>/dev/null || true
+    rm -rf /tmp/spawn-worktrees 2>/dev/null || true
+
+    return $rc
 }
 
 run_single_cycle() {
