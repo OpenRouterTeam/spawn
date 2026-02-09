@@ -26,6 +26,66 @@ log_warn()  { echo -e "${YELLOW}[spawn]${NC} $1"; }
 log_error() { echo -e "${RED}[spawn]${NC} $1"; }
 
 # --- Helper: clone the cli directory ---
+# --- Helper: find the best install directory ---
+# Picks the first directory that exists AND is in PATH
+find_install_dir() {
+    if [ -n "${SPAWN_INSTALL_DIR:-}" ]; then
+        echo "${SPAWN_INSTALL_DIR}"
+        return
+    fi
+    # Check common bin dirs in order of preference
+    local dirs=(
+        "${HOME}/.local/bin"
+        "$(bun pm bin -g 2>/dev/null)"
+        "${HOME}/.bun/bin"
+        "${HOME}/bin"
+    )
+    for dir in "${dirs[@]}"; do
+        [ -z "$dir" ] && continue
+        if echo "${PATH}" | tr ':' '\n' | grep -qx "$dir"; then
+            echo "$dir"
+            return
+        fi
+    done
+    # Nothing in PATH — default to ~/.local/bin and warn later
+    echo "${HOME}/.local/bin"
+}
+
+# --- Helper: show PATH instructions if spawn isn't findable ---
+ensure_in_path() {
+    local install_dir="$1"
+    if echo "${PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
+        echo ""
+        "${install_dir}/spawn" version
+        echo ""
+        log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
+    else
+        echo ""
+        log_warn "${BOLD}${install_dir}${NC}${YELLOW} is not in your PATH${NC}"
+        echo ""
+        case "${SHELL:-/bin/bash}" in
+            */zsh)
+                echo "  Run this, then reopen your terminal:"
+                echo ""
+                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.zshrc"
+                ;;
+            */fish)
+                echo "  Run this, then reopen your terminal:"
+                echo ""
+                echo "    fish_add_path ${install_dir}"
+                ;;
+            *)
+                echo "  Run this, then reopen your terminal:"
+                echo ""
+                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.bashrc"
+                ;;
+        esac
+        echo ""
+        echo "  Or run directly: ${install_dir}/spawn"
+        echo ""
+    fi
+}
+
 clone_cli() {
     local dest="$1"
     if command -v git &>/dev/null; then
@@ -65,26 +125,12 @@ if command -v bun &>/dev/null; then
     bun install
     bun run build
 
-    # Install cli.js to bun's global bin directory
-    INSTALL_DIR="${SPAWN_INSTALL_DIR:-$(bun pm bin -g 2>/dev/null)}"
-    INSTALL_DIR="${INSTALL_DIR:-${HOME}/.bun/bin}"
+    INSTALL_DIR="$(find_install_dir)"
     mkdir -p "${INSTALL_DIR}"
     cp cli.js "${INSTALL_DIR}/spawn"
     chmod +x "${INSTALL_DIR}/spawn"
     log_info "Installed spawn to ${INSTALL_DIR}/spawn"
-
-    if ! command -v spawn &>/dev/null; then
-        log_warn "${INSTALL_DIR} is not in your PATH"
-        echo ""
-        echo "Add it to your shell config:"
-        echo "  export PATH=\"${INSTALL_DIR}:\${PATH}\""
-        echo ""
-    else
-        echo ""
-        spawn version
-        echo ""
-        log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
-    fi
+    ensure_in_path "${INSTALL_DIR}"
     exit 0
 fi
 
@@ -108,37 +154,19 @@ if command -v npm &>/dev/null && command -v node &>/dev/null; then
         exit 1
     }
 
-    # Install to npm global bin or user bin
-    INSTALL_DIR="${SPAWN_INSTALL_DIR:-$(npm bin -g 2>/dev/null)}"
-    INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
-    mkdir -p "${INSTALL_DIR}" 2>/dev/null || {
-        log_warn "Cannot write to ${INSTALL_DIR}. Trying ~/.local/bin..."
-        INSTALL_DIR="${HOME}/.local/bin"
-        mkdir -p "${INSTALL_DIR}"
-    }
+    INSTALL_DIR="$(find_install_dir)"
+    mkdir -p "${INSTALL_DIR}"
     cp cli.js "${INSTALL_DIR}/spawn"
     chmod +x "${INSTALL_DIR}/spawn"
     log_info "Installed spawn to ${INSTALL_DIR}/spawn"
-
-    if ! command -v spawn &>/dev/null; then
-        log_warn "${INSTALL_DIR} is not in your PATH"
-        echo ""
-        echo "Add it to your shell config:"
-        echo "  export PATH=\"${INSTALL_DIR}:\${PATH}\""
-        echo ""
-    else
-        echo ""
-        spawn version
-        echo ""
-        log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
-    fi
+    ensure_in_path "${INSTALL_DIR}"
     exit 0
 fi
 
 # --- Method 3: Direct download fallback (bash wrapper) ---
 log_warn "Neither bun nor npm found. Installing bash fallback..."
 
-INSTALL_DIR="${SPAWN_INSTALL_DIR:-${HOME}/.local/bin}"
+INSTALL_DIR="$(find_install_dir)"
 mkdir -p "${INSTALL_DIR}"
 
 if ! curl -fsSL "${SPAWN_RAW_BASE}/cli/spawn.sh" -o "${INSTALL_DIR}/spawn"; then
@@ -148,35 +176,4 @@ fi
 
 chmod +x "${INSTALL_DIR}/spawn"
 log_info "Installed spawn (bash) to ${INSTALL_DIR}/spawn"
-
-# Check if install dir is in PATH
-if ! echo "${PATH}" | tr ':' '\n' | grep -qx "${INSTALL_DIR}"; then
-    log_warn "${INSTALL_DIR} is not in your PATH"
-    echo ""
-    echo "Add it to your PATH to use spawn from anywhere:"
-    echo ""
-    case "${SHELL:-/bin/bash}" in
-        */zsh)
-            echo "  echo 'export PATH=\"${INSTALL_DIR}:\${PATH}\"' >> ~/.zshrc"
-            echo "  source ~/.zshrc"
-            ;;
-        */fish)
-            echo "  fish_add_path ${INSTALL_DIR}"
-            ;;
-        *)
-            echo "  echo 'export PATH=\"${INSTALL_DIR}:\${PATH}\"' >> ~/.bashrc"
-            echo "  source ~/.bashrc"
-            ;;
-    esac
-    echo ""
-    echo "Or run directly: ${INSTALL_DIR}/spawn"
-    echo ""
-else
-    log_info "Installation complete!"
-    echo ""
-    echo "Try these commands:"
-    echo "  ${BOLD}spawn${NC}           - Interactive mode"
-    echo "  ${BOLD}spawn --help${NC}    - Show all commands"
-    echo "  ${BOLD}spawn list${NC}      - View the full matrix"
-    echo ""
-fi
+ensure_in_path "${INSTALL_DIR}"
