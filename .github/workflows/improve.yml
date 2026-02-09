@@ -16,12 +16,6 @@ jobs:
       - name: Trigger improve sprite
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
-          SPRITE_NAME: ${{ secrets.IMPROVE_SPRITE_NAME }}
-          SVC_NAME: ${{ secrets.IMPROVE_SERVICE_NAME }}
         run: |
-          echo "SPRITE_NAME length: ${#SPRITE_NAME}"
-          echo "SVC_NAME length: ${#SVC_NAME}"
-          URL="https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SVC_NAME}/start?duration=0s"
-          echo "URL: $URL"
-          curl -v -X POST "$URL" \
-            -H "Authorization: Bearer ${SPRITE_TOKEN}" 2>&1
+          curl -s -X POST "https://api.sprites.dev/v1/sprites/${{ secrets.IMPROVE_SPRITE_NAME }}/services/${{ secrets.IMPROVE_SERVICE_NAME }}/start?duration=0s" \
+            -H "Authorization: Bearer ${SPRITE_TOKEN}"
