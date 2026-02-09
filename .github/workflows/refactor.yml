@@ -17,14 +17,8 @@ jobs:
     steps:
       - name: Trigger refactor sprite
         env:
-          SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
-          SPRITE_NAME: ${{ secrets.REFACTOR_SPRITE_NAME }}
-          SVC_NAME: ${{ secrets.REFACTOR_SERVICE_NAME }}
+          SPRITE_URL: ${{ secrets.REFACTOR_SPRITE_URL }}
+          TRIGGER_SECRET: ${{ secrets.REFACTOR_TRIGGER_SECRET }}
         run: |
-          echo "SVC_NAME length: ${#SVC_NAME}"
-          echo "SVC_NAME hash: $(echo -n "$SVC_NAME" | sha256sum | cut -d' ' -f1)"
-          echo "SPRITE_NAME length: ${#SPRITE_NAME}"
-          echo "SPRITE_TOKEN length: ${#SPRITE_TOKEN}"
-          curl -X POST \
-            -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SVC_NAME}/start"
+          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            -H "Authorization: Bearer ${TRIGGER_SECRET}"

@@ -17,10 +17,8 @@ jobs:
     steps:
       - name: Trigger discovery sprite
         env:
-          SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
-          SPRITE_NAME: ${{ secrets.IMPROVE_SPRITE_NAME }}
-          SVC_NAME: ${{ secrets.IMPROVE_SERVICE_NAME }}
+          SPRITE_URL: ${{ secrets.DISCOVERY_SPRITE_URL }}
+          TRIGGER_SECRET: ${{ secrets.DISCOVERY_TRIGGER_SECRET }}
         run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SVC_NAME}/start"
+          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            -H "Authorization: Bearer ${TRIGGER_SECRET}"
