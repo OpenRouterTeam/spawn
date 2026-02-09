@@ -17,6 +17,16 @@ jobs:
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
         run: |
-          # Test with hardcoded values first to isolate the issue
-          curl -s -X POST "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve_trigger/start?duration=0s" \
-            -H "Authorization: Bearer ${SPRITE_TOKEN}"
+          # Debug: test each API level
+          echo "--- Test 1: list sprites ---"
+          curl -s -H "Authorization: Bearer ${SPRITE_TOKEN}" \
+            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery"
+          echo ""
+          echo "--- Test 2: list services ---"
+          curl -s -H "Authorization: Bearer ${SPRITE_TOKEN}" \
+            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services"
+          echo ""
+          echo "--- Test 3: start service (no duration) ---"
+          curl -s -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
+            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve_trigger/start"
+          echo ""
