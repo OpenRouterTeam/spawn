@@ -25,9 +25,9 @@ log_warn "Setting up sprite environment..."
 # Configure shell environment
 setup_shell_environment "${SPRITE_NAME}"
 
-# Install Claude Code using claude install
+# Install Claude Code
 log_warn "Installing Claude Code..."
-run_sprite "${SPRITE_NAME}" "claude install"
+run_sprite "${SPRITE_NAME}" "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation succeeded
 if ! run_sprite "${SPRITE_NAME}" "command -v claude &> /dev/null && claude --version &> /dev/null"; then
