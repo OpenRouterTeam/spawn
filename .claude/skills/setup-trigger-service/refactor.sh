@@ -6,7 +6,8 @@ set -eo pipefail
 # Spawns a Claude Code agent team to maintain and improve the spawn codebase
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "${SCRIPT_DIR}"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+cd "${REPO_ROOT}"
 
 LOG_FILE="/home/sprite/spawn/.docs/refactor.log"
 TEAM_NAME="spawn-refactor"
@@ -19,7 +20,7 @@ log() {
 }
 
 log "=== Starting Refactoring Cycle ==="
-log "Working directory: ${SCRIPT_DIR}"
+log "Working directory: ${REPO_ROOT}"
 log "Team name: ${TEAM_NAME}"
 log "Log file: ${LOG_FILE}"
 
