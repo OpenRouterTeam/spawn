@@ -53,7 +53,7 @@ clone_cli() {
     fi
 }
 
-# --- Method 1: bun install -g (preferred) ---
+# --- Method 1: bun (preferred) ---
 if command -v bun &>/dev/null; then
     log_info "Installing spawn via bun..."
     tmpdir=$(mktemp -d)
@@ -64,19 +64,23 @@ if command -v bun &>/dev/null; then
     cd "${tmpdir}/cli"
     bun install
     bun run build
-    bun link 2>/dev/null || bun install -g . 2>/dev/null || {
-        # If global install fails, build and copy binary
-        log_warn "Global install failed, building binary..."
-        bun build src/index.ts --compile --outfile spawn
-        INSTALL_DIR="${SPAWN_INSTALL_DIR:-${HOME}/.local/bin}"
-        mkdir -p "${INSTALL_DIR}"
-        mv spawn "${INSTALL_DIR}/spawn"
-        log_info "Installed spawn binary to ${INSTALL_DIR}/spawn"
-    }
 
-    log_info "spawn installed successfully!"
-    echo ""
-    if command -v spawn &>/dev/null; then
+    # Install cli.js to bun's global bin directory
+    INSTALL_DIR="${SPAWN_INSTALL_DIR:-$(bun pm bin -g 2>/dev/null)}"
+    INSTALL_DIR="${INSTALL_DIR:-${HOME}/.bun/bin}"
+    mkdir -p "${INSTALL_DIR}"
+    cp cli.js "${INSTALL_DIR}/spawn"
+    chmod +x "${INSTALL_DIR}/spawn"
+    log_info "Installed spawn to ${INSTALL_DIR}/spawn"
+
+    if ! command -v spawn &>/dev/null; then
+        log_warn "${INSTALL_DIR} is not in your PATH"
+        echo ""
+        echo "Add it to your shell config:"
+        echo "  export PATH=\"${INSTALL_DIR}:\${PATH}\""
+        echo ""
+    else
+        echo ""
         spawn version
         echo ""
         log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
@@ -84,7 +88,7 @@ if command -v bun &>/dev/null; then
     exit 0
 fi
 
-# --- Method 2: npm install -g ---
+# --- Method 2: npm/node ---
 if command -v npm &>/dev/null && command -v node &>/dev/null; then
     log_info "Installing spawn via npm..."
     tmpdir=$(mktemp -d)
@@ -95,7 +99,7 @@ if command -v npm &>/dev/null && command -v node &>/dev/null; then
     cd "${tmpdir}/cli"
     npm install
 
-    # Build cli.js — package.json bin points to it, so it must exist before linking
+    # Build cli.js with node shebang
     log_info "Building CLI..."
     npx -y esbuild src/index.ts --bundle --outfile=cli.js --platform=node --format=esm --banner:js='#!/usr/bin/env node' 2>/dev/null || {
         log_error "Failed to build cli.js. Install bun instead (recommended):"
@@ -103,29 +107,27 @@ if command -v npm &>/dev/null && command -v node &>/dev/null; then
         echo "  Then re-run: curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
         exit 1
     }
-    chmod +x cli.js
 
-    npm install -g . 2>/dev/null || {
-        log_warn "npm global install requires elevated permissions."
-        echo ""
-        echo "Choose one of these options:"
-        echo ""
-        echo "  1. Install with sudo (recommended):"
-        echo "     cd ${tmpdir}/cli && sudo npm install -g ."
-        echo ""
-        echo "  2. Install bun instead (no sudo needed):"
-        echo "     curl -fsSL https://bun.sh/install | bash"
-        echo "     Then re-run: curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
-        echo ""
-        echo "  3. Use the bash fallback (limited functionality):"
-        echo "     SPAWN_INSTALL_DIR=~/.local/bin curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
-        echo ""
-        exit 1
+    # Install to npm global bin or user bin
+    INSTALL_DIR="${SPAWN_INSTALL_DIR:-$(npm bin -g 2>/dev/null)}"
+    INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
+    mkdir -p "${INSTALL_DIR}" 2>/dev/null || {
+        log_warn "Cannot write to ${INSTALL_DIR}. Trying ~/.local/bin..."
+        INSTALL_DIR="${HOME}/.local/bin"
+        mkdir -p "${INSTALL_DIR}"
     }
+    cp cli.js "${INSTALL_DIR}/spawn"
+    chmod +x "${INSTALL_DIR}/spawn"
+    log_info "Installed spawn to ${INSTALL_DIR}/spawn"
 
-    log_info "spawn installed successfully!"
-    echo ""
-    if command -v spawn &>/dev/null; then
+    if ! command -v spawn &>/dev/null; then
+        log_warn "${INSTALL_DIR} is not in your PATH"
+        echo ""
+        echo "Add it to your shell config:"
+        echo "  export PATH=\"${INSTALL_DIR}:\${PATH}\""
+        echo ""
+    else
+        echo ""
         spawn version
         echo ""
         log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
