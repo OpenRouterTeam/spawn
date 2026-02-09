@@ -128,6 +128,10 @@ create_server() {
     local region="${DO_REGION:-nyc3}"
     local image="ubuntu-24-04-x64"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$size" || { log_error "Invalid DO_DROPLET_SIZE"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid DO_REGION"; return 1; }
+
     log_warn "Creating DigitalOcean droplet '$name' (size: $size, region: $region)..."
 
     # Get all SSH key IDs

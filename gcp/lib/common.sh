@@ -86,6 +86,10 @@ create_server() {
     local image_family="ubuntu-2404-lts-amd64"
     local image_project="ubuntu-os-cloud"
 
+    # Validate env var inputs to prevent command injection
+    validate_resource_name "${machine_type}" || { log_error "Invalid GCP_MACHINE_TYPE"; return 1; }
+    validate_region_name "${zone}" || { log_error "Invalid GCP_ZONE"; return 1; }
+
     log_warn "Creating GCP instance '${name}' (type: ${machine_type}, zone: ${zone})..."
 
     local userdata

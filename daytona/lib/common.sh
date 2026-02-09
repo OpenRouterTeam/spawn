@@ -100,6 +100,11 @@ create_server() {
     local memory="${DAYTONA_MEMORY:-2048}"
     local disk="${DAYTONA_DISK:-5}"
 
+    # Validate numeric env vars to prevent command injection
+    if [[ ! "${cpu}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_CPU: must be numeric"; return 1; fi
+    if [[ ! "${memory}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_MEMORY: must be numeric"; return 1; fi
+    if [[ ! "${disk}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_DISK: must be numeric"; return 1; fi
+
     log_warn "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
 
     # Create sandbox with resource flags and auto-stop disabled

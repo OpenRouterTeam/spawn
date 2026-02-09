@@ -94,6 +94,10 @@ create_server() {
     local az="${region}a"
     local blueprint="ubuntu_24_04"
 
+    # Validate env var inputs to prevent command injection
+    validate_resource_name "${bundle}" || { log_error "Invalid LIGHTSAIL_BUNDLE"; return 1; }
+    validate_region_name "${region}" || { log_error "Invalid AWS_DEFAULT_REGION"; return 1; }
+
     log_warn "Creating Lightsail instance '${name}' (bundle: ${bundle}, AZ: ${az})..."
 
     local userdata

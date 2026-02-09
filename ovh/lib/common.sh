@@ -303,6 +303,10 @@ create_ovh_instance() {
     local flavor="${OVH_FLAVOR:-d2-2}"
     local region="${OVH_REGION:-GRA7}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$flavor" || { log_error "Invalid OVH_FLAVOR"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid OVH_REGION"; return 1; }
+
     log_warn "Creating OVHcloud instance '$name' (flavor: $flavor, region: $region)..."
 
     # Find image ID

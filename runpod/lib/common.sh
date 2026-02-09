@@ -35,12 +35,13 @@ SSH_RETRY_DELAY=${SSH_RETRY_DELAY:-5}  # Delay between SSH connection retry atte
 runpod_api() {
     local query="${1}"
 
+    # Pass query safely via stdin to avoid triple-quote injection
     local body
     body=$(python3 -c "
-import json
-q = '''${query}'''
+import json, sys
+q = sys.stdin.read().strip()
 print(json.dumps({'query': q}))
-")
+" <<< "${query}")
 
     curl -s -X POST \
         -H "Content-Type: application/json" \
@@ -108,6 +109,15 @@ create_server() {
     local volume_gb="${RUNPOD_VOLUME_GB:-50}"
     local container_disk_gb="${RUNPOD_CONTAINER_DISK_GB:-20}"
     local cloud_type="${RUNPOD_CLOUD_TYPE:-ALL}"
+
+    # Validate numeric env vars to prevent injection into GraphQL query
+    if [[ ! "${gpu_count}" =~ ^[0-9]+$ ]]; then log_error "Invalid RUNPOD_GPU_COUNT: must be numeric"; return 1; fi
+    if [[ ! "${volume_gb}" =~ ^[0-9]+$ ]]; then log_error "Invalid RUNPOD_VOLUME_GB: must be numeric"; return 1; fi
+    if [[ ! "${container_disk_gb}" =~ ^[0-9]+$ ]]; then log_error "Invalid RUNPOD_CONTAINER_DISK_GB: must be numeric"; return 1; fi
+    if [[ ! "${cloud_type}" =~ ^[A-Z]+$ ]]; then log_error "Invalid RUNPOD_CLOUD_TYPE: must be uppercase letters only"; return 1; fi
+    # Block injection chars in string values (quotes, backslashes)
+    if [[ "${gpu_type}" =~ [\"\`\$\\] ]]; then log_error "Invalid RUNPOD_GPU_TYPE: contains unsafe characters"; return 1; fi
+    if [[ "${image}" =~ [\"\`\$\\] ]]; then log_error "Invalid RUNPOD_IMAGE: contains unsafe characters"; return 1; fi
 
     log_warn "Creating RunPod pod '${name}' (GPU: ${gpu_type}, image: ${image})..."
 

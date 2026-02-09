@@ -107,6 +107,10 @@ create_server() {
     local instance_type="${LAMBDA_INSTANCE_TYPE:-gpu_1x_a10}"
     local region="${LAMBDA_REGION:-us-east-1}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "${instance_type}" || { log_error "Invalid LAMBDA_INSTANCE_TYPE"; return 1; }
+    validate_region_name "${region}" || { log_error "Invalid LAMBDA_REGION"; return 1; }
+
     log_warn "Creating Lambda instance '${name}' (type: ${instance_type}, region: ${region})..."
 
     # Get all SSH key IDs

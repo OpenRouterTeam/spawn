@@ -122,6 +122,11 @@ create_server() {
     # Ubuntu 24.04 x64 OS ID
     local os_id="${VULTR_OS_ID:-2284}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$plan" || { log_error "Invalid VULTR_PLAN"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid VULTR_REGION"; return 1; }
+    if [[ ! "$os_id" =~ ^[0-9]+$ ]]; then log_error "Invalid VULTR_OS_ID: must be numeric"; return 1; fi
+
     log_warn "Creating Vultr instance '$name' (plan: $plan, region: $region)..."
 
     # Get all SSH key IDs
