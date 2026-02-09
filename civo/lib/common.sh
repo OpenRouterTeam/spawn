@@ -188,6 +188,10 @@ create_server() {
     local size="${CIVO_SIZE:-g3.medium}"
     local region="${CIVO_REGION:-NYC1}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$size" || { log_error "Invalid CIVO_SIZE"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid CIVO_REGION"; return 1; }
+
     log_warn "Creating Civo instance '$name' (size: $size, region: $region)..."
 
     # Get network ID
@@ -221,9 +225,14 @@ touch /root/.cloud-init-complete
 INIT_EOF
 )
 
+    # Pass init script safely via stdin to avoid triple-quote injection
+    local json_script
+    json_script=$(json_escape "$init_script")
+
     local body
     body=$(python3 -c "
-import json
+import json, sys
+script = json.loads(sys.stdin.read())
 body = {
     'hostname': '$name',
     'size': '$size',
@@ -232,11 +241,11 @@ body = {
     'template_id': '$template_id',
     'ssh_key_id': '$ssh_key_id',
     'initial_user': 'root',
-    'script': '''$(echo "$init_script" | sed "s/'/'\\''/g")''',
+    'script': script,
     'public_ip': 'create'
 }
 print(json.dumps(body))
-")
+" <<< "$json_script")
 
     local response
     response=$(civo_api POST "/instances" "$body")

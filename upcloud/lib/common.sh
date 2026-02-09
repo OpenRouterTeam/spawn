@@ -170,6 +170,10 @@ create_server() {
     local plan="${UPCLOUD_PLAN:-1xCPU-2GB}"
     local zone="${UPCLOUD_ZONE:-de-fra1}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$plan" || { log_error "Invalid UPCLOUD_PLAN"; return 1; }
+    validate_region_name "$zone" || { log_error "Invalid UPCLOUD_ZONE"; return 1; }
+
     log_warn "Creating UpCloud server '$name' (plan: $plan, zone: $zone)..."
 
     # Find Ubuntu template
@@ -186,11 +190,14 @@ create_server() {
     local ssh_pub_key
     ssh_pub_key=$(cat "${key_path}")
 
-    # Build request body
+    # Build request body - pass SSH key safely via stdin
+    local json_ssh_key
+    json_ssh_key=$(json_escape "$ssh_pub_key")
+
     local body
     body=$(python3 -c "
-import json
-ssh_key = '''$ssh_pub_key'''
+import json, sys
+ssh_key = json.loads(sys.stdin.read()).strip()
 body = {
     'server': {
         'zone': '$zone',
@@ -212,13 +219,13 @@ body = {
             'username': 'root',
             'create_password': 'no',
             'ssh_keys': {
-                'ssh_key': [ssh_key.strip()]
+                'ssh_key': [ssh_key]
             }
         }
     }
 }
 print(json.dumps(body))
-")
+" <<< "$json_ssh_key")
 
     local response
     response=$(upcloud_api POST "/server" "$body")

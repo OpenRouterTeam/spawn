@@ -61,6 +61,12 @@ create_server() {
     local name="${1}"
     local image="${MODAL_IMAGE:-debian_slim}"
 
+    # Validate image name - used as Python attribute name (e.g. modal.Image.debian_slim())
+    if [[ ! "${image}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+        log_error "Invalid MODAL_IMAGE: must be a valid Python identifier (letters, digits, underscores)"
+        return 1
+    fi
+
     log_warn "Creating Modal sandbox '${name}'..."
 
     # Capture both stdout and stderr from Python SDK

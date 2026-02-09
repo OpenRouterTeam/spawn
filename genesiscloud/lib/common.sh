@@ -117,6 +117,12 @@ create_server() {
     local region="${GENESIS_REGION:-ARC-IS-HAF-1}"
     local image="${GENESIS_IMAGE:-Ubuntu 24.04}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$instance_type" || { log_error "Invalid GENESIS_INSTANCE_TYPE"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid GENESIS_REGION"; return 1; }
+    # Image names may contain spaces (e.g. "Ubuntu 24.04") but must not contain quotes or shell metacharacters
+    if [[ "$image" =~ [\'\"\`\$\;\\] ]]; then log_error "Invalid GENESIS_IMAGE: contains unsafe characters"; return 1; fi
+
     log_warn "Creating Genesis Cloud instance '$name' (type: $instance_type, region: $region)..."
 
     # Get all SSH key IDs

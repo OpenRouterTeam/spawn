@@ -249,6 +249,14 @@ create_server() {
     local image="${KAMATERA_IMAGE:-ubuntu_server_24.04_64-bit}"
     local billing="${KAMATERA_BILLING:-hourly}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_region_name "$datacenter" || { log_error "Invalid KAMATERA_DATACENTER"; return 1; }
+    validate_resource_name "$cpu" || { log_error "Invalid KAMATERA_CPU"; return 1; }
+    if [[ ! "$ram" =~ ^[0-9]+$ ]]; then log_error "Invalid KAMATERA_RAM: must be numeric"; return 1; fi
+    if [[ ! "$disk" =~ ^[a-zA-Z0-9_=,-]+$ ]]; then log_error "Invalid KAMATERA_DISK"; return 1; fi
+    if [[ ! "$image" =~ ^[a-zA-Z0-9_.:-]+$ ]]; then log_error "Invalid KAMATERA_IMAGE"; return 1; fi
+    validate_resource_name "$billing" || { log_error "Invalid KAMATERA_BILLING"; return 1; }
+
     log_warn "Creating Kamatera server '$name' (datacenter: $datacenter, cpu: $cpu, ram: ${ram}MB)..."
 
     # Generate password for the server
@@ -281,15 +289,21 @@ touch /root/.cloud-init-complete
 INIT_EOF
 )
 
+    # Pass SSH key and script content safely via stdin as JSON
+    local json_ssh_key
+    json_ssh_key=$(json_escape "$ssh_key")
+    local json_script
+    json_script=$(json_escape "$script_content")
+
     local body
     body=$(python3 -c "
 import json, sys
-ssh_key = sys.stdin.read().strip()
+data = json.loads(sys.stdin.read())
 body = {
     'name': '$name',
     'password': '$password',
     'passwordValidate': '$password',
-    'ssh-key': ssh_key,
+    'ssh-key': data['ssh_key'],
     'datacenter': '$datacenter',
     'image': '$image',
     'cpu': '$cpu',
@@ -301,10 +315,10 @@ body = {
     'quantity': 1,
     'billingcycle': '$billing',
     'poweronaftercreate': 'yes',
-    'script-file': '''$(printf '%s' "$script_content" | sed "s/'/'\\''/g")'''
+    'script-file': data['script']
 }
 print(json.dumps(body))
-" <<< "$ssh_key")
+" <<< "{\"ssh_key\": $json_ssh_key, \"script\": $json_script}")
 
     local response
     response=$(kamatera_api POST "/service/server" "$body")
