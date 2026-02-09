@@ -66,7 +66,20 @@ Create these teammates:
    - Run 'bun test' and fix failures
    - Add integration tests for critical paths
 
-5. **community-coordinator** (Sonnet)
+5. **branch-cleaner** (Haiku)
+   - FIRST TASK: List all remote branches: git branch -r --format='%(refname:short) %(committerdate:unix)'
+   - For each remote branch (excluding main):
+     * Check if there's an open PR: gh pr list --head BRANCH --state open --json number,title
+     * If open PR exists and branch is stale (last commit >4 hours ago):
+       - If PR is mergeable: merge it with gh pr merge NUMBER --squash --delete-branch
+       - If PR has conflicts or failing checks: close it with gh pr close NUMBER --comment "Auto-closing: stale branch with unresolvable conflicts. Please reopen if still needed."
+     * If no open PR and branch is stale (>4 hours old): delete it with git push origin --delete BRANCH
+     * If branch is fresh (<4 hours): leave it alone (may be actively worked on)
+   - After cleanup, report summary: how many branches merged, closed, deleted, left alone
+   - Run this check AGAIN at the end of the cycle to catch branches created during the cycle
+   - GOAL: Zero stale branches left on the remote after each cycle.
+
+6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
    - For EVERY open issue, immediately post an acknowledgment comment:
      gh issue comment NUMBER --body "Thanks for reporting this! Our automated maintenance team is looking into it. We'll post updates here as we investigate."
@@ -92,40 +105,126 @@ When fixing a bug reported in a GitHub issue:
 
 1. Community-coordinator posts acknowledgment comment on the issue
 2. Community-coordinator messages the relevant teammate to investigate
-3. Create a fix branch: git checkout -b fix/issue-NUMBER
-4. Implement the fix and commit
-5. Community-coordinator posts interim update on the issue with root cause summary
-6. Push the branch: git push -u origin fix/issue-NUMBER
-7. Create a PR that references the issue:
+3. Create a worktree for the fix:
+   git worktree add /tmp/spawn-worktrees/fix/issue-NUMBER -b fix/issue-NUMBER origin/main
+4. Work inside the worktree: cd /tmp/spawn-worktrees/fix/issue-NUMBER
+5. Implement the fix and commit (include Agent: marker)
+6. Community-coordinator posts interim update on the issue with root cause summary
+7. Push the branch: git push -u origin fix/issue-NUMBER
+8. Create a PR that references the issue:
    gh pr create --title "Fix: description" --body "Fixes #NUMBER"
-8. Merge the PR immediately: gh pr merge --squash --delete-branch
-9. Community-coordinator posts final resolution comment with PR link and explanation
-10. Close the issue: gh issue close NUMBER
-11. Switch back to main: git checkout main && git pull origin main
+9. Merge the PR immediately: gh pr merge --squash --delete-branch
+10. Clean up: git worktree remove /tmp/spawn-worktrees/fix/issue-NUMBER
+11. Community-coordinator posts final resolution comment with PR link and explanation
+12. Close the issue: gh issue close NUMBER
 
 NEVER leave an issue open after the fix is merged. NEVER leave a PR unmerged.
 If a PR cannot be merged (conflicts, superseded, etc.), close it WITH a comment explaining why.
 NEVER close a PR silently — every closed PR MUST have a comment.
-The full cycle is: acknowledge → investigate → branch → fix → update → PR (references issue) → merge PR → resolve & close issue.
+The full cycle is: acknowledge → investigate → worktree → fix → update → PR (references issue) → merge PR → cleanup → resolve & close issue.
+
+## Commit Markers (MANDATORY)
+
+Every agent MUST include a marker trailer in their commit messages to identify which agent authored the change.
+Format: `Agent: <agent-name>` as the last trailer line before Co-Authored-By.
+
+Example commit message:
+```
+fix: Sanitize port input in OAuth server
+
+Agent: security-auditor
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+```
+
+Agent marker values:
+- `Agent: security-auditor`
+- `Agent: ux-engineer`
+- `Agent: complexity-hunter`
+- `Agent: test-engineer`
+- `Agent: branch-cleaner`
+- `Agent: community-coordinator`
+- `Agent: team-lead`
+
+This allows us to track which agent made which changes, audit agent behavior, and identify patterns.
+NEVER omit the Agent trailer. EVERY commit from a teammate must have one.
+
+## Git Worktrees (MANDATORY for parallel work)
+
+To avoid branch conflicts when multiple agents work simultaneously, each agent MUST use a dedicated git worktree instead of switching branches in the main checkout.
+
+### Setup (Team Lead does this at cycle start)
+
+Before spawning teammates, create a worktree directory:
+```bash
+mkdir -p /tmp/spawn-worktrees
+```
+
+### Per-Agent Worktree Pattern
+
+When an agent needs to create a branch for a fix or improvement:
+
+```bash
+# 1. Create a worktree for the branch (from the main checkout)
+git worktree add /tmp/spawn-worktrees/BRANCH-NAME -b BRANCH-NAME origin/main
+
+# 2. Do all work inside the worktree directory
+cd /tmp/spawn-worktrees/BRANCH-NAME
+# ... make changes, run tests ...
+
+# 3. Commit and push from the worktree
+git add FILES
+git commit -m "message
+
+Agent: agent-name
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+git push -u origin BRANCH-NAME
+
+# 4. Create PR (can be done from anywhere)
+gh pr create --title "title" --body "body"
+
+# 5. Merge and clean up
+gh pr merge NUMBER --squash --delete-branch
+git worktree remove /tmp/spawn-worktrees/BRANCH-NAME
+```
+
+### Why Worktrees?
+
+- Multiple agents can work on different branches simultaneously without conflicts
+- No risk of `git checkout` clobbering another agent's uncommitted changes
+- Each agent has a clean, isolated working directory
+- The main checkout stays on `main` and is never switched away
+
+### Rules
+
+- NEVER use `git checkout -b` or `git switch` in the main repo when other agents are active
+- ALWAYS use `git worktree add` for branch work
+- ALWAYS clean up worktrees after the PR is merged: `git worktree remove PATH`
+- At end of cycle, team lead runs: `git worktree prune` to clean up stale entries
 
 ## Workflow
 
 1. Create the team with TeamCreate
-2. Create tasks using TaskCreate for each area:
+2. Set up worktree directory: mkdir -p /tmp/spawn-worktrees
+3. Create tasks using TaskCreate for each area:
+   - Branch cleanup: scan and clean stale remote branches
    - Community coordination: scan all open issues, post acknowledgments, categorize, and delegate
    - Security scan of all scripts
    - UX test of main user flows
    - Complexity reduction in top 5 longest functions
    - Test coverage for recent changes
-3. Spawn teammates with Task tool using subagent_type='general-purpose'
-4. Assign tasks to teammates using TaskUpdate
-5. Community-coordinator engages issues FIRST — posts acknowledgments before other agents start investigating
-6. Community-coordinator delegates issue investigations to relevant teammates
-7. Monitor teammate progress via their messages
-8. Community-coordinator posts interim updates on issues as teammates report findings
-9. Create Sprite checkpoint after successful changes: sprite-env checkpoint create --comment 'Description'
-10. Community-coordinator posts final resolutions on all issues, closes them
-11. When cycle completes, verify: every issue engaged with comments, all PRs merged, summarize what was fixed/improved
+4. Spawn teammates with Task tool using subagent_type='general-purpose'
+5. Assign tasks to teammates using TaskUpdate
+6. Branch-cleaner runs first pass on stale branches
+7. Community-coordinator engages issues FIRST — posts acknowledgments before other agents start investigating
+8. Community-coordinator delegates issue investigations to relevant teammates
+9. All agents use worktrees for their branch work (never git checkout in the main repo)
+10. Monitor teammate progress via their messages
+11. Community-coordinator posts interim updates on issues as teammates report findings
+12. Create Sprite checkpoint after successful changes: sprite-env checkpoint create --comment 'Description'
+13. Community-coordinator posts final resolutions on all issues, closes them
+14. Branch-cleaner runs final pass to catch any branches created during the cycle
+15. Team lead runs: git worktree prune to clean stale worktree entries
+16. When cycle completes, verify: every issue engaged, all PRs merged, zero stale branches, summarize what was fixed/improved
 
 ## Safety Rules
 
