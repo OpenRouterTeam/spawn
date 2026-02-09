@@ -1,4 +1,4 @@
-name: Trigger Improve
+name: Trigger Discovery
 
 on:
   schedule:
@@ -8,14 +8,14 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: improve-sprite-trigger
+  group: discovery-sprite-trigger
   cancel-in-progress: false
 
 jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger improve sprite
+      - name: Trigger discovery sprite
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
           SPRITE_NAME: ${{ secrets.IMPROVE_SPRITE_NAME }}
