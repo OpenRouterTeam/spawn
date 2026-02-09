@@ -11,6 +11,7 @@ cd "${REPO_ROOT}"
 
 LOG_FILE="/home/sprite/spawn/.docs/refactor.log"
 TEAM_NAME="spawn-refactor"
+PROMPT_FILE=""
 
 # Ensure .docs directory exists
 mkdir -p "$(dirname "${LOG_FILE}")"
@@ -18,6 +19,26 @@ mkdir -p "$(dirname "${LOG_FILE}")"
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
 }
+
+# Cleanup function — runs on normal exit, SIGTERM, and SIGINT
+cleanup() {
+    local exit_code=$?
+    log "Running cleanup (exit_code=${exit_code})..."
+
+    cd "${REPO_ROOT}" 2>/dev/null || true
+
+    # Prune worktrees
+    git worktree prune 2>/dev/null || true
+    rm -rf /tmp/spawn-worktrees 2>/dev/null || true
+
+    # Clean up prompt file
+    rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
+
+    log "=== Refactoring Cycle Done (exit_code=${exit_code}) ==="
+    exit $exit_code
+}
+
+trap cleanup EXIT SIGTERM SIGINT
 
 log "=== Starting Refactoring Cycle ==="
 log "Working directory: ${REPO_ROOT}"
@@ -28,6 +49,38 @@ log "Log file: ${LOG_FILE}"
 log "Syncing with origin/main..."
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
+
+# Pre-cycle cleanup: stale worktrees, merged branches, abandoned PRs
+log "Pre-cycle cleanup: stale worktrees..."
+git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
+if [[ -d /tmp/spawn-worktrees ]]; then
+    rm -rf /tmp/spawn-worktrees 2>&1 | tee -a "${LOG_FILE}" || true
+    log "Removed stale /tmp/spawn-worktrees directory"
+fi
+
+log "Pre-cycle cleanup: merged remote branches..."
+MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ') || true
+for branch in $MERGED_BRANCHES; do
+    if [[ -n "$branch" && "$branch" != "main" ]]; then
+        git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
+    fi
+done
+
+log "Pre-cycle cleanup: stale open PRs..."
+STALE_PRS=$(gh pr list --repo OpenRouterTeam/spawn --state open --json number,updatedAt --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | .number' 2>/dev/null) || true
+for pr_num in $STALE_PRS; do
+    if [[ -n "$pr_num" ]]; then
+        log "Found stale PR #${pr_num}, checking if mergeable..."
+        PR_MERGEABLE=$(gh pr view "$pr_num" --repo OpenRouterTeam/spawn --json mergeable --jq '.mergeable' 2>/dev/null) || PR_MERGEABLE="UNKNOWN"
+        if [[ "$PR_MERGEABLE" == "MERGEABLE" ]]; then
+            log "Merging stale PR #${pr_num}..."
+            gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
+        else
+            log "Closing unmergeable stale PR #${pr_num}..."
+            gh pr close "$pr_num" --repo OpenRouterTeam/spawn --comment "Auto-closing: stale PR from a previous interrupted cycle. Please reopen if still needed." 2>&1 | tee -a "${LOG_FILE}" || true
+        fi
+    fi
+done
 
 # Launch Claude Code with team instructions
 log "Launching refactoring team..."
@@ -82,41 +135,50 @@ Create these teammates:
 
 6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
-   - For each issue, post a brief, casual comment thanking them for flagging it (e.g. "Thanks for flagging this!" or "Appreciate the report!") — keep it short and natural, not corporate
+   - DEDUP CHECK (MANDATORY before ANY comment): For each issue, FIRST check existing comments:
+     `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'`
+     If the issue already has a comment from your bot account (check for "la14-1" or any automated commenter), SKIP posting an acknowledgment — the issue has already been engaged.
+     Only post an acknowledgment if the issue has ZERO comments from automated accounts.
+   - For issues that need acknowledgment, post a brief, casual comment thanking them for flagging it (e.g. "Thanks for flagging this!" or "Appreciate the report!") — keep it short and natural, not corporate
+   - Before posting ANY comment (acknowledgment, interim update, or resolution), ALWAYS check existing comments first:
+     `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[-1].body'`
+     If the last comment already contains similar content (e.g., already has a "Thanks for flagging" or already has a resolution with a PR link), do NOT post again. Never duplicate information.
    - Categorize each issue (bug, feature request, question, already-fixed)
    - For bugs: message the relevant teammate to investigate
      * Security-related → message security-auditor
      * UX/error messages → message ux-engineer
      * Test failures → message test-engineer
      * Code quality → message complexity-hunter
-   - Post interim updates on issues as teammates report findings:
+   - Post interim updates on issues as teammates report findings (only if no similar update exists):
      gh issue comment NUMBER --body "Update: We've identified the root cause — [summary]. Working on a fix now."
-   - When a fix PR is merged, post the final resolution:
+   - When a fix PR is merged, post the final resolution (only if no resolution comment exists yet):
      gh issue comment NUMBER --body "This has been fixed in PR_URL. [Brief explanation of what was changed and why]. The fix is live on main — please try updating and let us know if you still see the issue."
    - Then close: gh issue close NUMBER
    - For feature requests: comment acknowledging the request, label as enhancement, and close with a note pointing to discussions
    - For questions: answer directly in a comment, then close
    - GOAL: Every issue reporter should feel heard and informed. No cold trails.
    - EVERY open issue must be engaged by end of cycle. No dangling issues.
+   - NEVER post duplicate comments. One acknowledgment per issue. One resolution per issue.
 
 ## Issue Fix Workflow (CRITICAL follow exactly)
 
 When fixing a bug reported in a GitHub issue:
 
-1. Community-coordinator posts acknowledgment comment on the issue
-2. Community-coordinator messages the relevant teammate to investigate
-3. Create a worktree for the fix:
+1. Community-coordinator checks for existing comments (dedup) before posting acknowledgment
+2. Community-coordinator posts acknowledgment comment on the issue (only if not already acknowledged)
+3. Community-coordinator messages the relevant teammate to investigate
+4. Create a worktree for the fix:
    git worktree add /tmp/spawn-worktrees/fix/issue-NUMBER -b fix/issue-NUMBER origin/main
-4. Work inside the worktree: cd /tmp/spawn-worktrees/fix/issue-NUMBER
-5. Implement the fix and commit (include Agent: marker)
-6. Community-coordinator posts interim update on the issue with root cause summary
-7. Push the branch: git push -u origin fix/issue-NUMBER
-8. Create a PR that references the issue:
+5. Work inside the worktree: cd /tmp/spawn-worktrees/fix/issue-NUMBER
+6. Implement the fix and commit (include Agent: marker)
+7. Community-coordinator posts interim update on the issue with root cause summary (only if no similar update exists)
+8. Push the branch: git push -u origin fix/issue-NUMBER
+9. Create a PR that references the issue:
    gh pr create --title "Fix: description" --body "Fixes #NUMBER"
-9. Merge the PR immediately: gh pr merge --squash --delete-branch
-10. Clean up: git worktree remove /tmp/spawn-worktrees/fix/issue-NUMBER
-11. Community-coordinator posts final resolution comment with PR link and explanation
-12. Close the issue: gh issue close NUMBER
+10. Merge the PR immediately: gh pr merge --squash --delete-branch
+11. Clean up: git worktree remove /tmp/spawn-worktrees/fix/issue-NUMBER
+12. Community-coordinator posts final resolution comment with PR link and explanation (only if no resolution exists)
+13. Close the issue: gh issue close NUMBER
 
 NEVER leave an issue open after the fix is merged. NEVER leave a PR unmerged.
 If a PR cannot be merged (conflicts, superseded, etc.), close it WITH a comment explaining why.
@@ -224,7 +286,31 @@ git worktree remove /tmp/spawn-worktrees/BRANCH-NAME
 13. Community-coordinator posts final resolutions on all issues, closes them
 14. Branch-cleaner runs final pass to catch any branches created during the cycle
 15. Team lead runs: git worktree prune to clean stale worktree entries
-16. When cycle completes, verify: every issue engaged, all PRs merged, zero stale branches, summarize what was fixed/improved
+16. When all work is done, execute the Lifecycle Management shutdown sequence (below) — send shutdown_request to every teammate, wait for confirmations, clean up worktrees, then exit
+
+## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
+
+You MUST remain active until ALL of the following are true:
+
+1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
+2. **All PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm zero open PRs from this cycle. Every PR must be either merged or closed with a comment.
+3. **All issues are engaged**: Run `gh issue list --repo OpenRouterTeam/spawn --state open` and confirm every open issue has been commented on (or was already engaged).
+4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf /tmp/spawn-worktrees` and `git worktree prune`.
+5. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
+
+### Shutdown Sequence (execute in this exact order):
+
+1. Check TaskList — if any tasks are still in_progress or pending, wait and check again (poll every 30 seconds, up to 10 minutes)
+2. Verify all PRs merged or closed: `gh pr list --repo OpenRouterTeam/spawn --state open`
+3. Verify all issues engaged: `gh issue list --repo OpenRouterTeam/spawn --state open`
+4. For each teammate, send a `shutdown_request` via SendMessage
+5. Wait for all `shutdown_response` confirmations
+6. Run final cleanup: `git worktree prune && rm -rf /tmp/spawn-worktrees`
+7. Create checkpoint: `sprite-env checkpoint create --comment 'Refactor cycle complete'`
+8. Print final summary of what was accomplished
+9. ONLY THEN may the session end
+
+### CRITICAL: If you exit before completing this sequence, running agents will be orphaned and the cycle will be incomplete. This has caused real problems in the past (PR #83 was left unmerged, issues got duplicate comments from overlapping cycles). You MUST wait for all teammates to shut down before exiting.
 
 ## Safety Rules
 
@@ -244,7 +330,7 @@ Score tasks: (Impact x Confidence) / Risk
 
 Target autonomous score: >30
 
-Begin now. Spawn the team and start working.
+Begin now. Spawn the team and start working. DO NOT EXIT until all teammates are shut down and all cleanup is complete per the Lifecycle Management section above.
 PROMPT_EOF
 
 # Run Claude Code with the prompt file
@@ -270,7 +356,4 @@ else
     log "Cycle failed"
 fi
 
-# Clean up prompt file
-rm -f "${PROMPT_FILE}"
-
-log "=== Refactoring Cycle Done ==="
+# Note: cleanup (worktree prune, prompt file removal, final log) handled by trap
