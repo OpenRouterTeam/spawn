@@ -25,8 +25,27 @@ ensure_sprite_installed() {
 
     # sprite not found, install it
     log_warn "Installing sprite CLI..."
-    curl -fsSL https://sprites.dev/install.sh | bash
+    if ! curl -fsSL https://sprites.dev/install.sh | bash; then
+        log_error "Failed to install sprite CLI"
+        log_error ""
+        log_error "Possible causes:"
+        log_error "  - Network connectivity issues"
+        log_error "  - Installation script download failed"
+        log_error "  - Insufficient permissions for installation"
+        log_error ""
+        log_error "Manual installation:"
+        log_error "  Visit https://sprites.dev for installation instructions"
+        log_error "  Or try: curl -fsSL https://sprites.dev/install.sh | bash"
+        return 1
+    fi
     export PATH="${HOME}/.local/bin:${PATH}"
+
+    # Verify installation succeeded
+    if ! command -v sprite &> /dev/null; then
+        log_error "Sprite CLI installation completed but command not found in PATH"
+        log_error "Try adding to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\""
+        return 1
+    fi
 }
 
 # Check if already authenticated with sprite
@@ -82,6 +101,14 @@ verify_sprite_connectivity() {
     done
 
     log_error "Sprite '${sprite_name}' failed to respond after ${max_attempts} attempts"
+    log_error ""
+    log_error "Troubleshooting:"
+    log_error "  1. Check sprite status: sprite list"
+    log_error "  2. View sprite logs: sprite logs ${sprite_name}"
+    log_error "  3. Try recreating the sprite: sprite delete ${sprite_name} && sprite create ${sprite_name}"
+    log_error "  4. Verify network connectivity to sprites.dev"
+    log_error ""
+    log_error "If issues persist, contact Sprite support: https://sprites.dev/support"
     return 1
 }
 

@@ -26,12 +26,24 @@ fi
 # ============================================================
 
 ensure_modal_cli() {
+    # Check Python 3 is available (required for Modal Python SDK)
+    check_python_available || return 1
+
     if ! command -v modal &>/dev/null; then
         log_warn "Installing Modal CLI..."
-        pip install modal 2>/dev/null || pip3 install modal || {
-            log_error "Failed to install Modal. Install manually: pip install modal"
+        if ! pip install modal 2>/dev/null && ! pip3 install modal 2>/dev/null; then
+            log_error "Failed to install Modal CLI"
+            log_error ""
+            log_error "Possible causes:"
+            log_error "  - pip/pip3 not installed (install: apt-get install python3-pip or brew install python3)"
+            log_error "  - Insufficient permissions (try: pip3 install --user modal)"
+            log_error "  - Network connectivity issues"
+            log_error ""
+            log_error "Manual installation:"
+            log_error "  pip3 install --user modal"
+            log_error "  export PATH=\"\$HOME/.local/bin:\$PATH\""
             return 1
-        }
+        fi
     fi
     # Check if authenticated
     if ! modal profile current &>/dev/null; then
@@ -51,24 +63,47 @@ create_server() {
 
     log_warn "Creating Modal sandbox '${name}'..."
 
-    # Create sandbox via Python SDK (Modal CLI doesn't have direct sandbox create)
-    MODAL_SANDBOX_ID=$(python3 -c "
-import modal
-app = modal.App.lookup('spawn-${name}', create_if_missing=True)
-sb = modal.Sandbox.create(
-    app=app,
-    name='${name}',
-    image=modal.Image.${image}().apt_install('curl', 'unzip', 'git', 'zsh'),
-    timeout=3600,
-)
-print(sb.object_id)
-" 2>/dev/null)
+    # Capture both stdout and stderr from Python SDK
+    local create_output
+    local create_exitcode
+    create_output=$(python3 -c "
+import modal, sys
+try:
+    app = modal.App.lookup('spawn-${name}', create_if_missing=True)
+    sb = modal.Sandbox.create(
+        app=app,
+        name='${name}',
+        image=modal.Image.${image}().apt_install('curl', 'unzip', 'git', 'zsh'),
+        timeout=3600,
+    )
+    print(sb.object_id)
+except Exception as e:
+    print(f'ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>&1)
+    create_exitcode=$?
 
-    if [[ -z "${MODAL_SANDBOX_ID}" ]]; then
-        log_error "Failed to create Modal sandbox"
+    if [[ ${create_exitcode} -ne 0 ]] || [[ -z "${create_output}" ]] || [[ "${create_output}" =~ ERROR ]]; then
+        log_error "Failed to create Modal sandbox '${name}'"
+        log_error ""
+        if [[ -n "${create_output}" ]]; then
+            log_error "Error details: ${create_output}"
+        fi
+        log_error ""
+        log_error "Possible causes:"
+        log_error "  - Modal authentication expired (run: modal setup)"
+        log_error "  - Insufficient quota or credits (check: https://modal.com/settings)"
+        log_error "  - Network connectivity issues"
+        log_error "  - Invalid sandbox name (must be alphanumeric with dashes)"
+        log_error ""
+        log_error "Troubleshooting:"
+        log_error "  1. Re-authenticate: modal setup"
+        log_error "  2. Verify account status: https://modal.com/settings"
+        log_error "  3. Check Modal status: https://status.modal.com"
         return 1
     fi
 
+    MODAL_SANDBOX_ID="${create_output}"
     export MODAL_SANDBOX_ID
     export MODAL_APP_NAME="spawn-${name}"
     export MODAL_SANDBOX_NAME_ACTUAL="${name}"
