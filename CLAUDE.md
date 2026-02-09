@@ -5,7 +5,7 @@ Spawn is a matrix of **agents x clouds**. Every script provisions a cloud server
 ## The Matrix
 
 `manifest.json` is the source of truth. It tracks:
-- **agents** — coding agents / AI tools (Claude Code, OpenClaw, NanoClaw, ...)
+- **agents** — AI agents and self-hosted AI tools (Claude Code, OpenClaw, NanoClaw, ...)
 - **clouds** — cloud providers to run them on (Sprite, Hetzner, ...)
 - **matrix** — which `cloud/agent` combinations are `"implemented"` vs `"missing"`
 
