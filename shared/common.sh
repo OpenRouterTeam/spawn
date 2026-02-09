@@ -644,7 +644,8 @@ get_openrouter_api_key_oauth() {
         echo "${api_key}"
         return 0
     else
-        log_error "Authentication cancelled by user"
+        log_error "Authentication cancelled"
+        log_error "Cannot proceed without an API key"
         return 1
     fi
 }
