@@ -170,14 +170,9 @@ for k in ('application_key','application_secret','consumer_key','project_id'):
     local config_dir
     config_dir=$(dirname "${config_file}")
     mkdir -p "${config_dir}"
-    cat > "${config_file}" << EOF
-{
-  "application_key": "${app_key}",
-  "application_secret": "${app_secret}",
-  "consumer_key": "${consumer_key}",
-  "project_id": "${project_id}"
-}
-EOF
+    printf '{\n  "application_key": "%s",\n  "application_secret": "%s",\n  "consumer_key": "%s",\n  "project_id": "%s"\n}\n' \
+        "$(json_escape "${app_key}")" "$(json_escape "${app_secret}")" \
+        "$(json_escape "${consumer_key}")" "$(json_escape "${project_id}")" > "${config_file}"
     chmod 600 "${config_file}"
     log_info "OVHcloud credentials saved to ${config_file}"
     return 0

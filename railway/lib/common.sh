@@ -108,11 +108,7 @@ ensure_railway_token() {
     # Save to config file
     export RAILWAY_TOKEN="$token"
     mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "token": "$token"
-}
-EOF
+    printf '{\n  "token": "%s"\n}\n' "$(json_escape "$token")" > "$config_file"
     chmod 600 "$config_file"
     log_info "Token saved to $config_file"
 }

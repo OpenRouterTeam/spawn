@@ -159,12 +159,7 @@ print(d.get('api_secret', ''))
     log_info "API credentials validated"
 
     mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "api_client_id": "$client_id",
-  "api_secret": "$secret"
-}
-EOF
+    printf '{\n  "api_client_id": "%s",\n  "api_secret": "%s"\n}\n' "$(json_escape "$client_id")" "$(json_escape "$secret")" > "$config_file"
     chmod 600 "$config_file"
     log_info "API credentials saved to $config_file"
 }
