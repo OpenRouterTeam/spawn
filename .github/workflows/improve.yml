@@ -17,16 +17,16 @@ jobs:
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
         run: |
-          # Debug: test each API level
-          echo "--- Test 1: list sprites ---"
-          curl -s -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery"
-          echo ""
-          echo "--- Test 2: list services ---"
-          curl -s -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services"
-          echo ""
-          echo "--- Test 3: start service (no duration) ---"
+          # Debug: test different start formats
+          echo "--- Test A: name in body ---"
           curl -s -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"improve_trigger"}' \
             "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve_trigger/start"
+          echo ""
+          echo "--- Test B: start at services level ---"
+          curl -s -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"improve_trigger"}' \
+            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/start"
           echo ""
