@@ -33,55 +33,31 @@ linode_api() {
     generic_cloud_api "$LINODE_API_BASE" "$LINODE_API_TOKEN" "$method" "$endpoint" "$body"
 }
 
-ensure_linode_token() {
-    # Check Python 3 is available (required for JSON parsing)
-    check_python_available || return 1
-
-    if [[ -n "${LINODE_API_TOKEN:-}" ]]; then
-        log_info "Using Linode API token from environment"; return 0
-    fi
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/linode.json"
-    if [[ -f "$config_file" ]]; then
-        local saved_token
-        saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_token" ]]; then
-            export LINODE_API_TOKEN="$saved_token"
-            log_info "Using Linode API token from $config_file"; return 0
-        fi
-    fi
-    echo ""; log_warn "Linode API Token Required"
-    log_warn "Get your token from: https://cloud.linode.com/profile/tokens"; echo ""
-    local token
-    token=$(validated_read "Enter your Linode API token: " validate_api_token) || return 1
-    export LINODE_API_TOKEN="$token"
+test_linode_token() {
     local response
     response=$(linode_api GET "/profile")
     if echo "$response" | grep -q '"username"'; then
         log_info "API token validated"
+        return 0
     else
-        log_error "Authentication failed: Invalid Linode API token"
-
-        # Parse error details
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print(errs[0].get('reason','No details') if errs else 'Unable to parse')" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-
         log_warn "Remediation steps:"
         log_warn "  1. Verify token at: https://cloud.linode.com/profile/tokens"
         log_warn "  2. Ensure the token has read/write permissions"
         log_warn "  3. Check token hasn't expired or been revoked"
-        unset LINODE_API_TOKEN
         return 1
     fi
-    mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "token": "$token"
 }
-EOF
-    chmod 600 "$config_file"
-    log_info "API token saved to $config_file"
+
+ensure_linode_token() {
+    ensure_api_token_with_provider \
+        "Linode" \
+        "LINODE_API_TOKEN" \
+        "$HOME/.config/spawn/linode.json" \
+        "https://cloud.linode.com/profile/tokens" \
+        "test_linode_token"
 }
 
 # Check if SSH key is registered with Linode
