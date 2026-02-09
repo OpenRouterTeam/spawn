@@ -479,6 +479,22 @@
         "image": "Ubuntu 24.04"
       },
       "notes": "GPU cloud provider with NVIDIA RTX 3080/3090, A100, and H100 instances. European data centers (Iceland, Norway). Requires GENESIS_API_KEY from https://developers.genesiscloud.com/"
+    },
+    "latitude": {
+      "name": "Latitude.sh",
+      "description": "Latitude.sh bare metal and VM servers via REST API",
+      "url": "https://www.latitude.sh/",
+      "type": "api",
+      "auth": "LATITUDE_API_KEY",
+      "provision_method": "POST /servers with SSH keys",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "plan": "vm.tiny",
+        "site": "DAL2",
+        "os": "ubuntu_24_04_x64_lts"
+      },
+      "notes": "Bare metal and VM cloud provider with global locations. Hourly billing. VMs from $0.07/hr. Requires LATITUDE_API_KEY from https://www.latitude.sh/dashboard"
     }
   },
   "matrix": {
@@ -715,6 +731,19 @@
     "genesiscloud/cline": "implemented",
     "genesiscloud/gptme": "implemented",
     "genesiscloud/opencode": "implemented",
-    "genesiscloud/plandex": "implemented"
+    "genesiscloud/plandex": "implemented",
+    "latitude/claude": "implemented",
+    "latitude/openclaw": "implemented",
+    "latitude/nanoclaw": "implemented",
+    "latitude/aider": "implemented",
+    "latitude/goose": "implemented",
+    "latitude/codex": "implemented",
+    "latitude/interpreter": "implemented",
+    "latitude/gemini": "implemented",
+    "latitude/amazonq": "implemented",
+    "latitude/cline": "implemented",
+    "latitude/gptme": "implemented",
+    "latitude/opencode": "implemented",
+    "latitude/plandex": "implemented"
   }
 }
