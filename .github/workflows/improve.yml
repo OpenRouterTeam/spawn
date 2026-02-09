@@ -17,5 +17,6 @@ jobs:
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
         run: |
-          curl -s -X POST "https://api.sprites.dev/v1/sprites/${{ secrets.IMPROVE_SPRITE_NAME }}/services/${{ secrets.IMPROVE_SERVICE_NAME }}/start?duration=0s" \
+          # Test with hardcoded values first to isolate the issue
+          curl -s -X POST "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve_trigger/start?duration=0s" \
             -H "Authorization: Bearer ${SPRITE_TOKEN}"
