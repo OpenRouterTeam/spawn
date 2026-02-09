@@ -495,6 +495,22 @@
         "os": "ubuntu_24_04_x64_lts"
       },
       "notes": "Bare metal and VM cloud provider with global locations. Hourly billing. VMs from $0.07/hr. Requires LATITUDE_API_KEY from https://www.latitude.sh/dashboard"
+    },
+    "ovh": {
+      "name": "OVHcloud",
+      "description": "OVHcloud Public Cloud instances via REST API",
+      "url": "https://www.ovhcloud.com/",
+      "type": "api",
+      "auth": "OVH_APPLICATION_KEY + OVH_APPLICATION_SECRET + OVH_CONSUMER_KEY + OVH_PROJECT_ID",
+      "provision_method": "POST /cloud/project/{projectId}/instance with signature auth",
+      "exec_method": "ssh ubuntu@IP",
+      "interactive_method": "ssh -t ubuntu@IP",
+      "defaults": {
+        "flavor": "d2-2",
+        "region": "GRA7",
+        "image": "Ubuntu 24.04"
+      },
+      "notes": "Major European cloud provider. Uses signature-based auth (Application Key + Secret + Consumer Key). Requires OVH_PROJECT_ID for Public Cloud. Create credentials at https://api.ovh.com/createToken/"
     }
   },
   "matrix": {
@@ -744,6 +760,19 @@
     "latitude/cline": "implemented",
     "latitude/gptme": "implemented",
     "latitude/opencode": "implemented",
-    "latitude/plandex": "implemented"
+    "latitude/plandex": "implemented",
+    "ovh/claude": "implemented",
+    "ovh/aider": "implemented",
+    "ovh/codex": "implemented",
+    "ovh/openclaw": "missing",
+    "ovh/nanoclaw": "missing",
+    "ovh/goose": "missing",
+    "ovh/interpreter": "missing",
+    "ovh/gemini": "missing",
+    "ovh/amazonq": "missing",
+    "ovh/cline": "missing",
+    "ovh/gptme": "missing",
+    "ovh/opencode": "missing",
+    "ovh/plandex": "missing"
   }
 }
