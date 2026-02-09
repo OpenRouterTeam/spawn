@@ -197,6 +197,11 @@ create_server() {
     local vm_size="${FLY_VM_SIZE:-shared-cpu-1x}"
     local vm_memory="${FLY_VM_MEMORY:-1024}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_region_name "$region" || { log_error "Invalid FLY_REGION"; return 1; }
+    validate_resource_name "$vm_size" || { log_error "Invalid FLY_VM_SIZE"; return 1; }
+    if [[ ! "$vm_memory" =~ ^[0-9]+$ ]]; then log_error "Invalid FLY_VM_MEMORY: must be numeric"; return 1; fi
+
     # Step 1: Create the app
     log_warn "Creating Fly.io app '$name'..."
     local org=$(get_fly_org)

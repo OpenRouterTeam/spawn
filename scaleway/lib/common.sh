@@ -166,16 +166,20 @@ scaleway_register_ssh_key() {
     local project_id
     project_id=$(get_scaleway_project_id) || return 1
 
+    local json_pub_key
+    json_pub_key=$(json_escape "$pub_key")
+
     local register_body
     register_body=$(python3 -c "
-import json
+import json, sys
+pub_key = json.loads(sys.stdin.read())
 body = {
     'name': '$key_name',
-    'public_key': '''$pub_key''',
+    'public_key': pub_key,
     'project_id': '$project_id'
 }
 print(json.dumps(body))
-")
+" <<< "$json_pub_key")
 
     local register_response
     register_response=$(scaleway_api POST "${SCALEWAY_ACCOUNT_API}/ssh-keys" "$register_body")
@@ -213,6 +217,10 @@ create_server() {
     local name="$1"
     local commercial_type="${SCALEWAY_TYPE:-DEV1-S}"
     local zone="${SCALEWAY_ZONE:-fr-par-1}"
+
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$commercial_type" || { log_error "Invalid SCALEWAY_TYPE"; return 1; }
+    validate_region_name "$zone" || { log_error "Invalid SCALEWAY_ZONE"; return 1; }
 
     log_warn "Creating Scaleway instance '$name' (type: $commercial_type, zone: $zone)..."
 

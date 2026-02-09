@@ -185,6 +185,11 @@ create_server() {
     local site="${LATITUDE_SITE:-DAL2}"
     local os="${LATITUDE_OS:-ubuntu_24_04_x64_lts}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$plan" || { log_error "Invalid LATITUDE_PLAN"; return 1; }
+    validate_region_name "$site" || { log_error "Invalid LATITUDE_SITE"; return 1; }
+    validate_resource_name "$os" || { log_error "Invalid LATITUDE_OS"; return 1; }
+
     log_warn "Creating Latitude.sh server '$hostname' (plan: $plan, site: $site)..."
 
     # Get project ID

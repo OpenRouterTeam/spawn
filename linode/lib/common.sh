@@ -119,6 +119,10 @@ create_server() {
     local region="${LINODE_REGION:-us-east}"
     local image="linode/ubuntu24.04"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$type" || { log_error "Invalid LINODE_TYPE"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid LINODE_REGION"; return 1; }
+
     log_warn "Creating Linode '$name' (type: $type, region: $region)..."
 
     # Get all SSH key IDs

@@ -149,6 +149,11 @@ create_server() {
     local region="${BINARYLANE_REGION:-syd}"
     local image="${BINARYLANE_IMAGE:-ubuntu-24.04}"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$size" || { log_error "Invalid BINARYLANE_SIZE"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid BINARYLANE_REGION"; return 1; }
+    validate_resource_name "$image" || { log_error "Invalid BINARYLANE_IMAGE"; return 1; }
+
     log_warn "Creating BinaryLane server '$name' (size: $size, region: $region, image: $image)..."
 
     # Get all SSH key IDs
@@ -160,20 +165,25 @@ create_server() {
     local userdata
     userdata=$(get_cloud_init_userdata)
 
+    # Pass userdata safely via stdin to avoid triple-quote injection
+    local json_userdata
+    json_userdata=$(json_escape "$userdata")
+
     local body
     body=$(python3 -c "
-import json
+import json, sys
+userdata = json.loads(sys.stdin.read())
 body = {
     'name': '$name',
     'region': '$region',
     'size': '$size',
     'image': '$image',
     'ssh_keys': $ssh_key_ids,
-    'user_data': '''$userdata''',
+    'user_data': userdata,
     'backups': False
 }
 print(json.dumps(body))
-")
+" <<< "$json_userdata")
 
     local response
     response=$(binarylane_api POST "/servers" "$body")

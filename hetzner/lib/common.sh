@@ -122,6 +122,10 @@ create_server() {
     local location="${HETZNER_LOCATION:-fsn1}"
     local image="ubuntu-24.04"
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$server_type" || { log_error "Invalid HETZNER_SERVER_TYPE"; return 1; }
+    validate_region_name "$location" || { log_error "Invalid HETZNER_LOCATION"; return 1; }
+
     log_warn "Creating Hetzner server '$name' (type: $server_type, location: $location)..."
 
     # Get all SSH key IDs
