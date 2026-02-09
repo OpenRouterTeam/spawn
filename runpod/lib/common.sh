@@ -45,7 +45,8 @@ print(json.dumps({'query': q}))
 
     curl -s -X POST \
         -H "Content-Type: application/json" \
-        "${RUNPOD_GRAPHQL_URL}?api_key=${RUNPOD_API_KEY}" \
+        -H "api-key: ${RUNPOD_API_KEY}" \
+        "${RUNPOD_GRAPHQL_URL}" \
         -d "${body}"
 }
 

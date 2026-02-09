@@ -81,11 +81,7 @@ ensure_binarylane_token() {
         return 1
     fi
     mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "api_token": "$api_token"
-}
-EOF
+    printf '{\n  "api_token": "%s"\n}\n' "$(json_escape "$api_token")" > "$config_file"
     chmod 600 "$config_file"
     log_info "API token saved to $config_file"
 }
