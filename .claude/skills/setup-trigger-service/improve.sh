@@ -345,9 +345,10 @@ EOF
 cleanup_between_cycles() {
     log_info "Cleaning up between cycles..."
 
-    # Ensure we're on main and up to date
+    # Ensure we're on main and up to date, prune stale remote-tracking refs
     cd "${REPO_ROOT}"
     git checkout main 2>/dev/null || true
+    git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
     # Prune stale worktrees
@@ -370,9 +371,10 @@ cleanup_between_cycles() {
 }
 
 run_team_cycle() {
-    # Always start fresh from latest main
+    # Always start fresh from latest main, prune stale remote-tracking refs
     cd "${REPO_ROOT}"
     git checkout main 2>/dev/null || true
+    git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
     # Set up worktree directory for parallel agent work
@@ -395,6 +397,7 @@ run_team_cycle() {
 run_single_cycle() {
     cd "${REPO_ROOT}"
     git checkout main 2>/dev/null || true
+    git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
     local prompt
@@ -410,6 +413,7 @@ log_info "Spawn Improvement System"
 log_info "Mode: ${MODE}"
 cd "${REPO_ROOT}"
 git checkout main 2>/dev/null || true
+git fetch --prune origin 2>/dev/null || true
 git pull --rebase origin main 2>/dev/null || true
 get_matrix_summary
 echo ""

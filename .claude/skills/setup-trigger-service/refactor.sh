@@ -25,7 +25,7 @@ log "Log file: ${LOG_FILE}"
 
 # Ensure we're on latest main
 log "Syncing with origin/main..."
-git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
+git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
 # Launch Claude Code with team instructions
