@@ -49,7 +49,7 @@ describe("Commands - Additional Coverage", () => {
       let row = manifest.agents[agent].name.padEnd(agentColWidth);
       for (const c of clouds) {
         const status = manifest.matrix[`${c}/${agent}`] ?? "missing";
-        const icon = status === "implemented" ? "  ✓" : "  –";
+        const icon = status === "implemented" ? "  +" : "  -";
         row += icon.padEnd(cloudColWidth);
       }
       return row;
@@ -70,14 +70,14 @@ describe("Commands - Additional Coverage", () => {
       const mockManifest = createMockManifest();
       // For test, just verify the icon logic works
       const status = "implemented";
-      const icon = status === "implemented" ? "  ✓" : "  –";
-      expect(icon).toBe("  ✓");
+      const icon = status === "implemented" ? "  +" : "  -";
+      expect(icon).toBe("  +");
     });
 
     it("should use correct icon for missing status", () => {
       const status = "missing";
-      const icon = status === "implemented" ? "  ✓" : "  –";
-      expect(icon).toBe("  –");
+      const icon = status === "implemented" ? "  +" : "  -";
+      expect(icon).toBe("  -");
     });
   });
 
@@ -94,7 +94,7 @@ describe("Commands - Additional Coverage", () => {
       const COL_PADDING = 2;
       let sep = "".padEnd(agentColWidth);
       for (const _ of clouds) {
-        sep += "─".repeat(cloudColWidth - COL_PADDING) + "  ";
+        sep += "-".repeat(cloudColWidth - COL_PADDING) + "  ";
       }
       return sep;
     }
@@ -128,7 +128,7 @@ describe("Commands - Additional Coverage", () => {
       const sep = renderMatrixSeparator(clouds, agentColWidth, cloudColWidth);
 
       // Should contain dashes
-      expect(sep).toContain("─");
+      expect(sep).toContain("-");
       // Should be long enough
       expect(sep.length).toBeGreaterThan(agentColWidth);
     });
