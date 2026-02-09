@@ -68,10 +68,7 @@ scaleway_api() {
                 log_error "Scaleway API network error after ${max_retries} attempts"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "${interval}" -gt "${max_interval}" ]]; then
-                interval="${max_interval}"
-            fi
+            _update_retry_interval "interval" "max_interval"
             attempt=$((attempt + 1))
             continue
         fi
@@ -82,10 +79,7 @@ scaleway_api() {
                 echo "${response_body}"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "${interval}" -gt "${max_interval}" ]]; then
-                interval="${max_interval}"
-            fi
+            _update_retry_interval "interval" "max_interval"
             attempt=$((attempt + 1))
             continue
         fi

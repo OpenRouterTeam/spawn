@@ -62,10 +62,7 @@ upcloud_api() {
                 log_error "UpCloud API network error after ${max_retries} attempts: curl exit code ${curl_exit_code}"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "${interval}" -gt "${max_interval}" ]]; then
-                interval="${max_interval}"
-            fi
+            _update_retry_interval "interval" "max_interval"
             attempt=$((attempt + 1))
             continue
         fi
@@ -76,10 +73,7 @@ upcloud_api() {
                 echo "${response_body}"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "${interval}" -gt "${max_interval}" ]]; then
-                interval="${max_interval}"
-            fi
+            _update_retry_interval "interval" "max_interval"
             attempt=$((attempt + 1))
             continue
         fi
