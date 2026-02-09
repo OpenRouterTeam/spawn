@@ -349,26 +349,71 @@ get_openrouter_api_key_manual() {
     echo "${api_key}"
 }
 
+# Validate port number for OAuth server
+# SECURITY: Prevents injection attacks via port parameter
+validate_oauth_port() {
+    local port="${1}"
+
+    # Ensure port is a valid integer
+    if [[ ! "${port}" =~ ^[0-9]+$ ]]; then
+        log_error "Invalid port number: '${port}' (must be numeric)"
+        return 1
+    fi
+
+    # Ensure port is in valid range (1024-65535, avoiding privileged ports)
+    if [[ "${port}" -lt 1024 ]] || [[ "${port}" -gt 65535 ]]; then
+        log_error "Invalid port number: ${port} (must be between 1024-65535)"
+        return 1
+    fi
+
+    return 0
+}
+
 # Start OAuth callback server using Node.js/Bun HTTP server
 # Proper HTTP server — handles multiple connections, favicon requests, etc.
 # Tries a range of ports if the initial port is busy
-# $1=starting_port $2=code_file $3=port_file (writes actual port used)
+# $1=starting_port $2=code_file $3=port_file (writes actual port used) $4=state_file (CSRF token)
 # Returns: server PID
+# SECURITY: Validates port number and CSRF state parameter
 start_oauth_server() {
     local starting_port="${1}"
     local code_file="${2}"
     local port_file="${3}"
+    local state_file="${4}"
     local runtime
     runtime=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
+
+    # SECURITY: Validate port number to prevent injection
+    if ! validate_oauth_port "${starting_port}"; then
+        log_error "OAuth server port validation failed"
+        return 1
+    fi
+
+    # SECURITY: Read CSRF state token for validation
+    local expected_state
+    expected_state=$(cat "${state_file}" 2>/dev/null || echo "")
+    if [[ -z "${expected_state}" ]]; then
+        log_error "CSRF state token file is missing or empty"
+        return 1
+    fi
 
     "${runtime}" -e "
 const http = require('http');
 const fs = require('fs');
 const url = require('url');
+const expectedState = '${expected_state}';
 const html = '<html><head><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class=\"card\"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>';
+const errorHtml = '<html><head><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#d9534f;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class=\"card\"><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection)</p><p>Please try again</p></div></body></html>';
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url, true);
   if (parsed.pathname === '/callback' && parsed.query.code) {
+    // SECURITY: Validate CSRF state parameter
+    if (!parsed.query.state || parsed.query.state !== expectedState) {
+      res.writeHead(403, {'Content-Type':'text/html','Connection':'close'});
+      res.end(errorHtml);
+      setTimeout(() => { server.close(); process.exit(1); }, 500);
+      return;
+    }
     fs.writeFileSync('${code_file}', parsed.query.code);
     res.writeHead(200, {'Content-Type':'text/html','Connection':'close'});
     res.end(html);
@@ -380,6 +425,7 @@ const server = http.createServer((req, res) => {
 });
 
 // Try port range: starting_port, starting_port+1, ..., starting_port+10
+// SECURITY: Port number validated in bash before interpolation
 let currentPort = ${starting_port};
 const maxPort = ${starting_port} + 10;
 
@@ -491,7 +537,8 @@ start_and_verify_oauth_server() {
     local callback_port="${1}"
     local code_file="${2}"
     local port_file="${3}"
-    local server_pid="${4}"
+    local state_file="${4}"
+    local server_pid="${5}"
 
     sleep "${POLL_INTERVAL}"
     if ! kill -0 "${server_pid}" 2>/dev/null; then
@@ -539,13 +586,14 @@ _setup_oauth_server() {
     local callback_port="${1}"
     local code_file="${2}"
     local port_file="${3}"
+    local state_file="${4}"
 
     log_warn "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
     local server_pid
-    server_pid=$(start_oauth_server "${callback_port}" "${code_file}" "${port_file}")
+    server_pid=$(start_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}")
 
     local actual_port
-    actual_port=$(start_and_verify_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${server_pid}")
+    actual_port=$(start_and_verify_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}" "${server_pid}")
     if [[ -z "${actual_port}" ]]; then
         return 1
     fi
@@ -568,6 +616,7 @@ _wait_for_oauth() {
 }
 
 # Try OAuth flow (orchestrates the helper functions above)
+# SECURITY: Generates CSRF state token to prevent OAuth code interception
 try_oauth_flow() {
     local callback_port=${1:-5180}
 
@@ -582,10 +631,24 @@ try_oauth_flow() {
     oauth_dir=$(mktemp -d)
     local code_file="${oauth_dir}/code"
     local port_file="${oauth_dir}/port"
+    local state_file="${oauth_dir}/state"
+
+    # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
+    local csrf_state
+    if command -v openssl &>/dev/null; then
+        csrf_state=$(openssl rand -hex 16)
+    elif [[ -r /dev/urandom ]]; then
+        csrf_state=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+    else
+        # Fallback: use timestamp + random
+        csrf_state="$(date +%s)$(printf '%04x' $RANDOM)$(printf '%04x' $RANDOM)"
+    fi
+    echo "${csrf_state}" > "${state_file}"
+    chmod 600 "${state_file}"
 
     # Start server
     local actual_port
-    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${port_file}") || {
+    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}") || {
         cleanup_oauth_session "" "${oauth_dir}"
         return 1
     }
@@ -594,9 +657,9 @@ try_oauth_flow() {
     local server_pid
     server_pid=$(pgrep -f "start_oauth_server" | tail -1)
 
-    # Open browser
+    # Open browser with CSRF state parameter
     local callback_url="http://localhost:${actual_port}/callback"
-    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}"
+    local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}&state=${csrf_state}"
     log_warn "Opening browser to authenticate with OpenRouter..."
     open_browser "${auth_url}"
 
