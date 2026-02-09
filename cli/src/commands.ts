@@ -241,7 +241,12 @@ function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryS
 
   if (primaryStatus === 404 && fallbackStatus === 404) {
     console.error("\nThis agent + cloud combination doesn't exist yet.");
-    console.error(`Check which combinations are available: ${pc.cyan("spawn list")}`);
+    console.error(`\nWhat to do:`);
+    console.error(`  1. Check the matrix: ${pc.cyan("spawn list")}`);
+    console.error(`  2. Verify the combination is implemented (marked with ✓)`);
+    console.error(`  3. Check for typos in agent or cloud name`);
+  } else {
+    console.error(`\nNetwork or server error - try again in a few moments.`);
   }
 }
 
