@@ -110,18 +110,24 @@ ensure_ovh_authenticated() {
 
     # Try config file
     if [[ -f "${config_file}" ]]; then
-        local saved_ak saved_as saved_ck saved_pid
-        saved_ak=$(python3 -c "import json; d=json.load(open('${config_file}')); print(d.get('application_key',''))" 2>/dev/null)
-        saved_as=$(python3 -c "import json; d=json.load(open('${config_file}')); print(d.get('application_secret',''))" 2>/dev/null)
-        saved_ck=$(python3 -c "import json; d=json.load(open('${config_file}')); print(d.get('consumer_key',''))" 2>/dev/null)
-        saved_pid=$(python3 -c "import json; d=json.load(open('${config_file}')); print(d.get('project_id',''))" 2>/dev/null)
-        if [[ -n "${saved_ak}" && -n "${saved_as}" && -n "${saved_ck}" && -n "${saved_pid}" ]]; then
-            export OVH_APPLICATION_KEY="${saved_ak}"
-            export OVH_APPLICATION_SECRET="${saved_as}"
-            export OVH_CONSUMER_KEY="${saved_ck}"
-            export OVH_PROJECT_ID="${saved_pid}"
-            log_info "Using OVHcloud credentials from ${config_file}"
-            return 0
+        local creds
+        creds=$(python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+for k in ('application_key','application_secret','consumer_key','project_id'):
+    print(d.get(k, ''))
+" "${config_file}" 2>/dev/null) || true
+        if [[ -n "${creds}" ]]; then
+            local saved_ak saved_as saved_ck saved_pid
+            { read -r saved_ak; read -r saved_as; read -r saved_ck; read -r saved_pid; } <<< "${creds}"
+            if [[ -n "${saved_ak}" && -n "${saved_as}" && -n "${saved_ck}" && -n "${saved_pid}" ]]; then
+                export OVH_APPLICATION_KEY="${saved_ak}"
+                export OVH_APPLICATION_SECRET="${saved_as}"
+                export OVH_CONSUMER_KEY="${saved_ck}"
+                export OVH_PROJECT_ID="${saved_pid}"
+                log_info "Using OVHcloud credentials from ${config_file}"
+                return 0
+            fi
         fi
     fi
 

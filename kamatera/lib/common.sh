@@ -108,14 +108,22 @@ ensure_kamatera_token() {
     local config_file="$config_dir/kamatera.json"
 
     if [[ -f "$config_file" ]]; then
-        local saved_client_id saved_secret
-        saved_client_id=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_client_id',''))" "$config_file" 2>/dev/null)
-        saved_secret=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_secret',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]]; then
-            export KAMATERA_API_CLIENT_ID="$saved_client_id"
-            export KAMATERA_API_SECRET="$saved_secret"
-            log_info "Using Kamatera API credentials from $config_file"
-            return 0
+        local creds
+        creds=$(python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(d.get('api_client_id', ''))
+print(d.get('api_secret', ''))
+" "$config_file" 2>/dev/null) || true
+        if [[ -n "${creds}" ]]; then
+            local saved_client_id saved_secret
+            { read -r saved_client_id; read -r saved_secret; } <<< "${creds}"
+            if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]]; then
+                export KAMATERA_API_CLIENT_ID="$saved_client_id"
+                export KAMATERA_API_SECRET="$saved_secret"
+                log_info "Using Kamatera API credentials from $config_file"
+                return 0
+            fi
         fi
     fi
 
