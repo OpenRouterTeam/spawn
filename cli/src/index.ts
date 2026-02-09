@@ -27,6 +27,28 @@ function handleError(err: unknown): never {
   process.exit(1);
 }
 
+/** Extract a flag and its value from args, returning [value, remainingArgs] */
+function extractFlagValue(
+  args: string[],
+  flags: string[],
+  flagLabel: string,
+  usageHint: string
+): [string | undefined, string[]] {
+  const idx = args.findIndex(arg => flags.includes(arg));
+  if (idx === -1) return [undefined, args];
+
+  if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
+    console.error(`Error: ${args[idx]} requires a value`);
+    console.error(`\nUsage: ${usageHint}`);
+    process.exit(1);
+  }
+
+  const value = args[idx + 1];
+  const remaining = [...args];
+  remaining.splice(idx, 2);
+  return [value, remaining];
+}
+
 async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
   const manifest = await loadManifest();
   if (!manifest.agents[agent]) {
@@ -53,36 +75,29 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   // Extract --prompt or -p flag
-  let prompt: string | undefined;
-  let filteredArgs = [...args];
-
-  const promptIndex = filteredArgs.findIndex(arg => arg === "--prompt" || arg === "-p");
-  if (promptIndex !== -1) {
-    if (!filteredArgs[promptIndex + 1] || filteredArgs[promptIndex + 1].startsWith("-")) {
-      console.error(`Error: ${filteredArgs[promptIndex]} requires a value`);
-      console.error(`\nUsage: spawn <agent> <cloud> ${filteredArgs[promptIndex]} "your prompt here"`);
-      process.exit(1);
-    }
-    prompt = filteredArgs[promptIndex + 1];
-    // Remove --prompt and its value from args
-    filteredArgs.splice(promptIndex, 2);
-  }
+  let [prompt, filteredArgs] = extractFlagValue(
+    args,
+    ["--prompt", "-p"],
+    "prompt",
+    'spawn <agent> <cloud> --prompt "your prompt here"'
+  );
 
   // Extract --prompt-file flag
-  const promptFileIndex = filteredArgs.findIndex(arg => arg === "--prompt-file");
-  if (promptFileIndex !== -1) {
-    if (!filteredArgs[promptFileIndex + 1] || filteredArgs[promptFileIndex + 1].startsWith("-")) {
-      console.error(`Error: --prompt-file requires a file path`);
-      console.error(`\nUsage: spawn <agent> <cloud> --prompt-file instructions.txt`);
-      process.exit(1);
-    }
+  const [promptFile, finalArgs] = extractFlagValue(
+    filteredArgs,
+    ["--prompt-file"],
+    "prompt file",
+    "spawn <agent> <cloud> --prompt-file instructions.txt"
+  );
+  filteredArgs = finalArgs;
+
+  if (promptFile) {
     const { readFileSync } = await import("fs");
     try {
-      prompt = readFileSync(filteredArgs[promptFileIndex + 1], "utf-8");
-      // Remove --prompt-file and its value from args
-      filteredArgs.splice(promptFileIndex, 2);
+      prompt = readFileSync(promptFile, "utf-8");
     } catch (err) {
-      console.error(`Error reading prompt file '${filteredArgs[promptFileIndex + 1]}': ${err && typeof err === "object" && "message" in err ? err.message : String(err)}`);
+      const msg = err && typeof err === "object" && "message" in err ? err.message : String(err);
+      console.error(`Error reading prompt file '${promptFile}': ${msg}`);
       console.error(`\nMake sure the file exists and is readable.`);
       process.exit(1);
     }
