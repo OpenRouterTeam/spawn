@@ -19,8 +19,12 @@ ensure_sprite_installed() {
     if command -v sprite &> /dev/null; then
         # sprite is already installed, check version
         local installed_version
-        installed_version=$(sprite version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || echo "unknown")
-        log_info "sprite ${installed_version} already installed, skipping installation"
+        installed_version=$(sprite version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || true)
+        if [[ -n "${installed_version}" ]]; then
+            log_info "sprite ${installed_version} already installed, skipping installation"
+        else
+            log_info "sprite already installed, skipping installation"
+        fi
         return 0
     fi
 
@@ -39,8 +43,12 @@ ensure_sprite_installed() {
             sprite_dir=$(dirname "${sprite_path}")
             export PATH="${sprite_dir}:${PATH}"
             local installed_version
-            installed_version=$(sprite version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || echo "unknown")
-            log_info "sprite ${installed_version} already installed at ${sprite_path}, skipping installation"
+            installed_version=$(sprite version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || true)
+            if [[ -n "${installed_version}" ]]; then
+                log_info "sprite ${installed_version} already installed at ${sprite_path}, skipping installation"
+            else
+                log_info "sprite already installed at ${sprite_path}, skipping installation"
+            fi
             return 0
         fi
     done
