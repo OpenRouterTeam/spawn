@@ -25,22 +25,41 @@ log_info()  { echo -e "${GREEN}[spawn]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[spawn]${NC} $1"; }
 log_error() { echo -e "${RED}[spawn]${NC} $1"; }
 
+# --- Helper: clone the cli directory ---
+clone_cli() {
+    local dest="$1"
+    if command -v git &>/dev/null; then
+        log_info "Cloning CLI source..."
+        git clone --depth 1 --filter=blob:none --sparse \
+            "https://github.com/${SPAWN_REPO}.git" "${dest}/repo" 2>/dev/null
+        cd "${dest}/repo"
+        git sparse-checkout set cli 2>/dev/null
+        mv cli "${dest}/cli"
+        cd "${dest}"
+        rm -rf "${dest}/repo"
+    else
+        log_info "Downloading CLI source..."
+        mkdir -p "${dest}/cli/src"
+        # Download all source files via GitHub API
+        local files
+        files=$(curl -fsSL "https://api.github.com/repos/${SPAWN_REPO}/contents/cli/src" \
+            | grep '"name"' | grep '\.ts"' | grep -v '__tests__' \
+            | sed 's/.*"name": "//;s/".*//')
+        curl -fsSL "${SPAWN_RAW_BASE}/cli/package.json"  -o "${dest}/cli/package.json"
+        curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"  -o "${dest}/cli/tsconfig.json"
+        for f in $files; do
+            curl -fsSL "${SPAWN_RAW_BASE}/cli/src/${f}" -o "${dest}/cli/src/${f}"
+        done
+    fi
+}
+
 # --- Method 1: bun install -g (preferred) ---
 if command -v bun &>/dev/null; then
     log_info "Installing spawn via bun..."
-    # Clone/download the cli directory and install from it
     tmpdir=$(mktemp -d)
     trap 'rm -rf "${tmpdir}"' EXIT
 
-    log_info "Downloading CLI package..."
-    mkdir -p "${tmpdir}/cli/src"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/package.json"    -o "${tmpdir}/cli/package.json"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"    -o "${tmpdir}/cli/tsconfig.json"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/index.ts"     -o "${tmpdir}/cli/src/index.ts"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/manifest.ts"  -o "${tmpdir}/cli/src/manifest.ts"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/commands.ts"   -o "${tmpdir}/cli/src/commands.ts"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/version.ts"    -o "${tmpdir}/cli/src/version.ts"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/security.ts"   -o "${tmpdir}/cli/src/security.ts"
+    clone_cli "${tmpdir}"
 
     cd "${tmpdir}/cli"
     bun install
@@ -71,15 +90,7 @@ if command -v npm &>/dev/null && command -v node &>/dev/null; then
     tmpdir=$(mktemp -d)
     trap 'rm -rf "${tmpdir}"' EXIT
 
-    log_info "Downloading CLI package..."
-    mkdir -p "${tmpdir}/cli/src"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/package.json"    -o "${tmpdir}/cli/package.json"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"    -o "${tmpdir}/cli/tsconfig.json"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/index.ts"     -o "${tmpdir}/cli/src/index.ts"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/manifest.ts"  -o "${tmpdir}/cli/src/manifest.ts"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/commands.ts"   -o "${tmpdir}/cli/src/commands.ts"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/version.ts"    -o "${tmpdir}/cli/src/version.ts"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/security.ts"   -o "${tmpdir}/cli/src/security.ts"
+    clone_cli "${tmpdir}"
 
     cd "${tmpdir}/cli"
     npm install
