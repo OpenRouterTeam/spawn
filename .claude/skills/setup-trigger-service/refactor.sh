@@ -81,6 +81,7 @@ Create these teammates:
 
 6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
+   - For each issue, post a brief, casual comment thanking them for flagging it (e.g. "Thanks for flagging this!" or "Appreciate the report!") — keep it short and natural, not corporate
    - Categorize each issue (bug, feature request, question, already-fixed)
    - For bugs: message the relevant teammate to investigate
      * Security-related → message security-auditor
