@@ -1,0 +1,81 @@
+name: Agent Request
+description: Request support for a new AI coding agent
+title: "[Agent]: "
+labels: ["agent-request", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new agent! We prioritize agents with strong community demand.
+
+  - type: input
+    id: agent-name
+    attributes:
+      label: Agent Name
+      description: Name of the AI coding agent
+      placeholder: e.g., Cursor, Continue, Tabby
+    validations:
+      required: true
+
+  - type: input
+    id: agent-url
+    attributes:
+      label: Repository / Website URL
+      description: Link to the agent's GitHub repo or homepage
+      placeholder: https://github.com/org/agent
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install Method
+      description: How is the agent installed?
+      options:
+        - npm / npx
+        - pip / pipx
+        - curl | bash
+        - brew
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: openrouter-support
+    attributes:
+      label: OpenRouter Compatibility
+      description: Does the agent work with OpenRouter?
+      options:
+        - Native support (OPENROUTER_API_KEY)
+        - Via OPENAI_BASE_URL override
+        - Via ANTHROPIC_BASE_URL override
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Community Demand Evidence
+      description: |
+        We require at least 2 of the following:
+        - 1000+ GitHub stars
+        - Hacker News post with 50+ points
+        - Reddit post with 100+ upvotes (r/LocalLLaMA, r/MachineLearning, r/ChatGPT)
+        - Explicit user request in this repo's issues
+
+        Paste links or screenshots showing demand.
+      placeholder: |
+        - GitHub: 5k stars (https://github.com/org/agent)
+        - HN: 200 points (https://news.ycombinator.com/item?id=...)
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other details (config requirements, env vars, known limitations)
+      placeholder: Requires Node 20+, uses OPENAI_API_KEY env var
+    validations:
+      required: false

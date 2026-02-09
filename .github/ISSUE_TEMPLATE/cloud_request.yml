@@ -1,0 +1,100 @@
+name: Cloud Provider Request
+description: Request support for a new cloud provider
+title: "[Cloud]: "
+labels: ["cloud-request", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new cloud provider! We bias heavily toward adding more clouds.
+
+  - type: input
+    id: cloud-name
+    attributes:
+      label: Cloud Provider Name
+      description: Name of the cloud provider
+      placeholder: e.g., OVH, Paperspace, Vast.ai
+    validations:
+      required: true
+
+  - type: input
+    id: cloud-url
+    attributes:
+      label: Website URL
+      description: Link to the provider's homepage
+      placeholder: https://cloud.provider.com
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cloud-type
+    attributes:
+      label: Provider Type
+      description: What kind of compute does it offer?
+      options:
+        - VPS / Cloud Servers (SSH access)
+        - GPU Cloud
+        - Container / Sandbox Platform
+        - Serverless / Functions
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: api-type
+    attributes:
+      label: API / CLI Access
+      description: How do you provision and manage instances?
+      options:
+        - REST API
+        - CLI tool
+        - Both REST API and CLI
+        - SDK only (Python, Node, etc.)
+        - Web console only (no API)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: billing
+    attributes:
+      label: Billing Model
+      description: How is compute billed?
+      options:
+        - Per-hour
+        - Per-minute / Per-second
+        - Monthly
+        - Pay-as-you-go (usage-based)
+        - Free tier available
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why This Provider?
+      description: What makes this provider a good fit for spawn? (pricing, speed, regions, unique features)
+      placeholder: |
+        - Fast provisioning (~30s)
+        - Cheap GPU instances
+        - Good API docs
+    validations:
+      required: true
+
+  - type: textarea
+    id: api-docs
+    attributes:
+      label: API Documentation Link
+      description: Link to API docs or CLI reference (if available)
+      placeholder: https://docs.provider.com/api
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other details (auth method, regions, OS support, limitations)
+      placeholder: Uses API key auth, available in US and EU regions
+    validations:
+      required: false

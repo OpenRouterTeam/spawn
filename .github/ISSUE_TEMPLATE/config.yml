@@ -1,5 +1,1 @@
 blank_issues_enabled: false
-contact_links:
-  - name: Feature Request Discussion
-    url: https://github.com/OpenRouterTeam/spawn/discussions/new?category=ideas
-    about: Suggest new agents or cloud providers
