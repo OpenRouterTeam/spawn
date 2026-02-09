@@ -1,6 +1,6 @@
 # Spawn
 
-Launch any AI coding agent on any cloud with a single command. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
+Launch any AI agent on any cloud with a single command. Coding agents, research agents, self-hosted AI tools — Spawn deploys them all. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
 **13 agents. 19 clouds. 247 combinations. Zero config.**
 
@@ -107,7 +107,7 @@ For cloud-specific auth, see each cloud's README in this repository.
 Each cell in the matrix is a self-contained bash script that:
 
 1. Provisions a server on the cloud provider
-2. Installs the coding agent
+2. Installs the agent
 3. Injects your [OpenRouter](https://openrouter.ai) API key so every agent uses the same billing
 4. Drops you into an interactive session
 
