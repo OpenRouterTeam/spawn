@@ -202,6 +202,19 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based CLI with sandbox and version control for AI changes."
+    },
+    "kilocode": {
+      "name": "Kilo Code",
+      "description": "All-in-one agentic engineering platform with CLI",
+      "url": "https://github.com/Kilo-Org/kilocode",
+      "install": "npm install -g @kilocode/cli",
+      "launch": "kilocode",
+      "env": {
+        "KILO_PROVIDER_TYPE": "openrouter",
+        "KILO_OPEN_ROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'."
     }
   },
   "clouds": {
@@ -804,6 +817,27 @@
     "kamatera/cline": "implemented",
     "kamatera/gptme": "implemented",
     "kamatera/opencode": "implemented",
-    "kamatera/plandex": "implemented"
+    "kamatera/plandex": "implemented",
+    "sprite/kilocode": "implemented",
+    "hetzner/kilocode": "missing",
+    "digitalocean/kilocode": "missing",
+    "vultr/kilocode": "missing",
+    "linode/kilocode": "missing",
+    "lambda/kilocode": "missing",
+    "aws-lightsail/kilocode": "missing",
+    "gcp/kilocode": "missing",
+    "e2b/kilocode": "missing",
+    "modal/kilocode": "missing",
+    "fly/kilocode": "missing",
+    "civo/kilocode": "missing",
+    "scaleway/kilocode": "missing",
+    "daytona/kilocode": "missing",
+    "runpod/kilocode": "missing",
+    "upcloud/kilocode": "missing",
+    "binarylane/kilocode": "missing",
+    "genesiscloud/kilocode": "missing",
+    "latitude/kilocode": "missing",
+    "ovh/kilocode": "missing",
+    "kamatera/kilocode": "missing"
   }
 }
