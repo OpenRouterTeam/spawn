@@ -15,11 +15,18 @@ SPRITE_CONNECTIVITY_POLL_DELAY=${SPRITE_CONNECTIVITY_POLL_DELAY:-5}  # Delay bet
 
 # Check if sprite CLI is installed, install if not
 ensure_sprite_installed() {
-    if ! command -v sprite &> /dev/null; then
-        log_warn "Installing sprite CLI..."
-        curl -fsSL https://sprites.dev/install.sh | bash
-        export PATH="${HOME}/.local/bin:${PATH}"
+    if command -v sprite &> /dev/null; then
+        # sprite is already installed, check version
+        local installed_version
+        installed_version=$(sprite version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || echo "unknown")
+        log_info "sprite ${installed_version} already installed, skipping installation"
+        return 0
     fi
+
+    # sprite not found, install it
+    log_warn "Installing sprite CLI..."
+    curl -fsSL https://sprites.dev/install.sh | bash
+    export PATH="${HOME}/.local/bin:${PATH}"
 }
 
 # Check if already authenticated with sprite
