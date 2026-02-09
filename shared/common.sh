@@ -139,40 +139,31 @@ validate_server_name() {
         return 1
     fi
 
-    # Check length (3-63 characters)
     local name_length=${#server_name}
-    if [[ ${name_length} -lt 3 ]]; then
-        log_error "Server name too short: '${server_name}' (minimum 3 characters)"
-        show_server_name_requirements
-        return 1
-    fi
 
-    if [[ ${name_length} -gt 63 ]]; then
-        log_error "Server name too long: '${server_name}' (maximum 63 characters)"
+    # Check length (3-63 characters)
+    if [[ ${name_length} -lt 3 ]] || [[ ${name_length} -gt 63 ]]; then
+        local constraint
+        if [[ ${name_length} -lt 3 ]]; then
+            constraint="too short (minimum 3)"
+        else
+            constraint="too long (maximum 63)"
+        fi
+        log_error "Server name ${constraint}: '${server_name}'"
         show_server_name_requirements
         return 1
     fi
 
     # Check for valid characters (alphanumeric + dash only)
     if [[ ! "${server_name}" =~ ^[a-zA-Z0-9-]+$ ]]; then
-        log_error "Invalid server name: '${server_name}'"
-        log_error "Server names must contain only alphanumeric characters and dashes"
+        log_error "Invalid server name: '${server_name}' (must contain only alphanumeric characters and dashes)"
         show_server_name_requirements
         return 1
     fi
 
-    # Check no leading dash
-    if [[ "${server_name}" =~ ^- ]]; then
-        log_error "Invalid server name: '${server_name}'"
-        log_error "Server names cannot start with a dash"
-        show_server_name_requirements
-        return 1
-    fi
-
-    # Check no trailing dash
-    if [[ "${server_name}" =~ -$ ]]; then
-        log_error "Invalid server name: '${server_name}'"
-        log_error "Server names cannot end with a dash"
+    # Check no leading or trailing dash
+    if [[ "${server_name}" =~ ^- ]] || [[ "${server_name}" =~ -$ ]]; then
+        log_error "Invalid server name: '${server_name}' (cannot start or end with dash)"
         show_server_name_requirements
         return 1
     fi
@@ -891,6 +882,28 @@ _api_should_retry_on_error() {
     return 0  # Do retry
 }
 
+# Helper to handle transient HTTP error (429 or 503) with retry decision
+# Usage: _api_handle_transient_error HTTP_CODE ATTEMPT MAX_RETRIES INTERVAL MAX_INTERVAL
+# Returns: 0 to retry, 1 to fail
+_api_handle_transient_http_error() {
+    local http_code="${1}"
+    local attempt="${2}"
+    local max_retries="${3}"
+    local interval="${4}"
+    local max_interval="${5}"
+
+    local error_msg="rate limit"
+    if [[ "${http_code}" == "503" ]]; then
+        error_msg="service unavailable"
+    fi
+
+    if ! _api_should_retry_on_error "http_${http_code}" "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API returned ${error_msg} (HTTP ${http_code})"; then
+        log_error "Cloud API returned HTTP ${http_code} after ${max_retries} attempts"
+        return 1
+    fi
+    return 0
+}
+
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
 # Includes automatic retry logic with exponential backoff for transient failures
 # Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY] [MAX_RETRIES]
@@ -949,13 +962,7 @@ generic_cloud_api() {
 
         # Check for transient HTTP errors that should be retried
         if [[ "${http_code}" == "429" ]] || [[ "${http_code}" == "503" ]]; then
-            local error_msg="rate limit"
-            if [[ "${http_code}" == "503" ]]; then
-                error_msg="service unavailable"
-            fi
-
-            if ! _api_should_retry_on_error "http_${http_code}" "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API returned ${error_msg} (HTTP ${http_code})"; then
-                log_error "Cloud API returned HTTP ${http_code} after ${max_retries} attempts"
+            if ! _api_handle_transient_http_error "${http_code}" "${attempt}" "${max_retries}" "${interval}" "${max_interval}"; then
                 echo "${response_body}"
                 return 1
             fi

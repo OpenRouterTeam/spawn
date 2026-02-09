@@ -20,7 +20,8 @@ import { validateIdentifier, validateScriptContent, validatePrompt } from "./sec
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 
 function getErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  // Use duck typing instead of instanceof to avoid prototype chain issues
+  return err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
 }
 
 function handleCancel(): never {
@@ -202,6 +203,10 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
   await execScript(cloud, agentKey, prompt);
 }
 
+function getStatusDescription(status: number): string {
+  return status === 404 ? "not found" : `HTTP ${status}`;
+}
+
 async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: string): Promise<string> {
   const s = p.spinner();
   s.start("Downloading spawn script...");
@@ -218,17 +223,7 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
     const ghRes = await fetch(fallbackUrl);
     if (!ghRes.ok) {
       s.stop(pc.red("Download failed"));
-      const primaryStatus = res.status === 404 ? "not found" : `HTTP ${res.status}`;
-      const fallbackStatus = ghRes.status === 404 ? "not found" : `HTTP ${ghRes.status}`;
-
-      p.log.error("Script download failed");
-      console.error(`\nPrimary source (${primaryUrl}): ${primaryStatus}`);
-      console.error(`Fallback source (${fallbackUrl}): ${fallbackStatus}`);
-
-      if (res.status === 404 && ghRes.status === 404) {
-        console.error("\nThis combination may not be implemented yet.");
-        console.error(`Run ${pc.cyan("spawn list")} to see all available combinations.`);
-      }
+      reportDownloadFailure(primaryUrl, fallbackUrl, res.status, ghRes.status);
       process.exit(1);
     }
     s.stop("Script downloaded (fallback)");
@@ -236,6 +231,17 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
   } catch (err) {
     s.stop(pc.red("Download failed"));
     throw err;
+  }
+}
+
+function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryStatus: number, fallbackStatus: number): void {
+  p.log.error("Script download failed");
+  console.error(`\nPrimary source (${primaryUrl}): ${getStatusDescription(primaryStatus)}`);
+  console.error(`Fallback source (${fallbackUrl}): ${getStatusDescription(fallbackStatus)}`);
+
+  if (primaryStatus === 404 && fallbackStatus === 404) {
+    console.error("\nThis combination may not be implemented yet.");
+    console.error(`Run ${pc.cyan("spawn list")} to see all available combinations.`);
   }
 }
 
