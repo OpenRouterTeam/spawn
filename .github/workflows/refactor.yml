@@ -21,6 +21,7 @@ jobs:
           SPRITE_NAME: ${{ secrets.REFACTOR_SPRITE_NAME }}
           SVC_NAME: ${{ secrets.REFACTOR_SERVICE_NAME }}
         run: |
+          echo "SVC_NAME: ${SVC_NAME}"
           curl -X POST \
             -H "Authorization: Bearer ${SPRITE_TOKEN}" \
             "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SVC_NAME}/start"
