@@ -143,14 +143,12 @@ verify_sprite_connectivity() {
 }
 
 # Helper function to run commands on sprite
-# SECURITY: Uses printf %q to properly escape commands to prevent injection
+# The command string is passed directly to bash -c for shell parsing.
+# All callers pass trusted, hardcoded command strings (not user input).
 run_sprite() {
     local sprite_name=${1}
     local command=${2}
-    # Use printf %q for proper shell escaping to prevent command injection
-    local escaped_command
-    escaped_command=$(printf '%q' "${command}")
-    sprite exec -s "${sprite_name}" -- bash -c "${escaped_command}"
+    sprite exec -s "${sprite_name}" -- bash -c "${command}"
 }
 
 # Configure shell environment (PATH, zsh setup)
