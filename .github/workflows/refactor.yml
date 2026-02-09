@@ -20,5 +20,5 @@ jobs:
           SPRITE_URL: ${{ secrets.REFACTOR_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.REFACTOR_TRIGGER_SECRET }}
         run: |
-          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}&issue=${{ github.event.issue.number || '' }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
