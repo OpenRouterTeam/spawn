@@ -232,11 +232,15 @@ ensure_manifest() {
 
     # Offline fallback: use stale cache if available
     if [[ -f "${SPAWN_MANIFEST}" ]]; then
-        log_warn "Using cached manifest (offline fallback)"
+        log_warn "Using cached manifest (offline or network issue)"
         return 0
     fi
 
-    log_error "No manifest available. Check your internet connection."
+    log_error "No manifest available and no cached version found"
+    echo "" >&2
+    echo "Check your internet connection and try again." >&2
+    echo "If the problem persists, file an issue at:" >&2
+    echo "  https://github.com/${SPAWN_REPO}/issues" >&2
     exit 1
 }
 
@@ -334,18 +338,25 @@ cmd_run() {
 
     if [[ -z "${agent_name}" ]]; then
         log_error "Unknown agent: ${agent}"
-        echo "Run 'spawn agents' to see available agents." >&2
+        echo "" >&2
+        echo "Run 'spawn agents' to see all available agents." >&2
+        echo "Run 'spawn help' for usage information." >&2
         exit 1
     fi
     if [[ -z "${cloud_name}" ]]; then
         log_error "Unknown cloud: ${cloud}"
-        echo "Run 'spawn clouds' to see available clouds." >&2
+        echo "" >&2
+        echo "Run 'spawn clouds' to see all available clouds." >&2
+        echo "Run 'spawn help' for usage information." >&2
         exit 1
     fi
 
     status=$(manifest_matrix_status "${cloud}" "${agent}")
     if [[ "${status}" != "implemented" ]]; then
         log_error "${agent_name} on ${cloud_name} is not yet implemented"
+        echo "" >&2
+        echo "Run 'spawn list' to see all available combinations." >&2
+        echo "Run 'spawn ${agent}' to see which clouds support ${agent_name}." >&2
         exit 1
     fi
 
@@ -633,7 +644,9 @@ main() {
             agent_name=$(manifest_agent_name "${agent}")
             if [[ -z "${agent_name}" ]]; then
                 log_error "Unknown command or agent: ${agent}"
-                echo "Run 'spawn help' for usage." >&2
+                echo "" >&2
+                echo "Run 'spawn agents' to see all available agents." >&2
+                echo "Run 'spawn help' for usage information." >&2
                 exit 1
             fi
 

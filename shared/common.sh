@@ -48,8 +48,8 @@ check_python_available() {
         log_error "Python 3 is required but not installed"
         log_error ""
         log_error "Spawn uses Python 3 for JSON parsing and API interactions."
-        log_error "Please install Python 3 before continuing:"
         log_error ""
+        log_error "Install Python 3:"
         log_error "  Ubuntu/Debian:  sudo apt-get update && sudo apt-get install -y python3"
         log_error "  Fedora/RHEL:    sudo dnf install -y python3"
         log_error "  macOS:          brew install python3"
@@ -78,6 +78,7 @@ safe_read() {
     else
         # No interactive input available
         log_error "Cannot read input: no TTY available"
+        log_error "Set required environment variables for non-interactive usage"
         return 1
     fi
 
@@ -115,8 +116,9 @@ validate_model_id() {
     local model_id="${1}"
     if [[ -z "${model_id}" ]]; then return 0; fi
     if [[ ! "${model_id}" =~ ^[a-zA-Z0-9/_:.-]+$ ]]; then
-        log_error "Invalid model ID: contains unsafe characters"
+        log_error "Invalid model ID: '${model_id}'"
         log_error "Model IDs should only contain: letters, numbers, /, -, _, :, ."
+        log_error "Browse valid models at: https://openrouter.ai/models"
         return 1
     fi
     return 0
@@ -186,6 +188,7 @@ validate_api_token() {
 
     if [[ -z "${token}" ]]; then
         log_error "API token cannot be empty"
+        log_error "Please provide a valid API token"
         return 1
     fi
 
@@ -193,6 +196,7 @@ validate_api_token() {
     if [[ "${token}" =~ [\;\'\"\<\>\|\&\$\`\\\(\)] ]]; then
         log_error "Invalid token format: contains shell metacharacters"
         log_error "Tokens should not contain: ; ' \" < > | & \$ \` \\ ( )"
+        log_error "Copy the token directly from your provider's dashboard"
         return 1
     fi
 
@@ -281,7 +285,8 @@ get_resource_name() {
     name=$(safe_read "${prompt_text}")
     if [[ -z "${name}" ]]; then
         log_error "${prompt_text%:*} is required"
-        log_warn "Set ${env_var_name} environment variable for non-interactive usage"
+        log_error ""
+        log_error "For non-interactive usage, set: ${env_var_name}=your-value"
         return 1
     fi
     echo "${name}"
@@ -411,6 +416,7 @@ wait_for_oauth_code() {
     local timeout="${2:-120}"
     local elapsed=0
 
+    log_warn "Waiting for authentication in browser (timeout: ${timeout}s)..."
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
         elapsed=$((elapsed + POLL_INTERVAL))
@@ -862,6 +868,29 @@ calculate_retry_backoff() {
     python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}"
 }
 
+# Handle API retry decision with backoff - extracted to reduce duplication across API wrappers
+# Usage: _api_should_retry_on_error ATTEMPT MAX_RETRIES INTERVAL MAX_INTERVAL MESSAGE
+# Returns: 0 to continue/retry, 1 to fail
+# Caller updates interval and attempt variables after success
+_api_should_retry_on_error() {
+    local attempt="${1}"
+    local max_retries="${2}"
+    local interval="${3}"
+    local max_interval="${4}"
+    local message="${5}"
+
+    if [[ "${attempt}" -ge "${max_retries}" ]]; then
+        return 1  # Don't retry - max attempts exhausted
+    fi
+
+    local jitter
+    jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
+    log_warn "${message} (attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
+    sleep "${jitter}"
+
+    return 0  # Do retry
+}
+
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
 # Includes automatic retry logic with exponential backoff for transient failures
 # Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY] [MAX_RETRIES]
@@ -906,16 +935,10 @@ generic_cloud_api() {
 
         # Check for network errors (curl exit code != 0)
         if [[ ${curl_exit_code} -ne 0 ]]; then
-            if [[ "${attempt}" -ge "${max_retries}" ]]; then
+            if ! _api_should_retry_on_error "network" "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API network error"; then
                 log_error "Cloud API network error after ${max_retries} attempts: curl exit code ${curl_exit_code}"
                 return 1
             fi
-
-            local jitter
-            jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
-            log_warn "Cloud API network error (attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
-            sleep "${jitter}"
-
             interval=$((interval * 2))
             if [[ "${interval}" -gt "${max_interval}" ]]; then
                 interval="${max_interval}"
@@ -926,22 +949,16 @@ generic_cloud_api() {
 
         # Check for transient HTTP errors that should be retried
         if [[ "${http_code}" == "429" ]] || [[ "${http_code}" == "503" ]]; then
-            if [[ "${attempt}" -ge "${max_retries}" ]]; then
-                log_error "Cloud API returned HTTP ${http_code} after ${max_retries} attempts"
-                echo "${response_body}"
-                return 1
-            fi
-
             local error_msg="rate limit"
             if [[ "${http_code}" == "503" ]]; then
                 error_msg="service unavailable"
             fi
 
-            local jitter
-            jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
-            log_warn "Cloud API returned ${error_msg} (HTTP ${http_code}, attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
-            sleep "${jitter}"
-
+            if ! _api_should_retry_on_error "http_${http_code}" "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API returned ${error_msg} (HTTP ${http_code})"; then
+                log_error "Cloud API returned HTTP ${http_code} after ${max_retries} attempts"
+                echo "${response_body}"
+                return 1
+            fi
             interval=$((interval * 2))
             if [[ "${interval}" -gt "${max_interval}" ]]; then
                 interval="${max_interval}"
@@ -980,13 +997,17 @@ verify_agent_installed() {
 
     if ! command -v "${agent_cmd}" &> /dev/null; then
         log_error "${agent_name} installation failed: command '${agent_cmd}' not found in PATH"
-        log_error "PATH: ${PATH}"
+        log_error ""
+        log_error "This usually means the installation process encountered an error."
+        log_error "Try running the script again, or check the installation logs above."
         return 1
     fi
 
     if ! "${agent_cmd}" "${verify_arg}" &> /dev/null; then
         log_error "${agent_name} installation failed: '${agent_cmd} ${verify_arg}' returned an error"
-        log_error "The command exists but does not execute properly"
+        log_error ""
+        log_error "The command exists but does not execute properly."
+        log_error "Try running the script again, or check for dependency issues."
         return 1
     fi
 
