@@ -81,8 +81,6 @@ Create these teammates:
 
 6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
-   - For EVERY open issue, immediately post an acknowledgment comment:
-     gh issue comment NUMBER --body "Thanks for reporting this! Our automated maintenance team is looking into it. We'll post updates here as we investigate."
    - Categorize each issue (bug, feature request, question, already-fixed)
    - For bugs: message the relevant teammate to investigate
      * Security-related → message security-auditor
