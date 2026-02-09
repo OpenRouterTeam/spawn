@@ -24,6 +24,7 @@ function handleError(err: unknown): never {
   } else {
     console.error(`Error: ${String(err)}`);
   }
+  console.error(`\nRun 'spawn help' for usage information.`);
   process.exit(1);
 }
 
@@ -32,8 +33,8 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   if (!manifest.agents[agent]) {
     console.error(`Error: Unknown agent "${agent}"`);
     console.error(`\nAvailable agents:`);
-    const agentNames = Object.values(manifest.agents).map(a => a.name).slice(0, 5);
-    agentNames.forEach(name => console.error(`  - ${name}`));
+    const agentEntries = Object.entries(manifest.agents).slice(0, 5);
+    agentEntries.forEach(([key, a]) => console.error(`  - ${key.padEnd(16)} ${a.name}`));
     if (Object.keys(manifest.agents).length > 5) {
       console.error(`  ... and ${Object.keys(manifest.agents).length - 5} more`);
     }
