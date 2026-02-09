@@ -995,6 +995,78 @@ _update_retry_interval() {
     eval "${interval_var}=${current_interval}"
 }
 
+# Helper to extract HTTP status code and response body from curl output
+# Curl is called with "-w \n%{http_code}" so last line is the code
+# Returns: http_code on stdout, response_body via global variable
+_parse_api_response() {
+    local response="${1}"
+    local http_code
+    http_code=$(echo "${response}" | tail -1)
+    local response_body
+    response_body=$(echo "${response}" | head -n -1)
+
+    API_HTTP_CODE="${http_code}"
+    API_RESPONSE_BODY="${response_body}"
+}
+
+# Helper to handle a single API request attempt - builds curl args and executes it
+# Returns: 0 on curl success, 1 on curl failure
+# Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
+_make_api_request() {
+    local base_url="${1}"
+    local auth_token="${2}"
+    local method="${3}"
+    local endpoint="${4}"
+    local body="${5:-}"
+
+    local args=(
+        -s
+        -w "\n%{http_code}"
+        -X "${method}"
+        -H "Authorization: Bearer ${auth_token}"
+        -H "Content-Type: application/json"
+    )
+
+    if [[ -n "${body}" ]]; then
+        args+=(-d "${body}")
+    fi
+
+    local response
+    response=$(curl "${args[@]}" "${base_url}${endpoint}" 2>&1)
+    local curl_exit_code=$?
+
+    _parse_api_response "${response}"
+
+    return ${curl_exit_code}
+}
+
+# Helper to handle transient API error and decide whether to retry
+# Returns: 0 to continue, 1 to fail (response already echoed)
+_handle_api_transient_error() {
+    local error_type="${1}"  # "network" or HTTP_CODE like "429"
+    local attempt="${2}"
+    local max_retries="${3}"
+    local interval_var="${4}"
+    local max_interval_var="${5}"
+    local response_body="${6}"
+
+    if [[ "${error_type}" == "network" ]]; then
+        if ! _api_should_retry_on_error "network" "${attempt}" "${max_retries}" "${!interval_var}" "${!max_interval_var}" "Cloud API network error"; then
+            log_error "Cloud API network error after ${max_retries} attempts"
+            return 1
+        fi
+    else
+        # HTTP error code (429 or 503)
+        if ! _api_handle_transient_http_error "${error_type}" "${attempt}" "${max_retries}" "${!interval_var}" "${!max_interval_var}"; then
+            echo "${response_body}"
+            return 1
+        fi
+    fi
+
+    _update_retry_interval "${interval_var}" "${max_interval_var}"
+    return 0
+}
+
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
 # Includes automatic retry logic with exponential backoff for transient failures
 # Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY] [MAX_RETRIES]
@@ -1015,52 +1087,27 @@ generic_cloud_api() {
     local max_interval=30
 
     while [[ "${attempt}" -le "${max_retries}" ]]; do
-        local args=(
-            -s
-            -w "\n%{http_code}"
-            -X "${method}"
-            -H "Authorization: Bearer ${auth_token}"
-            -H "Content-Type: application/json"
-        )
-
-        if [[ -n "${body}" ]]; then
-            args+=(-d "${body}")
-        fi
-
-        local response
-        response=$(curl "${args[@]}" "${base_url}${endpoint}" 2>&1)
-        local curl_exit_code=$?
-
-        # Extract HTTP status code (last line) and response body (everything else)
-        local http_code
-        http_code=$(echo "${response}" | tail -1)
-        local response_body
-        response_body=$(echo "${response}" | head -n -1)
-
-        # Check for network errors (curl exit code != 0)
-        if [[ ${curl_exit_code} -ne 0 ]]; then
-            if ! _api_should_retry_on_error "network" "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API network error"; then
-                log_error "Cloud API network error after ${max_retries} attempts: curl exit code ${curl_exit_code}"
+        # Make the API request
+        if ! _make_api_request "${base_url}" "${auth_token}" "${method}" "${endpoint}" "${body}"; then
+            # Network error - handle and retry
+            if ! _handle_api_transient_error "network" "${attempt}" "${max_retries}" "interval" "max_interval" ""; then
                 return 1
             fi
-            _update_retry_interval "interval" "max_interval"
             attempt=$((attempt + 1))
             continue
         fi
 
-        # Check for transient HTTP errors that should be retried
-        if [[ "${http_code}" == "429" ]] || [[ "${http_code}" == "503" ]]; then
-            if ! _api_handle_transient_http_error "${http_code}" "${attempt}" "${max_retries}" "${interval}" "${max_interval}"; then
-                echo "${response_body}"
+        # Check for transient HTTP errors (429 or 503)
+        if [[ "${API_HTTP_CODE}" == "429" ]] || [[ "${API_HTTP_CODE}" == "503" ]]; then
+            if ! _handle_api_transient_error "${API_HTTP_CODE}" "${attempt}" "${max_retries}" "interval" "max_interval" "${API_RESPONSE_BODY}"; then
                 return 1
             fi
-            _update_retry_interval "interval" "max_interval"
             attempt=$((attempt + 1))
             continue
         fi
 
         # Success or non-retryable error - return response body
-        echo "${response_body}"
+        echo "${API_RESPONSE_BODY}"
         return 0
     done
 
