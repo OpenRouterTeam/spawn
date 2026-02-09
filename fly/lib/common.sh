@@ -68,6 +68,20 @@ ensure_fly_cli() {
 }
 
 # Ensure FLY_API_TOKEN is available (env var -> config file -> prompt+save)
+# Save Fly.io token to config file
+_save_fly_token() {
+    local token="$1"
+    local config_dir="$HOME/.config/spawn"
+    local config_file="$config_dir/fly.json"
+    mkdir -p "$config_dir"
+    cat > "$config_file" << EOF
+{
+  "token": "$token"
+}
+EOF
+    chmod 600 "$config_file"
+}
+
 ensure_fly_token() {
     # Check Python 3 is available (required for JSON parsing)
     check_python_available || return 1
@@ -78,9 +92,10 @@ ensure_fly_token() {
         return 0
     fi
 
-    # 2. Check config file
     local config_dir="$HOME/.config/spawn"
     local config_file="$config_dir/fly.json"
+
+    # 2. Check config file
     if [[ -f "$config_file" ]]; then
         local saved_token
         saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
@@ -100,19 +115,12 @@ ensure_fly_token() {
         if [[ -n "$token" ]]; then
             export FLY_API_TOKEN="$token"
             log_info "Using Fly.io API token from flyctl auth"
-            # Save to config file
-            mkdir -p "$config_dir"
-            cat > "$config_file" << EOF
-{
-  "token": "$token"
-}
-EOF
-            chmod 600 "$config_file"
+            _save_fly_token "$token"
             return 0
         fi
     fi
 
-    # 4. Prompt and save
+    # 4. Prompt and validate
     echo ""
     log_warn "Fly.io API Token Required"
     echo -e "${YELLOW}Get your token by running: fly tokens deploy${NC}"
@@ -147,13 +155,7 @@ EOF
     fi
 
     # Save to config file
-    mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "token": "$token"
-}
-EOF
-    chmod 600 "$config_file"
+    _save_fly_token "$token"
     log_info "API token saved to $config_file"
 }
 
@@ -300,9 +302,12 @@ wait_for_cloud_init() {
 # Run a command on the Fly.io machine via flyctl ssh
 run_server() {
     local cmd="$1"
+    # SECURITY: Properly escape command to prevent injection
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$cmd")
     local fly_cmd="fly"
     command -v fly &>/dev/null || fly_cmd="flyctl"
-    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c '$cmd'" --quiet 2>/dev/null
+    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
 }
 
 # Upload a file to the machine via base64 encoding through exec
@@ -310,15 +315,23 @@ upload_file() {
     local local_path="$1"
     local remote_path="$2"
     local content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
-    run_server "echo '$content' | base64 -d > '$remote_path'"
+    # SECURITY: Properly escape paths and content to prevent injection
+    local escaped_path
+    escaped_path=$(printf '%q' "$remote_path")
+    local escaped_content
+    escaped_content=$(printf '%q' "$content")
+    run_server "echo $escaped_content | base64 -d > $escaped_path"
 }
 
 # Start an interactive SSH session on the Fly.io machine
 interactive_session() {
     local cmd="$1"
+    # SECURITY: Properly escape command to prevent injection
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$cmd")
     local fly_cmd="fly"
     command -v fly &>/dev/null || fly_cmd="flyctl"
-    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c '$cmd'"
+    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd"
 }
 
 # Destroy a Fly.io machine and app

@@ -87,10 +87,13 @@ wait_for_cloud_init() {
 # Modal uses Python SDK for exec
 run_server() {
     local cmd="${1}"
+    # SECURITY: Properly escape command to prevent injection
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "${cmd}")
     python3 -c "
-import modal
+import modal, shlex
 sb = modal.Sandbox.from_id('${MODAL_SANDBOX_ID}')
-p = sb.exec('bash', '-c', '''${cmd}''')
+p = sb.exec('bash', '-c', ${escaped_cmd})
 print(p.stdout.read(), end='')
 if p.stderr.read():
     import sys; print(p.stderr.read(), end='', file=sys.stderr)
@@ -103,15 +106,23 @@ upload_file() {
     local remote_path="${2}"
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
-    run_server "echo '${content}' | base64 -d > '${remote_path}'"
+    # SECURITY: Properly escape paths and content to prevent injection
+    local escaped_path
+    escaped_path=$(printf '%q' "${remote_path}")
+    local escaped_content
+    escaped_content=$(printf '%q' "${content}")
+    run_server "echo ${escaped_content} | base64 -d > ${escaped_path}"
 }
 
 interactive_session() {
     local cmd="${1}"
+    # SECURITY: Properly escape command to prevent injection
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "${cmd}")
     python3 -c "
 import modal, sys
 sb = modal.Sandbox.from_id('${MODAL_SANDBOX_ID}')
-p = sb.exec('bash', '-c', '''${cmd}''', pty=True)
+p = sb.exec('bash', '-c', ${escaped_cmd}, pty=True)
 for line in p.stdout:
     print(line, end='')
 p.wait()

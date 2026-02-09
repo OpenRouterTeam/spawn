@@ -163,16 +163,16 @@ run_script_test() {
     # Script-specific assertions
     case "${script_name}" in
         claude)
-            assert_contains "${MOCK_LOG}" "claude install" "Installs Claude Code"
+            assert_contains "${MOCK_LOG}" "sprite exec.*claude.*install" "Installs Claude Code"
             assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*settings.json" "Uploads Claude settings"
             assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*\.claude\.json" "Uploads Claude global state"
             ;;
         openclaw)
-            assert_contains "${MOCK_LOG}" "sprite exec.*bun install -g openclaw" "Installs openclaw via bun"
+            assert_contains "${MOCK_LOG}" "sprite exec.*\.sprite.*bun.*openclaw" "Installs openclaw via bun"
             assert_contains "${MOCK_LOG}" "sprite exec.*openclaw gateway" "Starts openclaw gateway"
             ;;
         nanoclaw)
-            assert_contains "${MOCK_LOG}" "sprite exec.*git clone.*nanoclaw" "Clones nanoclaw repo"
+            assert_contains "${MOCK_LOG}" "sprite exec.*git.*nanoclaw" "Clones nanoclaw repo"
             assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/nanoclaw_env" "Uploads nanoclaw .env"
             ;;
         *)

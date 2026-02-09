@@ -98,6 +98,24 @@ function validateAgent(manifest: Manifest, agent: string): asserts agent is keyo
   }
 }
 
+// Validate and load agent - consolidates the pattern used by cmdRun and cmdAgentInfo
+function validateAndGetAgent(agent: string): Promise<[manifest: Manifest, agentKey: string]> {
+  return (async () => {
+    try {
+      validateIdentifier(agent, "Agent name");
+    } catch (err) {
+      p.log.error(getErrorMessage(err));
+      process.exit(1);
+    }
+
+    validateNonEmptyString(agent, "Agent name", "spawn agents");
+    const manifest = await loadManifestWithSpinner();
+    validateAgent(manifest, agent);
+
+    return [manifest, agent];
+  })();
+}
+
 function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyof typeof manifest.clouds {
   if (!manifest.clouds[cloud]) {
     p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
@@ -165,16 +183,14 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
     process.exit(1);
   }
 
-  validateNonEmptyString(agent, "Agent name", "spawn agents");
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
 
-  const manifest = await loadManifestWithSpinner();
+  const [manifest, agentKey] = await validateAndGetAgent(agent);
 
-  validateAgent(manifest, agent);
   validateCloud(manifest, cloud);
-  validateImplementation(manifest, cloud, agent);
+  validateImplementation(manifest, cloud, agentKey);
 
-  const agentName = manifest.agents[agent].name;
+  const agentName = manifest.agents[agentKey].name;
   const cloudName = manifest.clouds[cloud].name;
 
   if (prompt) {
@@ -183,7 +199,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
     p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}...`);
   }
 
-  await execScript(cloud, agent, prompt);
+  await execScript(cloud, agentKey, prompt);
 }
 
 async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: string): Promise<string> {
@@ -316,22 +332,15 @@ export async function cmdList(): Promise<void> {
   const agents = agentKeys(manifest);
   const clouds = cloudKeys(manifest);
 
-  // Calculate column widths without creating intermediate arrays
-  let agentColWidth = MIN_AGENT_COL_WIDTH;
-  for (const a of agents) {
-    const width = manifest.agents[a].name.length + COL_PADDING;
-    if (width > agentColWidth) {
-      agentColWidth = width;
-    }
-  }
-
-  let cloudColWidth = MIN_CLOUD_COL_WIDTH;
-  for (const c of clouds) {
-    const width = manifest.clouds[c].name.length + COL_PADDING;
-    if (width > cloudColWidth) {
-      cloudColWidth = width;
-    }
-  }
+  // Calculate column widths
+  const agentColWidth = calculateColumnWidth(
+    agents.map((a) => manifest.agents[a].name),
+    MIN_AGENT_COL_WIDTH
+  );
+  const cloudColWidth = calculateColumnWidth(
+    clouds.map((c) => manifest.clouds[c].name),
+    MIN_CLOUD_COL_WIDTH
+  );
 
   console.log();
   console.log(renderMatrixHeader(clouds, manifest, agentColWidth, cloudColWidth));
@@ -381,21 +390,9 @@ export async function cmdClouds(): Promise<void> {
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
 export async function cmdAgentInfo(agent: string): Promise<void> {
-  // SECURITY: Validate input argument for injection attacks
-  try {
-    validateIdentifier(agent, "Agent name");
-  } catch (err) {
-    p.log.error(getErrorMessage(err));
-    process.exit(1);
-  }
+  const [manifest, agentKey] = await validateAndGetAgent(agent);
 
-  validateNonEmptyString(agent, "Agent name", "spawn agents");
-
-  const manifest = await loadManifestWithSpinner();
-
-  validateAgent(manifest, agent);
-
-  const a = manifest.agents[agent];
+  const a = manifest.agents[agentKey];
   console.log();
   console.log(`${pc.bold(a.name)} ${pc.dim("\u2014")} ${a.description}`);
   console.log();
@@ -404,10 +401,10 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
 
   let found = false;
   for (const cloud of cloudKeys(manifest)) {
-    const status = matrixStatus(manifest, cloud, agent);
+    const status = matrixStatus(manifest, cloud, agentKey);
     if (status === "implemented") {
       const c = manifest.clouds[cloud];
-      console.log(`  ${pc.green(c.name.padEnd(NAME_COLUMN_WIDTH))} ${pc.dim("spawn " + agent + " " + cloud)}`);
+      console.log(`  ${pc.green(c.name.padEnd(NAME_COLUMN_WIDTH))} ${pc.dim("spawn " + agentKey + " " + cloud)}`);
       found = true;
     }
   }

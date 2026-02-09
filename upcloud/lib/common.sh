@@ -58,38 +58,28 @@ upcloud_api() {
         response_body=$(printf '%s' "${response}" | head -n -1)
 
         if [[ ${curl_exit_code} -ne 0 ]]; then
-            if [[ "${attempt}" -ge "${max_retries}" ]]; then
+            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "UpCloud API network error"; then
                 log_error "UpCloud API network error after ${max_retries} attempts: curl exit code ${curl_exit_code}"
                 return 1
             fi
-            local next_interval=$((interval * 2))
-            if [[ "${next_interval}" -gt "${max_interval}" ]]; then
-                next_interval="${max_interval}"
+            interval=$((interval * 2))
+            if [[ "${interval}" -gt "${max_interval}" ]]; then
+                interval="${max_interval}"
             fi
-            local jitter
-            jitter=$(python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}")
-            log_warn "UpCloud API network error (attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
-            sleep "${jitter}"
-            interval="${next_interval}"
             attempt=$((attempt + 1))
             continue
         fi
 
         if [[ "${http_code}" == "429" ]] || [[ "${http_code}" == "503" ]]; then
-            if [[ "${attempt}" -ge "${max_retries}" ]]; then
+            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "UpCloud API returned HTTP ${http_code}"; then
                 log_error "UpCloud API returned HTTP ${http_code} after ${max_retries} attempts"
                 echo "${response_body}"
                 return 1
             fi
-            local next_interval=$((interval * 2))
-            if [[ "${next_interval}" -gt "${max_interval}" ]]; then
-                next_interval="${max_interval}"
+            interval=$((interval * 2))
+            if [[ "${interval}" -gt "${max_interval}" ]]; then
+                interval="${max_interval}"
             fi
-            local jitter
-            jitter=$(python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}")
-            log_warn "UpCloud API returned HTTP ${http_code} (attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
-            sleep "${jitter}"
-            interval="${next_interval}"
             attempt=$((attempt + 1))
             continue
         fi
