@@ -298,4 +298,4 @@ To add a new automation script (beyond improve.sh and refactor.sh):
 | Workflow | Sprite | Service Name | Secrets |
 |----------|--------|-------------|---------|
 | `improve.yml` (Trigger Discovery) | `lab-spawn-discovery` | `improve-trigger` | `DISCOVERY_SPRITE_URL`, `DISCOVERY_TRIGGER_SECRET` |
-| `refactor.yml` (Trigger Refactor) | _(not yet configured)_ | _(not yet configured)_ | `REFACTOR_SPRITE_URL`, `REFACTOR_TRIGGER_SECRET` |
+| `refactor.yml` (Trigger Refactor) | `lab-spawn-foundations` | `refactor` | `REFACTOR_SPRITE_URL`, `REFACTOR_TRIGGER_SECRET` |
