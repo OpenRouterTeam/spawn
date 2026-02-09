@@ -14,7 +14,8 @@
 
 set -eo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 MANIFEST="${REPO_ROOT}/manifest.json"
 MODE="${1:-once}"
 

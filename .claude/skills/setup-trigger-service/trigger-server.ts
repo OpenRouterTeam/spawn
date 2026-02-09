@@ -34,7 +34,7 @@ async function runScript(reason: string) {
   );
   try {
     const proc = Bun.spawn(["bash", TARGET_SCRIPT], {
-      cwd: TARGET_SCRIPT.substring(0, TARGET_SCRIPT.lastIndexOf("/")) || ".",
+      cwd: process.env.REPO_ROOT || TARGET_SCRIPT.substring(0, TARGET_SCRIPT.lastIndexOf("/")) || ".",
       stdout: "inherit",
       stderr: "inherit",
     });
