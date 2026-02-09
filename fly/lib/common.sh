@@ -82,8 +82,45 @@ EOF
     chmod 600 "$config_file"
 }
 
+# Try to get token from flyctl CLI if available
+_try_flyctl_auth() {
+    local fly_cmd=""
+    if command -v fly &>/dev/null; then
+        fly_cmd="fly"
+    elif command -v flyctl &>/dev/null; then
+        fly_cmd="flyctl"
+    else
+        return 1
+    fi
+
+    local token
+    token=$("$fly_cmd" auth token 2>/dev/null || true)
+    if [[ -n "$token" ]]; then
+        echo "$token"
+        return 0
+    fi
+    return 1
+}
+
+# Validate a Fly.io token by making a test API call
+_validate_fly_token() {
+    local response
+    response=$(fly_api GET "/apps?org_slug=personal")
+    if echo "$response" | grep -q '"error"'; then
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        log_error "Authentication failed: Invalid Fly.io API token"
+        log_error "API Error: $error_msg"
+        log_warn "Remediation steps:"
+        log_warn "  1. Run: fly tokens deploy"
+        log_warn "  2. Or generate a token at: https://fly.io/dashboard"
+        log_warn "  3. Ensure the token has appropriate permissions"
+        return 1
+    fi
+    return 0
+}
+
 ensure_fly_token() {
-    # Check Python 3 is available (required for JSON parsing)
     check_python_available || return 1
 
     # 1. Check environment variable
@@ -92,8 +129,7 @@ ensure_fly_token() {
         return 0
     fi
 
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/fly.json"
+    local config_file="$HOME/.config/spawn/fly.json"
 
     # 2. Check config file
     if [[ -f "$config_file" ]]; then
@@ -106,19 +142,14 @@ ensure_fly_token() {
         fi
     fi
 
-    # 3. Try to get token from flyctl auth
-    if command -v fly &>/dev/null || command -v flyctl &>/dev/null; then
-        local fly_cmd="fly"
-        command -v fly &>/dev/null || fly_cmd="flyctl"
-        local token
-        token=$("$fly_cmd" auth token 2>/dev/null || true)
-        if [[ -n "$token" ]]; then
-            export FLY_API_TOKEN="$token"
-            log_info "Using Fly.io API token from flyctl auth"
-            _save_fly_token "$token"
-            return 0
-        fi
-    fi
+    # 3. Try flyctl CLI auth
+    local token
+    token=$(_try_flyctl_auth) && {
+        export FLY_API_TOKEN="$token"
+        log_info "Using Fly.io API token from flyctl auth"
+        _save_fly_token "$token"
+        return 0
+    }
 
     # 4. Prompt and validate
     echo ""
@@ -127,7 +158,6 @@ ensure_fly_token() {
     printf '%b\n' "${YELLOW}Or create one at: https://fly.io/dashboard → Tokens${NC}"
     echo ""
 
-    local token
     token=$(safe_read "Enter your Fly.io API token: ") || return 1
     if [[ -z "$token" ]]; then
         log_error "API token cannot be empty"
@@ -135,26 +165,12 @@ ensure_fly_token() {
         return 1
     fi
 
-    # Validate token by making a test API call
     export FLY_API_TOKEN="$token"
-    local response
-    response=$(fly_api GET "/apps?org_slug=personal")
-    if echo "$response" | grep -q '"error"'; then
-        log_error "Authentication failed: Invalid Fly.io API token"
-
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
-
-        log_warn "Remediation steps:"
-        log_warn "  1. Run: fly tokens deploy"
-        log_warn "  2. Or generate a token at: https://fly.io/dashboard"
-        log_warn "  3. Ensure the token has appropriate permissions"
+    if ! _validate_fly_token; then
         unset FLY_API_TOKEN
         return 1
     fi
 
-    # Save to config file
     _save_fly_token "$token"
     log_info "API token saved to $config_file"
 }

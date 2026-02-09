@@ -62,34 +62,34 @@ kamatera_api() {
         local response_body
         response_body=$(printf '%s' "$response" | head -n -1)
 
+        # Success case
+        if [[ "$curl_exit_code" -eq 0 ]] && [[ "$http_code" != "429" ]] && [[ "$http_code" != "503" ]]; then
+            printf '%s' "$response_body"
+            return 0
+        fi
+
+        # Decide whether to retry
+        local should_retry=false
         if [[ "$curl_exit_code" -ne 0 ]]; then
-            if ! _api_should_retry_on_error "$attempt" "$max_retries" "$interval" "$max_interval" "Kamatera API network error"; then
+            _api_should_retry_on_error "$attempt" "$max_retries" "$interval" "$max_interval" "Kamatera API network error" && should_retry=true
+            if [[ "$should_retry" != "true" ]]; then
                 log_error "Kamatera API network error after $max_retries attempts"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "$interval" -gt "$max_interval" ]]; then
-                interval="$max_interval"
-            fi
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        if [[ "$http_code" == "429" ]] || [[ "$http_code" == "503" ]]; then
-            if ! _api_handle_transient_http_error "$http_code" "$attempt" "$max_retries" "$interval" "$max_interval"; then
+        else
+            _api_handle_transient_http_error "$http_code" "$attempt" "$max_retries" "$interval" "$max_interval" && should_retry=true
+            if [[ "$should_retry" != "true" ]]; then
                 printf '%s' "$response_body"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "$interval" -gt "$max_interval" ]]; then
-                interval="$max_interval"
-            fi
-            attempt=$((attempt + 1))
-            continue
         fi
 
-        printf '%s' "$response_body"
-        return 0
+        # Backoff
+        interval=$((interval * 2))
+        if [[ "$interval" -gt "$max_interval" ]]; then
+            interval="$max_interval"
+        fi
+        attempt=$((attempt + 1))
     done
 
     log_error "Kamatera API retry logic exhausted"
@@ -108,14 +108,22 @@ ensure_kamatera_token() {
     local config_file="$config_dir/kamatera.json"
 
     if [[ -f "$config_file" ]]; then
-        local saved_client_id saved_secret
-        saved_client_id=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_client_id',''))" "$config_file" 2>/dev/null)
-        saved_secret=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_secret',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]]; then
-            export KAMATERA_API_CLIENT_ID="$saved_client_id"
-            export KAMATERA_API_SECRET="$saved_secret"
-            log_info "Using Kamatera API credentials from $config_file"
-            return 0
+        local creds
+        creds=$(python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(d.get('api_client_id', ''))
+print(d.get('api_secret', ''))
+" "$config_file" 2>/dev/null) || true
+        if [[ -n "${creds}" ]]; then
+            local saved_client_id saved_secret
+            { read -r saved_client_id; read -r saved_secret; } <<< "${creds}"
+            if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]]; then
+                export KAMATERA_API_CLIENT_ID="$saved_client_id"
+                export KAMATERA_API_SECRET="$saved_secret"
+                log_info "Using Kamatera API credentials from $config_file"
+                return 0
+            fi
         fi
     fi
 
