@@ -100,21 +100,19 @@ function validateAgent(manifest: Manifest, agent: string): asserts agent is keyo
 }
 
 // Validate and load agent - consolidates the pattern used by cmdRun and cmdAgentInfo
-function validateAndGetAgent(agent: string): Promise<[manifest: Manifest, agentKey: string]> {
-  return (async () => {
-    try {
-      validateIdentifier(agent, "Agent name");
-    } catch (err) {
-      p.log.error(getErrorMessage(err));
-      process.exit(1);
-    }
+async function validateAndGetAgent(agent: string): Promise<[manifest: Manifest, agentKey: string]> {
+  try {
+    validateIdentifier(agent, "Agent name");
+  } catch (err) {
+    p.log.error(getErrorMessage(err));
+    process.exit(1);
+  }
 
-    validateNonEmptyString(agent, "Agent name", "spawn agents");
-    const manifest = await loadManifestWithSpinner();
-    validateAgent(manifest, agent);
+  validateNonEmptyString(agent, "Agent name", "spawn agents");
+  const manifest = await loadManifestWithSpinner();
+  validateAgent(manifest, agent);
 
-    return [manifest, agent];
-  })();
+  return [manifest, agent];
 }
 
 function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyof typeof manifest.clouds {
