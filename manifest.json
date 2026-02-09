@@ -495,6 +495,24 @@
         "os": "ubuntu_24_04_x64_lts"
       },
       "notes": "Bare metal and VM cloud provider with global locations. Hourly billing. VMs from $0.07/hr. Requires LATITUDE_API_KEY from https://www.latitude.sh/dashboard"
+    },
+    "kamatera": {
+      "name": "Kamatera",
+      "description": "Kamatera cloud servers via REST API with 25+ global datacenters",
+      "url": "https://www.kamatera.com/",
+      "type": "api",
+      "auth": "KAMATERA_API_CLIENT_ID + KAMATERA_API_SECRET",
+      "provision_method": "POST /service/server with script-file init",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "cpu": "2B",
+        "ram": 2048,
+        "disk": "size=20",
+        "datacenter": "EU",
+        "image": "ubuntu_server_24.04_64-bit"
+      },
+      "notes": "Global cloud provider with 25+ datacenters. Hourly billing. Uses AuthClientId/AuthSecret headers for API auth. Async operations via command queue. Requires KAMATERA_API_CLIENT_ID and KAMATERA_API_SECRET from https://console.kamatera.com/keys"
     }
   },
   "matrix": {
@@ -744,6 +762,19 @@
     "latitude/cline": "implemented",
     "latitude/gptme": "implemented",
     "latitude/opencode": "implemented",
-    "latitude/plandex": "implemented"
+    "latitude/plandex": "implemented",
+    "kamatera/claude": "implemented",
+    "kamatera/openclaw": "implemented",
+    "kamatera/nanoclaw": "implemented",
+    "kamatera/aider": "implemented",
+    "kamatera/goose": "implemented",
+    "kamatera/codex": "implemented",
+    "kamatera/interpreter": "implemented",
+    "kamatera/gemini": "implemented",
+    "kamatera/amazonq": "implemented",
+    "kamatera/cline": "implemented",
+    "kamatera/gptme": "implemented",
+    "kamatera/opencode": "implemented",
+    "kamatera/plandex": "implemented"
   }
 }
