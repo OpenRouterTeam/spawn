@@ -17,22 +17,6 @@ jobs:
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
         run: |
-          # Debug: test different URL path formats
-          echo "--- Test A: /services/{name}/start ---"
-          curl -s -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve_trigger/start" 2>&1
-          echo ""
-          echo "--- Test B: /services/start/{name} ---"
-          curl -s -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/start/improve_trigger" 2>&1
-          echo ""
-          echo "--- Test C: /services:start with body ---"
-          curl -s -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"service_name":"improve_trigger"}' \
-            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services:start" 2>&1
-          echo ""
-          echo "--- Test D: sprite-env from inside ---"
-          curl -s --unix-socket /.sprite/sprite-env.sock -X POST \
-            "http://localhost/services/improve_trigger/start" 2>&1
-          echo ""
+          curl -X POST \
+            -H "Authorization: Bearer ${SPRITE_TOKEN}" \
+            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve-trigger/start"
