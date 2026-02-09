@@ -123,8 +123,8 @@ ensure_fly_token() {
     # 4. Prompt and validate
     echo ""
     log_warn "Fly.io API Token Required"
-    echo -e "${YELLOW}Get your token by running: fly tokens deploy${NC}"
-    echo -e "${YELLOW}Or create one at: https://fly.io/dashboard → Tokens${NC}"
+    printf '%b\n' "${YELLOW}Get your token by running: fly tokens deploy${NC}"
+    printf '%b\n' "${YELLOW}Or create one at: https://fly.io/dashboard → Tokens${NC}"
     echo ""
 
     local token

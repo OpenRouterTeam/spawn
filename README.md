@@ -68,7 +68,7 @@ export OPENROUTER_API_KEY=sk-or-v1-xxxxx
 # Cloud-specific credentials (varies by provider)
 export SPRITE_API_KEY=...        # For Sprite
 export HCLOUD_TOKEN=...           # For Hetzner
-export DIGITALOCEAN_TOKEN=...     # For DigitalOcean
+export DO_API_TOKEN=...           # For DigitalOcean
 
 # Run non-interactively
 spawn claude sprite

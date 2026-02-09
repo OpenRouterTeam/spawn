@@ -10,16 +10,76 @@ Civo cloud-native instances via REST API. [Civo](https://www.civo.com/)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/claude.sh)
 ```
 
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/nanoclaw.sh)
+```
+
 #### Aider
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/aider.sh)
 ```
 
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/goose.sh)
+```
+
 #### Codex CLI
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/codex.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/interpreter.sh)
+```
+
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/gemini.sh)
+```
+
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/amazonq.sh)
+```
+
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/cline.sh)
+```
+
+#### gptme
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/gptme.sh)
+```
+
+#### OpenCode
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/opencode.sh)
+```
+
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/plandex.sh)
 ```
 
 ## Non-Interactive Mode
