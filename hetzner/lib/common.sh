@@ -40,10 +40,11 @@ test_hcloud_token() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify token at: https://console.hetzner.cloud/projects → API Tokens"
-        log_warn "  2. Ensure the token has read/write permissions"
-        log_warn "  3. Check token hasn't expired"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Verify your token at: https://console.hetzner.cloud/projects → API Tokens"
+        log_error "  2. Ensure the token has read/write permissions"
+        log_error "  3. Check the token hasn't expired"
         return 1
     fi
     return 0
@@ -84,11 +85,11 @@ hetzner_register_ssh_key() {
         local error_msg
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
         log_error "API Error: $error_msg"
-
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered with this name"
-        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
-        log_warn "  - API token lacks write permissions"
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - SSH key already registered with this name"
+        log_error "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_error "  - API token lacks write permissions"
         return 1
     fi
 
@@ -161,13 +162,14 @@ print(json.dumps(body))
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
-
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance or payment method required"
-        log_warn "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
-        log_warn "  - Server limit reached"
-        log_warn "  - Invalid cloud-init userdata"
-        log_warn "Remediation: Check https://console.hetzner.cloud/"
+        log_error ""
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance or payment method required"
+        log_error "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
+        log_error "  - Server limit reached for your account"
+        log_error "  - Invalid cloud-init userdata"
+        log_error ""
+        log_error "Check your account status: https://console.hetzner.cloud/"
         return 1
     fi
 

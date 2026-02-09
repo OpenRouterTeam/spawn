@@ -77,8 +77,12 @@ safe_read() {
         read -r -p "${prompt}" result < /dev/tty
     else
         # No interactive input available
-        log_error "Cannot read input: no TTY available"
-        log_error "Set required environment variables for non-interactive usage"
+        log_error "Cannot prompt for input: no interactive terminal available"
+        log_error ""
+        log_error "Running in non-interactive mode (pipe, background job, or automated script)."
+        log_error "Set required environment variables before running spawn."
+        log_error ""
+        log_error "Example: OPENROUTER_API_KEY=sk-or-v1-... spawn claude sprite"
         return 1
     fi
 
@@ -275,9 +279,10 @@ get_resource_name() {
     local name
     name=$(safe_read "${prompt_text}")
     if [[ -z "${name}" ]]; then
-        log_error "${prompt_text%:*} is required"
+        log_error "${prompt_text%:*} is required but not provided"
         log_error ""
-        log_error "For non-interactive usage, set: ${env_var_name}=your-value"
+        log_error "For non-interactive usage, set the environment variable:"
+        log_error "  ${env_var_name}=your-value spawn ..."
         return 1
     fi
     echo "${name}"
@@ -644,8 +649,12 @@ get_openrouter_api_key_oauth() {
         echo "${api_key}"
         return 0
     else
-        log_error "Authentication cancelled"
-        log_error "Cannot proceed without an API key"
+        log_error "Authentication cancelled by user"
+        log_error ""
+        log_error "An OpenRouter API key is required to use spawn."
+        log_error "Get your free API key at: https://openrouter.ai/settings/keys"
+        log_error ""
+        log_error "For non-interactive usage, set: OPENROUTER_API_KEY=sk-or-v1-..."
         return 1
     fi
 }
@@ -1006,16 +1015,25 @@ verify_agent_installed() {
     if ! command -v "${agent_cmd}" &> /dev/null; then
         log_error "${agent_name} installation failed: command '${agent_cmd}' not found in PATH"
         log_error ""
-        log_error "This usually means the installation process encountered an error."
-        log_error "Try running the script again, or check the installation logs above."
+        log_error "Possible causes:"
+        log_error "  - The installation script encountered an error (check logs above)"
+        log_error "  - Network connectivity issues during download"
+        log_error "  - Insufficient disk space or permissions"
+        log_error ""
+        log_error "Try running the script again, or install ${agent_name} manually."
         return 1
     fi
 
     if ! "${agent_cmd}" "${verify_arg}" &> /dev/null; then
         log_error "${agent_name} installation failed: '${agent_cmd} ${verify_arg}' returned an error"
         log_error ""
-        log_error "The command exists but does not execute properly."
-        log_error "Try running the script again, or check for dependency issues."
+        log_error "The command was installed but doesn't execute properly."
+        log_error "Possible causes:"
+        log_error "  - Missing runtime dependencies (Python, Node.js, etc.)"
+        log_error "  - Incompatible system architecture or OS version"
+        log_error "  - Corrupted download or partial installation"
+        log_error ""
+        log_error "Try running the script again, or check ${agent_name}'s installation docs."
         return 1
     fi
 

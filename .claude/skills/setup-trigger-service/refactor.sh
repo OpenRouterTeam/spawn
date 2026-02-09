@@ -66,48 +66,66 @@ Create these teammates:
    - Run 'bun test' and fix failures
    - Add integration tests for critical paths
 
-5. **issue-triager** (Sonnet)
-   - Run: gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,createdAt
-   - For each open issue:
-     * Read the error log provided
-     * Attempt to reproduce locally
-     * If reproducible: create a fix branch, fix the bug, then follow the Issue Fix Workflow below
-     * If not reproducible or user error: comment explaining why, then close with gh issue close
-     * If feature request: label as 'enhancement' and close (point to discussions)
-   - EVERY open issue must be resolved by end of cycle. No dangling issues.
+5. **community-coordinator** (Sonnet)
+   - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
+   - For EVERY open issue, immediately post an acknowledgment comment:
+     gh issue comment NUMBER --body "Thanks for reporting this! Our automated maintenance team is looking into it. We'll post updates here as we investigate."
+   - Categorize each issue (bug, feature request, question, already-fixed)
+   - For bugs: message the relevant teammate to investigate
+     * Security-related → message security-auditor
+     * UX/error messages → message ux-engineer
+     * Test failures → message test-engineer
+     * Code quality → message complexity-hunter
+   - Post interim updates on issues as teammates report findings:
+     gh issue comment NUMBER --body "Update: We've identified the root cause — [summary]. Working on a fix now."
+   - When a fix PR is merged, post the final resolution:
+     gh issue comment NUMBER --body "This has been fixed in PR_URL. [Brief explanation of what was changed and why]. The fix is live on main — please try updating and let us know if you still see the issue."
+   - Then close: gh issue close NUMBER
+   - For feature requests: comment acknowledging the request, label as enhancement, and close with a note pointing to discussions
+   - For questions: answer directly in a comment, then close
+   - GOAL: Every issue reporter should feel heard and informed. No cold trails.
+   - EVERY open issue must be engaged by end of cycle. No dangling issues.
 
 ## Issue Fix Workflow (CRITICAL follow exactly)
 
 When fixing a bug reported in a GitHub issue:
 
-1. Create a fix branch: git checkout -b fix/issue-NUMBER
-2. Implement the fix and commit
-3. Push the branch: git push -u origin fix/issue-NUMBER
-4. Create a PR that references the issue:
+1. Community-coordinator posts acknowledgment comment on the issue
+2. Community-coordinator messages the relevant teammate to investigate
+3. Create a fix branch: git checkout -b fix/issue-NUMBER
+4. Implement the fix and commit
+5. Community-coordinator posts interim update on the issue with root cause summary
+6. Push the branch: git push -u origin fix/issue-NUMBER
+7. Create a PR that references the issue:
    gh pr create --title "Fix: description" --body "Fixes #NUMBER"
-5. Merge the PR immediately: gh pr merge --squash --delete-branch
-6. Close the issue: gh issue close NUMBER --comment "Fixed in PR_URL. The fix is now on main."
-7. Switch back to main: git checkout main && git pull origin main
+8. Merge the PR immediately: gh pr merge --squash --delete-branch
+9. Community-coordinator posts final resolution comment with PR link and explanation
+10. Close the issue: gh issue close NUMBER
+11. Switch back to main: git checkout main && git pull origin main
 
 NEVER leave an issue open after the fix is merged. NEVER leave a PR unmerged.
 If a PR cannot be merged (conflicts, superseded, etc.), close it WITH a comment explaining why.
 NEVER close a PR silently — every closed PR MUST have a comment.
-The full cycle is: branch -> fix -> PR (references issue) -> merge PR -> close issue.
+The full cycle is: acknowledge → investigate → branch → fix → update → PR (references issue) → merge PR → resolve & close issue.
 
 ## Workflow
 
 1. Create the team with TeamCreate
 2. Create tasks using TaskCreate for each area:
+   - Community coordination: scan all open issues, post acknowledgments, categorize, and delegate
    - Security scan of all scripts
    - UX test of main user flows
    - Complexity reduction in top 5 longest functions
    - Test coverage for recent changes
-   - GitHub issue triage: check ALL open issues and resolve each one
 3. Spawn teammates with Task tool using subagent_type='general-purpose'
 4. Assign tasks to teammates using TaskUpdate
-5. Monitor teammate progress via their messages
-6. Create Sprite checkpoint after successful changes: sprite-env checkpoint create --comment 'Description'
-7. When cycle completes, verify: zero open issues, all PRs merged, summarize what was fixed/improved
+5. Community-coordinator engages issues FIRST — posts acknowledgments before other agents start investigating
+6. Community-coordinator delegates issue investigations to relevant teammates
+7. Monitor teammate progress via their messages
+8. Community-coordinator posts interim updates on issues as teammates report findings
+9. Create Sprite checkpoint after successful changes: sprite-env checkpoint create --comment 'Description'
+10. Community-coordinator posts final resolutions on all issues, closes them
+11. When cycle completes, verify: every issue engaged with comments, all PRs merged, summarize what was fixed/improved
 
 ## Safety Rules
 
