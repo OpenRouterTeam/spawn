@@ -3,6 +3,8 @@ name: Trigger Improve
 on:
   schedule:
     - cron: '*/30 * * * *'
+  issues:
+    types: [opened, reopened]
   workflow_dispatch:
 
 concurrency:
@@ -16,7 +18,9 @@ jobs:
       - name: Trigger improve sprite
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+          SPRITE_NAME: ${{ secrets.IMPROVE_SPRITE_NAME }}
+          SVC_NAME: ${{ secrets.IMPROVE_SERVICE_NAME }}
         run: |
           curl -X POST \
             -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve-trigger/start"
+            "https://api.sprites.dev/v1/sprites/${SPRITE_NAME}/services/${SVC_NAME}/start"
