@@ -35,59 +35,31 @@ vultr_api() {
     generic_cloud_api "$VULTR_API_BASE" "$VULTR_API_KEY" "$method" "$endpoint" "$body"
 }
 
-ensure_vultr_token() {
-    # Check Python 3 is available (required for JSON parsing)
-    check_python_available || return 1
-
-    if [[ -n "${VULTR_API_KEY:-}" ]]; then
-        log_info "Using Vultr API key from environment"
-        return 0
-    fi
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/vultr.json"
-    if [[ -f "$config_file" ]]; then
-        local saved_key
-        saved_key=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_key',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_key" ]]; then
-            export VULTR_API_KEY="$saved_key"
-            log_info "Using Vultr API key from $config_file"
-            return 0
-        fi
-    fi
-    echo ""
-    log_warn "Vultr API Key Required"
-    log_warn "Get your API key from: https://my.vultr.com/settings/#settingsapi"
-    echo ""
-    local api_key
-    api_key=$(validated_read "Enter your Vultr API key: " validate_api_token) || return 1
-    export VULTR_API_KEY="$api_key"
+test_vultr_token() {
     local response
     response=$(vultr_api GET "/account")
     if echo "$response" | grep -q '"account"'; then
         log_info "API key validated"
+        return 0
     else
-        log_error "Authentication failed: Invalid Vultr API key"
-
-        # Parse error details
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-
         log_warn "Remediation steps:"
         log_warn "  1. Verify API key at: https://my.vultr.com/settings/#settingsapi"
         log_warn "  2. Ensure the key has appropriate permissions"
         log_warn "  3. Check key hasn't been revoked"
-        unset VULTR_API_KEY
         return 1
     fi
-    mkdir -p "$config_dir"
-    cat > "$config_file" << EOF
-{
-  "api_key": "$api_key"
 }
-EOF
-    chmod 600 "$config_file"
-    log_info "API key saved to $config_file"
+
+ensure_vultr_token() {
+    ensure_api_token_with_provider \
+        "Vultr" \
+        "VULTR_API_KEY" \
+        "$HOME/.config/spawn/vultr.json" \
+        "https://my.vultr.com/settings/#settingsapi" \
+        "test_vultr_token"
 }
 
 # Check if SSH key is registered with Vultr
