@@ -511,6 +511,24 @@
         "image": "Ubuntu 24.04"
       },
       "notes": "Major European cloud provider. Uses signature-based auth (Application Key + Secret + Consumer Key). Requires OVH_PROJECT_ID for Public Cloud. Create credentials at https://api.ovh.com/createToken/"
+    },
+    "kamatera": {
+      "name": "Kamatera",
+      "description": "Kamatera cloud servers via REST API with 25+ global datacenters",
+      "url": "https://www.kamatera.com/",
+      "type": "api",
+      "auth": "KAMATERA_API_CLIENT_ID + KAMATERA_API_SECRET",
+      "provision_method": "POST /service/server with script-file init",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "cpu": "2B",
+        "ram": 2048,
+        "disk": "size=20",
+        "datacenter": "EU",
+        "image": "ubuntu_server_24.04_64-bit"
+      },
+      "notes": "Global cloud provider with 25+ datacenters. Hourly billing. Uses AuthClientId/AuthSecret headers for API auth. Async operations via command queue. Requires KAMATERA_API_CLIENT_ID and KAMATERA_API_SECRET from https://console.kamatera.com/keys"
     }
   },
   "matrix": {
@@ -773,6 +791,19 @@
     "ovh/cline": "missing",
     "ovh/gptme": "missing",
     "ovh/opencode": "missing",
-    "ovh/plandex": "missing"
+    "ovh/plandex": "missing",
+    "kamatera/claude": "implemented",
+    "kamatera/openclaw": "implemented",
+    "kamatera/nanoclaw": "implemented",
+    "kamatera/aider": "implemented",
+    "kamatera/goose": "implemented",
+    "kamatera/codex": "implemented",
+    "kamatera/interpreter": "implemented",
+    "kamatera/gemini": "implemented",
+    "kamatera/amazonq": "implemented",
+    "kamatera/cline": "implemented",
+    "kamatera/gptme": "implemented",
+    "kamatera/opencode": "implemented",
+    "kamatera/plandex": "implemented"
   }
 }
