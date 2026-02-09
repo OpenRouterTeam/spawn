@@ -63,8 +63,8 @@ async function loadManifestWithSpinner(): Promise<Manifest> {
 
 function validateNonEmptyString(value: string, fieldName: string, helpCommand: string): void {
   if (!value || value.trim() === "") {
-    p.log.error(`${fieldName} cannot be empty`);
-    p.log.info(`Run ${pc.cyan(helpCommand)} to see available ${fieldName.toLowerCase()}s.`);
+    p.log.error(`${fieldName} is required but was not provided`);
+    p.log.info(`Run ${pc.cyan(helpCommand)} to see all available ${fieldName.toLowerCase()}s.`);
     process.exit(1);
   }
 }
@@ -240,8 +240,8 @@ function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryS
   console.error(`Fallback source (${fallbackUrl}): ${getStatusDescription(fallbackStatus)}`);
 
   if (primaryStatus === 404 && fallbackStatus === 404) {
-    console.error("\nThis combination may not be implemented yet.");
-    console.error(`Run ${pc.cyan("spawn list")} to see all available combinations.`);
+    console.error("\nThis agent + cloud combination doesn't exist yet.");
+    console.error(`Check which combinations are available: ${pc.cyan("spawn list")}`);
   }
 }
 
@@ -255,10 +255,10 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
   } catch (err) {
     p.log.error("Failed to download or execute spawn script");
     console.error("\nError:", getErrorMessage(err));
-    console.error("\nTroubleshooting steps:");
-    console.error("  1. Check your internet connection");
-    console.error("  2. Verify the combination is implemented: spawn list");
-    console.error(`  3. Try the direct link: ${ghUrl}`);
+    console.error("\nTroubleshooting:");
+    console.error(`  1. Verify this combination exists: ${pc.cyan("spawn list")}`);
+    console.error("  2. Check your internet connection");
+    console.error(`  3. Try accessing the script directly: ${ghUrl}`);
     process.exit(1);
   }
 }
