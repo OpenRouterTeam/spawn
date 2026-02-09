@@ -17,16 +17,12 @@ jobs:
         env:
           SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
         run: |
-          # Debug: test different start formats
-          echo "--- Test A: name in body ---"
-          curl -s -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"name":"improve_trigger"}' \
-            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve_trigger/start"
+          # Debug: try both API and direct sprite URL
+          echo "--- Test 1: start service API ---"
+          curl -sv -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
+            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/improve_trigger/start" 2>&1 | tail -5
           echo ""
-          echo "--- Test B: start at services level ---"
-          curl -s -X POST -H "Authorization: Bearer ${SPRITE_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"name":"improve_trigger"}' \
-            "https://api.sprites.dev/v1/sprites/lab-spawn-discovery/services/start"
+          echo "--- Test 2: direct sprite URL ---"
+          curl -sv -X POST \
+            "https://lab-spawn-discovery-lg6f.sprites.app/trigger?reason=workflow_dispatch" 2>&1 | tail -5
           echo ""
