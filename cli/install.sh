@@ -40,6 +40,7 @@ if command -v bun &>/dev/null; then
     curl -fsSL "${SPAWN_RAW_BASE}/cli/src/manifest.ts"  -o "${tmpdir}/cli/src/manifest.ts"
     curl -fsSL "${SPAWN_RAW_BASE}/cli/src/commands.ts"   -o "${tmpdir}/cli/src/commands.ts"
     curl -fsSL "${SPAWN_RAW_BASE}/cli/src/version.ts"    -o "${tmpdir}/cli/src/version.ts"
+    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/security.ts"   -o "${tmpdir}/cli/src/security.ts"
 
     cd "${tmpdir}/cli"
     bun install
@@ -78,6 +79,7 @@ if command -v npm &>/dev/null && command -v node &>/dev/null; then
     curl -fsSL "${SPAWN_RAW_BASE}/cli/src/manifest.ts"  -o "${tmpdir}/cli/src/manifest.ts"
     curl -fsSL "${SPAWN_RAW_BASE}/cli/src/commands.ts"   -o "${tmpdir}/cli/src/commands.ts"
     curl -fsSL "${SPAWN_RAW_BASE}/cli/src/version.ts"    -o "${tmpdir}/cli/src/version.ts"
+    curl -fsSL "${SPAWN_RAW_BASE}/cli/src/security.ts"   -o "${tmpdir}/cli/src/security.ts"
 
     cd "${tmpdir}/cli"
     npm install
