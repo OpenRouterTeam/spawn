@@ -62,34 +62,34 @@ kamatera_api() {
         local response_body
         response_body=$(printf '%s' "$response" | head -n -1)
 
+        # Success case
+        if [[ "$curl_exit_code" -eq 0 ]] && [[ "$http_code" != "429" ]] && [[ "$http_code" != "503" ]]; then
+            printf '%s' "$response_body"
+            return 0
+        fi
+
+        # Decide whether to retry
+        local should_retry=false
         if [[ "$curl_exit_code" -ne 0 ]]; then
-            if ! _api_should_retry_on_error "$attempt" "$max_retries" "$interval" "$max_interval" "Kamatera API network error"; then
+            _api_should_retry_on_error "$attempt" "$max_retries" "$interval" "$max_interval" "Kamatera API network error" && should_retry=true
+            if [[ "$should_retry" != "true" ]]; then
                 log_error "Kamatera API network error after $max_retries attempts"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "$interval" -gt "$max_interval" ]]; then
-                interval="$max_interval"
-            fi
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        if [[ "$http_code" == "429" ]] || [[ "$http_code" == "503" ]]; then
-            if ! _api_handle_transient_http_error "$http_code" "$attempt" "$max_retries" "$interval" "$max_interval"; then
+        else
+            _api_handle_transient_http_error "$http_code" "$attempt" "$max_retries" "$interval" "$max_interval" && should_retry=true
+            if [[ "$should_retry" != "true" ]]; then
                 printf '%s' "$response_body"
                 return 1
             fi
-            interval=$((interval * 2))
-            if [[ "$interval" -gt "$max_interval" ]]; then
-                interval="$max_interval"
-            fi
-            attempt=$((attempt + 1))
-            continue
         fi
 
-        printf '%s' "$response_body"
-        return 0
+        # Backoff
+        interval=$((interval * 2))
+        if [[ "$interval" -gt "$max_interval" ]]; then
+            interval="$max_interval"
+        fi
+        attempt=$((attempt + 1))
     done
 
     log_error "Kamatera API retry logic exhausted"
