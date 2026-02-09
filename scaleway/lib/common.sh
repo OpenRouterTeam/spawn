@@ -30,66 +30,16 @@ readonly SCALEWAY_ACCOUNT_API="https://api.scaleway.com/account/v3"
 # Configurable timeout/delay constants
 INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}
 
-# Scaleway API wrapper (uses X-Auth-Token header instead of Bearer)
+# Scaleway API wrapper (uses X-Auth-Token header instead of Bearer) with retry logic
+# Takes a full URL (not base+endpoint) for flexibility across Scaleway API namespaces
 scaleway_api() {
     local method="$1"
     local url="$2"
     local body="${3:-}"
     local max_retries="${4:-3}"
-
-    local attempt=1
-    local interval=2
-    local max_interval=30
-
-    while [[ "${attempt}" -le "${max_retries}" ]]; do
-        local args=(
-            -s
-            -w "\n%{http_code}"
-            -X "${method}"
-            -H "X-Auth-Token: ${SCW_SECRET_KEY}"
-            -H "Content-Type: application/json"
-        )
-
-        if [[ -n "${body}" ]]; then
-            args+=(-d "${body}")
-        fi
-
-        local response
-        response=$(curl "${args[@]}" "${url}" 2>&1)
-        local curl_exit_code=$?
-
-        local http_code
-        http_code=$(echo "${response}" | tail -1)
-        local response_body
-        response_body=$(echo "${response}" | head -n -1)
-
-        if [[ ${curl_exit_code} -ne 0 ]]; then
-            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Scaleway API network error"; then
-                log_error "Scaleway API network error after ${max_retries} attempts"
-                return 1
-            fi
-            _update_retry_interval "interval" "max_interval"
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        if [[ "${http_code}" == "429" ]] || [[ "${http_code}" == "503" ]]; then
-            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Scaleway API rate limited (HTTP ${http_code})"; then
-                log_error "Scaleway API returned HTTP ${http_code} after ${max_retries} attempts"
-                echo "${response_body}"
-                return 1
-            fi
-            _update_retry_interval "interval" "max_interval"
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        echo "${response_body}"
-        return 0
-    done
-
-    log_error "Scaleway API retry logic exhausted"
-    return 1
+    # Pass empty base_url since url is already complete
+    generic_cloud_api_custom_auth "" "$method" "$url" "$body" "$max_retries" \
+        -H "X-Auth-Token: ${SCW_SECRET_KEY}"
 }
 
 # Convenience wrapper for instance API

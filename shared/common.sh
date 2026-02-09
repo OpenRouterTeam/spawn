@@ -1116,6 +1116,80 @@ generic_cloud_api() {
     return 1
 }
 
+# Helper to make API request with custom curl auth args (e.g., Basic Auth, custom headers)
+# Returns: 0 on curl success, 1 on curl failure
+# Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
+_make_api_request_custom_auth() {
+    local url="${1}"
+    local method="${2}"
+    local body="${3:-}"
+    shift 3
+    # Remaining args are custom curl auth flags (e.g., -u "user:pass" or -H "X-Auth-Token: ...")
+
+    local args=(
+        -s
+        -w "\n%{http_code}"
+        -X "${method}"
+        -H "Content-Type: application/json"
+        "$@"
+    )
+
+    if [[ -n "${body}" ]]; then
+        args+=(-d "${body}")
+    fi
+
+    local response
+    response=$(curl "${args[@]}" "${url}" 2>&1)
+    local curl_exit_code=$?
+
+    _parse_api_response "${response}"
+
+    return ${curl_exit_code}
+}
+
+# Generic cloud API wrapper with custom curl auth args
+# Like generic_cloud_api but accepts arbitrary curl flags for authentication
+# Usage: generic_cloud_api_custom_auth BASE_URL METHOD ENDPOINT BODY MAX_RETRIES AUTH_ARGS...
+# Example: generic_cloud_api_custom_auth "$API_BASE" GET "/account" "" 3 -H "X-Auth-Token: $TOKEN"
+# Example: generic_cloud_api_custom_auth "$API_BASE" POST "/servers" "$body" 3 -u "$USER:$PASS"
+generic_cloud_api_custom_auth() {
+    local base_url="${1}"
+    local method="${2}"
+    local endpoint="${3}"
+    local body="${4:-}"
+    local max_retries="${5:-3}"
+    shift 5
+    # Remaining args are custom curl auth flags
+
+    local attempt=1
+    local interval=2
+    local max_interval=30
+
+    while [[ "${attempt}" -le "${max_retries}" ]]; do
+        if ! _make_api_request_custom_auth "${base_url}${endpoint}" "${method}" "${body}" "$@"; then
+            if ! _handle_api_transient_error "network" "${attempt}" "${max_retries}" "interval" "max_interval" ""; then
+                return 1
+            fi
+            attempt=$((attempt + 1))
+            continue
+        fi
+
+        if [[ "${API_HTTP_CODE}" == "429" ]] || [[ "${API_HTTP_CODE}" == "503" ]]; then
+            if ! _handle_api_transient_error "${API_HTTP_CODE}" "${attempt}" "${max_retries}" "interval" "max_interval" "${API_RESPONSE_BODY}"; then
+                return 1
+            fi
+            attempt=$((attempt + 1))
+            continue
+        fi
+
+        echo "${API_RESPONSE_BODY}"
+        return 0
+    done
+
+    log_error "Cloud API retry logic exhausted"
+    return 1
+}
+
 # ============================================================
 # Agent verification helpers
 # ============================================================

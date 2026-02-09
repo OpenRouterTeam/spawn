@@ -23,67 +23,15 @@ readonly UPCLOUD_API_BASE="https://api.upcloud.com/1.3"
 # Configurable timeout/delay constants
 INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}
 
-# UpCloud API wrapper using Basic Auth
+# UpCloud API wrapper using Basic Auth with retry logic
 # Usage: upcloud_api METHOD ENDPOINT [BODY] [MAX_RETRIES]
 upcloud_api() {
     local method="$1"
     local endpoint="$2"
     local body="${3:-}"
     local max_retries="${4:-3}"
-
-    local attempt=1
-    local interval=2
-    local max_interval=30
-
-    while [[ "${attempt}" -le "${max_retries}" ]]; do
-        local args=(
-            -s
-            -w "\n%{http_code}"
-            -X "${method}"
-            -u "${UPCLOUD_USERNAME}:${UPCLOUD_PASSWORD}"
-            -H "Content-Type: application/json"
-        )
-
-        if [[ -n "${body}" ]]; then
-            args+=(-d "${body}")
-        fi
-
-        local response
-        response=$(curl "${args[@]}" "${UPCLOUD_API_BASE}${endpoint}" 2>&1)
-        local curl_exit_code=$?
-
-        local http_code
-        http_code=$(printf '%s' "${response}" | tail -1)
-        local response_body
-        response_body=$(printf '%s' "${response}" | head -n -1)
-
-        if [[ ${curl_exit_code} -ne 0 ]]; then
-            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "UpCloud API network error"; then
-                log_error "UpCloud API network error after ${max_retries} attempts: curl exit code ${curl_exit_code}"
-                return 1
-            fi
-            _update_retry_interval "interval" "max_interval"
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        if [[ "${http_code}" == "429" ]] || [[ "${http_code}" == "503" ]]; then
-            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "UpCloud API returned HTTP ${http_code}"; then
-                log_error "UpCloud API returned HTTP ${http_code} after ${max_retries} attempts"
-                echo "${response_body}"
-                return 1
-            fi
-            _update_retry_interval "interval" "max_interval"
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        echo "${response_body}"
-        return 0
-    done
-
-    log_error "UpCloud API retry logic exhausted"
-    return 1
+    generic_cloud_api_custom_auth "$UPCLOUD_API_BASE" "$method" "$endpoint" "$body" "$max_retries" \
+        -u "${UPCLOUD_USERNAME}:${UPCLOUD_PASSWORD}"
 }
 
 test_upcloud_credentials() {
