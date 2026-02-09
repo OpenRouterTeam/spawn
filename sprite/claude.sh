@@ -27,7 +27,7 @@ setup_shell_environment "${SPRITE_NAME}"
 
 # Install Claude Code using claude install
 log_warn "Installing Claude Code..."
-run_sprite "${SPRITE_NAME}" "claude install > /dev/null 2>&1"
+run_sprite "${SPRITE_NAME}" "claude install"
 
 # Verify installation succeeded
 if ! run_sprite "${SPRITE_NAME}" "command -v claude &> /dev/null && claude --version &> /dev/null"; then
