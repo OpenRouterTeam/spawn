@@ -64,6 +64,24 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/amazonq.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/cline.sh)
 ```
 
+#### gptme
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/gptme.sh)
+```
+
+#### OpenCode
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/opencode.sh)
+```
+
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/digitalocean/plandex.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash

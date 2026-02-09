@@ -56,23 +56,33 @@ async function main(): Promise<void> {
   let prompt: string | undefined;
   let filteredArgs = [...args];
 
-  const promptIndex = args.findIndex(arg => arg === "--prompt" || arg === "-p");
-  if (promptIndex !== -1 && args[promptIndex + 1]) {
-    prompt = args[promptIndex + 1];
+  const promptIndex = filteredArgs.findIndex(arg => arg === "--prompt" || arg === "-p");
+  if (promptIndex !== -1) {
+    if (!filteredArgs[promptIndex + 1] || filteredArgs[promptIndex + 1].startsWith("-")) {
+      console.error(`Error: ${filteredArgs[promptIndex]} requires a value`);
+      console.error(`\nUsage: spawn <agent> <cloud> ${filteredArgs[promptIndex]} "your prompt here"`);
+      process.exit(1);
+    }
+    prompt = filteredArgs[promptIndex + 1];
     // Remove --prompt and its value from args
     filteredArgs.splice(promptIndex, 2);
   }
 
   // Extract --prompt-file flag
-  const promptFileIndex = args.findIndex(arg => arg === "--prompt-file");
-  if (promptFileIndex !== -1 && args[promptFileIndex + 1]) {
+  const promptFileIndex = filteredArgs.findIndex(arg => arg === "--prompt-file");
+  if (promptFileIndex !== -1) {
+    if (!filteredArgs[promptFileIndex + 1] || filteredArgs[promptFileIndex + 1].startsWith("-")) {
+      console.error(`Error: --prompt-file requires a file path`);
+      console.error(`\nUsage: spawn <agent> <cloud> --prompt-file instructions.txt`);
+      process.exit(1);
+    }
     const { readFileSync } = await import("fs");
     try {
-      prompt = readFileSync(args[promptFileIndex + 1], "utf-8");
+      prompt = readFileSync(filteredArgs[promptFileIndex + 1], "utf-8");
       // Remove --prompt-file and its value from args
       filteredArgs.splice(promptFileIndex, 2);
     } catch (err) {
-      console.error(`Error reading prompt file '${args[promptFileIndex + 1]}': ${err && typeof err === "object" && "message" in err ? err.message : String(err)}`);
+      console.error(`Error reading prompt file '${filteredArgs[promptFileIndex + 1]}': ${err && typeof err === "object" && "message" in err ? err.message : String(err)}`);
       console.error(`\nMake sure the file exists and is readable.`);
       process.exit(1);
     }
