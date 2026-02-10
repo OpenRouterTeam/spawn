@@ -951,7 +951,7 @@
     "koyeb/interpreter": "implemented",
     "koyeb/gemini": "implemented",
     "koyeb/amazonq": "implemented",
-    "koyeb/cline": "missing",
+    "koyeb/cline": "implemented",
     "koyeb/gptme": "missing",
     "koyeb/opencode": "missing",
     "koyeb/plandex": "missing",
