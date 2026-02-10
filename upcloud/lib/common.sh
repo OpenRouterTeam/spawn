@@ -128,7 +128,7 @@ ensure_upcloud_credentials() {
     local config_dir
     config_dir=$(dirname "${config_file}")
     mkdir -p "${config_dir}"
-    printf '{\n  "username": "%s",\n  "password": "%s"\n}\n' "$(json_escape "${username}")" "$(json_escape "${password}")" > "${config_file}"
+    printf '{\n  "username": %s,\n  "password": %s\n}\n' "$(json_escape "${username}")" "$(json_escape "${password}")" > "${config_file}"
     chmod 600 "${config_file}"
     log_info "Credentials saved to ${config_file}"
 }
