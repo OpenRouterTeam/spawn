@@ -1072,7 +1072,7 @@
     "northflank/cline": "implemented",
     "northflank/gptme": "implemented",
     "northflank/opencode": "implemented",
-    "northflank/plandex": "missing",
+    "northflank/plandex": "implemented",
     "northflank/kilocode": "implemented",
     "railway/claude": "implemented",
     "railway/openclaw": "implemented",
