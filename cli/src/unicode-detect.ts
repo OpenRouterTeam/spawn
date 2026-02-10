@@ -15,30 +15,22 @@ const shouldForceAscii = (): boolean => {
     return true;
   }
 
-  // Already detected as needing ASCII by clack's own logic
-  if (process.env.TERM === "linux") {
-    return false; // clack will handle this
-  }
-
   // Dumb terminals and serial consoles lack unicode support
   if (process.env.TERM === "dumb" || !process.env.TERM) {
     return true;
   }
 
-  // Check if we're in a cloud/remote environment that might not render unicode well
-  // Common patterns: SSH sessions, cloud shells, container terminals
+  // SSH sessions often have encoding mismatches between client/server
+  // This is the most common source of Unicode rendering issues
   if (process.env.SSH_CONNECTION || process.env.SSH_CLIENT || process.env.SSH_TTY) {
-    return true; // SSH sessions often have unicode rendering issues
+    return true;
   }
 
-  // Default to ASCII for safety - users can opt-in with SPAWN_UNICODE=1
-  return true;
+  // Default to Unicode for local terminals (macOS Terminal, iTerm2, modern Linux terminals)
+  // These have excellent Unicode support and proper fonts installed
+  return false;
 };
 
 if (shouldForceAscii()) {
   process.env.TERM = "linux";
-  // Also set CI=true as a backup - clack uses this to disable Unicode
-  if (!process.env.CI) {
-    process.env.CI = "true";
-  }
 }
