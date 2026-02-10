@@ -3,11 +3,11 @@
     "command": "create_server",
     "error": null,
     "finished": null,
-    "id": 611311291703796,
+    "id": 610821665885201,
     "progress": 0,
     "resources": [
       {
-        "id": 120895015,
+        "id": 120682780,
         "type": "server"
       },
       {
@@ -15,7 +15,7 @@
         "type": "image"
       }
     ],
-    "started": "2026-02-13T06:37:14Z",
+    "started": "2026-02-10T21:55:23Z",
     "status": "running"
   },
   "next_actions": [
@@ -23,23 +23,23 @@
       "command": "start_server",
       "error": null,
       "finished": null,
-      "id": 611311291703797,
-      "parent_id": 611311291703796,
+      "id": 610821665885202,
+      "parent_id": 610821665885201,
       "progress": 0,
       "resources": [
         {
-          "id": 120895015,
+          "id": 120682780,
           "type": "server"
         }
       ],
-      "started": "2026-02-13T06:37:14Z",
+      "started": "2026-02-10T21:55:23Z",
       "status": "running"
     }
   ],
   "root_password": null,
   "server": {
     "backup_window": null,
-    "created": "2026-02-13T06:37:14Z",
+    "created": "2026-02-10T21:55:23Z",
     "datacenter": {
       "description": "Nuremberg 1 virtual DC 3",
       "id": 2,
@@ -65,7 +65,6 @@
           45,
           93,
           94,
-          95,
           96,
           97,
           98,
@@ -92,7 +91,6 @@
           45,
           93,
           94,
-          95,
           96,
           97,
           98,
@@ -168,7 +166,7 @@
         ]
       }
     },
-    "id": 120895015,
+    "id": 120682780,
     "image": {
       "architecture": "x86",
       "bound_to": null,
@@ -207,7 +205,7 @@
       "network_zone": "eu-central"
     },
     "locked": false,
-    "name": "spawn-record-1770964633",
+    "name": "spawn-record-1770760522",
     "outgoing_traffic": 0,
     "placement_group": null,
     "primary_disk_size": 40,
@@ -221,15 +219,15 @@
       "floating_ips": [],
       "ipv4": {
         "blocked": false,
-        "dns_ptr": "static.81.176.245.188.clients.your-server.de",
-        "id": 117982494,
-        "ip": "188.245.176.81"
+        "dns_ptr": "static.197.210.245.188.clients.your-server.de",
+        "id": 117603379,
+        "ip": "188.245.210.197"
       },
       "ipv6": {
         "blocked": false,
         "dns_ptr": [],
-        "id": 117982495,
-        "ip": "2a01:4f8:1c1a:f748::/64"
+        "id": 117603380,
+        "ip": "2a01:4f8:1c1e:bc55::/64"
       }
     },
     "rescue_enabled": false,

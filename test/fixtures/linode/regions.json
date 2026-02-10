@@ -30,8 +30,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -76,8 +75,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -122,8 +120,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -168,8 +165,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -192,7 +188,6 @@
         "Backups",
         "NodeBalancers",
         "Block Storage",
-        "Object Storage",
         "GPU Linodes",
         "Kubernetes",
         "Cloud Firewall",
@@ -215,8 +210,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -239,7 +233,6 @@
         "Backups",
         "NodeBalancers",
         "Block Storage",
-        "Object Storage",
         "GPU Linodes",
         "Kubernetes",
         "Cloud Firewall",
@@ -261,8 +254,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -304,12 +296,10 @@
       "label": "Melbourne, AU",
       "monitors": {
         "alerts": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -354,8 +344,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -401,8 +390,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -447,8 +435,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -494,8 +481,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -540,8 +526,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -586,8 +571,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -633,8 +617,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -679,8 +662,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -725,8 +707,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -770,8 +751,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -816,8 +796,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -862,8 +841,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -908,8 +886,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -950,12 +927,10 @@
       "label": "Washington, DC",
       "monitors": {
         "alerts": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -994,12 +969,10 @@
       "label": "Sydney, AU",
       "monitors": {
         "alerts": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -1042,8 +1015,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -1086,8 +1058,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -1129,8 +1100,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -1172,8 +1142,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -1217,8 +1186,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -1258,9 +1226,7 @@
       "label": "Singapore, SG",
       "monitors": {
         "alerts": [],
-        "metrics": [
-          "NodeBalancers"
-        ]
+        "metrics": []
       },
       "placement_group_limits": {
         "maximum_linodes_per_flexible_pg": 5,
@@ -1297,9 +1263,7 @@
       "label": "London, UK",
       "monitors": {
         "alerts": [],
-        "metrics": [
-          "NodeBalancers"
-        ]
+        "metrics": []
       },
       "placement_group_limits": {
         "maximum_linodes_per_flexible_pg": 5,
@@ -1342,8 +1306,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -1387,8 +1350,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
@@ -1430,8 +1392,7 @@
           "Managed Databases"
         ],
         "metrics": [
-          "Managed Databases",
-          "NodeBalancers"
+          "Managed Databases"
         ]
       },
       "placement_group_limits": {
