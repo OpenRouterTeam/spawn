@@ -619,6 +619,20 @@
         "image": "ubuntu:24.04"
       },
       "notes": "Container platform with shell access. Free tier: 2 services. Pay-per-second pricing. Requires API token from https://northflank.com/account/settings/api/tokens"
+    },
+    "railway": {
+      "name": "Railway",
+      "description": "Railway serverless container platform via CLI",
+      "url": "https://railway.app/",
+      "type": "cli",
+      "auth": "RAILWAY_TOKEN",
+      "provision_method": "railway init + railway up with Dockerfile",
+      "exec_method": "railway run",
+      "interactive_method": "railway shell",
+      "defaults": {
+        "region": "us-west1"
+      },
+      "notes": "Developer-focused container platform. Per-second billing. Fast provisioning. Requires Railway CLI (npm install -g @railway/cli)."
     }
   },
   "matrix": {
@@ -985,6 +999,36 @@
     "northflank/gptme": "missing",
     "northflank/opencode": "missing",
     "northflank/plandex": "missing",
-    "northflank/kilocode": "missing"
+    "northflank/kilocode": "missing",
+    "railway/claude": "implemented",
+    "railway/openclaw": "implemented",
+    "northflank/claude": "implemented",
+    "northflank/openclaw": "implemented",
+    "northflank/nanoclaw": "implemented",
+    "northflank/aider": "implemented",
+    "northflank/goose": "implemented",
+    "northflank/codex": "implemented",
+    "northflank/interpreter": "implemented",
+    "northflank/gemini": "implemented",
+    "northflank/amazonq": "missing",
+    "northflank/cline": "missing",
+    "northflank/gptme": "missing",
+    "northflank/opencode": "missing",
+    "northflank/plandex": "missing",
+    "northflank/kilocode": "missing",
+    "railway/claude": "implemented",
+    "railway/openclaw": "implemented",
+    "railway/nanoclaw": "implemented",
+    "railway/aider": "implemented",
+    "railway/goose": "missing",
+    "railway/codex": "missing",
+    "railway/interpreter": "missing",
+    "railway/gemini": "missing",
+    "railway/amazonq": "missing",
+    "railway/cline": "missing",
+    "railway/gptme": "missing",
+    "railway/opencode": "missing",
+    "railway/plandex": "missing",
+    "railway/kilocode": "missing"
   }
 }
