@@ -397,13 +397,18 @@ start_oauth_server() {
         return 1
     fi
 
+    # OAuth callback page styles and HTML (shared CSS, extracted for readability)
+    local oauth_css='body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}'
+    local oauth_success_html="<html><head><style>${oauth_css}h1{color:#00d4aa}</style></head><body><div class=\"card\"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>"
+    local oauth_error_html="<html><head><style>${oauth_css}h1{color:#d9534f}</style></head><body><div class=\"card\"><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection)</p><p>Please try again</p></div></body></html>"
+
     "${runtime}" -e "
 const http = require('http');
 const fs = require('fs');
 const url = require('url');
 const expectedState = '${expected_state}';
-const html = '<html><head><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#00d4aa;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class=\"card\"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>';
-const errorHtml = '<html><head><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{color:#d9534f;margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}</style></head><body><div class=\"card\"><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection)</p><p>Please try again</p></div></body></html>';
+const html = '${oauth_success_html}';
+const errorHtml = '${oauth_error_html}';
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url, true);
   if (parsed.pathname === '/callback' && parsed.query.code) {
@@ -624,6 +629,17 @@ _wait_for_oauth() {
 
 # Try OAuth flow (orchestrates the helper functions above)
 # SECURITY: Generates CSRF state token to prevent OAuth code interception
+_generate_csrf_state() {
+    if command -v openssl &>/dev/null; then
+        openssl rand -hex 16
+    elif [[ -r /dev/urandom ]]; then
+        od -An -N16 -tx1 /dev/urandom | tr -d ' \n'
+    else
+        # Fallback: use timestamp + random
+        printf '%s%04x%04x' "$(date +%s)" $RANDOM $RANDOM
+    fi
+}
+
 try_oauth_flow() {
     local callback_port=${1:-5180}
 
@@ -642,14 +658,7 @@ try_oauth_flow() {
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
-    if command -v openssl &>/dev/null; then
-        csrf_state=$(openssl rand -hex 16)
-    elif [[ -r /dev/urandom ]]; then
-        csrf_state=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
-    else
-        # Fallback: use timestamp + random
-        csrf_state="$(date +%s)$(printf '%04x' $RANDOM)$(printf '%04x' $RANDOM)"
-    fi
+    csrf_state=$(_generate_csrf_state)
     echo "${csrf_state}" > "${state_file}"
     chmod 600 "${state_file}"
 
@@ -1086,22 +1095,19 @@ _handle_api_transient_error() {
 # Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" POST "/droplets" "$body"
 # Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" GET "/account" "" 5
 # Retries on: 429 (rate limit), 503 (service unavailable), network errors
-generic_cloud_api() {
-    local base_url="${1}"
-    local auth_token="${2}"
-    local method="${3}"
-    local endpoint="${4}"
-    local body="${5:-}"
-    local max_retries="${6:-3}"
+# Internal retry loop shared by generic_cloud_api and generic_cloud_api_custom_auth
+# Usage: _cloud_api_retry_loop REQUEST_FUNC MAX_RETRIES [REQUEST_FUNC_ARGS...]
+_cloud_api_retry_loop() {
+    local request_func="${1}"
+    local max_retries="${2}"
+    shift 2
 
     local attempt=1
     local interval=2
     local max_interval=30
 
     while [[ "${attempt}" -le "${max_retries}" ]]; do
-        # Make the API request
-        if ! _make_api_request "${base_url}" "${auth_token}" "${method}" "${endpoint}" "${body}"; then
-            # Network error - handle and retry
+        if ! "${request_func}" "$@"; then
             if ! _handle_api_transient_error "network" "${attempt}" "${max_retries}" "interval" "max_interval" ""; then
                 return 1
             fi
@@ -1118,14 +1124,23 @@ generic_cloud_api() {
             continue
         fi
 
-        # Success or non-retryable error - return response body
         echo "${API_RESPONSE_BODY}"
         return 0
     done
 
-    # Should not reach here, but fail safe
     log_error "Cloud API retry logic exhausted"
     return 1
+}
+
+generic_cloud_api() {
+    local base_url="${1}"
+    local auth_token="${2}"
+    local method="${3}"
+    local endpoint="${4}"
+    local body="${5:-}"
+    local max_retries="${6:-3}"
+
+    _cloud_api_retry_loop _make_api_request "${max_retries}" "${base_url}" "${auth_token}" "${method}" "${endpoint}" "${body}"
 }
 
 # Helper to make API request with custom curl auth args (e.g., Basic Auth, custom headers)
@@ -1173,33 +1188,7 @@ generic_cloud_api_custom_auth() {
     shift 5
     # Remaining args are custom curl auth flags
 
-    local attempt=1
-    local interval=2
-    local max_interval=30
-
-    while [[ "${attempt}" -le "${max_retries}" ]]; do
-        if ! _make_api_request_custom_auth "${base_url}${endpoint}" "${method}" "${body}" "$@"; then
-            if ! _handle_api_transient_error "network" "${attempt}" "${max_retries}" "interval" "max_interval" ""; then
-                return 1
-            fi
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        if [[ "${API_HTTP_CODE}" == "429" ]] || [[ "${API_HTTP_CODE}" == "503" ]]; then
-            if ! _handle_api_transient_error "${API_HTTP_CODE}" "${attempt}" "${max_retries}" "interval" "max_interval" "${API_RESPONSE_BODY}"; then
-                return 1
-            fi
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        echo "${API_RESPONSE_BODY}"
-        return 0
-    done
-
-    log_error "Cloud API retry logic exhausted"
-    return 1
+    _cloud_api_retry_loop _make_api_request_custom_auth "${max_retries}" "${base_url}${endpoint}" "${method}" "${body}" "$@"
 }
 
 # ============================================================
