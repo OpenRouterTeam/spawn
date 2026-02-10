@@ -874,7 +874,7 @@
     "oracle/aider": "implemented",
     "oracle/goose": "implemented",
     "oracle/openclaw": "implemented",
-    "oracle/nanoclaw": "missing",
+    "oracle/nanoclaw": "implemented",
     "oracle/codex": "missing",
     "oracle/interpreter": "missing",
     "oracle/gemini": "implemented",
