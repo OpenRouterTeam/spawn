@@ -770,7 +770,7 @@
     "github-codespaces/codex": "implemented",
     "github-codespaces/interpreter": "implemented",
     "github-codespaces/gemini": "implemented",
-    "github-codespaces/amazonq": "missing",
+    "github-codespaces/amazonq": "implemented",
     "github-codespaces/cline": "missing",
     "e2b/claude": "implemented",
     "e2b/openclaw": "implemented",
