@@ -37,4 +37,8 @@ const shouldForceAscii = (): boolean => {
 
 if (shouldForceAscii()) {
   process.env.TERM = "linux";
+  // Also set CI=true as a backup - clack uses this to disable Unicode
+  if (!process.env.CI) {
+    process.env.CI = "true";
+  }
 }

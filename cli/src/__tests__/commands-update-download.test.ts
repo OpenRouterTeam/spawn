@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
-import { VERSION } from "../version";
+import pkg from "../../package.json" with { type: "json" };
+const VERSION = pkg.version;
 
 /**
  * Tests for cmdUpdate and script download/execution paths in commands.ts.

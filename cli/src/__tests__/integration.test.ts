@@ -53,9 +53,10 @@ describe("CLI Integration Tests", () => {
   it("should handle version command", async () => {
     // This test verifies the basic CLI structure works
     // In a real environment, we'd spawn the CLI process
-    // For now, we just verify the version module exports
+    // For now, we just verify the version is exported from package.json
 
-    const { VERSION } = await import("../version");
+    const pkg = await import("../../package.json", { with: { type: "json" } });
+    const VERSION = pkg.default.version;
     expect(VERSION).toBeDefined();
     expect(typeof VERSION).toBe("string");
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/);
