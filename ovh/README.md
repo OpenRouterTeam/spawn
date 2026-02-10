@@ -49,6 +49,18 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/codex.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/gemini.sh)
+```
+
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/amazonq.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
