@@ -1,13 +1,11 @@
 {
   "cloud": "digitalocean",
-  "recorded_at": "2026-02-11T03:07:38Z",
+  "recorded_at": "2026-02-10T21:55:29Z",
   "fixtures": {
-    "account": {"endpoint": "/account", "recorded_at": "2026-02-11T03:07:30Z"},
-    "ssh_keys": {"endpoint": "/account/keys", "recorded_at": "2026-02-11T03:07:30Z"},
-    "droplets": {"endpoint": "/droplets", "recorded_at": "2026-02-11T03:07:31Z"},
-    "sizes": {"endpoint": "/sizes", "recorded_at": "2026-02-11T03:07:31Z"},
-    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-11T03:07:32Z"},
-    "create_server": {"endpoint": "POST /droplets", "type": "live", "recorded_at": "2026-02-11T03:07:34Z"},
-    "delete_server": {"endpoint": "DELETE /droplets/{id}", "type": "live", "recorded_at": "2026-02-11T03:07:38Z"}
+    "account": {"endpoint": "/account", "recorded_at": "2026-02-10T21:55:27Z"},
+    "ssh_keys": {"endpoint": "/account/keys", "recorded_at": "2026-02-10T21:55:27Z"},
+    "droplets": {"endpoint": "/droplets", "recorded_at": "2026-02-10T21:55:28Z"},
+    "sizes": {"endpoint": "/sizes", "recorded_at": "2026-02-10T21:55:29Z"},
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-10T21:55:29Z"}
   }
 }

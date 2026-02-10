@@ -495,14 +495,7 @@
       "hourly_cost_preemptible": 0.438,
       "id": "vc2-16c-64gb",
       "invoice_type": "monthly",
-      "location_cost": {
-        "sao": {
-          "hourly_cost": 0.658,
-          "hourly_cost_preemptible": 0.658,
-          "monthly_cost": 480,
-          "monthly_cost_preemptible": 480
-        }
-      },
+      "location_cost": {},
       "locations": [
         "ewr",
         "ord",
@@ -525,7 +518,6 @@
         "sgp",
         "sto",
         "mex",
-        "sao",
         "mel",
         "bom",
         "jnb",
@@ -5370,7 +5362,8 @@
       "invoice_type": "hourly",
       "location_cost": {},
       "locations": [
-        "ewr"
+        "ewr",
+        "nrt"
       ],
       "monthly_cost": 315,
       "monthly_cost_preemptible": 315,

@@ -31,9 +31,9 @@ verify_server_connectivity "${DO_SERVER_IP}"
 wait_for_cloud_init "${DO_SERVER_IP}" 60
 
 # 5. Verify Claude Code is installed (fallback to manual install)
-log_step "Verifying Claude Code installation..."
+log_warn "Verifying Claude Code installation..."
 if ! run_server "${DO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
+    log_warn "Claude Code not found, installing manually..."
     run_server "${DO_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
 
@@ -54,7 +54,7 @@ else
 fi
 
 # 7. Inject environment variables into ~/.zshrc
-log_step "Setting up environment variables..."
+log_warn "Setting up environment variables..."
 inject_env_vars_ssh "${DO_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
@@ -74,7 +74,7 @@ log_info "Droplet: ${DROPLET_NAME} (ID: ${DO_DROPLET_ID}, IP: ${DO_SERVER_IP})"
 echo ""
 
 # 9. Start Claude Code interactively
-log_step "Starting Claude Code..."
+log_warn "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${DO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

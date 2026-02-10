@@ -19,12 +19,12 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${KAMATERA_SERVER_IP}"
 
-log_step "Waiting for init script to complete..."
+log_warn "Waiting for init script to complete..."
 generic_ssh_wait "root" "${KAMATERA_SERVER_IP}" "${SSH_OPTS} -o ConnectTimeout=5" "test -f /root/.cloud-init-complete" "init script" 60 5
 
-log_step "Verifying Claude Code installation..."
+log_warn "Verifying Claude Code installation..."
 if ! run_server "${KAMATERA_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
+    log_warn "Claude Code not found, installing manually..."
     run_server "${KAMATERA_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
 log_info "Claude Code is installed"
@@ -36,7 +36,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_step "Setting up environment variables..."
+log_warn "Setting up environment variables..."
 inject_env_vars_ssh "${KAMATERA_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
@@ -54,7 +54,7 @@ log_info "Kamatera server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (IP: ${KAMATERA_SERVER_IP})"
 echo ""
 
-log_step "Starting Claude Code..."
+log_warn "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${KAMATERA_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

@@ -26,9 +26,9 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # 4. Verify Claude Code is installed (fallback to manual install)
-log_step "Verifying Claude Code installation..."
+log_warn "Verifying Claude Code installation..."
 if ! run_server "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
+    log_warn "Claude Code not found, installing manually..."
     run_server "curl -fsSL https://claude.ai/install.sh | bash"
 fi
 log_info "Claude Code is installed"
@@ -42,7 +42,7 @@ else
 fi
 
 # 6. Inject environment variables into ~/.zshrc
-log_step "Setting up environment variables..."
+log_warn "Setting up environment variables..."
 
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -63,7 +63,7 @@ log_info "Sandbox: ${SERVER_NAME} (ID: ${DAYTONA_SANDBOX_ID})"
 echo ""
 
 # 8. Start Claude Code interactively
-log_step "Starting Claude Code..."
+log_warn "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

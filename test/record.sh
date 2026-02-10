@@ -79,9 +79,7 @@ get_endpoints() {
             printf '%s\n' \
                 "regions:/regions" \
                 "instances:/instances" \
-                "sshkeys:/sshkeys" \
-                "networks:/networks" \
-                "disk_images:/disk_images"
+                "ssh_keys:/sshkeys"
             ;;
         upcloud)
             printf '%s\n' \
@@ -167,23 +165,16 @@ try_load_config() {
     # OVH uses separate config with multiple fields
     if [[ "$cloud" == "ovh" ]]; then
         if [[ -f "$config_file" ]]; then
-            local ovh_vals
-            ovh_vals=$(python3 -c "
+            eval "$(python3 -c "
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
-    # Output tab-separated values in fixed order
-    print('\t'.join(d.get(k, '') for k in ['application_key', 'application_secret', 'consumer_key', 'project_id']))
-except: print('\t\t\t')
-" "$config_file" 2>/dev/null) || true
-            if [[ -n "${ovh_vals:-}" ]]; then
-                local IFS=$'\t'
-                read -r ak as ck pid <<< "$ovh_vals"
-                [[ -n "${ak:-}" ]] && export OVH_APPLICATION_KEY="$ak"
-                [[ -n "${as:-}" ]] && export OVH_APPLICATION_SECRET="$as"
-                [[ -n "${ck:-}" ]] && export OVH_CONSUMER_KEY="$ck"
-                [[ -n "${pid:-}" ]] && export OVH_PROJECT_ID="$pid"
-            fi
+    for k, e in [('application_key','OVH_APPLICATION_KEY'), ('application_secret','OVH_APPLICATION_SECRET'),
+                 ('consumer_key','OVH_CONSUMER_KEY'), ('project_id','OVH_PROJECT_ID')]:
+        v = d.get(k, '')
+        if v: print(f'export {e}=\"{v}\"')
+except: pass
+" "$config_file" 2>/dev/null)" || true
         fi
         return 0
     fi
@@ -233,29 +224,29 @@ save_config() {
     case "$cloud" in
         ovh)
             python3 -c "
-import json, sys
-d = {'application_key': sys.argv[1], 'application_secret': sys.argv[2],
-     'consumer_key': sys.argv[3], 'project_id': sys.argv[4]}
+import json
+d = {'application_key': '${OVH_APPLICATION_KEY:-}', 'application_secret': '${OVH_APPLICATION_SECRET:-}',
+     'consumer_key': '${OVH_CONSUMER_KEY:-}', 'project_id': '${OVH_PROJECT_ID:-}'}
 print(json.dumps(d, indent=2))
-" "${OVH_APPLICATION_KEY:-}" "${OVH_APPLICATION_SECRET:-}" "${OVH_CONSUMER_KEY:-}" "${OVH_PROJECT_ID:-}" > "$config_file"
+" > "$config_file"
             ;;
         upcloud)
             python3 -c "
-import json, sys
-print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}, indent=2))
-" "${UPCLOUD_USERNAME:-}" "${UPCLOUD_PASSWORD:-}" > "$config_file"
+import json
+print(json.dumps({'username': '${UPCLOUD_USERNAME:-}', 'password': '${UPCLOUD_PASSWORD:-}'}, indent=2))
+" > "$config_file"
             ;;
         kamatera)
             python3 -c "
-import json, sys
-print(json.dumps({'client_id': sys.argv[1], 'secret': sys.argv[2]}, indent=2))
-" "${KAMATERA_API_CLIENT_ID:-}" "${KAMATERA_API_SECRET:-}" > "$config_file"
+import json
+print(json.dumps({'client_id': '${KAMATERA_API_CLIENT_ID:-}', 'secret': '${KAMATERA_API_SECRET:-}'}, indent=2))
+" > "$config_file"
             ;;
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
             eval "local val=\"\${${env_var}:-}\""
-            python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"
+            python3 -c "import json; print(json.dumps({'api_key': '${val}'}, indent=2))" > "$config_file"
             ;;
     esac
     printf '%b\n' "  ${GREEN}saved${NC} → ${config_file}"
@@ -335,7 +326,7 @@ has_api_error() {
     echo "$response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
-cloud = sys.argv[1]
+cloud = '$cloud'
 
 if cloud == 'hetzner':
     err = d.get('error')
@@ -360,7 +351,7 @@ elif cloud == 'latitude':
     sys.exit(0 if 'error' in d or ('errors' in d and d['errors']) else 1)
 else:
     sys.exit(1)
-" "$cloud" 2>/dev/null
+" 2>/dev/null
 }
 
 # --- Pretty print JSON ---
@@ -376,16 +367,13 @@ _record_live_cycle() {
     local cloud="$1"
     local fixture_dir="$2"
 
-    # Source cloud lib so API wrappers are available (dynamic scoping
-    # lets _live_* functions update caller's counters/metadata)
-    source "${REPO_ROOT}/${cloud}/lib/common.sh" 2>/dev/null || true
-
     case "$cloud" in
-        hetzner)       _live_hetzner "$fixture_dir" ;;
-        digitalocean)  _live_digitalocean "$fixture_dir" ;;
-        vultr)         _live_vultr "$fixture_dir" ;;
-        linode)        _live_linode "$fixture_dir" ;;
-        civo)          _live_civo "$fixture_dir" ;;
+        hetzner)
+            # Source cloud lib so API wrappers are available (dynamic scoping
+            # lets _live_hetzner update caller's counters/metadata)
+            source "${REPO_ROOT}/${cloud}/lib/common.sh" 2>/dev/null || true
+            _live_hetzner "$fixture_dir"
+            ;;
         *)  return 0 ;;  # No live cycle for this cloud yet
     esac
 }
@@ -405,13 +393,6 @@ _save_live_fixture() {
 
     if ! echo "$response" | is_valid_json; then
         printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
-        cloud_errors=$((cloud_errors + 1))
-        return 1
-    fi
-
-    # Check for API error responses (cloud var is available via dynamic scoping)
-    if has_api_error "$cloud" "$response"; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
         cloud_errors=$((cloud_errors + 1))
         return 1
     fi
@@ -660,79 +641,98 @@ _live_civo() {
 }
 
 # --- Record one cloud ---
-# Check credentials and prompt if needed; returns 1 to skip this cloud
-_record_ensure_credentials() {
+record_cloud() {
     local cloud="$1"
-    if has_credentials "$cloud"; then
-        return 0
-    fi
 
-    local env_var
-    env_var=$(get_auth_env_var "$cloud")
-    if [[ "$PROMPT_FOR_CREDS" == "true" ]]; then
-        printf '%b\n' "${CYAN}━━━ ${cloud} ━━━${NC}"
-        printf '%b\n' "  ${YELLOW}missing${NC} ${env_var}"
-        if prompt_credentials "$cloud"; then
+    if ! has_credentials "$cloud"; then
+        local env_var
+        env_var=$(get_auth_env_var "$cloud")
+        if [[ "$PROMPT_FOR_CREDS" == "true" ]]; then
+            printf '%b\n' "${CYAN}━━━ ${cloud} ━━━${NC}"
+            printf '%b\n' "  ${YELLOW}missing${NC} ${env_var}"
+            if ! prompt_credentials "$cloud"; then
+                printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}"
+                SKIPPED=$((SKIPPED + 1))
+                return 0
+            fi
+        else
+            printf '%b\n' "  ${YELLOW}skip${NC} ${cloud} — ${env_var} not set"
+            SKIPPED=$((SKIPPED + 1))
             return 0
         fi
-        printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}"
-    else
-        printf '%b\n' "  ${YELLOW}skip${NC} ${cloud} — ${env_var} not set"
-    fi
-    SKIPPED=$((SKIPPED + 1))
-    return 1
-}
-
-# Record a single endpoint fixture; increments cloud_recorded/cloud_errors
-# Usage: _record_endpoint CLOUD FIXTURE_DIR FIXTURE_NAME ENDPOINT
-_record_endpoint() {
-    local cloud="$1" fixture_dir="$2" fixture_name="$3" endpoint="$4"
-
-    # Call API in a subshell that sources the cloud lib
-    local tmp_response
-    tmp_response=$(mktemp /tmp/spawn-record-XXXXXX)
-
-    (
-        source "${REPO_ROOT}/${cloud}/lib/common.sh" 2>/dev/null
-        call_api "$cloud" "$endpoint" 2>/dev/null
-    ) > "$tmp_response" 2>/dev/null || true
-
-    local response
-    response=$(cat "$tmp_response")
-    rm -f "$tmp_response"
-
-    if [[ -z "$response" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — empty response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
     fi
 
-    if ! echo "$response" | is_valid_json; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
+    printf '%b\n' "${CYAN}━━━ Recording ${cloud} ━━━${NC}"
 
-    if has_api_error "$cloud" "$response"; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
+    # Create fixture directory
+    local fixture_dir="${FIXTURES_DIR}/${cloud}"
+    mkdir -p "$fixture_dir"
 
-    echo "$response" | pretty_json > "${fixture_dir}/${fixture_name}.json"
-    printf '%b\n' "  ${GREEN}  ok${NC} ${fixture_name} → fixtures/${cloud}/${fixture_name}.json"
-    cloud_recorded=$((cloud_recorded + 1))
+    # Source the cloud's lib in a subshell to avoid namespace collisions
+    # Capture results via temp files
+    local endpoints
+    endpoints=$(get_endpoints "$cloud")
 
-    local timestamp
-    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    metadata_entries="${metadata_entries}    \"${fixture_name}\": {\"endpoint\": \"${endpoint}\", \"recorded_at\": \"${timestamp}\"},
+    local cloud_recorded=0
+    local cloud_errors=0
+    local metadata_entries=""
+
+    while IFS=: read -r fixture_name endpoint; do
+        [[ -z "$fixture_name" ]] && continue
+
+        local response=""
+        local record_ok=false
+
+        # Call API in a subshell that sources the cloud lib
+        local tmp_response
+        tmp_response=$(mktemp /tmp/spawn-record-XXXXXX)
+
+        (
+            # Source cloud lib (this also sources shared/common.sh)
+            source "${REPO_ROOT}/${cloud}/lib/common.sh" 2>/dev/null
+
+            # Suppress any interactive prompts by ensuring tokens are loaded
+            # The API call itself uses env vars directly
+            call_api "$cloud" "$endpoint" 2>/dev/null
+        ) > "$tmp_response" 2>/dev/null || true
+
+        response=$(cat "$tmp_response")
+        rm -f "$tmp_response"
+
+        if [[ -z "$response" ]]; then
+            printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — empty response"
+            cloud_errors=$((cloud_errors + 1))
+            continue
+        fi
+
+        if ! echo "$response" | is_valid_json; then
+            printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
+            cloud_errors=$((cloud_errors + 1))
+            continue
+        fi
+
+        if has_api_error "$cloud" "$response"; then
+            printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
+            cloud_errors=$((cloud_errors + 1))
+            continue
+        fi
+
+        # Save pretty-printed fixture
+        echo "$response" | pretty_json > "${fixture_dir}/${fixture_name}.json"
+        printf '%b\n' "  ${GREEN}  ok${NC} ${fixture_name} → fixtures/${cloud}/${fixture_name}.json"
+        cloud_recorded=$((cloud_recorded + 1))
+
+        # Build metadata entry
+        local timestamp
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        metadata_entries="${metadata_entries}    \"${fixture_name}\": {\"endpoint\": \"${endpoint}\", \"recorded_at\": \"${timestamp}\"},
 "
-}
+    done <<< "$endpoints"
 
-# Write the _metadata.json file for a cloud's fixtures
-_record_write_metadata() {
-    local cloud="$1" fixture_dir="$2"
+    # --- Live create+delete cycle for write endpoint fixtures ---
+    _record_live_cycle "$cloud" "$fixture_dir" cloud_recorded cloud_errors metadata_entries
 
+    # Write metadata
     local meta_timestamp
     meta_timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -748,34 +748,6 @@ ${metadata_entries}
   }
 }
 METADATA_EOF
-}
-
-record_cloud() {
-    local cloud="$1"
-
-    _record_ensure_credentials "$cloud" || return 0
-
-    printf '%b\n' "${CYAN}━━━ Recording ${cloud} ━━━${NC}"
-
-    local fixture_dir="${FIXTURES_DIR}/${cloud}"
-    mkdir -p "$fixture_dir"
-
-    local endpoints
-    endpoints=$(get_endpoints "$cloud")
-
-    local cloud_recorded=0
-    local cloud_errors=0
-    local metadata_entries=""
-
-    while IFS=: read -r fixture_name endpoint; do
-        [[ -z "$fixture_name" ]] && continue
-        _record_endpoint "$cloud" "$fixture_dir" "$fixture_name" "$endpoint"
-    done <<< "$endpoints"
-
-    # Live create+delete cycle for write endpoint fixtures
-    _record_live_cycle "$cloud" "$fixture_dir" cloud_recorded cloud_errors metadata_entries || true
-
-    _record_write_metadata "$cloud" "$fixture_dir"
 
     RECORDED=$((RECORDED + cloud_recorded))
     ERRORS=$((ERRORS + cloud_errors))

@@ -33,9 +33,9 @@ verify_server_connectivity "${OVH_SERVER_IP}"
 install_base_deps "${OVH_SERVER_IP}"
 
 # 7. Verify Claude Code is installed (fallback to manual install)
-log_step "Verifying Claude Code installation..."
+log_warn "Verifying Claude Code installation..."
 if ! run_ovh "${OVH_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
+    log_warn "Claude Code not found, installing manually..."
     run_ovh "${OVH_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
 
@@ -55,7 +55,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_step "Setting up environment variables..."
+log_warn "Setting up environment variables..."
 inject_env_vars_ovh "${OVH_SERVER_IP}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
@@ -75,7 +75,7 @@ log_info "Instance: ${SERVER_NAME} (ID: ${OVH_INSTANCE_ID}, IP: ${OVH_SERVER_IP}
 echo ""
 
 # 10. Start Claude Code interactively
-log_step "Starting Claude Code..."
+log_warn "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${OVH_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"
