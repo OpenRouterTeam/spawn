@@ -915,7 +915,7 @@
     "vastai/kilocode": "implemented",
     "hyperstack/claude": "implemented",
     "hyperstack/openclaw": "implemented",
-    "hyperstack/nanoclaw": "missing",
+    "hyperstack/nanoclaw": "implemented",
     "hyperstack/aider": "implemented",
     "hyperstack/goose": "implemented",
     "hyperstack/codex": "implemented",
