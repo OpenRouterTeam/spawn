@@ -816,7 +816,7 @@
     "fly/gptme": "implemented",
     "fluidstack/claude": "implemented",
     "fluidstack/openclaw": "implemented",
-    "fluidstack/nanoclaw": "missing",
+    "fluidstack/nanoclaw": "implemented",
     "fluidstack/aider": "implemented",
     "fluidstack/goose": "missing",
     "fluidstack/codex": "missing",
