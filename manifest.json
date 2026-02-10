@@ -881,7 +881,7 @@
     "oracle/amazonq": "missing",
     "oracle/cline": "missing",
     "oracle/gptme": "missing",
-    "oracle/opencode": "missing",
+    "oracle/opencode": "implemented",
     "oracle/plandex": "missing",
     "oracle/kilocode": "missing",
     "vastai/claude": "implemented",
