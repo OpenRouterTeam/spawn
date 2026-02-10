@@ -573,6 +573,21 @@
         "image": "nvidia/cuda:12.1.0-devel-ubuntu22.04"
       },
       "notes": "GPU marketplace with per-hour pricing. Uses vastai CLI (pip install vastai). SSH via dynamic port mapping. Docker-based instances with CUDA pre-installed."
+    },
+    "hyperstack": {
+      "name": "Hyperstack",
+      "description": "Hyperstack GPU cloud via REST API",
+      "url": "https://www.hyperstack.cloud/",
+      "type": "api",
+      "auth": "HYPERSTACK_API_KEY",
+      "provision_method": "POST /core/virtual-machines",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "flavor": "n1-cpu-small",
+        "image": "Ubuntu Server 24.04 LTS R5504 UEFI"
+      },
+      "notes": "GPU cloud provider. Competitive pricing on RTX A6000 ($0.50/hr). Requires HYPERSTACK_API_KEY from https://infrahub.hyperstack.cloud"
     }
   },
   "matrix": {
@@ -897,6 +912,20 @@
     "vastai/gptme": "implemented",
     "vastai/opencode": "implemented",
     "vastai/plandex": "implemented",
-    "vastai/kilocode": "implemented"
+    "vastai/kilocode": "implemented",
+    "hyperstack/claude": "implemented",
+    "hyperstack/openclaw": "implemented",
+    "hyperstack/nanoclaw": "missing",
+    "hyperstack/aider": "implemented",
+    "hyperstack/goose": "missing",
+    "hyperstack/codex": "missing",
+    "hyperstack/interpreter": "missing",
+    "hyperstack/gemini": "missing",
+    "hyperstack/amazonq": "missing",
+    "hyperstack/cline": "missing",
+    "hyperstack/gptme": "missing",
+    "hyperstack/opencode": "missing",
+    "hyperstack/plandex": "missing",
+    "hyperstack/kilocode": "missing"
   }
 }
