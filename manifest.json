@@ -877,7 +877,7 @@
     "oracle/nanoclaw": "missing",
     "oracle/codex": "missing",
     "oracle/interpreter": "missing",
-    "oracle/gemini": "missing",
+    "oracle/gemini": "implemented",
     "oracle/amazonq": "missing",
     "oracle/cline": "missing",
     "oracle/gptme": "missing",
