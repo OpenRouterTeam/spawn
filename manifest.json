@@ -818,7 +818,7 @@
     "fluidstack/openclaw": "implemented",
     "fluidstack/nanoclaw": "implemented",
     "fluidstack/aider": "implemented",
-    "fluidstack/goose": "missing",
+    "fluidstack/goose": "implemented",
     "fluidstack/codex": "missing",
     "fluidstack/interpreter": "missing",
     "fluidstack/gemini": "missing",
