@@ -769,7 +769,7 @@
     "github-codespaces/goose": "implemented",
     "github-codespaces/codex": "implemented",
     "github-codespaces/interpreter": "implemented",
-    "github-codespaces/gemini": "missing",
+    "github-codespaces/gemini": "implemented",
     "github-codespaces/amazonq": "missing",
     "github-codespaces/cline": "missing",
     "e2b/claude": "implemented",
