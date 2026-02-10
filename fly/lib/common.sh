@@ -232,9 +232,9 @@ _fly_create_app() {
     log_info "App '$name' created"
 }
 
-# Create a Fly.io machine and wait for it to start
-# Sets FLY_MACHINE_ID on success
-_fly_create_and_start_machine() {
+# Create a Fly.io machine via the Machines API
+# Sets FLY_MACHINE_ID and FLY_APP_NAME on success
+_fly_create_machine() {
     local name="$1"
     local region="$2"
     local vm_memory="$3"
@@ -282,13 +282,20 @@ print(json.dumps(body))
     FLY_MACHINE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
     export FLY_MACHINE_ID FLY_APP_NAME="$name"
     log_info "Machine created: ID=$FLY_MACHINE_ID, App=$name"
+}
+
+# Wait for a Fly.io machine to reach "started" state
+# Usage: _fly_wait_for_machine_start APP_NAME MACHINE_ID [MAX_ATTEMPTS]
+_fly_wait_for_machine_start() {
+    local name="$1"
+    local machine_id="$2"
+    local max_attempts="${3:-30}"
+    local attempt=1
 
     log_warn "Waiting for machine to start..."
-    local max_attempts=30
-    local attempt=1
     while [[ "$attempt" -le "$max_attempts" ]]; do
         local status_response
-        status_response=$(fly_api GET "/apps/$name/machines/$FLY_MACHINE_ID")
+        status_response=$(fly_api GET "/apps/$name/machines/$machine_id")
         local state
         state=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('state','unknown'))")
 
@@ -319,7 +326,8 @@ create_server() {
     if [[ ! "$vm_memory" =~ ^[0-9]+$ ]]; then log_error "Invalid FLY_VM_MEMORY: must be numeric"; return 1; fi
 
     _fly_create_app "$name" || return 1
-    _fly_create_and_start_machine "$name" "$region" "$vm_memory"
+    _fly_create_machine "$name" "$region" "$vm_memory" || return 1
+    _fly_wait_for_machine_start "$name" "$FLY_MACHINE_ID"
 }
 
 # Wait for base tools to be installed (Fly.io uses bare Ubuntu image)
