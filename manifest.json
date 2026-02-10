@@ -900,7 +900,7 @@
     "lambda/plandex": "implemented",
     "aws-lightsail/plandex": "implemented",
     "gcp/plandex": "implemented",
-    "github-codespaces/plandex": "missing",
+    "github-codespaces/plandex": "implemented",
     "e2b/plandex": "implemented",
     "modal/plandex": "implemented",
     "fly/plandex": "implemented",
