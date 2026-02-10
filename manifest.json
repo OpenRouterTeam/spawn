@@ -823,7 +823,7 @@
     "fluidstack/interpreter": "implemented",
     "fluidstack/gemini": "implemented",
     "fluidstack/amazonq": "implemented",
-    "fluidstack/cline": "missing",
+    "fluidstack/cline": "implemented",
     "fluidstack/gptme": "implemented",
     "fluidstack/opencode": "missing",
     "fluidstack/plandex": "missing",
