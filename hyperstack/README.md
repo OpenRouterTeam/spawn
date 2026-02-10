@@ -53,6 +53,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hy
 
 # Codex on Hyperstack
 bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/codex.sh)
+
+# Gemini CLI on Hyperstack
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/gemini.sh)
 ```
 
 ## Configuration Options
