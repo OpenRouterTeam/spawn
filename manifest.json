@@ -1012,7 +1012,7 @@
     "northflank/gemini": "implemented",
     "northflank/amazonq": "implemented",
     "northflank/cline": "implemented",
-    "northflank/gptme": "missing",
+    "northflank/gptme": "implemented",
     "northflank/opencode": "missing",
     "northflank/plandex": "missing",
     "northflank/kilocode": "missing",
