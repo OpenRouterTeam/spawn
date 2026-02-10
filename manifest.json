@@ -766,7 +766,7 @@
     "github-codespaces/openclaw": "implemented",
     "github-codespaces/nanoclaw": "implemented",
     "github-codespaces/aider": "implemented",
-    "github-codespaces/goose": "missing",
+    "github-codespaces/goose": "implemented",
     "github-codespaces/codex": "missing",
     "github-codespaces/interpreter": "missing",
     "github-codespaces/gemini": "missing",
