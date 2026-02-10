@@ -771,7 +771,7 @@
     "github-codespaces/interpreter": "implemented",
     "github-codespaces/gemini": "implemented",
     "github-codespaces/amazonq": "implemented",
-    "github-codespaces/cline": "missing",
+    "github-codespaces/cline": "implemented",
     "e2b/claude": "implemented",
     "e2b/openclaw": "implemented",
     "e2b/nanoclaw": "implemented",
