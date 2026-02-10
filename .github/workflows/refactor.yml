@@ -25,7 +25,7 @@ jobs:
           # --fail-with-body: exit 22 on HTTP errors but still print the body
           # -N: no output buffering (stream chunks in real-time)
           # --max-time: hard cap matching the Sprite's cycle timeout + grace
-          curl -sSN --fail-with-body --max-time 5400 -X POST \
+          curl -sSN --http1.1 --fail-with-body --max-time 5400 -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}&issue=${{ github.event.issue.number || '' }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
           CURL_EXIT=$?
