@@ -106,12 +106,6 @@ describe("cmdUpdate", () => {
           json: async () => ({ version: "99.99.99" }),
         };
       }
-      if (typeof url === "string" && url.includes("install.sh")) {
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\necho install",
-        };
-      }
       return { ok: false, status: 404 };
     }) as any;
 
@@ -121,10 +115,6 @@ describe("cmdUpdate", () => {
     // Should show update message with version transition
     const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
     expect(stopCalls.some((msg: string) => msg.includes("99.99.99"))).toBe(true);
-
-    // Should show the install command
-    const logOutput = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(logOutput).toContain("install.sh");
   });
 
   it("should handle package.json fetch failure gracefully", async () => {
@@ -157,7 +147,7 @@ describe("cmdUpdate", () => {
     expect(stopCalls.some((msg: string) => msg.includes("Failed"))).toBe(true);
   });
 
-  it("should handle install.sh fetch failure after version check succeeds", async () => {
+  it("should handle update failure gracefully", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
         return {
@@ -165,20 +155,16 @@ describe("cmdUpdate", () => {
           json: async () => ({ version: "99.99.99" }),
         };
       }
-      if (typeof url === "string" && url.includes("install.sh")) {
-        return {
-          ok: false,
-          status: 404,
-        };
-      }
       return { ok: false, status: 404 };
     }) as any;
 
+    // cmdUpdate now runs execSync which will fail in test env
     // The function catches errors internally, so it should not throw
     await cmdUpdate();
 
-    // Should still show version info before the install fetch error
-    expect(mockSpinnerMessage).toHaveBeenCalled();
+    // Should show the update version in spinner stop
+    const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+    expect(stopCalls.some((msg: string) => msg.includes("99.99.99"))).toBe(true);
   });
 
   it("should start spinner with checking message", async () => {
@@ -193,7 +179,7 @@ describe("cmdUpdate", () => {
     expect(startCalls.some((msg: string) => msg.includes("Checking"))).toBe(true);
   });
 
-  it("should show spinner message with new version during update", async () => {
+  it("should show version in spinner stop during update", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
         return {
@@ -201,19 +187,14 @@ describe("cmdUpdate", () => {
           json: async () => ({ version: "2.0.0" }),
         };
       }
-      if (typeof url === "string" && url.includes("install.sh")) {
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\necho update",
-        };
-      }
       return { ok: false };
     }) as any;
 
     await cmdUpdate();
 
-    const messageCalls = mockSpinnerMessage.mock.calls.map((c: any[]) => c.join(" "));
-    expect(messageCalls.some((msg: string) => msg.includes("2.0.0"))).toBe(true);
+    // cmdUpdate now uses s.stop() with version info instead of s.message()
+    const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+    expect(stopCalls.some((msg: string) => msg.includes("2.0.0"))).toBe(true);
   });
 });
 
