@@ -51,11 +51,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hy
 # OpenClaw on Hyperstack
 bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/openclaw.sh)
 
+# Goose on Hyperstack
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/goose.sh)
+
 # Codex on Hyperstack
 bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/codex.sh)
 
 # Open Interpreter on Hyperstack
 bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/interpreter.sh)
+
+# Gemini CLI on Hyperstack
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/gemini.sh)
 ```
 
 ## Configuration Options
