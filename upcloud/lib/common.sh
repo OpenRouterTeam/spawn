@@ -51,6 +51,33 @@ test_upcloud_credentials() {
     fi
 }
 
+# Try to load UpCloud credentials from config file
+# Returns 0 if loaded, 1 otherwise
+_load_upcloud_config() {
+    local config_file="$1"
+    [[ -f "${config_file}" ]] || return 1
+
+    local creds
+    creds=$(python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(d.get('username', ''))
+print(d.get('password', ''))
+" "${config_file}" 2>/dev/null) || return 1
+
+    [[ -n "${creds}" ]] || return 1
+
+    local saved_username saved_password
+    { read -r saved_username; read -r saved_password; } <<< "${creds}"
+    if [[ -n "${saved_username}" ]] && [[ -n "${saved_password}" ]]; then
+        export UPCLOUD_USERNAME="${saved_username}"
+        export UPCLOUD_PASSWORD="${saved_password}"
+        log_info "Using UpCloud credentials from ${config_file}"
+        return 0
+    fi
+    return 1
+}
+
 # Ensure UpCloud credentials are available (env var -> config file -> prompt+save)
 ensure_upcloud_credentials() {
     check_python_available || return 1
@@ -66,24 +93,8 @@ ensure_upcloud_credentials() {
 
     # 2. Check config file
     local config_file="$HOME/.config/spawn/upcloud.json"
-    if [[ -f "${config_file}" ]]; then
-        local creds
-        creds=$(python3 -c "
-import json, sys
-d = json.load(open(sys.argv[1]))
-print(d.get('username', ''))
-print(d.get('password', ''))
-" "${config_file}" 2>/dev/null) || true
-        if [[ -n "${creds}" ]]; then
-            local saved_username saved_password
-            { read -r saved_username; read -r saved_password; } <<< "${creds}"
-            if [[ -n "${saved_username}" ]] && [[ -n "${saved_password}" ]]; then
-                export UPCLOUD_USERNAME="${saved_username}"
-                export UPCLOUD_PASSWORD="${saved_password}"
-                log_info "Using UpCloud credentials from ${config_file}"
-                return 0
-            fi
-        fi
+    if _load_upcloud_config "${config_file}"; then
+        return 0
     fi
 
     # 3. Prompt and save
@@ -114,7 +125,6 @@ print(d.get('password', ''))
         return 1
     fi
 
-    # Save to config file
     local config_dir
     config_dir=$(dirname "${config_file}")
     mkdir -p "${config_dir}"
@@ -165,6 +175,47 @@ else:
     fi
 
     echo "${template_uuid}"
+}
+
+# Wait for UpCloud server to become started and get its public IP
+# Sets: UPCLOUD_SERVER_IP
+# Usage: _wait_for_upcloud_server_ip SERVER_UUID [MAX_ATTEMPTS]
+_wait_for_upcloud_server_ip() {
+    local server_uuid="$1"
+    local max_attempts=${2:-60}
+    local attempt=1
+
+    log_warn "Waiting for server to become active..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local status_response
+        status_response=$(upcloud_api GET "/server/$server_uuid")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['state'])" 2>/dev/null || echo "unknown")
+
+        if [[ "$status" == "started" ]]; then
+            UPCLOUD_SERVER_IP=$(echo "$status_response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+for iface in data['server'].get('ip_addresses', {}).get('ip_address', []):
+    if iface.get('access') == 'public' and iface.get('family') == 'IPv4':
+        print(iface['address'])
+        break
+" 2>/dev/null)
+            export UPCLOUD_SERVER_IP
+
+            if [[ -n "${UPCLOUD_SERVER_IP}" ]]; then
+                log_info "Server active: IP=$UPCLOUD_SERVER_IP"
+                return 0
+            fi
+        fi
+
+        log_warn "Server status: $status ($attempt/$max_attempts)"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Server did not become active in time"
+    return 1
 }
 
 # Create an UpCloud server
@@ -247,46 +298,12 @@ print(json.dumps(body))
         return 1
     fi
 
-    # Extract server UUID and wait for IP
+    # Extract server UUID
     UPCLOUD_SERVER_UUID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['uuid'])")
     export UPCLOUD_SERVER_UUID
-
     log_info "Server created: UUID=$UPCLOUD_SERVER_UUID"
 
-    # Wait for server to become started and get IP
-    log_warn "Waiting for server to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(upcloud_api GET "/server/$UPCLOUD_SERVER_UUID")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['state'])" 2>/dev/null || echo "unknown")
-
-        if [[ "$status" == "started" ]]; then
-            UPCLOUD_SERVER_IP=$(echo "$status_response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for iface in data['server'].get('ip_addresses', {}).get('ip_address', []):
-    if iface.get('access') == 'public' and iface.get('family') == 'IPv4':
-        print(iface['address'])
-        break
-" 2>/dev/null)
-            export UPCLOUD_SERVER_IP
-
-            if [[ -n "${UPCLOUD_SERVER_IP}" ]]; then
-                log_info "Server active: IP=$UPCLOUD_SERVER_IP"
-                return 0
-            fi
-        fi
-
-        log_warn "Server status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Server did not become active in time"
-    return 1
+    _wait_for_upcloud_server_ip "$UPCLOUD_SERVER_UUID"
 }
 
 # Wait for SSH connectivity
