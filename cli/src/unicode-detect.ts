@@ -31,6 +31,17 @@ const shouldForceAscii = (): boolean => {
   return false;
 };
 
-if (shouldForceAscii()) {
+const forceAscii = shouldForceAscii();
+
+// Debug logging (only if SPAWN_DEBUG is set)
+if (process.env.SPAWN_DEBUG === "1") {
+  console.error("[unicode-detect] TERM:", process.env.TERM);
+  console.error("[unicode-detect] SSH_CONNECTION:", process.env.SSH_CONNECTION);
+  console.error("[unicode-detect] SSH_CLIENT:", process.env.SSH_CLIENT);
+  console.error("[unicode-detect] SSH_TTY:", process.env.SSH_TTY);
+  console.error("[unicode-detect] Force ASCII:", forceAscii);
+}
+
+if (forceAscii) {
   process.env.TERM = "linux";
 }
