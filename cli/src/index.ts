@@ -10,7 +10,6 @@ import {
   cmdUpdate,
   cmdHelp,
 } from "./commands.js";
-import { loadManifest } from "./manifest.js";
 import { VERSION } from "./version.js";
 
 function isInteractiveTTY(): boolean {
@@ -51,20 +50,6 @@ function extractFlagValue(
 }
 
 async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
-  const manifest = await loadManifest();
-  if (!manifest.agents[agent]) {
-    console.error(`Error: Unknown agent "${agent}"`);
-    console.error(`\nAvailable agents:`);
-    const agentEntries = Object.entries(manifest.agents).slice(0, 5);
-    agentEntries.forEach(([key, a]) => console.error(`  - ${key.padEnd(16)} ${a.name}`));
-    if (Object.keys(manifest.agents).length > 5) {
-      console.error(`  ... and ${Object.keys(manifest.agents).length - 5} more`);
-    }
-    console.error(`\nRun 'spawn agents' to see all agents.`);
-    console.error(`Run 'spawn help' for complete usage.`);
-    process.exit(1);
-  }
-
   if (cloud) {
     await cmdRun(agent, cloud, prompt);
   } else {
@@ -91,6 +76,14 @@ async function main(): Promise<void> {
     "spawn <agent> <cloud> --prompt-file instructions.txt"
   );
   filteredArgs = finalArgs;
+
+  if (prompt && promptFile) {
+    console.error("Error: --prompt and --prompt-file cannot be used together");
+    console.error(`\nUse one or the other:`);
+    console.error(`  spawn <agent> <cloud> --prompt "your prompt here"`);
+    console.error(`  spawn <agent> <cloud> --prompt-file instructions.txt`);
+    process.exit(1);
+  }
 
   if (promptFile) {
     const { readFileSync } = await import("fs");
