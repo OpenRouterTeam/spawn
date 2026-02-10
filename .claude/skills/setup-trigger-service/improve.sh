@@ -19,14 +19,45 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 MANIFEST="${REPO_ROOT}/manifest.json"
 MODE="${1:-once}"
 
+# --- Lifecycle config (mirrors refactor.sh patterns) ---
+WORKTREE_BASE="/tmp/spawn-worktrees/improve"
+TEAM_NAME="spawn-improve"
+CYCLE_TIMEOUT=3600   # 60 min for team cycles
+SINGLE_TIMEOUT=1800  # 30 min for single-agent cycles
+LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"
+PROMPT_FILE=""
+
+# Ensure .docs directory exists
+mkdir -p "$(dirname "${LOG_FILE}")"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-log_info()  { printf "${GREEN}[improve]${NC} %s\n" "$1"; }
-log_warn()  { printf "${YELLOW}[improve]${NC} %s\n" "$1"; }
-log_error() { printf "${RED}[improve]${NC} %s\n" "$1"; }
+log_info()  { printf "${GREEN}[improve]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [improve] $1" >> "${LOG_FILE}"; }
+log_warn()  { printf "${YELLOW}[improve]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [improve] WARN: $1" >> "${LOG_FILE}"; }
+log_error() { printf "${RED}[improve]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [improve] ERROR: $1" >> "${LOG_FILE}"; }
+
+# --- Cleanup trap (from refactor.sh) ---
+cleanup() {
+    local exit_code=$?
+    log_info "Running cleanup (exit_code=${exit_code})..."
+
+    cd "${REPO_ROOT}" 2>/dev/null || true
+
+    # Prune worktrees and clean up only OUR worktree base
+    git worktree prune 2>/dev/null || true
+    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+
+    # Clean up prompt file
+    rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
+
+    log_info "=== Cycle Done (exit_code=${exit_code}) ==="
+    exit $exit_code
+}
+
+trap cleanup EXIT SIGTERM SIGINT
 
 # Check prerequisites
 if ! command -v claude &>/dev/null; then
@@ -86,6 +117,16 @@ PROMPT_EOF
     cat <<'PROMPT_EOF'
 
 Your job: coordinate teammates to expand the spawn matrix. Use delegate mode — do NOT implement anything yourself. Only coordinate, review, and synthesize.
+
+## Time Budget
+
+Each cycle MUST complete within 45 minutes. This is a HARD deadline.
+
+- At the 35-minute mark, stop spawning new work and tell all agents to wrap up
+- At the 40-minute mark, send shutdown_request to any agent that hasn't finished
+- At 45 minutes, force shutdown — the cycle is over regardless
+
+Agents should aim for focused, high-impact work. Do NOT exhaustively expand everything.
 
 ## Priority Order
 
@@ -175,7 +216,7 @@ Multiple agents working simultaneously MUST use git worktrees instead of switchi
 
 ### Setup (Team Lead does this at cycle start)
 ```bash
-mkdir -p /tmp/spawn-worktrees
+mkdir -p WORKTREE_BASE_PLACEHOLDER
 ```
 
 ### Per-Agent Worktree Pattern
@@ -187,10 +228,10 @@ CRITICAL: Always fetch latest main before creating a worktree.
 git fetch origin main
 
 # 2. Create a worktree for the branch off latest origin/main
-git worktree add /tmp/spawn-worktrees/BRANCH-NAME -b BRANCH-NAME origin/main
+git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME -b BRANCH-NAME origin/main
 
 # 3. Do all work inside the worktree
-cd /tmp/spawn-worktrees/BRANCH-NAME
+cd WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 # ... make changes, run bash -n, run tests ...
 
 # 4. Commit with Agent marker
@@ -208,7 +249,7 @@ gh pr create --title "title" --body "body"
 gh pr merge NUMBER --squash --delete-branch
 
 # 7. Clean up worktree
-git worktree remove /tmp/spawn-worktrees/BRANCH-NAME
+git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 ```
 
 ### Why Worktrees?
@@ -229,8 +270,8 @@ Every teammate MUST follow this workflow using worktrees. NO exceptions.
 
 ### For each unit of work:
 1. Fetch latest: `git fetch origin main`
-2. Create worktree: `git worktree add /tmp/spawn-worktrees/{branch-name} -b {branch-name} origin/main`
-3. Work inside worktree: `cd /tmp/spawn-worktrees/{branch-name}`
+2. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER/{branch-name} -b {branch-name} origin/main`
+3. Work inside worktree: `cd WORKTREE_BASE_PLACEHOLDER/{branch-name}`
 4. Do the work, commit (with Agent: marker)
 5. Push: `git push -u origin {branch-name}`
 6. Create PR: `gh pr create --title "..." --body "..."`
@@ -240,7 +281,7 @@ Every teammate MUST follow this workflow using worktrees. NO exceptions.
    - Close with: `gh pr close {number} --comment "Closing: {reason}"`
    - Acceptable reasons: merge conflict with a concurrent PR, superseded by another PR, implementation found to be incorrect after review
    - NEVER close a PR silently — every closed PR MUST have a comment
-9. Clean up worktree: `git worktree remove /tmp/spawn-worktrees/{branch-name}`
+9. Clean up worktree: `git worktree remove WORKTREE_BASE_PLACEHOLDER/{branch-name}`
 
 ### PR Policy (MANDATORY):
 Every PR must reach one of these terminal states:
@@ -254,6 +295,27 @@ Every PR must reach one of these terminal states:
 - Leave PRs open/abandoned — resolve them in the same cycle
 - Leave branches or worktrees hanging after merge
 - Work on a stale base — always `git fetch origin main` before creating a worktree
+
+## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
+
+You MUST remain active until ALL of the following are true:
+
+1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
+2. **All PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm zero open PRs from this cycle. Every PR must be either merged or closed with a comment.
+3. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
+4. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
+
+### Shutdown Sequence (execute in this exact order):
+
+1. Check TaskList — if any tasks are still in_progress or pending, wait and check again (poll every 30 seconds, up to 5 minutes)
+2. Verify all PRs merged or closed: `gh pr list --repo OpenRouterTeam/spawn --state open`
+3. For each teammate, send a `shutdown_request` via SendMessage
+4. Wait for all `shutdown_response` confirmations
+5. Run final cleanup: `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER`
+6. Print final summary of what was accomplished
+7. ONLY THEN may the session end
+
+### CRITICAL: If you exit before completing this sequence, running agents will be orphaned and the cycle will be incomplete. You MUST wait for all teammates to shut down before exiting.
 
 ## After EVERY change (MANDATORY):
 
@@ -295,6 +357,8 @@ Copy the output and replace the matrix table between `## Matrix` and `## Develop
 - Update manifest.json, the cloud's README.md, AND the root README.md matrix
 - Clean up worktrees after every PR: `git worktree remove PATH`
 - NEVER revert prior macOS/curl-bash compatibility fixes
+
+Begin now. Spawn the team and start working. DO NOT EXIT until all teammates are shut down and all cleanup is complete per the Lifecycle Management section above.
 PROMPT_EOF
 }
 
@@ -354,7 +418,7 @@ cleanup_between_cycles() {
 
     # Prune stale worktrees
     git worktree prune 2>/dev/null || true
-    rm -rf /tmp/spawn-worktrees 2>/dev/null || true
+    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
 
     # Delete merged remote branches (not main)
     local merged_branches
@@ -379,21 +443,55 @@ run_team_cycle() {
     git pull --rebase origin main 2>/dev/null || true
 
     # Set up worktree directory for parallel agent work
-    mkdir -p /tmp/spawn-worktrees
+    mkdir -p "${WORKTREE_BASE}"
 
-    local prompt
-    prompt=$(build_team_prompt)
+    # Write prompt to temp file (from refactor.sh pattern)
+    PROMPT_FILE=$(mktemp /tmp/improve-prompt-XXXXXX.md)
+    build_team_prompt > "${PROMPT_FILE}"
+
+    # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
+    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+
     log_info "Launching agent team..."
+    log_info "Worktree base: ${WORKTREE_BASE}"
+    log_info "Cycle timeout: ${CYCLE_TIMEOUT}s"
     echo ""
-    timeout --signal=TERM --kill-after=60 3600 \
-        claude -p "${prompt}" --dangerously-skip-permissions --model sonnet
-    local rc=$?
+
+    # Add grace period: 15 min beyond the cycle timeout (from refactor.sh)
+    local HARD_TIMEOUT=$((CYCLE_TIMEOUT + 900))
+    log_info "Hard timeout: ${HARD_TIMEOUT}s"
+
+    # Run Claude with the prompt file, enforcing a hard timeout
+    local CLAUDE_EXIT=0
+    timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
+        claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
+        2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+
+    if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+        log_info "Cycle completed successfully"
+
+        # Create checkpoint for successful cycle
+        log_info "Creating checkpoint..."
+        sprite-env checkpoint create --comment "improve cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+    elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+        log_warn "Cycle timed out after ${HARD_TIMEOUT}s — killed by hard timeout"
+
+        # Still create checkpoint for any partial work that was merged
+        log_info "Creating checkpoint for partial work..."
+        sprite-env checkpoint create --comment "improve cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
+    else
+        log_error "Cycle failed (exit_code=${CLAUDE_EXIT})"
+    fi
+
+    # Clean up prompt file
+    rm -f "${PROMPT_FILE}" 2>/dev/null || true
+    PROMPT_FILE=""
 
     # Clean up worktrees after cycle
     git worktree prune 2>/dev/null || true
-    rm -rf /tmp/spawn-worktrees 2>/dev/null || true
+    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
 
-    return $rc
+    return $CLAUDE_EXIT
 }
 
 run_single_cycle() {
@@ -402,18 +500,42 @@ run_single_cycle() {
     git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
-    local prompt
-    prompt=$(build_single_prompt)
+    PROMPT_FILE=$(mktemp /tmp/improve-prompt-XXXXXX.md)
+    build_single_prompt > "${PROMPT_FILE}"
+
     log_info "Launching single agent..."
+    log_info "Cycle timeout: ${SINGLE_TIMEOUT}s"
     echo ""
-    timeout --signal=TERM --kill-after=60 3600 \
-        claude --print -p "${prompt}" --model sonnet
-    return $?
+
+    local HARD_TIMEOUT=$((SINGLE_TIMEOUT + 300))
+    log_info "Hard timeout: ${HARD_TIMEOUT}s"
+
+    local CLAUDE_EXIT=0
+    timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
+        claude --print -p "$(cat "${PROMPT_FILE}")" --model sonnet \
+        2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+
+    if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+        log_info "Single cycle completed successfully"
+        sprite-env checkpoint create --comment "improve single cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+    elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+        log_warn "Single cycle timed out after ${HARD_TIMEOUT}s"
+        sprite-env checkpoint create --comment "improve single cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
+    else
+        log_error "Single cycle failed (exit_code=${CLAUDE_EXIT})"
+    fi
+
+    rm -f "${PROMPT_FILE}" 2>/dev/null || true
+    PROMPT_FILE=""
+
+    return $CLAUDE_EXIT
 }
 
 # Main
+log_info "=== Starting improve cycle ==="
 log_info "Spawn Improvement System"
 log_info "Mode: ${MODE}"
+log_info "Worktree base: ${WORKTREE_BASE}"
 cd "${REPO_ROOT}"
 git checkout main 2>/dev/null || true
 git fetch --prune origin 2>/dev/null || true
