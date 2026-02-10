@@ -113,18 +113,16 @@ get_server_name() {
     echo "${prefix}-${timestamp}-${random_suffix}" | tr '[:upper:]' '[:lower:]'
 }
 
-# Create a Railway project and service via CLI
-# Sets: RAILWAY_PROJECT_ID, RAILWAY_SERVICE_ID, RAILWAY_SERVICE_NAME
-create_server() {
-    local name="${1:-$(get_server_name)}"
+# Create and link a Railway project
+# Sets: RAILWAY_SERVICE_NAME
+# Usage: _railway_create_project NAME
+_railway_create_project() {
+    local name="$1"
 
-    RAILWAY_SERVICE_NAME="${name}"
+    log_warn "Creating Railway project: $name"
 
-    log_warn "Creating Railway project: $RAILWAY_SERVICE_NAME"
-
-    # Create new project with CLI
     local project_output
-    project_output=$(railway init -n "$RAILWAY_SERVICE_NAME" 2>&1)
+    project_output=$(railway init -n "$name" 2>&1)
 
     if echo "$project_output" | grep -qi "error"; then
         log_error "Failed to create Railway project"
@@ -132,18 +130,19 @@ create_server() {
         return 1
     fi
 
-    # Link to the project we just created
-    railway link "$RAILWAY_SERVICE_NAME" >/dev/null 2>&1 || {
+    railway link "$name" >/dev/null 2>&1 || {
         log_error "Failed to link to Railway project"
         return 1
     }
 
-    log_info "Railway project created: $RAILWAY_SERVICE_NAME"
+    log_info "Railway project created: $name"
+}
 
-    # Deploy an Ubuntu container that stays alive
+# Deploy an Ubuntu container to the linked Railway project
+# Usage: _railway_deploy_container
+_railway_deploy_container() {
     log_warn "Deploying service..."
 
-    # Create a minimal Dockerfile in a temp directory
     local temp_dir=$(mktemp -d)
     cat > "$temp_dir/Dockerfile" <<'EOF'
 FROM ubuntu:24.04
@@ -153,7 +152,6 @@ RUN apt-get update && apt-get install -y \
 CMD ["tail", "-f", "/dev/null"]
 EOF
 
-    # Deploy from the temp directory
     (cd "$temp_dir" && railway up --detach) || {
         log_error "Failed to deploy Railway service"
         rm -rf "$temp_dir"
@@ -161,11 +159,15 @@ EOF
     }
 
     rm -rf "$temp_dir"
+}
 
-    # Wait for deployment to be ready
-    log_warn "Waiting for service to deploy..."
-    local max_attempts=60
+# Wait for the Railway deployment to become ready
+# Usage: _railway_wait_for_deployment [MAX_ATTEMPTS]
+_railway_wait_for_deployment() {
+    local max_attempts="${1:-60}"
     local attempt=0
+
+    log_warn "Waiting for service to deploy..."
 
     while [[ $attempt -lt $max_attempts ]]; do
         local status
@@ -173,7 +175,7 @@ EOF
 
         if echo "$status" | grep -qi "success\|active\|running\|healthy"; then
             log_info "Service is ready"
-            break
+            return 0
         fi
 
         if echo "$status" | grep -qi "failed\|error"; then
@@ -185,10 +187,20 @@ EOF
         sleep 5
     done
 
-    if [[ $attempt -ge $max_attempts ]]; then
-        log_error "Timeout waiting for service to be ready"
-        return 1
-    fi
+    log_error "Timeout waiting for service to be ready"
+    return 1
+}
+
+# Create a Railway project and service via CLI
+# Sets: RAILWAY_SERVICE_NAME
+create_server() {
+    local name="${1:-$(get_server_name)}"
+
+    RAILWAY_SERVICE_NAME="${name}"
+
+    _railway_create_project "$name" || return 1
+    _railway_deploy_container || return 1
+    _railway_wait_for_deployment || return 1
 
     log_info "Railway service deployed successfully"
 }
