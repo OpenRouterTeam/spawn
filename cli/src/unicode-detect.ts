@@ -45,12 +45,25 @@ if (process.env.SPAWN_DEBUG === "1") {
 if (forceAscii) {
   process.env.TERM = "linux";
 } else {
-  // Explicitly ensure UTF-8 encoding for Unicode output
+  // Ensure LANG includes UTF-8
   if (!process.env.LANG || !process.env.LANG.includes("UTF-8")) {
     process.env.LANG = "en_US.UTF-8";
   }
-  // Set stdout encoding to UTF-8 if possible
-  if (process.stdout.setEncoding) {
-    process.stdout.setEncoding("utf8");
-  }
+
+  // Monkey-patch stdout.write to explicitly encode strings as UTF-8 Buffer.
+  // This fixes mojibake (â instead of ◆) seen in some Bun + terminal combos
+  // where process.stdout.write(string) doesn't use UTF-8 by default.
+  const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+  (process.stdout as any).write = function (
+    chunk: any,
+    encodingOrCb?: BufferEncoding | ((err?: Error) => void),
+    cb?: (err?: Error) => void
+  ): boolean {
+    if (typeof chunk === "string") {
+      const encoding =
+        typeof encodingOrCb === "string" ? encodingOrCb : "utf8";
+      return originalStdoutWrite(Buffer.from(chunk, encoding), cb ?? (typeof encodingOrCb === "function" ? encodingOrCb : undefined));
+    }
+    return originalStdoutWrite(chunk, encodingOrCb as any, cb);
+  };
 }
