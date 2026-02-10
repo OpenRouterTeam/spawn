@@ -764,7 +764,7 @@
     "gcp/cline": "implemented",
     "github-codespaces/claude": "implemented",
     "github-codespaces/openclaw": "implemented",
-    "github-codespaces/nanoclaw": "missing",
+    "github-codespaces/nanoclaw": "implemented",
     "github-codespaces/aider": "implemented",
     "github-codespaces/goose": "missing",
     "github-codespaces/codex": "missing",
