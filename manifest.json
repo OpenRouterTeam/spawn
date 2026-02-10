@@ -883,7 +883,7 @@
     "oracle/gptme": "missing",
     "oracle/opencode": "implemented",
     "oracle/plandex": "implemented",
-    "oracle/kilocode": "missing",
+    "oracle/kilocode": "implemented",
     "vastai/claude": "implemented",
     "vastai/aider": "implemented",
     "vastai/codex": "implemented",
