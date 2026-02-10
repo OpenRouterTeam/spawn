@@ -380,6 +380,20 @@
       },
       "notes": "Uses Machines API for provisioning and flyctl SSH for exec. Docker-based, pay-per-second pricing. Requires flyctl CLI."
     },
+    "fluidstack": {
+      "name": "FluidStack",
+      "description": "FluidStack GPU cloud via REST API",
+      "url": "https://www.fluidstack.io/",
+      "type": "api",
+      "auth": "FLUIDSTACK_API_KEY",
+      "provision_method": "POST /instances with gpu_type and ssh_key",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "gpu_type": "RTX_4090"
+      },
+      "notes": "GPU cloud provider with A100s and H100s starting at $1.35/hr. Up to 70% cheaper than hyperscalers. Zero egress fees. Simple REST API with Python SDK available."
+    },
     "civo": {
       "name": "Civo",
       "description": "Civo cloud-native instances via REST API",
@@ -773,6 +787,20 @@
     "fly/amazonq": "implemented",
     "fly/cline": "implemented",
     "fly/gptme": "implemented",
+    "fluidstack/claude": "implemented",
+    "fluidstack/openclaw": "missing",
+    "fluidstack/nanoclaw": "missing",
+    "fluidstack/aider": "implemented",
+    "fluidstack/goose": "missing",
+    "fluidstack/codex": "missing",
+    "fluidstack/interpreter": "missing",
+    "fluidstack/gemini": "missing",
+    "fluidstack/amazonq": "missing",
+    "fluidstack/cline": "missing",
+    "fluidstack/gptme": "implemented",
+    "fluidstack/opencode": "missing",
+    "fluidstack/plandex": "missing",
+    "fluidstack/kilocode": "missing",
     "civo/claude": "implemented",
     "civo/aider": "implemented",
     "civo/codex": "implemented",
