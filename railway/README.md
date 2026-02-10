@@ -1,156 +1,98 @@
 # Railway
 
-Railway container platform via CLI. [Railway](https://railway.app/)
+Deploy AI agents on Railway's container platform with per-minute billing.
 
-> Pay-per-minute billing. Fast deployment. Uses websocket-based SSH protocol (not standard SSH). Requires Railway CLI.
+## Overview
 
-## Agents
+Railway is a modern container platform that offers:
+- Per-minute billing (more granular than hourly)
+- Instant deployment via CLI
+- Docker-based containers
+- $5 free trial credit
+- Simple CLI interface with `railway run` for command execution
 
-#### Claude Code
+## Prerequisites
 
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/claude.sh)
-```
-
-#### Aider
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/aider.sh)
-```
-
-#### gptme
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/gptme.sh)
-```
-
-#### OpenClaw
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/openclaw.sh)
-```
-
-#### NanoClaw
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/nanoclaw.sh)
-```
-
-#### Goose
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/goose.sh)
-```
-
-#### Codex CLI
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/codex.sh)
-```
-
-#### Open Interpreter
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/interpreter.sh)
-```
-
-#### Gemini CLI
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/gemini.sh)
-```
-
-#### Amazon Q CLI
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/amazonq.sh)
-```
-
-#### Cline
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/cline.sh)
-```
-
-#### OpenCode
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/opencode.sh)
-```
-
-#### Plandex
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/plandex.sh)
-```
-
-## Non-Interactive Mode
-
-```bash
-RAILWAY_PROJECT_NAME=dev-mk1 \
-RAILWAY_TOKEN=your-token \
-OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/claude.sh)
-```
+- Node.js or Bun (for Railway CLI installation)
+- Railway account: [railway.app](https://railway.app/)
+- Railway API token: [railway.app/account/tokens](https://railway.app/account/tokens)
 
 ## Authentication
 
-Railway CLI requires authentication. You can authenticate in three ways:
+Set your Railway API token:
 
-1. **Interactive login** (default): `railway login` opens a browser for OAuth
-2. **Project token**: Set `RAILWAY_TOKEN` environment variable from https://railway.app/account/tokens
-3. **Stored credentials**: After running `railway login`, credentials are stored and reused
+```bash
+export RAILWAY_TOKEN=your_token_here
+```
 
-For CI/CD pipelines, use project tokens via the `RAILWAY_TOKEN` environment variable.
+Or the script will prompt you and save it to `~/.config/spawn/railway.json`.
+
+## Usage
+
+### Claude Code
+
+```bash
+bash railway/claude.sh
+```
+
+### Aider
+
+```bash
+bash railway/aider.sh
+```
+
+### Remote Execution
+
+All scripts work via `curl | bash`:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/railway/claude.sh)
+```
+
+## How It Works
+
+1. **Project Creation**: Creates a Railway project via `railway init`
+2. **Service Deployment**: Deploys an Ubuntu 24.04 Docker container with `railway up`
+3. **Agent Installation**: Installs the agent inside the running container
+4. **Environment Setup**: Configures OpenRouter API key and agent-specific env vars
+5. **Interactive Session**: Drops you into the container with `railway run`
 
 ## Pricing
 
-Railway uses pay-per-minute billing for compute resources. You only pay for what you use:
+Railway uses usage-based pricing on top of a subscription:
 
-- **Free tier**: $5 of free credits per month
-- **Hobby plan**: $5/month subscription + usage-based pricing
-- **Pro plan**: $20/month subscription + usage-based pricing with higher limits
+- **Free Trial**: $5 credit (expires in 30 days)
+- **Hobby Plan**: $5/month (includes $5 usage credit)
+- **Pro Plan**: $20/month (includes $20 usage credit)
 
-Pricing is prorated to the minute, so you're not paying for idle resources when your service is stopped.
+Additional usage beyond credits is billed per-minute for:
+- CPU and memory utilization
+- Bandwidth/egress
+- Volume storage
 
-## Limits
+See: [railway.app/pricing](https://railway.app/pricing)
 
-- Project name: 1-50 characters, lowercase letters, numbers, and hyphens
-- Must start and end with alphanumeric character
-- No standard SSH access (uses Railway's websocket-based protocol)
-- Requires Railway CLI for all operations
+## Notes
 
-## Troubleshooting
+- Railway CLI requires Node.js or Bun
+- Services run as Docker containers
+- Per-minute billing means you only pay for active usage
+- No SSH access - uses `railway run` for command execution
+- Project and service are automatically created and managed
 
-### Railway CLI not found
+## Cleanup
 
-Install via npm:
+Railway services persist after exit. To manually delete:
+
 ```bash
-npm install -g @railway/cli
+railway service delete --yes
+railway project delete --yes
 ```
 
-Or use the official installer:
-```bash
-bash <(curl -fsSL cli.new)
-```
+## Supported Agents
 
-### Authentication failed
+Currently implemented:
+- Claude Code (`claude.sh`)
+- Aider (`aider.sh`)
 
-Generate a new token at https://railway.app/account/tokens and set:
-```bash
-export RAILWAY_TOKEN=your-token-here
-```
-
-### Project already exists
-
-If you get "project already exists", Railway will attempt to reuse the existing project. If this causes issues, you can either:
-1. Use a different project name
-2. Delete the old project from https://railway.app/dashboard
-3. Use `railway link` to link to an existing project
-
-## Resources
-
-- Railway Documentation: https://docs.railway.com/
-- Railway CLI Reference: https://docs.railway.com/reference/cli-api
-- Railway Dashboard: https://railway.app/dashboard
-- Generate API Tokens: https://railway.app/account/tokens
+All other agents from the spawn matrix can be implemented using the same pattern.

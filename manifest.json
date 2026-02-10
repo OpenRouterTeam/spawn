@@ -619,6 +619,21 @@
         "image": "ubuntu:24.04"
       },
       "notes": "Container platform with shell access. Free tier: 2 services. Pay-per-second pricing. Requires API token from https://northflank.com/account/settings/api/tokens"
+    },
+    "railway": {
+      "name": "Railway",
+      "description": "Railway container platform via CLI with per-minute billing",
+      "url": "https://railway.app/",
+      "type": "cli",
+      "auth": "RAILWAY_TOKEN",
+      "provision_method": "railway init + railway up with Docker image",
+      "exec_method": "railway run bash -c",
+      "interactive_method": "railway run (PTY)",
+      "defaults": {
+        "region": "us-west1",
+        "image": "ubuntu:24.04"
+      },
+      "notes": "Container platform with CLI access. Per-minute billing. Free trial: $5 credit. Requires API token from https://railway.app/account/tokens"
     }
   },
   "matrix": {
@@ -985,6 +1000,20 @@
     "northflank/gptme": "missing",
     "northflank/opencode": "missing",
     "northflank/plandex": "missing",
-    "northflank/kilocode": "missing"
+    "northflank/kilocode": "missing",
+    "railway/claude": "implemented",
+    "railway/openclaw": "missing",
+    "railway/nanoclaw": "missing",
+    "railway/aider": "implemented",
+    "railway/goose": "missing",
+    "railway/codex": "missing",
+    "railway/interpreter": "missing",
+    "railway/gemini": "missing",
+    "railway/amazonq": "missing",
+    "railway/cline": "missing",
+    "railway/gptme": "missing",
+    "railway/opencode": "missing",
+    "railway/plandex": "missing",
+    "railway/kilocode": "missing"
   }
 }
