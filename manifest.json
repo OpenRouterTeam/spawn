@@ -30,7 +30,7 @@
     },
     "openclaw": {
       "name": "OpenClaw",
-      "description": "OpenRouter's agent framework with gateway + TUI",
+      "description": "Personal AI assistant with multi-channel gateway + TUI",
       "url": "https://github.com/OpenRouterTeam/openclaw",
       "install": "bun install -g openclaw",
       "launch": "openclaw tui",
