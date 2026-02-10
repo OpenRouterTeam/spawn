@@ -937,7 +937,7 @@
     "hyperstack/interpreter": "implemented",
     "hyperstack/gemini": "implemented",
     "hyperstack/amazonq": "implemented",
-    "hyperstack/cline": "missing",
+    "hyperstack/cline": "implemented",
     "hyperstack/gptme": "implemented",
     "hyperstack/opencode": "implemented",
     "hyperstack/plandex": "missing",
