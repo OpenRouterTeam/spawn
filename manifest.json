@@ -819,7 +819,7 @@
     "fluidstack/nanoclaw": "implemented",
     "fluidstack/aider": "implemented",
     "fluidstack/goose": "implemented",
-    "fluidstack/codex": "missing",
+    "fluidstack/codex": "implemented",
     "fluidstack/interpreter": "missing",
     "fluidstack/gemini": "missing",
     "fluidstack/amazonq": "missing",
