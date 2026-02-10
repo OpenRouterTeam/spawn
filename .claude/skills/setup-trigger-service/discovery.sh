@@ -118,6 +118,31 @@ PROMPT_EOF
 
 Your job: coordinate teammates to expand the spawn matrix. Use delegate mode — do NOT implement anything yourself. Only coordinate, review, and synthesize.
 
+## FIRST STEP: Update README Matrix (MANDATORY — do this BEFORE spawning teammates)
+
+Before doing anything else, sync the root `README.md` matrix table with `manifest.json`. This ensures the README reflects the current state before any new work begins. Run this script, then replace the matrix table between `## Matrix` and `### How it works` in README.md. Also update the stats line near the top (`**X agents. Y clouds. Z combinations. Zero config.**`).
+
+```bash
+python3 -c "
+import json
+m = json.load(open('manifest.json'))
+agents = list(m['agents'].keys())
+clouds = list(m['clouds'].keys())
+impl = sum(1 for v in m['matrix'].values() if v == 'implemented')
+print(f'Stats: {len(agents)} agents. {len(clouds)} clouds. {impl} combinations.')
+cols = ' | '.join(f'[{m[\"clouds\"][c][\"name\"]}]({c}/)' for c in clouds)
+print(f'| | {cols} |')
+print(f'|---|' + '|'.join(['---' for _ in clouds]) + '|')
+for a in agents:
+    name = m['agents'][a]['name']
+    url = m['agents'][a].get('url','')
+    cells = ' | '.join('✓' if m['matrix'].get(f'{c}/{a}') == 'implemented' else ' ' for c in clouds)
+    print(f'| [**{name}**]({url}) | {cells} |')
+"
+```
+
+Commit and push this README update directly to main before spawning any teammates. Use commit message: `docs: Sync README matrix with manifest.json`
+
 ## Time Budget
 
 Each cycle MUST complete within 45 minutes. This is a HARD deadline.
@@ -317,32 +342,11 @@ You MUST remain active until ALL of the following are true:
 
 ### CRITICAL: If you exit before completing this sequence, running agents will be orphaned and the cycle will be incomplete. You MUST wait for all teammates to shut down before exiting.
 
-## After EVERY change (MANDATORY):
+## FINAL STEP: Update README Matrix Again (MANDATORY — Team Lead does this LAST)
 
-After each PR is merged, one teammate MUST update the root `README.md` matrix table to reflect the current state. The matrix table in README.md must always match manifest.json. Run this to regenerate it:
+After ALL teammates have shut down and ALL PRs are merged, the team lead MUST sync the README matrix one final time. This catches any changes made during the cycle. Use the same python script from the FIRST STEP above. Commit directly to main with: `docs: Sync README matrix with manifest.json (post-cycle)`
 
-```bash
-python3 -c "
-import json
-m = json.load(open('manifest.json'))
-agents = list(m['agents'].keys())
-clouds = list(m['clouds'].keys())
-agent_meta = m['agents']
-cloud_meta = m['clouds']
-# Header
-cols = ' | '.join(f'[{cloud_meta[c][\"name\"]}]({c}/)' for c in clouds)
-print(f'| | {cols} |')
-print(f'|---|{\"|---\" * len(clouds)}|')
-# Rows
-for a in agents:
-    name = agent_meta[a]['name']
-    url = agent_meta[a].get('url','')
-    cells = ' | '.join('✓' if m['matrix'].get(f'{c}/{a}') == 'implemented' else ' ' for c in clouds)
-    print(f'| [**{name}**]({url}) | {cells} |')
-"
-```
-
-Copy the output and replace the matrix table between `## Matrix` and `## Development` in README.md. Include this update in the same PR or as a follow-up PR immediately after.
+The cycle is NOT complete until this final README update is committed and pushed.
 
 ## Rules for ALL teammates:
 - Read CLAUDE.md Shell Script Rules before writing ANY code
