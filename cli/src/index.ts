@@ -81,19 +81,37 @@ function checkUnknownFlags(args: string[]): void {
   }
 }
 
-async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
-  // Handle "spawn <agent> --help" / "spawn <agent> -h" / "spawn <agent> help"
-  if (cloud && HELP_FLAGS.includes(cloud)) {
-    // Could be "spawn <agent> --help" or "spawn <cloud> --help"
-    const manifest = await loadManifest();
-    if (manifest.agents[agent]) {
-      await cmdAgentInfo(agent);
-    } else if (manifest.clouds[agent]) {
-      await cmdCloudInfo(agent);
-    } else {
-      // Show help anyway - cmdAgentInfo will handle "unknown agent" error with its own suggestions
-      await cmdAgentInfo(agent);
+/** Show info for a name that could be an agent or cloud, or show an error with suggestions */
+async function showInfoOrError(name: string): Promise<void> {
+  const manifest = await loadManifest();
+  if (manifest.agents[name]) {
+    await cmdAgentInfo(name);
+  } else if (manifest.clouds[name]) {
+    await cmdCloudInfo(name);
+  } else {
+    const agentMatch = findClosestMatch(name, agentKeys(manifest));
+    const cloudMatch = findClosestMatch(name, cloudKeys(manifest));
+
+    console.error(pc.red(`Unknown command: ${pc.bold(name)}`));
+    console.error();
+    if (agentMatch && cloudMatch) {
+      console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent) or ${pc.cyan(cloudMatch)} (cloud)?`);
+    } else if (agentMatch) {
+      console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent)?`);
+    } else if (cloudMatch) {
+      console.error(`  Did you mean ${pc.cyan(cloudMatch)} (cloud)?`);
     }
+    console.error();
+    console.error(`  Run ${pc.cyan("spawn agents")} to see available agents.`);
+    console.error(`  Run ${pc.cyan("spawn clouds")} to see available clouds.`);
+    console.error(`  Run ${pc.cyan("spawn help")} for usage information.`);
+    process.exit(1);
+  }
+}
+
+async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
+  if (cloud && HELP_FLAGS.includes(cloud)) {
+    await showInfoOrError(agent);
     return;
   }
   if (cloud) {
@@ -104,34 +122,7 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
       console.error(`\nUsage: spawn ${agent} <cloud> --prompt "your prompt here"`);
       process.exit(1);
     }
-    // "spawn <name>" with no second arg: show agent info, or cloud info if it's a cloud name
-    const manifest = await loadManifest();
-    if (manifest.agents[agent]) {
-      await cmdAgentInfo(agent);
-    } else if (manifest.clouds[agent]) {
-      await cmdCloudInfo(agent);
-    } else {
-      // Input matches neither an agent nor a cloud - provide unified error with suggestions from both
-      const allAgents = agentKeys(manifest);
-      const allClouds = cloudKeys(manifest);
-      const agentMatch = findClosestMatch(agent, allAgents);
-      const cloudMatch = findClosestMatch(agent, allClouds);
-
-      console.error(pc.red(`Unknown command: ${pc.bold(agent)}`));
-      console.error();
-      if (agentMatch && cloudMatch) {
-        console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent) or ${pc.cyan(cloudMatch)} (cloud)?`);
-      } else if (agentMatch) {
-        console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent)?`);
-      } else if (cloudMatch) {
-        console.error(`  Did you mean ${pc.cyan(cloudMatch)} (cloud)?`);
-      }
-      console.error();
-      console.error(`  Run ${pc.cyan("spawn agents")} to see available agents.`);
-      console.error(`  Run ${pc.cyan("spawn clouds")} to see available clouds.`);
-      console.error(`  Run ${pc.cyan("spawn help")} for usage information.`);
-      process.exit(1);
-    }
+    await showInfoOrError(agent);
   }
 }
 
@@ -203,59 +194,38 @@ async function main(): Promise<void> {
       return;
     }
 
-    // If second arg is --help/-h, show general help for known subcommands
+    // Commands that print immediately (no help flag override)
+    const immediateCommands: Record<string, () => void> = {
+      "help": cmdHelp, "--help": cmdHelp, "-h": cmdHelp,
+      "version": () => console.log(`spawn v${VERSION}`),
+      "--version": () => console.log(`spawn v${VERSION}`),
+      "-v": () => console.log(`spawn v${VERSION}`),
+      "-V": () => console.log(`spawn v${VERSION}`),
+    };
+
+    if (immediateCommands[cmd]) {
+      immediateCommands[cmd]();
+      return;
+    }
+
+    // Subcommands that show help when passed --help/-h
+    const subcommands: Record<string, () => Promise<void>> = {
+      "list": cmdList, "ls": cmdList,
+      "agents": cmdAgents,
+      "clouds": cmdClouds,
+      "update": cmdUpdate,
+    };
+
     const hasHelpFlag = filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
 
-    switch (cmd) {
-      case "help":
-      case "--help":
-      case "-h":
+    if (subcommands[cmd]) {
+      if (hasHelpFlag) {
         cmdHelp();
-        break;
-
-      case "version":
-      case "--version":
-      case "-v":
-      case "-V":
-        console.log(`spawn v${VERSION}`);
-        break;
-
-      case "list":
-      case "ls":
-        if (hasHelpFlag) {
-          cmdHelp();
-        } else {
-          await cmdList();
-        }
-        break;
-
-      case "agents":
-        if (hasHelpFlag) {
-          cmdHelp();
-        } else {
-          await cmdAgents();
-        }
-        break;
-
-      case "clouds":
-        if (hasHelpFlag) {
-          cmdHelp();
-        } else {
-          await cmdClouds();
-        }
-        break;
-
-      case "update":
-        if (hasHelpFlag) {
-          cmdHelp();
-        } else {
-          await cmdUpdate();
-        }
-        break;
-
-      default:
-        await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt);
-        break;
+      } else {
+        await subcommands[cmd]();
+      }
+    } else {
+      await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt);
     }
   } catch (err) {
     handleError(err);
