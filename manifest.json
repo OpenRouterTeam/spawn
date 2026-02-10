@@ -1098,7 +1098,7 @@
     "render/gemini": "implemented",
     "render/amazonq": "implemented",
     "render/cline": "implemented",
-    "render/gptme": "missing",
+    "render/gptme": "implemented",
     "render/opencode": "missing",
     "render/plandex": "missing",
     "render/kilocode": "missing"
