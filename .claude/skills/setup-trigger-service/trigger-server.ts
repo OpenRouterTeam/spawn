@@ -187,18 +187,19 @@ function startStreamingRun(reason: string, issue: string): Response {
       const header = `[trigger] Run #${id} started (reason=${reason}${issue ? `, issue=#${issue}` : ""}, concurrent=${runs.size}/${MAX_CONCURRENT})\n`;
       enqueue(controller, encoder.encode(header));
 
-      // --- Heartbeat: emit every 30s of silence to keep proxy alive ---
+      // --- Heartbeat: emit every 15s of silence to keep connection alive ---
+      // Must fire well before Bun's idleTimeout (255s) and any proxy timeouts.
       let lastActivity = Date.now();
       const heartbeat = setInterval(() => {
         if (!clientConnected) return;
         const silentMs = Date.now() - lastActivity;
-        if (silentMs >= 29_000) {
+        if (silentMs >= 14_000) {
           const elapsed = Math.round((Date.now() - startedAt) / 1000);
           const msg = `[heartbeat] Run #${id} active (${elapsed}s elapsed)\n`;
           enqueue(controller, encoder.encode(msg));
           lastActivity = Date.now();
         }
-      }, 30_000);
+      }, 15_000);
 
       // --- Drain stdout + stderr concurrently ---
       async function drain(src: ReadableStream<Uint8Array> | null) {
@@ -270,6 +271,7 @@ function startStreamingRun(reason: string, issue: string): Response {
 
 const server = Bun.serve({
   port: PORT,
+  idleTimeout: 255, // max value (seconds) — prevent Bun from closing streaming connections during silent periods
   async fetch(req) {
     const url = new URL(req.url);
 
