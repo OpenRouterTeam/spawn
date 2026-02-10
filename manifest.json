@@ -896,7 +896,7 @@
     "vastai/cline": "missing",
     "vastai/gptme": "missing",
     "vastai/opencode": "implemented",
-    "vastai/plandex": "missing",
+    "vastai/plandex": "implemented",
     "vastai/kilocode": "missing"
   }
 }
