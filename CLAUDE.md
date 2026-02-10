@@ -236,6 +236,18 @@ macOS ships bash 3.2. All scripts MUST work on it:
 - Run tests with `bun test`
 - Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
 
+## CLI Version Management
+
+**CRITICAL: Bump the version on every CLI change!**
+
+- **ANY change to `cli/` requires a version bump** in `cli/package.json`
+- Use semantic versioning:
+  - **Patch** (0.2.X → 0.2.X+1): Bug fixes, minor improvements, documentation
+  - **Minor** (0.X.0 → 0.X+1.0): New features, significant improvements
+  - **Major** (X.0.0 → X+1.0.0): Breaking changes
+- The CLI has auto-update enabled — users get new versions immediately on next run
+- Version bumps ensure users always have the latest fixes and features
+
 ## Autonomous Loops
 
 When running autonomous improvement/refactoring loops (`./improve.sh --loop`):
