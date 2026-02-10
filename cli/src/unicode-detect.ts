@@ -5,7 +5,12 @@
 // Setting TERM=linux forces ASCII fallback symbols (>, *, |, etc.)
 
 const shouldForceAscii = (): boolean => {
-  // Explicit user override
+  // Explicit user override to enable Unicode
+  if (process.env.SPAWN_UNICODE === "1") {
+    return false;
+  }
+
+  // Explicit user override to force ASCII
   if (process.env.SPAWN_NO_UNICODE === "1" || process.env.SPAWN_ASCII === "1") {
     return true;
   }
@@ -20,7 +25,14 @@ const shouldForceAscii = (): boolean => {
     return true;
   }
 
-  return false;
+  // Check if we're in a cloud/remote environment that might not render unicode well
+  // Common patterns: SSH sessions, cloud shells, container terminals
+  if (process.env.SSH_CONNECTION || process.env.SSH_CLIENT || process.env.SSH_TTY) {
+    return true; // SSH sessions often have unicode rendering issues
+  }
+
+  // Default to ASCII for safety - users can opt-in with SPAWN_UNICODE=1
+  return true;
 };
 
 if (shouldForceAscii()) {
