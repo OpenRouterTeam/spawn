@@ -889,7 +889,7 @@
     "vastai/codex": "implemented",
     "vastai/openclaw": "implemented",
     "vastai/nanoclaw": "implemented",
-    "vastai/goose": "missing",
+    "vastai/goose": "implemented",
     "vastai/interpreter": "missing",
     "vastai/gemini": "implemented",
     "vastai/amazonq": "implemented",
