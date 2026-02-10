@@ -133,26 +133,35 @@ _render_create_service() {
     local service_name="$1"
     log_warn "Creating Render web service: $service_name"
 
+    # Build JSON body safely via Python to prevent injection
+    local body
+    body=$(printf '%s' "$service_name" | python3 -c "
+import json, sys
+name = sys.stdin.read()
+body = {
+    'type': 'web_service',
+    'name': name,
+    'runtime': 'docker',
+    'dockerfilePath': './Dockerfile',
+    'repo': 'https://github.com/render-examples/docker-hello-world',
+    'autoDeploy': 'yes',
+    'serviceDetails': {
+        'plan': 'starter',
+        'region': 'oregon',
+        'healthCheckPath': '/',
+        'env': 'docker',
+        'disk': None
+    }
+}
+print(json.dumps(body))
+")
+
     # Create service via API
     local create_response
     create_response=$(curl -s -X POST "https://api.render.com/v1/services" \
         -H "Authorization: Bearer ${RENDER_API_KEY}" \
         -H "Content-Type: application/json" \
-        -d "{
-            \"type\": \"web_service\",
-            \"name\": \"${service_name}\",
-            \"runtime\": \"docker\",
-            \"dockerfilePath\": \"./Dockerfile\",
-            \"repo\": \"https://github.com/render-examples/docker-hello-world\",
-            \"autoDeploy\": \"yes\",
-            \"serviceDetails\": {
-                \"plan\": \"starter\",
-                \"region\": \"oregon\",
-                \"healthCheckPath\": \"/\",
-                \"env\": \"docker\",
-                \"disk\": null
-            }
-        }" 2>&1)
+        -d "$body" 2>&1)
 
     if echo "$create_response" | grep -q "error"; then
         log_error "Failed to create Render service"
