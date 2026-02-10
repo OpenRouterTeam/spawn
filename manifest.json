@@ -842,7 +842,7 @@
     "fluidstack/cline": "implemented",
     "fluidstack/gptme": "implemented",
     "fluidstack/opencode": "implemented",
-    "fluidstack/plandex": "missing",
+    "fluidstack/plandex": "implemented",
     "fluidstack/kilocode": "missing",
     "civo/claude": "implemented",
     "civo/aider": "implemented",
