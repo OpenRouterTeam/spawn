@@ -893,7 +893,7 @@
     "vastai/interpreter": "missing",
     "vastai/gemini": "implemented",
     "vastai/amazonq": "implemented",
-    "vastai/cline": "missing",
+    "vastai/cline": "implemented",
     "vastai/gptme": "missing",
     "vastai/opencode": "implemented",
     "vastai/plandex": "implemented",
