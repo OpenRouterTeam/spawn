@@ -1099,7 +1099,7 @@
     "render/amazonq": "implemented",
     "render/cline": "implemented",
     "render/gptme": "implemented",
-    "render/opencode": "missing",
+    "render/opencode": "implemented",
     "render/plandex": "missing",
     "render/kilocode": "implemented"
   }
