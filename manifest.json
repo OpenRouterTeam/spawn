@@ -1086,7 +1086,7 @@
     "railway/cline": "implemented",
     "railway/gptme": "implemented",
     "railway/opencode": "implemented",
-    "railway/plandex": "missing",
+    "railway/plandex": "implemented",
     "railway/kilocode": "implemented",
     "render/claude": "implemented",
     "render/openclaw": "implemented",
