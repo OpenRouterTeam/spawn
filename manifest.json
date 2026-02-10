@@ -588,6 +588,21 @@
         "image": "Ubuntu Server 24.04 LTS R5504 UEFI"
       },
       "notes": "GPU cloud provider. Competitive pricing on RTX A6000 ($0.50/hr). Requires HYPERSTACK_API_KEY from https://infrahub.hyperstack.cloud"
+    },
+    "koyeb": {
+      "name": "Koyeb",
+      "description": "Koyeb serverless container platform via CLI",
+      "url": "https://www.koyeb.com/",
+      "type": "cli",
+      "auth": "KOYEB_TOKEN",
+      "provision_method": "koyeb service create with docker image",
+      "exec_method": "koyeb instances exec",
+      "interactive_method": "koyeb instances exec (PTY)",
+      "defaults": {
+        "instance_type": "nano",
+        "region": "was"
+      },
+      "notes": "Serverless container platform. Free tier available (no credit card). Per-second billing. Requires koyeb CLI."
     }
   },
   "matrix": {
@@ -926,6 +941,20 @@
     "hyperstack/gptme": "missing",
     "hyperstack/opencode": "missing",
     "hyperstack/plandex": "missing",
-    "hyperstack/kilocode": "missing"
+    "hyperstack/kilocode": "missing",
+    "koyeb/claude": "implemented",
+    "koyeb/openclaw": "implemented",
+    "koyeb/nanoclaw": "missing",
+    "koyeb/aider": "implemented",
+    "koyeb/goose": "missing",
+    "koyeb/codex": "missing",
+    "koyeb/interpreter": "missing",
+    "koyeb/gemini": "missing",
+    "koyeb/amazonq": "missing",
+    "koyeb/cline": "missing",
+    "koyeb/gptme": "missing",
+    "koyeb/opencode": "missing",
+    "koyeb/plandex": "missing",
+    "koyeb/kilocode": "missing"
   }
 }
