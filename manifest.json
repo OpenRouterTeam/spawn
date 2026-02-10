@@ -1096,7 +1096,7 @@
     "render/codex": "implemented",
     "render/interpreter": "implemented",
     "render/gemini": "implemented",
-    "render/amazonq": "missing",
+    "render/amazonq": "implemented",
     "render/cline": "missing",
     "render/gptme": "missing",
     "render/opencode": "missing",
