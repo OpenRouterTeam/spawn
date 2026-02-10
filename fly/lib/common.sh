@@ -74,7 +74,7 @@ _save_fly_token() {
     local config_dir="$HOME/.config/spawn"
     local config_file="$config_dir/fly.json"
     mkdir -p "$config_dir"
-    printf '{\n  "token": "%s"\n}\n' "$(json_escape "$token")" > "$config_file"
+    printf '{\n  "token": %s\n}\n' "$(json_escape "$token")" > "$config_file"
     chmod 600 "$config_file"
 }
 

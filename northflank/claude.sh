@@ -47,7 +47,7 @@ fi
 # 6. Inject environment variables into shell configs
 log_warn "Setting up environment variables..."
 
-inject_env_vars_local upload_file run_server \
+inject_env_vars_northflank \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
     "ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}" \

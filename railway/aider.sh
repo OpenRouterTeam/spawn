@@ -12,11 +12,11 @@ fi
 log_info "Aider on Railway"
 echo ""
 
-# 1. Ensure Railway CLI and token
+# 1. Ensure Railway CLI and API token
 ensure_railway_cli
 ensure_railway_token
 
-# 2. Get project name and create service
+# 2. Create service
 SERVER_NAME=$(get_server_name)
 create_server "$SERVER_NAME"
 
@@ -39,20 +39,20 @@ fi
 # 6. Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
-# 7. Inject environment variables into shell config
+# 7. Inject environment variables
 log_warn "Setting up environment variables..."
 
-inject_env_vars_railway \
+inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "PATH=\$HOME/.bun/bin:\$PATH"
+    "PATH=\$HOME/.local/bin:\$PATH"
 
 echo ""
 log_info "Railway service setup completed successfully!"
-log_info "Project: $SERVER_NAME"
+log_info "Service: $RAILWAY_SERVICE_NAME"
 echo ""
 
 # 8. Start Aider interactively
 log_warn "Starting Aider..."
 sleep 1
 clear
-interactive_session "source ~/.bashrc && aider --model openrouter/${MODEL_ID}"
+interactive_session "source /root/.bashrc && aider --model openrouter/${MODEL_ID}"

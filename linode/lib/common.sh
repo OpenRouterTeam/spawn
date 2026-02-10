@@ -113,40 +113,31 @@ get_server_name() {
 
 # get_cloud_init_userdata is now defined in shared/common.sh
 
-create_server() {
-    local name="$1"
-    local type="${LINODE_TYPE:-g6-standard-1}"
-    local region="${LINODE_REGION:-us-east}"
-    local image="linode/ubuntu24.04"
-
-    # Validate env var inputs to prevent injection into Python code
-    validate_resource_name "$type" || { log_error "Invalid LINODE_TYPE"; return 1; }
-    validate_region_name "$region" || { log_error "Invalid LINODE_REGION"; return 1; }
-
-    log_warn "Creating Linode '$name' (type: $type, region: $region)..."
-
-    # Get all SSH key IDs
+# Fetch all authorized SSH public keys from Linode profile
+_linode_fetch_ssh_keys() {
     local ssh_keys_response
     ssh_keys_response=$(linode_api GET "/profile/sshkeys")
-    local authorized_keys
-    authorized_keys=$(python3 -c "
+    python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
 keys = [k['ssh_key'] for k in data.get('data', [])]
 print(json.dumps(keys))
-" <<< "$ssh_keys_response")
+" <<< "$ssh_keys_response"
+}
+
+# Build the JSON request body for Linode instance creation
+_linode_build_create_payload() {
+    local name="$1" region="$2" type="$3" image="$4" authorized_keys="$5"
 
     local userdata
     userdata=$(get_cloud_init_userdata)
     local userdata_b64
     userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
 
-    # Generate a root password (required by Linode API)
     local root_pass
     root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#$') for _ in range(32)))")
 
-    local body
-    body=$(python3 -c "
+    python3 -c "
 import json
 body = {
     'label': '$name',
@@ -161,7 +152,49 @@ body = {
     'booted': True
 }
 print(json.dumps(body))
-")
+"
+}
+
+# Poll Linode API until instance is running, sets LINODE_SERVER_IP
+_linode_wait_for_active() {
+    local server_id="$1"
+    log_warn "Waiting for Linode to become active..."
+    local max_attempts=60 attempt=1
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local status_response
+        status_response=$(linode_api GET "/linode/instances/$server_id")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['status'])")
+
+        if [[ "$status" == "running" ]]; then
+            LINODE_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['ipv4'][0])")
+            export LINODE_SERVER_IP
+            log_info "Linode active: IP=$LINODE_SERVER_IP"
+            return 0
+        fi
+        log_warn "Linode status: $status ($attempt/$max_attempts)"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"; attempt=$((attempt + 1))
+    done
+    log_error "Linode did not become active in time"; return 1
+}
+
+create_server() {
+    local name="$1"
+    local type="${LINODE_TYPE:-g6-standard-1}"
+    local region="${LINODE_REGION:-us-east}"
+    local image="linode/ubuntu24.04"
+
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$type" || { log_error "Invalid LINODE_TYPE"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid LINODE_REGION"; return 1; }
+
+    log_warn "Creating Linode '$name' (type: $type, region: $region)..."
+
+    local authorized_keys
+    authorized_keys=$(_linode_fetch_ssh_keys)
+
+    local body
+    body=$(_linode_build_create_payload "$name" "$region" "$type" "$image" "$authorized_keys")
 
     local response
     response=$(linode_api POST "/linode/instances" "$body")
@@ -173,7 +206,6 @@ print(json.dumps(body))
     else
         log_error "Failed to create Linode instance"
 
-        # Parse error details
         local error_msg
         error_msg=$(echo "$response" | python3 -c "
 import json,sys
@@ -192,25 +224,7 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
         return 1
     fi
 
-    # Wait for Linode to become running and get IP
-    log_warn "Waiting for Linode to become active..."
-    local max_attempts=60 attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(linode_api GET "/linode/instances/$LINODE_SERVER_ID")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['status'])")
-
-        if [[ "$status" == "running" ]]; then
-            LINODE_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['ipv4'][0])")
-            export LINODE_SERVER_IP
-            log_info "Linode active: IP=$LINODE_SERVER_IP"
-            return 0
-        fi
-        log_warn "Linode status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"; ((attempt++))
-    done
-    log_error "Linode did not become active in time"; return 1
+    _linode_wait_for_active "$LINODE_SERVER_ID"
 }
 
 verify_server_connectivity() {

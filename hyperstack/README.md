@@ -1,21 +1,101 @@
-# Hyperstack Cloud Scripts
+# Hyperstack
 
-Spawn scripts for deploying AI agents on [Hyperstack](https://www.hyperstack.cloud/) GPU cloud infrastructure.
+Hyperstack GPU cloud via REST API. [Hyperstack](https://www.hyperstack.cloud/)
 
-## What is Hyperstack?
+> Hyperstack (formerly NexGen Cloud) offers NVIDIA GPUs with pay-per-minute billing.
 
-Hyperstack (formerly NexGen Cloud) is a GPU cloud provider offering competitive pricing on NVIDIA GPUs, including:
-- **RTX A6000** (48GB) - $0.50/hour on-demand, $0.35/hour reserved
-- **RTX A4000**, **A100**, **H100**, and other high-performance GPUs
-- Pay-per-minute billing for on-demand instances
-- Global availability across multiple regions
+## Agents
+
+#### Claude Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/claude.sh)
+```
+
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/nanoclaw.sh)
+```
+
+#### Aider
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/aider.sh)
+```
+
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/goose.sh)
+```
+
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/codex.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/interpreter.sh)
+```
+
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/gemini.sh)
+```
+
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/amazonq.sh)
+```
+
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/cline.sh)
+```
+
+#### gptme
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/gptme.sh)
+```
+
+#### OpenCode
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/opencode.sh)
+```
+
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/plandex.sh)
+```
+
+#### Kilo Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/kilocode.sh)
+```
 
 ## Setup
 
 ### 1. Get Hyperstack API Key
 
 1. Sign up at [Hyperstack Infrahub](https://infrahub.hyperstack.cloud)
-2. Navigate to **Settings → API Keys**
+2. Navigate to **Settings -> API Keys**
 3. Create a new API key
 4. Copy the API key
 
@@ -39,55 +119,27 @@ curl -H "api_key: YOUR_API_KEY" \
   https://infrahub-api.nexgencloud.com/v1/core/environments | jq '.environments[] | {name, region}'
 ```
 
-## Usage
+## Non-Interactive Mode
 
 ```bash
-# Claude Code on Hyperstack
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/claude.sh)
-
-# Aider on Hyperstack
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/aider.sh)
-
-# OpenClaw on Hyperstack
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/openclaw.sh)
-
-# NanoClaw on Hyperstack
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/nanoclaw.sh)
-
-# Goose on Hyperstack
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/goose.sh)
-
-# Codex on Hyperstack
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/codex.sh)
-
-# Open Interpreter on Hyperstack
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/interpreter.sh)
-
-# Gemini CLI on Hyperstack
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/gemini.sh)
+HYPERSTACK_API_KEY=your-key \
+HYPERSTACK_ENVIRONMENT=default-CANADA-1 \
+HYPERSTACK_VM_NAME=my-vm \
+OPENROUTER_API_KEY=sk-or-v1-xxxxx \
+  bash <(curl -fsSL https://openrouter.ai/lab/spawn/hyperstack/claude.sh)
 ```
 
-## Configuration Options
+## Environment Variables
 
-### Environment Variables
-
-- `HYPERSTACK_API_KEY` - API key from Hyperstack Infrahub (required)
-- `HYPERSTACK_ENVIRONMENT` - Environment name (e.g., `default-CANADA-1`)
-- `HYPERSTACK_FLAVOR` - VM flavor/size (default: `n1-cpu-small`)
-- `HYPERSTACK_IMAGE` - OS image (default: `Ubuntu Server 24.04 LTS R5504 UEFI`)
-- `HYPERSTACK_VM_NAME` - Custom VM name (default: prompts interactively)
-- `HYPERSTACK_SSH_KEY_NAME` - SSH key name (default: `spawn-key-$(whoami)`)
-
-### Example with Environment Variables
-
-```bash
-export HYPERSTACK_API_KEY="your-key"
-export HYPERSTACK_ENVIRONMENT="default-CANADA-1"
-export HYPERSTACK_FLAVOR="n1-cpu-medium"
-export HYPERSTACK_VM_NAME="my-claude-vm"
-
-bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/claude.sh)
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `HYPERSTACK_API_KEY` | API key from Hyperstack Infrahub | _(required)_ |
+| `HYPERSTACK_ENVIRONMENT` | Environment name | _(prompted)_ |
+| `HYPERSTACK_FLAVOR` | VM flavor/size | `n1-cpu-small` |
+| `HYPERSTACK_IMAGE` | OS image | `Ubuntu Server 24.04 LTS R5504 UEFI` |
+| `HYPERSTACK_VM_NAME` | Custom VM name | _(prompted)_ |
+| `HYPERSTACK_SSH_KEY_NAME` | SSH key name | `spawn-key-$(whoami)` |
+| `OPENROUTER_API_KEY` | OpenRouter API key | _(OAuth or prompted)_ |
 
 ## Available Flavors
 
@@ -123,19 +175,6 @@ Hyperstack uses pay-per-minute billing for on-demand instances. Pricing is calcu
 
 Check current pricing at [Hyperstack Pricing](https://www.hyperstack.cloud/pricing) or via the API pricebook endpoints.
 
-## API Documentation
-
-Full API reference: [Hyperstack API Docs](https://docs.hyperstack.cloud)
-
-Base URL: `https://infrahub-api.nexgencloud.com/v1`
-
-## Billing Notes
-
-- VMs are only billed when in `ACTIVE` or `SHUTOFF` states
-- `HIBERNATED` VMs only charge for storage and public IP
-- Transitional states (e.g., `HIBERNATING`, `RESTORING`) are not charged
-- Minimum billing period is 1 minute
-
 ## Troubleshooting
 
 ### API Key Invalid
@@ -159,9 +198,3 @@ Common issues:
 - Flavor not available in the selected region
 - SSH key name conflicts with existing key
 - Invalid security rules
-
-## Support
-
-- [Hyperstack Documentation](https://docs.hyperstack.cloud)
-- [Hyperstack Support](https://www.hyperstack.cloud/support)
-- [Spawn GitHub Issues](https://github.com/OpenRouterTeam/spawn/issues)
