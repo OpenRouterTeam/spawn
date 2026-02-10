@@ -174,6 +174,57 @@ delete_codespace() {
     }
 }
 
+# Upload a file to codespace via gh codespace cp
+# Args: $1 = local path
+#       $2 = remote path
+upload_file() {
+    local local_path="$1"
+    local remote_path="$2"
+
+    if [[ ! -f "$local_path" ]]; then
+        log_error "Local file not found: $local_path"
+        return 1
+    fi
+
+    if [[ -z "${CODESPACE_NAME:-}" ]]; then
+        log_error "CODESPACE_NAME not set. Call create_codespace first."
+        return 1
+    fi
+
+    gh codespace cp "$local_path" "${CODESPACE_NAME}:${remote_path}"
+}
+
+# Run a command on the codespace (wrapper matching other providers' interface)
+run_server() {
+    local cmd="$1"
+
+    if [[ -z "${CODESPACE_NAME:-}" ]]; then
+        log_error "CODESPACE_NAME not set. Call create_codespace first."
+        return 1
+    fi
+
+    gh codespace ssh --codespace "$CODESPACE_NAME" -- bash -c "$cmd"
+}
+
+# Inject environment variables into shell config
+# Writes to a temp file and uploads to avoid shell interpolation of values
+inject_env_vars() {
+    log_warn "Injecting environment variables..."
+
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    generate_env_config "$@" > "${env_temp}"
+
+    # Upload and append to .bashrc
+    upload_file "${env_temp}" "/tmp/env_config"
+    run_server "cat /tmp/env_config >> ~/.bashrc && rm /tmp/env_config"
+
+    log_info "Environment variables configured"
+}
+
 # Get codespace info
 # Args: $1 = codespace name
 get_codespace_info() {

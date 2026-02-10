@@ -31,12 +31,15 @@ fi
 
 log_info "Codespace created: $CODESPACE"
 
+# Set CODESPACE_NAME for upload_file/run_server/inject_env_vars helpers
+CODESPACE_NAME="$CODESPACE"
+
 # 3. Wait for codespace to be ready
 wait_for_codespace "$CODESPACE"
 
 # 4. Install gptme
 log_warn "Installing gptme..."
-run_in_codespace "$CODESPACE" "pip install gptme 2>/dev/null || pip3 install gptme"
+run_server "pip install gptme 2>/dev/null || pip3 install gptme"
 log_info "gptme installed"
 
 # 5. Get OpenRouter API key
@@ -50,16 +53,9 @@ fi
 # 6. Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
-# 7. Inject environment variables into ~/.bashrc
-log_warn "Setting up environment variables..."
-
-ENV_VARS="
-export OPENROUTER_API_KEY='${OPENROUTER_API_KEY}'
-"
-
-run_in_codespace "$CODESPACE" "cat >> ~/.bashrc << 'ENVEOF'
-$ENV_VARS
-ENVEOF"
+# 7. Inject environment variables via safe temp file upload
+inject_env_vars \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
 log_info "GitHub Codespace setup completed successfully!"
@@ -73,4 +69,4 @@ echo ""
 sleep 1
 
 # Launch gptme with model
-run_in_codespace "$CODESPACE" "source ~/.bashrc && gptme -m openrouter/${MODEL_ID}"
+run_server "source ~/.bashrc && gptme -m openrouter/${MODEL_ID}"
