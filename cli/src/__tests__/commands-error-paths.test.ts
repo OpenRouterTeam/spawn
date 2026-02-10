@@ -27,6 +27,7 @@ const mockManifest = createMockManifest();
 const mockLogError = mock(() => {});
 const mockLogInfo = mock(() => {});
 const mockLogStep = mock(() => {});
+const mockLogWarn = mock(() => {});
 const mockSpinnerStart = mock(() => {});
 const mockSpinnerStop = mock(() => {});
 
@@ -40,6 +41,7 @@ mock.module("@clack/prompts", () => ({
     step: mockLogStep,
     info: mockLogInfo,
     error: mockLogError,
+    warn: mockLogWarn,
   },
   intro: mock(() => {}),
   outro: mock(() => {}),
@@ -61,6 +63,7 @@ describe("Commands Error Paths", () => {
     mockLogError.mockClear();
     mockLogInfo.mockClear();
     mockLogStep.mockClear();
+    mockLogWarn.mockClear();
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
@@ -345,6 +348,51 @@ describe("Commands Error Paths", () => {
 
       const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
+    });
+  });
+
+  // ── cmdRun: swapped arguments detection ──────────────────────────────
+
+  describe("cmdRun - swapped arguments detection", () => {
+    it("should detect when cloud and agent arguments are swapped", async () => {
+      // "spawn sprite claude" should detect that sprite is a cloud and claude is an agent
+      await expect(cmdRun("sprite", "claude")).rejects.toThrow("process.exit");
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
+    });
+
+    it("should suggest the correct argument order when swapped", async () => {
+      await expect(cmdRun("sprite", "claude")).rejects.toThrow("process.exit");
+
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("spawn claude sprite"))).toBe(true);
+    });
+
+    it("should suggest correct order for hetzner/aider swap", async () => {
+      await expect(cmdRun("hetzner", "aider")).rejects.toThrow("process.exit");
+
+      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
+
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("spawn aider hetzner"))).toBe(true);
+    });
+
+    it("should NOT trigger swap detection when both args are unknown", async () => {
+      await expect(cmdRun("unknown1", "unknown2")).rejects.toThrow("process.exit");
+
+      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(false);
+    });
+
+    it("should NOT trigger swap detection when agent is valid", async () => {
+      // "spawn claude nonexistent" - agent is valid, cloud is not
+      await expect(cmdRun("claude", "nonexistent")).rejects.toThrow("process.exit");
+
+      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(false);
     });
   });
 });

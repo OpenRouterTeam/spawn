@@ -244,14 +244,22 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
     process.exit(1);
   }
 
+  validateNonEmptyString(agent, "Agent name", "spawn agents");
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
 
-  const [manifest, agentKey] = await validateAndGetAgent(agent);
+  // Detect swapped arguments: user typed "spawn <cloud> <agent>" instead of "spawn <agent> <cloud>"
+  const manifest = await loadManifestWithSpinner();
+  if (!manifest.agents[agent] && manifest.clouds[agent] && manifest.agents[cloud]) {
+    p.log.warn(`It looks like you swapped the agent and cloud arguments.`);
+    p.log.info(`Try: ${pc.cyan(`spawn ${cloud} ${agent}`)}`);
+    process.exit(1);
+  }
 
+  validateAgent(manifest, agent);
   validateCloud(manifest, cloud);
-  validateImplementation(manifest, cloud, agentKey);
+  validateImplementation(manifest, cloud, agent);
 
-  const agentName = manifest.agents[agentKey].name;
+  const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
 
   if (prompt) {
@@ -260,7 +268,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
     p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}...`);
   }
 
-  await execScript(cloud, agentKey, prompt);
+  await execScript(cloud, agent, prompt);
 }
 
 function getStatusDescription(status: number): string {
@@ -446,7 +454,7 @@ export async function cmdAgents(): Promise<void> {
   for (const key of agentKeys(manifest)) {
     const a = manifest.agents[key];
     const implCount = getImplementedClouds(manifest, key).length;
-    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} clouds  ${a.description}`)}`);
+    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} cloud${implCount !== 1 ? "s" : ""}  ${a.description}`)}`);
   }
   console.log();
   console.log(pc.dim(`  Run ${pc.cyan("spawn <agent>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
@@ -464,7 +472,7 @@ export async function cmdClouds(): Promise<void> {
   for (const key of cloudKeys(manifest)) {
     const c = manifest.clouds[key];
     const implCount = getImplementedAgents(manifest, key).length;
-    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} agents  ${c.description}`)}`);
+    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} agent${implCount !== 1 ? "s" : ""}  ${c.description}`)}`);
   }
   console.log();
   console.log(pc.dim(`  Run ${pc.cyan("spawn <agent> <cloud>")} to launch.`));

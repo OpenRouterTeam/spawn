@@ -27,6 +27,7 @@ mock.module("@clack/prompts", () => ({
   log: {
     step: mock(() => {}),
     info: mock(() => {}),
+    warn: mock(() => {}),
     error: mock(() => {}),
   },
   intro: mock(() => {}),
@@ -137,7 +138,8 @@ describe("Command Output Functions", () => {
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       // claude has 2 clouds (sprite, hetzner), aider has 1 (sprite)
       expect(output).toContain("2 clouds");
-      expect(output).toContain("1 clouds");
+      expect(output).toContain("1 cloud");
+      expect(output).not.toContain("1 clouds");
     });
 
     it("should show agent descriptions", async () => {
@@ -187,7 +189,8 @@ describe("Command Output Functions", () => {
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       // sprite has 2 agents (claude, aider), hetzner has 1 (claude)
       expect(output).toContain("2 agents");
-      expect(output).toContain("1 agents");
+      expect(output).toContain("1 agent");
+      expect(output).not.toContain("1 agents");
     });
 
     it("should show cloud descriptions", async () => {
