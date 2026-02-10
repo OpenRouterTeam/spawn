@@ -918,7 +918,7 @@
     "hyperstack/nanoclaw": "missing",
     "hyperstack/aider": "implemented",
     "hyperstack/goose": "missing",
-    "hyperstack/codex": "missing",
+    "hyperstack/codex": "implemented",
     "hyperstack/interpreter": "missing",
     "hyperstack/gemini": "missing",
     "hyperstack/amazonq": "missing",
