@@ -940,7 +940,7 @@
     "hyperstack/cline": "missing",
     "hyperstack/gptme": "implemented",
     "hyperstack/opencode": "implemented",
-    "hyperstack/plandex": "missing",
+    "hyperstack/plandex": "implemented",
     "hyperstack/kilocode": "missing",
     "koyeb/claude": "implemented",
     "koyeb/openclaw": "implemented",
