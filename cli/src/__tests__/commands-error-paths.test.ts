@@ -49,7 +49,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import commands after @clack/prompts mock is set up
-const { cmdRun, cmdAgentInfo } = await import("../commands.js");
+const { cmdRun, cmdAgentInfo, findClosestMatch } = await import("../commands.js");
 
 describe("Commands Error Paths", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -280,6 +280,67 @@ describe("Commands Error Paths", () => {
     it("should reject empty agent name", async () => {
       await expect(cmdRun("", "sprite")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  // ── "Did you mean?" suggestions ────────────────────────────────────────
+
+  describe("Did you mean suggestions", () => {
+    it("should suggest close agent match for typo", async () => {
+      // "claud" is 1 edit away from "claude"
+      await expect(cmdRun("claud", "sprite")).rejects.toThrow("process.exit");
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Did you mean") && msg.includes("claude"))).toBe(true);
+    });
+
+    it("should suggest close cloud match for typo", async () => {
+      // "sprit" is 1 edit away from "sprite"
+      await expect(cmdRun("claude", "sprit")).rejects.toThrow("process.exit");
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Did you mean") && msg.includes("sprite"))).toBe(true);
+    });
+
+    it("should not suggest match for completely different name", async () => {
+      await expect(cmdRun("xyzabc", "sprite")).rejects.toThrow("process.exit");
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Did you mean"))).toBe(false);
+    });
+  });
+
+  // ── findClosestMatch unit tests ─────────────────────────────────────
+
+  describe("findClosestMatch", () => {
+    it("should find exact match", () => {
+      expect(findClosestMatch("claude", ["claude", "aider"])).toBe("claude");
+    });
+
+    it("should find match with 1 edit distance", () => {
+      expect(findClosestMatch("claud", ["claude", "aider"])).toBe("claude");
+    });
+
+    it("should find match with 2 edit distance", () => {
+      expect(findClosestMatch("clode", ["claude", "aider"])).toBe("claude");
+    });
+
+    it("should return null when no match is close enough", () => {
+      expect(findClosestMatch("xyzabc", ["claude", "aider"], 3)).toBeNull();
+    });
+
+    it("should be case-insensitive", () => {
+      expect(findClosestMatch("Claude", ["claude", "aider"])).toBe("claude");
+    });
+
+    it("should return closest of multiple candidates", () => {
+      expect(findClosestMatch("sprit", ["sprite", "hetzner"])).toBe("sprite");
+    });
+
+    it("should respect maxDistance parameter", () => {
+      expect(findClosestMatch("claud", ["claude"], 0)).toBeNull();
+      expect(findClosestMatch("claud", ["claude"], 1)).toBe("claude");
+    });
+
+    it("should handle empty candidates", () => {
+      expect(findClosestMatch("test", [])).toBeNull();
     });
   });
 

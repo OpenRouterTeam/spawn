@@ -21,6 +21,37 @@ import { validateIdentifier, validateScriptContent, validatePrompt } from "./sec
 
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 
+/** Simple Levenshtein distance for "did you mean?" suggestions */
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/** Find the closest match from a list of candidates, or null if none are close enough */
+export function findClosestMatch(input: string, candidates: string[], maxDistance = 3): string | null {
+  let best: string | null = null;
+  let bestDist = maxDistance + 1;
+  for (const c of candidates) {
+    const d = levenshtein(input.toLowerCase(), c.toLowerCase());
+    if (d < bestDist) {
+      bestDist = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
 function getErrorMessage(err: unknown): string {
   // Use duck typing instead of instanceof to avoid prototype chain issues
   return err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
@@ -96,6 +127,16 @@ function getImplementedClouds(manifest: Manifest, agent: string): string[] {
 function validateAgent(manifest: Manifest, agent: string): asserts agent is keyof typeof manifest.agents {
   if (!manifest.agents[agent]) {
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+    const keys = agentKeys(manifest);
+    const names = keys.map((k) => manifest.agents[k].name);
+    const match = findClosestMatch(agent, [...keys, ...names]);
+    if (match) {
+      // If match is a display name, find the corresponding key
+      const matchKey = keys.find((k) => k === match || manifest.agents[k].name === match);
+      if (matchKey) {
+        p.log.info(`Did you mean ${pc.cyan(matchKey)} (${manifest.agents[matchKey].name})?`);
+      }
+    }
     p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
     process.exit(1);
   }
@@ -120,6 +161,15 @@ async function validateAndGetAgent(agent: string): Promise<[manifest: Manifest, 
 function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyof typeof manifest.clouds {
   if (!manifest.clouds[cloud]) {
     p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
+    const keys = cloudKeys(manifest);
+    const names = keys.map((k) => manifest.clouds[k].name);
+    const match = findClosestMatch(cloud, [...keys, ...names]);
+    if (match) {
+      const matchKey = keys.find((k) => k === match || manifest.clouds[k].name === match);
+      if (matchKey) {
+        p.log.info(`Did you mean ${pc.cyan(matchKey)} (${manifest.clouds[matchKey].name})?`);
+      }
+    }
     p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
     process.exit(1);
   }
