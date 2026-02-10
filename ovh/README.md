@@ -49,6 +49,18 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/codex.sh)
 ```
 
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/goose.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/interpreter.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
