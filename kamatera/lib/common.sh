@@ -29,71 +29,59 @@ INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}
 KAMATERA_COMMAND_TIMEOUT=${KAMATERA_COMMAND_TIMEOUT:-600}  # 10 minutes for async commands
 
 # Kamatera API wrapper - uses AuthClientId/AuthSecret headers instead of Bearer token
+# Delegates to generic_cloud_api_custom_auth for retry logic and error handling
 kamatera_api() {
     local method="$1"
     local endpoint="$2"
     local body="${3:-}"
     local max_retries="${4:-3}"
+    generic_cloud_api_custom_auth "$KAMATERA_API_BASE" "$method" "$endpoint" "$body" "$max_retries" \
+        -H "AuthClientId: ${KAMATERA_API_CLIENT_ID}" \
+        -H "AuthSecret: ${KAMATERA_API_SECRET}"
+}
 
-    local attempt=1
-    local interval=2
-    local max_interval=30
+# Try to load Kamatera credentials from config file
+# Returns 0 if loaded, 1 otherwise
+_load_kamatera_config() {
+    local config_file="$1"
+    [[ -f "$config_file" ]] || return 1
 
-    while [[ "$attempt" -le "$max_retries" ]]; do
-        local args=(
-            -s
-            -w "\n%{http_code}"
-            -X "$method"
-            -H "AuthClientId: ${KAMATERA_API_CLIENT_ID}"
-            -H "AuthSecret: ${KAMATERA_API_SECRET}"
-            -H "Content-Type: application/json"
-        )
+    local creds
+    creds=$(python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(d.get('api_client_id', ''))
+print(d.get('api_secret', ''))
+" "$config_file" 2>/dev/null) || return 1
 
-        if [[ -n "$body" ]]; then
-            args+=(-d "$body")
-        fi
+    [[ -n "${creds}" ]] || return 1
 
-        local response
-        response=$(curl "${args[@]}" "${KAMATERA_API_BASE}${endpoint}" 2>&1)
-        local curl_exit_code=$?
-
-        local http_code
-        http_code=$(printf '%s' "$response" | tail -1)
-        local response_body
-        response_body=$(printf '%s' "$response" | head -n -1)
-
-        # Success case
-        if [[ "$curl_exit_code" -eq 0 ]] && [[ "$http_code" != "429" ]] && [[ "$http_code" != "503" ]]; then
-            printf '%s' "$response_body"
-            return 0
-        fi
-
-        # Decide whether to retry
-        local should_retry=false
-        if [[ "$curl_exit_code" -ne 0 ]]; then
-            _api_should_retry_on_error "$attempt" "$max_retries" "$interval" "$max_interval" "Kamatera API network error" && should_retry=true
-            if [[ "$should_retry" != "true" ]]; then
-                log_error "Kamatera API network error after $max_retries attempts"
-                return 1
-            fi
-        else
-            _api_handle_transient_http_error "$http_code" "$attempt" "$max_retries" "$interval" "$max_interval" && should_retry=true
-            if [[ "$should_retry" != "true" ]]; then
-                printf '%s' "$response_body"
-                return 1
-            fi
-        fi
-
-        # Backoff
-        interval=$((interval * 2))
-        if [[ "$interval" -gt "$max_interval" ]]; then
-            interval="$max_interval"
-        fi
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Kamatera API retry logic exhausted"
+    local saved_client_id saved_secret
+    { read -r saved_client_id; read -r saved_secret; } <<< "${creds}"
+    if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]]; then
+        export KAMATERA_API_CLIENT_ID="$saved_client_id"
+        export KAMATERA_API_SECRET="$saved_secret"
+        log_info "Using Kamatera API credentials from $config_file"
+        return 0
+    fi
     return 1
+}
+
+# Validate Kamatera credentials with a test API call
+# Returns 0 if valid, 1 otherwise (unsets credentials on failure)
+_validate_kamatera_credentials() {
+    local response
+    response=$(kamatera_api POST "/service/server/info" '{"name":"__test__"}')
+    if printf '%s' "$response" | grep -qi "authentication failed\|unauthorized\|invalid.*auth"; then
+        log_error "Authentication failed: Invalid Kamatera API credentials"
+        log_warn "Remediation steps:"
+        log_warn "  1. Verify credentials at: https://console.kamatera.com/keys"
+        log_warn "  2. Ensure the API key has appropriate permissions"
+        unset KAMATERA_API_CLIENT_ID
+        unset KAMATERA_API_SECRET
+        return 1
+    fi
+    return 0
 }
 
 ensure_kamatera_token() {
@@ -104,27 +92,10 @@ ensure_kamatera_token() {
         return 0
     fi
 
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/kamatera.json"
+    local config_file="$HOME/.config/spawn/kamatera.json"
 
-    if [[ -f "$config_file" ]]; then
-        local creds
-        creds=$(python3 -c "
-import json, sys
-d = json.load(open(sys.argv[1]))
-print(d.get('api_client_id', ''))
-print(d.get('api_secret', ''))
-" "$config_file" 2>/dev/null) || true
-        if [[ -n "${creds}" ]]; then
-            local saved_client_id saved_secret
-            { read -r saved_client_id; read -r saved_secret; } <<< "${creds}"
-            if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]]; then
-                export KAMATERA_API_CLIENT_ID="$saved_client_id"
-                export KAMATERA_API_SECRET="$saved_secret"
-                log_info "Using Kamatera API credentials from $config_file"
-                return 0
-            fi
-        fi
+    if _load_kamatera_config "$config_file"; then
+        return 0
     fi
 
     echo ""
@@ -141,23 +112,11 @@ print(d.get('api_secret', ''))
     export KAMATERA_API_CLIENT_ID="$client_id"
     export KAMATERA_API_SECRET="$secret"
 
-    # Validate credentials by listing server options (lightweight call)
-    local response
-    response=$(kamatera_api POST "/service/server/info" '{"name":"__test__"}')
-    # A valid response (even if no server found) means auth succeeded
-    # An auth error returns a specific error message
-    if printf '%s' "$response" | grep -qi "authentication failed\|unauthorized\|invalid.*auth"; then
-        log_error "Authentication failed: Invalid Kamatera API credentials"
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify credentials at: https://console.kamatera.com/keys"
-        log_warn "  2. Ensure the API key has appropriate permissions"
-        unset KAMATERA_API_CLIENT_ID
-        unset KAMATERA_API_SECRET
-        return 1
-    fi
-
+    _validate_kamatera_credentials || return 1
     log_info "API credentials validated"
 
+    local config_dir
+    config_dir=$(dirname "$config_file")
     mkdir -p "$config_dir"
     printf '{\n  "api_client_id": "%s",\n  "api_secret": "%s"\n}\n' "$(json_escape "$client_id")" "$(json_escape "$secret")" > "$config_file"
     chmod 600 "$config_file"
