@@ -29,7 +29,7 @@ hyperstack_api() {
     local endpoint="$2"
     local body="${3:-}"
     # shellcheck disable=SC2154
-    generic_cloud_api "$HYPERSTACK_API_BASE" "$HYPERSTACK_API_KEY" "$method" "$endpoint" "$body" "api_key"
+    generic_cloud_api "$HYPERSTACK_API_BASE" "$HYPERSTACK_API_KEY" "$method" "$endpoint" "$body"
 }
 
 test_hyperstack_api_key() {

@@ -330,6 +330,14 @@ const server = Bun.serve({
       const reason = url.searchParams.get("reason") ?? "manual";
       const issue = url.searchParams.get("issue") ?? "";
 
+      // Validate issue is a positive integer (prevents injection into shell commands)
+      if (issue && !/^\d+$/.test(issue)) {
+        return Response.json(
+          { error: "issue must be a positive integer" },
+          { status: 400 }
+        );
+      }
+
       // Dedup: reject if a run for the same issue is already in progress
       if (issue) {
         for (const [, run] of runs) {

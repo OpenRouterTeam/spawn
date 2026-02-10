@@ -15,6 +15,12 @@ cd "${REPO_ROOT}"
 SPAWN_ISSUE="${SPAWN_ISSUE:-}"
 SPAWN_REASON="${SPAWN_REASON:-manual}"
 
+# Validate SPAWN_ISSUE is a positive integer to prevent command injection
+if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: SPAWN_ISSUE must be a positive integer, got: '${SPAWN_ISSUE}'" >&2
+    exit 1
+fi
+
 if [[ -n "${SPAWN_ISSUE}" ]]; then
     RUN_MODE="issue"
     WORKTREE_BASE="/tmp/spawn-worktrees/issue-${SPAWN_ISSUE}"
