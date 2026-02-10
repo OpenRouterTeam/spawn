@@ -2,5 +2,4 @@ node_modules/
 cli.js
 spawn
 dist/
-bun.lock
 *.tgz
