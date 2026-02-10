@@ -42,7 +42,7 @@ MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 # 7. Inject environment variables into shell config
 log_warn "Setting up environment variables..."
 
-inject_env_vars_railway \
+inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "PATH=\$HOME/.bun/bin:\$PATH"
 

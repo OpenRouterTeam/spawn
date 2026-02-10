@@ -24,6 +24,36 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/aider.sh)
 ```
 
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/nanoclaw.sh)
+```
+
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/goose.sh)
+```
+
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/codex.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/interpreter.sh)
+```
+
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/gemini.sh)
+```
+
 ## Setup
 
 1. Create a Northflank account at https://northflank.com
@@ -43,6 +73,15 @@ NORTHFLANK_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/claude.sh)
 ```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NORTHFLANK_TOKEN` | Northflank API token | _(prompted)_ |
+| `NORTHFLANK_SERVICE_NAME` | Service name | _(prompted)_ |
+| `NORTHFLANK_PROJECT_NAME` | Project name | `spawn-project` |
+| `OPENROUTER_API_KEY` | OpenRouter API key | _(OAuth or prompted)_ |
 
 ## Free Tier
 

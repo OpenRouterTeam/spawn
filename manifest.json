@@ -1026,7 +1026,7 @@
     "railway/gemini": "missing",
     "railway/amazonq": "missing",
     "railway/cline": "missing",
-    "railway/gptme": "missing",
+    "railway/gptme": "implemented",
     "railway/opencode": "missing",
     "railway/plandex": "missing",
     "railway/kilocode": "missing"
