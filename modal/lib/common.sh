@@ -67,19 +67,29 @@ create_server() {
         return 1
     fi
 
+    # Validate sandbox name - alphanumeric and dashes only
+    if [[ ! "${name}" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; then
+        log_error "Invalid sandbox name: must be alphanumeric with dashes/underscores"
+        return 1
+    fi
+
     log_warn "Creating Modal sandbox '${name}'..."
 
     # Capture both stdout and stderr from Python SDK
+    # SECURITY: Pass name via environment variable to prevent Python injection
     local create_output
     local create_exitcode
-    create_output=$(python3 -c "
-import modal, sys
+    create_output=$(_MODAL_NAME="${name}" _MODAL_IMAGE="${image}" python3 -c "
+import modal, sys, os
 try:
-    app = modal.App.lookup('spawn-${name}', create_if_missing=True)
+    name = os.environ['_MODAL_NAME']
+    image_name = os.environ['_MODAL_IMAGE']
+    app = modal.App.lookup('spawn-' + name, create_if_missing=True)
+    image_fn = getattr(modal.Image, image_name)
     sb = modal.Sandbox.create(
         app=app,
-        name='${name}',
-        image=modal.Image.${image}().apt_install('curl', 'unzip', 'git', 'zsh'),
+        name=name,
+        image=image_fn().apt_install('curl', 'unzip', 'git', 'zsh'),
         timeout=3600,
     )
     print(sb.object_id)
@@ -125,19 +135,27 @@ wait_for_cloud_init() {
     log_info "Tools installed"
 }
 
+# Validate Modal sandbox ID format (sb-XXXXX)
+validate_sandbox_id() {
+    local sid="${1}"
+    if [[ ! "${sid}" =~ ^sb-[a-zA-Z0-9_-]+$ ]]; then
+        log_error "Invalid MODAL_SANDBOX_ID format: expected sb-<alphanumeric>"
+        return 1
+    fi
+}
+
 # Modal uses Python SDK for exec
 run_server() {
     local cmd="${1}"
-    # SECURITY: Properly escape command to prevent injection
-    local escaped_cmd
-    escaped_cmd=$(printf '%q' "${cmd}")
-    python3 -c "
-import modal, shlex
-sb = modal.Sandbox.from_id('${MODAL_SANDBOX_ID}')
-p = sb.exec('bash', '-c', ${escaped_cmd})
+    validate_sandbox_id "${MODAL_SANDBOX_ID}" || return 1
+    # SECURITY: Pass sandbox ID and command via environment variables to prevent Python injection
+    _MODAL_SB_ID="${MODAL_SANDBOX_ID}" _MODAL_CMD="${cmd}" python3 -c "
+import modal, os, sys
+sb = modal.Sandbox.from_id(os.environ['_MODAL_SB_ID'])
+p = sb.exec('bash', '-c', os.environ['_MODAL_CMD'])
 print(p.stdout.read(), end='')
 if p.stderr.read():
-    import sys; print(p.stderr.read(), end='', file=sys.stderr)
+    print(p.stderr.read(), end='', file=sys.stderr)
 p.wait()
 "
 }
@@ -147,23 +165,19 @@ upload_file() {
     local remote_path="${2}"
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
-    # SECURITY: Properly escape paths and content to prevent injection
-    local escaped_path
-    escaped_path=$(printf '%q' "${remote_path}")
-    local escaped_content
-    escaped_content=$(printf '%q' "${content}")
-    run_server "echo ${escaped_content} | base64 -d > ${escaped_path}"
+    # base64 output is safe (alphanumeric + /+=) so no injection risk in the echo
+    # Remote path needs quoting for spaces/special chars in the remote shell
+    run_server "echo '${content}' | base64 -d > '${remote_path}'"
 }
 
 interactive_session() {
     local cmd="${1}"
-    # SECURITY: Properly escape command to prevent injection
-    local escaped_cmd
-    escaped_cmd=$(printf '%q' "${cmd}")
-    python3 -c "
-import modal, sys
-sb = modal.Sandbox.from_id('${MODAL_SANDBOX_ID}')
-p = sb.exec('bash', '-c', ${escaped_cmd}, pty=True)
+    validate_sandbox_id "${MODAL_SANDBOX_ID}" || return 1
+    # SECURITY: Pass sandbox ID and command via environment variables to prevent Python injection
+    _MODAL_SB_ID="${MODAL_SANDBOX_ID}" _MODAL_CMD="${cmd}" python3 -c "
+import modal, sys, os
+sb = modal.Sandbox.from_id(os.environ['_MODAL_SB_ID'])
+p = sb.exec('bash', '-c', os.environ['_MODAL_CMD'], pty=True)
 for line in p.stdout:
     print(line, end='')
 p.wait()
@@ -172,10 +186,12 @@ p.wait()
 
 destroy_server() {
     local sandbox_id="${1:-${MODAL_SANDBOX_ID}}"
+    validate_sandbox_id "${sandbox_id}" || return 1
     log_warn "Terminating sandbox..."
-    python3 -c "
-import modal
-sb = modal.Sandbox.from_id('${sandbox_id}')
+    # SECURITY: Pass sandbox ID via environment variable to prevent Python injection
+    _MODAL_SB_ID="${sandbox_id}" python3 -c "
+import modal, os
+sb = modal.Sandbox.from_id(os.environ['_MODAL_SB_ID'])
 sb.terminate()
 " 2>/dev/null || true
     log_info "Sandbox terminated"
