@@ -22,7 +22,7 @@ const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const TARGET_SCRIPT = process.env.TARGET_SCRIPT ?? "";
 const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT ?? "1", 10);
 const RUN_TIMEOUT_MS = parseInt(
-  process.env.RUN_TIMEOUT_MS ?? String(30 * 60 * 1000),
+  process.env.RUN_TIMEOUT_MS ?? String(2 * 60 * 60 * 1000),
   10
 );
 

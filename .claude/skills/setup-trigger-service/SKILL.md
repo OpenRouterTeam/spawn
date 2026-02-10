@@ -47,18 +47,25 @@ GitHub Actions (cron / events / manual)
 The trigger server lives at:
 `/home/sprite/spawn/.claude/skills/setup-trigger-service/trigger-server.ts`
 
-It reads two required env vars:
-- `TRIGGER_SECRET` — Bearer token for authenticating requests
-- `TARGET_SCRIPT` — Absolute path to the script to run on trigger
+It reads env vars:
+- `TRIGGER_SECRET` (required) — Bearer token for authenticating requests
+- `TARGET_SCRIPT` (required) — Absolute path to the script to run on trigger
+- `REPO_ROOT` (optional) — Working directory for the script (defaults to script's parent dir)
+- `MAX_CONCURRENT` (optional) — Max parallel runs (default: `1`)
+- `RUN_TIMEOUT_MS` (optional) — Kill runs older than this in milliseconds (default: `7200000` = 2 hours)
+
+**Stale run detection:**
+Before accepting a trigger, the server checks if tracked processes are still alive (`kill -0`). Dead processes are reaped automatically. Runs exceeding `RUN_TIMEOUT_MS` are force-killed to free the slot.
 
 **Endpoints:**
-- `GET /health` → `{"status":"ok"}` (no auth, for health checks)
-- `POST /trigger` → validates `Authorization: Bearer <secret>`, runs target script in background
+- `GET /health` → `{"status":"ok","running":N,"max":N,"timeoutSec":N,"runs":[...]}` (no auth, shows per-run pid/age)
+- `POST /trigger` → validates `Authorization: Bearer <secret>`, reaps stale runs, then runs target script in background
 
 **Responses:**
 - `200` — `{"triggered":true,"reason":"...","running":N,"max":N}` on success
 - `401` — `{"error":"unauthorized"}` if bearer token is wrong
-- `429` — `{"error":"max concurrent runs reached"}` if at limit (default 3, configurable via `MAX_CONCURRENT` env var)
+- `429` — `{"error":"max concurrent runs reached","oldestAgeSec":N}` if at limit
+- `503` — `{"error":"server is shutting down"}` during graceful shutdown
 
 ## Step 2: Generate a trigger secret
 
@@ -78,6 +85,7 @@ Create `start-<service-name>.sh` in the skill directory:
 #!/bin/bash
 export TRIGGER_SECRET="<secret-from-step-2>"
 export TARGET_SCRIPT="/home/sprite/spawn/.claude/skills/setup-trigger-service/<target-script>.sh"
+export REPO_ROOT="/home/sprite/spawn"
 exec bun run /home/sprite/spawn/.claude/skills/setup-trigger-service/trigger-server.ts
 ```
 
@@ -191,8 +199,18 @@ jobs:
           SPRITE_URL: ${{ secrets.<SERVICE_NAME>_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.<SERVICE_NAME>_TRIGGER_SECRET }}
         run: |
-          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
-            -H "Authorization: Bearer ${TRIGGER_SECRET}"
+          HTTP_CODE=$(curl -s -o /tmp/response.json -w '%{http_code}' -X POST \
+            "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            -H "Authorization: Bearer ${TRIGGER_SECRET}")
+          cat /tmp/response.json
+          if [ "$HTTP_CODE" = "429" ]; then
+            echo "Cycle already running, skipping"
+          elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "Triggered successfully"
+          else
+            echo "Failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
 ```
 
 **Cron examples:**
@@ -222,7 +240,45 @@ printf '<secret-from-step-2>' | gh secret set <SERVICE_NAME>_TRIGGER_SECRET --re
 | `<SERVICE>_SPRITE_URL` | `DISCOVERY_SPRITE_URL` | Public URL of the Sprite |
 | `<SERVICE>_TRIGGER_SECRET` | `DISCOVERY_TRIGGER_SECRET` | Bearer token for the trigger server |
 
-## Step 8: Ensure the target script is single-cycle
+## Step 8: Tune RUN_TIMEOUT_MS
+
+`RUN_TIMEOUT_MS` controls how long a run can execute before the trigger server force-kills it and frees the slot. **Start high, then tune down based on real data.**
+
+### Recommended approach
+
+1. **Start with a high timeout (6-12 hours).** You don't know how long cycles take yet. A too-short timeout kills legitimate runs mid-work, leaving orphaned branches, half-merged PRs, and dirty worktrees.
+
+2. **Run several cycles and collect data.** Check the trigger server logs for actual run durations:
+
+```bash
+# Look for "finished" lines with duration
+cat /.sprite/logs/services/<service-name>.log | grep 'finished'
+```
+
+3. **Set the timeout to 2x your longest observed cycle.** For example, if cycles take 30-90 minutes, set `RUN_TIMEOUT_MS` to `10800000` (3 hours). This gives headroom for slow cycles without letting truly hung processes block the slot forever.
+
+4. **Re-evaluate after changes.** Adding more agents to a team, increasing the scope of work, or hitting API rate limits can all increase cycle time. Check logs periodically.
+
+### Current values (based on observed data)
+
+| Service | Observed cycle time | RUN_TIMEOUT_MS | Rationale |
+|---------|-------------------|----------------|-----------|
+| Discovery (improve.sh) | 1-2 hours | `7200000` (2h) | Team cycles with 5+ agents, worktrees, PRs |
+| Refactor (refactor.sh) | TBD | `7200000` (2h) | Start high, tune after data |
+
+To override, add to the wrapper script:
+
+```bash
+export RUN_TIMEOUT_MS=14400000   # 4 hours
+```
+
+Or set it to a very high value initially:
+
+```bash
+export RUN_TIMEOUT_MS=43200000   # 12 hours (safe starting point)
+```
+
+## Step 9: Ensure the target script is single-cycle
 
 The target script (e.g., `refactor.sh`, `improve.sh`) MUST:
 
@@ -295,7 +351,7 @@ rm -rf /tmp/spawn-worktrees
 
 These conventions are already embedded in the prompts of `improve.sh` and `refactor.sh`. When adding new service scripts, copy the same patterns.
 
-## Step 9: Commit and push
+## Step 10: Commit and push
 
 Commit the workflow file and .gitignore changes (but NOT the wrapper script):
 
@@ -305,7 +361,7 @@ git commit -m "feat: Add GitHub Actions trigger for <service-name>"
 git push origin main
 ```
 
-## Step 10: Test end-to-end
+## Step 11: Test end-to-end
 
 ```bash
 # Trigger manually via GitHub Actions
@@ -348,7 +404,7 @@ To add a new automation script (beyond improve.sh and refactor.sh):
 | curl exits with code 22 | The sprite URL may require auth — run Step 5 to set `auth: "public"` |
 | Script runs but nothing happens | Check the target script works standalone: `bash /path/to/script.sh` |
 | Sprite doesn't wake | Verify `<SERVICE>_SPRITE_URL` secret matches the Sprite's public URL |
-| `{"error":"max concurrent runs reached"}` | Max concurrent limit reached (default 3) — wait for runs to finish or increase `MAX_CONCURRENT` env var in wrapper script |
+| `{"error":"max concurrent runs reached"}` | Max concurrent limit reached (default 1) — wait for runs to finish or increase `MAX_CONCURRENT` env var in wrapper script |
 | env vars not passed | Use the wrapper script pattern (not `--env` flag with commas in values) |
 | GitHub Actions secret is empty | Check `gh secret list --repo <owner>/<repo>` and re-set with `printf` (not `echo`, to avoid trailing newline) |
 
