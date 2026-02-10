@@ -1,3 +1,4 @@
+import "./unicode-detect.js"; // Must be first: configures TERM before clack reads it
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { spawn } from "child_process";
@@ -584,6 +585,7 @@ ${pc.bold("TROUBLESHOOTING")}
   ${pc.dim("*")} Script not found: Run ${pc.cyan("spawn list")} to verify the combination exists
   ${pc.dim("*")} Missing credentials: Check cloud-specific READMEs in the repo
   ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
+  ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output
 
 ${pc.bold("MORE INFO")}
   Repository:  https://github.com/${REPO}
