@@ -815,7 +815,7 @@
     "fly/cline": "implemented",
     "fly/gptme": "implemented",
     "fluidstack/claude": "implemented",
-    "fluidstack/openclaw": "missing",
+    "fluidstack/openclaw": "implemented",
     "fluidstack/nanoclaw": "missing",
     "fluidstack/aider": "implemented",
     "fluidstack/goose": "missing",
