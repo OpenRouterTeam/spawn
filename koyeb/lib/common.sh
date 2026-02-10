@@ -264,18 +264,16 @@ upload_file() {
         return 1
     fi
 
-    # Validate remote_path to prevent command injection
-    if [[ "$remote_path" == *"'"* || "$remote_path" == *'$'* || "$remote_path" == *'`'* || "$remote_path" == *$'\n'* ]]; then
-        log_error "Invalid remote path (contains unsafe characters): $remote_path"
-        return 1
-    fi
-
-    # Read file content and encode (base64 output is safe for shell embedding)
+    # SECURITY: base64 -w0 produces single-line output (no newline injection)
     local content
-    content=$(base64 < "$local_path")
+    content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
 
-    # Write file on remote instance
-    run_server "printf '%s' '$content' | base64 -d > '$remote_path'"
+    # SECURITY: Properly escape remote_path to prevent injection
+    local escaped_path
+    escaped_path=$(printf '%q' "$remote_path")
+
+    # base64 output is safe (alphanumeric + /+=) so no injection risk
+    run_server "printf '%s' '$content' | base64 -d > $escaped_path"
 }
 
 # Wait for cloud-init or basic system readiness
