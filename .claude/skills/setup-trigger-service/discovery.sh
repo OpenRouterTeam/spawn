@@ -552,7 +552,7 @@ run_team_cycle() {
     # The trigger server's RUN_TIMEOUT_MS is the safety net if it hangs.
     local CLAUDE_EXIT=0
     claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
-        2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+        --output-format stream-json 2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Cycle completed successfully"
