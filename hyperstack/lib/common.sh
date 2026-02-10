@@ -156,16 +156,17 @@ create_vm() {
 
     log_warn "Creating Hyperstack VM '$name' (flavor: $flavor, env: $environment)..."
 
-    # Build request body
+    # Build request body using stdin to prevent Python injection
     local body
-    body=$(python3 -c "
-import json
+    body=$(printf '%s\n%s\n%s\n%s\n%s' "$name" "$environment" "$key_name" "$image" "$flavor" | python3 -c "
+import json, sys
+lines = sys.stdin.read().split('\n')
 body = {
-    'name': '$name',
-    'environment_name': '$environment',
-    'key_name': '$key_name',
-    'image_name': '$image',
-    'flavor_name': '$flavor',
+    'name': lines[0],
+    'environment_name': lines[1],
+    'key_name': lines[2],
+    'image_name': lines[3],
+    'flavor_name': lines[4],
     'count': 1,
     'assign_floating_ip': True,
     'security_rules': [
