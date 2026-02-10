@@ -941,7 +941,7 @@
     "hyperstack/gptme": "implemented",
     "hyperstack/opencode": "implemented",
     "hyperstack/plandex": "implemented",
-    "hyperstack/kilocode": "missing",
+    "hyperstack/kilocode": "implemented",
     "koyeb/claude": "implemented",
     "koyeb/openclaw": "implemented",
     "koyeb/nanoclaw": "implemented",
