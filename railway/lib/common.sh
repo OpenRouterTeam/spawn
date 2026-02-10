@@ -1,6 +1,6 @@
 #!/bin/bash
 # Common bash functions for Railway spawn scripts
-# Uses Railway CLI for provisioning and SSH access
+# Uses Railway CLI for provisioning and exec access
 
 # Bash safety flags
 set -eo pipefail
@@ -31,19 +31,19 @@ ensure_railway_cli() {
     fi
 
     log_warn "Installing Railway CLI..."
-    if command -v npm &>/dev/null; then
-        npm install -g @railway/cli 2>/dev/null || {
-            log_error "Failed to install Railway CLI via npm"
-            log_error "Install manually: npm install -g @railway/cli"
-            return 1
-        }
-    else
-        # Use the official installer script
-        bash <(curl -fsSL cli.new) 2>/dev/null || {
-            log_error "Failed to install Railway CLI"
-            log_error "Install manually: bash <(curl -fsSL cli.new)"
-            return 1
-        }
+
+    # Railway CLI is installed via npm
+    if ! command -v npm &>/dev/null; then
+        log_error "npm is required to install Railway CLI"
+        log_error "Install Node.js/npm from https://nodejs.org/ or use your package manager"
+        return 1
+    fi
+
+    if ! npm install -g @railway/cli; then
+        log_error "Failed to install Railway CLI"
+        log_error "Install manually: npm install -g @railway/cli"
+        log_error "See: https://docs.railway.app/develop/cli"
+        return 1
     fi
 
     if ! command -v railway &>/dev/null; then
@@ -54,245 +54,212 @@ ensure_railway_cli() {
     log_info "Railway CLI installed"
 }
 
+# Save Railway token to config file
+_save_railway_token() {
+    local token="$1"
+    local config_dir="$HOME/.config/spawn"
+    local config_file="$config_dir/railway.json"
+    mkdir -p "$config_dir"
+    printf '{\n  "token": "%s"\n}\n' "$(json_escape "$token")" > "$config_file"
+    chmod 600 "$config_file"
+}
+
 # Ensure RAILWAY_TOKEN is available (env var -> config file -> prompt+save)
 ensure_railway_token() {
-    # Check Python 3 is available (required for JSON parsing)
     check_python_available || return 1
 
     # 1. Check environment variable
     if [[ -n "${RAILWAY_TOKEN:-}" ]]; then
-        log_info "Using Railway token from environment"
+        log_info "Using Railway API token from environment"
         return 0
     fi
 
+    local config_file="$HOME/.config/spawn/railway.json"
+
     # 2. Check config file
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/railway.json"
     if [[ -f "$config_file" ]]; then
-        local saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
+        local saved_token
+        saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
         if [[ -n "$saved_token" ]]; then
             export RAILWAY_TOKEN="$saved_token"
-            log_info "Using Railway token from $config_file"
+            log_info "Using Railway API token from $config_file"
             return 0
         fi
     fi
 
-    # 3. Try to login interactively via Railway CLI
-    if command -v railway &>/dev/null; then
-        log_warn "Railway CLI requires authentication"
-        log_warn "Opening browser for Railway login..."
-        railway login || {
-            log_error "Railway login failed"
-            return 1
-        }
-        log_info "Railway login successful"
-
-        # Try to extract token from CLI (Railway stores tokens internally)
-        # We'll just rely on railway commands working after login
-        return 0
-    fi
-
-    # 4. Prompt for token
+    # 3. Prompt user for token
+    log_warn "Railway API token required"
     echo ""
-    log_warn "Railway Token Required"
-    echo -e "${YELLOW}Get your token at: https://railway.app/account/tokens${NC}"
+    echo "Get your API token at: https://railway.app/account/tokens"
     echo ""
 
-    local token=$(safe_read "Enter your Railway token: ") || return 1
+    local token
+    token=$(safe_read "Enter Railway API token: ")
     if [[ -z "$token" ]]; then
-        log_error "Token cannot be empty"
-        log_warn "For non-interactive usage, set: RAILWAY_TOKEN=your-token"
+        log_error "No token provided"
         return 1
     fi
 
-    # Save to config file
     export RAILWAY_TOKEN="$token"
-    mkdir -p "$config_dir"
-    printf '{\n  "token": "%s"\n}\n' "$(json_escape "$token")" > "$config_file"
-    chmod 600 "$config_file"
-    log_info "Token saved to $config_file"
+    _save_railway_token "$token"
+    log_info "Railway API token saved"
 }
 
-# Validate server name (Railway project name)
-validate_server_name() {
-    local name="$1"
-    if [[ ! "$name" =~ ^[a-z0-9][a-z0-9-]*[a-z0-9]$ ]]; then
-        log_error "Invalid project name: $name"
-        log_error "Must start and end with alphanumeric, contain only lowercase letters, numbers, and hyphens"
-        return 1
-    fi
-    if [[ "${#name}" -gt 50 ]]; then
-        log_error "Project name too long (max 50 characters): $name"
-        return 1
-    fi
-    echo "$name"
-}
-
-# Get server name from env var or prompt
+# Generate a unique project and service name for Railway
 get_server_name() {
-    if [[ -n "${RAILWAY_PROJECT_NAME:-}" ]]; then
-        log_info "Using project name from environment: $RAILWAY_PROJECT_NAME"
-        if ! validate_server_name "$RAILWAY_PROJECT_NAME"; then
-            return 1
-        fi
-        echo "$RAILWAY_PROJECT_NAME"
-        return 0
-    fi
-
-    local server_name=$(safe_read "Enter project name: ")
-    if [[ -z "$server_name" ]]; then
-        log_error "Project name is required"
-        log_warn "Set RAILWAY_PROJECT_NAME environment variable for non-interactive usage:"
-        log_warn "  RAILWAY_PROJECT_NAME=dev-mk1 curl ... | bash"
-        return 1
-    fi
-
-    if ! validate_server_name "$server_name"; then
-        return 1
-    fi
-
-    echo "$server_name"
+    local prefix="${1:-spawn}"
+    local timestamp=$(date +%s)
+    local random_suffix=$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    echo "${prefix}-${timestamp}-${random_suffix}" | tr '[:upper:]' '[:lower:]'
 }
 
-# Create a Railway project and service
+# Create a Railway project and service via CLI
+# Sets: RAILWAY_PROJECT_ID, RAILWAY_SERVICE_ID, RAILWAY_SERVICE_NAME
 create_server() {
-    local name="$1"
+    local name="${1:-$(get_server_name)}"
 
-    log_warn "Creating Railway project '$name'..."
+    RAILWAY_SERVICE_NAME="${name}"
 
-    # Create a temporary directory for the project
-    local project_dir="$HOME/.spawn-railway/$name"
-    mkdir -p "$project_dir"
-    cd "$project_dir"
+    log_warn "Creating Railway project: $RAILWAY_SERVICE_NAME"
 
-    # Initialize new project
-    railway init --name "$name" || {
+    # Create new project with CLI
+    local project_output
+    project_output=$(railway init -n "$RAILWAY_SERVICE_NAME" 2>&1)
+
+    if echo "$project_output" | grep -qi "error"; then
         log_error "Failed to create Railway project"
+        log_error "$project_output"
+        return 1
+    fi
+
+    # Link to the project we just created
+    railway link "$RAILWAY_SERVICE_NAME" >/dev/null 2>&1 || {
+        log_error "Failed to link to Railway project"
         return 1
     }
 
-    log_info "Project '$name' created"
+    log_info "Railway project created: $RAILWAY_SERVICE_NAME"
 
-    # Deploy a simple Ubuntu container with sleep to keep it running
-    log_warn "Creating service with Ubuntu 24.04..."
+    # Deploy an Ubuntu container that stays alive
+    log_warn "Deploying service..."
 
-    # Create a simple Dockerfile
-    cat > Dockerfile << 'EOF'
+    # Create a minimal Dockerfile in a temp directory
+    local temp_dir=$(mktemp -d)
+    cat > "$temp_dir/Dockerfile" <<'EOF'
 FROM ubuntu:24.04
-
-# Install base tools
 RUN apt-get update && apt-get install -y \
-    curl \
-    wget \
-    git \
-    unzip \
-    python3 \
-    python3-pip \
-    build-essential \
-    ca-certificates \
+    curl wget git python3 python3-pip build-essential ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-# Keep container running
-CMD ["sleep", "infinity"]
+CMD ["tail", "-f", "/dev/null"]
 EOF
 
-    # Deploy the service
-    log_warn "Deploying service (this may take 1-2 minutes)..."
-    railway up --detach || {
-        log_error "Failed to deploy service"
+    # Deploy from the temp directory
+    (cd "$temp_dir" && railway up --detach) || {
+        log_error "Failed to deploy Railway service"
+        rm -rf "$temp_dir"
         return 1
     }
 
-    # Export variables for later use
-    export RAILWAY_PROJECT_DIR="$project_dir"
-    export RAILWAY_PROJECT_NAME="$name"
+    rm -rf "$temp_dir"
 
-    log_info "Service deployed and running"
+    # Wait for deployment to be ready
+    log_warn "Waiting for service to deploy..."
+    local max_attempts=60
+    local attempt=0
 
-    # Wait a moment for the service to be fully ready
-    sleep 5
+    while [[ $attempt -lt $max_attempts ]]; do
+        local status
+        status=$(railway status 2>/dev/null | grep -i "status" | head -1 || echo "")
+
+        if echo "$status" | grep -qi "success\|active\|running\|healthy"; then
+            log_info "Service is ready"
+            break
+        fi
+
+        if echo "$status" | grep -qi "failed\|error"; then
+            log_error "Service deployment failed"
+            return 1
+        fi
+
+        attempt=$((attempt + 1))
+        sleep 5
+    done
+
+    if [[ $attempt -ge $max_attempts ]]; then
+        log_error "Timeout waiting for service to be ready"
+        return 1
+    fi
+
+    log_info "Railway service deployed successfully"
 }
 
-# Wait for cloud-init (not needed for Railway, but kept for compatibility)
-wait_for_cloud_init() {
-    log_warn "Installing additional tools..."
-    run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
-    run_server 'printf "export PATH=\"\$HOME/.bun/bin:\$PATH\"\n" >> ~/.bashrc' >/dev/null 2>&1 || true
-    run_server 'printf "export PATH=\"\$HOME/.bun/bin:\$PATH\"\n" >> ~/.zshrc' >/dev/null 2>&1 || true
-    log_info "Additional tools installed"
-}
-
-# Run a command on the Railway service via railway run
-# SECURITY: Uses printf %q to properly escape commands to prevent injection
+# Run a command on the Railway service
 run_server() {
     local cmd="$1"
-    local escaped_cmd
-    escaped_cmd=$(printf '%q' "$cmd")
-    cd "$RAILWAY_PROJECT_DIR"
-    railway run bash -c "$escaped_cmd" 2>/dev/null
+
+    # Railway CLI doesn't have a direct exec - we use shell command via railway run
+    railway run bash -c "$cmd"
 }
 
-# Upload a file to the service via base64 encoding through exec
+# Upload a file to the Railway service
 upload_file() {
     local local_path="$1"
     local remote_path="$2"
-    local content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
-    # SECURITY: Properly escape paths and content
-    local escaped_path
-    escaped_path=$(printf '%q' "$remote_path")
-    local escaped_content
-    escaped_content=$(printf '%q' "$content")
-    run_server "printf '%s' $escaped_content | base64 -d > $escaped_path"
-}
 
-# Start an interactive SSH session on the Railway service
-interactive_session() {
-    local cmd="$1"
-    local escaped_cmd
-    escaped_cmd=$(printf '%q' "$cmd")
-    cd "$RAILWAY_PROJECT_DIR"
-    railway run bash -c "$escaped_cmd"
-}
-
-# Destroy a Railway project
-destroy_server() {
-    local project_name="${1:-$RAILWAY_PROJECT_NAME}"
-
-    log_warn "Destroying Railway project '$project_name'..."
-
-    local project_dir="$HOME/.spawn-railway/$project_name"
-    if [[ -d "$project_dir" ]]; then
-        cd "$project_dir"
-        railway down || true
-        cd ~
-        rm -rf "$project_dir"
+    if [[ ! -f "$local_path" ]]; then
+        log_error "Local file not found: $local_path"
+        return 1
     fi
 
-    log_info "Project '$project_name' destroyed"
+    # Read file content and encode
+    local content
+    content=$(cat "$local_path" | base64)
+
+    # Write file on remote service via railway run
+    railway run bash -c "echo '$content' | base64 -d > '$remote_path'"
 }
 
-# Inject environment variables into both .bashrc and .zshrc
-# Usage: inject_env_vars_railway KEY1=VAL1 KEY2=VAL2 ...
-inject_env_vars_railway() {
-    local env_temp
-    env_temp=$(mktemp)
-    chmod 600 "${env_temp}"
-    track_temp_file "${env_temp}"
+# Wait for system readiness (Railway containers start with Ubuntu base)
+wait_for_cloud_init() {
+    log_warn "Verifying system packages..."
 
-    generate_env_config "$@" > "${env_temp}"
-
-    # Upload and append to both .bashrc and .zshrc
-    upload_file "${env_temp}" "/tmp/env_config"
-    run_server "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-
-    # Note: temp file will be cleaned up by trap handler
-}
-
-# List all Railway projects
-list_servers() {
-    log_warn "Listing Railway projects..."
-    railway list || {
-        log_error "Failed to list Railway projects"
-        return 1
+    # Update package lists if needed
+    run_server "apt-get update -qq >/dev/null 2>&1 || true" || {
+        log_warn "Package update skipped (may already be ready)"
     }
+
+    log_info "System ready"
+}
+
+# Inject environment variables into shell config
+inject_env_vars() {
+    local shell_rc="/root/.bashrc"
+
+    log_warn "Injecting environment variables..."
+
+    for env_var in "$@"; do
+        # Escape special characters for sed
+        local escaped_var=$(echo "$env_var" | sed 's/[&/\]/\\&/g')
+        run_server "echo 'export $escaped_var' >> $shell_rc"
+    done
+
+    log_info "Environment variables configured"
+}
+
+# Start an interactive session via Railway SSH
+interactive_session() {
+    local launch_cmd="${1:-bash}"
+
+    log_info "Starting interactive session..."
+
+    # Railway CLI has a shell command for interactive sessions
+    railway shell
+}
+
+# Cleanup: delete the project
+cleanup_server() {
+    if [[ -n "${RAILWAY_SERVICE_NAME:-}" ]]; then
+        log_warn "Deleting Railway project: $RAILWAY_SERVICE_NAME"
+        railway delete --yes >/dev/null 2>&1 || true
+    fi
 }

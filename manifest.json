@@ -603,6 +603,20 @@
         "region": "was"
       },
       "notes": "Serverless container platform. Free tier available (no credit card). Per-second billing. Requires koyeb CLI."
+    },
+    "railway": {
+      "name": "Railway",
+      "description": "Railway serverless container platform via CLI",
+      "url": "https://railway.app/",
+      "type": "cli",
+      "auth": "RAILWAY_TOKEN",
+      "provision_method": "railway init + railway up with Dockerfile",
+      "exec_method": "railway run",
+      "interactive_method": "railway shell",
+      "defaults": {
+        "region": "us-west1"
+      },
+      "notes": "Developer-focused container platform. Per-second billing. Fast provisioning. Requires Railway CLI (npm install -g @railway/cli)."
     }
   },
   "matrix": {
@@ -955,6 +969,20 @@
     "koyeb/gptme": "missing",
     "koyeb/opencode": "missing",
     "koyeb/plandex": "missing",
-    "koyeb/kilocode": "missing"
+    "koyeb/kilocode": "missing",
+    "railway/claude": "implemented",
+    "railway/openclaw": "implemented",
+    "railway/nanoclaw": "missing",
+    "railway/aider": "implemented",
+    "railway/goose": "missing",
+    "railway/codex": "missing",
+    "railway/interpreter": "missing",
+    "railway/gemini": "missing",
+    "railway/amazonq": "missing",
+    "railway/cline": "missing",
+    "railway/gptme": "missing",
+    "railway/opencode": "missing",
+    "railway/plandex": "missing",
+    "railway/kilocode": "missing"
   }
 }

@@ -12,11 +12,11 @@ fi
 log_info "Claude Code on Railway"
 echo ""
 
-# 1. Ensure Railway CLI and token
+# 1. Ensure Railway CLI and API token
 ensure_railway_cli
 ensure_railway_token
 
-# 2. Get project name and create service
+# 2. Create service
 SERVER_NAME=$(get_server_name)
 create_server "$SERVER_NAME"
 
@@ -42,10 +42,10 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-# 6. Inject environment variables into shell config
+# 6. Inject environment variables
 log_warn "Setting up environment variables..."
 
-inject_env_vars_railway \
+inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
     "ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}" \
@@ -57,7 +57,7 @@ inject_env_vars_railway \
 # 7. Configure Claude Code settings
 log_warn "Configuring Claude Code..."
 
-run_server "mkdir -p ~/.claude"
+run_server "mkdir -p /root/.claude"
 
 # Upload settings.json
 SETTINGS_TEMP=$(mktemp)
@@ -95,15 +95,15 @@ upload_file "$GLOBAL_STATE_TEMP" "/root/.claude.json"
 rm "$GLOBAL_STATE_TEMP"
 
 # Create empty CLAUDE.md
-run_server "touch ~/.claude/CLAUDE.md"
+run_server "touch /root/.claude/CLAUDE.md"
 
 echo ""
 log_info "Railway service setup completed successfully!"
-log_info "Project: $SERVER_NAME"
+log_info "Service: $RAILWAY_SERVICE_NAME"
 echo ""
 
 # 8. Start Claude Code interactively
 log_warn "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "source ~/.bashrc && claude"
+interactive_session "source /root/.bashrc && claude"
