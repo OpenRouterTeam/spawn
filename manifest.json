@@ -841,7 +841,7 @@
     "fluidstack/amazonq": "implemented",
     "fluidstack/cline": "implemented",
     "fluidstack/gptme": "implemented",
-    "fluidstack/opencode": "missing",
+    "fluidstack/opencode": "implemented",
     "fluidstack/plandex": "missing",
     "fluidstack/kilocode": "missing",
     "civo/claude": "implemented",
