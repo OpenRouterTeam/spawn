@@ -33,6 +33,14 @@ Deploys Claude Code with OpenRouter integration. Configures:
 - Bypass permissions mode for autonomous operation
 - Dark theme and vim editor settings
 
+### OpenClaw
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/render/openclaw.sh)
+```
+
+Deploys OpenClaw with multi-channel gateway and TUI. Starts gateway in background, then launches interactive TUI. Prompts for model selection (default: `openrouter/auto`).
+
 ### Aider
 
 ```bash

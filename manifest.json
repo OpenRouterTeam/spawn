@@ -1031,7 +1031,7 @@
     "railway/plandex": "missing",
     "railway/kilocode": "missing",
     "render/claude": "implemented",
-    "render/openclaw": "missing",
+    "render/openclaw": "implemented",
     "render/nanoclaw": "missing",
     "render/aider": "implemented",
     "render/goose": "missing",
