@@ -61,8 +61,8 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
-  // Check for updates in the background (non-blocking)
-  checkForUpdates();
+  // Check for updates and auto-update if needed (blocking)
+  await checkForUpdates();
 
   // Extract --prompt or -p flag
   let [prompt, filteredArgs] = extractFlagValue(

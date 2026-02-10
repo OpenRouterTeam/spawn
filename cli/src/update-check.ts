@@ -1,8 +1,14 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "fs";
 import { join } from "path";
+import { execSync as nodeExecSync } from "child_process";
 import pc from "picocolors";
 import { VERSION } from "./version.js";
 import { RAW_BASE, CACHE_DIR } from "./manifest.js";
+
+// Internal executor for testability - can be replaced in tests
+export const executor = {
+  execSync: (cmd: string, options?: any) => nodeExecSync(cmd, options),
+};
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -86,7 +92,7 @@ function compareVersions(current: string, latest: string): boolean {
   return false; // Versions are equal
 }
 
-function printUpdateNotification(latestVersion: string): void {
+function performAutoUpdate(latestVersion: string): void {
   console.error(); // Use stderr so it doesn't interfere with parseable output
   console.error(pc.yellow("┌────────────────────────────────────────────────────────────┐"));
   console.error(
@@ -96,12 +102,36 @@ function printUpdateNotification(latestVersion: string): void {
     pc.yellow("                       │")
   );
   console.error(
-    pc.yellow("│ Run: ") +
-    pc.cyan(pc.bold("spawn update")) +
-    pc.yellow(" to see how to upgrade              │")
+    pc.yellow("│ ") +
+    pc.bold("Updating automatically...") +
+    pc.yellow("                                  │")
   );
   console.error(pc.yellow("└────────────────────────────────────────────────────────────┘"));
   console.error();
+
+  try {
+    // Run the install script to update
+    executor.execSync(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`, {
+      stdio: "inherit",
+      shell: "/bin/bash",
+    });
+
+    console.error();
+    console.error(pc.green(pc.bold("✓ Updated successfully!")));
+    console.error(pc.dim("  Restart your command to use the new version."));
+    console.error();
+
+    // Exit cleanly after update
+    process.exit(0);
+  } catch (err) {
+    console.error();
+    console.error(pc.red(pc.bold("✗ Auto-update failed")));
+    console.error(pc.dim("  Please update manually:"));
+    console.error();
+    console.error(pc.cyan(`  curl -fsSL ${RAW_BASE}/cli/install.sh | bash`));
+    console.error();
+    // Continue with original command despite update failure
+  }
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
@@ -124,33 +154,32 @@ export async function checkForUpdates(): Promise<void> {
 
   // Skip if we checked recently
   if (!shouldCheckForUpdate()) {
-    // Show cached notification if available
+    // Auto-update if cached version is newer
     const cache = readUpdateCache();
     if (cache?.latestVersion && compareVersions(VERSION, cache.latestVersion)) {
-      printUpdateNotification(cache.latestVersion);
+      performAutoUpdate(cache.latestVersion);
     }
     return;
   }
 
-  // Fetch latest version (non-blocking, don't await)
-  fetchLatestVersion()
-    .then((latestVersion) => {
-      if (!latestVersion) return;
+  // Fetch latest version (blocking for auto-update)
+  try {
+    const latestVersion = await fetchLatestVersion();
+    if (!latestVersion) return;
 
-      const now = Math.floor(Date.now() / 1000);
+    const now = Math.floor(Date.now() / 1000);
 
-      // Update cache with latest check time
-      writeUpdateCache({
-        lastCheck: now,
-        latestVersion,
-      });
-
-      // Show notification if newer version is available
-      if (compareVersions(VERSION, latestVersion)) {
-        printUpdateNotification(latestVersion);
-      }
-    })
-    .catch(() => {
-      // Silently fail - update check is non-critical
+    // Update cache with latest check time
+    writeUpdateCache({
+      lastCheck: now,
+      latestVersion,
     });
+
+    // Auto-update if newer version is available
+    if (compareVersions(VERSION, latestVersion)) {
+      performAutoUpdate(latestVersion);
+    }
+  } catch {
+    // Silently fail - update check is non-critical
+  }
 }

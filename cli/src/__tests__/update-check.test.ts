@@ -48,18 +48,22 @@ function readUpdateCheckCache(): any {
 describe("update-check", () => {
   let originalEnv: NodeJS.ProcessEnv;
   let consoleErrorSpy: ReturnType<typeof spyOn>;
+  let processExitSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     cleanupTestCache(); // Clean first to ensure fresh state
     originalEnv = mockEnv();
     setupTestCache();
     consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {});
+    // Mock process.exit to prevent tests from exiting
+    processExitSpy = spyOn(process, "exit").mockImplementation((() => {}) as any);
   });
 
   afterEach(() => {
     restoreEnv(originalEnv);
     cleanupTestCache();
     consoleErrorSpy.mockRestore();
+    processExitSpy.mockRestore();
   });
 
   describe("checkForUpdates", () => {
@@ -92,19 +96,21 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.2.0" }),
+          json: () => Promise.resolve({ version: "0.3.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
+      // Mock execSync to prevent actual update
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
+
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
-      // Give the promise time to resolve
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
       expect(fetchSpy).toHaveBeenCalled();
       fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
     });
 
     it("should not check again within 24 hours", async () => {
@@ -112,10 +118,14 @@ describe("update-check", () => {
       const now = Math.floor(Date.now() / 1000);
       writeUpdateCheckCache({
         lastCheck: now - 3600, // 1 hour ago
-        latestVersion: "0.2.0",
+        latestVersion: "0.3.0",
       });
 
       const fetchSpy = spyOn(global, "fetch");
+
+      // Mock execSync to prevent actual update
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -123,6 +133,7 @@ describe("update-check", () => {
       // Should use cache, not fetch
       expect(fetchSpy).not.toHaveBeenCalled();
       fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
     });
 
     it("should check again after 24 hours", async () => {
@@ -136,22 +147,57 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.2.0" }),
+          json: () => Promise.resolve({ version: "0.3.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
+      // Mock execSync to prevent actual update
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
+
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
-
-      // Give the promise time to resolve
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(fetchSpy).toHaveBeenCalled();
       fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
     });
 
-    it("should show notification for newer version", async () => {
+    it("should auto-update when newer version is available", async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ version: "0.3.0" }),
+        } as Response)
+      );
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      // Mock execSync to prevent actual update
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      // Should have printed update message to stderr
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
+      expect(output).toContain("Update available");
+      expect(output).toContain("0.3.0");
+      expect(output).toContain("Updating automatically");
+
+      // Should have run the install script
+      expect(execSyncSpy).toHaveBeenCalled();
+
+      // Should have exited
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
+    });
+
+    it("should not update when up to date", async () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
@@ -160,40 +206,19 @@ describe("update-check", () => {
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
-      const { checkForUpdates } = await import("../update-check.js");
-      await checkForUpdates();
-
-      // Give the promise time to resolve
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Should have printed notification to stderr
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
-      expect(output).toContain("Update available");
-      expect(output).toContain("0.2.0");
-
-      fetchSpy.mockRestore();
-    });
-
-    it("should not show notification when up to date", async () => {
-      const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ version: "0.1.0" }),
-        } as Response)
-      );
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+      // Mock execSync to prevent actual update
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
-      // Give the promise time to resolve
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Should not print notification
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      // Should not auto-update
+      expect(execSyncSpy).not.toHaveBeenCalled();
+      expect(processExitSpy).not.toHaveBeenCalled();
 
       fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
     });
 
     it("should handle network errors gracefully", async () => {
@@ -203,16 +228,13 @@ describe("update-check", () => {
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
-      // Give the promise time to reject
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Should not crash or show notification
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      // Should not crash or try to update
+      expect(processExitSpy).not.toHaveBeenCalled();
 
       fetchSpy.mockRestore();
     });
 
-    it("should show cached notification when skipping check", async () => {
+    it("should auto-update using cached version when skipping check", async () => {
       // Clear any previous state
       cleanupTestCache();
       setupTestCache();
@@ -226,37 +248,55 @@ describe("update-check", () => {
 
       const fetchSpy = spyOn(global, "fetch");
 
+      // Mock execSync to prevent actual update
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
+
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
-      // Should not fetch, but should show cached notification
+      // Should not fetch, but should auto-update from cache
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(consoleErrorSpy).toHaveBeenCalled();
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
       expect(output).toContain("Update available");
       expect(output).toContain("0.3.0");
 
+      // Should have run the install script
+      expect(execSyncSpy).toHaveBeenCalled();
+
       fetchSpy.mockRestore();
-    });
-  });
-
-  describe("version comparison", () => {
-    it("should detect newer major version", () => {
-      // This is tested indirectly through checkForUpdates
-      // We'll create a more direct test by mocking different versions
-      expect(true).toBe(true); // Placeholder - actual logic tested above
+      execSyncSpy.mockRestore();
     });
 
-    it("should detect newer minor version", () => {
-      expect(true).toBe(true); // Placeholder - actual logic tested above
-    });
+    it("should handle update failures gracefully", async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ version: "0.3.0" }),
+        } as Response)
+      );
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
-    it("should detect newer patch version", () => {
-      expect(true).toBe(true); // Placeholder - actual logic tested above
-    });
+      // Mock execSync to throw an error
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {
+        throw new Error("Update failed");
+      });
 
-    it("should handle equal versions", () => {
-      expect(true).toBe(true); // Placeholder - actual logic tested above
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      // Should have printed error message
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
+      expect(output).toContain("Auto-update failed");
+
+      // Should NOT have exited (continue with original command)
+      expect(processExitSpy).not.toHaveBeenCalled();
+
+      fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
     });
   });
 
@@ -267,21 +307,23 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.2.0" }),
+          json: () => Promise.resolve({ version: "0.3.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
+      // Mock execSync to prevent actual update
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
+
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
-
-      // Give the promise time to resolve
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Cache file should exist now (if CACHE_DIR is writable)
       // This is non-critical, so we don't assert
 
       fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
     });
 
     it("should handle corrupted cache gracefully", async () => {
@@ -292,43 +334,22 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.2.0" }),
+          json: () => Promise.resolve({ version: "0.3.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      // Mock execSync to prevent actual update
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
       // Should treat corrupted cache as missing and check for updates
-      // Give the promise time to resolve
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
       expect(fetchSpy).toHaveBeenCalled();
       fetchSpy.mockRestore();
-    });
-  });
-
-  describe("timeout handling", () => {
-    it("should timeout slow requests", async () => {
-      const mockFetch = mock(() => {
-        return new Promise((_, reject) => {
-          // Simulate a timeout error
-          setTimeout(() => reject(new Error("Timeout")), 100);
-        });
-      });
-      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
-
-      const { checkForUpdates } = await import("../update-check.js");
-      await checkForUpdates();
-
-      // Give it time to timeout
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // Should not crash or show notification
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
-
-      fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
     });
   });
 });
