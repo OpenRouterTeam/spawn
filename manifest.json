@@ -887,7 +887,7 @@
     "vastai/claude": "implemented",
     "vastai/aider": "implemented",
     "vastai/codex": "implemented",
-    "vastai/openclaw": "missing",
+    "vastai/openclaw": "implemented",
     "vastai/nanoclaw": "missing",
     "vastai/goose": "missing",
     "vastai/interpreter": "missing",
