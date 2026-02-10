@@ -11,6 +11,7 @@ import {
   cmdHelp,
 } from "./commands.js";
 import { VERSION } from "./version.js";
+import { checkForUpdates } from "./update-check.js";
 
 function isInteractiveTTY(): boolean {
   return process.stdin.isTTY && process.stdout.isTTY;
@@ -59,6 +60,9 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+
+  // Check for updates in the background (non-blocking)
+  checkForUpdates();
 
   // Extract --prompt or -p flag
   let [prompt, filteredArgs] = extractFlagValue(

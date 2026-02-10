@@ -30,7 +30,9 @@ cli/
 │   ├── index.ts        # Entry point (routes commands to handlers)
 │   ├── commands.ts     # All command implementations
 │   ├── manifest.ts     # Manifest fetching and caching logic
-│   └── version.ts      # Version constant
+│   ├── update-check.ts # Auto-update check (once per day)
+│   ├── version.ts      # Version constant
+│   └── __tests__/      # Test suite (Bun test runner)
 ├── install.sh          # Installer (auto-installs bun if needed)
 ├── package.json        # Package metadata and dependencies
 └── tsconfig.json       # TypeScript configuration
@@ -42,6 +44,7 @@ The TypeScript CLI (`src/*.ts`) provides:
 
 - **Interactive mode**: Terminal UI with prompts for selecting agents and clouds
 - **Manifest caching**: Local cache with TTL to minimize network requests
+- **Auto-update check**: Non-intrusive daily version check with notifications
 - **Progress indicators**: Spinners and colored output for better UX
 - **Error handling**: Structured error messages and exit codes
 
@@ -160,6 +163,8 @@ spawn update
 ```
 
 Displays update instructions (re-run installer).
+
+**Auto-update check**: The CLI automatically checks for updates once per day and displays a notification if a newer version is available. To disable this, set `SPAWN_NO_UPDATE_CHECK=1`.
 
 ### Version
 
