@@ -977,7 +977,7 @@
     "northflank/nanoclaw": "missing",
     "northflank/aider": "implemented",
     "northflank/goose": "missing",
-    "northflank/codex": "missing",
+    "northflank/codex": "implemented",
     "northflank/interpreter": "missing",
     "northflank/gemini": "missing",
     "northflank/amazonq": "missing",
