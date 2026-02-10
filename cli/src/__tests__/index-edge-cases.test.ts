@@ -179,30 +179,97 @@ describe("CLI Argument Parsing Edge Cases", () => {
   });
 
   describe("handleDefaultCommand routing logic", () => {
+    // Mirrors the updated routing in index.ts handleDefaultCommand:
+    // 1. If input matches an agent -> agentInfo
+    // 2. If input matches a cloud -> cloudInfo
+    // 3. Otherwise -> unified error with suggestions from both pools
     function routeDefaultCommand(
-      agent: string,
+      input: string,
       cloud: string | undefined,
-      agentExists: boolean
-    ): "error" | "run" | "agentInfo" {
-      if (!agentExists) return "error";
+      agents: Record<string, boolean>,
+      clouds: Record<string, boolean>
+    ): "run" | "agentInfo" | "cloudInfo" | "unifiedError" {
       if (cloud) return "run";
-      return "agentInfo";
+      if (agents[input]) return "agentInfo";
+      if (clouds[input]) return "cloudInfo";
+      return "unifiedError";
     }
 
-    it("should route to error for unknown agent", () => {
-      expect(routeDefaultCommand("nonexistent", "sprite", false)).toBe("error");
-    });
+    const agents = { claude: true, aider: true, openclaw: true };
+    const clouds = { sprite: true, hetzner: true, digitalocean: true };
 
     it("should route to run when agent and cloud provided", () => {
-      expect(routeDefaultCommand("claude", "sprite", true)).toBe("run");
+      expect(routeDefaultCommand("claude", "sprite", agents, clouds)).toBe("run");
     });
 
-    it("should route to agentInfo when only agent provided", () => {
-      expect(routeDefaultCommand("claude", undefined, true)).toBe("agentInfo");
+    it("should route to agentInfo when input matches an agent", () => {
+      expect(routeDefaultCommand("claude", undefined, agents, clouds)).toBe("agentInfo");
     });
 
-    it("should route to error even when cloud is provided but agent unknown", () => {
-      expect(routeDefaultCommand("nonexistent", "sprite", false)).toBe("error");
+    it("should route to cloudInfo when input matches a cloud", () => {
+      expect(routeDefaultCommand("hetzner", undefined, agents, clouds)).toBe("cloudInfo");
+    });
+
+    it("should route to unifiedError when input matches neither", () => {
+      expect(routeDefaultCommand("nonexistent", undefined, agents, clouds)).toBe("unifiedError");
+    });
+
+    it("should prefer agentInfo over cloudInfo when input is ambiguous", () => {
+      // If a name exists in both agents and clouds, agent takes priority
+      const ambiguousAgents = { ...agents, hetzner: true };
+      expect(routeDefaultCommand("hetzner", undefined, ambiguousAgents, clouds)).toBe("agentInfo");
+    });
+
+    it("should route to run even for unknown names when cloud arg present", () => {
+      expect(routeDefaultCommand("nonexistent", "sprite", agents, clouds)).toBe("run");
+    });
+  });
+
+  describe("unified error suggestions from both agents and clouds", () => {
+    // Mirrors the new behavior: when input matches neither, suggest from both pools
+    function findUnifiedSuggestion(
+      input: string,
+      agentKeys: string[],
+      cloudKeys: string[],
+      findClosest: (input: string, candidates: string[]) => string | null
+    ): { agentMatch: string | null; cloudMatch: string | null } {
+      return {
+        agentMatch: findClosest(input, agentKeys),
+        cloudMatch: findClosest(input, cloudKeys),
+      };
+    }
+
+    // Simple mock findClosestMatch that returns exact prefix matches
+    function mockFindClosest(input: string, candidates: string[]): string | null {
+      for (const c of candidates) {
+        if (c.startsWith(input) || input.startsWith(c)) return c;
+      }
+      return null;
+    }
+
+    it("should find agent suggestion for near-agent input", () => {
+      const result = findUnifiedSuggestion("claud", ["claude", "aider"], ["sprite", "hetzner"], mockFindClosest);
+      expect(result.agentMatch).toBe("claude");
+      expect(result.cloudMatch).toBeNull();
+    });
+
+    it("should find cloud suggestion for near-cloud input", () => {
+      const result = findUnifiedSuggestion("hetzne", ["claude", "aider"], ["sprite", "hetzner"], mockFindClosest);
+      expect(result.agentMatch).toBeNull();
+      expect(result.cloudMatch).toBe("hetzner");
+    });
+
+    it("should find both suggestions when input is ambiguous", () => {
+      // "aid" could match "aider" (agent) and "aide-cloud" (cloud) if it existed
+      const result = findUnifiedSuggestion("aid", ["claude", "aider"], ["aide-cloud", "hetzner"], mockFindClosest);
+      expect(result.agentMatch).toBe("aider");
+      expect(result.cloudMatch).toBe("aide-cloud");
+    });
+
+    it("should return null for both when no matches found", () => {
+      const result = findUnifiedSuggestion("zzzzz", ["claude", "aider"], ["sprite", "hetzner"], mockFindClosest);
+      expect(result.agentMatch).toBeNull();
+      expect(result.cloudMatch).toBeNull();
     });
   });
 
