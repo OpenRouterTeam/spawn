@@ -87,6 +87,36 @@ chown ubuntu:ubuntu /home/ubuntu/.cloud-init-complete
 CLOUD_INIT_EOF
 }
 
+# Wait for Lightsail instance to become running and get its public IP
+# Sets: LIGHTSAIL_SERVER_IP
+# Usage: _wait_for_lightsail_instance NAME [MAX_ATTEMPTS]
+_wait_for_lightsail_instance() {
+    local name="${1}"
+    local max_attempts=${2:-60}
+    local attempt=1
+
+    log_warn "Waiting for instance to become running..."
+    while [[ ${attempt} -le ${max_attempts} ]]; do
+        local state
+        state=$(aws lightsail get-instance --instance-name "${name}" \
+            --query 'instance.state.name' --output text 2>/dev/null)
+
+        if [[ "${state}" == "running" ]]; then
+            LIGHTSAIL_SERVER_IP=$(aws lightsail get-instance --instance-name "${name}" \
+                --query 'instance.publicIpAddress' --output text)
+            export LIGHTSAIL_SERVER_IP
+            log_info "Instance running: IP=${LIGHTSAIL_SERVER_IP}"
+            return 0
+        fi
+        log_warn "Instance state: ${state} (${attempt}/${max_attempts})"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Instance did not become running in time"
+    return 1
+}
+
 create_server() {
     local name="${1}"
     local bundle="${LIGHTSAIL_BUNDLE:-medium_3_0}"
@@ -118,25 +148,7 @@ create_server() {
     export LIGHTSAIL_INSTANCE_NAME="${name}"
     log_info "Instance creation initiated: ${name}"
 
-    # Wait for instance to become running and get IP
-    log_warn "Waiting for instance to become running..."
-    local max_attempts=60 attempt=1
-    while [[ ${attempt} -le ${max_attempts} ]]; do
-        local state
-        state=$(aws lightsail get-instance --instance-name "${name}" \
-            --query 'instance.state.name' --output text 2>/dev/null)
-
-        if [[ "${state}" == "running" ]]; then
-            LIGHTSAIL_SERVER_IP=$(aws lightsail get-instance --instance-name "${name}" \
-                --query 'instance.publicIpAddress' --output text)
-            export LIGHTSAIL_SERVER_IP
-            log_info "Instance running: IP=${LIGHTSAIL_SERVER_IP}"
-            return 0
-        fi
-        log_warn "Instance state: ${state} (${attempt}/${max_attempts})"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"; attempt=$((attempt + 1))
-    done
-    log_error "Instance did not become running in time"; return 1
+    _wait_for_lightsail_instance "${name}"
 }
 
 verify_server_connectivity() {
