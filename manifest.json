@@ -1025,7 +1025,7 @@
     "railway/interpreter": "missing",
     "railway/gemini": "implemented",
     "railway/amazonq": "implemented",
-    "railway/cline": "missing",
+    "railway/cline": "implemented",
     "railway/gptme": "implemented",
     "railway/opencode": "missing",
     "railway/plandex": "missing",
