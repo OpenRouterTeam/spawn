@@ -1,0 +1,54 @@
+{
+  "alerts": {
+    "cpu": 90,
+    "io": 10000,
+    "network_in": 10,
+    "network_out": 10,
+    "transfer_quota": 80
+  },
+  "backups": {
+    "available": false,
+    "enabled": false,
+    "last_successful": null,
+    "schedule": {
+      "day": null,
+      "window": null
+    }
+  },
+  "capabilities": [
+    "Block Storage Encryption",
+    "Maintenance Policy"
+  ],
+  "created": "2026-02-10T23:48:40",
+  "disk_encryption": "enabled",
+  "group": "",
+  "has_user_data": false,
+  "host_uuid": "8b96a1f14d312ac159c48ad9d7a0f10f9f675223",
+  "hypervisor": "kvm",
+  "id": 91474248,
+  "image": "linode/ubuntu24.04",
+  "interface_generation": "legacy_config",
+  "ipv4": [
+    "45.79.187.16"
+  ],
+  "ipv6": "2600:3c03::2000:10ff:fe23:b21d/128",
+  "label": "spawn-record-1770767320",
+  "lke_cluster_id": null,
+  "maintenance_policy": "linode/migrate",
+  "placement_group": null,
+  "region": "us-east",
+  "site_type": "core",
+  "specs": {
+    "accelerated_devices": 0,
+    "disk": 25600,
+    "gpus": 0,
+    "memory": 1024,
+    "transfer": 1000,
+    "vcpus": 1
+  },
+  "status": "provisioning",
+  "tags": [],
+  "type": "g6-nanode-1",
+  "updated": "2026-02-10T23:48:40",
+  "watchdog_enabled": true
+}
