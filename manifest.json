@@ -1006,7 +1006,7 @@
     "lambda/kilocode": "implemented",
     "aws-lightsail/kilocode": "implemented",
     "gcp/kilocode": "implemented",
-    "github-codespaces/kilocode": "missing",
+    "github-codespaces/kilocode": "implemented",
     "e2b/kilocode": "implemented",
     "modal/kilocode": "implemented",
     "fly/kilocode": "implemented",
