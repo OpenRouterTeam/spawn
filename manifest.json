@@ -976,7 +976,7 @@
     "northflank/openclaw": "implemented",
     "northflank/nanoclaw": "missing",
     "northflank/aider": "implemented",
-    "northflank/goose": "missing",
+    "northflank/goose": "implemented",
     "northflank/codex": "implemented",
     "northflank/interpreter": "missing",
     "northflank/gemini": "implemented",
