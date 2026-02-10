@@ -1087,7 +1087,7 @@
     "railway/gptme": "implemented",
     "railway/opencode": "missing",
     "railway/plandex": "missing",
-    "railway/kilocode": "missing",
+    "railway/kilocode": "implemented",
     "render/claude": "implemented",
     "render/openclaw": "implemented",
     "render/nanoclaw": "implemented",
