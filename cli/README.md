@@ -12,38 +12,15 @@ The spawn CLI provides a unified interface to:
 
 ## Architecture
 
-### Three-Tier Installation Strategy
+### Installation Strategy
 
-The CLI uses a progressive fallback installation strategy to maximize compatibility:
+The installer uses bun to build the TypeScript CLI into a standalone JavaScript file. If bun is not already installed, the installer auto-installs it first (~5 seconds).
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Method 1: Bun (Preferred)                               │
-│ - Fastest execution (native TypeScript runtime)         │
-│ - Full TypeScript support with minimal overhead         │
-│ - Falls back to compiled binary if global install fails │
-└─────────────────────────────────────────────────────────┘
-                         ↓ (if bun not found)
-┌─────────────────────────────────────────────────────────┐
-│ Method 2: npm                                           │
-│ - Standard Node.js package manager                      │
-│ - Transpiles TypeScript to JavaScript at install time   │
-│ - Requires Node.js runtime                              │
-└─────────────────────────────────────────────────────────┘
-                         ↓ (if npm not found)
-┌─────────────────────────────────────────────────────────┐
-│ Method 3: Bash Fallback                                 │
-│ - Pure bash implementation (spawn.sh)                   │
-│ - Zero runtime dependencies except curl + jq/python3    │
-│ - Functional subset of TypeScript CLI                   │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Why this pattern?**
-- **Universal compatibility**: Works on any system with bash and curl
-- **Optimal performance**: Uses the fastest available runtime (bun > node > bash)
-- **Zero friction**: No prerequisite installation required for basic usage
-- **Graceful degradation**: Each tier provides full functionality with varying performance characteristics
+**Why bun?**
+- **Fast**: Native TypeScript runtime, instant builds
+- **Universal**: Auto-installed if missing, works on any system with bash and curl
+- **Zero friction**: No prerequisite installation required
+- **Single implementation**: One codebase, always feature-complete
 
 ### Directory Structure
 
@@ -54,9 +31,8 @@ cli/
 │   ├── commands.ts     # All command implementations
 │   ├── manifest.ts     # Manifest fetching and caching logic
 │   └── version.ts      # Version constant
-├── install.sh          # Multi-tier installer script
-├── spawn.sh            # Bash fallback CLI (full implementation)
-├── package.json        # npm package metadata
+├── install.sh          # Installer (auto-installs bun if needed)
+├── package.json        # Package metadata and dependencies
 └── tsconfig.json       # TypeScript configuration
 ```
 
@@ -73,21 +49,6 @@ The TypeScript CLI (`src/*.ts`) provides:
 - `@clack/prompts` — Interactive terminal prompts
 - `picocolors` — Terminal color support
 
-### Bash Fallback Implementation
-
-The bash CLI (`spawn.sh`) is a standalone script that:
-
-- Implements the same commands as the TypeScript version
-- Uses `jq` or `python3` for JSON parsing (auto-detects which is available)
-- Provides a numbered menu picker for interactive mode
-- Maintains local manifest cache with TTL
-- Supports all core commands: `list`, `agents`, `clouds`, `run`, `improve`, `update`
-
-**Why maintain both implementations?**
-- **Portability**: Bash version works on minimal systems (CI containers, embedded Linux, etc.)
-- **Bootstrap**: Used by installer when bun/npm aren't available
-- **Reference**: Demonstrates that the protocol is runtime-agnostic
-
 ## Installation
 
 ### Quick Install
@@ -97,13 +58,13 @@ curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/insta
 ```
 
 The installer will:
-1. Check for `bun` → install via `bun install -g` if found
-2. Check for `npm` → install via `npm install -g` if found
-3. Fallback → download `spawn.sh` to `$HOME/.local/bin` if neither found
+1. Install `bun` if not already present
+2. Clone the CLI source
+3. Build and install the `spawn` binary to `~/.local/bin`
 
 ### Environment Variables
 
-- `SPAWN_INSTALL_DIR` — Override install directory (default: `$HOME/.local/bin` for fallback method)
+- `SPAWN_INSTALL_DIR` — Override install directory (default: `$HOME/.local/bin`)
 
 ### Manual Installation (Development)
 
@@ -198,8 +159,7 @@ Clone (or update) the spawn repository and run the `improve.sh` script, which us
 spawn update
 ```
 
-- **TypeScript version**: Displays update instructions (re-run installer)
-- **Bash version**: Self-updates by downloading the latest `spawn.sh`
+Displays update instructions (re-run installer).
 
 ### Version
 
@@ -213,8 +173,7 @@ Display the current CLI version.
 
 ### Prerequisites
 
-- Bun 1.0+ (or Node.js 18+ with npm)
-- TypeScript 5.0+
+- Bun 1.0+
 
 ### Running Locally
 
@@ -227,15 +186,9 @@ bun run compile         # Compile to standalone binary
 ### Testing
 
 ```bash
-# Test TypeScript version
 bun run dev list
 bun run dev agents
 bun run dev claude sprite
-
-# Test bash version
-bash spawn.sh list
-bash spawn.sh agents
-bash spawn.sh claude sprite
 ```
 
 ### Code Organization
@@ -259,7 +212,6 @@ bash spawn.sh claude sprite
 
 **`src/version.ts`**
 - Single source of truth for version number
-- Imported by both TypeScript and bash implementations
 
 ### Adding a New Command
 
@@ -280,8 +232,6 @@ bash spawn.sh claude sprite
 
 3. Update help text in `src/commands.ts` → `cmdHelp()`
 
-4. (Optional) Add equivalent implementation to `spawn.sh` for bash fallback
-
 ## Design Rationale
 
 ### Why TypeScript?
@@ -291,23 +241,16 @@ bash spawn.sh claude sprite
 - **Rich ecosystem**: Access to high-quality CLI libraries (`@clack/prompts`, etc.)
 - **Single codebase**: Same code runs on bun, node, or as a compiled binary
 
-### Why Bash Fallback?
+### Why Auto-install Bun?
 
-- **Universality**: Bash is available on virtually all Unix-like systems
-- **Zero dependencies**: Only requires `curl` and `jq`/`python3` (one of which is usually installed)
-- **CI/CD friendly**: Works in minimal Docker containers, GitHub Actions, etc.
-- **Educational**: Demonstrates the protocol can be implemented in any language
-
-### Why Bun → npm → Bash Tiering?
-
-- **Performance gradient**: Bun is fastest, npm is widely available, bash always works
-- **User experience**: Bun users get instant execution, others get working tool
-- **Distribution**: Can be installed via package manager or curl | bash
-- **Maintenance**: Single TypeScript codebase serves bun and npm, bash is separate but synchronized
+- **Single implementation**: No need to maintain a separate bash CLI
+- **Feature parity**: Every user gets the full TypeScript CLI with all features
+- **Fast install**: Bun installs in ~5 seconds via `curl -fsSL https://bun.sh/install | bash`
+- **Simple maintenance**: One codebase, one source of truth
 
 ## Manifest Caching
 
-Both implementations cache the manifest locally to reduce network requests:
+The CLI caches the manifest locally to reduce network requests:
 
 - **Cache location**: `$XDG_CACHE_HOME/spawn/manifest.json` (or `~/.cache/spawn/manifest.json`)
 - **TTL**: 1 hour (3600 seconds)
@@ -329,33 +272,25 @@ When you run `spawn <agent> <cloud>`:
 
 ### Before Submitting Changes
 
-1. Test both TypeScript and bash versions:
+1. Test the CLI:
    ```bash
    bun run dev --help
-   bash spawn.sh --help
    ```
 
 2. Ensure version numbers are synchronized:
    - `src/version.ts` → `VERSION`
-   - `spawn.sh` → `SPAWN_VERSION`
    - `package.json` → `version`
 
 3. Update this README if you add new commands or change behavior
 
-4. Run the installer locally to verify the three-tier strategy works:
+4. Run the installer locally to verify it works:
    ```bash
-   # Test with bun
    bash install.sh
-
-   # Test without bun (rename temporarily)
-   mv $(which bun) $(which bun).bak
-   bash install.sh
-   mv $(which bun).bak $(which bun)
    ```
 
 ### Release Checklist
 
-1. Bump version in all three locations (see above)
+1. Bump version in both locations (see above)
 2. Update CHANGELOG (if exists)
 3. Test installer on clean system
 4. Tag release: `git tag -a cli-vX.Y.Z -m "Release vX.Y.Z"`
