@@ -56,6 +56,11 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   if (cloud) {
     await cmdRun(agent, cloud, prompt);
   } else {
+    if (prompt) {
+      console.error("Error: --prompt requires both <agent> and <cloud>");
+      console.error(`\nUsage: spawn ${agent} <cloud> --prompt "your prompt here"`);
+      process.exit(1);
+    }
     await cmdAgentInfo(agent);
   }
 }
@@ -107,6 +112,11 @@ async function main(): Promise<void> {
 
   try {
     if (!cmd) {
+      if (prompt) {
+        console.error("Error: --prompt requires both <agent> and <cloud>");
+        console.error(`\nUsage: spawn <agent> <cloud> --prompt "your prompt here"`);
+        process.exit(1);
+      }
       if (isInteractiveTTY()) {
         await cmdInteractive();
       } else {

@@ -507,28 +507,33 @@ export async function cmdUpdate(): Promise<void> {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
     if (!res.ok) throw new Error("fetch failed");
-    const pkg = (await res.json()) as { version: string };
-    const remoteVersion = pkg.version;
+    const remotePkg = (await res.json()) as { version: string };
+    const remoteVersion = remotePkg.version;
 
     if (remoteVersion === VERSION) {
       s.stop(`Already up to date ${pc.dim(`(v${VERSION})`)}`);
       return;
     }
 
-    s.message(`Found v${remoteVersion}...`);
+    s.stop(`Updating: v${VERSION} -> v${remoteVersion}`);
 
-    // Run the install script to update
-    const installRes = await fetch(`${RAW_BASE}/cli/install.sh`);
-    if (!installRes.ok) throw new Error("fetch install.sh failed");
-    const installScript = await installRes.text();
-
-    s.stop(`Update available: v${VERSION} -> v${remoteVersion}`);
-    p.log.info(`Run this to update:`);
-    console.log();
-    console.log(
-      `  ${pc.cyan(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`)}`
-    );
-    console.log();
+    const { execSync } = await import("child_process");
+    try {
+      execSync(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`, {
+        stdio: "inherit",
+        shell: "/bin/bash",
+      });
+      console.log();
+      p.log.success(`Updated to v${remoteVersion}`);
+      p.log.info("Restart your command to use the new version.");
+    } catch {
+      p.log.error("Auto-update failed. Update manually:");
+      console.log();
+      console.log(
+        `  ${pc.cyan(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`)}`
+      );
+      console.log();
+    }
   } catch (err) {
     s.stop(pc.red("Failed to check for updates"));
     console.error("Error:", getErrorMessage(err));

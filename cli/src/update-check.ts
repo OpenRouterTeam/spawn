@@ -47,20 +47,27 @@ function compareVersions(current: string, latest: string): boolean {
 }
 
 function performAutoUpdate(latestVersion: string): void {
+  const line1 = `Update available: v${VERSION} -> v${latestVersion}`;
+  const line2 = "Updating automatically...";
+  const width = Math.max(line1.length, line2.length) + 4;
+  const border = "+" + "-".repeat(width) + "+";
+
   console.error(); // Use stderr so it doesn't interfere with parseable output
-  console.error(pc.yellow("+------------------------------------------------------------+"));
+  console.error(pc.yellow(border));
   console.error(
     pc.yellow("| ") +
     pc.bold(`Update available: v${VERSION} -> `) +
     pc.green(pc.bold(`v${latestVersion}`)) +
-    pc.yellow("                       |")
+    " ".repeat(width - 2 - line1.length) +
+    pc.yellow(" |")
   );
   console.error(
     pc.yellow("| ") +
-    pc.bold("Updating automatically...") +
-    pc.yellow("                                  |")
+    pc.bold(line2) +
+    " ".repeat(width - 2 - line2.length) +
+    pc.yellow(" |")
   );
-  console.error(pc.yellow("+------------------------------------------------------------+"));
+  console.error(pc.yellow(border));
   console.error();
 
   try {
