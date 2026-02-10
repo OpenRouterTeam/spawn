@@ -52,7 +52,14 @@ function extractFlagValue(
   return [value, remaining];
 }
 
+const HELP_FLAGS = ["--help", "-h", "help"];
+
 async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
+  // Handle "spawn <agent> --help" / "spawn <agent> -h" / "spawn <agent> help"
+  if (cloud && HELP_FLAGS.includes(cloud)) {
+    await cmdAgentInfo(agent);
+    return;
+  }
   if (cloud) {
     await cmdRun(agent, cloud, prompt);
   } else {
@@ -129,6 +136,9 @@ async function main(): Promise<void> {
       return;
     }
 
+    // If second arg is --help/-h, show general help for known subcommands
+    const hasHelpFlag = filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
+
     switch (cmd) {
       case "help":
       case "--help":
@@ -145,23 +155,43 @@ async function main(): Promise<void> {
 
       case "list":
       case "ls":
-        await cmdList();
+        if (hasHelpFlag) {
+          cmdHelp();
+        } else {
+          await cmdList();
+        }
         break;
 
       case "agents":
-        await cmdAgents();
+        if (hasHelpFlag) {
+          cmdHelp();
+        } else {
+          await cmdAgents();
+        }
         break;
 
       case "clouds":
-        await cmdClouds();
+        if (hasHelpFlag) {
+          cmdHelp();
+        } else {
+          await cmdClouds();
+        }
         break;
 
       case "improve":
-        await cmdImprove(filteredArgs.slice(1));
+        if (hasHelpFlag) {
+          cmdHelp();
+        } else {
+          await cmdImprove(filteredArgs.slice(1));
+        }
         break;
 
       case "update":
-        await cmdUpdate();
+        if (hasHelpFlag) {
+          cmdHelp();
+        } else {
+          await cmdUpdate();
+        }
         break;
 
       default:
