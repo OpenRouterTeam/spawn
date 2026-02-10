@@ -1071,7 +1071,7 @@
     "northflank/amazonq": "implemented",
     "northflank/cline": "implemented",
     "northflank/gptme": "implemented",
-    "northflank/opencode": "missing",
+    "northflank/opencode": "implemented",
     "northflank/plandex": "missing",
     "northflank/kilocode": "implemented",
     "railway/claude": "implemented",
