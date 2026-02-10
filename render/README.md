@@ -49,6 +49,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/re
 
 Deploys Codex CLI with OpenRouter integration via OPENAI_BASE_URL override.
 
+### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/render/interpreter.sh)
+```
+
+Deploys Open Interpreter with OpenRouter integration via OPENAI_BASE_URL override.
+
 ## Service Details
 
 - **Plan**: Starter (can be configured)

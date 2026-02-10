@@ -1036,7 +1036,7 @@
     "render/aider": "implemented",
     "render/goose": "missing",
     "render/codex": "implemented",
-    "render/interpreter": "missing",
+    "render/interpreter": "implemented",
     "render/gemini": "missing",
     "render/amazonq": "missing",
     "render/cline": "missing",
