@@ -44,4 +44,13 @@ if (process.env.SPAWN_DEBUG === "1") {
 
 if (forceAscii) {
   process.env.TERM = "linux";
+} else {
+  // Explicitly ensure UTF-8 encoding for Unicode output
+  if (!process.env.LANG || !process.env.LANG.includes("UTF-8")) {
+    process.env.LANG = "en_US.UTF-8";
+  }
+  // Set stdout encoding to UTF-8 if possible
+  if (process.stdout.setEncoding) {
+    process.stdout.setEncoding("utf8");
+  }
 }
