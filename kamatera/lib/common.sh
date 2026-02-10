@@ -272,6 +272,54 @@ if power == 'on':
     return 1
 }
 
+# Validate Kamatera server creation parameters
+# Usage: validate_kamatera_params DATACENTER CPU RAM DISK IMAGE BILLING
+validate_kamatera_params() {
+    local datacenter="$1" cpu="$2" ram="$3" disk="$4" image="$5" billing="$6"
+    validate_region_name "$datacenter" || { log_error "Invalid KAMATERA_DATACENTER"; return 1; }
+    validate_resource_name "$cpu" || { log_error "Invalid KAMATERA_CPU"; return 1; }
+    if [[ ! "$ram" =~ ^[0-9]+$ ]]; then log_error "Invalid KAMATERA_RAM: must be numeric"; return 1; fi
+    if [[ ! "$disk" =~ ^[a-zA-Z0-9_=,-]+$ ]]; then log_error "Invalid KAMATERA_DISK"; return 1; fi
+    if [[ ! "$image" =~ ^[a-zA-Z0-9_.:-]+$ ]]; then log_error "Invalid KAMATERA_IMAGE"; return 1; fi
+    validate_resource_name "$billing" || { log_error "Invalid KAMATERA_BILLING"; return 1; }
+}
+
+# Build the JSON request body for Kamatera server creation
+# Usage: build_kamatera_server_body NAME PASSWORD DATACENTER IMAGE CPU RAM DISK BILLING SSH_KEY SCRIPT_CONTENT
+build_kamatera_server_body() {
+    local name="$1" password="$2" datacenter="$3" image="$4"
+    local cpu="$5" ram="$6" disk="$7" billing="$8"
+    local ssh_key="$9" script_content="${10}"
+
+    local json_ssh_key json_script
+    json_ssh_key=$(json_escape "$ssh_key")
+    json_script=$(json_escape "$script_content")
+
+    python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+body = {
+    'name': '$name',
+    'password': '$password',
+    'passwordValidate': '$password',
+    'ssh-key': data['ssh_key'],
+    'datacenter': '$datacenter',
+    'image': '$image',
+    'cpu': '$cpu',
+    'ram': $ram,
+    'disk': '$disk',
+    'dailybackup': 'no',
+    'managed': 'no',
+    'network': 'name=wan,ip=auto',
+    'quantity': 1,
+    'billingcycle': '$billing',
+    'poweronaftercreate': 'yes',
+    'script-file': data['script']
+}
+print(json.dumps(body))
+" <<< "{\"ssh_key\": $json_ssh_key, \"script\": $json_script}"
+}
+
 create_server() {
     local name="$1"
     local datacenter="${KAMATERA_DATACENTER:-EU}"
@@ -281,13 +329,7 @@ create_server() {
     local image="${KAMATERA_IMAGE:-ubuntu_server_24.04_64-bit}"
     local billing="${KAMATERA_BILLING:-hourly}"
 
-    # Validate env var inputs to prevent injection into Python code
-    validate_region_name "$datacenter" || { log_error "Invalid KAMATERA_DATACENTER"; return 1; }
-    validate_resource_name "$cpu" || { log_error "Invalid KAMATERA_CPU"; return 1; }
-    if [[ ! "$ram" =~ ^[0-9]+$ ]]; then log_error "Invalid KAMATERA_RAM: must be numeric"; return 1; fi
-    if [[ ! "$disk" =~ ^[a-zA-Z0-9_=,-]+$ ]]; then log_error "Invalid KAMATERA_DISK"; return 1; fi
-    if [[ ! "$image" =~ ^[a-zA-Z0-9_.:-]+$ ]]; then log_error "Invalid KAMATERA_IMAGE"; return 1; fi
-    validate_resource_name "$billing" || { log_error "Invalid KAMATERA_BILLING"; return 1; }
+    validate_kamatera_params "$datacenter" "$cpu" "$ram" "$disk" "$image" "$billing" || return 1
 
     log_warn "Creating Kamatera server '$name' (datacenter: $datacenter, cpu: $cpu, ram: ${ram}MB)..."
 
@@ -321,36 +363,9 @@ touch /root/.cloud-init-complete
 INIT_EOF
 )
 
-    # Pass SSH key and script content safely via stdin as JSON
-    local json_ssh_key
-    json_ssh_key=$(json_escape "$ssh_key")
-    local json_script
-    json_script=$(json_escape "$script_content")
-
+    # Build request body and submit server creation
     local body
-    body=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-body = {
-    'name': '$name',
-    'password': '$password',
-    'passwordValidate': '$password',
-    'ssh-key': data['ssh_key'],
-    'datacenter': '$datacenter',
-    'image': '$image',
-    'cpu': '$cpu',
-    'ram': $ram,
-    'disk': '$disk',
-    'dailybackup': 'no',
-    'managed': 'no',
-    'network': 'name=wan,ip=auto',
-    'quantity': 1,
-    'billingcycle': '$billing',
-    'poweronaftercreate': 'yes',
-    'script-file': data['script']
-}
-print(json.dumps(body))
-" <<< "{\"ssh_key\": $json_ssh_key, \"script\": $json_script}")
+    body=$(build_kamatera_server_body "$name" "$password" "$datacenter" "$image" "$cpu" "$ram" "$disk" "$billing" "$ssh_key" "$script_content")
 
     local response
     response=$(kamatera_api POST "/service/server" "$body")
