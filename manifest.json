@@ -948,7 +948,7 @@
     "koyeb/aider": "implemented",
     "koyeb/goose": "implemented",
     "koyeb/codex": "implemented",
-    "koyeb/interpreter": "missing",
+    "koyeb/interpreter": "implemented",
     "koyeb/gemini": "missing",
     "koyeb/amazonq": "missing",
     "koyeb/cline": "missing",
