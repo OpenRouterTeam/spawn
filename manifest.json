@@ -891,7 +891,7 @@
     "vastai/nanoclaw": "missing",
     "vastai/goose": "missing",
     "vastai/interpreter": "missing",
-    "vastai/gemini": "missing",
+    "vastai/gemini": "implemented",
     "vastai/amazonq": "missing",
     "vastai/cline": "missing",
     "vastai/gptme": "missing",
