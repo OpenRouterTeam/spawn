@@ -283,33 +283,6 @@ describe("Command Helpers", () => {
     });
   });
 
-  describe("isLocalSpawnCheckout", () => {
-    // Helper function behavior
-    function isLocalSpawnCheckout(fileExists: (path: string) => boolean): boolean {
-      return fileExists("./improve.sh") && fileExists("./manifest.json");
-    }
-
-    it("should return true when both files exist", () => {
-      const fakeExists = (path: string) => path === "./improve.sh" || path === "./manifest.json";
-      expect(isLocalSpawnCheckout(fakeExists)).toBe(true);
-    });
-
-    it("should return false when improve.sh is missing", () => {
-      const fakeExists = (path: string) => path === "./manifest.json";
-      expect(isLocalSpawnCheckout(fakeExists)).toBe(false);
-    });
-
-    it("should return false when manifest.json is missing", () => {
-      const fakeExists = (path: string) => path === "./improve.sh";
-      expect(isLocalSpawnCheckout(fakeExists)).toBe(false);
-    });
-
-    it("should return false when both files are missing", () => {
-      const fakeExists = () => false;
-      expect(isLocalSpawnCheckout(fakeExists)).toBe(false);
-    });
-  });
-
   describe("reportDownloadFailure error messages", () => {
     it("should show helpful message for 404 on both sources", () => {
       const primaryStatus = 404;

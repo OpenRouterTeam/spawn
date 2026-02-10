@@ -1,5 +1,5 @@
 #!/bin/bash
-# Continuous improvement loop for spawn using Claude Code Agent Teams
+# Continuous discovery loop for spawn using Claude Code Agent Teams
 #
 # Discovery priorities:
 #   1. Clouds/sandboxes > agents (bias toward new compute targets)
@@ -8,9 +8,9 @@
 #   4. Fill matrix gaps from prior discovery
 #
 # Usage:
-#   ./improve.sh                  # one team cycle
-#   ./improve.sh --loop           # continuous cycles
-#   ./improve.sh --single         # single-agent mode (no teams)
+#   ./discovery.sh                  # one team cycle
+#   ./discovery.sh --loop           # continuous cycles
+#   ./discovery.sh --single         # single-agent mode (no teams)
 
 set -eo pipefail
 
@@ -20,8 +20,8 @@ MANIFEST="${REPO_ROOT}/manifest.json"
 MODE="${1:-once}"
 
 # --- Lifecycle config (mirrors refactor.sh patterns) ---
-WORKTREE_BASE="/tmp/spawn-worktrees/improve"
-TEAM_NAME="spawn-improve"
+WORKTREE_BASE="/tmp/spawn-worktrees/discovery"
+TEAM_NAME="spawn-discovery"
 CYCLE_TIMEOUT=3600   # 60 min for team cycles
 SINGLE_TIMEOUT=1800  # 30 min for single-agent cycles
 LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"
@@ -35,9 +35,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-log_info()  { printf "${GREEN}[improve]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [improve] $1" >> "${LOG_FILE}"; }
-log_warn()  { printf "${YELLOW}[improve]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [improve] WARN: $1" >> "${LOG_FILE}"; }
-log_error() { printf "${RED}[improve]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [improve] ERROR: $1" >> "${LOG_FILE}"; }
+log_info()  { printf "${GREEN}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] $1" >> "${LOG_FILE}"; }
+log_warn()  { printf "${YELLOW}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] WARN: $1" >> "${LOG_FILE}"; }
+log_error() { printf "${RED}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] ERROR: $1" >> "${LOG_FILE}"; }
 
 # --- Cleanup trap (from refactor.sh) ---
 cleanup() {
@@ -109,7 +109,7 @@ build_team_prompt() {
     summary=$(get_matrix_summary)
 
     cat <<'PROMPT_EOF'
-You are the lead of the spawn improvement team. Read CLAUDE.md and manifest.json first.
+You are the lead of the spawn discovery team. Read CLAUDE.md and manifest.json first.
 
 Current state:
 PROMPT_EOF
@@ -446,7 +446,7 @@ run_team_cycle() {
     mkdir -p "${WORKTREE_BASE}"
 
     # Write prompt to temp file (from refactor.sh pattern)
-    PROMPT_FILE=$(mktemp /tmp/improve-prompt-XXXXXX.md)
+    PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
     build_team_prompt > "${PROMPT_FILE}"
 
     # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
@@ -472,13 +472,13 @@ run_team_cycle() {
 
         # Create checkpoint for successful cycle
         log_info "Creating checkpoint..."
-        sprite-env checkpoint create --comment "improve cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+        sprite-env checkpoint create --comment "discovery cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
     elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         log_warn "Cycle timed out after ${HARD_TIMEOUT}s — killed by hard timeout"
 
         # Still create checkpoint for any partial work that was merged
         log_info "Creating checkpoint for partial work..."
-        sprite-env checkpoint create --comment "improve cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
+        sprite-env checkpoint create --comment "discovery cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Cycle failed (exit_code=${CLAUDE_EXIT})"
     fi
@@ -500,7 +500,7 @@ run_single_cycle() {
     git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
-    PROMPT_FILE=$(mktemp /tmp/improve-prompt-XXXXXX.md)
+    PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
     build_single_prompt > "${PROMPT_FILE}"
 
     log_info "Launching single agent..."
@@ -517,10 +517,10 @@ run_single_cycle() {
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Single cycle completed successfully"
-        sprite-env checkpoint create --comment "improve single cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+        sprite-env checkpoint create --comment "discovery single cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
     elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         log_warn "Single cycle timed out after ${HARD_TIMEOUT}s"
-        sprite-env checkpoint create --comment "improve single cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
+        sprite-env checkpoint create --comment "discovery single cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Single cycle failed (exit_code=${CLAUDE_EXIT})"
     fi
@@ -532,8 +532,8 @@ run_single_cycle() {
 }
 
 # Main
-log_info "=== Starting improve cycle ==="
-log_info "Spawn Improvement System"
+log_info "=== Starting discovery cycle ==="
+log_info "Spawn Discovery System"
 log_info "Mode: ${MODE}"
 log_info "Worktree base: ${WORKTREE_BASE}"
 cd "${REPO_ROOT}"

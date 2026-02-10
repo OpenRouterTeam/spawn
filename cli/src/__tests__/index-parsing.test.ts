@@ -157,7 +157,6 @@ describe("CLI Argument Parsing", () => {
         case "list": case "ls": return "list";
         case "agents": return "agents";
         case "clouds": return "clouds";
-        case "improve": return "improve";
         case "update": return "update";
         default: return "default";
       }
@@ -175,7 +174,6 @@ describe("CLI Argument Parsing", () => {
       expect(routeCommand("ls")).toBe("list");
       expect(routeCommand("agents")).toBe("agents");
       expect(routeCommand("clouds")).toBe("clouds");
-      expect(routeCommand("improve")).toBe("improve");
       expect(routeCommand("update")).toBe("update");
     });
 

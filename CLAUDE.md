@@ -11,7 +11,7 @@ Spawn is a matrix of **agents x clouds**. Every script provisions a cloud server
 
 ## How to Improve Spawn
 
-When run via `./improve.sh`, your job is to pick ONE of these tasks and execute it:
+When run via `./discovery.sh`, your job is to pick ONE of these tasks and execute it:
 
 ### 1. Fill a missing matrix entry
 
@@ -111,12 +111,15 @@ spawn/
     {agent}.sh                   # Agent deployment scripts
   .claude/skills/setup-trigger-service/
     trigger-server.ts            # HTTP trigger server (concurrent runs, dedup)
+    discovery.sh                 # Discovery cycle script (fill gaps, scout new clouds/agents)
     refactor.sh                  # Dual-mode cycle script (issue fix or full refactor)
+    start-discovery.sh           # Launcher with secrets (gitignored)
     start-refactor.sh            # Launcher with secrets (gitignored)
   .github/workflows/
-    refactor.yml                 # Scheduled + issue-triggered workflow
+    discovery.yml                # Scheduled + issue-triggered discovery workflow
+    refactor.yml                 # Scheduled + issue-triggered refactor workflow
   manifest.json                  # The matrix (source of truth)
-  improve.sh                     # Run this to trigger one improvement cycle
+  discovery.sh                   # Run this to trigger one discovery cycle
   test/run.sh                    # Test harness
   README.md                      # User-facing docs
   CLAUDE.md                      # This file - contributor guide
@@ -250,7 +253,7 @@ macOS ships bash 3.2. All scripts MUST work on it:
 
 ## Autonomous Loops
 
-When running autonomous improvement/refactoring loops (`./improve.sh --loop`):
+When running autonomous discovery/refactoring loops (`./discovery.sh --loop`):
 
 - **Run `bash -n` on every changed .sh file** before committing — syntax errors break everything
 - **NEVER revert a prior fix** — if `shared/common.sh` was changed to fix macOS compat, don't undo it

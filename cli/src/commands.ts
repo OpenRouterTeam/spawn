@@ -10,7 +10,6 @@ import {
   countImplemented,
   RAW_BASE,
   REPO,
-  CACHE_DIR,
   type Manifest,
 } from "./manifest.js";
 import pkg from "../package.json" with { type: "json" };
@@ -29,21 +28,6 @@ function getErrorMessage(err: unknown): string {
 function handleCancel(): never {
   console.error(pc.red("Operation cancelled."));
   process.exit(0);
-}
-
-function spawnBashScript(script: string, args: string[], cwd?: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn("bash", [script, ...args], {
-      cwd: cwd || process.cwd(),
-      stdio: "inherit",
-      env: process.env,
-    });
-    child.on("close", (code: number | null) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${script} exited with code ${code}`));
-    });
-    child.on("error", reject);
-  });
 }
 
 async function withSpinner<T>(msg: string, fn: () => Promise<T>): Promise<T> {
@@ -507,44 +491,6 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   console.log();
 }
 
-// ── Improve ────────────────────────────────────────────────────────────────────
-
-function isLocalSpawnCheckout(exists: (path: string) => boolean): boolean {
-  return exists("./improve.sh") && exists("./manifest.json");
-}
-
-async function ensureRepoExists(repoDir: string, exists: (path: string) => boolean): Promise<void> {
-  const { join } = await import("path");
-  const { execSync } = await import("child_process");
-
-  if (exists(join(repoDir, ".git"))) {
-    p.log.step("Updating spawn repo...");
-    try {
-      execSync("git pull --ff-only", { cwd: repoDir, stdio: "pipe" });
-    } catch (err) {
-      // Git pull failed (network issue, merge conflict, etc.) - continue with existing repo
-      console.error("Warning: Failed to update repo:", getErrorMessage(err));
-    }
-  } else {
-    p.log.step("Cloning spawn repo...");
-    execSync(`git clone https://github.com/${REPO}.git ${repoDir}`, { stdio: "inherit" });
-  }
-}
-
-export async function cmdImprove(args: string[]): Promise<void> {
-  const { existsSync: exists } = await import("fs");
-
-  // Check if we're in a spawn checkout
-  if (isLocalSpawnCheckout(exists)) {
-    return spawnBashScript("improve.sh", args, ".");
-  }
-
-  const { join } = await import("path");
-  const repoDir = join(CACHE_DIR, "repo");
-  await ensureRepoExists(repoDir, exists);
-  return spawnBashScript("improve.sh", args, repoDir);
-}
-
 // ── Update ─────────────────────────────────────────────────────────────────────
 
 export async function cmdUpdate(): Promise<void> {
@@ -606,7 +552,6 @@ ${pc.bold("USAGE")}
   spawn list                         Full matrix table
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
-  spawn improve [--loop]             Run improvement system
   spawn update                       Check for CLI updates
   spawn version                      Show version
   spawn help                         Show this help message

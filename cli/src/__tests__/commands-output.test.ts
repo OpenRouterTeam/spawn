@@ -268,7 +268,6 @@ describe("Command Output Functions", () => {
       expect(output).toContain("list");
       expect(output).toContain("agents");
       expect(output).toContain("clouds");
-      expect(output).toContain("improve");
       expect(output).toContain("update");
       expect(output).toContain("version");
       expect(output).toContain("help");

@@ -6,7 +6,6 @@ import {
   cmdAgents,
   cmdClouds,
   cmdAgentInfo,
-  cmdImprove,
   cmdUpdate,
   cmdHelp,
 } from "./commands.js";
@@ -175,14 +174,6 @@ async function main(): Promise<void> {
           cmdHelp();
         } else {
           await cmdClouds();
-        }
-        break;
-
-      case "improve":
-        if (hasHelpFlag) {
-          cmdHelp();
-        } else {
-          await cmdImprove(filteredArgs.slice(1));
         }
         break;
 

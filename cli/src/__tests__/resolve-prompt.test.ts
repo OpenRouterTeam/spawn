@@ -580,7 +580,7 @@ describe("subcommand --help flag detection", () => {
     expect(hasHelpFlag(["agents", "--help"])).toBe(true);
     expect(hasHelpFlag(["clouds", "--help"])).toBe(true);
     expect(hasHelpFlag(["update", "--help"])).toBe(true);
-    expect(hasHelpFlag(["improve", "--help"])).toBe(true);
+    expect(hasHelpFlag(["update", "--help"])).toBe(true);
   });
 
   it("should detect -h after subcommand", () => {
@@ -605,7 +605,7 @@ describe("subcommand --help flag detection", () => {
 
   it("should detect help flag in any position after first", () => {
     expect(hasHelpFlag(["list", "something", "--help"])).toBe(true);
-    expect(hasHelpFlag(["improve", "--loop", "-h"])).toBe(true);
+    expect(hasHelpFlag(["update", "--verbose", "-h"])).toBe(true);
   });
 
   it("should not false-positive on similar but different flags", () => {

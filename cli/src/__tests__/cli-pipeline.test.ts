@@ -389,7 +389,6 @@ describe("CLI Pipeline - extractFlagValue", () => {
         case "list": case "ls": return "list";
         case "agents": return "agents";
         case "clouds": return "clouds";
-        case "improve": return "improve";
         case "update": return "update";
         default: return "default";
       }

@@ -148,14 +148,6 @@ spawn clouds
 
 Show all available cloud providers with descriptions.
 
-### Improve Command
-
-```bash
-spawn improve [--loop]
-```
-
-Clone (or update) the spawn repository and run the `improve.sh` script, which uses Claude to autonomously add missing matrix entries or new agents/clouds.
-
 ### Update CLI
 
 ```bash

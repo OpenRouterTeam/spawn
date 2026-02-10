@@ -263,7 +263,7 @@ cat /.sprite/logs/services/<service-name>.log | grep 'finished'
 
 | Service | Observed cycle time | RUN_TIMEOUT_MS | Rationale |
 |---------|-------------------|----------------|-----------|
-| Discovery (improve.sh) | 15 min (gaps), 1-2h+ (discovery) | `14400000` (4h) | Discovery cycles are open-ended; gap fills are fast |
+| Discovery (discovery.sh) | 15 min (gaps), 1-2h+ (discovery) | `14400000` (4h) | Discovery cycles are open-ended; gap fills are fast |
 | Refactor (refactor.sh) | TBD | `14400000` (4h) | Start high, tune after data |
 
 To override, add to the wrapper script:
@@ -280,7 +280,7 @@ export RUN_TIMEOUT_MS=43200000   # 12 hours (safe starting point)
 
 ## Step 9: Ensure the target script is single-cycle
 
-The target script (e.g., `refactor.sh`, `improve.sh`) MUST:
+The target script (e.g., `refactor.sh`, `discovery.sh`) MUST:
 
 1. **Run a single cycle and exit** — no `while true` loops
 2. **Sync with origin before work** — `git fetch origin main && git pull origin main`
@@ -289,12 +289,12 @@ The target script (e.g., `refactor.sh`, `improve.sh`) MUST:
 If converting from a looping script, remove the `while true` / `sleep` and keep only the body of one iteration.
 
 **Included scripts in this skill directory:**
-- `improve.sh` — Continuous improvement loop for spawn (already single-cycle ready)
+- `discovery.sh` — Continuous discovery loop for spawn (already single-cycle ready)
 - `refactor.sh` — Refactoring team service (already single-cycle ready)
 
 ## Git Conventions for Agent Team Scripts
 
-All agent team scripts (`improve.sh`, `refactor.sh`, and any future scripts) MUST instruct their agents to follow these conventions:
+All agent team scripts (`discovery.sh`, `refactor.sh`, and any future scripts) MUST instruct their agents to follow these conventions:
 
 ### 1. Always pull main before creating worktrees
 
@@ -349,7 +349,7 @@ git worktree prune
 rm -rf /tmp/spawn-worktrees
 ```
 
-These conventions are already embedded in the prompts of `improve.sh` and `refactor.sh`. When adding new service scripts, copy the same patterns.
+These conventions are already embedded in the prompts of `discovery.sh` and `refactor.sh`. When adding new service scripts, copy the same patterns.
 
 ## Step 10: Commit and push
 
@@ -387,7 +387,7 @@ The `trigger-server.ts` file is **shared** — same code runs on every Sprite, c
 
 ## Adding New Service Scripts
 
-To add a new automation script (beyond improve.sh and refactor.sh):
+To add a new automation script (beyond discovery.sh and refactor.sh):
 
 1. Create the script in `/home/sprite/spawn/.claude/skills/setup-trigger-service/<script-name>.sh`
 2. Make it executable: `chmod +x <script-name>.sh`
@@ -412,5 +412,5 @@ To add a new automation script (beyond improve.sh and refactor.sh):
 
 | Workflow | Sprite | Service Name | Secrets |
 |----------|--------|-------------|---------|
-| `improve.yml` (Trigger Discovery) | `lab-spawn-discovery` | `improve-trigger` | `DISCOVERY_SPRITE_URL`, `DISCOVERY_TRIGGER_SECRET` |
+| `discovery.yml` (Trigger Discovery) | `lab-spawn-discovery` | `discovery-trigger` | `DISCOVERY_SPRITE_URL`, `DISCOVERY_TRIGGER_SECRET` |
 | `refactor.yml` (Trigger Refactor) | `lab-spawn-foundations` | `refactor` | `REFACTOR_SPRITE_URL`, `REFACTOR_TRIGGER_SECRET` |

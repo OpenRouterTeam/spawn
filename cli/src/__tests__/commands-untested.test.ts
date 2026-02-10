@@ -343,44 +343,6 @@ describe("Commands - Additional Coverage", () => {
     });
   });
 
-  describe("isLocalSpawnCheckout logic", () => {
-    it("should return true when both files exist", () => {
-      function isLocalSpawnCheckout(fileExists: (path: string) => boolean): boolean {
-        return fileExists("./improve.sh") && fileExists("./manifest.json");
-      }
-
-      const fakeExists = (path: string) => path === "./improve.sh" || path === "./manifest.json";
-      expect(isLocalSpawnCheckout(fakeExists)).toBe(true);
-    });
-
-    it("should return false when improve.sh is missing", () => {
-      function isLocalSpawnCheckout(fileExists: (path: string) => boolean): boolean {
-        return fileExists("./improve.sh") && fileExists("./manifest.json");
-      }
-
-      const fakeExists = (path: string) => path === "./manifest.json";
-      expect(isLocalSpawnCheckout(fakeExists)).toBe(false);
-    });
-
-    it("should return false when manifest.json is missing", () => {
-      function isLocalSpawnCheckout(fileExists: (path: string) => boolean): boolean {
-        return fileExists("./improve.sh") && fileExists("./manifest.json");
-      }
-
-      const fakeExists = (path: string) => path === "./improve.sh";
-      expect(isLocalSpawnCheckout(fakeExists)).toBe(false);
-    });
-
-    it("should return false when both are missing", () => {
-      function isLocalSpawnCheckout(fileExists: (path: string) => boolean): boolean {
-        return fileExists("./improve.sh") && fileExists("./manifest.json");
-      }
-
-      const fakeExists = () => false;
-      expect(isLocalSpawnCheckout(fakeExists)).toBe(false);
-    });
-  });
-
   describe("getImplementedClouds helper", () => {
     const mockManifest = createMockManifest();
 
