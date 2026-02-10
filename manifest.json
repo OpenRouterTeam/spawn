@@ -822,7 +822,7 @@
     "fluidstack/codex": "implemented",
     "fluidstack/interpreter": "implemented",
     "fluidstack/gemini": "implemented",
-    "fluidstack/amazonq": "missing",
+    "fluidstack/amazonq": "implemented",
     "fluidstack/cline": "missing",
     "fluidstack/gptme": "implemented",
     "fluidstack/opencode": "missing",
