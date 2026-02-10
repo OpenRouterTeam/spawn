@@ -115,6 +115,59 @@ get_server_name() {
 
 # get_cloud_init_userdata is now defined in shared/common.sh
 
+# Build JSON request body for Vultr instance creation
+# Usage: _vultr_build_instance_body NAME PLAN REGION OS_ID SSH_KEY_IDS USERDATA_B64
+_vultr_build_instance_body() {
+    local name="$1" plan="$2" region="$3" os_id="$4" ssh_key_ids="$5" userdata_b64="$6"
+    python3 -c "
+import json
+body = {
+    'label': '$name',
+    'hostname': '$name',
+    'region': '$region',
+    'plan': '$plan',
+    'os_id': $os_id,
+    'sshkey_id': $ssh_key_ids,
+    'user_data': '$userdata_b64',
+    'backups': 'disabled'
+}
+print(json.dumps(body))
+"
+}
+
+# Wait for Vultr instance to become active and get its IP
+# Sets: VULTR_SERVER_IP
+# Usage: _wait_for_vultr_instance INSTANCE_ID [MAX_ATTEMPTS]
+_wait_for_vultr_instance() {
+    local instance_id="$1"
+    local max_attempts=${2:-60}
+    local attempt=1
+
+    log_warn "Waiting for instance to become active..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local status_response
+        status_response=$(vultr_api GET "/instances/$instance_id")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
+        local power
+        power=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['power_status'])")
+
+        if [[ "$status" == "active" && "$power" == "running" ]]; then
+            VULTR_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['main_ip'])")
+            export VULTR_SERVER_IP
+            log_info "Instance active: IP=$VULTR_SERVER_IP"
+            return 0
+        fi
+
+        log_warn "Instance status: $status/$power ($attempt/$max_attempts)"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Instance did not become active in time"
+    return 1
+}
+
 create_server() {
     local name="$1"
     local plan="${VULTR_PLAN:-vc2-1c-2gb}"
@@ -141,20 +194,7 @@ create_server() {
     userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
 
     local body
-    body=$(python3 -c "
-import json
-body = {
-    'label': '$name',
-    'hostname': '$name',
-    'region': '$region',
-    'plan': '$plan',
-    'os_id': $os_id,
-    'sshkey_id': $ssh_key_ids,
-    'user_data': '$userdata_b64',
-    'backups': 'disabled'
-}
-print(json.dumps(body))
-")
+    body=$(_vultr_build_instance_body "$name" "$plan" "$region" "$os_id" "$ssh_key_ids" "$userdata_b64")
 
     local response
     response=$(vultr_api POST "/instances" "$body")
@@ -165,12 +205,9 @@ print(json.dumps(body))
         log_info "Instance created: ID=$VULTR_SERVER_ID"
     else
         log_error "Failed to create Vultr instance"
-
-        # Parse error details
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
-
         log_warn "Common issues:"
         log_warn "  - Insufficient account balance"
         log_warn "  - Plan/region unavailable (try different VULTR_PLAN or VULTR_REGION)"
@@ -180,32 +217,7 @@ print(json.dumps(body))
         return 1
     fi
 
-    # Wait for instance to get an IP
-    log_warn "Waiting for instance to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(vultr_api GET "/instances/$VULTR_SERVER_ID")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
-        local power
-        power=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['power_status'])")
-
-        if [[ "$status" == "active" && "$power" == "running" ]]; then
-            VULTR_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['main_ip'])")
-            export VULTR_SERVER_IP
-            log_info "Instance active: IP=$VULTR_SERVER_IP"
-            return 0
-        fi
-
-        log_warn "Instance status: $status/$power ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        ((attempt++))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
+    _wait_for_vultr_instance "$VULTR_SERVER_ID"
 }
 
 verify_server_connectivity() {
