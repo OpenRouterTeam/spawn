@@ -13,7 +13,8 @@ import {
   CACHE_DIR,
   type Manifest,
 } from "./manifest.js";
-import { VERSION } from "./version.js";
+import pkg from "../package.json" with { type: "json" };
+const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

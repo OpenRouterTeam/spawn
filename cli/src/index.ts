@@ -10,8 +10,10 @@ import {
   cmdUpdate,
   cmdHelp,
 } from "./commands.js";
-import { VERSION } from "./version.js";
+import pkg from "../package.json" with { type: "json" };
 import { checkForUpdates } from "./update-check.js";
+
+const VERSION = pkg.version;
 
 function isInteractiveTTY(): boolean {
   return process.stdin.isTTY && process.stdout.isTTY;

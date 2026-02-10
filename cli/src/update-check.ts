@@ -2,8 +2,10 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "fs
 import { join } from "path";
 import { execSync as nodeExecSync } from "child_process";
 import pc from "picocolors";
-import { VERSION } from "./version.js";
+import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE, CACHE_DIR } from "./manifest.js";
+
+const VERSION = pkg.version;
 
 // Internal executor for testability - can be replaced in tests
 export const executor = {
