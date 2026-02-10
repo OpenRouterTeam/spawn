@@ -22,8 +22,6 @@ MODE="${1:-once}"
 # --- Lifecycle config (mirrors refactor.sh patterns) ---
 WORKTREE_BASE="/tmp/spawn-worktrees/discovery"
 TEAM_NAME="spawn-discovery"
-CYCLE_TIMEOUT=3600   # 60 min for team cycles
-SINGLE_TIMEOUT=1800  # 30 min for single-agent cycles
 LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"
 PROMPT_FILE=""
 
@@ -548,31 +546,18 @@ run_team_cycle() {
 
     log_info "Launching agent team..."
     log_info "Worktree base: ${WORKTREE_BASE}"
-    log_info "Cycle timeout: ${CYCLE_TIMEOUT}s"
     echo ""
 
-    # Add grace period: 15 min beyond the cycle timeout (from refactor.sh)
-    local HARD_TIMEOUT=$((CYCLE_TIMEOUT + 900))
-    log_info "Hard timeout: ${HARD_TIMEOUT}s"
-
-    # Run Claude with the prompt file, enforcing a hard timeout
+    # No hard timeout — let the cycle run to completion.
+    # The trigger server's RUN_TIMEOUT_MS is the safety net if it hangs.
     local CLAUDE_EXIT=0
-    timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
-        claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
+    claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
         2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Cycle completed successfully"
-
-        # Create checkpoint for successful cycle
         log_info "Creating checkpoint..."
         sprite-env checkpoint create --comment "discovery cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
-    elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-        log_warn "Cycle timed out after ${HARD_TIMEOUT}s — killed by hard timeout"
-
-        # Still create checkpoint for any partial work that was merged
-        log_info "Creating checkpoint for partial work..."
-        sprite-env checkpoint create --comment "discovery cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Cycle failed (exit_code=${CLAUDE_EXIT})"
     fi
@@ -598,23 +583,15 @@ run_single_cycle() {
     build_single_prompt > "${PROMPT_FILE}"
 
     log_info "Launching single agent..."
-    log_info "Cycle timeout: ${SINGLE_TIMEOUT}s"
     echo ""
 
-    local HARD_TIMEOUT=$((SINGLE_TIMEOUT + 300))
-    log_info "Hard timeout: ${HARD_TIMEOUT}s"
-
     local CLAUDE_EXIT=0
-    timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
-        claude --print -p "$(cat "${PROMPT_FILE}")" --model sonnet \
+    claude --print -p "$(cat "${PROMPT_FILE}")" --model sonnet \
         2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Single cycle completed successfully"
         sprite-env checkpoint create --comment "discovery single cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
-    elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-        log_warn "Single cycle timed out after ${HARD_TIMEOUT}s"
-        sprite-env checkpoint create --comment "discovery single cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Single cycle failed (exit_code=${CLAUDE_EXIT})"
     fi
