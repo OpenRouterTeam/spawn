@@ -978,7 +978,7 @@
     "northflank/aider": "implemented",
     "northflank/goose": "implemented",
     "northflank/codex": "implemented",
-    "northflank/interpreter": "missing",
+    "northflank/interpreter": "implemented",
     "northflank/gemini": "implemented",
     "northflank/amazonq": "missing",
     "northflank/cline": "missing",
