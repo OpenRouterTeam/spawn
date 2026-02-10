@@ -459,7 +459,7 @@ export async function cmdClouds(): Promise<void> {
     console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} agent${implCount !== 1 ? "s" : ""}  ${c.description}`)}`);
   }
   console.log();
-  console.log(pc.dim(`  Run ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
+  console.log(pc.dim(`  Run ${pc.cyan("spawn <cloud>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
   console.log();
 }
 
@@ -487,6 +487,53 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
 
   if (!found) {
     console.log(pc.dim("  No implemented clouds yet."));
+  }
+  console.log();
+}
+
+// ── Cloud Info ─────────────────────────────────────────────────────────────────
+
+// Validate and load cloud - consolidates the pattern used by cmdCloudInfo
+async function validateAndGetCloud(cloud: string): Promise<[manifest: Manifest, cloudKey: string]> {
+  try {
+    validateIdentifier(cloud, "Cloud name");
+  } catch (err) {
+    p.log.error(getErrorMessage(err));
+    process.exit(1);
+  }
+
+  validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
+  const manifest = await loadManifestWithSpinner();
+  validateCloud(manifest, cloud);
+
+  return [manifest, cloud];
+}
+
+export async function cmdCloudInfo(cloud: string): Promise<void> {
+  const [manifest, cloudKey] = await validateAndGetCloud(cloud);
+
+  const c = manifest.clouds[cloudKey];
+  console.log();
+  console.log(`${pc.bold(c.name)} ${pc.dim("--")} ${c.description}`);
+  if (c.notes) {
+    console.log(pc.dim(`  ${c.notes}`));
+  }
+  console.log();
+  console.log(pc.bold("Available agents:"));
+  console.log();
+
+  let found = false;
+  for (const agent of agentKeys(manifest)) {
+    const status = matrixStatus(manifest, cloudKey, agent);
+    if (status === "implemented") {
+      const a = manifest.agents[agent];
+      console.log(`  ${pc.green(agent.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agent + " " + cloudKey)}`);
+      found = true;
+    }
+  }
+
+  if (!found) {
+    console.log(pc.dim("  No implemented agents yet."));
   }
   console.log();
 }
@@ -549,6 +596,7 @@ ${pc.bold("USAGE")}
   spawn <agent> <cloud> --prompt-file <file>
                                      Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
+  spawn <cloud>                      Show available agents for cloud
   spawn list                         Full matrix table
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
@@ -566,6 +614,7 @@ ${pc.bold("EXAMPLES")}
   spawn claude sprite --prompt-file instructions.txt
                                      ${pc.dim("# Read prompt from file")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
+  spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# See the full agent x cloud matrix")}
 
 ${pc.bold("AUTHENTICATION")}
