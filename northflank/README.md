@@ -60,6 +60,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/gemini.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/amazonq.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/cline.sh)
+```
+
 ## Setup
 
 1. Create a Northflank account at https://northflank.com

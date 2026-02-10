@@ -1011,7 +1011,7 @@
     "northflank/interpreter": "implemented",
     "northflank/gemini": "implemented",
     "northflank/amazonq": "implemented",
-    "northflank/cline": "missing",
+    "northflank/cline": "implemented",
     "northflank/gptme": "missing",
     "northflank/opencode": "missing",
     "northflank/plandex": "missing",
