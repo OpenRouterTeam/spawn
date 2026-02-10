@@ -97,10 +97,10 @@ describe("unicode-detect", () => {
   });
 
   describe("LANG environment variable", () => {
-    it("should set LANG to en_US.UTF-8 when Unicode is enabled and LANG is missing", () => {
+    it("should not modify LANG (unicode-detect only touches TERM)", () => {
       const script = `
         import "./src/unicode-detect.ts";
-        console.log(process.env.LANG);
+        console.log(process.env.LANG ?? "undefined");
       `;
       const result = execSync(`bun -e '${script}'`, {
         cwd: CLI_DIR,
@@ -108,7 +108,8 @@ describe("unicode-detect", () => {
         encoding: "utf-8",
         timeout: 5000,
       });
-      expect(result.trim()).toBe("en_US.UTF-8");
+      // unicode-detect only modifies TERM, never LANG
+      expect(result.trim()).toBe("undefined");
     });
 
     it("should preserve existing LANG with UTF-8", () => {
@@ -125,7 +126,7 @@ describe("unicode-detect", () => {
       expect(result.trim()).toBe("fr_FR.UTF-8");
     });
 
-    it("should override LANG without UTF-8 when Unicode is enabled", () => {
+    it("should preserve LANG even without UTF-8 suffix", () => {
       const script = `
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG);
@@ -136,7 +137,8 @@ describe("unicode-detect", () => {
         encoding: "utf-8",
         timeout: 5000,
       });
-      expect(result.trim()).toBe("en_US.UTF-8");
+      // unicode-detect does not modify LANG
+      expect(result.trim()).toBe("C");
     });
   });
 
