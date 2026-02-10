@@ -55,6 +55,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/nanoclaw.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/cline.sh)
+```
+
 #### Codex CLI
 
 ```bash
@@ -95,6 +101,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/opencode.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/plandex.sh)
+```
+
+#### gptme
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/gptme.sh)
 ```
 
 ## Non-Interactive Mode
