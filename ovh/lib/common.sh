@@ -319,19 +319,13 @@ if keys:
 " <<< "${keys_response}"
 }
 
-# Create an OVH Public Cloud instance
-create_ovh_instance() {
-    local name="$1"
-    local flavor="${OVH_FLAVOR:-d2-2}"
-    local region="${OVH_REGION:-GRA7}"
+# Resolve image ID, flavor ID, and SSH key ID for OVH instance creation
+# Outputs three lines: image_id, flavor_id, ssh_key_id
+# Usage: _ovh_resolve_resources REGION FLAVOR_NAME
+_ovh_resolve_resources() {
+    local region="$1"
+    local flavor_name="$2"
 
-    # Validate env var inputs to prevent injection into Python code
-    validate_resource_name "$flavor" || { log_error "Invalid OVH_FLAVOR"; return 1; }
-    validate_region_name "$region" || { log_error "Invalid OVH_REGION"; return 1; }
-
-    log_warn "Creating OVHcloud instance '$name' (flavor: $flavor, region: $region)..."
-
-    # Find image ID
     local image_id
     image_id=$(_ovh_find_image_id "${region}")
     if [[ -z "${image_id}" ]]; then
@@ -340,25 +334,28 @@ create_ovh_instance() {
     fi
     log_info "Found image: ${image_id}"
 
-    # Find flavor ID
     local flavor_id
-    flavor_id=$(_ovh_find_flavor_id "${region}" "${flavor}")
+    flavor_id=$(_ovh_find_flavor_id "${region}" "${flavor_name}")
     if [[ -z "${flavor_id}" ]]; then
-        log_error "Failed to find flavor '${flavor}' in region ${region}"
+        log_error "Failed to find flavor '${flavor_name}' in region ${region}"
         return 1
     fi
     log_info "Found flavor: ${flavor_id}"
 
-    # Get SSH key ID
     local pub_path="${HOME}/.ssh/id_ed25519.pub"
     local fingerprint
     fingerprint=$(get_ssh_fingerprint "${pub_path}")
     local ssh_key_id
     ssh_key_id=$(_ovh_get_ssh_key_id "${fingerprint}")
 
-    # Build request body
-    local body
-    body=$(python3 -c "
+    printf '%s\n%s\n%s\n' "${image_id}" "${flavor_id}" "${ssh_key_id}"
+}
+
+# Build JSON request body for OVH instance creation
+# Usage: _ovh_build_instance_body NAME FLAVOR_ID IMAGE_ID REGION SSH_KEY_ID
+_ovh_build_instance_body() {
+    local name="$1" flavor_id="$2" image_id="$3" region="$4" ssh_key_id="$5"
+    python3 -c "
 import json
 body = {
     'name': '${name}',
@@ -371,7 +368,29 @@ ssh_key_id = '${ssh_key_id}'
 if ssh_key_id:
     body['sshKeyId'] = ssh_key_id
 print(json.dumps(body))
-")
+"
+}
+
+# Create an OVH Public Cloud instance
+create_ovh_instance() {
+    local name="$1"
+    local flavor="${OVH_FLAVOR:-d2-2}"
+    local region="${OVH_REGION:-GRA7}"
+
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$flavor" || { log_error "Invalid OVH_FLAVOR"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid OVH_REGION"; return 1; }
+
+    log_warn "Creating OVHcloud instance '$name' (flavor: $flavor, region: $region)..."
+
+    # Resolve image, flavor, and SSH key IDs
+    local resources
+    resources=$(_ovh_resolve_resources "${region}" "${flavor}") || return 1
+    local image_id flavor_id ssh_key_id
+    { read -r image_id; read -r flavor_id; read -r ssh_key_id; } <<< "${resources}"
+
+    local body
+    body=$(_ovh_build_instance_body "$name" "$flavor_id" "$image_id" "$region" "$ssh_key_id")
 
     local response
     response=$(ovh_api_call POST "/cloud/project/${OVH_PROJECT_ID}/instance" "$body")
