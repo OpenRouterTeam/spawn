@@ -1085,7 +1085,7 @@
     "railway/amazonq": "implemented",
     "railway/cline": "implemented",
     "railway/gptme": "implemented",
-    "railway/opencode": "missing",
+    "railway/opencode": "implemented",
     "railway/plandex": "missing",
     "railway/kilocode": "implemented",
     "render/claude": "implemented",
