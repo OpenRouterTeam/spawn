@@ -136,7 +136,7 @@ _save_ovh_config() {
     local config_dir
     config_dir=$(dirname "${config_file}")
     mkdir -p "${config_dir}"
-    printf '{\n  "application_key": "%s",\n  "application_secret": "%s",\n  "consumer_key": "%s",\n  "project_id": "%s"\n}\n' \
+    printf '{\n  "application_key": %s,\n  "application_secret": %s,\n  "consumer_key": %s,\n  "project_id": %s\n}\n' \
         "$(json_escape "${app_key}")" "$(json_escape "${app_secret}")" \
         "$(json_escape "${consumer_key}")" "$(json_escape "${project_id}")" > "${config_file}"
     chmod 600 "${config_file}"

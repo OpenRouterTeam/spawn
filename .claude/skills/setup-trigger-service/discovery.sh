@@ -327,18 +327,28 @@ You MUST remain active until ALL of the following are true:
 
 1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
 2. **All PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm zero open PRs from this cycle. Every PR must be either merged or closed with a comment.
-3. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
-4. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
+3. **All provider PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName` and check for ANY open PRs related to cloud providers (branches like `add/*`, `feat/*-cloud`, provider names in titles). For each:
+   - Check mergeability: `gh pr view NUMBER --json mergeable --jq '.mergeable'`
+   - If MERGEABLE → merge: `gh pr merge NUMBER --squash --delete-branch`
+   - If not mergeable → close with comment: `gh pr close NUMBER --comment "Auto-closing: provider PR from interrupted cycle (unmergeable). Please reopen if still needed."`
+   - **No provider PR should survive across cycles** — resolve every one before exiting
+4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
+5. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
 
 ### Shutdown Sequence (execute in this exact order):
 
 1. Check TaskList — if any tasks are still in_progress or pending, wait and check again (poll every 30 seconds, up to 5 minutes)
 2. Verify all PRs merged or closed: `gh pr list --repo OpenRouterTeam/spawn --state open`
-3. For each teammate, send a `shutdown_request` via SendMessage
-4. Wait for all `shutdown_response` confirmations
-5. Run final cleanup: `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER`
-6. Print final summary of what was accomplished
-7. ONLY THEN may the session end
+3. **Sweep for leftover provider PRs**: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,mergeable`
+   - For each PR whose title or branch references a cloud/provider (e.g. `hetzner`, `vultr`, `runpod`, `add/`, `feat/`):
+     - MERGEABLE → merge with `gh pr merge NUMBER --squash --delete-branch`
+     - Not mergeable → close with `gh pr close NUMBER --comment "Auto-closing: stale provider PR. Please reopen if still needed."`
+   - Log every action taken
+4. For each teammate, send a `shutdown_request` via SendMessage
+5. Wait for all `shutdown_response` confirmations
+6. Run final cleanup: `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER`
+7. Print final summary of what was accomplished (include count of PRs merged/closed)
+8. ONLY THEN may the session end
 
 ### CRITICAL: If you exit before completing this sequence, running agents will be orphaned and the cycle will be incomplete. You MUST wait for all teammates to shut down before exiting.
 
@@ -436,6 +446,34 @@ cleanup_between_cycles() {
     # Delete local branches that are merged
     git branch --merged main | grep -v 'main' | grep -v '^\*' | xargs -r git branch -d 2>/dev/null || true
 
+    # Resolve any open PRs left behind by the previous cycle
+    log_info "Between-cycle cleanup: checking for leftover open PRs..."
+    local open_prs
+    open_prs=$(gh pr list --repo OpenRouterTeam/spawn --state open \
+        --json number,updatedAt,title,headRefName \
+        --jq '.[] | "\(.number)\t\(.headRefName)\t\(.title)"' 2>/dev/null) || true
+
+    while IFS=$'\t' read -r pr_num pr_branch pr_title; do
+        if [[ -z "$pr_num" ]]; then
+            continue
+        fi
+
+        log_info "Leftover PR #${pr_num}: ${pr_title} (branch: ${pr_branch})"
+
+        local pr_mergeable
+        pr_mergeable=$(gh pr view "$pr_num" --repo OpenRouterTeam/spawn --json mergeable --jq '.mergeable' 2>/dev/null) || pr_mergeable="UNKNOWN"
+
+        if [[ "$pr_mergeable" == "MERGEABLE" ]]; then
+            log_info "Merging leftover PR #${pr_num}..."
+            gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
+        else
+            log_info "Closing unmergeable leftover PR #${pr_num} (status: ${pr_mergeable})..."
+            gh pr close "$pr_num" --repo OpenRouterTeam/spawn \
+                --comment "Auto-closing: leftover PR between discovery cycles (unmergeable: ${pr_mergeable}). Please reopen if still needed." \
+                2>&1 | tee -a "${LOG_FILE}" || true
+        fi
+    done <<< "$open_prs"
+
     log_info "Cleanup complete"
 }
 
@@ -446,6 +484,55 @@ run_team_cycle() {
     git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
+    # --- Pre-cycle cleanup: stale worktrees ---
+    log_info "Pre-cycle cleanup: stale worktrees..."
+    git worktree prune 2>/dev/null || true
+    if [[ -d "${WORKTREE_BASE}" ]]; then
+        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+        log_info "Removed stale ${WORKTREE_BASE} directory"
+    fi
+
+    # --- Pre-cycle cleanup: merged remote branches ---
+    log_info "Pre-cycle cleanup: merged remote branches..."
+    local merged_branches
+    merged_branches=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ') || true
+    for branch in $merged_branches; do
+        if [[ -n "$branch" && "$branch" != "main" ]]; then
+            git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log_info "Deleted merged branch: $branch" || true
+        fi
+    done
+
+    # --- Pre-cycle cleanup: open PRs from previous cycles ---
+    # Resolve stale open PRs (updated >2 hours ago) — especially provider-related ones
+    # that may have been left behind by interrupted discovery cycles.
+    log_info "Pre-cycle cleanup: stale open PRs..."
+    local stale_prs
+    stale_prs=$(gh pr list --repo OpenRouterTeam/spawn --state open \
+        --json number,updatedAt,title,headRefName \
+        --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | "\(.number)\t\(.headRefName)\t\(.title)"' 2>/dev/null) || true
+
+    while IFS=$'\t' read -r pr_num pr_branch pr_title; do
+        if [[ -z "$pr_num" ]]; then
+            continue
+        fi
+
+        log_info "Found stale PR #${pr_num}: ${pr_title} (branch: ${pr_branch})"
+
+        # Check mergeability
+        local pr_mergeable
+        pr_mergeable=$(gh pr view "$pr_num" --repo OpenRouterTeam/spawn --json mergeable --jq '.mergeable' 2>/dev/null) || pr_mergeable="UNKNOWN"
+
+        if [[ "$pr_mergeable" == "MERGEABLE" ]]; then
+            log_info "Merging stale PR #${pr_num}..."
+            gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
+        else
+            log_info "Closing unmergeable stale PR #${pr_num} (status: ${pr_mergeable})..."
+            gh pr close "$pr_num" --repo OpenRouterTeam/spawn \
+                --comment "Auto-closing: stale PR from a previous interrupted discovery cycle (unmergeable: ${pr_mergeable}). Please reopen if still needed." \
+                2>&1 | tee -a "${LOG_FILE}" || true
+        fi
+    done <<< "$stale_prs"
+
     # Set up worktree directory for parallel agent work
     mkdir -p "${WORKTREE_BASE}"
 
@@ -455,6 +542,9 @@ run_team_cycle() {
 
     # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+
+    # NOTE: VM keep-alive is handled by the trigger server streaming output back
+    # to the GitHub Actions runner. The long-lived HTTP response keeps Sprite alive.
 
     log_info "Launching agent team..."
     log_info "Worktree base: ${WORKTREE_BASE}"

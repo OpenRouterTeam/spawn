@@ -118,7 +118,7 @@ ensure_kamatera_token() {
     local config_dir
     config_dir=$(dirname "$config_file")
     mkdir -p "$config_dir"
-    printf '{\n  "api_client_id": "%s",\n  "api_secret": "%s"\n}\n' "$(json_escape "$client_id")" "$(json_escape "$secret")" > "$config_file"
+    printf '{\n  "api_client_id": %s,\n  "api_secret": %s\n}\n' "$(json_escape "$client_id")" "$(json_escape "$secret")" > "$config_file"
     chmod 600 "$config_file"
     log_info "API credentials saved to $config_file"
 }

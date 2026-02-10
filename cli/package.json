@@ -1,13 +1,13 @@
 {
   "name": "@openrouter/spawn",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "type": "module",
   "bin": {
     "spawn": "cli.js"
   },
   "scripts": {
     "dev": "bun run src/index.ts",
-    "build": "bun build src/index.ts --outfile cli.js --target bun --minify",
+    "build": "bun build src/index.ts --outfile cli.js --target bun --minify --packages bundle",
     "compile": "bun build src/index.ts --compile --outfile spawn",
     "test": "bun test",
     "test:watch": "bun test --watch"

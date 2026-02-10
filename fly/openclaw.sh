@@ -58,7 +58,7 @@ GATEWAY_TOKEN=$(openssl rand -hex 16)
 
 OPENCLAW_CONFIG_TEMP=$(mktemp)
 chmod 600 "$OPENCLAW_CONFIG_TEMP"
-printf '{\n  "env": {\n    "OPENROUTER_API_KEY": "%s"\n  },\n  "gateway": {\n    "mode": "local",\n    "auth": {\n      "token": "%s"\n    }\n  },\n  "agents": {\n    "defaults": {\n      "model": {\n        "primary": "openrouter/%s"\n      }\n    }\n  }\n}\n' "$(json_escape "${OPENROUTER_API_KEY}")" "$(json_escape "${GATEWAY_TOKEN}")" "$(json_escape "${MODEL_ID}")" > "$OPENCLAW_CONFIG_TEMP"
+printf '{\n  "env": {\n    "OPENROUTER_API_KEY": %s\n  },\n  "gateway": {\n    "mode": "local",\n    "auth": {\n      "token": %s\n    }\n  },\n  "agents": {\n    "defaults": {\n      "model": {\n        "primary": "openrouter/%s"\n      }\n    }\n  }\n}\n' "$(json_escape "${OPENROUTER_API_KEY}")" "$(json_escape "${GATEWAY_TOKEN}")" "${MODEL_ID}" > "$OPENCLAW_CONFIG_TEMP"
 
 upload_file "$OPENCLAW_CONFIG_TEMP" "/root/.openclaw/openclaw.json"
 rm "$OPENCLAW_CONFIG_TEMP"

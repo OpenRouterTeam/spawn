@@ -1540,7 +1540,7 @@ setup_claude_code_config() {
 
     # Create settings.json
     local settings_json
-    settings_json=$(printf '{\n  "theme": "dark",\n  "editor": "vim",\n  "env": {\n    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",\n    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",\n    "ANTHROPIC_AUTH_TOKEN": "%s"\n  },\n  "permissions": {\n    "defaultMode": "bypassPermissions",\n    "dangerouslySkipPermissions": true\n  }\n}\n' "$(json_escape "${openrouter_key}")")
+    settings_json=$(printf '{\n  "theme": "dark",\n  "editor": "vim",\n  "env": {\n    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",\n    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",\n    "ANTHROPIC_AUTH_TOKEN": %s\n  },\n  "permissions": {\n    "defaultMode": "bypassPermissions",\n    "dangerouslySkipPermissions": true\n  }\n}\n' "$(json_escape "${openrouter_key}")")
     upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "~/.claude/settings.json"
 
     # Create .claude.json global state
@@ -1598,7 +1598,7 @@ setup_openclaw_config() {
 
     # Create openclaw.json config
     local openclaw_json
-    openclaw_json=$(printf '{\n  "env": {\n    "OPENROUTER_API_KEY": "%s"\n  },\n  "gateway": {\n    "mode": "local",\n    "auth": {\n      "token": "%s"\n    }\n  },\n  "agents": {\n    "defaults": {\n      "model": {\n        "primary": "openrouter/%s"\n      }\n    }\n  }\n}\n' "$(json_escape "${openrouter_key}")" "$(json_escape "${gateway_token}")" "$(json_escape "${model_id}")")
+    openclaw_json=$(printf '{\n  "env": {\n    "OPENROUTER_API_KEY": %s\n  },\n  "gateway": {\n    "mode": "local",\n    "auth": {\n      "token": %s\n    }\n  },\n  "agents": {\n    "defaults": {\n      "model": {\n        "primary": "openrouter/%s"\n      }\n    }\n  }\n}\n' "$(json_escape "${openrouter_key}")" "$(json_escape "${gateway_token}")" "${model_id}")
     upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "~/.openclaw/openclaw.json"
 }
 

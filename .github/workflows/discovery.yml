@@ -14,21 +14,32 @@ concurrency:
 jobs:
   trigger:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
-      - name: Trigger discovery sprite
+      - name: Trigger and stream discovery cycle
         env:
           SPRITE_URL: ${{ secrets.DISCOVERY_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.DISCOVERY_TRIGGER_SECRET }}
         run: |
-          HTTP_CODE=$(curl -s -o /tmp/response.json -w '%{http_code}' -X POST \
+          set +e
+          # --fail-with-body: exit 22 on HTTP errors but still print the body
+          # -N: no output buffering (stream chunks in real-time)
+          # --max-time: hard cap matching the Sprite's cycle timeout + grace
+          curl -sSN --fail-with-body --max-time 5400 -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
-            -H "Authorization: Bearer ${TRIGGER_SECRET}")
-          cat /tmp/response.json
-          if [ "$HTTP_CODE" = "429" ]; then
-            echo "Cycle already running, skipping"
-          elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-            echo "Triggered successfully"
+            -H "Authorization: Bearer ${TRIGGER_SECRET}"
+          CURL_EXIT=$?
+          set -e
+
+          if [ "$CURL_EXIT" -eq 0 ]; then
+            echo ""
+            echo "=== Cycle completed ==="
+          elif [ "$CURL_EXIT" -eq 22 ]; then
+            # HTTP error — body was already printed above (429 = already running, etc.)
+            echo ""
+            echo "=== Trigger returned HTTP error (see output above) ==="
           else
-            echo "Failed with HTTP $HTTP_CODE"
+            echo ""
+            echo "=== curl failed (exit=$CURL_EXIT) ==="
             exit 1
           fi
