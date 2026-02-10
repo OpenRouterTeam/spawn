@@ -158,27 +158,11 @@ _get_availability_domain() {
     echo "${ad}"
 }
 
-_get_subnet_id() {
-    local compartment="${OCI_COMPARTMENT_ID}"
+_create_vcn() {
+    local compartment="${1}"
 
-    # Try to find an existing public subnet
-    local subnet_id
-    subnet_id=$(oci network subnet list \
-        --compartment-id "${compartment}" \
-        --query 'data[?("prohibit-public-ip-on-vnic"==`false`)].id | [0]' \
-        --raw-output 2>/dev/null || true)
-
-    if [[ -n "${subnet_id}" && "${subnet_id}" != "null" ]]; then
-        echo "${subnet_id}"
-        return 0
-    fi
-
-    # No public subnet found - create a VCN and subnet
-    log_warn "No public subnet found. Creating VCN and subnet..."
-
-    # Create VCN
-    local vcn_result
-    vcn_result=$(oci network vcn create \
+    local vcn_id
+    vcn_id=$(oci network vcn create \
         --compartment-id "${compartment}" \
         --cidr-blocks '["10.0.0.0/16"]' \
         --display-name "spawn-vcn" \
@@ -187,15 +171,21 @@ _get_subnet_id() {
         --query 'data.id' \
         --raw-output 2>/dev/null)
 
-    if [[ -z "${vcn_result}" || "${vcn_result}" == "null" ]]; then
+    if [[ -z "${vcn_id}" || "${vcn_id}" == "null" ]]; then
         log_error "Failed to create VCN"
         return 1
     fi
-    local vcn_id="${vcn_result}"
+
+    echo "${vcn_id}"
+}
+
+_setup_vcn_networking() {
+    local compartment="${1}"
+    local vcn_id="${2}"
 
     # Create internet gateway
-    local igw_result
-    igw_result=$(oci network internet-gateway create \
+    local igw_id
+    igw_id=$(oci network internet-gateway create \
         --compartment-id "${compartment}" \
         --vcn-id "${vcn_id}" \
         --display-name "spawn-igw" \
@@ -204,7 +194,7 @@ _get_subnet_id() {
         --query 'data.id' \
         --raw-output 2>/dev/null)
 
-    # Get default route table and add internet route
+    # Add default route to internet gateway
     local rt_id
     rt_id=$(oci network route-table list \
         --compartment-id "${compartment}" \
@@ -212,15 +202,15 @@ _get_subnet_id() {
         --query 'data[0].id' \
         --raw-output 2>/dev/null)
 
-    if [[ -n "${rt_id}" && "${rt_id}" != "null" && -n "${igw_result}" && "${igw_result}" != "null" ]]; then
+    if [[ -n "${rt_id}" && "${rt_id}" != "null" && -n "${igw_id}" && "${igw_id}" != "null" ]]; then
         oci network route-table update \
             --rt-id "${rt_id}" \
-            --route-rules "[{\"destination\":\"0.0.0.0/0\",\"networkEntityId\":\"${igw_result}\",\"destinationType\":\"CIDR_BLOCK\"}]" \
+            --route-rules "[{\"destination\":\"0.0.0.0/0\",\"networkEntityId\":\"${igw_id}\",\"destinationType\":\"CIDR_BLOCK\"}]" \
             --force \
             --wait-for-state AVAILABLE >/dev/null 2>&1 || true
     fi
 
-    # Get default security list and add SSH ingress rule
+    # Add SSH ingress rule to default security list
     local sl_id
     sl_id=$(oci network security-list list \
         --compartment-id "${compartment}" \
@@ -236,12 +226,16 @@ _get_subnet_id() {
             --force \
             --wait-for-state AVAILABLE >/dev/null 2>&1 || true
     fi
+}
 
-    # Get AD for subnet
+_create_subnet() {
+    local compartment="${1}"
+    local vcn_id="${2}"
+
     local ad
     ad=$(_get_availability_domain)
 
-    # Create public subnet
+    local subnet_id
     subnet_id=$(oci network subnet create \
         --compartment-id "${compartment}" \
         --vcn-id "${vcn_id}" \
@@ -261,35 +255,79 @@ _get_subnet_id() {
     echo "${subnet_id}"
 }
 
+_get_subnet_id() {
+    local compartment="${OCI_COMPARTMENT_ID}"
+
+    # Try to find an existing public subnet
+    local subnet_id
+    subnet_id=$(oci network subnet list \
+        --compartment-id "${compartment}" \
+        --query 'data[?("prohibit-public-ip-on-vnic"==`false`)].id | [0]' \
+        --raw-output 2>/dev/null || true)
+
+    if [[ -n "${subnet_id}" && "${subnet_id}" != "null" ]]; then
+        echo "${subnet_id}"
+        return 0
+    fi
+
+    # No public subnet found - create VCN with networking and subnet
+    log_warn "No public subnet found. Creating VCN and subnet..."
+
+    local vcn_id
+    vcn_id=$(_create_vcn "${compartment}") || return 1
+    _setup_vcn_networking "${compartment}" "${vcn_id}"
+    _create_subnet "${compartment}" "${vcn_id}"
+}
+
+_get_instance_public_ip() {
+    local instance_id="${1}"
+
+    local vnic_id
+    vnic_id=$(oci compute vnic-attachment list \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --instance-id "${instance_id}" \
+        --query 'data[0]."vnic-id"' \
+        --raw-output 2>/dev/null)
+
+    if [[ -z "${vnic_id}" || "${vnic_id}" == "null" ]]; then
+        log_error "Could not get VNIC for instance"
+        return 1
+    fi
+
+    local ip
+    ip=$(oci network vnic get \
+        --vnic-id "${vnic_id}" \
+        --query 'data."public-ip"' \
+        --raw-output 2>/dev/null || true)
+
+    if [[ -z "${ip}" || "${ip}" == "null" ]]; then
+        log_error "Could not get public IP for instance"
+        return 1
+    fi
+
+    echo "${ip}"
+}
+
 create_server() {
     local name="${1}"
     local shape="${OCI_SHAPE:-VM.Standard.E2.1.Micro}"
 
     log_warn "Creating OCI instance '${name}' (shape: ${shape})..."
 
-    # Get image ID
     local image_id
     image_id=$(_get_ubuntu_image_id "${shape}") || return 1
 
-    # Get availability domain
     local ad
     ad=$(_get_availability_domain) || return 1
 
-    # Get or create subnet
     local subnet_id="${OCI_SUBNET_ID:-}"
     if [[ -z "${subnet_id}" ]]; then
         subnet_id=$(_get_subnet_id) || return 1
     fi
 
-    # Read SSH public key
-    local pub_key
-    pub_key=$(cat "${HOME}/.ssh/id_ed25519.pub")
-
-    # Get cloud-init userdata
-    local userdata
-    userdata=$(get_cloud_init_userdata)
+    # Encode cloud-init userdata (macOS and Linux compatible)
     local userdata_b64
-    userdata_b64=$(printf '%s' "${userdata}" | base64 -w0 2>/dev/null || printf '%s' "${userdata}" | base64)
+    userdata_b64=$(get_cloud_init_userdata | base64 -w0 2>/dev/null || get_cloud_init_userdata | base64)
 
     # Build shape config for flex shapes
     local shape_config_args=()
@@ -299,9 +337,8 @@ create_server() {
         shape_config_args=(--shape-config "{\"ocpus\": ${ocpus}, \"memoryInGBs\": ${memory}}")
     fi
 
-    # Create the instance
-    local result
-    result=$(oci compute instance launch \
+    local instance_id
+    instance_id=$(oci compute instance launch \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
         --availability-domain "${ad}" \
         --shape "${shape}" \
@@ -316,35 +353,17 @@ create_server() {
         --query 'data.id' \
         --raw-output 2>/dev/null) || true
 
-    if [[ -z "${result}" || "${result}" == "null" ]]; then
+    if [[ -z "${instance_id}" || "${instance_id}" == "null" ]]; then
         log_error "Failed to create OCI instance"
         log_error "Check your quota and compartment permissions"
         return 1
     fi
 
-    export OCI_INSTANCE_ID="${result}"
+    export OCI_INSTANCE_ID="${instance_id}"
     export OCI_INSTANCE_NAME_ACTUAL="${name}"
 
-    # Get public IP
-    local vnic_attachments
-    vnic_attachments=$(oci compute vnic-attachment list \
-        --compartment-id "${OCI_COMPARTMENT_ID}" \
-        --instance-id "${result}" \
-        --query 'data[0]."vnic-id"' \
-        --raw-output 2>/dev/null)
-
-    local server_ip=""
-    if [[ -n "${vnic_attachments}" && "${vnic_attachments}" != "null" ]]; then
-        server_ip=$(oci network vnic get \
-            --vnic-id "${vnic_attachments}" \
-            --query 'data."public-ip"' \
-            --raw-output 2>/dev/null || true)
-    fi
-
-    if [[ -z "${server_ip}" || "${server_ip}" == "null" ]]; then
-        log_error "Could not get public IP for instance"
-        return 1
-    fi
+    local server_ip
+    server_ip=$(_get_instance_public_ip "${instance_id}") || return 1
 
     export OCI_SERVER_IP="${server_ip}"
     log_info "Instance created: IP=${OCI_SERVER_IP}"
