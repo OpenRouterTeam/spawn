@@ -1101,6 +1101,6 @@
     "render/gptme": "implemented",
     "render/opencode": "missing",
     "render/plandex": "missing",
-    "render/kilocode": "missing"
+    "render/kilocode": "implemented"
   }
 }
