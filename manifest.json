@@ -944,7 +944,7 @@
     "hyperstack/kilocode": "missing",
     "koyeb/claude": "implemented",
     "koyeb/openclaw": "implemented",
-    "koyeb/nanoclaw": "missing",
+    "koyeb/nanoclaw": "implemented",
     "koyeb/aider": "implemented",
     "koyeb/goose": "missing",
     "koyeb/codex": "missing",
