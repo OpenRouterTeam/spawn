@@ -183,6 +183,67 @@ if data:
     echo "$ssh_key_id"
 }
 
+# Build the JSON request body for instance creation
+# Usage: build_create_instance_body NAME SIZE REGION NETWORK_ID TEMPLATE_ID SSH_KEY_ID INIT_SCRIPT
+build_create_instance_body() {
+    local name="$1" size="$2" region="$3"
+    local network_id="$4" template_id="$5" ssh_key_id="$6"
+    local init_script="$7"
+
+    local json_script
+    json_script=$(json_escape "$init_script")
+
+    python3 -c "
+import json, sys
+script = json.loads(sys.stdin.read())
+body = {
+    'hostname': '$name',
+    'size': '$size',
+    'region': '$region',
+    'network_id': '$network_id',
+    'template_id': '$template_id',
+    'ssh_key_id': '$ssh_key_id',
+    'initial_user': 'root',
+    'script': script,
+    'public_ip': 'create'
+}
+print(json.dumps(body))
+" <<< "$json_script"
+}
+
+# Wait for a Civo instance to become ACTIVE and retrieve its public IP
+# Sets: CIVO_SERVER_IP
+# Usage: wait_for_civo_instance SERVER_ID [MAX_ATTEMPTS]
+wait_for_civo_instance() {
+    local server_id="$1"
+    local max_attempts=${2:-60}
+
+    log_warn "Waiting for instance to become active..."
+    local attempt=1
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local status_response
+        status_response=$(civo_api GET "/instances/$server_id")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('status',''))")
+
+        if [[ "$status" == "ACTIVE" ]]; then
+            CIVO_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('public_ip',''))")
+            export CIVO_SERVER_IP
+            if [[ -n "$CIVO_SERVER_IP" ]]; then
+                log_info "Instance active: IP=$CIVO_SERVER_IP"
+                return 0
+            fi
+        fi
+
+        log_warn "Instance status: $status ($attempt/$max_attempts)"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Instance did not become active in time"
+    return 1
+}
+
 create_server() {
     local name="$1"
     local size="${CIVO_SIZE:-g3.medium}"
@@ -194,16 +255,10 @@ create_server() {
 
     log_warn "Creating Civo instance '$name' (size: $size, region: $region)..."
 
-    # Get network ID
-    local network_id
+    # Gather required resource IDs
+    local network_id template_id ssh_key_id
     network_id=$(get_default_network_id "$region") || return 1
-
-    # Get Ubuntu template ID
-    local template_id
     template_id=$(get_ubuntu_template_id "$region") || return 1
-
-    # Get SSH key ID
-    local ssh_key_id
     ssh_key_id=$(get_ssh_key_id) || return 1
 
     # Build init script for cloud-init equivalent
@@ -225,27 +280,9 @@ touch /root/.cloud-init-complete
 INIT_EOF
 )
 
-    # Pass init script safely via stdin to avoid triple-quote injection
-    local json_script
-    json_script=$(json_escape "$init_script")
-
+    # Build request body and create instance
     local body
-    body=$(python3 -c "
-import json, sys
-script = json.loads(sys.stdin.read())
-body = {
-    'hostname': '$name',
-    'size': '$size',
-    'region': '$region',
-    'network_id': '$network_id',
-    'template_id': '$template_id',
-    'ssh_key_id': '$ssh_key_id',
-    'initial_user': 'root',
-    'script': script,
-    'public_ip': 'create'
-}
-print(json.dumps(body))
-" <<< "$json_script")
+    body=$(build_create_instance_body "$name" "$size" "$region" "$network_id" "$template_id" "$ssh_key_id" "$init_script")
 
     local response
     response=$(civo_api POST "/instances" "$body")
@@ -269,32 +306,7 @@ print(json.dumps(body))
         return 1
     fi
 
-    # Wait for instance to become active and get an IP
-    log_warn "Waiting for instance to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(civo_api GET "/instances/$CIVO_SERVER_ID")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('status',''))")
-
-        if [[ "$status" == "ACTIVE" ]]; then
-            CIVO_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('public_ip',''))")
-            export CIVO_SERVER_IP
-            if [[ -n "$CIVO_SERVER_IP" ]]; then
-                log_info "Instance active: IP=$CIVO_SERVER_IP"
-                return 0
-            fi
-        fi
-
-        log_warn "Instance status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
+    wait_for_civo_instance "$CIVO_SERVER_ID"
 }
 
 verify_server_connectivity() {
