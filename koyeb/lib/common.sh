@@ -76,55 +76,13 @@ ensure_koyeb_cli() {
     log_info "Koyeb CLI installed"
 }
 
-# Save Koyeb token to config file
-_save_koyeb_token() {
-    local token="$1"
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/koyeb.json"
-    mkdir -p "$config_dir"
-    printf '{\n  "token": "%s"\n}\n' "$(json_escape "$token")" > "$config_file"
-    chmod 600 "$config_file"
-}
-
 # Ensure KOYEB_TOKEN is available (env var -> config file -> prompt+save)
 ensure_koyeb_token() {
-    check_python_available || return 1
-
-    # 1. Check environment variable
-    if [[ -n "${KOYEB_TOKEN:-}" ]]; then
-        log_info "Using Koyeb API token from environment"
-        return 0
-    fi
-
-    local config_file="$HOME/.config/spawn/koyeb.json"
-
-    # 2. Check config file
-    if [[ -f "$config_file" ]]; then
-        local saved_token
-        saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_token" ]]; then
-            export KOYEB_TOKEN="$saved_token"
-            log_info "Using Koyeb API token from $config_file"
-            return 0
-        fi
-    fi
-
-    # 3. Prompt user for token
-    log_warn "Koyeb API token required"
-    echo ""
-    echo "Get your API token at: https://app.koyeb.com/account/api"
-    echo ""
-
-    local token
-    token=$(safe_read "Enter Koyeb API token: ")
-    if [[ -z "$token" ]]; then
-        log_error "No token provided"
-        return 1
-    fi
-
-    export KOYEB_TOKEN="$token"
-    _save_koyeb_token "$token"
-    log_info "Koyeb API token saved"
+    ensure_api_token_with_provider \
+        "Koyeb" \
+        "KOYEB_TOKEN" \
+        "$HOME/.config/spawn/koyeb.json" \
+        "https://app.koyeb.com/account/api"
 }
 
 # Generate a unique server name for Koyeb (must be lowercase alphanumeric + hyphens)
