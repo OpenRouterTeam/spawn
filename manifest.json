@@ -878,7 +878,7 @@
     "oracle/codex": "missing",
     "oracle/interpreter": "missing",
     "oracle/gemini": "implemented",
-    "oracle/amazonq": "missing",
+    "oracle/amazonq": "implemented",
     "oracle/cline": "missing",
     "oracle/gptme": "missing",
     "oracle/opencode": "implemented",
