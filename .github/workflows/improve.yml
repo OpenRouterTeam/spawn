@@ -20,5 +20,15 @@ jobs:
           SPRITE_URL: ${{ secrets.DISCOVERY_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.DISCOVERY_TRIGGER_SECRET }}
         run: |
-          curl -sf -X POST "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
-            -H "Authorization: Bearer ${TRIGGER_SECRET}"
+          HTTP_CODE=$(curl -s -o /tmp/response.json -w '%{http_code}' -X POST \
+            "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            -H "Authorization: Bearer ${TRIGGER_SECRET}")
+          cat /tmp/response.json
+          if [ "$HTTP_CODE" = "429" ]; then
+            echo "Cycle already running, skipping"
+          elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "Triggered successfully"
+          else
+            echo "Failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
