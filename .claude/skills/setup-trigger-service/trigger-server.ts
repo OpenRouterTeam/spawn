@@ -220,21 +220,28 @@ function startStreamingRun(reason: string, issue: string): Response {
         }
       }
 
-      await Promise.all([drain(proc.stdout), drain(proc.stderr)]);
-
-      // --- Wait for exit ---
-      const exitCode = await proc.exited;
-      runs.delete(id);
-      clearInterval(heartbeat);
-
-      const elapsed = Math.round((Date.now() - startedAt) / 1000);
-      const footer = `\n[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size}/${MAX_CONCURRENT})\n`;
-      console.log(footer.trim());
-      enqueue(controller, encoder.encode(footer));
-
       try {
-        controller.close();
-      } catch {}
+        await Promise.all([drain(proc.stdout), drain(proc.stderr)]);
+
+        // --- Wait for exit ---
+        const exitCode = await proc.exited;
+
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        const footer = `\n[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size}/${MAX_CONCURRENT})\n`;
+        console.log(footer.trim());
+        enqueue(controller, encoder.encode(footer));
+      } catch (err) {
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        const errMsg = `\n[trigger] Run #${id} stream error after ${elapsed}s: ${err}\n`;
+        console.error(errMsg.trim());
+        enqueue(controller, encoder.encode(errMsg));
+      } finally {
+        runs.delete(id);
+        clearInterval(heartbeat);
+        try {
+          controller.close();
+        } catch {}
+      }
     },
 
     cancel() {

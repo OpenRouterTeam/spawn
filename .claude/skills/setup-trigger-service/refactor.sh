@@ -45,6 +45,10 @@ log() {
 
 # Cleanup function — runs on normal exit, SIGTERM, and SIGINT
 cleanup() {
+    # Guard against re-entry (SIGTERM trap calls exit, which fires EXIT trap again)
+    if [[ -n "${_cleanup_done:-}" ]]; then return; fi
+    _cleanup_done=1
+
     local exit_code=$?
     log "Running cleanup (exit_code=${exit_code})..."
 
@@ -487,7 +491,7 @@ log "Hard timeout: ${HARD_TIMEOUT}s"
 # Run Claude Code with the prompt file, enforcing a hard timeout
 CLAUDE_EXIT=0
 timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
-    claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json 2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+    claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
     log "Cycle completed successfully"
