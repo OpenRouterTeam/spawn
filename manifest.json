@@ -543,6 +543,21 @@
       },
       "notes": "Global cloud provider with 25+ datacenters. Hourly billing. Uses AuthClientId/AuthSecret headers for API auth. Async operations via command queue. Requires KAMATERA_API_CLIENT_ID and KAMATERA_API_SECRET from https://console.kamatera.com/keys"
     },
+    "oracle": {
+      "name": "Oracle Cloud Infrastructure",
+      "description": "Oracle Cloud compute instances via OCI CLI",
+      "url": "https://cloud.oracle.com/",
+      "type": "cli",
+      "auth": "oci setup config (OCI CLI config with API keys)",
+      "provision_method": "oci compute instance launch with --user-data",
+      "exec_method": "ssh ubuntu@IP",
+      "interactive_method": "ssh -t ubuntu@IP",
+      "defaults": {
+        "shape": "VM.Standard.E2.1.Micro",
+        "image": "Ubuntu 24.04"
+      },
+      "notes": "Has a generous Always Free tier (VM.Standard.E2.1.Micro, VM.Standard.A1.Flex). Uses 'ubuntu' user for SSH. Requires OCI CLI installed (pip install oci-cli) and configured. Set OCI_COMPARTMENT_ID for the target compartment."
+    },
     "vastai": {
       "name": "Vast.ai",
       "description": "Vast.ai GPU marketplace via CLI",
@@ -855,6 +870,20 @@
     "latitude/kilocode": "implemented",
     "ovh/kilocode": "implemented",
     "kamatera/kilocode": "implemented",
+    "oracle/claude": "implemented",
+    "oracle/aider": "implemented",
+    "oracle/goose": "implemented",
+    "oracle/openclaw": "missing",
+    "oracle/nanoclaw": "missing",
+    "oracle/codex": "missing",
+    "oracle/interpreter": "missing",
+    "oracle/gemini": "missing",
+    "oracle/amazonq": "missing",
+    "oracle/cline": "missing",
+    "oracle/gptme": "missing",
+    "oracle/opencode": "missing",
+    "oracle/plandex": "missing",
+    "oracle/kilocode": "missing",
     "vastai/claude": "implemented",
     "vastai/aider": "implemented",
     "vastai/codex": "implemented",
