@@ -249,16 +249,20 @@ wait_for_cloud_init() {
 }
 
 # Inject environment variables into shell config
+# Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    local shell_rc="/root/.bashrc"
-
     log_warn "Injecting environment variables..."
 
-    for env_var in "$@"; do
-        # Escape special characters for sed
-        local escaped_var=$(echo "$env_var" | sed 's/[&/\]/\\&/g')
-        run_server "echo 'export $escaped_var' >> $shell_rc"
-    done
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    generate_env_config "$@" > "${env_temp}"
+
+    # Upload and append to .bashrc (Railway containers use bash)
+    upload_file "${env_temp}" "/tmp/env_config"
+    run_server "cat /tmp/env_config >> /root/.bashrc && rm /tmp/env_config"
 
     log_info "Environment variables configured"
 }

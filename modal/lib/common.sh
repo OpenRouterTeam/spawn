@@ -163,6 +163,13 @@ p.wait()
 upload_file() {
     local local_path="${1}"
     local remote_path="${2}"
+
+    # Validate remote_path to prevent command injection
+    if [[ "$remote_path" == *"'"* || "$remote_path" == *'$'* || "$remote_path" == *'`'* || "$remote_path" == *$'\n'* ]]; then
+        log_error "Invalid remote path (contains unsafe characters): $remote_path"
+        return 1
+    fi
+
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
     # SECURITY: Properly escape remote_path to prevent single-quote breakout injection
