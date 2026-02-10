@@ -385,7 +385,8 @@ run_team_cycle() {
     prompt=$(build_team_prompt)
     log_info "Launching agent team..."
     echo ""
-    claude -p "${prompt}" --dangerously-skip-permissions
+    timeout --signal=TERM --kill-after=60 3600 \
+        claude -p "${prompt}" --dangerously-skip-permissions --model sonnet
     local rc=$?
 
     # Clean up worktrees after cycle
@@ -405,7 +406,8 @@ run_single_cycle() {
     prompt=$(build_single_prompt)
     log_info "Launching single agent..."
     echo ""
-    claude --print -p "${prompt}"
+    timeout --signal=TERM --kill-after=60 3600 \
+        claude --print -p "${prompt}" --model sonnet
     return $?
 }
 
