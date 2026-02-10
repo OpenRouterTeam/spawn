@@ -121,6 +121,65 @@ get_server_name() {
 
 # get_cloud_init_userdata is now defined in shared/common.sh
 
+# Build the JSON request body for DigitalOcean droplet creation
+# Usage: _build_droplet_request_body NAME REGION SIZE IMAGE SSH_KEY_IDS USERDATA_JSON
+_build_droplet_request_body() {
+    local name="$1" region="$2" size="$3" image="$4"
+    local ssh_key_ids="$5" userdata_json="$6"
+    python3 -c "
+import json
+body = {
+    'name': '$name',
+    'region': '$region',
+    'size': '$size',
+    'image': '$image',
+    'ssh_keys': $ssh_key_ids,
+    'user_data': json.loads($userdata_json),
+    'backups': False,
+    'monitoring': False
+}
+print(json.dumps(body))
+"
+}
+
+# Wait for a DigitalOcean droplet to become active and set its IP
+# Sets: DO_SERVER_IP (exported)
+# Usage: _wait_for_droplet_active DROPLET_ID [MAX_ATTEMPTS]
+_wait_for_droplet_active() {
+    local droplet_id="$1"
+    local max_attempts="${2:-60}"
+    local attempt=1
+
+    log_warn "Waiting for droplet to become active..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local status_response
+        status_response=$(do_api GET "/droplets/$droplet_id")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['status'])")
+
+        if [[ "$status" == "active" ]]; then
+            DO_SERVER_IP=$(echo "$status_response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+for net in data['droplet']['networks']['v4']:
+    if net['type'] == 'public':
+        print(net['ip_address'])
+        break
+")
+            export DO_SERVER_IP
+            log_info "Droplet active: IP=$DO_SERVER_IP"
+            return 0
+        fi
+
+        log_warn "Droplet status: $status ($attempt/$max_attempts)"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Droplet did not become active in time"
+    return 1
+}
+
 # Create a DigitalOcean droplet with cloud-init
 create_server() {
     local name="$1"
@@ -147,20 +206,7 @@ create_server() {
     userdata_json=$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <<< "$userdata")
 
     local body
-    body=$(python3 -c "
-import json
-body = {
-    'name': '$name',
-    'region': '$region',
-    'size': '$size',
-    'image': '$image',
-    'ssh_keys': $ssh_key_ids,
-    'user_data': json.loads($userdata_json),
-    'backups': False,
-    'monitoring': False
-}
-print(json.dumps(body))
-")
+    body=$(_build_droplet_request_body "$name" "$region" "$size" "$image" "$ssh_key_ids" "$userdata_json")
 
     local response
     response=$(do_api POST "/droplets" "$body")
@@ -187,37 +233,7 @@ print(json.dumps(body))
         return 1
     fi
 
-    # Wait for droplet to get an IP (poll until active)
-    log_warn "Waiting for droplet to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(do_api GET "/droplets/$DO_DROPLET_ID")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['status'])")
-
-        if [[ "$status" == "active" ]]; then
-            DO_SERVER_IP=$(echo "$status_response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for net in data['droplet']['networks']['v4']:
-    if net['type'] == 'public':
-        print(net['ip_address'])
-        break
-")
-            export DO_SERVER_IP
-            log_info "Droplet active: IP=$DO_SERVER_IP"
-            return 0
-        fi
-
-        log_warn "Droplet status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        ((attempt++))
-    done
-
-    log_error "Droplet did not become active in time"
-    return 1
+    _wait_for_droplet_active "$DO_DROPLET_ID"
 }
 
 # Wait for SSH connectivity
