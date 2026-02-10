@@ -40,6 +40,7 @@ interface RunEntry {
   proc: ReturnType<typeof Bun.spawn>;
   startedAt: number;
   reason: string;
+  issue: string;
 }
 
 let shuttingDown = false;
@@ -130,11 +131,11 @@ function gracefulShutdown(signal: string) {
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
-async function runScript(reason: string) {
+async function runScript(reason: string, issue: string) {
   const id = nextRunId++;
   const startedAt = Date.now();
   console.log(
-    `[trigger] Run #${id} starting (reason=${reason}, concurrent=${runs.size + 1}/${MAX_CONCURRENT})`
+    `[trigger] Run #${id} starting (reason=${reason}${issue ? `, issue=#${issue}` : ""}, concurrent=${runs.size + 1}/${MAX_CONCURRENT})`
   );
   try {
     const proc = Bun.spawn(["bash", TARGET_SCRIPT], {
@@ -144,8 +145,13 @@ async function runScript(reason: string) {
         ".",
       stdout: "inherit",
       stderr: "inherit",
+      env: {
+        ...process.env,
+        SPAWN_ISSUE: issue,
+        SPAWN_REASON: reason,
+      },
     });
-    runs.set(id, { proc, startedAt, reason });
+    runs.set(id, { proc, startedAt, reason, issue });
     await proc.exited;
     runs.delete(id);
     const elapsed = Math.round((Date.now() - startedAt) / 1000);
@@ -170,6 +176,7 @@ const server = Bun.serve({
         id,
         pid: r.proc.pid,
         reason: r.reason,
+        issue: r.issue || undefined,
         ageSec: Math.round((now - r.startedAt) / 1000),
       }));
       return Response.json({
@@ -217,13 +224,31 @@ const server = Bun.serve({
       }
 
       const reason = url.searchParams.get("reason") ?? "manual";
+      const issue = url.searchParams.get("issue") ?? "";
+
+      // Dedup: reject if a run for the same issue is already in progress
+      if (issue) {
+        for (const [, run] of runs) {
+          if (run.issue === issue) {
+            return Response.json(
+              {
+                error: "run for this issue already in progress",
+                issue,
+                running: runs.size,
+              },
+              { status: 409 }
+            );
+          }
+        }
+      }
 
       // Fire and forget
-      runScript(reason);
+      runScript(reason, issue);
 
       return Response.json({
         triggered: true,
         reason,
+        issue: issue || undefined,
         running: runs.size,
         max: MAX_CONCURRENT,
       });
