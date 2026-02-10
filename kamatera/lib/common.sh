@@ -243,6 +243,76 @@ generate_server_password() {
     printf '%s' "$password"
 }
 
+# Parse command IDs from a Kamatera API response
+# Kamatera returns an array of command IDs, a single number, or a string
+# Usage: parse_command_ids JSON_RESPONSE
+parse_command_ids() {
+    local response="$1"
+    python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+if isinstance(data, list):
+    print(','.join(str(x) for x in data))
+elif isinstance(data, (int, float)):
+    print(int(data))
+else:
+    print(data)
+" <<< "$response" 2>/dev/null
+}
+
+# Poll Kamatera server info until a WAN IP address is available
+# Sets: KAMATERA_SERVER_IP
+# Usage: get_kamatera_server_ip SERVER_NAME [MAX_ATTEMPTS]
+get_kamatera_server_ip() {
+    local name="$1"
+    local max_attempts=${2:-30}
+    local attempt=1
+
+    log_warn "Retrieving server IP address..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local info_response
+        info_response=$(kamatera_api POST "/service/server/info" "{\"name\":\"$name\"}")
+
+        KAMATERA_SERVER_IP=$(python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+if isinstance(data, list) and len(data) > 0:
+    server = data[0]
+else:
+    server = data
+networks = server.get('networks', [])
+for net in networks:
+    net_name = net.get('network', '')
+    if net_name.startswith('wan'):
+        ips = net.get('ips', [])
+        if ips:
+            print(ips[0])
+            sys.exit(0)
+# Fallback: try power_on field or any IP
+power = server.get('power', '')
+if power == 'on':
+    for net in networks:
+        ips = net.get('ips', [])
+        if ips:
+            print(ips[0])
+            sys.exit(0)
+" <<< "$info_response" 2>/dev/null)
+
+        if [[ -n "$KAMATERA_SERVER_IP" ]]; then
+            export KAMATERA_SERVER_IP
+            log_info "Server active: IP=$KAMATERA_SERVER_IP"
+            return 0
+        fi
+
+        log_warn "Waiting for server IP... (attempt $attempt/$max_attempts)"
+        sleep "$INSTANCE_STATUS_POLL_DELAY"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Failed to retrieve server IP address"
+    return 1
+}
+
 create_server() {
     local name="$1"
     local datacenter="${KAMATERA_DATACENTER:-EU}"
@@ -326,18 +396,8 @@ print(json.dumps(body))
     local response
     response=$(kamatera_api POST "/service/server" "$body")
 
-    # Parse command ID from response (Kamatera returns array of command IDs)
     local command_ids
-    command_ids=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-if isinstance(data, list):
-    print(','.join(str(x) for x in data))
-elif isinstance(data, (int, float)):
-    print(int(data))
-else:
-    print(data)
-" <<< "$response" 2>/dev/null)
+    command_ids=$(parse_command_ids "$response")
 
     if [[ -z "$command_ids" ]]; then
         log_error "Failed to create Kamatera server"
@@ -352,60 +412,13 @@ else:
 
     log_info "Server creation command submitted: $command_ids"
 
-    # Wait for the command to complete
     local queue_result
     queue_result=$(wait_for_command "$command_ids" 600) || return 1
 
-    # Extract server name from the completed command
     KAMATERA_SERVER_NAME_ACTUAL="$name"
     export KAMATERA_SERVER_NAME_ACTUAL
 
-    # Get server info to retrieve IP address
-    log_warn "Retrieving server IP address..."
-    local max_info_attempts=30
-    local info_attempt=1
-    while [[ "$info_attempt" -le "$max_info_attempts" ]]; do
-        local info_response
-        info_response=$(kamatera_api POST "/service/server/info" "{\"name\":\"$name\"}")
-
-        KAMATERA_SERVER_IP=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-if isinstance(data, list) and len(data) > 0:
-    server = data[0]
-else:
-    server = data
-networks = server.get('networks', [])
-for net in networks:
-    net_name = net.get('network', '')
-    if net_name.startswith('wan'):
-        ips = net.get('ips', [])
-        if ips:
-            print(ips[0])
-            sys.exit(0)
-# Fallback: try power_on field or any IP
-power = server.get('power', '')
-if power == 'on':
-    for net in networks:
-        ips = net.get('ips', [])
-        if ips:
-            print(ips[0])
-            sys.exit(0)
-" <<< "$info_response" 2>/dev/null)
-
-        if [[ -n "$KAMATERA_SERVER_IP" ]]; then
-            export KAMATERA_SERVER_IP
-            log_info "Server active: IP=$KAMATERA_SERVER_IP"
-            return 0
-        fi
-
-        log_warn "Waiting for server IP... (attempt $info_attempt/$max_info_attempts)"
-        sleep "$INSTANCE_STATUS_POLL_DELAY"
-        info_attempt=$((info_attempt + 1))
-    done
-
-    log_error "Failed to retrieve server IP address"
-    return 1
+    get_kamatera_server_ip "$name"
 }
 
 verify_server_connectivity() {
@@ -438,18 +451,8 @@ destroy_server() {
     local response
     response=$(kamatera_api POST "/service/server/terminate" "{\"name\":\"$server_name\",\"force\":true}")
 
-    # Parse command ID and wait for completion
     local command_ids
-    command_ids=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-if isinstance(data, list):
-    print(','.join(str(x) for x in data))
-elif isinstance(data, (int, float)):
-    print(int(data))
-else:
-    print(data)
-" <<< "$response" 2>/dev/null)
+    command_ids=$(parse_command_ids "$response")
 
     if [[ -n "$command_ids" ]]; then
         wait_for_command "$command_ids" 120 || true

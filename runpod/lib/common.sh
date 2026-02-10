@@ -102,6 +102,65 @@ get_server_name() {
     echo "${server_name}"
 }
 
+# Wait for a RunPod pod to become ready and set SSH connection vars
+# Sets: RUNPOD_SSH_HOST, RUNPOD_SSH_PORT, RUNPOD_SSH_USER
+# Usage: wait_for_pod_ready POD_ID [MAX_ATTEMPTS]
+wait_for_pod_ready() {
+    local pod_id="${1}"
+    local max_attempts=${2:-60}
+    local attempt=1
+
+    log_warn "Waiting for pod to become ready..."
+    while [[ "${attempt}" -le "${max_attempts}" ]]; do
+        local status_query='query { pod(input: { podId: "'"${pod_id}"'" }) { id name desiredStatus runtime { uptimeInSeconds ports { ip isIpPublic privatePort publicPort type } } } }'
+        local status_response
+        status_response=$(runpod_api "${status_query}")
+
+        local runtime
+        runtime=$(echo "${status_response}" | python3 -c "import json,sys; r=json.loads(sys.stdin.read())['data']['pod']['runtime']; print('running' if r else 'pending')" 2>/dev/null || echo "pending")
+
+        if [[ "${runtime}" == "running" ]]; then
+            # Extract SSH connection info from ports
+            local ssh_info
+            ssh_info=$(echo "${status_response}" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+ports = data['data']['pod']['runtime']['ports']
+for p in (ports or []):
+    if p['privatePort'] == 22 and p['type'] == 'tcp':
+        print(p['ip'] + ':' + str(p['publicPort']))
+        sys.exit(0)
+# No direct TCP port found, fall back to proxy SSH
+print('proxy')
+" 2>/dev/null || echo "proxy")
+
+            if [[ "${ssh_info}" == "proxy" ]]; then
+                RUNPOD_SSH_HOST="ssh.runpod.io"
+                RUNPOD_SSH_PORT="22"
+                RUNPOD_SSH_USER="${pod_id}"
+                export RUNPOD_SSH_HOST RUNPOD_SSH_PORT RUNPOD_SSH_USER
+                log_info "Pod ready (using SSH proxy: ${RUNPOD_SSH_USER}@${RUNPOD_SSH_HOST})"
+            else
+                RUNPOD_SSH_HOST=$(echo "${ssh_info}" | cut -d: -f1)
+                RUNPOD_SSH_PORT=$(echo "${ssh_info}" | cut -d: -f2)
+                RUNPOD_SSH_USER="root"
+                export RUNPOD_SSH_HOST RUNPOD_SSH_PORT RUNPOD_SSH_USER
+                log_info "Pod ready: SSH at ${RUNPOD_SSH_HOST}:${RUNPOD_SSH_PORT}"
+            fi
+            return 0
+        fi
+
+        local desired_status
+        desired_status=$(echo "${status_response}" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['data']['pod']['desiredStatus'])" 2>/dev/null || echo "UNKNOWN")
+        log_warn "Pod status: ${desired_status}/${runtime} (${attempt}/${max_attempts})"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Pod did not become ready in time"
+    return 1
+}
+
 create_server() {
     local name="${1}"
     local gpu_type="${RUNPOD_GPU_TYPE:-NVIDIA RTX A4000}"
@@ -144,59 +203,7 @@ create_server() {
     export RUNPOD_POD_ID
     log_info "Pod created: ID=${RUNPOD_POD_ID}"
 
-    # Wait for pod to become ready and get SSH connection info
-    log_warn "Waiting for pod to become ready..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "${attempt}" -le "${max_attempts}" ]]; do
-        local status_query='query { pod(input: { podId: "'"${RUNPOD_POD_ID}"'" }) { id name desiredStatus runtime { uptimeInSeconds ports { ip isIpPublic privatePort publicPort type } } } }'
-        local status_response
-        status_response=$(runpod_api "${status_query}")
-
-        local runtime
-        runtime=$(echo "${status_response}" | python3 -c "import json,sys; r=json.loads(sys.stdin.read())['data']['pod']['runtime']; print('running' if r else 'pending')" 2>/dev/null || echo "pending")
-
-        if [[ "${runtime}" == "running" ]]; then
-            # Extract SSH connection info from ports
-            local ssh_info
-            ssh_info=$(echo "${status_response}" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-ports = data['data']['pod']['runtime']['ports']
-for p in (ports or []):
-    if p['privatePort'] == 22 and p['type'] == 'tcp':
-        print(p['ip'] + ':' + str(p['publicPort']))
-        sys.exit(0)
-# No direct TCP port found, fall back to proxy SSH
-print('proxy')
-" 2>/dev/null || echo "proxy")
-
-            if [[ "${ssh_info}" == "proxy" ]]; then
-                # Use RunPod SSH proxy
-                RUNPOD_SSH_HOST="ssh.runpod.io"
-                RUNPOD_SSH_PORT="22"
-                RUNPOD_SSH_USER="${RUNPOD_POD_ID}"
-                export RUNPOD_SSH_HOST RUNPOD_SSH_PORT RUNPOD_SSH_USER
-                log_info "Pod ready (using SSH proxy: ${RUNPOD_SSH_USER}@${RUNPOD_SSH_HOST})"
-            else
-                RUNPOD_SSH_HOST=$(echo "${ssh_info}" | cut -d: -f1)
-                RUNPOD_SSH_PORT=$(echo "${ssh_info}" | cut -d: -f2)
-                RUNPOD_SSH_USER="root"
-                export RUNPOD_SSH_HOST RUNPOD_SSH_PORT RUNPOD_SSH_USER
-                log_info "Pod ready: SSH at ${RUNPOD_SSH_HOST}:${RUNPOD_SSH_PORT}"
-            fi
-            return 0
-        fi
-
-        local desired_status
-        desired_status=$(echo "${status_response}" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['data']['pod']['desiredStatus'])" 2>/dev/null || echo "UNKNOWN")
-        log_warn "Pod status: ${desired_status}/${runtime} (${attempt}/${max_attempts})"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Pod did not become ready in time"
-    return 1
+    wait_for_pod_ready "${RUNPOD_POD_ID}"
 }
 
 # Build SSH options string for RunPod (may use non-standard port)
