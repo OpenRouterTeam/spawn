@@ -57,6 +57,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/re
 
 Deploys Aider with OpenRouter model routing. Prompts for model selection (default: `openrouter/auto`).
 
+### Goose
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/render/goose.sh)
+```
+
+Deploys Goose AI coding agent by Block with native OpenRouter support.
+
 ### Codex CLI
 
 ```bash
@@ -72,6 +80,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/re
 ```
 
 Deploys Open Interpreter with OpenRouter integration via OPENAI_BASE_URL override.
+
+### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/render/gemini.sh)
+```
+
+Deploys Gemini CLI with OpenRouter integration via OPENAI_BASE_URL and GEMINI_API_KEY override.
 
 ## Service Details
 

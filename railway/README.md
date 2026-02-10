@@ -64,6 +64,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/amazonq.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/interpreter.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/cline.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
