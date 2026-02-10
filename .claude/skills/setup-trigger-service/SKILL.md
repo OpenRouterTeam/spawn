@@ -52,7 +52,7 @@ It reads env vars:
 - `TARGET_SCRIPT` (required) — Absolute path to the script to run on trigger
 - `REPO_ROOT` (optional) — Working directory for the script (defaults to script's parent dir)
 - `MAX_CONCURRENT` (optional) — Max parallel runs (default: `1`)
-- `RUN_TIMEOUT_MS` (optional) — Kill runs older than this in milliseconds (default: `7200000` = 2 hours)
+- `RUN_TIMEOUT_MS` (optional) — Kill runs older than this in milliseconds (default: `14400000` = 4 hours)
 
 **Stale run detection:**
 Before accepting a trigger, the server checks if tracked processes are still alive (`kill -0`). Dead processes are reaped automatically. Runs exceeding `RUN_TIMEOUT_MS` are force-killed to free the slot.
@@ -263,8 +263,8 @@ cat /.sprite/logs/services/<service-name>.log | grep 'finished'
 
 | Service | Observed cycle time | RUN_TIMEOUT_MS | Rationale |
 |---------|-------------------|----------------|-----------|
-| Discovery (improve.sh) | 1-2 hours | `7200000` (2h) | Team cycles with 5+ agents, worktrees, PRs |
-| Refactor (refactor.sh) | TBD | `7200000` (2h) | Start high, tune after data |
+| Discovery (improve.sh) | 15 min (gaps), 1-2h+ (discovery) | `14400000` (4h) | Discovery cycles are open-ended; gap fills are fast |
+| Refactor (refactor.sh) | TBD | `14400000` (4h) | Start high, tune after data |
 
 To override, add to the wrapper script:
 
