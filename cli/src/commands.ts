@@ -27,7 +27,7 @@ function getErrorMessage(err: unknown): string {
 }
 
 function handleCancel(): never {
-  p.cancel("Cancelled.");
+  console.error(pc.red("Operation cancelled."));
   process.exit(0);
 }
 

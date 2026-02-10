@@ -48,19 +48,19 @@ function compareVersions(current: string, latest: string): boolean {
 
 function performAutoUpdate(latestVersion: string): void {
   console.error(); // Use stderr so it doesn't interfere with parseable output
-  console.error(pc.yellow("┌────────────────────────────────────────────────────────────┐"));
+  console.error(pc.yellow("+------------------------------------------------------------+"));
   console.error(
-    pc.yellow("│ ") +
-    pc.bold(`Update available: v${VERSION} → `) +
+    pc.yellow("| ") +
+    pc.bold(`Update available: v${VERSION} -> `) +
     pc.green(pc.bold(`v${latestVersion}`)) +
-    pc.yellow("                       │")
+    pc.yellow("                       |")
   );
   console.error(
-    pc.yellow("│ ") +
+    pc.yellow("| ") +
     pc.bold("Updating automatically...") +
-    pc.yellow("                                  │")
+    pc.yellow("                                  |")
   );
-  console.error(pc.yellow("└────────────────────────────────────────────────────────────┘"));
+  console.error(pc.yellow("+------------------------------------------------------------+"));
   console.error();
 
   try {
