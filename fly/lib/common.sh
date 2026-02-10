@@ -202,46 +202,47 @@ get_server_name() {
     echo "$server_name"
 }
 
-# Create a Fly.io app and machine
-create_server() {
+# Create Fly.io app, returning 0 on success or if app already exists
+_fly_create_app() {
     local name="$1"
-    local region="${FLY_REGION:-iad}"
-    local vm_size="${FLY_VM_SIZE:-shared-cpu-1x}"
-    local vm_memory="${FLY_VM_MEMORY:-1024}"
+    local org
+    org=$(get_fly_org)
 
-    # Validate env var inputs to prevent injection into Python code
-    validate_region_name "$region" || { log_error "Invalid FLY_REGION"; return 1; }
-    validate_resource_name "$vm_size" || { log_error "Invalid FLY_VM_SIZE"; return 1; }
-    if [[ ! "$vm_memory" =~ ^[0-9]+$ ]]; then log_error "Invalid FLY_VM_MEMORY: must be numeric"; return 1; fi
-
-    # Step 1: Create the app
     log_warn "Creating Fly.io app '$name'..."
-    local org=$(get_fly_org)
     local app_body="{\"app_name\":\"$name\",\"org_slug\":\"$org\"}"
-    local app_response=$(fly_api POST "/apps" "$app_body")
+    local app_response
+    app_response=$(fly_api POST "/apps" "$app_body")
 
     if echo "$app_response" | grep -q '"error"'; then
-        # App might already exist, try to continue
-        local error_msg=$(echo "$app_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$app_response")
+        local error_msg
+        error_msg=$(echo "$app_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$app_response")
         if echo "$error_msg" | grep -qi "already exists"; then
             log_warn "App '$name' already exists, reusing it"
-        else
-            log_error "Failed to create Fly.io app"
-            log_error "API Error: $error_msg"
-            log_warn "Common issues:"
-            log_warn "  - App name already taken by another user"
-            log_warn "  - Invalid organization slug"
-            log_warn "  - API token lacks permissions"
-            return 1
+            return 0
         fi
-    else
-        log_info "App '$name' created"
+        log_error "Failed to create Fly.io app"
+        log_error "API Error: $error_msg"
+        log_warn "Common issues:"
+        log_warn "  - App name already taken by another user"
+        log_warn "  - Invalid organization slug"
+        log_warn "  - API token lacks permissions"
+        return 1
     fi
 
-    # Step 2: Create a machine in the app
-    log_warn "Creating Fly.io machine (region: $region, size: $vm_size, memory: ${vm_memory}MB)..."
+    log_info "App '$name' created"
+}
 
-    local machine_body=$(python3 -c "
+# Create a Fly.io machine and wait for it to start
+# Sets FLY_MACHINE_ID on success
+_fly_create_and_start_machine() {
+    local name="$1"
+    local region="$2"
+    local vm_memory="$3"
+
+    log_warn "Creating Fly.io machine (region: $region, memory: ${vm_memory}MB)..."
+
+    local machine_body
+    machine_body=$(python3 -c "
 import json
 body = {
     'name': '$name',
@@ -262,14 +263,14 @@ body = {
 print(json.dumps(body))
 ")
 
-    local response=$(fly_api POST "/apps/$name/machines" "$machine_body")
+    local response
+    response=$(fly_api POST "/apps/$name/machines" "$machine_body")
 
     if echo "$response" | grep -q '"error"'; then
         log_error "Failed to create Fly.io machine"
-
-        local error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
-
         log_warn "Common issues:"
         log_warn "  - Insufficient account balance or payment method required"
         log_warn "  - Region unavailable (try different FLY_REGION)"
@@ -278,19 +279,18 @@ print(json.dumps(body))
         return 1
     fi
 
-    # Extract machine ID and state
     FLY_MACHINE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
     export FLY_MACHINE_ID FLY_APP_NAME="$name"
-
     log_info "Machine created: ID=$FLY_MACHINE_ID, App=$name"
 
-    # Wait for machine to be in started state
     log_warn "Waiting for machine to start..."
     local max_attempts=30
     local attempt=1
     while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response=$(fly_api GET "/apps/$name/machines/$FLY_MACHINE_ID")
-        local state=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('state','unknown'))")
+        local status_response
+        status_response=$(fly_api GET "/apps/$name/machines/$FLY_MACHINE_ID")
+        local state
+        state=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('state','unknown'))")
 
         if [[ "$state" == "started" ]]; then
             log_info "Machine is running"
@@ -299,11 +299,27 @@ print(json.dumps(body))
 
         log_warn "Machine state: $state ($attempt/$max_attempts)"
         sleep 3
-        ((attempt++))
+        attempt=$((attempt + 1))
     done
 
     log_error "Machine did not start in time"
     return 1
+}
+
+# Create a Fly.io app and machine
+create_server() {
+    local name="$1"
+    local region="${FLY_REGION:-iad}"
+    local vm_size="${FLY_VM_SIZE:-shared-cpu-1x}"
+    local vm_memory="${FLY_VM_MEMORY:-1024}"
+
+    # Validate env var inputs to prevent injection into Python code
+    validate_region_name "$region" || { log_error "Invalid FLY_REGION"; return 1; }
+    validate_resource_name "$vm_size" || { log_error "Invalid FLY_VM_SIZE"; return 1; }
+    if [[ ! "$vm_memory" =~ ^[0-9]+$ ]]; then log_error "Invalid FLY_VM_MEMORY: must be numeric"; return 1; fi
+
+    _fly_create_app "$name" || return 1
+    _fly_create_and_start_machine "$name" "$region" "$vm_memory"
 }
 
 # Wait for base tools to be installed (Fly.io uses bare Ubuntu image)

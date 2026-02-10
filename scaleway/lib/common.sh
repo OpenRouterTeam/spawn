@@ -213,6 +213,66 @@ get_server_name() {
     echo "$server_name"
 }
 
+# Parse Scaleway server response to extract public IP address
+_scaleway_extract_ip() {
+    python3 -c "
+import json, sys
+server = json.loads(sys.stdin.read())['server']
+ip = server.get('public_ip', {})
+if ip:
+    print(ip.get('address', ''))
+else:
+    ips = server.get('public_ips', [])
+    for pip in ips:
+        if pip.get('address'):
+            print(pip['address'])
+            sys.exit(0)
+    print('')
+"
+}
+
+# Power on and wait for Scaleway instance to become running with a public IP
+# Sets SCALEWAY_SERVER_IP on success
+_scaleway_power_on_and_wait() {
+    local server_id="$1"
+
+    log_warn "Powering on instance..."
+    local action_response
+    action_response=$(scaleway_instance_api POST "/servers/${server_id}/action" '{"action":"poweron"}')
+
+    if echo "$action_response" | grep -q '"task"'; then
+        log_info "Power on initiated"
+    else
+        log_warn "Power on may have failed, checking status..."
+    fi
+
+    log_warn "Waiting for instance to become active..."
+    local max_attempts=60
+    local attempt=1
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local status_response
+        status_response=$(scaleway_instance_api GET "/servers/$server_id")
+        local state
+        state=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['state'])")
+
+        if [[ "$state" == "running" ]]; then
+            SCALEWAY_SERVER_IP=$(echo "$status_response" | _scaleway_extract_ip)
+            if [[ -n "$SCALEWAY_SERVER_IP" ]]; then
+                export SCALEWAY_SERVER_IP
+                log_info "Instance active: IP=$SCALEWAY_SERVER_IP"
+                return 0
+            fi
+        fi
+
+        log_warn "Instance state: $state ($attempt/$max_attempts)"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Instance did not become active in time"
+    return 1
+}
+
 create_server() {
     local name="$1"
     local commercial_type="${SCALEWAY_TYPE:-DEV1-S}"
@@ -227,7 +287,6 @@ create_server() {
     local project_id
     project_id=$(get_scaleway_project_id) || return 1
 
-    # Get Ubuntu image ID
     local image_id
     image_id=$(get_ubuntu_image_id) || return 1
     log_info "Using image: $image_id"
@@ -265,57 +324,7 @@ print(json.dumps(body))
         return 1
     fi
 
-    # Power on the server (Scaleway requires explicit poweron after create)
-    log_warn "Powering on instance..."
-    local action_response
-    action_response=$(scaleway_instance_api POST "/servers/${SCALEWAY_SERVER_ID}/action" '{"action":"poweron"}')
-
-    if echo "$action_response" | grep -q '"task"'; then
-        log_info "Power on initiated"
-    else
-        log_warn "Power on may have failed, checking status..."
-    fi
-
-    # Wait for instance to get an IP and become running
-    log_warn "Waiting for instance to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(scaleway_instance_api GET "/servers/$SCALEWAY_SERVER_ID")
-        local state
-        state=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['state'])")
-
-        if [[ "$state" == "running" ]]; then
-            SCALEWAY_SERVER_IP=$(echo "$status_response" | python3 -c "
-import json, sys
-server = json.loads(sys.stdin.read())['server']
-ip = server.get('public_ip', {})
-if ip:
-    print(ip.get('address', ''))
-else:
-    # Check public_ips array
-    ips = server.get('public_ips', [])
-    for pip in ips:
-        if pip.get('address'):
-            print(pip['address'])
-            sys.exit(0)
-    print('')
-")
-            if [[ -n "$SCALEWAY_SERVER_IP" ]]; then
-                export SCALEWAY_SERVER_IP
-                log_info "Instance active: IP=$SCALEWAY_SERVER_IP"
-                return 0
-            fi
-        fi
-
-        log_warn "Instance state: $state ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
+    _scaleway_power_on_and_wait "$SCALEWAY_SERVER_ID"
 }
 
 verify_server_connectivity() {
