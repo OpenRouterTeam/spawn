@@ -132,10 +132,16 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
 
     const availableClouds = getImplementedClouds(manifest, agent);
     if (availableClouds.length > 0) {
-      const cloudNames = availableClouds.slice(0, 5).map((c) => manifest.clouds[c].name);
-      p.log.info(`${agentName} is available on: ${cloudNames.join(", ")}${availableClouds.length > 5 ? `, and ${availableClouds.length - 5} more` : ""}`);
-      p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all available clouds.`);
+      const examples = availableClouds.slice(0, 3).map((c) => `spawn ${agent} ${c}`);
+      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these instead:`);
+      for (const cmd of examples) {
+        p.log.info(`  ${pc.cyan(cmd)}`);
+      }
+      if (availableClouds.length > 3) {
+        p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
+      }
     } else {
+      p.log.info(`This agent has no implemented cloud providers yet.`);
       p.log.info(`Run ${pc.cyan("spawn list")} to see the full availability matrix.`);
     }
     process.exit(1);
