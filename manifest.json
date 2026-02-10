@@ -979,7 +979,7 @@
     "northflank/goose": "missing",
     "northflank/codex": "missing",
     "northflank/interpreter": "missing",
-    "northflank/gemini": "missing",
+    "northflank/gemini": "implemented",
     "northflank/amazonq": "missing",
     "northflank/cline": "missing",
     "northflank/gptme": "missing",
