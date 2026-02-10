@@ -1073,7 +1073,7 @@
     "northflank/gptme": "implemented",
     "northflank/opencode": "missing",
     "northflank/plandex": "missing",
-    "northflank/kilocode": "missing",
+    "northflank/kilocode": "implemented",
     "railway/claude": "implemented",
     "railway/openclaw": "implemented",
     "railway/nanoclaw": "implemented",
