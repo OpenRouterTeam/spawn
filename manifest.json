@@ -894,7 +894,7 @@
     "vastai/gemini": "implemented",
     "vastai/amazonq": "implemented",
     "vastai/cline": "implemented",
-    "vastai/gptme": "missing",
+    "vastai/gptme": "implemented",
     "vastai/opencode": "implemented",
     "vastai/plandex": "implemented",
     "vastai/kilocode": "implemented"
