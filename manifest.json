@@ -821,7 +821,7 @@
     "fluidstack/goose": "implemented",
     "fluidstack/codex": "implemented",
     "fluidstack/interpreter": "implemented",
-    "fluidstack/gemini": "missing",
+    "fluidstack/gemini": "implemented",
     "fluidstack/amazonq": "missing",
     "fluidstack/cline": "missing",
     "fluidstack/gptme": "implemented",
