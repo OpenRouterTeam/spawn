@@ -26,6 +26,8 @@ jobs:
           cat /tmp/response.json
           if [ "$HTTP_CODE" = "429" ]; then
             echo "Cycle already running, skipping"
+          elif [ "$HTTP_CODE" = "409" ]; then
+            echo "Run for this issue already in progress, skipping"
           elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
             echo "Triggered successfully"
           else

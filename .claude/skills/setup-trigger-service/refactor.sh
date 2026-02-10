@@ -1,23 +1,40 @@
 #!/bin/bash
 set -eo pipefail
 
-# Refactoring Team Service — Single Cycle
+# Refactoring Team Service — Single Cycle (Dual-Mode)
 # Triggered by trigger-server.ts via GitHub Actions
-# Spawns a Claude Code agent team to maintain and improve the spawn codebase
+#
+# RUN_MODE=issue   — lightweight 2-agent fix for a specific GitHub issue (15 min)
+# RUN_MODE=refactor — full 6-agent team for codebase maintenance (30 min)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 cd "${REPO_ROOT}"
 
-LOG_FILE="/home/sprite/spawn/.docs/refactor.log"
-TEAM_NAME="spawn-refactor"
+# --- Run mode detection ---
+SPAWN_ISSUE="${SPAWN_ISSUE:-}"
+SPAWN_REASON="${SPAWN_REASON:-manual}"
+
+if [[ -n "${SPAWN_ISSUE}" ]]; then
+    RUN_MODE="issue"
+    WORKTREE_BASE="/tmp/spawn-worktrees/issue-${SPAWN_ISSUE}"
+    TEAM_NAME="spawn-issue-${SPAWN_ISSUE}"
+    CYCLE_TIMEOUT=900   # 15 min for issue runs
+else
+    RUN_MODE="refactor"
+    WORKTREE_BASE="/tmp/spawn-worktrees/refactor"
+    TEAM_NAME="spawn-refactor"
+    CYCLE_TIMEOUT=1800  # 30 min for refactor runs
+fi
+
+LOG_FILE="/home/sprite/spawn/.docs/${TEAM_NAME}.log"
 PROMPT_FILE=""
 
 # Ensure .docs directory exists
 mkdir -p "$(dirname "${LOG_FILE}")"
 
 log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [${RUN_MODE}] $*" | tee -a "${LOG_FILE}"
 }
 
 # Cleanup function — runs on normal exit, SIGTERM, and SIGINT
@@ -27,67 +44,154 @@ cleanup() {
 
     cd "${REPO_ROOT}" 2>/dev/null || true
 
-    # Prune worktrees
+    # Prune worktrees and clean up only OUR worktree base
     git worktree prune 2>/dev/null || true
-    rm -rf /tmp/spawn-worktrees 2>/dev/null || true
+    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
 
     # Clean up prompt file
     rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
 
-    log "=== Refactoring Cycle Done (exit_code=${exit_code}) ==="
+    log "=== Cycle Done (exit_code=${exit_code}) ==="
     exit $exit_code
 }
 
 trap cleanup EXIT SIGTERM SIGINT
 
-log "=== Starting Refactoring Cycle ==="
+log "=== Starting ${RUN_MODE} cycle ==="
 log "Working directory: ${REPO_ROOT}"
 log "Team name: ${TEAM_NAME}"
-log "Log file: ${LOG_FILE}"
-
-# Ensure we're on latest main
-log "Syncing with origin/main..."
-git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
-git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
-
-# Pre-cycle cleanup: stale worktrees, merged branches, abandoned PRs
-log "Pre-cycle cleanup: stale worktrees..."
-git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
-if [[ -d /tmp/spawn-worktrees ]]; then
-    rm -rf /tmp/spawn-worktrees 2>&1 | tee -a "${LOG_FILE}" || true
-    log "Removed stale /tmp/spawn-worktrees directory"
+log "Worktree base: ${WORKTREE_BASE}"
+log "Timeout: ${CYCLE_TIMEOUT}s"
+if [[ "${RUN_MODE}" == "issue" ]]; then
+    log "Issue: #${SPAWN_ISSUE}"
 fi
 
-log "Pre-cycle cleanup: merged remote branches..."
-MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ') || true
-for branch in $MERGED_BRANCHES; do
-    if [[ -n "$branch" && "$branch" != "main" ]]; then
-        git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
-    fi
-done
+# Fetch latest refs (read-only, safe for concurrent runs)
+log "Fetching latest refs..."
+git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 
-log "Pre-cycle cleanup: stale open PRs..."
-STALE_PRS=$(gh pr list --repo OpenRouterTeam/spawn --state open --json number,updatedAt --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | .number' 2>/dev/null) || true
-for pr_num in $STALE_PRS; do
-    if [[ -n "$pr_num" ]]; then
-        log "Found stale PR #${pr_num}, checking if mergeable..."
-        PR_MERGEABLE=$(gh pr view "$pr_num" --repo OpenRouterTeam/spawn --json mergeable --jq '.mergeable' 2>/dev/null) || PR_MERGEABLE="UNKNOWN"
-        if [[ "$PR_MERGEABLE" == "MERGEABLE" ]]; then
-            log "Merging stale PR #${pr_num}..."
-            gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
-        else
-            log "Closing unmergeable stale PR #${pr_num}..."
-            gh pr close "$pr_num" --repo OpenRouterTeam/spawn --comment "Auto-closing: stale PR from a previous interrupted cycle. Please reopen if still needed." 2>&1 | tee -a "${LOG_FILE}" || true
+# Pre-cycle cleanup only in refactor mode (issue runs skip housekeeping)
+if [[ "${RUN_MODE}" == "refactor" ]]; then
+    # Reset main checkout to origin/main
+    git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
+
+    log "Pre-cycle cleanup: stale worktrees..."
+    git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
+    if [[ -d "${WORKTREE_BASE}" ]]; then
+        rm -rf "${WORKTREE_BASE}" 2>&1 | tee -a "${LOG_FILE}" || true
+        log "Removed stale ${WORKTREE_BASE} directory"
+    fi
+
+    log "Pre-cycle cleanup: merged remote branches..."
+    MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ') || true
+    for branch in $MERGED_BRANCHES; do
+        if [[ -n "$branch" && "$branch" != "main" ]]; then
+            git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
         fi
-    fi
-done
+    done
 
-# Launch Claude Code with team instructions
-log "Launching refactoring team..."
+    log "Pre-cycle cleanup: stale open PRs..."
+    STALE_PRS=$(gh pr list --repo OpenRouterTeam/spawn --state open --json number,updatedAt --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | .number' 2>/dev/null) || true
+    for pr_num in $STALE_PRS; do
+        if [[ -n "$pr_num" ]]; then
+            log "Found stale PR #${pr_num}, checking if mergeable..."
+            PR_MERGEABLE=$(gh pr view "$pr_num" --repo OpenRouterTeam/spawn --json mergeable --jq '.mergeable' 2>/dev/null) || PR_MERGEABLE="UNKNOWN"
+            if [[ "$PR_MERGEABLE" == "MERGEABLE" ]]; then
+                log "Merging stale PR #${pr_num}..."
+                gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
+            else
+                log "Closing unmergeable stale PR #${pr_num}..."
+                gh pr close "$pr_num" --repo OpenRouterTeam/spawn --comment "Auto-closing: stale PR from a previous interrupted cycle. Please reopen if still needed." 2>&1 | tee -a "${LOG_FILE}" || true
+            fi
+        fi
+    done
+fi
 
-# Write prompt to a temp file to avoid shell escaping issues
+# Launch Claude Code with mode-specific prompt
+log "Launching ${RUN_MODE} cycle..."
+
 PROMPT_FILE=$(mktemp /tmp/refactor-prompt-XXXXXX.md)
-cat > "${PROMPT_FILE}" << 'PROMPT_EOF'
+
+if [[ "${RUN_MODE}" == "issue" ]]; then
+    # --- Issue mode: lightweight 2-agent fix ---
+    cat > "${PROMPT_FILE}" << ISSUE_PROMPT_EOF
+You are the Team Lead for a focused issue-fix cycle on the spawn codebase.
+
+## Target Issue
+
+Fix GitHub issue #${SPAWN_ISSUE}.
+
+First, fetch the issue details:
+\`\`\`bash
+gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn
+\`\`\`
+
+## Time Budget
+
+This cycle MUST complete within 10 minutes. This is a HARD deadline.
+
+- At the 7-minute mark, stop new work and wrap up
+- At the 9-minute mark, send shutdown_request to all agents
+- At 10 minutes, force shutdown
+
+## Team Structure
+
+Create these teammates:
+
+1. **issue-fixer** (Sonnet)
+   - Diagnose the root cause of issue #${SPAWN_ISSUE}
+   - Implement the fix in an isolated worktree
+   - Run tests to verify the fix
+   - Create a PR with \`Fixes #${SPAWN_ISSUE}\` in the body
+   - Merge the PR immediately
+
+2. **issue-tester** (Haiku)
+   - Review the fix for correctness and edge cases
+   - Run \`bun test\` to verify no regressions
+   - Run \`bash -n\` on any modified .sh files
+   - Report test results to the team lead
+
+## Workflow
+
+1. Create the team with TeamCreate
+2. Fetch issue details: \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn\`
+3. DEDUP CHECK: Check if issue already has comments from automated accounts:
+   \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'\`
+   Only post acknowledgment if no automated comments exist.
+4. Post acknowledgment comment on the issue (if not already acknowledged):
+   \`gh issue comment ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now."\`
+5. Create worktree: \`git worktree add ${WORKTREE_BASE} -b fix/issue-${SPAWN_ISSUE} origin/main\`
+6. Spawn issue-fixer to work in \`${WORKTREE_BASE}\`
+7. Spawn issue-tester to review and test
+8. When fix is ready:
+   - Push: \`git push -u origin fix/issue-${SPAWN_ISSUE}\`
+   - PR: \`gh pr create --title "fix: Description" --body "Fixes #${SPAWN_ISSUE}"\`
+   - Merge: \`gh pr merge --squash --delete-branch\`
+9. Post resolution comment on the issue with PR link
+10. Close the issue: \`gh issue close ${SPAWN_ISSUE}\`
+11. Clean up worktree: \`git worktree remove ${WORKTREE_BASE}\`
+12. Shutdown all teammates and exit
+
+## Commit Markers (MANDATORY)
+
+Every commit MUST include:
+\`\`\`
+Agent: issue-fixer
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+\`\`\`
+
+## Safety Rules
+
+- Run tests after every change
+- Never break existing functionality
+- If fix is not straightforward (>10 min), post a comment on the issue explaining the complexity and close the cycle
+
+Begin now. Fix issue #${SPAWN_ISSUE}.
+ISSUE_PROMPT_EOF
+
+else
+    # --- Refactor mode: full 6-agent team ---
+    cat > "${PROMPT_FILE}" << 'PROMPT_EOF'
 You are the Team Lead for the spawn continuous refactoring service.
 
 Your mission: Spawn a team of specialized agents to maintain and improve the spawn codebase autonomously.
@@ -191,15 +295,15 @@ When fixing a bug reported in a GitHub issue:
 2. Community-coordinator posts acknowledgment comment on the issue (only if not already acknowledged)
 3. Community-coordinator messages the relevant teammate to investigate
 4. Create a worktree for the fix:
-   git worktree add /tmp/spawn-worktrees/fix/issue-NUMBER -b fix/issue-NUMBER origin/main
-5. Work inside the worktree: cd /tmp/spawn-worktrees/fix/issue-NUMBER
+   git worktree add WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER -b fix/issue-NUMBER origin/main
+5. Work inside the worktree: cd WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
 6. Implement the fix and commit (include Agent: marker)
 7. Community-coordinator posts interim update on the issue with root cause summary (only if no similar update exists)
 8. Push the branch: git push -u origin fix/issue-NUMBER
 9. Create a PR that references the issue:
    gh pr create --title "Fix: description" --body "Fixes #NUMBER"
 10. Merge the PR immediately: gh pr merge --squash --delete-branch
-11. Clean up: git worktree remove /tmp/spawn-worktrees/fix/issue-NUMBER
+11. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
 12. Community-coordinator posts final resolution comment with PR link and explanation (only if no resolution exists)
 13. Close the issue: gh issue close NUMBER
 
@@ -241,7 +345,7 @@ To avoid branch conflicts when multiple agents work simultaneously, each agent M
 
 Before spawning teammates, create a worktree directory:
 ```bash
-mkdir -p /tmp/spawn-worktrees
+mkdir -p WORKTREE_BASE_PLACEHOLDER
 ```
 
 ### Per-Agent Worktree Pattern
@@ -250,10 +354,10 @@ When an agent needs to create a branch for a fix or improvement:
 
 ```bash
 # 1. Create a worktree for the branch (from the main checkout)
-git worktree add /tmp/spawn-worktrees/BRANCH-NAME -b BRANCH-NAME origin/main
+git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME -b BRANCH-NAME origin/main
 
 # 2. Do all work inside the worktree directory
-cd /tmp/spawn-worktrees/BRANCH-NAME
+cd WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 # ... make changes, run tests ...
 
 # 3. Commit and push from the worktree
@@ -269,7 +373,7 @@ gh pr create --title "title" --body "body"
 
 # 5. Merge and clean up
 gh pr merge NUMBER --squash --delete-branch
-git worktree remove /tmp/spawn-worktrees/BRANCH-NAME
+git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 ```
 
 ### Why Worktrees?
@@ -289,7 +393,7 @@ git worktree remove /tmp/spawn-worktrees/BRANCH-NAME
 ## Workflow
 
 1. Create the team with TeamCreate
-2. Set up worktree directory: mkdir -p /tmp/spawn-worktrees
+2. Set up worktree directory: mkdir -p WORKTREE_BASE_PLACEHOLDER
 3. Create tasks using TaskCreate for each area:
    - Branch cleanup: scan and clean stale remote branches
    - Community coordination: scan all open issues, post acknowledgments, categorize, and delegate
@@ -320,7 +424,7 @@ You MUST remain active until ALL of the following are true:
 3. **All issues are engaged**: Run `gh issue list --repo OpenRouterTeam/spawn --state open`
    and for EACH open issue, verify it has at least one comment. If any issue has zero comments,
    the community-coordinator MUST post an acknowledgment before shutdown proceeds.
-4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf /tmp/spawn-worktrees` and `git worktree prune`.
+4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
 5. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
 
 ### Shutdown Sequence (execute in this exact order):
@@ -330,7 +434,7 @@ You MUST remain active until ALL of the following are true:
 3. Verify all issues engaged: `gh issue list --repo OpenRouterTeam/spawn --state open`
 4. For each teammate, send a `shutdown_request` via SendMessage
 5. Wait for all `shutdown_response` confirmations
-6. Run final cleanup: `git worktree prune && rm -rf /tmp/spawn-worktrees`
+6. Run final cleanup: `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER`
 7. Create checkpoint: `sprite-env checkpoint create --comment 'Refactor cycle complete'`
 8. Print final summary of what was accomplished
 9. ONLY THEN may the session end
@@ -358,40 +462,50 @@ Target autonomous score: >30
 Begin now. Spawn the team and start working. DO NOT EXIT until all teammates are shut down and all cleanup is complete per the Lifecycle Management section above.
 PROMPT_EOF
 
-# Hard timeout: 20 minutes. The prompt says 15 min, but we give 5 min grace
-# for shutdown coordination. After 20 min, the process tree is killed.
-CYCLE_TIMEOUT=1200  # 20 minutes in seconds
+    # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
+    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+fi
+
+# Add grace period: issue=5min, refactor=10min beyond the prompt timeout
+if [[ "${RUN_MODE}" == "issue" ]]; then
+    HARD_TIMEOUT=$((CYCLE_TIMEOUT + 300))   # 15 + 5 = 20 min
+else
+    HARD_TIMEOUT=$((CYCLE_TIMEOUT + 600))   # 30 + 10 = 40 min
+fi
+
+log "Hard timeout: ${HARD_TIMEOUT}s"
 
 # Run Claude Code with the prompt file, enforcing a hard timeout
-# Use a subshell to capture the exit code before the pipe
 CLAUDE_EXIT=0
-timeout --signal=TERM --kill-after=60 "${CYCLE_TIMEOUT}" \
+timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
     claude -p "$(cat "${PROMPT_FILE}")" 2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
     log "Cycle completed successfully"
 
-    # Commit any changes made during the cycle
-    if [[ -n "$(git status --porcelain)" ]]; then
-        log "Committing changes from cycle..."
-        git add -A
-        git commit -m "refactor: Automated improvements
+    # Direct commit to main only in refactor mode
+    if [[ "${RUN_MODE}" == "refactor" ]]; then
+        if [[ -n "$(git status --porcelain)" ]]; then
+            log "Committing changes from cycle..."
+            git add -A
+            git commit -m "refactor: Automated improvements
 
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" 2>&1 | tee -a "${LOG_FILE}" || true
 
-        # Push to main
-        git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
+            # Push to main
+            git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
+        fi
     fi
 
     # Create checkpoint
     log "Creating checkpoint..."
-    sprite-env checkpoint create --comment "Refactor cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+    sprite-env checkpoint create --comment "${RUN_MODE} cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
 elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    log "Cycle timed out after ${CYCLE_TIMEOUT}s — killed by hard timeout"
+    log "Cycle timed out after ${HARD_TIMEOUT}s — killed by hard timeout"
 
     # Still create checkpoint for any partial work that was merged
     log "Creating checkpoint for partial work..."
-    sprite-env checkpoint create --comment "Refactor cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
+    sprite-env checkpoint create --comment "${RUN_MODE} cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
 else
     log "Cycle failed (exit_code=${CLAUDE_EXIT})"
 fi
