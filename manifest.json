@@ -953,7 +953,7 @@
     "koyeb/amazonq": "implemented",
     "koyeb/cline": "implemented",
     "koyeb/gptme": "implemented",
-    "koyeb/opencode": "missing",
+    "koyeb/opencode": "implemented",
     "koyeb/plandex": "missing",
     "koyeb/kilocode": "missing"
   }
