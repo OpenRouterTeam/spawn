@@ -22,6 +22,18 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/aider.sh)
 ```
 
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/nanoclaw.sh)
+```
+
+#### gptme
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/gptme.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
