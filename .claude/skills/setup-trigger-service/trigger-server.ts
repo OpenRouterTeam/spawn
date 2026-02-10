@@ -271,8 +271,7 @@ function startStreamingRun(reason: string, issue: string): Response {
 
 const server = Bun.serve({
   port: PORT,
-  idleTimeout: 255, // max value (seconds) — prevent Bun from closing streaming connections during silent periods
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
 
     if (req.method === "GET" && url.pathname === "/health") {
@@ -355,6 +354,10 @@ const server = Bun.serve({
           }
         }
       }
+
+      // Disable idle timeout for this request — the stream may be silent for
+      // minutes at a time while Claude thinks. 0 = no timeout.
+      server.timeout(req, 0);
 
       // Stream the script output back as the response body.
       // The long-lived HTTP connection keeps the Sprite VM alive.
