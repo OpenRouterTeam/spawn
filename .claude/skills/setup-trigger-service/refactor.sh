@@ -358,8 +358,17 @@ Target autonomous score: >30
 Begin now. Spawn the team and start working. DO NOT EXIT until all teammates are shut down and all cleanup is complete per the Lifecycle Management section above.
 PROMPT_EOF
 
-# Run Claude Code with the prompt file
-if claude -p "$(cat "${PROMPT_FILE}")" 2>&1 | tee -a "${LOG_FILE}"; then
+# Hard timeout: 20 minutes. The prompt says 15 min, but we give 5 min grace
+# for shutdown coordination. After 20 min, the process tree is killed.
+CYCLE_TIMEOUT=1200  # 20 minutes in seconds
+
+# Run Claude Code with the prompt file, enforcing a hard timeout
+# Use a subshell to capture the exit code before the pipe
+CLAUDE_EXIT=0
+timeout --signal=TERM --kill-after=60 "${CYCLE_TIMEOUT}" \
+    claude -p "$(cat "${PROMPT_FILE}")" 2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+
+if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
     log "Cycle completed successfully"
 
     # Commit any changes made during the cycle
@@ -377,8 +386,14 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" 2>&1 | tee -a "${LOG_
     # Create checkpoint
     log "Creating checkpoint..."
     sprite-env checkpoint create --comment "Refactor cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    log "Cycle timed out after ${CYCLE_TIMEOUT}s — killed by hard timeout"
+
+    # Still create checkpoint for any partial work that was merged
+    log "Creating checkpoint for partial work..."
+    sprite-env checkpoint create --comment "Refactor cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
 else
-    log "Cycle failed"
+    log "Cycle failed (exit_code=${CLAUDE_EXIT})"
 fi
 
 # Note: cleanup (worktree prune, prompt file removal, final log) handled by trap
