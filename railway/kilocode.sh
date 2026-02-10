@@ -9,24 +9,24 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/railway/lib/common.sh)"
 fi
 
-log_info "Aider on Railway"
+log_info "Kilo Code on Railway"
 echo ""
 
-# 1. Ensure Railway CLI and authentication
+# 1. Ensure flyctl CLI and API token
 ensure_railway_cli
 ensure_railway_auth
 
-# 2. Get service name and create container
+# 2. Get app name and create machine
 SERVICE_NAME=$(get_service_name)
 create_server "$SERVICE_NAME"
 
-# 3. Wait for container to be ready
+# 3. Install base tools
 wait_for_cloud_init
 
-# 4. Install Aider
-log_warn "Installing Aider..."
-run_server "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
-log_info "Aider installed"
+# 4. Install Kilo Code
+log_warn "Installing Kilo Code..."
+run_server "npm install -g @kilocode/cli"
+log_info "Kilo Code installed"
 
 # 5. Get OpenRouter API key
 echo ""
@@ -36,23 +36,21 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-# 6. Get model preference
-MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
-
-# 7. Inject environment variables
+# 6. Inject environment variables into ~/.bashrc and ~/.zshrc
 log_warn "Setting up environment variables..."
 
 inject_env_vars_railway \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "PATH=\$HOME/.bun/bin:\$PATH"
+    "KILO_PROVIDER_TYPE=openrouter" \
+    "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
-log_info "Railway service setup completed successfully!"
+log_info "Railway machine setup completed successfully!"
 log_info "Service: $SERVICE_NAME"
 echo ""
 
-# 8. Start Aider interactively
-log_warn "Starting Aider..."
+# 7. Start Kilo Code interactively
+log_warn "Starting Kilo Code..."
 sleep 1
 clear
-interactive_session "source ~/.bashrc && aider --model openrouter/${MODEL_ID}"
+interactive_session "source ~/.bashrc && kilocode"

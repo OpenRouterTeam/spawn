@@ -12,15 +12,15 @@ fi
 log_info "Claude Code on Railway"
 echo ""
 
-# 1. Ensure Railway CLI and token
+# 1. Ensure Railway CLI and authentication
 ensure_railway_cli
-ensure_railway_token
+ensure_railway_auth
 
-# 2. Get project name and create service
-SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
+# 2. Get service name and create container
+SERVICE_NAME=$(get_service_name)
+create_server "$SERVICE_NAME"
 
-# 3. Install base tools
+# 3. Wait for container to be ready
 wait_for_cloud_init
 
 # 4. Install Claude Code
@@ -42,7 +42,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-# 6. Inject environment variables into shell config
+# 6. Inject environment variables
 log_warn "Setting up environment variables..."
 
 inject_env_vars_railway \
@@ -62,6 +62,8 @@ run_server "mkdir -p ~/.claude"
 # Upload settings.json
 SETTINGS_TEMP=$(mktemp)
 chmod 600 "$SETTINGS_TEMP"
+track_temp_file "$SETTINGS_TEMP"
+
 cat > "$SETTINGS_TEMP" << EOF
 {
   "theme": "dark",
@@ -79,11 +81,12 @@ cat > "$SETTINGS_TEMP" << EOF
 EOF
 
 upload_file "$SETTINGS_TEMP" "/root/.claude/settings.json"
-rm "$SETTINGS_TEMP"
 
 # Upload ~/.claude.json global state
 GLOBAL_STATE_TEMP=$(mktemp)
 chmod 600 "$GLOBAL_STATE_TEMP"
+track_temp_file "$GLOBAL_STATE_TEMP"
+
 cat > "$GLOBAL_STATE_TEMP" << EOF
 {
   "hasCompletedOnboarding": true,
@@ -92,14 +95,13 @@ cat > "$GLOBAL_STATE_TEMP" << EOF
 EOF
 
 upload_file "$GLOBAL_STATE_TEMP" "/root/.claude.json"
-rm "$GLOBAL_STATE_TEMP"
 
 # Create empty CLAUDE.md
 run_server "touch ~/.claude/CLAUDE.md"
 
 echo ""
 log_info "Railway service setup completed successfully!"
-log_info "Project: $SERVER_NAME"
+log_info "Service: $SERVICE_NAME"
 echo ""
 
 # 8. Start Claude Code interactively

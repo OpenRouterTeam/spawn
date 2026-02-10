@@ -573,6 +573,20 @@
         "image": "nvidia/cuda:12.1.0-devel-ubuntu22.04"
       },
       "notes": "GPU marketplace with per-hour pricing. Uses vastai CLI (pip install vastai). SSH via dynamic port mapping. Docker-based instances with CUDA pre-installed."
+    },
+    "railway": {
+      "name": "Railway",
+      "description": "Railway container platform via CLI",
+      "url": "https://railway.app/",
+      "type": "cli",
+      "auth": "railway login (browser) or RAILWAY_TOKEN",
+      "provision_method": "railway init + railway up",
+      "exec_method": "railway run",
+      "interactive_method": "railway run bash",
+      "defaults": {
+        "image": "ubuntu:24.04"
+      },
+      "notes": "Container platform with per-second billing. Uses Railway CLI (npm install -g @railway/cli). Docker-based services with persistent containers."
     }
   },
   "matrix": {
@@ -897,6 +911,20 @@
     "vastai/gptme": "implemented",
     "vastai/opencode": "implemented",
     "vastai/plandex": "implemented",
-    "vastai/kilocode": "implemented"
+    "vastai/kilocode": "implemented",
+    "railway/claude": "implemented",
+    "railway/openclaw": "implemented",
+    "railway/nanoclaw": "implemented",
+    "railway/aider": "implemented",
+    "railway/goose": "implemented",
+    "railway/codex": "implemented",
+    "railway/interpreter": "implemented",
+    "railway/gemini": "implemented",
+    "railway/amazonq": "implemented",
+    "railway/cline": "implemented",
+    "railway/gptme": "implemented",
+    "railway/opencode": "implemented",
+    "railway/plandex": "implemented",
+    "railway/kilocode": "implemented"
   }
 }
