@@ -1,0 +1,681 @@
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { loadManifest } from "../manifest";
+
+/**
+ * Tests for display/output commands: cmdAgentInfo (happy path), cmdList,
+ * cmdAgents, cmdClouds, cmdHelp, and cmdUpdate error paths.
+ *
+ * Existing tests cover:
+ * - cmdAgentInfo error paths (commands-error-paths.test.ts)
+ * - cmdCloudInfo full coverage (commands-cloud-info.test.ts)
+ * - cmdRun validation and error paths (commands-error-paths.test.ts)
+ *
+ * This file covers the UNTESTED happy paths and output formatting of:
+ * - cmdAgentInfo: displaying agent details and available clouds
+ * - cmdList: rendering the full matrix table
+ * - cmdAgents: listing all agents with cloud counts
+ * - cmdClouds: listing all clouds with agent counts
+ * - cmdHelp: verifying help output content
+ * - cmdUpdate: version check and error handling paths
+ *
+ * Agent: test-engineer
+ */
+
+const mockManifest = createMockManifest();
+
+// Manifest with no implementations for edge case testing
+const noImplManifest = {
+  ...mockManifest,
+  matrix: {
+    "sprite/claude": "missing",
+    "sprite/aider": "missing",
+    "hetzner/claude": "missing",
+    "hetzner/aider": "missing",
+  },
+};
+
+// Manifest with a single implementation
+const singleImplManifest = {
+  ...mockManifest,
+  matrix: {
+    "sprite/claude": "implemented",
+    "sprite/aider": "missing",
+    "hetzner/claude": "missing",
+    "hetzner/aider": "missing",
+  },
+};
+
+// Manifest with many clouds (> 3) to test "see all" hint
+const manyCloudManifest = {
+  agents: {
+    claude: mockManifest.agents.claude,
+  },
+  clouds: {
+    sprite: mockManifest.clouds.sprite,
+    hetzner: mockManifest.clouds.hetzner,
+    vultr: {
+      name: "Vultr",
+      description: "Cloud compute",
+      url: "https://vultr.com",
+      type: "cloud",
+      auth: "token",
+      provision_method: "api",
+      exec_method: "ssh",
+      interactive_method: "ssh",
+    },
+    linode: {
+      name: "Linode",
+      description: "Cloud hosting",
+      url: "https://linode.com",
+      type: "cloud",
+      auth: "token",
+      provision_method: "api",
+      exec_method: "ssh",
+      interactive_method: "ssh",
+    },
+    digitalocean: {
+      name: "DigitalOcean",
+      description: "Cloud infrastructure",
+      url: "https://digitalocean.com",
+      type: "cloud",
+      auth: "token",
+      provision_method: "api",
+      exec_method: "ssh",
+      interactive_method: "ssh",
+    },
+  },
+  matrix: {
+    "sprite/claude": "implemented",
+    "hetzner/claude": "implemented",
+    "vultr/claude": "implemented",
+    "linode/claude": "implemented",
+    "digitalocean/claude": "implemented",
+  },
+};
+
+// Mock @clack/prompts
+const mockLogError = mock(() => {});
+const mockLogInfo = mock(() => {});
+const mockLogStep = mock(() => {});
+const mockLogWarn = mock(() => {});
+const mockSpinnerStart = mock(() => {});
+const mockSpinnerStop = mock(() => {});
+
+mock.module("@clack/prompts", () => ({
+  spinner: () => ({
+    start: mockSpinnerStart,
+    stop: mockSpinnerStop,
+    message: mock(() => {}),
+  }),
+  log: {
+    step: mockLogStep,
+    info: mockLogInfo,
+    error: mockLogError,
+    warn: mockLogWarn,
+    success: mock(() => {}),
+  },
+  intro: mock(() => {}),
+  outro: mock(() => {}),
+  cancel: mock(() => {}),
+  select: mock(() => {}),
+  isCancel: () => false,
+}));
+
+// Import commands after mock setup
+const { cmdAgentInfo, cmdList, cmdAgents, cmdClouds, cmdHelp, cmdUpdate } =
+  await import("../commands.js");
+
+describe("Commands Display Output", () => {
+  let consoleMocks: ReturnType<typeof createConsoleMocks>;
+  let originalFetch: typeof global.fetch;
+  let processExitSpy: ReturnType<typeof spyOn>;
+
+  beforeEach(async () => {
+    consoleMocks = createConsoleMocks();
+    mockLogError.mockClear();
+    mockLogInfo.mockClear();
+    mockLogStep.mockClear();
+    mockLogWarn.mockClear();
+    mockSpinnerStart.mockClear();
+    mockSpinnerStop.mockClear();
+
+    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit");
+    }) as any);
+
+    originalFetch = global.fetch;
+    global.fetch = mock(async () => ({
+      ok: true,
+      json: async () => mockManifest,
+      text: async () => JSON.stringify(mockManifest),
+    })) as any;
+
+    await loadManifest(true);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    processExitSpy.mockRestore();
+    restoreMocks(consoleMocks.log, consoleMocks.error);
+  });
+
+  // ── cmdAgentInfo happy path ────────────────────────────────────────
+
+  describe("cmdAgentInfo - happy path", () => {
+    it("should display agent name and description for claude", async () => {
+      await cmdAgentInfo("claude");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Claude Code");
+      expect(output).toContain("AI coding assistant");
+    });
+
+    it("should display Available clouds header", async () => {
+      await cmdAgentInfo("claude");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Available clouds");
+    });
+
+    it("should list implemented clouds for claude", async () => {
+      await cmdAgentInfo("claude");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      // claude is implemented on both sprite and hetzner
+      expect(output).toContain("sprite");
+      expect(output).toContain("hetzner");
+    });
+
+    it("should show launch command hint for each cloud", async () => {
+      await cmdAgentInfo("claude");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("spawn claude sprite");
+      expect(output).toContain("spawn claude hetzner");
+    });
+
+    it("should show aider agent info with only sprite cloud", async () => {
+      await cmdAgentInfo("aider");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Aider");
+      expect(output).toContain("AI pair programmer");
+      expect(output).toContain("spawn aider sprite");
+      expect(output).not.toContain("spawn aider hetzner");
+    });
+
+    it("should show no-clouds message when agent has no implementations", async () => {
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => noImplManifest,
+        text: async () => JSON.stringify(noImplManifest),
+      })) as any;
+      await loadManifest(true);
+
+      await cmdAgentInfo("claude");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("No implemented clouds");
+    });
+
+    it("should use spinner while loading manifest", async () => {
+      await cmdAgentInfo("claude");
+      expect(mockSpinnerStart).toHaveBeenCalled();
+      expect(mockSpinnerStop).toHaveBeenCalled();
+    });
+  });
+
+  // ── cmdList ────────────────────────────────────────────────────────
+
+  describe("cmdList", () => {
+    it("should display cloud names in header", async () => {
+      await cmdList();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Sprite");
+      expect(output).toContain("Hetzner Cloud");
+    });
+
+    it("should display agent names in rows", async () => {
+      await cmdList();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Claude Code");
+      expect(output).toContain("Aider");
+    });
+
+    it("should show implemented count", async () => {
+      await cmdList();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      // 3 implemented out of 4 total (2 agents x 2 clouds)
+      expect(output).toContain("3/4");
+    });
+
+    it("should show legend for + and -", async () => {
+      await cmdList();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("implemented");
+      expect(output).toContain("not yet available");
+    });
+
+    it("should show + for implemented and - for missing", async () => {
+      await cmdList();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("+");
+      expect(output).toContain("-");
+    });
+
+    it("should show 0 implemented when nothing is implemented", async () => {
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => noImplManifest,
+        text: async () => JSON.stringify(noImplManifest),
+      })) as any;
+      await loadManifest(true);
+
+      await cmdList();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("0/4");
+    });
+
+    it("should use spinner while loading manifest", async () => {
+      await cmdList();
+      expect(mockSpinnerStart).toHaveBeenCalled();
+      expect(mockSpinnerStop).toHaveBeenCalled();
+    });
+  });
+
+  // ── cmdAgents ──────────────────────────────────────────────────────
+
+  describe("cmdAgents", () => {
+    it("should display Agents header", async () => {
+      await cmdAgents();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Agents");
+    });
+
+    it("should list all agents with their display names", async () => {
+      await cmdAgents();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("claude");
+      expect(output).toContain("Claude Code");
+      expect(output).toContain("aider");
+      expect(output).toContain("Aider");
+    });
+
+    it("should show cloud counts for each agent", async () => {
+      await cmdAgents();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      // claude has 2 clouds, aider has 1 cloud
+      expect(output).toContain("2 clouds");
+      expect(output).toContain("1 cloud");
+    });
+
+    it("should show correct singular/plural for cloud count", async () => {
+      await cmdAgents();
+      const calls = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
+      // Find the line with aider (1 cloud - singular)
+      const aiderLine = calls.find(
+        (line: string) => line.includes("aider") && line.includes("cloud")
+      );
+      expect(aiderLine).toBeDefined();
+      expect(aiderLine).toContain("1 cloud");
+      expect(aiderLine).not.toContain("1 clouds");
+    });
+
+    it("should show agent descriptions", async () => {
+      await cmdAgents();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("AI coding assistant");
+      expect(output).toContain("AI pair programmer");
+    });
+
+    it("should show usage hint at bottom", async () => {
+      await cmdAgents();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("spawn <agent>");
+    });
+  });
+
+  // ── cmdClouds ──────────────────────────────────────────────────────
+
+  describe("cmdClouds", () => {
+    it("should display Cloud Providers header", async () => {
+      await cmdClouds();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Cloud Providers");
+    });
+
+    it("should list all clouds with their display names", async () => {
+      await cmdClouds();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("sprite");
+      expect(output).toContain("Sprite");
+      expect(output).toContain("hetzner");
+      expect(output).toContain("Hetzner Cloud");
+    });
+
+    it("should show agent counts for each cloud", async () => {
+      await cmdClouds();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      // sprite has 2 agents, hetzner has 1 agent
+      expect(output).toContain("2 agents");
+      expect(output).toContain("1 agent");
+    });
+
+    it("should show correct singular/plural for agent count", async () => {
+      await cmdClouds();
+      const calls = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
+      // hetzner has 1 agent (singular)
+      const hetznerLine = calls.find(
+        (line: string) => line.includes("hetzner") && line.includes("agent")
+      );
+      expect(hetznerLine).toBeDefined();
+      expect(hetznerLine).toContain("1 agent");
+      expect(hetznerLine).not.toContain("1 agents");
+    });
+
+    it("should show cloud descriptions", async () => {
+      await cmdClouds();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Lightweight VMs");
+      expect(output).toContain("European cloud provider");
+    });
+
+    it("should show usage hint at bottom", async () => {
+      await cmdClouds();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("spawn <cloud>");
+    });
+  });
+
+  // ── cmdHelp ────────────────────────────────────────────────────────
+
+  describe("cmdHelp", () => {
+    it("should display usage section", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("USAGE");
+    });
+
+    it("should show all subcommands", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("spawn list");
+      expect(output).toContain("spawn agents");
+      expect(output).toContain("spawn clouds");
+      expect(output).toContain("spawn update");
+      expect(output).toContain("spawn version");
+      expect(output).toContain("spawn help");
+    });
+
+    it("should show examples section", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("EXAMPLES");
+    });
+
+    it("should show authentication section", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("AUTHENTICATION");
+      expect(output).toContain("OpenRouter");
+    });
+
+    it("should show troubleshooting section", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("TROUBLESHOOTING");
+    });
+
+    it("should show --prompt and --prompt-file usage", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("--prompt");
+      expect(output).toContain("--prompt-file");
+    });
+
+    it("should mention SPAWN_NO_UNICODE env var", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("SPAWN_NO_UNICODE");
+    });
+
+    it("should show install section with curl command", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("INSTALL");
+      expect(output).toContain("curl");
+      expect(output).toContain("install.sh");
+    });
+
+    it("should show repository URL", () => {
+      cmdHelp();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("OpenRouterTeam/spawn");
+    });
+  });
+
+  // ── cmdUpdate ──────────────────────────────────────────────────────
+
+  describe("cmdUpdate", () => {
+    it("should show already up to date when versions match", async () => {
+      const pkg = await import("../../package.json");
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => ({ version: pkg.default.version }),
+      })) as any;
+
+      await cmdUpdate();
+
+      // Spinner should have been used
+      expect(mockSpinnerStart).toHaveBeenCalled();
+      expect(mockSpinnerStop).toHaveBeenCalled();
+      // Stop message should mention "up to date"
+      const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) =>
+        c.join(" ")
+      );
+      expect(
+        stopCalls.some((msg: string) => msg.includes("up to date"))
+      ).toBe(true);
+    });
+
+    it("should handle fetch failure gracefully", async () => {
+      global.fetch = mock(async () => {
+        throw new Error("Network timeout");
+      }) as any;
+
+      await cmdUpdate();
+
+      // Should stop spinner with failure message
+      expect(mockSpinnerStop).toHaveBeenCalled();
+      // Should print error details
+      const errorOutput = consoleMocks.error.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(errorOutput).toContain("Network timeout");
+    });
+
+    it("should handle non-ok fetch response", async () => {
+      global.fetch = mock(async () => ({
+        ok: false,
+      })) as any;
+
+      await cmdUpdate();
+
+      // Should stop spinner with failure message
+      expect(mockSpinnerStop).toHaveBeenCalled();
+    });
+  });
+
+  // ── cmdList with varied manifests ──────────────────────────────────
+
+  describe("cmdList - edge cases", () => {
+    it("should handle single implementation correctly", async () => {
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => singleImplManifest,
+        text: async () => JSON.stringify(singleImplManifest),
+      })) as any;
+      await loadManifest(true);
+
+      await cmdList();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("1/4");
+    });
+
+    it("should handle manifest with many clouds", async () => {
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => manyCloudManifest,
+        text: async () => JSON.stringify(manyCloudManifest),
+      })) as any;
+      await loadManifest(true);
+
+      await cmdList();
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Vultr");
+      expect(output).toContain("Linode");
+      expect(output).toContain("DigitalOcean");
+      // 5 out of 5 (1 agent x 5 clouds, all implemented)
+      expect(output).toContain("5/5");
+    });
+  });
+
+  // ── cmdAgentInfo with many clouds ──────────────────────────────────
+
+  describe("cmdAgentInfo - many clouds", () => {
+    it("should list all implemented clouds for agent with many options", async () => {
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => manyCloudManifest,
+        text: async () => JSON.stringify(manyCloudManifest),
+      })) as any;
+      await loadManifest(true);
+
+      await cmdAgentInfo("claude");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("spawn claude sprite");
+      expect(output).toContain("spawn claude hetzner");
+      expect(output).toContain("spawn claude vultr");
+      expect(output).toContain("spawn claude linode");
+      expect(output).toContain("spawn claude digitalocean");
+    });
+  });
+
+  // ── cmdAgents with no implementations ──────────────────────────────
+
+  describe("cmdAgents - zero implementations", () => {
+    it("should show 0 clouds for all agents", async () => {
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => noImplManifest,
+        text: async () => JSON.stringify(noImplManifest),
+      })) as any;
+      await loadManifest(true);
+
+      await cmdAgents();
+      const calls = consoleMocks.log.mock.calls.map((c: any[]) =>
+        c.join(" ")
+      );
+      // Both agents should show 0 clouds
+      const agentLines = calls.filter(
+        (line: string) =>
+          line.includes("claude") || line.includes("aider")
+      );
+      for (const line of agentLines) {
+        if (line.includes("cloud")) {
+          expect(line).toContain("0 clouds");
+        }
+      }
+    });
+  });
+
+  // ── cmdClouds with no implementations ──────────────────────────────
+
+  describe("cmdClouds - zero implementations", () => {
+    it("should show 0 agents for all clouds", async () => {
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => noImplManifest,
+        text: async () => JSON.stringify(noImplManifest),
+      })) as any;
+      await loadManifest(true);
+
+      await cmdClouds();
+      const calls = consoleMocks.log.mock.calls.map((c: any[]) =>
+        c.join(" ")
+      );
+      const cloudLines = calls.filter(
+        (line: string) =>
+          line.includes("sprite") || line.includes("hetzner")
+      );
+      for (const line of cloudLines) {
+        if (line.includes("agent")) {
+          expect(line).toContain("0 agents");
+        }
+      }
+    });
+  });
+});
