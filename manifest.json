@@ -1020,7 +1020,7 @@
     "railway/openclaw": "implemented",
     "railway/nanoclaw": "implemented",
     "railway/aider": "implemented",
-    "railway/goose": "missing",
+    "railway/goose": "implemented",
     "railway/codex": "missing",
     "railway/interpreter": "missing",
     "railway/gemini": "missing",
