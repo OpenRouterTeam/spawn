@@ -41,6 +41,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/re
 
 Deploys OpenClaw with multi-channel gateway and TUI. Starts gateway in background, then launches interactive TUI. Prompts for model selection (default: `openrouter/auto`).
 
+### NanoClaw
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/render/nanoclaw.sh)
+```
+
+Deploys NanoClaw WhatsApp-based AI agent. Requires WhatsApp QR code scan for authentication.
+
 ### Aider
 
 ```bash
