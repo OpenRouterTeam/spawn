@@ -233,7 +233,7 @@ run_server() {
     koyeb instances exec "$KOYEB_INSTANCE_ID" -- bash -c "$cmd"
 }
 
-# Upload a file to the Koyeb instance
+# Upload a file to the Koyeb instance via base64 encoding
 upload_file() {
     local local_path="$1"
     local remote_path="$2"
@@ -243,12 +243,18 @@ upload_file() {
         return 1
     fi
 
-    # Read file content and encode
+    # Validate remote_path to prevent command injection
+    if [[ "$remote_path" == *"'"* || "$remote_path" == *'$'* || "$remote_path" == *'`'* || "$remote_path" == *$'\n'* ]]; then
+        log_error "Invalid remote path (contains unsafe characters): $remote_path"
+        return 1
+    fi
+
+    # Read file content and encode (base64 output is safe for shell embedding)
     local content
-    content=$(cat "$local_path" | base64)
+    content=$(base64 < "$local_path")
 
     # Write file on remote instance
-    run_server "echo '$content' | base64 -d > '$remote_path'"
+    run_server "printf '%s' '$content' | base64 -d > '$remote_path'"
 }
 
 # Wait for cloud-init or basic system readiness
@@ -265,16 +271,20 @@ wait_for_cloud_init() {
 }
 
 # Inject environment variables into shell config
+# Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    local shell_rc="/root/.bashrc"
-
     log_warn "Injecting environment variables..."
 
-    for env_var in "$@"; do
-        # Escape special characters for sed
-        local escaped_var=$(echo "$env_var" | sed 's/[&/\]/\\&/g')
-        run_server "echo 'export $escaped_var' >> $shell_rc"
-    done
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    generate_env_config "$@" > "${env_temp}"
+
+    # Upload and append to .bashrc (Koyeb containers use bash, not zsh)
+    upload_file "${env_temp}" "/tmp/env_config"
+    run_server "cat /tmp/env_config >> /root/.bashrc && rm /tmp/env_config"
 
     log_info "Environment variables configured"
 }

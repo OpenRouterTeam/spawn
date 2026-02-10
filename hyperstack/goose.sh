@@ -47,7 +47,9 @@ else
 fi
 
 log_warn "Setting up environment variables..."
-run_server "$HYPERSTACK_VM_IP" "printf '\nexport GOOSE_PROVIDER=openrouter\nexport OPENROUTER_API_KEY=%s\n' '$OPENROUTER_API_KEY' >> ~/.bashrc"
+inject_env_vars_ssh "$HYPERSTACK_VM_IP" upload_file run_server \
+    "GOOSE_PROVIDER=openrouter" \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
 log_info "Hyperstack VM setup completed successfully!"
@@ -57,4 +59,4 @@ echo ""
 log_warn "Starting Goose..."
 sleep 1
 clear
-interactive_session "$HYPERSTACK_VM_IP" "bash -c 'source ~/.bashrc && goose'"
+interactive_session "$HYPERSTACK_VM_IP" "source ~/.zshrc && goose"

@@ -34,11 +34,10 @@ else
 fi
 
 log_warn "Setting up environment variables..."
-run_server "$HYPERSTACK_VM_IP" "cat >> ~/.bashrc << 'EOF'
-export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-export OPENAI_API_KEY=${OPENROUTER_API_KEY}
-export OPENAI_BASE_URL=https://openrouter.ai/api/v1
-EOF"
+inject_env_vars_ssh "$HYPERSTACK_VM_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "Hyperstack VM setup completed successfully!"
@@ -47,4 +46,4 @@ echo ""
 log_warn "Starting Codex..."
 sleep 1
 clear
-interactive_session "$HYPERSTACK_VM_IP" "bash -c 'source ~/.bashrc && codex'"
+interactive_session "$HYPERSTACK_VM_IP" "source ~/.zshrc && codex"
