@@ -832,12 +832,12 @@
     "civo/kilocode": "implemented",
     "scaleway/kilocode": "implemented",
     "daytona/kilocode": "implemented",
-    "runpod/kilocode": "missing",
-    "upcloud/kilocode": "missing",
-    "binarylane/kilocode": "missing",
-    "genesiscloud/kilocode": "missing",
-    "latitude/kilocode": "missing",
-    "ovh/kilocode": "missing",
-    "kamatera/kilocode": "missing"
+    "runpod/kilocode": "implemented",
+    "upcloud/kilocode": "implemented",
+    "binarylane/kilocode": "implemented",
+    "genesiscloud/kilocode": "implemented",
+    "latitude/kilocode": "implemented",
+    "ovh/kilocode": "implemented",
+    "kamatera/kilocode": "implemented"
   }
 }
