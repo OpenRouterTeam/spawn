@@ -263,29 +263,12 @@ except: print(sys.stdin.read())
     log_warn "Waiting for server provisioning (this may take a few minutes for bare metal)..."
 }
 
-# Wait for server to become active and get its IP address
-wait_for_server_ready() {
-    local server_id="$1"
-    local max_attempts=${2:-60}
-    local attempt=1
-
-    log_warn "Waiting for server $server_id to become active..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local response
-        response=$(latitude_api GET "/servers/$server_id")
-
-        local status
-        status=$(echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-server = data.get('data', {})
-attrs = server.get('attributes', {})
-print(attrs.get('status', 'unknown'))
-" 2>/dev/null || echo "unknown")
-
-        if [[ "$status" == "on" ]] || [[ "$status" == "active" ]]; then
-            # Extract IP address
-            LATITUDE_SERVER_IP=$(echo "$response" | python3 -c "
+# Extract the IPv4 address from a Latitude.sh server API response
+# Checks network.ip, ip_addresses[], and primary_ipv4 fields
+# Usage: extract_latitude_server_ip JSON_RESPONSE
+extract_latitude_server_ip() {
+    local response="$1"
+    echo "$response" | python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
 server = data.get('data', {})
@@ -315,15 +298,36 @@ if primary:
     print(primary)
     sys.exit(0)
 sys.exit(1)
-" 2>/dev/null)
+" 2>/dev/null
+}
 
+# Wait for server to become active and get its IP address
+wait_for_server_ready() {
+    local server_id="$1"
+    local max_attempts=${2:-60}
+    local attempt=1
+
+    log_warn "Waiting for server $server_id to become active..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local response
+        response=$(latitude_api GET "/servers/$server_id")
+
+        local status
+        status=$(echo "$response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+server = data.get('data', {})
+attrs = server.get('attributes', {})
+print(attrs.get('status', 'unknown'))
+" 2>/dev/null || echo "unknown")
+
+        if [[ "$status" == "on" ]] || [[ "$status" == "active" ]]; then
+            LATITUDE_SERVER_IP=$(extract_latitude_server_ip "$response")
             if [[ -n "$LATITUDE_SERVER_IP" ]]; then
                 export LATITUDE_SERVER_IP
                 log_info "Server active: IP=$LATITUDE_SERVER_IP"
                 return 0
             fi
-
-            # IP might not be assigned yet, keep waiting
             log_warn "Server active but IP not yet assigned... (attempt $attempt/$max_attempts)"
         else
             log_warn "Server status: $status (attempt $attempt/$max_attempts)"
