@@ -860,67 +860,9 @@ printf '\n'
 
 mkdir -p "$FIXTURES_DIR"
 
-# Count clouds to decide sequential vs parallel
-CLOUD_COUNT=0
-for _c in $CLOUDS_TO_RECORD; do
-    CLOUD_COUNT=$((CLOUD_COUNT + 1))
+for cloud in $CLOUDS_TO_RECORD; do
+    record_cloud "$cloud"
 done
-
-# Parallel recording: each cloud runs in its own subshell when recording 2+ clouds
-# Each cloud writes to its own fixture dir so there are no conflicts.
-if [[ "$CLOUD_COUNT" -gt 1 ]] && [[ "$PROMPT_FOR_CREDS" != "true" ]]; then
-    printf '%b\n' "${CYAN}Recording ${CLOUD_COUNT} clouds in parallel...${NC}"
-    printf '\n'
-
-    PARALLEL_DIR=$(mktemp -d /tmp/spawn-record-parallel-XXXXXX)
-    PIDS=""
-
-    for cloud in $CLOUDS_TO_RECORD; do
-        (
-            # Each subshell writes its own result file
-            RESULT_FILE="${PARALLEL_DIR}/${cloud}.result"
-            OUTPUT_FILE="${PARALLEL_DIR}/${cloud}.log"
-
-            # Capture all output
-            record_cloud "$cloud" > "$OUTPUT_FILE" 2>&1
-
-            # Write counters to result file for aggregation
-            printf '%d %d %d\n' "$RECORDED" "$SKIPPED" "$ERRORS" > "$RESULT_FILE"
-        ) &
-        PIDS="${PIDS} $!"
-    done
-
-    # Wait for all parallel recordings
-    for pid in $PIDS; do
-        wait "$pid" 2>/dev/null || true
-    done
-
-    # Aggregate results and print output
-    for cloud in $CLOUDS_TO_RECORD; do
-        OUTPUT_FILE="${PARALLEL_DIR}/${cloud}.log"
-        RESULT_FILE="${PARALLEL_DIR}/${cloud}.result"
-
-        # Print the captured output
-        if [[ -f "$OUTPUT_FILE" ]]; then
-            cat "$OUTPUT_FILE"
-        fi
-
-        # Aggregate counters
-        if [[ -f "$RESULT_FILE" ]]; then
-            read -r r s e < "$RESULT_FILE"
-            RECORDED=$((RECORDED + r))
-            SKIPPED=$((SKIPPED + s))
-            ERRORS=$((ERRORS + e))
-        fi
-    done
-
-    rm -rf "$PARALLEL_DIR"
-else
-    # Sequential recording: single cloud or interactive credential prompting
-    for cloud in $CLOUDS_TO_RECORD; do
-        record_cloud "$cloud"
-    done
-fi
 
 # --- Summary ---
 printf '%b\n' "${CYAN}===============================${NC}"
