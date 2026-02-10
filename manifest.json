@@ -843,7 +843,7 @@
     "fluidstack/gptme": "implemented",
     "fluidstack/opencode": "implemented",
     "fluidstack/plandex": "implemented",
-    "fluidstack/kilocode": "missing",
+    "fluidstack/kilocode": "implemented",
     "civo/claude": "implemented",
     "civo/aider": "implemented",
     "civo/codex": "implemented",
