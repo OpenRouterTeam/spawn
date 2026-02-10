@@ -42,9 +42,6 @@ cleanup() {
     local exit_code=$?
     log "Running cleanup (exit_code=${exit_code})..."
 
-    # Stop keep-alive loop
-    stop_keepalive
-
     cd "${REPO_ROOT}" 2>/dev/null || true
 
     # Prune worktrees and clean up only OUR worktree base
@@ -59,41 +56,6 @@ cleanup() {
 }
 
 trap cleanup EXIT SIGTERM SIGINT
-
-# --- Keep-alive: ping the Sprite's PUBLIC URL to prevent VM pause ---
-# Sprite only counts inbound HTTP requests through its proxy as "active."
-# Localhost requests (curl http://localhost:8080/health) bypass the proxy
-# entirely and do NOT prevent the VM from pausing. We must hit the public
-# URL so the request routes through the Sprite proxy infrastructure.
-KEEPALIVE_PID=""
-SPRITE_PUBLIC_URL=""
-start_keepalive() {
-    # Resolve the Sprite's public URL from sprite-env info
-    SPRITE_PUBLIC_URL=$(sprite-env info 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['sprite_url'])" 2>/dev/null) || SPRITE_PUBLIC_URL=""
-
-    if [[ -z "${SPRITE_PUBLIC_URL}" ]]; then
-        log "WARNING: Could not resolve Sprite public URL — keep-alive will use localhost (may not prevent pause)"
-        SPRITE_PUBLIC_URL="http://localhost:8080"
-    else
-        log "Keep-alive will ping: ${SPRITE_PUBLIC_URL}/health"
-    fi
-
-    (
-        while true; do
-            # Ping via public URL (routes through Sprite proxy, counts as active HTTP)
-            curl -sf "${SPRITE_PUBLIC_URL}/health" >/dev/null 2>&1 || true
-            sleep 30
-        done
-    ) &
-    KEEPALIVE_PID=$!
-}
-stop_keepalive() {
-    if [[ -n "${KEEPALIVE_PID}" ]]; then
-        kill "${KEEPALIVE_PID}" 2>/dev/null || true
-        wait "${KEEPALIVE_PID}" 2>/dev/null || true
-        KEEPALIVE_PID=""
-    fi
-}
 
 log "=== Starting ${RUN_MODE} cycle ==="
 log "Working directory: ${REPO_ROOT}"
@@ -513,9 +475,8 @@ fi
 
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
-# Start keep-alive before launching claude (prevents Sprite from pausing the VM)
-start_keepalive
-log "Keep-alive started (pid=${KEEPALIVE_PID})"
+# NOTE: VM keep-alive is handled by the trigger server streaming output back
+# to the GitHub Actions runner. The long-lived HTTP response keeps Sprite alive.
 
 # Run Claude Code with the prompt file, enforcing a hard timeout
 CLAUDE_EXIT=0
