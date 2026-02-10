@@ -938,7 +938,7 @@
     "hyperstack/gemini": "implemented",
     "hyperstack/amazonq": "missing",
     "hyperstack/cline": "missing",
-    "hyperstack/gptme": "missing",
+    "hyperstack/gptme": "implemented",
     "hyperstack/opencode": "missing",
     "hyperstack/plandex": "missing",
     "hyperstack/kilocode": "missing",
