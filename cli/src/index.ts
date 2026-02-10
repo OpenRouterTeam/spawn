@@ -57,6 +57,30 @@ function extractFlagValue(
 
 const HELP_FLAGS = ["--help", "-h", "help"];
 
+const KNOWN_FLAGS = new Set([
+  "--help", "-h",
+  "--version", "-v", "-V",
+  "--prompt", "-p", "--prompt-file",
+]);
+
+/** Check for unknown flags and show an actionable error */
+function checkUnknownFlags(args: string[]): void {
+  for (const arg of args) {
+    if ((arg.startsWith("--") || (arg.startsWith("-") && arg.length > 1 && !/^-\d/.test(arg))) && !KNOWN_FLAGS.has(arg)) {
+      console.error(pc.red(`Unknown flag: ${pc.bold(arg)}`));
+      console.error();
+      console.error(`  Supported flags:`);
+      console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
+      console.error(`    ${pc.cyan("--prompt-file")}       Read prompt from a file`);
+      console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
+      console.error(`    ${pc.cyan("--version, -v")}       Show version`);
+      console.error();
+      console.error(`  Run ${pc.cyan("spawn help")} for full usage information.`);
+      process.exit(1);
+    }
+  }
+}
+
 async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
   // Handle "spawn <agent> --help" / "spawn <agent> -h" / "spawn <agent> help"
   if (cloud && HELP_FLAGS.includes(cloud)) {
@@ -158,6 +182,10 @@ async function main(): Promise<void> {
   await checkForUpdates();
 
   const [prompt, filteredArgs] = await resolvePrompt(args);
+
+  // Check for unknown flags before dispatching commands
+  checkUnknownFlags(filteredArgs);
+
   const cmd = filteredArgs[0];
 
   try {
