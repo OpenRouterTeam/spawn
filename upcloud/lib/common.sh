@@ -218,6 +218,44 @@ for iface in data['server'].get('ip_addresses', {}).get('ip_address', []):
     return 1
 }
 
+# Build JSON request body for UpCloud server creation
+# Usage: _build_upcloud_server_body NAME ZONE PLAN TEMPLATE_UUID JSON_SSH_KEY
+_build_upcloud_server_body() {
+    local name="$1" zone="$2" plan="$3" template_uuid="$4" json_ssh_key="$5"
+
+    python3 -c "
+import json, sys
+ssh_key = json.loads(sys.stdin.read()).strip()
+body = {
+    'server': {
+        'zone': '$zone',
+        'title': '$name',
+        'hostname': '$name',
+        'plan': '$plan',
+        'storage_devices': {
+            'storage_device': [
+                {
+                    'action': 'clone',
+                    'storage': '$template_uuid',
+                    'title': '$name-os',
+                    'size': 25,
+                    'tier': 'maxiops'
+                }
+            ]
+        },
+        'login_user': {
+            'username': 'root',
+            'create_password': 'no',
+            'ssh_keys': {
+                'ssh_key': [ssh_key]
+            }
+        }
+    }
+}
+print(json.dumps(body))
+" <<< "$json_ssh_key"
+}
+
 # Create an UpCloud server
 create_server() {
     local name="$1"
@@ -249,37 +287,7 @@ create_server() {
     json_ssh_key=$(json_escape "$ssh_pub_key")
 
     local body
-    body=$(python3 -c "
-import json, sys
-ssh_key = json.loads(sys.stdin.read()).strip()
-body = {
-    'server': {
-        'zone': '$zone',
-        'title': '$name',
-        'hostname': '$name',
-        'plan': '$plan',
-        'storage_devices': {
-            'storage_device': [
-                {
-                    'action': 'clone',
-                    'storage': '$template_uuid',
-                    'title': '$name-os',
-                    'size': 25,
-                    'tier': 'maxiops'
-                }
-            ]
-        },
-        'login_user': {
-            'username': 'root',
-            'create_password': 'no',
-            'ssh_keys': {
-                'ssh_key': [ssh_key]
-            }
-        }
-    }
-}
-print(json.dumps(body))
-" <<< "$json_ssh_key")
+    body=$(_build_upcloud_server_body "$name" "$zone" "$plan" "$template_uuid" "$json_ssh_key")
 
     local response
     response=$(upcloud_api POST "/server" "$body")
