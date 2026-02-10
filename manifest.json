@@ -863,7 +863,7 @@
     "lambda/opencode": "implemented",
     "aws-lightsail/opencode": "implemented",
     "gcp/opencode": "implemented",
-    "github-codespaces/opencode": "missing",
+    "github-codespaces/opencode": "implemented",
     "e2b/opencode": "implemented",
     "modal/opencode": "implemented",
     "fly/opencode": "implemented",
