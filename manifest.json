@@ -1037,7 +1037,7 @@
     "render/goose": "missing",
     "render/codex": "implemented",
     "render/interpreter": "implemented",
-    "render/gemini": "missing",
+    "render/gemini": "implemented",
     "render/amazonq": "missing",
     "render/cline": "missing",
     "render/gptme": "missing",
