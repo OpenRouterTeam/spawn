@@ -350,6 +350,12 @@ const MIN_AGENT_COL_WIDTH = 16;
 const MIN_CLOUD_COL_WIDTH = 10;
 const COL_PADDING = 2;
 const NAME_COLUMN_WIDTH = 18;
+const COMPACT_NAME_WIDTH = 20;
+const COMPACT_COUNT_WIDTH = 10;
+
+function getTerminalWidth(): number {
+  return process.stdout.columns || 80;
+}
 
 function calculateColumnWidth(items: string[], minWidth: number): number {
   let maxWidth = minWidth;
@@ -389,13 +395,43 @@ function renderMatrixRow(agent: string, clouds: string[], manifest: Manifest, ag
   return row;
 }
 
+function getMissingClouds(manifest: Manifest, agent: string, clouds: string[]): string[] {
+  return clouds.filter((c) => matrixStatus(manifest, c, agent) !== "implemented");
+}
+
+function renderCompactList(manifest: Manifest, agents: string[], clouds: string[]): void {
+  const totalClouds = clouds.length;
+
+  console.log();
+  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Missing"));
+  console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + 20)));
+
+  for (const a of agents) {
+    const implCount = getImplementedClouds(manifest, a).length;
+    const missing = getMissingClouds(manifest, a, clouds);
+    const countStr = `${implCount}/${totalClouds}`;
+    const colorFn = implCount === totalClouds ? pc.green : pc.yellow;
+
+    let line = pc.bold(manifest.agents[a].name.padEnd(COMPACT_NAME_WIDTH));
+    line += colorFn(countStr.padEnd(COMPACT_COUNT_WIDTH));
+
+    if (missing.length === 0) {
+      line += pc.green("all clouds");
+    } else {
+      line += pc.dim(missing.map((c) => manifest.clouds[c].name).join(", "));
+    }
+
+    console.log(line);
+  }
+}
+
 export async function cmdList(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   const agents = agentKeys(manifest);
   const clouds = cloudKeys(manifest);
 
-  // Calculate column widths
+  // Calculate column widths for grid view
   const agentColWidth = calculateColumnWidth(
     agents.map((a) => manifest.agents[a].name),
     MIN_AGENT_COL_WIDTH
@@ -405,12 +441,20 @@ export async function cmdList(): Promise<void> {
     MIN_CLOUD_COL_WIDTH
   );
 
-  console.log();
-  console.log(renderMatrixHeader(clouds, manifest, agentColWidth, cloudColWidth));
-  console.log(renderMatrixSeparator(clouds, agentColWidth, cloudColWidth));
+  const gridWidth = agentColWidth + clouds.length * cloudColWidth;
+  const termWidth = getTerminalWidth();
 
-  for (const a of agents) {
-    console.log(renderMatrixRow(a, clouds, manifest, agentColWidth, cloudColWidth));
+  // Use compact view if grid would be wider than the terminal
+  if (gridWidth > termWidth) {
+    renderCompactList(manifest, agents, clouds);
+  } else {
+    console.log();
+    console.log(renderMatrixHeader(clouds, manifest, agentColWidth, cloudColWidth));
+    console.log(renderMatrixSeparator(clouds, agentColWidth, cloudColWidth));
+
+    for (const a of agents) {
+      console.log(renderMatrixRow(a, clouds, manifest, agentColWidth, cloudColWidth));
+    }
   }
 
   const impl = countImplemented(manifest);
@@ -418,6 +462,7 @@ export async function cmdList(): Promise<void> {
   console.log();
   console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   console.log(pc.green(`${impl}/${total} combinations implemented`));
+  console.log(pc.dim(`Run ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")} for details.`));
   console.log();
 }
 

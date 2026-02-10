@@ -593,9 +593,10 @@ describe("Commands Display Output", () => {
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
-      expect(output).toContain("Vultr");
-      expect(output).toContain("Linode");
-      expect(output).toContain("DigitalOcean");
+      // With many clouds, compact view is used when grid exceeds terminal width
+      // All 5 clouds are implemented so it shows "all clouds"
+      expect(output).toContain("Claude Code");
+      expect(output).toContain("all clouds");
       // 5 out of 5 (1 agent x 5 clouds, all implemented)
       expect(output).toContain("5/5");
     });
