@@ -763,7 +763,7 @@
     "gcp/amazonq": "implemented",
     "gcp/cline": "implemented",
     "github-codespaces/claude": "implemented",
-    "github-codespaces/openclaw": "missing",
+    "github-codespaces/openclaw": "implemented",
     "github-codespaces/nanoclaw": "missing",
     "github-codespaces/aider": "implemented",
     "github-codespaces/goose": "missing",
