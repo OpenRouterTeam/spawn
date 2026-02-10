@@ -557,6 +557,22 @@
         "image": "Ubuntu 24.04"
       },
       "notes": "Has a generous Always Free tier (VM.Standard.E2.1.Micro, VM.Standard.A1.Flex). Uses 'ubuntu' user for SSH. Requires OCI CLI installed (pip install oci-cli) and configured. Set OCI_COMPARTMENT_ID for the target compartment."
+    },
+    "vastai": {
+      "name": "Vast.ai",
+      "description": "Vast.ai GPU marketplace via CLI",
+      "url": "https://vast.ai/",
+      "type": "cli",
+      "auth": "VASTAI_API_KEY",
+      "provision_method": "vastai create instance OFFER_ID --image IMAGE --ssh",
+      "exec_method": "ssh root@IP -p PORT",
+      "interactive_method": "ssh -t root@IP -p PORT",
+      "defaults": {
+        "gpu_type": "RTX_4090",
+        "disk_gb": 40,
+        "image": "nvidia/cuda:12.1.0-devel-ubuntu22.04"
+      },
+      "notes": "GPU marketplace with per-hour pricing. Uses vastai CLI (pip install vastai). SSH via dynamic port mapping. Docker-based instances with CUDA pre-installed."
     }
   },
   "matrix": {
@@ -867,6 +883,20 @@
     "oracle/gptme": "missing",
     "oracle/opencode": "missing",
     "oracle/plandex": "missing",
-    "oracle/kilocode": "missing"
+    "oracle/kilocode": "missing",
+    "vastai/claude": "implemented",
+    "vastai/aider": "implemented",
+    "vastai/codex": "implemented",
+    "vastai/openclaw": "missing",
+    "vastai/nanoclaw": "missing",
+    "vastai/goose": "missing",
+    "vastai/interpreter": "missing",
+    "vastai/gemini": "missing",
+    "vastai/amazonq": "missing",
+    "vastai/cline": "missing",
+    "vastai/gptme": "missing",
+    "vastai/opencode": "missing",
+    "vastai/plandex": "missing",
+    "vastai/kilocode": "missing"
   }
 }
