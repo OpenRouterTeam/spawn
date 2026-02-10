@@ -139,19 +139,18 @@ print(json.dumps(ids))
 
     local userdata
     userdata=$(get_cloud_init_userdata)
-    local userdata_json
-    userdata_json=$(echo "$userdata" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
 
     local body
-    body=$(python3 -c "
-import json
+    body=$(echo "$userdata" | python3 -c "
+import json, sys
+userdata = sys.stdin.read()
 body = {
     'name': '$name',
     'type': '$instance_type',
     'region': '$region',
     'image': '$image',
     'ssh_key_ids': $ssh_key_ids,
-    'startup_script': json.loads($userdata_json)
+    'startup_script': userdata
 }
 print(json.dumps(body))
 ")

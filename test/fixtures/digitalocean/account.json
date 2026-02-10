@@ -1,0 +1,18 @@
+{
+  "account": {
+    "droplet_limit": 3,
+    "email": "sirtorunboss@gmail.com",
+    "email_verified": true,
+    "floating_ip_limit": 3,
+    "name": "sirtorunboss@gmail.com",
+    "reserved_ip_limit": 3,
+    "status": "active",
+    "status_message": "",
+    "team": {
+      "name": "My Team",
+      "uuid": "b84e0623-7d0a-4140-b075-3dd1419653f9"
+    },
+    "uuid": "46a0edaf-1509-4246-9560-b3b865ca8a59",
+    "volume_limit": 5000
+  }
+}

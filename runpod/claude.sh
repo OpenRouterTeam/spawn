@@ -30,7 +30,7 @@ install_base_tools
 
 # 5. Verify Claude Code is installed (fallback to manual install)
 log_warn "Verifying Claude Code installation..."
-if ! run_server "${RUNPOD_POD_ID}" "command -v claude" >/dev/null 2>&1; then
+if ! run_server "${RUNPOD_POD_ID}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
     log_warn "Claude Code not found, installing manually..."
     run_server "${RUNPOD_POD_ID}" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
@@ -68,4 +68,4 @@ echo ""
 log_warn "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${RUNPOD_POD_ID}" "source ~/.zshrc && claude"
+interactive_session "${RUNPOD_POD_ID}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

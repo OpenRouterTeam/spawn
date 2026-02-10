@@ -1,0 +1,11 @@
+{
+  "cloud": "vultr",
+  "recorded_at": "2026-02-10T21:55:33Z",
+  "fixtures": {
+    "account": {"endpoint": "/account", "recorded_at": "2026-02-10T21:55:30Z"},
+    "ssh_keys": {"endpoint": "/ssh-keys", "recorded_at": "2026-02-10T21:55:31Z"},
+    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-10T21:55:31Z"},
+    "plans": {"endpoint": "/plans", "recorded_at": "2026-02-10T21:55:33Z"},
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-10T21:55:33Z"}
+  }
+}

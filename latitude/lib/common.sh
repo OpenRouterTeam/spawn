@@ -115,18 +115,17 @@ latitude_register_ssh_key() {
     local pub_path="$2"
     local pub_key
     pub_key=$(cat "$pub_path")
-    local json_pub_key
-    json_pub_key=$(json_escape "$pub_key")
 
     local body
-    body=$(python3 -c "
-import json
+    body=$(echo "$pub_key" | python3 -c "
+import json, sys
+pub_key = sys.stdin.read().strip()
 body = {
     'data': {
         'type': 'ssh_keys',
         'attributes': {
             'name': '$key_name',
-            'public_key': json.loads($json_pub_key)
+            'public_key': pub_key
         }
     }
 }

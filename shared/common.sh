@@ -867,7 +867,9 @@ register_cleanup_trap() {
 
 # Default SSH options for all cloud providers
 # Clouds can override this if they need provider-specific settings
-readonly SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i ${HOME}/.ssh/id_ed25519"
+if [[ -z "${SSH_OPTS:-}" ]]; then
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i ${HOME}/.ssh/id_ed25519"
+fi
 
 # ============================================================
 # SSH key management helpers
@@ -1042,7 +1044,7 @@ _parse_api_response() {
     local http_code
     http_code=$(echo "${response}" | tail -1)
     local response_body
-    response_body=$(echo "${response}" | head -n -1)
+    response_body=$(echo "${response}" | sed '$d')
 
     API_HTTP_CODE="${http_code}"
     API_RESPONSE_BODY="${response_body}"

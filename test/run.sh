@@ -552,7 +552,7 @@ test_shared_common() {
 
     # Test 25: safe_read fails when no TTY available
     rc=0
-    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && safe_read "test: "' </dev/null >/dev/null 2>&1 || rc=$?
+    timeout 5 bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && safe_read "test: "' </dev/null >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} safe_read fails when no TTY available"
         ((PASSED++))

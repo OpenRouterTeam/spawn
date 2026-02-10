@@ -52,4 +52,4 @@ echo ""
 log_warn "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${SCALEWAY_SERVER_IP}" "source ~/.zshrc && claude"
+interactive_session "${SCALEWAY_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"
