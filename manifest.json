@@ -888,7 +888,7 @@
     "vastai/aider": "implemented",
     "vastai/codex": "implemented",
     "vastai/openclaw": "implemented",
-    "vastai/nanoclaw": "missing",
+    "vastai/nanoclaw": "implemented",
     "vastai/goose": "missing",
     "vastai/interpreter": "missing",
     "vastai/gemini": "implemented",
