@@ -952,7 +952,7 @@
     "koyeb/gemini": "implemented",
     "koyeb/amazonq": "implemented",
     "koyeb/cline": "implemented",
-    "koyeb/gptme": "missing",
+    "koyeb/gptme": "implemented",
     "koyeb/opencode": "missing",
     "koyeb/plandex": "missing",
     "koyeb/kilocode": "missing"
