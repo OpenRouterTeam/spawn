@@ -1021,7 +1021,7 @@
     "railway/nanoclaw": "implemented",
     "railway/aider": "implemented",
     "railway/goose": "implemented",
-    "railway/codex": "missing",
+    "railway/codex": "implemented",
     "railway/interpreter": "missing",
     "railway/gemini": "implemented",
     "railway/amazonq": "implemented",
