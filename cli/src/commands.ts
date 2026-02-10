@@ -388,8 +388,11 @@ export async function cmdAgents(): Promise<void> {
   console.log();
   for (const key of agentKeys(manifest)) {
     const a = manifest.agents[key];
-    console.log(`  ${pc.green(a.name.padEnd(NAME_COLUMN_WIDTH))} ${pc.dim(a.description)}`);
+    const implCount = getImplementedClouds(manifest, key).length;
+    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} clouds`)}`);
   }
+  console.log();
+  console.log(pc.dim(`  Usage: spawn <agent> <cloud>`));
   console.log();
 }
 
@@ -403,8 +406,10 @@ export async function cmdClouds(): Promise<void> {
   console.log();
   for (const key of cloudKeys(manifest)) {
     const c = manifest.clouds[key];
-    console.log(`  ${pc.green(c.name.padEnd(NAME_COLUMN_WIDTH))} ${pc.dim(c.description)}`);
+    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(c.description)}`);
   }
+  console.log();
+  console.log(pc.dim(`  Usage: spawn <agent> <cloud>`));
   console.log();
 }
 
