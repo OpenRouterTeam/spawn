@@ -946,7 +946,7 @@
     "koyeb/openclaw": "implemented",
     "koyeb/nanoclaw": "implemented",
     "koyeb/aider": "implemented",
-    "koyeb/goose": "missing",
+    "koyeb/goose": "implemented",
     "koyeb/codex": "missing",
     "koyeb/interpreter": "missing",
     "koyeb/gemini": "missing",
