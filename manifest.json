@@ -939,7 +939,7 @@
     "hyperstack/amazonq": "missing",
     "hyperstack/cline": "missing",
     "hyperstack/gptme": "missing",
-    "hyperstack/opencode": "missing",
+    "hyperstack/opencode": "implemented",
     "hyperstack/plandex": "missing",
     "hyperstack/kilocode": "missing",
     "koyeb/claude": "implemented",
