@@ -46,6 +46,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/goose.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/gemini.sh)
 ```
 
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/codex.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
