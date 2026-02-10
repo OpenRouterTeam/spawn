@@ -1022,7 +1022,7 @@
     "railway/aider": "implemented",
     "railway/goose": "implemented",
     "railway/codex": "implemented",
-    "railway/interpreter": "missing",
+    "railway/interpreter": "implemented",
     "railway/gemini": "implemented",
     "railway/amazonq": "implemented",
     "railway/cline": "missing",

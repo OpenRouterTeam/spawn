@@ -58,6 +58,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/amazonq.sh)
 ```
 
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/interpreter.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
