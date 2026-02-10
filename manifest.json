@@ -1023,7 +1023,7 @@
     "railway/goose": "missing",
     "railway/codex": "missing",
     "railway/interpreter": "missing",
-    "railway/gemini": "missing",
+    "railway/gemini": "implemented",
     "railway/amazonq": "missing",
     "railway/cline": "missing",
     "railway/gptme": "implemented",
