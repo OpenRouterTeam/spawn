@@ -588,6 +588,20 @@
         "image": "Ubuntu Server 24.04 LTS R5504 UEFI"
       },
       "notes": "GPU cloud provider. Competitive pricing on RTX A6000 ($0.50/hr). Requires HYPERSTACK_API_KEY from https://infrahub.hyperstack.cloud"
+    },
+    "railway": {
+      "name": "Railway",
+      "description": "Railway container PaaS via CLI and GraphQL API",
+      "url": "https://railway.app/",
+      "type": "cli",
+      "auth": "railway login OR RAILWAY_TOKEN",
+      "provision_method": "railway init + railway up (Dockerfile deployment)",
+      "exec_method": "railway run COMMAND",
+      "interactive_method": "railway run bash or railway ssh",
+      "defaults": {
+        "image": "ubuntu:24.04"
+      },
+      "notes": "Container PaaS with per-minute billing, instant deployments, and built-in SSH via 'railway ssh'. Uses Railway CLI for all operations."
     }
   },
   "matrix": {
@@ -926,6 +940,20 @@
     "hyperstack/gptme": "missing",
     "hyperstack/opencode": "missing",
     "hyperstack/plandex": "missing",
-    "hyperstack/kilocode": "missing"
+    "hyperstack/kilocode": "missing",
+    "railway/claude": "implemented",
+    "railway/openclaw": "implemented",
+    "railway/nanoclaw": "missing",
+    "railway/aider": "implemented",
+    "railway/goose": "missing",
+    "railway/codex": "missing",
+    "railway/interpreter": "missing",
+    "railway/gemini": "missing",
+    "railway/amazonq": "missing",
+    "railway/cline": "missing",
+    "railway/gptme": "implemented",
+    "railway/opencode": "missing",
+    "railway/plandex": "missing",
+    "railway/kilocode": "missing"
   }
 }
