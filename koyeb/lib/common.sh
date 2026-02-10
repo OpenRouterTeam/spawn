@@ -135,30 +135,29 @@ get_server_name() {
     echo "${prefix}-${timestamp}-${random_suffix}" | tr '[:upper:]' '[:lower:]'
 }
 
-# Create a Koyeb app and service
-# Sets: KOYEB_APP_NAME, KOYEB_SERVICE_NAME, KOYEB_SERVICE_ID
-create_server() {
-    local name="${1:-$(get_server_name)}"
-
-    # App and service names must be separate
-    KOYEB_APP_NAME="${name}"
-    KOYEB_SERVICE_NAME="${name}-svc"
-
-    log_warn "Creating Koyeb app: $KOYEB_APP_NAME"
-
-    # Create app first
-    if ! koyeb app create "$KOYEB_APP_NAME" >/dev/null 2>&1; then
+# Create the Koyeb app resource
+# Usage: _koyeb_create_app APP_NAME
+_koyeb_create_app() {
+    local app_name="$1"
+    log_warn "Creating Koyeb app: $app_name"
+    if ! koyeb app create "$app_name" >/dev/null 2>&1; then
         log_error "Failed to create Koyeb app"
         return 1
     fi
+}
 
-    log_warn "Creating Koyeb service: $KOYEB_SERVICE_NAME"
+# Create a Koyeb service and extract its ID
+# Sets: KOYEB_SERVICE_ID
+# Usage: _koyeb_create_service APP_NAME SERVICE_NAME
+_koyeb_create_service() {
+    local app_name="$1"
+    local service_name="$2"
 
-    # Create service with Ubuntu 24.04 image
-    # Using a long-running command to keep container alive
+    log_warn "Creating Koyeb service: $service_name"
+
     local create_output
-    create_output=$(koyeb service create "$KOYEB_SERVICE_NAME" \
-        --app "$KOYEB_APP_NAME" \
+    create_output=$(koyeb service create "$service_name" \
+        --app "$app_name" \
         --docker ubuntu:24.04 \
         --regions was \
         --instance-type nano \
@@ -177,23 +176,27 @@ create_server() {
 
     if [[ -z "$KOYEB_SERVICE_ID" ]]; then
         # Fallback: try to get it from service list
-        KOYEB_SERVICE_ID=$(koyeb service list --app "$KOYEB_APP_NAME" 2>/dev/null | grep "$KOYEB_SERVICE_NAME" | awk '{print $1}' | head -1)
+        KOYEB_SERVICE_ID=$(koyeb service list --app "$app_name" 2>/dev/null | grep "$service_name" | awk '{print $1}' | head -1)
     fi
 
-    log_info "Koyeb service created: $KOYEB_SERVICE_NAME (ID: $KOYEB_SERVICE_ID)"
+    log_info "Koyeb service created: $service_name (ID: $KOYEB_SERVICE_ID)"
+}
 
-    # Wait for service to be ready
-    log_warn "Waiting for service to deploy..."
-    local max_attempts=60
+# Wait for a Koyeb service to become healthy/running
+# Usage: _koyeb_wait_for_service SERVICE_ID [MAX_ATTEMPTS]
+_koyeb_wait_for_service() {
+    local service_id="$1"
+    local max_attempts=${2:-60}
     local attempt=0
 
+    log_warn "Waiting for service to deploy..."
     while [[ $attempt -lt $max_attempts ]]; do
         local status
-        status=$(koyeb service get "$KOYEB_SERVICE_ID" 2>/dev/null | grep "Status:" | awk '{print $2}')
+        status=$(koyeb service get "$service_id" 2>/dev/null | grep "Status:" | awk '{print $2}')
 
         if [[ "$status" == "healthy" || "$status" == "running" ]]; then
             log_info "Service is ready"
-            break
+            return 0
         fi
 
         if [[ "$status" == "error" || "$status" == "failed" ]]; then
@@ -205,13 +208,17 @@ create_server() {
         sleep 5
     done
 
-    if [[ $attempt -ge $max_attempts ]]; then
-        log_error "Timeout waiting for service to be ready"
-        return 1
-    fi
+    log_error "Timeout waiting for service to be ready"
+    return 1
+}
 
-    # Get instance ID for exec commands
-    KOYEB_INSTANCE_ID=$(koyeb instances list --service "$KOYEB_SERVICE_ID" 2>/dev/null | grep -v "^ID" | awk '{print $1}' | head -1)
+# Get the instance ID for a running Koyeb service
+# Sets: KOYEB_INSTANCE_ID
+# Usage: _koyeb_get_instance_id SERVICE_ID
+_koyeb_get_instance_id() {
+    local service_id="$1"
+
+    KOYEB_INSTANCE_ID=$(koyeb instances list --service "$service_id" 2>/dev/null | grep -v "^ID" | awk '{print $1}' | head -1)
 
     if [[ -z "$KOYEB_INSTANCE_ID" ]]; then
         log_error "Failed to get instance ID"
@@ -219,6 +226,20 @@ create_server() {
     fi
 
     log_info "Instance ID: $KOYEB_INSTANCE_ID"
+}
+
+# Create a Koyeb app and service
+# Sets: KOYEB_APP_NAME, KOYEB_SERVICE_NAME, KOYEB_SERVICE_ID, KOYEB_INSTANCE_ID
+create_server() {
+    local name="${1:-$(get_server_name)}"
+
+    KOYEB_APP_NAME="${name}"
+    KOYEB_SERVICE_NAME="${name}-svc"
+
+    _koyeb_create_app "$KOYEB_APP_NAME" || return 1
+    _koyeb_create_service "$KOYEB_APP_NAME" "$KOYEB_SERVICE_NAME" || return 1
+    _koyeb_wait_for_service "$KOYEB_SERVICE_ID" || return 1
+    _koyeb_get_instance_id "$KOYEB_SERVICE_ID" || return 1
 }
 
 # Run a command on the Koyeb service instance

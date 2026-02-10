@@ -88,15 +88,11 @@ get_server_name() {
     echo "${server_name}"
 }
 
-# Search for an available offer and create an instance
-# Sets: VASTAI_INSTANCE_ID
-create_server() {
-    local name="${1}"
-    local gpu_type="${VASTAI_GPU_TYPE:-RTX_4090}"
-    local disk_gb="${VASTAI_DISK_GB:-40}"
-    local image="${VASTAI_IMAGE:-nvidia/cuda:12.1.0-devel-ubuntu22.04}"
+# Validate Vast.ai create_server parameters
+# Usage: _validate_vastai_params DISK_GB IMAGE GPU_TYPE
+_validate_vastai_params() {
+    local disk_gb="${1}" image="${2}" gpu_type="${3}"
 
-    # Validate inputs
     if [[ ! "${disk_gb}" =~ ^[0-9]+$ ]]; then
         log_error "Invalid VASTAI_DISK_GB: must be numeric"
         return 1
@@ -109,10 +105,16 @@ create_server() {
         log_error "Invalid VASTAI_GPU_TYPE: contains unsafe characters"
         return 1
     fi
+}
+
+# Search for the cheapest available GPU offer on Vast.ai
+# Prints the offer ID on success
+# Usage: _find_cheapest_offer GPU_TYPE
+_find_cheapest_offer() {
+    local gpu_type="${1}"
 
     log_warn "Searching for available ${gpu_type} offers..."
 
-    # Search for cheapest available offer
     local offer_id
     offer_id=$(vastai search offers "gpu_name=${gpu_type} num_gpus=1 rentable=true inet_down>100 reliability>0.95" -o "dph_total" --raw 2>/dev/null | python3 -c "
 import json, sys
@@ -128,7 +130,14 @@ print(data[0]['id'])
     }
 
     log_info "Found offer: ${offer_id}"
-    log_warn "Creating instance '${name}' (GPU: ${gpu_type}, image: ${image})..."
+    printf '%s' "${offer_id}"
+}
+
+# Create a Vast.ai instance from an offer and extract its ID
+# Sets: VASTAI_INSTANCE_ID
+# Usage: _create_vastai_instance OFFER_ID NAME IMAGE DISK_GB
+_create_vastai_instance() {
+    local offer_id="${1}" name="${2}" image="${3}" disk_gb="${4}"
 
     local create_output
     create_output=$(vastai create instance "${offer_id}" \
@@ -165,6 +174,23 @@ else:
 
     export VASTAI_INSTANCE_ID
     log_info "Instance created: ID=${VASTAI_INSTANCE_ID}"
+}
+
+# Search for an available offer and create an instance
+# Sets: VASTAI_INSTANCE_ID
+create_server() {
+    local name="${1}"
+    local gpu_type="${VASTAI_GPU_TYPE:-RTX_4090}"
+    local disk_gb="${VASTAI_DISK_GB:-40}"
+    local image="${VASTAI_IMAGE:-nvidia/cuda:12.1.0-devel-ubuntu22.04}"
+
+    _validate_vastai_params "${disk_gb}" "${image}" "${gpu_type}" || return 1
+
+    local offer_id
+    offer_id=$(_find_cheapest_offer "${gpu_type}") || return 1
+
+    log_warn "Creating instance '${name}' (GPU: ${gpu_type}, image: ${image})..."
+    _create_vastai_instance "${offer_id}" "${name}" "${image}" "${disk_gb}" || return 1
 
     wait_for_instance_ready "${VASTAI_INSTANCE_ID}"
 }

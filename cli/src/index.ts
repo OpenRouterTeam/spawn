@@ -6,11 +6,13 @@ import {
   cmdAgents,
   cmdClouds,
   cmdAgentInfo,
+  cmdCloudInfo,
   cmdUpdate,
   cmdHelp,
 } from "./commands.js";
 import pkg from "../package.json" with { type: "json" };
 import { checkForUpdates } from "./update-check.js";
+import { loadManifest } from "./manifest.js";
 
 const VERSION = pkg.version;
 
@@ -56,7 +58,13 @@ const HELP_FLAGS = ["--help", "-h", "help"];
 async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
   // Handle "spawn <agent> --help" / "spawn <agent> -h" / "spawn <agent> help"
   if (cloud && HELP_FLAGS.includes(cloud)) {
-    await cmdAgentInfo(agent);
+    // Could be "spawn <agent> --help" or "spawn <cloud> --help"
+    const manifest = await loadManifest();
+    if (!manifest.agents[agent] && manifest.clouds[agent]) {
+      await cmdCloudInfo(agent);
+    } else {
+      await cmdAgentInfo(agent);
+    }
     return;
   }
   if (cloud) {
@@ -67,7 +75,13 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
       console.error(`\nUsage: spawn ${agent} <cloud> --prompt "your prompt here"`);
       process.exit(1);
     }
-    await cmdAgentInfo(agent);
+    // "spawn <name>" with no second arg: show agent info, or cloud info if it's a cloud name
+    const manifest = await loadManifest();
+    if (!manifest.agents[agent] && manifest.clouds[agent]) {
+      await cmdCloudInfo(agent);
+    } else {
+      await cmdAgentInfo(agent);
+    }
   }
 }
 
