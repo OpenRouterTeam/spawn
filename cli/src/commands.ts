@@ -93,9 +93,45 @@ function getImplementedClouds(manifest: Manifest, agent: string): string[] {
   );
 }
 
+/** Levenshtein distance between two strings */
+export function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/** Find the closest match from a list of candidates (max distance 3) */
+export function findClosestMatch(input: string, candidates: string[]): string | null {
+  let best: string | null = null;
+  let bestDist = Infinity;
+  for (const candidate of candidates) {
+    const dist = levenshtein(input.toLowerCase(), candidate.toLowerCase());
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = candidate;
+    }
+  }
+  return bestDist <= 3 ? best : null;
+}
+
 function validateAgent(manifest: Manifest, agent: string): asserts agent is keyof typeof manifest.agents {
   if (!manifest.agents[agent]) {
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+    const keys = agentKeys(manifest);
+    const suggestion = findClosestMatch(agent, keys);
+    if (suggestion) {
+      p.log.info(`Did you mean ${pc.cyan(suggestion)}?`);
+    }
     p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
     process.exit(1);
   }
@@ -120,6 +156,11 @@ async function validateAndGetAgent(agent: string): Promise<[manifest: Manifest, 
 function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyof typeof manifest.clouds {
   if (!manifest.clouds[cloud]) {
     p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
+    const keys = cloudKeys(manifest);
+    const suggestion = findClosestMatch(cloud, keys);
+    if (suggestion) {
+      p.log.info(`Did you mean ${pc.cyan(suggestion)}?`);
+    }
     p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
     process.exit(1);
   }

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { levenshtein, findClosestMatch } from "../commands";
 
 /**
  * Tests for helper functions in commands.ts
@@ -6,6 +7,76 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
  */
 
 describe("Command Helpers", () => {
+  describe("levenshtein", () => {
+    it("should return 0 for identical strings", () => {
+      expect(levenshtein("claude", "claude")).toBe(0);
+    });
+
+    it("should return string length for empty comparison", () => {
+      expect(levenshtein("abc", "")).toBe(3);
+      expect(levenshtein("", "abc")).toBe(3);
+    });
+
+    it("should return 0 for two empty strings", () => {
+      expect(levenshtein("", "")).toBe(0);
+    });
+
+    it("should count single character substitution", () => {
+      expect(levenshtein("cat", "car")).toBe(1);
+    });
+
+    it("should count single insertion", () => {
+      expect(levenshtein("claud", "claude")).toBe(1);
+    });
+
+    it("should count single deletion", () => {
+      expect(levenshtein("claudee", "claude")).toBe(1);
+    });
+
+    it("should handle transpositions as two edits", () => {
+      expect(levenshtein("ab", "ba")).toBe(2);
+    });
+
+    it("should handle completely different strings", () => {
+      expect(levenshtein("abc", "xyz")).toBe(3);
+    });
+  });
+
+  describe("findClosestMatch", () => {
+    const agents = ["claude", "aider", "openclaw", "nanoclaw", "codex", "goose"];
+
+    it("should find exact match (distance 0)", () => {
+      expect(findClosestMatch("claude", agents)).toBe("claude");
+    });
+
+    it("should find close typo (distance 1)", () => {
+      expect(findClosestMatch("cloude", agents)).toBe("claude");
+      expect(findClosestMatch("claud", agents)).toBe("claude");
+      expect(findClosestMatch("aidr", agents)).toBe("aider");
+    });
+
+    it("should find matches with distance 2", () => {
+      expect(findClosestMatch("claudee", agents)).toBe("claude");
+    });
+
+    it("should return null for very different strings", () => {
+      expect(findClosestMatch("kubernetes", agents)).toBeNull();
+    });
+
+    it("should return null for empty candidates", () => {
+      expect(findClosestMatch("claude", [])).toBeNull();
+    });
+
+    it("should be case insensitive", () => {
+      expect(findClosestMatch("Claude", agents)).toBe("claude");
+      expect(findClosestMatch("AIDER", agents)).toBe("aider");
+    });
+
+    it("should pick the closest match among multiple candidates", () => {
+      expect(findClosestMatch("cldude", agents)).toBe("claude");
+    });
+  });
+
   describe("getErrorMessage", () => {
     it("should extract message from Error objects", () => {
       const err = new Error("Test error");
