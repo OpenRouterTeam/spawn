@@ -4,10 +4,9 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
 #
-# This installs spawn via bun (preferred) or npm. If neither is available,
-# it falls back to downloading the bundled JS file and creating a runner script.
+# This installs spawn via bun. If bun is not available, it auto-installs it first.
 #
-# Override install directory (for fallback method):
+# Override install directory:
 #   SPAWN_INSTALL_DIR=/usr/local/bin curl -fsSL ... | bash
 
 set -eo pipefail
@@ -25,7 +24,6 @@ log_info()  { echo -e "${GREEN}[spawn]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[spawn]${NC} $1"; }
 log_error() { echo -e "${RED}[spawn]${NC} $1"; }
 
-# --- Helper: clone the cli directory ---
 # --- Helper: find the best install directory ---
 # Picks the first directory that exists AND is in PATH
 find_install_dir() {
@@ -113,9 +111,8 @@ clone_cli() {
     fi
 }
 
-# --- Method 1: bun (preferred) ---
-if command -v bun &>/dev/null; then
-    log_info "Installing spawn via bun..."
+# --- Helper: build and install the CLI using bun ---
+build_and_install() {
     tmpdir=$(mktemp -d)
     trap 'rm -rf "${tmpdir}"' EXIT
 
@@ -131,49 +128,30 @@ if command -v bun &>/dev/null; then
     chmod +x "${INSTALL_DIR}/spawn"
     log_info "Installed spawn to ${INSTALL_DIR}/spawn"
     ensure_in_path "${INSTALL_DIR}"
-    exit 0
-fi
+}
 
-# --- Method 2: npm/node ---
-if command -v npm &>/dev/null && command -v node &>/dev/null; then
-    log_info "Installing spawn via npm..."
-    tmpdir=$(mktemp -d)
-    trap 'rm -rf "${tmpdir}"' EXIT
+# --- Install bun if not present ---
+if ! command -v bun &>/dev/null; then
+    log_info "bun not found. Installing bun..."
+    curl -fsSL https://bun.sh/install | bash
 
-    clone_cli "${tmpdir}"
+    # Source the updated PATH so bun is available immediately
+    export BUN_INSTALL="${HOME}/.bun"
+    export PATH="${BUN_INSTALL}/bin:${PATH}"
 
-    cd "${tmpdir}/cli"
-    npm install
-
-    # Build cli.js with node shebang
-    log_info "Building CLI..."
-    npx -y esbuild src/index.ts --bundle --outfile=cli.js --platform=node --format=esm --banner:js='#!/usr/bin/env node' 2>/dev/null || {
-        log_error "Failed to build cli.js. Install bun instead (recommended):"
+    if ! command -v bun &>/dev/null; then
+        log_error "Failed to install bun automatically"
+        echo ""
+        echo "Please install bun manually:"
         echo "  curl -fsSL https://bun.sh/install | bash"
-        echo "  Then re-run: curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
+        echo ""
+        echo "Then re-run:"
+        echo "  curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
         exit 1
-    }
+    fi
 
-    INSTALL_DIR="$(find_install_dir)"
-    mkdir -p "${INSTALL_DIR}"
-    cp cli.js "${INSTALL_DIR}/spawn"
-    chmod +x "${INSTALL_DIR}/spawn"
-    log_info "Installed spawn to ${INSTALL_DIR}/spawn"
-    ensure_in_path "${INSTALL_DIR}"
-    exit 0
+    log_info "bun installed successfully"
 fi
 
-# --- Method 3: Direct download fallback (bash wrapper) ---
-log_warn "Neither bun nor npm found. Installing bash fallback..."
-
-INSTALL_DIR="$(find_install_dir)"
-mkdir -p "${INSTALL_DIR}"
-
-if ! curl -fsSL "${SPAWN_RAW_BASE}/cli/spawn.sh" -o "${INSTALL_DIR}/spawn"; then
-    log_error "Failed to download spawn CLI"
-    exit 1
-fi
-
-chmod +x "${INSTALL_DIR}/spawn"
-log_info "Installed spawn (bash) to ${INSTALL_DIR}/spawn"
-ensure_in_path "${INSTALL_DIR}"
+log_info "Installing spawn via bun..."
+build_and_install

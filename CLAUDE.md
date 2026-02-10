@@ -103,8 +103,7 @@ spawn/
     src/commands.ts              # All subcommands (interactive, list, run, etc.)
     src/version.ts               # Version constant
     package.json                 # npm package (@openrouter/spawn)
-    install.sh                   # One-liner installer (bun → npm → bash fallback)
-    spawn.sh                     # Bash fallback CLI (no bun/node required)
+    install.sh                   # One-liner installer (bun → npm → auto-install bun)
   shared/
     common.sh                    # Provider-agnostic shared utilities
   {cloud}/
