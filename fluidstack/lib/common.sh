@@ -84,11 +84,12 @@ fluidstack_check_ssh_key() {
     local existing_keys
     existing_keys=$(fluidstack_api GET "/ssh_keys")
     # FluidStack returns SSH key fingerprints in MD5 format in "public_key_fingerprint" field
-    echo "${existing_keys}" | python3 -c "
-import json, sys
+    echo "${existing_keys}" | _SPAWN_FINGERPRINT="${fingerprint}" python3 -c "
+import json, sys, os
+fingerprint = os.environ.get('_SPAWN_FINGERPRINT', '')
 data = json.loads(sys.stdin.read())
 for key in data.get('ssh_keys', []):
-    if '${fingerprint}' in key.get('public_key_fingerprint', '') or '${fingerprint}' in key.get('name', ''):
+    if fingerprint in key.get('public_key_fingerprint', '') or fingerprint in key.get('name', ''):
         sys.exit(0)
 sys.exit(1)
 "
@@ -98,17 +99,16 @@ sys.exit(1)
 fluidstack_register_ssh_key() {
     local key_name="${1}"
     local pub_path="${2}"
-    local pub_key
-    pub_key=$(cat "${pub_path}")
 
     local register_body
     register_body=$(python3 -c "
-import json
+import json, sys
+pub_key = sys.stdin.read().strip()
 print(json.dumps({
-    'name': '${key_name}',
-    'public_key': '''${pub_key}'''
+    'name': sys.argv[1],
+    'public_key': pub_key
 }))
-")
+" "${key_name}" < "${pub_path}")
 
     local register_response
     register_response=$(fluidstack_api POST "/ssh_keys" "${register_body}")
@@ -186,20 +186,22 @@ create_server() {
     local ssh_key_name="${FLUIDSTACK_SSH_KEY_NAME:-spawn-${USER}}"
 
     # Block injection chars in string values (quotes, backslashes)
-    if [[ "${gpu_type}" =~ [\"\`\$\\] ]]; then log_error "Invalid FLUIDSTACK_GPU_TYPE: contains unsafe characters"; return 1; fi
-    if [[ "${ssh_key_name}" =~ [\"\`\$\\] ]]; then log_error "Invalid FLUIDSTACK_SSH_KEY_NAME: contains unsafe characters"; return 1; fi
+    if [[ "${gpu_type}" =~ [\"\'\`\$\\] ]]; then log_error "Invalid FLUIDSTACK_GPU_TYPE: contains unsafe characters"; return 1; fi
+    if [[ "${ssh_key_name}" =~ [\"\'\`\$\\] ]]; then log_error "Invalid FLUIDSTACK_SSH_KEY_NAME: contains unsafe characters"; return 1; fi
 
     log_warn "Creating FluidStack instance '${name}' (GPU: ${gpu_type})..."
 
-    # Build instance creation request
+    # Build instance creation request safely via stdin
     local create_body
     create_body=$(python3 -c "
-import json
+import json, sys
+parts = sys.stdin.read().strip().split('\n')
 print(json.dumps({
-    'gpu_type': '${gpu_type}',
-    'ssh_key': '${ssh_key_name}'
+    'gpu_type': parts[0],
+    'ssh_key': parts[1]
 }))
-")
+" <<< "${gpu_type}
+${ssh_key_name}")
 
     local response
     response=$(fluidstack_api POST "/instances" "${create_body}")

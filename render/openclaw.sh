@@ -58,24 +58,8 @@ inject_env_vars \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
     "PATH=\$HOME/.bun/bin:\$PATH"
 
-# 9. Configure openclaw settings
-log_warn "Configuring openclaw..."
-
-run_server "mkdir -p /root/.openclaw"
-
-# Create openclaw config with API key and model
-OPENCLAW_CONFIG_TEMP=$(mktemp)
-chmod 600 "$OPENCLAW_CONFIG_TEMP"
-cat > "$OPENCLAW_CONFIG_TEMP" << EOF
-{
-  "model": "${MODEL_ID}",
-  "apiKey": "${OPENROUTER_API_KEY}",
-  "baseUrl": "https://openrouter.ai/api"
-}
-EOF
-
-upload_file "$OPENCLAW_CONFIG_TEMP" "/root/.openclaw/config.json"
-rm "$OPENCLAW_CONFIG_TEMP"
+# 9. Configure openclaw settings via shared helper (uses json_escape for safe key handling)
+setup_openclaw_config "$OPENROUTER_API_KEY" "$MODEL_ID" "upload_file" "run_server"
 
 echo ""
 log_info "Render service setup completed successfully!"

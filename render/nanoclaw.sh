@@ -58,17 +58,15 @@ inject_env_vars \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
-# 9. Create nanoclaw .env file
+# 9. Create nanoclaw .env file safely via temp file
 log_warn "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
 chmod 600 "$DOTENV_TEMP"
-cat > "$DOTENV_TEMP" << EOF
-ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
-EOF
+track_temp_file "$DOTENV_TEMP"
+printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "$DOTENV_TEMP"
 
 upload_file "$DOTENV_TEMP" "/root/nanoclaw/.env"
-rm "$DOTENV_TEMP"
 
 echo ""
 log_info "Render service setup completed successfully!"
