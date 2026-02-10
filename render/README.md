@@ -57,6 +57,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/re
 
 Deploys Aider with OpenRouter model routing. Prompts for model selection (default: `openrouter/auto`).
 
+### Goose
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/render/goose.sh)
+```
+
+Deploys Goose AI coding agent by Block with native OpenRouter support.
+
 ### Codex CLI
 
 ```bash
