@@ -573,6 +573,22 @@
       },
       "notes": "Global cloud provider with 25+ datacenters. Hourly billing. Uses AuthClientId/AuthSecret headers for API auth. Async operations via command queue. Requires KAMATERA_API_CLIENT_ID and KAMATERA_API_SECRET from https://console.kamatera.com/keys"
     },
+    "cherry": {
+      "name": "Cherry Servers",
+      "description": "Cherry Servers bare metal and cloud VPS via REST API",
+      "url": "https://www.cherryservers.com/",
+      "type": "api",
+      "auth": "CHERRY_AUTH_TOKEN",
+      "provision_method": "POST /v1/projects/{project_id}/servers with ssh_keys",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "plan": "cloud_vps_1",
+        "region": "eu_nord_1",
+        "image": "Ubuntu 24.04 64bit"
+      },
+      "notes": "European cloud provider with bare metal and VPS. Hourly billing. Full root access. Requires CHERRY_AUTH_TOKEN from https://portal.cherryservers.com/"
+    },
     "oracle": {
       "name": "Oracle Cloud Infrastructure",
       "description": "Oracle Cloud compute instances via OCI CLI",
@@ -1101,6 +1117,20 @@
     "render/gptme": "implemented",
     "render/opencode": "implemented",
     "render/plandex": "implemented",
-    "render/kilocode": "implemented"
+    "render/kilocode": "implemented",
+    "cherry/claude": "implemented",
+    "cherry/openclaw": "implemented",
+    "cherry/nanoclaw": "implemented",
+    "cherry/aider": "implemented",
+    "cherry/goose": "implemented",
+    "cherry/codex": "implemented",
+    "cherry/interpreter": "implemented",
+    "cherry/gemini": "implemented",
+    "cherry/amazonq": "implemented",
+    "cherry/cline": "implemented",
+    "cherry/gptme": "implemented",
+    "cherry/opencode": "implemented",
+    "cherry/plandex": "implemented",
+    "cherry/kilocode": "implemented"
   }
 }
