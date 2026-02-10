@@ -59,8 +59,6 @@ export function validateScriptContent(script: string): void {
     { pattern: /mkfs\./, description: "filesystem formatting command" },
     { pattern: /dd\s+if=/, description: "raw disk operation" },
     { pattern: /:(){:|:&};:/, description: "fork bomb pattern" },
-    { pattern: /curl.*\|\s*(bash|sh)/, description: "nested curl|bash execution" },
-    { pattern: /wget.*\|\s*(bash|sh)/, description: "nested wget|bash execution" },
   ];
 
   for (const { pattern, description } of dangerousPatterns) {
