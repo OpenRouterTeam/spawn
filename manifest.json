@@ -950,7 +950,7 @@
     "koyeb/codex": "implemented",
     "koyeb/interpreter": "implemented",
     "koyeb/gemini": "implemented",
-    "koyeb/amazonq": "missing",
+    "koyeb/amazonq": "implemented",
     "koyeb/cline": "missing",
     "koyeb/gptme": "missing",
     "koyeb/opencode": "missing",
