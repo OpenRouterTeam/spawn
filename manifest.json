@@ -880,7 +880,7 @@
     "oracle/gemini": "implemented",
     "oracle/amazonq": "implemented",
     "oracle/cline": "implemented",
-    "oracle/gptme": "missing",
+    "oracle/gptme": "implemented",
     "oracle/opencode": "implemented",
     "oracle/plandex": "implemented",
     "oracle/kilocode": "implemented",
