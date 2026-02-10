@@ -43,6 +43,18 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/aider.sh)
 ```
 
+#### OpenClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/openclaw.sh)
+```
+
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/nanoclaw.sh)
+```
+
 #### Codex CLI
 
 ```bash
