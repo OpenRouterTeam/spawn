@@ -55,14 +55,55 @@ test_northflank_token() {
     return 0
 }
 
+# Authenticate with Northflank CLI using a token
+# Returns 0 on success, 1 on invalid token
+_northflank_login() {
+    local token="$1"
+    if ! northflank login -t "${token}" &>/dev/null; then
+        return 1
+    fi
+    return 0
+}
+
+# Try to load Northflank token from config file and authenticate
+# Returns 0 if loaded and valid, 1 otherwise
+_load_northflank_config() {
+    local config_file="$1"
+    [[ -f "${config_file}" ]] || return 1
+
+    local saved_token
+    saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "${config_file}" 2>/dev/null)
+    if [[ -n "${saved_token}" ]]; then
+        export NORTHFLANK_TOKEN="${saved_token}"
+        log_info "Using Northflank token from ${config_file}"
+        if _northflank_login "${saved_token}"; then
+            return 0
+        fi
+        log_warn "Saved Northflank token is invalid, prompting for new one"
+        unset NORTHFLANK_TOKEN
+    fi
+    return 1
+}
+
+# Save Northflank token to config file
+_save_northflank_token() {
+    local token="$1"
+    local config_file="$2"
+    local config_dir
+    config_dir=$(dirname "${config_file}")
+    mkdir -p "${config_dir}"
+    printf '{\n  "token": "%s"\n}\n' "$(json_escape "${token}")" > "${config_file}"
+    chmod 600 "${config_file}"
+    log_info "Northflank token saved to ${config_file}"
+}
+
 ensure_northflank_token() {
     check_python_available || return 1
 
     # 1. Check environment variable
     if [[ -n "${NORTHFLANK_TOKEN:-}" ]]; then
         log_info "Using Northflank token from environment"
-        # Login with token
-        if ! northflank login -t "${NORTHFLANK_TOKEN}" &>/dev/null; then
+        if ! _northflank_login "${NORTHFLANK_TOKEN}"; then
             log_error "Northflank token in environment is invalid"
             return 1
         fi
@@ -72,19 +113,8 @@ ensure_northflank_token() {
     local config_file="${HOME}/.config/spawn/northflank.json"
 
     # 2. Check config file
-    if [[ -f "${config_file}" ]]; then
-        local saved_token
-        saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "${config_file}" 2>/dev/null)
-        if [[ -n "${saved_token}" ]]; then
-            export NORTHFLANK_TOKEN="${saved_token}"
-            log_info "Using Northflank token from ${config_file}"
-            if ! northflank login -t "${saved_token}" &>/dev/null; then
-                log_warn "Saved Northflank token is invalid, prompting for new one"
-                unset NORTHFLANK_TOKEN
-            else
-                return 0
-            fi
-        fi
+    if _load_northflank_config "${config_file}"; then
+        return 0
     fi
 
     # 3. Prompt and validate
@@ -102,18 +132,13 @@ ensure_northflank_token() {
     fi
 
     export NORTHFLANK_TOKEN="${token}"
-    if ! northflank login -t "${token}" &>/dev/null; then
+    if ! _northflank_login "${token}"; then
         log_error "Invalid Northflank token"
         unset NORTHFLANK_TOKEN
         return 1
     fi
 
-    # Save token
-    local config_dir="${HOME}/.config/spawn"
-    mkdir -p "${config_dir}"
-    printf '{\n  "token": "%s"\n}\n' "$(json_escape "${token}")" > "${config_file}"
-    chmod 600 "${config_file}"
-    log_info "Northflank token saved to ${config_file}"
+    _save_northflank_token "${token}" "${config_file}"
 }
 
 get_server_name() {
@@ -122,6 +147,32 @@ get_server_name() {
 
 get_project_name() {
     get_resource_name "NORTHFLANK_PROJECT_NAME" "Enter project name: "
+}
+
+# Wait for a Northflank service to become running
+# Usage: _northflank_wait_for_service NAME PROJECT [MAX_ATTEMPTS]
+_northflank_wait_for_service() {
+    local name="$1"
+    local project_name="$2"
+    local max_attempts="${3:-60}"
+    local attempt=1
+
+    log_warn "Waiting for service to start..."
+    while [[ "${attempt}" -le "${max_attempts}" ]]; do
+        local status
+        status=$(northflank get service --name "${name}" --project "${project_name}" 2>/dev/null | grep -i "status" || true)
+        if echo "${status}" | grep -qi "running\|active"; then
+            log_info "Service is running"
+            return 0
+        fi
+
+        log_warn "Waiting for service to start (${attempt}/${max_attempts})..."
+        sleep 3
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Service did not start in time"
+    return 1
 }
 
 create_server() {
@@ -159,25 +210,7 @@ create_server() {
     export NORTHFLANK_SERVICE_NAME="${name}"
     log_info "Service '${name}' created"
 
-    # Wait for service to be running
-    log_warn "Waiting for service to start..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "${attempt}" -le "${max_attempts}" ]]; do
-        local status
-        status=$(northflank get service --name "${name}" --project "${project_name}" 2>/dev/null | grep -i "status" || true)
-        if echo "${status}" | grep -qi "running\|active"; then
-            log_info "Service is running"
-            return 0
-        fi
-
-        log_warn "Waiting for service to start (${attempt}/${max_attempts})..."
-        sleep 3
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Service did not start in time"
-    return 1
+    _northflank_wait_for_service "${name}" "${project_name}"
 }
 
 wait_for_cloud_init() {
