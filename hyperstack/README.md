@@ -50,6 +50,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hy
 
 # OpenClaw on Hyperstack
 bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/openclaw.sh)
+
+# Open Interpreter on Hyperstack
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hyperstack/interpreter.sh)
 ```
 
 ## Configuration Options

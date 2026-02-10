@@ -919,7 +919,7 @@
     "hyperstack/aider": "implemented",
     "hyperstack/goose": "missing",
     "hyperstack/codex": "missing",
-    "hyperstack/interpreter": "missing",
+    "hyperstack/interpreter": "implemented",
     "hyperstack/gemini": "missing",
     "hyperstack/amazonq": "missing",
     "hyperstack/cline": "missing",
