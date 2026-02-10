@@ -879,7 +879,7 @@
     "oracle/interpreter": "missing",
     "oracle/gemini": "implemented",
     "oracle/amazonq": "implemented",
-    "oracle/cline": "missing",
+    "oracle/cline": "implemented",
     "oracle/gptme": "missing",
     "oracle/opencode": "implemented",
     "oracle/plandex": "implemented",
