@@ -1100,7 +1100,7 @@
     "render/cline": "implemented",
     "render/gptme": "implemented",
     "render/opencode": "implemented",
-    "render/plandex": "missing",
+    "render/plandex": "implemented",
     "render/kilocode": "implemented"
   }
 }
