@@ -73,6 +73,18 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/gemini.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/amazonq.sh)
 ```
 
+#### OpenCode
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/opencode.sh)
+```
+
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/plandex.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
