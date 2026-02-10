@@ -369,6 +369,37 @@ validate_oauth_port() {
     return 0
 }
 
+# Generate OAuth callback HTML pages (success and error)
+# Sets OAUTH_SUCCESS_HTML and OAUTH_ERROR_HTML variables
+_generate_oauth_html() {
+    local css='body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}'
+    OAUTH_SUCCESS_HTML="<html><head><style>${css}h1{color:#00d4aa}</style></head><body><div class=\"card\"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>"
+    OAUTH_ERROR_HTML="<html><head><style>${css}h1{color:#d9534f}</style></head><body><div class=\"card\"><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection)</p><p>Please try again</p></div></body></html>"
+}
+
+# Validate OAuth server prerequisites (port, state token, runtime)
+# Sets OAUTH_RUNTIME and OAUTH_STATE variables on success
+# $1=starting_port $2=state_file
+_validate_oauth_server_args() {
+    local starting_port="${1}"
+    local state_file="${2}"
+
+    OAUTH_RUNTIME=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
+
+    # SECURITY: Validate port number to prevent injection
+    if ! validate_oauth_port "${starting_port}"; then
+        log_error "OAuth server port validation failed"
+        return 1
+    fi
+
+    # SECURITY: Read CSRF state token for validation
+    OAUTH_STATE=$(cat "${state_file}" 2>/dev/null || echo "")
+    if [[ -z "${OAUTH_STATE}" ]]; then
+        log_error "CSRF state token file is missing or empty"
+        return 1
+    fi
+}
+
 # Start OAuth callback server using Node.js/Bun HTTP server
 # Proper HTTP server — handles multiple connections, favicon requests, etc.
 # Tries a range of ports if the initial port is busy
@@ -380,27 +411,14 @@ start_oauth_server() {
     local code_file="${2}"
     local port_file="${3}"
     local state_file="${4}"
-    local runtime
-    runtime=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
 
-    # SECURITY: Validate port number to prevent injection
-    if ! validate_oauth_port "${starting_port}"; then
-        log_error "OAuth server port validation failed"
-        return 1
-    fi
+    _validate_oauth_server_args "${starting_port}" "${state_file}" || return 1
+    local runtime="${OAUTH_RUNTIME}"
+    local expected_state="${OAUTH_STATE}"
 
-    # SECURITY: Read CSRF state token for validation
-    local expected_state
-    expected_state=$(cat "${state_file}" 2>/dev/null || echo "")
-    if [[ -z "${expected_state}" ]]; then
-        log_error "CSRF state token file is missing or empty"
-        return 1
-    fi
-
-    # OAuth callback page styles and HTML (shared CSS, extracted for readability)
-    local oauth_css='body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}'
-    local oauth_success_html="<html><head><style>${oauth_css}h1{color:#00d4aa}</style></head><body><div class=\"card\"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>"
-    local oauth_error_html="<html><head><style>${oauth_css}h1{color:#d9534f}</style></head><body><div class=\"card\"><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection)</p><p>Please try again</p></div></body></html>"
+    _generate_oauth_html
+    local oauth_success_html="${OAUTH_SUCCESS_HTML}"
+    local oauth_error_html="${OAUTH_ERROR_HTML}"
 
     "${runtime}" -e "
 const http = require('http');
