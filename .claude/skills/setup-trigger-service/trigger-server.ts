@@ -233,6 +233,12 @@ const server = Bun.serve({
   },
 });
 
+// Proactively reap stale runs every 60 seconds instead of only on requests
+const reapInterval = setInterval(() => {
+  if (runs.size > 0) reapAndEnforce();
+}, 60_000);
+reapInterval.unref?.();
+
 console.log(`[trigger] Listening on port ${server.port}`);
 console.log(`[trigger] TARGET_SCRIPT=${TARGET_SCRIPT}`);
 console.log(`[trigger] MAX_CONCURRENT=${MAX_CONCURRENT}`);
