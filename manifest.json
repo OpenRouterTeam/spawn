@@ -1034,7 +1034,7 @@
     "render/openclaw": "implemented",
     "render/nanoclaw": "implemented",
     "render/aider": "implemented",
-    "render/goose": "missing",
+    "render/goose": "implemented",
     "render/codex": "implemented",
     "render/interpreter": "implemented",
     "render/gemini": "missing",
