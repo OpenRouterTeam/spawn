@@ -955,6 +955,6 @@
     "koyeb/gptme": "implemented",
     "koyeb/opencode": "implemented",
     "koyeb/plandex": "implemented",
-    "koyeb/kilocode": "missing"
+    "koyeb/kilocode": "implemented"
   }
 }
