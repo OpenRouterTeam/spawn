@@ -60,13 +60,8 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   }
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-
-  // Check for updates and auto-update if needed (blocking)
-  await checkForUpdates();
-
-  // Extract --prompt or -p flag
+/** Parse --prompt / -p and --prompt-file flags, returning the resolved prompt text and remaining args */
+async function resolvePrompt(args: string[]): Promise<[string | undefined, string[]]> {
   let [prompt, filteredArgs] = extractFlagValue(
     args,
     ["--prompt", "-p"],
@@ -74,7 +69,6 @@ async function main(): Promise<void> {
     'spawn <agent> <cloud> --prompt "your prompt here"'
   );
 
-  // Extract --prompt-file flag
   const [promptFile, finalArgs] = extractFlagValue(
     filteredArgs,
     ["--prompt-file"],
@@ -103,6 +97,16 @@ async function main(): Promise<void> {
     }
   }
 
+  return [prompt, filteredArgs];
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+
+  // Check for updates and auto-update if needed (blocking)
+  await checkForUpdates();
+
+  const [prompt, filteredArgs] = await resolvePrompt(args);
   const cmd = filteredArgs[0];
 
   try {
