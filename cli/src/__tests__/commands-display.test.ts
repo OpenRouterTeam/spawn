@@ -601,6 +601,55 @@ describe("Commands Display Output", () => {
     });
   });
 
+  // ── cmdAgentInfo cloud type display ─────────────────────────────────
+
+  describe("cmdAgentInfo - cloud type display", () => {
+    it("should show cloud type for each implemented cloud", async () => {
+      await cmdAgentInfo("claude");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      // sprite has type "vm", hetzner has type "cloud"
+      expect(output).toContain("vm");
+      expect(output).toContain("cloud");
+    });
+
+    it("should show agent notes when present", async () => {
+      // Create a manifest with agent notes
+      const manifestWithNotes = {
+        ...mockManifest,
+        agents: {
+          ...mockManifest.agents,
+          aider: {
+            ...mockManifest.agents.aider,
+            notes: "Natively supports OpenRouter",
+          },
+        },
+      };
+      global.fetch = mock(async () => ({
+        ok: true,
+        json: async () => manifestWithNotes,
+        text: async () => JSON.stringify(manifestWithNotes),
+      })) as any;
+      await loadManifest(true);
+
+      await cmdAgentInfo("aider");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      expect(output).toContain("Natively supports OpenRouter");
+    });
+
+    it("should not show notes line when agent has no notes", async () => {
+      await cmdAgentInfo("claude");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      // claude in mock manifest has no notes field
+      expect(output).not.toContain("Natively supports");
+    });
+  });
+
   // ── cmdAgentInfo with many clouds ──────────────────────────────────
 
   describe("cmdAgentInfo - many clouds", () => {

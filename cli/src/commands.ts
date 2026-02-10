@@ -465,12 +465,17 @@ export async function cmdClouds(): Promise<void> {
 
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
+const TYPE_COLUMN_WIDTH = 10;
+
 export async function cmdAgentInfo(agent: string): Promise<void> {
   const [manifest, agentKey] = await validateAndGetAgent(agent);
 
   const a = manifest.agents[agentKey];
   console.log();
   console.log(`${pc.bold(a.name)} ${pc.dim("--")} ${a.description}`);
+  if (a.notes) {
+    console.log(pc.dim(`  ${a.notes}`));
+  }
   console.log();
   console.log(pc.bold("Available clouds:"));
   console.log();
@@ -480,7 +485,7 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     const status = matrixStatus(manifest, cloud, agentKey);
     if (status === "implemented") {
       const c = manifest.clouds[cloud];
-      console.log(`  ${pc.green(cloud.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agentKey + " " + cloud)}`);
+      console.log(`  ${pc.green(cloud.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(c.type.padEnd(TYPE_COLUMN_WIDTH))}${pc.dim("spawn " + agentKey + " " + cloud)}`);
       found = true;
     }
   }
@@ -515,6 +520,7 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   const c = manifest.clouds[cloudKey];
   console.log();
   console.log(`${pc.bold(c.name)} ${pc.dim("--")} ${c.description}`);
+  console.log(pc.dim(`  Type: ${c.type}`));
   if (c.notes) {
     console.log(pc.dim(`  ${c.notes}`));
   }
