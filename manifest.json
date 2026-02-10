@@ -633,6 +633,22 @@
         "region": "us-west1"
       },
       "notes": "Developer-focused container platform. Per-second billing. Fast provisioning. Requires Railway CLI (npm install -g @railway/cli)."
+    },
+    "render": {
+      "name": "Render",
+      "description": "Render cloud platform for full-stack applications with CLI and SSH access",
+      "url": "https://render.com/",
+      "type": "cli",
+      "auth": "RENDER_API_KEY",
+      "provision_method": "Render API POST /v1/services with Docker image",
+      "exec_method": "render ssh --service",
+      "interactive_method": "render ssh (PTY)",
+      "defaults": {
+        "plan": "starter",
+        "region": "oregon",
+        "runtime": "docker"
+      },
+      "notes": "Developer-first platform with free Hobby plan (100GB bandwidth, 500 build minutes). Requires API key from https://dashboard.render.com/u/settings/api-keys. SSH not available on free tier."
     }
   },
   "matrix": {
@@ -1002,22 +1018,6 @@
     "northflank/kilocode": "missing",
     "railway/claude": "implemented",
     "railway/openclaw": "implemented",
-    "northflank/claude": "implemented",
-    "northflank/openclaw": "implemented",
-    "northflank/nanoclaw": "implemented",
-    "northflank/aider": "implemented",
-    "northflank/goose": "implemented",
-    "northflank/codex": "implemented",
-    "northflank/interpreter": "implemented",
-    "northflank/gemini": "implemented",
-    "northflank/amazonq": "missing",
-    "northflank/cline": "missing",
-    "northflank/gptme": "missing",
-    "northflank/opencode": "missing",
-    "northflank/plandex": "missing",
-    "northflank/kilocode": "missing",
-    "railway/claude": "implemented",
-    "railway/openclaw": "implemented",
     "railway/nanoclaw": "implemented",
     "railway/aider": "implemented",
     "railway/goose": "missing",
@@ -1029,6 +1029,20 @@
     "railway/gptme": "missing",
     "railway/opencode": "missing",
     "railway/plandex": "missing",
-    "railway/kilocode": "missing"
+    "railway/kilocode": "missing",
+    "render/claude": "implemented",
+    "render/openclaw": "missing",
+    "render/nanoclaw": "missing",
+    "render/aider": "implemented",
+    "render/goose": "missing",
+    "render/codex": "missing",
+    "render/interpreter": "missing",
+    "render/gemini": "missing",
+    "render/amazonq": "missing",
+    "render/cline": "missing",
+    "render/gptme": "missing",
+    "render/opencode": "missing",
+    "render/plandex": "missing",
+    "render/kilocode": "missing"
   }
 }
