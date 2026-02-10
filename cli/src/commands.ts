@@ -174,6 +174,7 @@ export async function cmdInteractive(): Promise<void> {
   const agentName = manifest.agents[agentChoice].name;
   const cloudName = manifest.clouds[cloudChoice].name;
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
+  p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
   await execScript(cloudChoice, agentChoice);
@@ -374,11 +375,18 @@ export async function cmdList(): Promise<void> {
   const impl = countImplemented(manifest);
   const total = agents.length * clouds.length;
   console.log();
+  console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   console.log(pc.green(`${impl}/${total} combinations implemented`));
   console.log();
 }
 
 // ── Agents ─────────────────────────────────────────────────────────────────────
+
+function getImplementedAgents(manifest: Manifest, cloud: string): string[] {
+  return agentKeys(manifest).filter(
+    (a: string): boolean => matrixStatus(manifest, cloud, a) === "implemented"
+  );
+}
 
 export async function cmdAgents(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
@@ -389,10 +397,10 @@ export async function cmdAgents(): Promise<void> {
   for (const key of agentKeys(manifest)) {
     const a = manifest.agents[key];
     const implCount = getImplementedClouds(manifest, key).length;
-    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} clouds`)}`);
+    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} clouds  ${a.description}`)}`);
   }
   console.log();
-  console.log(pc.dim(`  Usage: spawn <agent> <cloud>`));
+  console.log(pc.dim(`  Run ${pc.cyan("spawn <agent>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
   console.log();
 }
 
@@ -406,10 +414,11 @@ export async function cmdClouds(): Promise<void> {
   console.log();
   for (const key of cloudKeys(manifest)) {
     const c = manifest.clouds[key];
-    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(c.description)}`);
+    const implCount = getImplementedAgents(manifest, key).length;
+    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} agents  ${c.description}`)}`);
   }
   console.log();
-  console.log(pc.dim(`  Usage: spawn <agent> <cloud>`));
+  console.log(pc.dim(`  Run ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
   console.log();
 }
 
@@ -430,7 +439,7 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     const status = matrixStatus(manifest, cloud, agentKey);
     if (status === "implemented") {
       const c = manifest.clouds[cloud];
-      console.log(`  ${pc.green(c.name.padEnd(NAME_COLUMN_WIDTH))} ${pc.dim("spawn " + agentKey + " " + cloud)}`);
+      console.log(`  ${pc.green(cloud.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agentKey + " " + cloud)}`);
       found = true;
     }
   }
@@ -498,7 +507,7 @@ export async function cmdUpdate(): Promise<void> {
       return;
     }
 
-    s.message(`Updating v${VERSION} -> v${remoteVersion}...`);
+    s.message(`Found v${remoteVersion}...`);
 
     // Run the install script to update
     const installRes = await fetch(`${RAW_BASE}/cli/install.sh`);
@@ -538,6 +547,7 @@ ${pc.bold("USAGE")}
   spawn improve [--loop]             Run improvement system
   spawn update                       Check for CLI updates
   spawn version                      Show version
+  spawn help                         Show this help message
 
 ${pc.bold("EXAMPLES")}
   spawn                              ${pc.dim("# Pick interactively")}
