@@ -39,10 +39,45 @@ log_info()  { printf "${GREEN}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m
 log_warn()  { printf "${YELLOW}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] WARN: $1" >> "${LOG_FILE}"; }
 log_error() { printf "${RED}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] ERROR: $1" >> "${LOG_FILE}"; }
 
+# --- Keep-alive: ping the Sprite's PUBLIC URL to prevent VM pause ---
+# Sprite only counts inbound HTTP requests through its proxy as "active."
+# Localhost requests bypass the proxy and do NOT prevent the VM from pausing.
+# We must hit the public URL so the request routes through the Sprite proxy.
+KEEPALIVE_PID=""
+SPRITE_PUBLIC_URL=""
+start_keepalive() {
+    SPRITE_PUBLIC_URL=$(sprite-env info 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['sprite_url'])" 2>/dev/null) || SPRITE_PUBLIC_URL=""
+
+    if [[ -z "${SPRITE_PUBLIC_URL}" ]]; then
+        log_warn "Could not resolve Sprite public URL — keep-alive will use localhost (may not prevent pause)"
+        SPRITE_PUBLIC_URL="http://localhost:8080"
+    else
+        log_info "Keep-alive will ping: ${SPRITE_PUBLIC_URL}/health"
+    fi
+
+    (
+        while true; do
+            curl -sf "${SPRITE_PUBLIC_URL}/health" >/dev/null 2>&1 || true
+            sleep 30
+        done
+    ) &
+    KEEPALIVE_PID=$!
+}
+stop_keepalive() {
+    if [[ -n "${KEEPALIVE_PID}" ]]; then
+        kill "${KEEPALIVE_PID}" 2>/dev/null || true
+        wait "${KEEPALIVE_PID}" 2>/dev/null || true
+        KEEPALIVE_PID=""
+    fi
+}
+
 # --- Cleanup trap (from refactor.sh) ---
 cleanup() {
     local exit_code=$?
     log_info "Running cleanup (exit_code=${exit_code})..."
+
+    # Stop keep-alive loop
+    stop_keepalive
 
     cd "${REPO_ROOT}" 2>/dev/null || true
 
@@ -543,6 +578,10 @@ run_team_cycle() {
     # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
 
+    # Start keep-alive before launching claude (prevents Sprite from pausing the VM)
+    start_keepalive
+    log_info "Keep-alive started (pid=${KEEPALIVE_PID})"
+
     log_info "Launching agent team..."
     log_info "Worktree base: ${WORKTREE_BASE}"
     log_info "Cycle timeout: ${CYCLE_TIMEOUT}s"
@@ -557,6 +596,9 @@ run_team_cycle() {
     timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
         claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
         2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+
+    # Stop keep-alive now that the cycle is done
+    stop_keepalive
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Cycle completed successfully"
@@ -594,6 +636,10 @@ run_single_cycle() {
     PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
     build_single_prompt > "${PROMPT_FILE}"
 
+    # Start keep-alive before launching claude
+    start_keepalive
+    log_info "Keep-alive started (pid=${KEEPALIVE_PID})"
+
     log_info "Launching single agent..."
     log_info "Cycle timeout: ${SINGLE_TIMEOUT}s"
     echo ""
@@ -605,6 +651,8 @@ run_single_cycle() {
     timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
         claude --print -p "$(cat "${PROMPT_FILE}")" --model sonnet \
         2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+
+    stop_keepalive
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Single cycle completed successfully"

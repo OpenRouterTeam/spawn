@@ -60,16 +60,28 @@ cleanup() {
 
 trap cleanup EXIT SIGTERM SIGINT
 
-# --- Keep-alive: ping the trigger server's /health endpoint periodically ---
-# Sprite pauses/stops VMs that have no HTTP activity. When claude is running
-# (waiting on API calls), there may be no inbound requests for long stretches,
-# causing Sprite to freeze the VM mid-cycle. This background loop ensures
-# continuous HTTP activity so Sprite keeps the VM alive.
+# --- Keep-alive: ping the Sprite's PUBLIC URL to prevent VM pause ---
+# Sprite only counts inbound HTTP requests through its proxy as "active."
+# Localhost requests (curl http://localhost:8080/health) bypass the proxy
+# entirely and do NOT prevent the VM from pausing. We must hit the public
+# URL so the request routes through the Sprite proxy infrastructure.
 KEEPALIVE_PID=""
+SPRITE_PUBLIC_URL=""
 start_keepalive() {
+    # Resolve the Sprite's public URL from sprite-env info
+    SPRITE_PUBLIC_URL=$(sprite-env info 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['sprite_url'])" 2>/dev/null) || SPRITE_PUBLIC_URL=""
+
+    if [[ -z "${SPRITE_PUBLIC_URL}" ]]; then
+        log "WARNING: Could not resolve Sprite public URL — keep-alive will use localhost (may not prevent pause)"
+        SPRITE_PUBLIC_URL="http://localhost:8080"
+    else
+        log "Keep-alive will ping: ${SPRITE_PUBLIC_URL}/health"
+    fi
+
     (
         while true; do
-            curl -sf http://localhost:8080/health >/dev/null 2>&1 || true
+            # Ping via public URL (routes through Sprite proxy, counts as active HTTP)
+            curl -sf "${SPRITE_PUBLIC_URL}/health" >/dev/null 2>&1 || true
             sleep 30
         done
     ) &
