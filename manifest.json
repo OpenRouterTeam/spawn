@@ -972,7 +972,7 @@
     "koyeb/kilocode": "missing",
     "railway/claude": "implemented",
     "railway/openclaw": "implemented",
-    "railway/nanoclaw": "missing",
+    "railway/nanoclaw": "implemented",
     "railway/aider": "implemented",
     "railway/goose": "missing",
     "railway/codex": "missing",
