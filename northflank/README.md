@@ -54,6 +54,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/interpreter.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/gemini.sh)
 ```
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/amazonq.sh)
+```
+
 ## Setup
 
 1. Create a Northflank account at https://northflank.com

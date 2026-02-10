@@ -40,6 +40,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/gptme.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/goose.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/gemini.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash

@@ -41,6 +41,14 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/re
 
 Deploys Aider with OpenRouter model routing. Prompts for model selection (default: `openrouter/auto`).
 
+### Codex CLI
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/render/codex.sh)
+```
+
+Deploys Codex CLI with OpenRouter integration via OPENAI_BASE_URL override.
+
 ## Service Details
 
 - **Plan**: Starter (can be configured)
