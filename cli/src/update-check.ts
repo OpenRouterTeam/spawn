@@ -1,9 +1,7 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "fs";
-import { join } from "path";
 import { execSync as nodeExecSync } from "child_process";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
-import { RAW_BASE, CACHE_DIR } from "./manifest.js";
+import { RAW_BASE } from "./manifest.js";
 
 const VERSION = pkg.version;
 
@@ -14,55 +12,9 @@ export const executor = {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const CHECK_INTERVAL = 86400; // 24 hours in seconds
-const FETCH_TIMEOUT = 5000; // 5 seconds (shorter timeout for background check)
-
-// Allow tests to override the cache directory
-function getUpdateCheckFile(): string {
-  const cacheDir = process.env.TEST_CACHE_DIR || CACHE_DIR;
-  return join(cacheDir, "update-check.json");
-}
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface UpdateCheckCache {
-  lastCheck: number;
-  latestVersion?: string;
-  dismissed?: boolean;
-}
+const FETCH_TIMEOUT = 5000; // 5 seconds
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function readUpdateCache(): UpdateCheckCache | null {
-  try {
-    const updateCheckFile = getUpdateCheckFile();
-    if (!existsSync(updateCheckFile)) return null;
-    return JSON.parse(readFileSync(updateCheckFile, "utf-8")) as UpdateCheckCache;
-  } catch {
-    return null;
-  }
-}
-
-function writeUpdateCache(data: UpdateCheckCache): void {
-  try {
-    const cacheDir = process.env.TEST_CACHE_DIR || CACHE_DIR;
-    const updateCheckFile = getUpdateCheckFile();
-    mkdirSync(cacheDir, { recursive: true });
-    writeFileSync(updateCheckFile, JSON.stringify(data, null, 2), "utf-8");
-  } catch {
-    // Silently fail - update check is non-critical
-  }
-}
-
-function shouldCheckForUpdate(): boolean {
-  const cache = readUpdateCache();
-  if (!cache) return true;
-
-  const now = Math.floor(Date.now() / 1000);
-  const timeSinceLastCheck = now - cache.lastCheck;
-
-  return timeSinceLastCheck >= CHECK_INTERVAL;
-}
 
 async function fetchLatestVersion(): Promise<string | null> {
   try {
@@ -139,9 +91,8 @@ function performAutoUpdate(latestVersion: string): void {
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 /**
- * Check for updates in the background (non-blocking).
- * Shows a notification if a newer version is available.
- * Only checks once per day to avoid network overhead.
+ * Check for updates on every run and auto-update if available.
+ * Uses a 5-second timeout to avoid blocking for too long.
  */
 export async function checkForUpdates(): Promise<void> {
   // Skip in test environment
@@ -154,28 +105,10 @@ export async function checkForUpdates(): Promise<void> {
     return;
   }
 
-  // Skip if we checked recently
-  if (!shouldCheckForUpdate()) {
-    // Auto-update if cached version is newer
-    const cache = readUpdateCache();
-    if (cache?.latestVersion && compareVersions(VERSION, cache.latestVersion)) {
-      performAutoUpdate(cache.latestVersion);
-    }
-    return;
-  }
-
-  // Fetch latest version (blocking for auto-update)
+  // Always fetch the latest version on every run
   try {
     const latestVersion = await fetchLatestVersion();
     if (!latestVersion) return;
-
-    const now = Math.floor(Date.now() / 1000);
-
-    // Update cache with latest check time
-    writeUpdateCache({
-      lastCheck: now,
-      latestVersion,
-    });
 
     // Auto-update if newer version is available
     if (compareVersions(VERSION, latestVersion)) {
