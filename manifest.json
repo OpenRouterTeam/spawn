@@ -1035,7 +1035,7 @@
     "render/nanoclaw": "missing",
     "render/aider": "implemented",
     "render/goose": "missing",
-    "render/codex": "missing",
+    "render/codex": "implemented",
     "render/interpreter": "missing",
     "render/gemini": "missing",
     "render/amazonq": "missing",
