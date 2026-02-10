@@ -458,7 +458,7 @@ wait_for_oauth_code() {
     local timeout="${2:-120}"
     local elapsed=0
 
-    log_warn "Waiting for authentication in browser (timeout: ${timeout}s)..."
+    log_warn "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
         elapsed=$((elapsed + POLL_INTERVAL))
@@ -480,7 +480,10 @@ exchange_oauth_code() {
     api_key=$(echo "${key_response}" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
 
     if [[ -z "${api_key}" ]]; then
-        log_error "Failed to exchange OAuth code: ${key_response}"
+        log_error "Failed to exchange OAuth code for API key"
+        log_warn "Server response: ${key_response}"
+        log_warn "This may indicate the OAuth code expired or was already used"
+        log_warn "Please try again, or set OPENROUTER_API_KEY manually"
         return 1
     fi
 
@@ -542,7 +545,8 @@ start_and_verify_oauth_server() {
 
     sleep "${POLL_INTERVAL}"
     if ! kill -0 "${server_pid}" 2>/dev/null; then
-        log_warn "Failed to start OAuth server (all ports in range may be in use)"
+        log_warn "Failed to start OAuth server - ports ${callback_port}-$((callback_port + 10)) may be in use"
+        log_warn "Try closing other dev servers or set OPENROUTER_API_KEY to skip OAuth"
         return 1
     fi
 
@@ -554,7 +558,8 @@ start_and_verify_oauth_server() {
     done
 
     if [[ ! -f "${port_file}" ]]; then
-        log_warn "OAuth server failed to allocate a port"
+        log_warn "OAuth server failed to allocate a port after 2 seconds"
+        log_warn "Another process may be using ports ${callback_port}-$((callback_port + 10))"
         return 1
     fi
 
@@ -567,13 +572,15 @@ _check_oauth_prerequisites() {
     if ! check_openrouter_connectivity; then
         log_warn "Cannot reach openrouter.ai - network may be unavailable"
         log_warn "Please check your internet connection and try again"
+        log_warn "Alternatively, set OPENROUTER_API_KEY in your environment to skip OAuth"
         return 1
     fi
 
     local runtime
     runtime=$(find_node_runtime)
     if [[ -z "${runtime}" ]]; then
-        log_warn "No Node.js runtime (bun/node) found - OAuth server unavailable"
+        log_warn "No Node.js runtime (bun/node) found - required for the OAuth callback server"
+        log_warn "Install one with: brew install node  OR  curl -fsSL https://bun.sh/install | bash"
         return 1
     fi
 
@@ -666,6 +673,10 @@ try_oauth_flow() {
     # Wait for code
     if ! _wait_for_oauth "${code_file}"; then
         cleanup_oauth_session "${server_pid}" "${oauth_dir}"
+        log_warn "OAuth timed out after 120 seconds. Common causes:"
+        log_warn "  - Browser did not open (try visiting the URL manually)"
+        log_warn "  - Authentication was not completed in the browser"
+        log_warn "  - Firewall or proxy blocked the local callback on port ${actual_port}"
         return 1
     fi
 
@@ -697,8 +708,9 @@ get_openrouter_api_key_oauth() {
 
     # OAuth failed, offer manual entry
     echo ""
-    log_warn "OAuth authentication failed or unavailable"
+    log_warn "OAuth authentication was not completed"
     log_warn "You can enter your API key manually instead"
+    log_warn "Get a free key at: https://openrouter.ai/settings/keys"
     echo ""
     local manual_choice
     manual_choice=$(safe_read "Would you like to enter your API key manually? (Y/n): ") || {
@@ -1301,7 +1313,7 @@ generic_ssh_wait() {
     local max_interval=30
     local elapsed_time=0
 
-    log_warn "Waiting for ${description} to ${ip}..."
+    log_warn "Waiting for ${description} to ${ip} (this usually takes 30-90 seconds)..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         # shellcheck disable=SC2086
         if ssh ${ssh_opts} "${username}@${ip}" "${test_cmd}" >/dev/null 2>&1; then
@@ -1325,6 +1337,7 @@ generic_ssh_wait() {
     done
 
     log_error "${description} failed after ${max_attempts} attempts (${elapsed_time}s elapsed)"
+    log_warn "The server at ${ip} may still be booting. You can try again or check its status in your cloud provider dashboard."
     return 1
 }
 
