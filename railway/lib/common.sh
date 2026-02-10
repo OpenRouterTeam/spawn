@@ -223,12 +223,17 @@ upload_file() {
         return 1
     fi
 
-    # Read file content and encode
+    # SECURITY: base64 -w0 produces single-line output (no newline injection)
+    # macOS base64 doesn't support -w0 but produces single-line by default
     local content
-    content=$(cat "$local_path" | base64)
+    content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
 
-    # Write file on remote service via railway run
-    railway run bash -c "echo '$content' | base64 -d > '$remote_path'"
+    # SECURITY: Properly escape remote_path to prevent injection via single-quote breakout
+    local escaped_path
+    escaped_path=$(printf '%q' "$remote_path")
+
+    # base64 output is alphanumeric+/+= so safe without escaping
+    run_server "printf '%s' '${content}' | base64 -d > ${escaped_path}"
 }
 
 # Wait for system readiness (Railway containers start with Ubuntu base)
