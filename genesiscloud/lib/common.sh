@@ -111,70 +111,6 @@ get_server_name() {
     echo "$server_name"
 }
 
-# Fetch all SSH key IDs from Genesis Cloud account
-_genesis_fetch_ssh_key_ids() {
-    local ssh_keys_response
-    ssh_keys_response=$(genesis_api GET "/ssh-keys")
-    echo "$ssh_keys_response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-keys = data.get('ssh_keys', [])
-ids = [k['id'] for k in keys]
-print(json.dumps(ids))
-"
-}
-
-# Build the JSON request body for Genesis Cloud instance creation
-_genesis_build_create_payload() {
-    local name="$1" instance_type="$2" region="$3" image="$4" ssh_key_ids="$5"
-
-    local userdata
-    userdata=$(get_cloud_init_userdata)
-    local userdata_json
-    userdata_json=$(echo "$userdata" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
-
-    python3 -c "
-import json
-body = {
-    'name': '$name',
-    'type': '$instance_type',
-    'region': '$region',
-    'image': '$image',
-    'ssh_key_ids': $ssh_key_ids,
-    'startup_script': json.loads($userdata_json)
-}
-print(json.dumps(body))
-"
-}
-
-# Poll Genesis Cloud API until instance is active, sets GENESIS_SERVER_IP
-_genesis_wait_for_active() {
-    local server_id="$1"
-    log_warn "Waiting for instance to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(genesis_api GET "/instances/$server_id")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
-
-        if [[ "$status" == "active" ]]; then
-            GENESIS_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['public_ip'])")
-            export GENESIS_SERVER_IP
-            log_info "Instance active: IP=$GENESIS_SERVER_IP"
-            return 0
-        fi
-
-        log_warn "Instance status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
-}
-
 create_server() {
     local name="$1"
     local instance_type="${GENESIS_INSTANCE_TYPE:-vcpu-4_memory-12g_nvidia-rtx-3080-1}"
@@ -189,11 +125,35 @@ create_server() {
 
     log_warn "Creating Genesis Cloud instance '$name' (type: $instance_type, region: $region)..."
 
+    # Get all SSH key IDs
+    local ssh_keys_response
+    ssh_keys_response=$(genesis_api GET "/ssh-keys")
     local ssh_key_ids
-    ssh_key_ids=$(_genesis_fetch_ssh_key_ids)
+    ssh_key_ids=$(echo "$ssh_keys_response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+keys = data.get('ssh_keys', [])
+ids = [k['id'] for k in keys]
+print(json.dumps(ids))
+")
+
+    local userdata
+    userdata=$(get_cloud_init_userdata)
 
     local body
-    body=$(_genesis_build_create_payload "$name" "$instance_type" "$region" "$image" "$ssh_key_ids")
+    body=$(echo "$userdata" | python3 -c "
+import json, sys
+userdata = sys.stdin.read()
+body = {
+    'name': '$name',
+    'type': '$instance_type',
+    'region': '$region',
+    'image': '$image',
+    'ssh_key_ids': $ssh_key_ids,
+    'startup_script': userdata
+}
+print(json.dumps(body))
+")
 
     local response
     response=$(genesis_api POST "/instances" "$body")
@@ -217,7 +177,30 @@ create_server() {
         return 1
     fi
 
-    _genesis_wait_for_active "$GENESIS_SERVER_ID"
+    # Wait for instance to get an IP and become active
+    log_warn "Waiting for instance to become active..."
+    local max_attempts=60
+    local attempt=1
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local status_response
+        status_response=$(genesis_api GET "/instances/$GENESIS_SERVER_ID")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
+
+        if [[ "$status" == "active" ]]; then
+            GENESIS_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['public_ip'])")
+            export GENESIS_SERVER_IP
+            log_info "Instance active: IP=$GENESIS_SERVER_IP"
+            return 0
+        fi
+
+        log_warn "Instance status: $status ($attempt/$max_attempts)"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Instance did not become active in time"
+    return 1
 }
 
 verify_server_connectivity() {

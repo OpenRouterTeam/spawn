@@ -1,0 +1,80 @@
+{
+  "locations": [
+    {
+      "Active": true,
+      "city": "Falkenstein",
+      "country": "DE",
+      "description": "Falkenstein DC Park 1",
+      "id": 1,
+      "latitude": 50.47612,
+      "longitude": 12.370071,
+      "name": "fsn1",
+      "network_zone": "eu-central"
+    },
+    {
+      "Active": true,
+      "city": "Nuremberg",
+      "country": "DE",
+      "description": "Nuremberg DC Park 1",
+      "id": 2,
+      "latitude": 49.452102,
+      "longitude": 11.076665,
+      "name": "nbg1",
+      "network_zone": "eu-central"
+    },
+    {
+      "Active": true,
+      "city": "Helsinki",
+      "country": "FI",
+      "description": "Helsinki DC Park 1",
+      "id": 3,
+      "latitude": 60.169855,
+      "longitude": 24.938379,
+      "name": "hel1",
+      "network_zone": "eu-central"
+    },
+    {
+      "Active": true,
+      "city": "Ashburn, VA",
+      "country": "US",
+      "description": "Ashburn, VA",
+      "id": 4,
+      "latitude": 39.045821,
+      "longitude": -77.487073,
+      "name": "ash",
+      "network_zone": "us-east"
+    },
+    {
+      "Active": true,
+      "city": "Hillsboro, OR",
+      "country": "US",
+      "description": "Hillsboro, OR",
+      "id": 5,
+      "latitude": 45.54222,
+      "longitude": -122.951924,
+      "name": "hil",
+      "network_zone": "us-west"
+    },
+    {
+      "Active": true,
+      "city": "Singapore",
+      "country": "SG",
+      "description": "Singapore",
+      "id": 6,
+      "latitude": 1.283333,
+      "longitude": 103.833333,
+      "name": "sin",
+      "network_zone": "ap-southeast"
+    }
+  ],
+  "meta": {
+    "pagination": {
+      "last_page": 1,
+      "next_page": null,
+      "page": 1,
+      "per_page": 25,
+      "previous_page": null,
+      "total_entries": 6
+    }
+  }
+}

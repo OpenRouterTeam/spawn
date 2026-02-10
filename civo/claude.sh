@@ -24,7 +24,7 @@ log_warn "Waiting for cloud-init to complete..."
 generic_ssh_wait "root" "${CIVO_SERVER_IP}" "${SSH_OPTS} -o ConnectTimeout=5" "test -f /root/.cloud-init-complete" "cloud-init" 60 5
 
 log_warn "Verifying Claude Code installation..."
-if ! run_server "${CIVO_SERVER_IP}" "command -v claude" >/dev/null 2>&1; then
+if ! run_server "${CIVO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
     log_warn "Claude Code not found, installing manually..."
     run_server "${CIVO_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
@@ -58,4 +58,4 @@ echo ""
 log_warn "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${CIVO_SERVER_IP}" "source ~/.zshrc && claude"
+interactive_session "${CIVO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

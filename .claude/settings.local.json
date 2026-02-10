@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(done)",
+      "Bash(grep:*)",
+      "Bash(for cloud in sprite hetzner digitalocean vultr linode)",
+      "Bash(do)",
+      "Bash(echo:*)",
+      "Bash(if ! grep -q \"setup_shell_environment\\\\|inject_env_vars\" \"/Users/ahmed/Documents/GitHub/spawn/$cloud/lib/common.sh\")",
+      "Bash(then)",
+      "Bash(fi)",
+      "Bash(if ! grep -q \"setup_claude_code_config\\\\|setup_openclaw_config\" \"/Users/ahmed/Documents/GitHub/spawn/$cloud/lib/common.sh\")",
+      "Bash(if ! grep -q \"run_server\\\\|upload_file\\\\|interactive_session\" \"/Users/ahmed/Documents/GitHub/spawn/$cloud/lib/common.sh\")",
+      "Bash( ls -d /Users/ahmed/Documents/GitHub/spawn/*/)",
+      "Bash(xargs:*)",
+      "Read(//private/tmp/**)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(bash:*)"
+    ]
+  }
+}

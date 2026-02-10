@@ -1,0 +1,11 @@
+{
+  "cloud": "digitalocean",
+  "recorded_at": "2026-02-10T21:55:29Z",
+  "fixtures": {
+    "account": {"endpoint": "/account", "recorded_at": "2026-02-10T21:55:27Z"},
+    "ssh_keys": {"endpoint": "/account/keys", "recorded_at": "2026-02-10T21:55:27Z"},
+    "droplets": {"endpoint": "/droplets", "recorded_at": "2026-02-10T21:55:28Z"},
+    "sizes": {"endpoint": "/sizes", "recorded_at": "2026-02-10T21:55:29Z"},
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-10T21:55:29Z"}
+  }
+}

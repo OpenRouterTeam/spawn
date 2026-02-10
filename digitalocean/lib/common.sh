@@ -122,19 +122,20 @@ get_server_name() {
 # get_cloud_init_userdata is now defined in shared/common.sh
 
 # Build the JSON request body for DigitalOcean droplet creation
-# Usage: _build_droplet_request_body NAME REGION SIZE IMAGE SSH_KEY_IDS USERDATA_JSON
+# Usage: echo "$userdata" | _build_droplet_request_body NAME REGION SIZE IMAGE SSH_KEY_IDS
 _build_droplet_request_body() {
     local name="$1" region="$2" size="$3" image="$4"
-    local ssh_key_ids="$5" userdata_json="$6"
+    local ssh_key_ids="$5"
     python3 -c "
-import json
+import json, sys
+userdata = sys.stdin.read()
 body = {
     'name': '$name',
     'region': '$region',
     'size': '$size',
     'image': '$image',
     'ssh_keys': $ssh_key_ids,
-    'user_data': json.loads($userdata_json),
+    'user_data': userdata,
     'backups': False,
     'monitoring': False
 }
@@ -199,14 +200,12 @@ create_server() {
     local ssh_key_ids
     ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
-    # JSON-escape the cloud-init userdata
+    # Get cloud-init userdata and build request body (piped via stdin to avoid quoting issues)
     local userdata
     userdata=$(get_cloud_init_userdata)
-    local userdata_json
-    userdata_json=$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" <<< "$userdata")
 
     local body
-    body=$(_build_droplet_request_body "$name" "$region" "$size" "$image" "$ssh_key_ids" "$userdata_json")
+    body=$(echo "$userdata" | _build_droplet_request_body "$name" "$region" "$size" "$image" "$ssh_key_ids")
 
     local response
     response=$(do_api POST "/droplets" "$body")

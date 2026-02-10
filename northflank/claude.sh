@@ -30,7 +30,7 @@ log_warn "Installing Claude Code..."
 run_server "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation
-if ! run_server "command -v claude" >/dev/null 2>&1; then
+if ! run_server "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
     log_error "Claude Code installation failed"
     exit 1
 fi
@@ -69,4 +69,4 @@ echo ""
 log_warn "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "source ~/.bashrc && claude"
+interactive_session "export PATH=\$HOME/.local/bin:\$PATH && source ~/.bashrc && claude"
