@@ -142,23 +142,11 @@ if envs:
     echo "$env_name"
 }
 
-# Create a Hyperstack VM
-create_vm() {
-    local name="$1"
-    local environment="${2:-}"
-    local flavor="${HYPERSTACK_FLAVOR:-n1-cpu-small}"
-    local image="${HYPERSTACK_IMAGE:-Ubuntu Server 24.04 LTS R5504 UEFI}"
-    local key_name="${HYPERSTACK_SSH_KEY_NAME:-spawn-key-$(whoami)}"
-
-    # Validate env var inputs to prevent injection
-    validate_resource_name "$flavor" || { log_error "Invalid HYPERSTACK_FLAVOR"; return 1; }
-    validate_resource_name "$key_name" || { log_error "Invalid HYPERSTACK_SSH_KEY_NAME"; return 1; }
-
-    log_warn "Creating Hyperstack VM '$name' (flavor: $flavor, env: $environment)..."
-
-    # Build request body using stdin to prevent Python injection
-    local body
-    body=$(printf '%s\n%s\n%s\n%s\n%s' "$name" "$environment" "$key_name" "$image" "$flavor" | python3 -c "
+# Build the JSON request body for Hyperstack VM creation (uses stdin to prevent injection)
+# Usage: _build_vm_request_body NAME ENVIRONMENT KEY_NAME IMAGE FLAVOR
+_build_vm_request_body() {
+    local name="$1" environment="$2" key_name="$3" image="$4" flavor="$5"
+    printf '%s\n%s\n%s\n%s\n%s' "$name" "$environment" "$key_name" "$image" "$flavor" | python3 -c "
 import json, sys
 lines = sys.stdin.read().split('\n')
 body = {
@@ -181,43 +169,21 @@ body = {
     ]
 }
 print(json.dumps(body))
-")
+"
+}
 
-    local response
-    response=$(hyperstack_api POST "/core/virtual-machines" "$body")
-
-    # Check for errors
-    if echo "$response" | grep -q '"status".*4[0-9][0-9]'; then
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "Failed to create VM: $error_msg"
-        return 1
-    fi
-
-    # Extract VM details from response
-    HYPERSTACK_VM_ID=$(echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-vms = data.get('virtual_machines', [])
-if vms:
-    print(vms[0].get('id', ''))
-")
-
-    if [[ -z "$HYPERSTACK_VM_ID" ]]; then
-        log_error "Failed to extract VM ID from response"
-        return 1
-    fi
-
-    log_info "VM created with ID: $HYPERSTACK_VM_ID"
-
-    # Wait for VM to become active and get IP
-    log_warn "Waiting for VM to become active..."
-    local max_wait=300
+# Wait for a Hyperstack VM to become active and set its IP
+# Sets: HYPERSTACK_VM_IP, HYPERSTACK_VM_ID (exported)
+# Usage: _wait_for_vm_active VM_ID [MAX_WAIT_SECONDS]
+_wait_for_vm_active() {
+    local vm_id="$1"
+    local max_wait="${2:-300}"
     local elapsed=0
 
+    log_warn "Waiting for VM to become active..."
     while [[ $elapsed -lt $max_wait ]]; do
         local vm_info
-        vm_info=$(hyperstack_api GET "/core/virtual-machines/$HYPERSTACK_VM_ID")
+        vm_info=$(hyperstack_api GET "/core/virtual-machines/$vm_id")
 
         local status
         status=$(echo "$vm_info" | python3 -c "
@@ -236,7 +202,7 @@ print(data.get('floating_ip', ''))
             if [[ -n "$HYPERSTACK_VM_IP" ]]; then
                 log_info "VM is active with IP: $HYPERSTACK_VM_IP"
                 export HYPERSTACK_VM_IP
-                export HYPERSTACK_VM_ID
+                export HYPERSTACK_VM_ID="$vm_id"
                 return 0
             fi
         fi
@@ -247,6 +213,53 @@ print(data.get('floating_ip', ''))
 
     log_error "VM did not become active within ${max_wait}s"
     return 1
+}
+
+# Create a Hyperstack VM
+create_vm() {
+    local name="$1"
+    local environment="${2:-}"
+    local flavor="${HYPERSTACK_FLAVOR:-n1-cpu-small}"
+    local image="${HYPERSTACK_IMAGE:-Ubuntu Server 24.04 LTS R5504 UEFI}"
+    local key_name="${HYPERSTACK_SSH_KEY_NAME:-spawn-key-$(whoami)}"
+
+    # Validate env var inputs to prevent injection
+    validate_resource_name "$flavor" || { log_error "Invalid HYPERSTACK_FLAVOR"; return 1; }
+    validate_resource_name "$key_name" || { log_error "Invalid HYPERSTACK_SSH_KEY_NAME"; return 1; }
+
+    log_warn "Creating Hyperstack VM '$name' (flavor: $flavor, env: $environment)..."
+
+    local body
+    body=$(_build_vm_request_body "$name" "$environment" "$key_name" "$image" "$flavor")
+
+    local response
+    response=$(hyperstack_api POST "/core/virtual-machines" "$body")
+
+    # Check for errors
+    if echo "$response" | grep -q '"status".*4[0-9][0-9]'; then
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        log_error "Failed to create VM: $error_msg"
+        return 1
+    fi
+
+    # Extract VM ID from response
+    HYPERSTACK_VM_ID=$(echo "$response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+vms = data.get('virtual_machines', [])
+if vms:
+    print(vms[0].get('id', ''))
+")
+
+    if [[ -z "$HYPERSTACK_VM_ID" ]]; then
+        log_error "Failed to extract VM ID from response"
+        return 1
+    fi
+
+    log_info "VM created with ID: $HYPERSTACK_VM_ID"
+
+    _wait_for_vm_active "$HYPERSTACK_VM_ID"
 }
 
 # Verify server connectivity via SSH
