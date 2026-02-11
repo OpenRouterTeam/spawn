@@ -1139,7 +1139,7 @@
     "hostinger/opencode": "implemented",
     "hostinger/plandex": "missing",
     "hostinger/kilocode": "implemented",
-    "hostinger/continue": "missing",
+    "hostinger/continue": "implemented",
     "local/claude": "implemented",
     "local/openclaw": "implemented",
     "local/nanoclaw": "implemented",
