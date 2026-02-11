@@ -30,10 +30,10 @@ _cherry_json_field() {
 import sys, json
 try:
     data = json.load(sys.stdin)
-    print(data.get('$field', ''))
+    print(data.get(sys.argv[1], ''))
 except:
     pass
-" 2>&1
+" "$field" 2>&1
 }
 
 # Find an SSH key ID by fingerprint from a JSON array of keys
@@ -45,12 +45,12 @@ import sys, json
 try:
     keys = json.load(sys.stdin)
     for key in keys:
-        if key.get('fingerprint', '') == '$fingerprint':
+        if key.get('fingerprint', '') == sys.argv[1]:
             print(key.get('id', ''))
             break
 except:
     pass
-" 2>&1
+" "$fingerprint" 2>&1
 }
 
 # Extract the primary IP address from a Cherry server info response
@@ -132,11 +132,17 @@ ensure_ssh_key() {
     log_info "Registering new SSH key with Cherry Servers..."
 
     local label="spawn-$(date +%s)"
+    local ssh_key_payload
+    ssh_key_payload=$(python3 -c "
+import json, sys
+print(json.dumps({'label': sys.argv[1], 'key': sys.argv[2]}))
+" "$label" "$ssh_pub_key")
+
     local response
     response=$(curl -s -X POST \
         -H "Authorization: Bearer ${CHERRY_AUTH_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d "{\"label\": \"$label\", \"key\": \"$ssh_pub_key\"}" \
+        -d "$ssh_key_payload" \
         "${CHERRY_API_BASE}/ssh-keys" 2>&1)
 
     key_id=$(printf '%s' "$response" | _cherry_json_field "id")
@@ -206,6 +212,11 @@ create_server() {
 
     check_python_available
 
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$hostname" || { log_error "Invalid hostname"; return 1; }
+    validate_resource_name "$plan" || { log_error "Invalid CHERRY_DEFAULT_PLAN"; return 1; }
+    validate_resource_name "$region" || { log_error "Invalid CHERRY_DEFAULT_REGION"; return 1; }
+
     local project_id
     project_id=$(get_cherry_project_id)
 
@@ -214,16 +225,16 @@ create_server() {
 
     local payload
     payload=$(python3 -c "
-import json
+import json, sys
 data = {
-    'plan': '$plan',
-    'region': '$region',
-    'image': '$image',
-    'hostname': '$hostname',
-    'ssh_keys': [${CHERRY_SSH_KEY_ID}]
+    'plan': sys.argv[1],
+    'region': sys.argv[2],
+    'image': sys.argv[3],
+    'hostname': sys.argv[4],
+    'ssh_keys': [int(sys.argv[5])]
 }
 print(json.dumps(data))
-")
+" "$plan" "$region" "$image" "$hostname" "${CHERRY_SSH_KEY_ID}")
 
     local response
     response=$(curl -s -X POST \
