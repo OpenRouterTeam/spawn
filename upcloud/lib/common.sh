@@ -227,6 +227,29 @@ print(json.dumps(body))
 " <<< "$json_ssh_key"
 }
 
+# Parse server UUID from create response, or log error and return 1
+# Sets UPCLOUD_SERVER_UUID on success
+_upcloud_handle_create_response() {
+    local response="$1"
+
+    if echo "$response" | grep -q '"error"'; then
+        log_error "Failed to create UpCloud server"
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('error_message','Unknown error'))" 2>/dev/null || echo "$response")
+        log_error "API Error: $error_msg"
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance"
+        log_warn "  - Plan not available in zone (try different UPCLOUD_PLAN or UPCLOUD_ZONE)"
+        log_warn "  - Server limit reached"
+        log_warn "Remediation: Check https://hub.upcloud.com/"
+        return 1
+    fi
+
+    UPCLOUD_SERVER_UUID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['uuid'])")
+    export UPCLOUD_SERVER_UUID
+    log_info "Server created: UUID=$UPCLOUD_SERVER_UUID"
+}
+
 # Create an UpCloud server
 create_server() {
     local name="$1"
@@ -263,24 +286,7 @@ create_server() {
     local response
     response=$(upcloud_api POST "/server" "$body")
 
-    # Check for errors
-    if echo "$response" | grep -q '"error"'; then
-        log_error "Failed to create UpCloud server"
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('error_message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Plan not available in zone (try different UPCLOUD_PLAN or UPCLOUD_ZONE)"
-        log_warn "  - Server limit reached"
-        log_warn "Remediation: Check https://hub.upcloud.com/"
-        return 1
-    fi
-
-    # Extract server UUID
-    UPCLOUD_SERVER_UUID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['uuid'])")
-    export UPCLOUD_SERVER_UUID
-    log_info "Server created: UUID=$UPCLOUD_SERVER_UUID"
+    _upcloud_handle_create_response "$response" || return 1
 
     _wait_for_upcloud_server_ip "$UPCLOUD_SERVER_UUID"
 }

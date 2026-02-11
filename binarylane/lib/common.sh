@@ -167,6 +167,57 @@ _binarylane_wait_for_active() {
     return 1
 }
 
+# Build JSON request body for BinaryLane server creation
+# Usage: _binarylane_build_server_body NAME REGION SIZE IMAGE SSH_KEY_IDS
+_binarylane_build_server_body() {
+    local name="$1" region="$2" size="$3" image="$4" ssh_key_ids="$5"
+
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+    local json_userdata
+    json_userdata=$(json_escape "$userdata")
+
+    python3 -c "
+import json, sys
+userdata = json.loads(sys.stdin.read())
+body = {
+    'name': '$name',
+    'region': '$region',
+    'size': '$size',
+    'image': '$image',
+    'ssh_keys': $ssh_key_ids,
+    'user_data': userdata,
+    'backups': False
+}
+print(json.dumps(body))
+" <<< "$json_userdata"
+}
+
+# Parse server ID from create response, or log error and return 1
+# Sets BINARYLANE_SERVER_ID on success
+_binarylane_handle_create_response() {
+    local response="$1"
+
+    if echo "$response" | grep -q '"server"'; then
+        BINARYLANE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])")
+        export BINARYLANE_SERVER_ID
+        log_info "Server created: ID=$BINARYLANE_SERVER_ID"
+        return 0
+    fi
+
+    log_error "Failed to create BinaryLane server"
+    local error_msg
+    error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
+    log_error "API Error: $error_msg"
+    log_warn "Common issues:"
+    log_warn "  - Insufficient account balance"
+    log_warn "  - Size/region/image unavailable (try different BINARYLANE_SIZE, BINARYLANE_REGION, or BINARYLANE_IMAGE)"
+    log_warn "  - Server limit reached"
+    log_warn "  - Invalid cloud-init userdata"
+    log_warn "Remediation: Check https://home.binarylane.com.au/"
+    return 1
+}
+
 create_server() {
     local name="$1"
     local size="${BINARYLANE_SIZE:-std-1vcpu}"
@@ -186,52 +237,14 @@ create_server() {
     local ssh_key_ids
     ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
-    local userdata
-    userdata=$(get_cloud_init_userdata)
-
-    # Pass userdata safely via stdin to avoid triple-quote injection
-    local json_userdata
-    json_userdata=$(json_escape "$userdata")
-
+    # Build request body and create server
     local body
-    body=$(python3 -c "
-import json, sys
-userdata = json.loads(sys.stdin.read())
-body = {
-    'name': '$name',
-    'region': '$region',
-    'size': '$size',
-    'image': '$image',
-    'ssh_keys': $ssh_key_ids,
-    'user_data': userdata,
-    'backups': False
-}
-print(json.dumps(body))
-" <<< "$json_userdata")
+    body=$(_binarylane_build_server_body "$name" "$region" "$size" "$image" "$ssh_key_ids")
 
     local response
     response=$(binarylane_api POST "/servers" "$body")
 
-    if echo "$response" | grep -q '"server"'; then
-        BINARYLANE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])")
-        export BINARYLANE_SERVER_ID
-        log_info "Server created: ID=$BINARYLANE_SERVER_ID"
-    else
-        log_error "Failed to create BinaryLane server"
-
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Size/region/image unavailable (try different BINARYLANE_SIZE, BINARYLANE_REGION, or BINARYLANE_IMAGE)"
-        log_warn "  - Server limit reached"
-        log_warn "  - Invalid cloud-init userdata"
-        log_warn "Remediation: Check https://home.binarylane.com.au/"
-        return 1
-    fi
+    _binarylane_handle_create_response "$response" || return 1
 
     # Wait for server to become active with IP
     _binarylane_wait_for_active
