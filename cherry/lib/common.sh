@@ -19,6 +19,57 @@ CHERRY_DEFAULT_REGION="${CHERRY_DEFAULT_REGION:-eu_nord_1}"
 CHERRY_DEFAULT_IMAGE="${CHERRY_DEFAULT_IMAGE:-Ubuntu 24.04 64bit}"
 
 # ============================================================
+# JSON Helpers
+# ============================================================
+
+# Extract a field from a JSON object via stdin
+# Usage: echo '{"id": 123}' | _cherry_json_field "id"
+_cherry_json_field() {
+    local field="$1"
+    python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get('$field', ''))
+except:
+    pass
+" 2>&1
+}
+
+# Find an SSH key ID by fingerprint from a JSON array of keys
+# Usage: echo '[{"fingerprint":"...","id":1}]' | _cherry_find_key_by_fingerprint "aa:bb:..."
+_cherry_find_key_by_fingerprint() {
+    local fingerprint="$1"
+    python3 -c "
+import sys, json
+try:
+    keys = json.load(sys.stdin)
+    for key in keys:
+        if key.get('fingerprint', '') == '$fingerprint':
+            print(key.get('id', ''))
+            break
+except:
+    pass
+" 2>&1
+}
+
+# Extract the primary IP address from a Cherry server info response
+# Usage: echo '{"ip_addresses":[...]}' | _cherry_extract_primary_ip
+_cherry_extract_primary_ip() {
+    python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for addr in data.get('ip_addresses', []):
+        if addr.get('type') == 'primary-ip':
+            print(addr.get('address', ''))
+            break
+except:
+    pass
+" 2>&1
+}
+
+# ============================================================
 # Authentication
 # ============================================================
 
@@ -68,18 +119,7 @@ ensure_ssh_key() {
 
     # Check if our key is already registered
     local key_id
-    key_id=$(printf '%s' "$existing_keys" | python3 -c "
-import sys, json
-try:
-    keys = json.load(sys.stdin)
-    fingerprint = '${key_fingerprint}'
-    for key in keys:
-        if key.get('fingerprint', '') == fingerprint:
-            print(key.get('id', ''))
-            break
-except:
-    pass
-" 2>&1)
+    key_id=$(printf '%s' "$existing_keys" | _cherry_find_key_by_fingerprint "$key_fingerprint")
 
     if [[ -n "$key_id" ]]; then
         log_info "SSH key already registered (ID: $key_id)"
@@ -99,14 +139,7 @@ except:
         -d "{\"label\": \"$label\", \"key\": \"$ssh_pub_key\"}" \
         "${CHERRY_API_BASE}/ssh-keys" 2>&1)
 
-    key_id=$(printf '%s' "$response" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    print(data.get('id', ''))
-except:
-    pass
-" 2>&1)
+    key_id=$(printf '%s' "$response" | _cherry_json_field "id")
 
     if [[ -z "$key_id" ]]; then
         log_error "Failed to register SSH key"
@@ -140,8 +173,7 @@ try:
     data = json.load(sys.stdin)
     if isinstance(data, list) and len(data) > 0:
         print(data[0].get('id', ''))
-except:
-    pass
+except: pass
 " 2>&1)
 
     if [[ -z "$project_id" ]]; then
@@ -201,14 +233,7 @@ print(json.dumps(data))
         "${CHERRY_API_BASE}/projects/${project_id}/servers" 2>&1)
 
     local server_id
-    server_id=$(printf '%s' "$response" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    print(data.get('id', ''))
-except:
-    pass
-" 2>&1)
+    server_id=$(printf '%s' "$response" | _cherry_json_field "id")
 
     if [[ -z "$server_id" ]]; then
         log_error "Failed to create server"
@@ -235,18 +260,7 @@ except:
             -H "Content-Type: application/json" \
             "${CHERRY_API_BASE}/servers/${server_id}" 2>&1)
 
-        ip_address=$(printf '%s' "$server_info" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    addresses = data.get('ip_addresses', [])
-    for addr in addresses:
-        if addr.get('type') == 'primary-ip':
-            print(addr.get('address', ''))
-            break
-except:
-    pass
-" 2>&1)
+        ip_address=$(printf '%s' "$server_info" | _cherry_extract_primary_ip)
 
         attempts=$((attempts + 1))
     done
