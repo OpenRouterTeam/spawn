@@ -56,11 +56,6 @@ function validateNonEmptyString(value: string, fieldName: string, helpCommand: s
   }
 }
 
-function errorMessage(message: string): never {
-  p.log.error(message);
-  process.exit(1);
-}
-
 function mapToSelectOptions<T extends { name: string; description: string }>(
   keys: string[],
   items: Record<string, T>
