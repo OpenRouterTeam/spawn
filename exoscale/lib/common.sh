@@ -190,7 +190,7 @@ _wait_for_exoscale_instance() {
             fi
         fi
 
-        log_warn "Instance status: $status ($attempt/$max_attempts)"
+        log_step "Instance status: $status ($attempt/$max_attempts)"
         sleep "${INSTANCE_STATUS_POLL_DELAY}"
         attempt=$((attempt + 1))
     done

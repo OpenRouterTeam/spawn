@@ -246,7 +246,7 @@ _scaleway_power_on_and_wait() {
             fi
         fi
 
-        log_warn "Instance state: $state ($attempt/$max_attempts)"
+        log_step "Instance state: $state ($attempt/$max_attempts)"
         sleep "${INSTANCE_STATUS_POLL_DELAY}"
         attempt=$((attempt + 1))
     done
