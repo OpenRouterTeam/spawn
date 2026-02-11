@@ -1134,7 +1134,7 @@
     "hostinger/interpreter": "missing",
     "hostinger/gemini": "implemented",
     "hostinger/amazonq": "missing",
-    "hostinger/cline": "missing",
+    "hostinger/cline": "implemented",
     "hostinger/gptme": "missing",
     "hostinger/opencode": "implemented",
     "hostinger/plandex": "missing",
