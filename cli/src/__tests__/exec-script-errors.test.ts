@@ -211,8 +211,36 @@ describe("execScript bash execution error handling", () => {
       expect(errors).toContain("Common causes");
     });
 
-    it("should mention missing credentials for generic failures", async () => {
+    it("should mention missing credentials for exit code 1", async () => {
       mockFetchWithScript("exit 1");
+      await loadManifest(true);
+
+      try {
+        await cmdRun("claude", "sprite");
+      } catch {
+        // Expected
+      }
+
+      const errors = getErrorOutput();
+      expect(errors).toContain("credentials");
+    });
+
+    it("should mention API errors for exit code 1", async () => {
+      mockFetchWithScript("exit 1");
+      await loadManifest(true);
+
+      try {
+        await cmdRun("claude", "sprite");
+      } catch {
+        // Expected
+      }
+
+      const errors = getErrorOutput();
+      expect(errors).toContain("API error");
+    });
+
+    it("should mention local dependencies for other exit codes", async () => {
+      mockFetchWithScript("exit 2");
       await loadManifest(true);
 
       try {
@@ -223,34 +251,6 @@ describe("execScript bash execution error handling", () => {
 
       const errors = getErrorOutput();
       expect(errors).toContain("Missing credentials");
-    });
-
-    it("should mention rate limits for generic failures", async () => {
-      mockFetchWithScript("exit 1");
-      await loadManifest(true);
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
-
-      const errors = getErrorOutput();
-      expect(errors).toContain("rate limit");
-    });
-
-    it("should mention local dependencies for generic failures", async () => {
-      mockFetchWithScript("exit 1");
-      await loadManifest(true);
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
-
-      const errors = getErrorOutput();
-      expect(errors).toContain("SSH");
       expect(errors).toContain("curl");
       expect(errors).toContain("jq");
     });

@@ -445,6 +445,11 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
       console.error(`  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`);
     } else if (exitCode === 126) {
       console.error("\nA command was found but could not be executed (permission denied).");
+    } else if (exitCode === 1) {
+      console.error("\nCommon causes:");
+      console.error(`  - Missing or invalid credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`);
+      console.error("  - Cloud provider API error (quota, rate limit, or region issue)");
+      console.error("  - Server provisioning failed (try again or pick a different region)");
     } else {
       console.error("\nCommon causes:");
       console.error(`  - Missing credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup instructions)`);
@@ -601,7 +606,9 @@ export async function cmdList(): Promise<void> {
   const impl = countImplemented(manifest);
   const total = agents.length * clouds.length;
   console.log();
-  if (!isCompact) {
+  if (isCompact) {
+    console.log(`${pc.green("N/N")} all clouds  ${pc.yellow("N/N")} some missing`);
+  } else {
     console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   }
   console.log(pc.green(`${impl}/${total} combinations implemented`));
@@ -876,7 +883,7 @@ export async function cmdUpdate(): Promise<void> {
       console.log();
     }
   } catch (err) {
-    s.stop(pc.red("Failed to check for updates"));
+    s.stop(pc.red(`Failed to check for updates ${pc.dim(`(current: v${VERSION})`)}`));
     console.error("Error:", getErrorMessage(err));
     console.error(`\nTroubleshooting:`);
     console.error(`  1. Check your internet connection`);
