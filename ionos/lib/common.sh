@@ -87,53 +87,60 @@ test_ionos_credentials() {
     return 0
 }
 
+# Try loading IONOS credentials from config file
+# Returns 0 if loaded, 1 otherwise
+_ionos_load_config_credentials() {
+    local config_file="$1"
+    local creds
+    creds=$(_load_json_config_fields "$config_file" username password) || return 1
+
+    local saved_user saved_pass
+    { read -r saved_user; read -r saved_pass; } <<< "${creds}"
+    if [[ -z "$saved_user" ]] || [[ -z "$saved_pass" ]]; then
+        return 1
+    fi
+
+    log_info "Loading IONOS credentials from $config_file"
+    export IONOS_USERNAME="$saved_user" IONOS_PASSWORD="$saved_pass"
+}
+
+# Prompt user for IONOS credentials interactively
+# Returns 0 on success (exports credentials), 1 on failure
+_ionos_prompt_credentials() {
+    log_warn "IONOS Cloud credentials not found"
+    echo ""
+    log_info "Get credentials at: https://dcd.ionos.com/ → Management → Users & Keys"
+    echo ""
+
+    IONOS_USERNAME=$(safe_read "Enter IONOS username (email): ") || return 1
+    IONOS_PASSWORD=$(safe_read "Enter IONOS password/API key: ") || return 1
+    export IONOS_USERNAME IONOS_PASSWORD
+}
+
 # Ensure IONOS credentials are available (env vars → config file → prompt+save)
 ensure_ionos_credentials() {
     local config_file="$HOME/.config/spawn/ionos.json"
 
-    # Check environment variables first
+    # Try env vars, then config file, then prompt
     if [[ -z "${IONOS_USERNAME:-}" ]] || [[ -z "${IONOS_PASSWORD:-}" ]]; then
-        # Try loading from config file (single python3 call instead of 2)
-        local creds
-        if creds=$(_load_json_config_fields "$config_file" username password); then
-            local saved_user saved_pass
-            { read -r saved_user; read -r saved_pass; } <<< "${creds}"
-            if [[ -n "$saved_user" ]] && [[ -n "$saved_pass" ]]; then
-                log_info "Loading IONOS credentials from $config_file"
-                export IONOS_USERNAME="$saved_user" IONOS_PASSWORD="$saved_pass"
-            fi
-        fi
+        _ionos_load_config_credentials "$config_file" || true
     fi
 
-    # If still missing, prompt user
+    local need_save=false
     if [[ -z "${IONOS_USERNAME:-}" ]] || [[ -z "${IONOS_PASSWORD:-}" ]]; then
-        log_warn "IONOS Cloud credentials not found"
-        echo ""
-        log_info "Get credentials at: https://dcd.ionos.com/ → Management → Users & Keys"
-        echo ""
+        _ionos_prompt_credentials || return 1
+        need_save=true
+    fi
 
-        IONOS_USERNAME=$(safe_read "Enter IONOS username (email): ") || return 1
-        IONOS_PASSWORD=$(safe_read "Enter IONOS password/API key: ") || return 1
-        export IONOS_USERNAME IONOS_PASSWORD
+    log_info "Testing IONOS credentials..."
+    if ! test_ionos_credentials; then
+        log_error "Invalid IONOS credentials. Please check IONOS_USERNAME and IONOS_PASSWORD."
+        return 1
+    fi
 
-        # Test credentials before saving
-        log_info "Testing IONOS credentials..."
-        if ! test_ionos_credentials; then
-            log_error "Invalid IONOS credentials"
-            return 1
-        fi
-
+    if [[ "$need_save" == "true" ]]; then
         _save_json_config "$config_file" username "$IONOS_USERNAME" password "$IONOS_PASSWORD"
-    else
-        # Test existing credentials
-        log_info "Testing IONOS credentials..."
-        if ! test_ionos_credentials; then
-            log_error "Invalid IONOS credentials. Please check IONOS_USERNAME and IONOS_PASSWORD."
-            return 1
-        fi
     fi
-
-    return 0
 }
 
 # Check if SSH key is registered with IONOS
@@ -206,38 +213,32 @@ get_server_name() {
     echo "$server_name"
 }
 
-# Ensure datacenter exists or create one
-ensure_datacenter() {
-    local location="${IONOS_LOCATION:-us/las}"
+# Try to find and use an existing IONOS datacenter
+# Sets IONOS_DATACENTER_ID on success, returns 1 if none found
+_ionos_find_existing_datacenter() {
+    local response="$1"
 
-    # Validate location format (e.g., us/las, de/fra, de/txl)
-    if [[ ! "$location" =~ ^[a-z]{2}/[a-z]{2,4}$ ]]; then
-        log_error "Invalid IONOS_LOCATION format: '$location' (expected format: us/las)"
-        return 1
-    fi
-
-    log_warn "Checking for existing IONOS datacenter..."
-
-    # List datacenters
-    local response
-    response=$(ionos_api GET "/datacenters?depth=1")
-
-    # Check if we have any datacenters
     local dc_count
     dc_count=$(echo "$response" | python3 -c "import json,sys; print(len(json.loads(sys.stdin.read()).get('items',[])))" 2>/dev/null || echo "0")
 
-    if [[ "$dc_count" -gt 0 ]]; then
-        # Use the first datacenter
-        IONOS_DATACENTER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['items'][0]['id'])")
-        local dc_name
-        dc_name=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['items'][0]['properties']['name'])")
-        log_info "Using existing datacenter: $dc_name (ID: $IONOS_DATACENTER_ID)"
-    else
-        # Create a new datacenter
-        log_warn "No datacenter found, creating new datacenter..."
+    if [[ "$dc_count" -eq 0 ]]; then
+        return 1
+    fi
 
-        local dc_body
-        dc_body=$(python3 -c "
+    IONOS_DATACENTER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['items'][0]['id'])")
+    local dc_name
+    dc_name=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['items'][0]['properties']['name'])")
+    log_info "Using existing datacenter: $dc_name (ID: $IONOS_DATACENTER_ID)"
+}
+
+# Create a new IONOS datacenter
+# Sets IONOS_DATACENTER_ID on success
+_ionos_create_datacenter() {
+    local location="$1"
+    log_warn "No datacenter found, creating new datacenter..."
+
+    local dc_body
+    dc_body=$(python3 -c "
 import json
 body = {
     'properties': {
@@ -249,19 +250,35 @@ body = {
 print(json.dumps(body))
 ")
 
-        local dc_response
-        dc_response=$(ionos_api POST "/datacenters" "$dc_body")
+    local dc_response
+    dc_response=$(ionos_api POST "/datacenters" "$dc_body")
 
-        if ionos_check_api_error "$dc_response" "Failed to create datacenter"; then
-            return 1
-        fi
+    if ionos_check_api_error "$dc_response" "Failed to create datacenter"; then
+        return 1
+    fi
 
-        IONOS_DATACENTER_ID=$(echo "$dc_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
-        log_info "Datacenter created: $IONOS_DATACENTER_ID"
+    IONOS_DATACENTER_ID=$(echo "$dc_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    log_info "Datacenter created: $IONOS_DATACENTER_ID"
+}
+
+# Ensure datacenter exists or create one
+ensure_datacenter() {
+    local location="${IONOS_LOCATION:-us/las}"
+
+    if [[ ! "$location" =~ ^[a-z]{2}/[a-z]{2,4}$ ]]; then
+        log_error "Invalid IONOS_LOCATION format: '$location' (expected format: us/las)"
+        return 1
+    fi
+
+    log_warn "Checking for existing IONOS datacenter..."
+    local response
+    response=$(ionos_api GET "/datacenters?depth=1")
+
+    if ! _ionos_find_existing_datacenter "$response"; then
+        _ionos_create_datacenter "$location" || return 1
     fi
 
     export IONOS_DATACENTER_ID
-    return 0
 }
 
 # Find Ubuntu 24.04 HDD image ID from IONOS API
@@ -284,21 +301,17 @@ for img in data.get('items', []):
 " 2>/dev/null
 }
 
-# Create a boot volume in the datacenter and wait for it to become AVAILABLE
-# Usage: volume_id=$(_ionos_create_boot_volume NAME DISK_SIZE IMAGE_ID)
-_ionos_create_boot_volume() {
-    local name="$1"
-    local disk_size="$2"
-    local image_id="$3"
+# Build JSON request body for IONOS volume creation
+# Reads cloud-init userdata, outputs JSON body
+_ionos_build_volume_body() {
+    local name="$1" disk_size="$2" image_id="$3"
 
     local userdata
     userdata=$(get_cloud_init_userdata)
     local userdata_json
     userdata_json=$(echo "$userdata" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
 
-    log_warn "Creating boot volume..."
-    local volume_body
-    volume_body=$(python3 -c "
+    python3 -c "
 import json
 body = {
     'properties': {
@@ -312,7 +325,44 @@ body = {
     }
 }
 print(json.dumps(body))
-")
+"
+}
+
+# Poll until an IONOS volume reaches AVAILABLE state
+# Usage: _ionos_wait_for_volume VOLUME_ID [MAX_WAIT]
+_ionos_wait_for_volume() {
+    local volume_id="$1"
+    local max_wait="${2:-120}"
+
+    log_warn "Waiting for volume provisioning..."
+    local waited=0
+    while [[ $waited -lt $max_wait ]]; do
+        local vol_status
+        vol_status=$(ionos_api GET "/datacenters/${IONOS_DATACENTER_ID}/volumes/${volume_id}")
+        local state
+        state=$(echo "$vol_status" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('metadata',{}).get('state',''))" 2>/dev/null || echo "")
+
+        if [[ "$state" == "AVAILABLE" ]]; then
+            log_info "Volume ready"
+            return 0
+        fi
+
+        sleep 5
+        waited=$((waited + 5))
+    done
+    return 1
+}
+
+# Create a boot volume in the datacenter and wait for it to become AVAILABLE
+# Usage: volume_id=$(_ionos_create_boot_volume NAME DISK_SIZE IMAGE_ID)
+_ionos_create_boot_volume() {
+    local name="$1"
+    local disk_size="$2"
+    local image_id="$3"
+
+    log_warn "Creating boot volume..."
+    local volume_body
+    volume_body=$(_ionos_build_volume_body "$name" "$disk_size" "$image_id")
 
     local volume_response
     volume_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/volumes" "$volume_body")
@@ -325,24 +375,7 @@ print(json.dumps(body))
     volume_id=$(echo "$volume_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
     log_info "Volume created: $volume_id"
 
-    # Wait for volume to be ready
-    log_warn "Waiting for volume provisioning..."
-    local max_wait=120
-    local waited=0
-    while [[ $waited -lt $max_wait ]]; do
-        local vol_status
-        vol_status=$(ionos_api GET "/datacenters/${IONOS_DATACENTER_ID}/volumes/${volume_id}")
-        local state
-        state=$(echo "$vol_status" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('metadata',{}).get('state',''))" 2>/dev/null || echo "")
-
-        if [[ "$state" == "AVAILABLE" ]]; then
-            log_info "Volume ready"
-            break
-        fi
-
-        sleep 5
-        waited=$((waited + 5))
-    done
+    _ionos_wait_for_volume "$volume_id" || true
 
     echo "$volume_id"
 }
