@@ -506,10 +506,14 @@ wait_for_oauth_code() {
 exchange_oauth_code() {
     local oauth_code="${1}"
 
+    # SECURITY: Use json_escape to prevent JSON injection via crafted OAuth codes
+    local escaped_code
+    escaped_code=$(json_escape "${oauth_code}")
+
     local key_response
     key_response=$(curl -s --max-time 30 -X POST "https://openrouter.ai/api/v1/auth/keys" \
         -H "Content-Type: application/json" \
-        -d "{\"code\": \"${oauth_code}\"}")
+        -d "{\"code\": ${escaped_code}}")
 
     local api_key
     api_key=$(echo "${key_response}" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')

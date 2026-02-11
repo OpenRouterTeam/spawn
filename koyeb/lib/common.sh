@@ -201,6 +201,7 @@ create_server() {
 }
 
 # Run a command on the Koyeb service instance
+# SECURITY: Uses printf %q to properly escape commands to prevent injection
 run_server() {
     local cmd="$1"
 
@@ -209,7 +210,9 @@ run_server() {
         return 1
     fi
 
-    koyeb instances exec "$KOYEB_INSTANCE_ID" -- bash -c "$cmd"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$cmd")
+    koyeb instances exec "$KOYEB_INSTANCE_ID" -- bash -c "$escaped_cmd"
 }
 
 # Upload a file to the Koyeb instance via base64 encoding
@@ -278,7 +281,10 @@ interactive_session() {
     fi
 
     log_info "Starting interactive session..."
-    koyeb instances exec "$KOYEB_INSTANCE_ID" -- bash -c "$launch_cmd"
+    # SECURITY: Properly escape command to prevent injection
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$launch_cmd")
+    koyeb instances exec "$KOYEB_INSTANCE_ID" -- bash -c "$escaped_cmd"
 }
 
 # Cleanup: delete the service and app

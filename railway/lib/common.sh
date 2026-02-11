@@ -164,11 +164,14 @@ create_server() {
 }
 
 # Run a command on the Railway service
+# SECURITY: Uses printf %q to properly escape commands to prevent injection
 run_server() {
     local cmd="$1"
 
     # Railway CLI doesn't have a direct exec - we use shell command via railway run
-    railway run bash -c "$cmd"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$cmd")
+    railway run bash -c "$escaped_cmd"
 }
 
 # Upload a file to the Railway service
