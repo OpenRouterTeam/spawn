@@ -1010,7 +1010,7 @@
     "civo/continue": "missing",
     "scaleway/continue": "missing",
     "daytona/continue": "missing",
-    "upcloud/continue": "missing",
+    "upcloud/continue": "implemented",
     "binarylane/continue": "missing",
     "latitude/continue": "missing",
     "ovh/continue": "missing",
