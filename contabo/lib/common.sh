@@ -92,71 +92,14 @@ test_contabo_credentials() {
     return 0
 }
 
-# Prompt for a single Contabo credential if not already set
-# Usage: _prompt_contabo_cred VAR_NAME "prompt text"
-_prompt_contabo_cred() {
-    local var_name="$1"
-    local prompt_text="$2"
-
-    if [[ -n "${!var_name:-}" ]]; then
-        return 0
-    fi
-
-    local value
-    value=$(safe_read "$prompt_text") || return 1
-    export "${var_name}=${value}"
-}
-
 # Ensure Contabo credentials are available
 ensure_contabo_credentials() {
-    check_python_available || return 1
-
-    local config_file="$HOME/.config/spawn/contabo.json"
-
-    # Try environment variables first (all 4 must be set)
-    if [[ -n "${CONTABO_CLIENT_ID:-}" ]] && [[ -n "${CONTABO_CLIENT_SECRET:-}" ]] && \
-       [[ -n "${CONTABO_API_USER:-}" ]] && [[ -n "${CONTABO_API_PASSWORD:-}" ]]; then
-        log_info "Using Contabo credentials from environment"
-        return 0
-    fi
-
-    # Try config file
-    local creds
-    if creds=$(_load_json_config_fields "$config_file" client_id client_secret api_user api_password); then
-        local saved_client_id saved_secret saved_user saved_password
-        { read -r saved_client_id; read -r saved_secret; read -r saved_user; read -r saved_password; } <<< "${creds}"
-        if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]] && [[ -n "$saved_user" ]] && [[ -n "$saved_password" ]]; then
-            export CONTABO_CLIENT_ID="$saved_client_id"
-            export CONTABO_CLIENT_SECRET="$saved_secret"
-            export CONTABO_API_USER="$saved_user"
-            export CONTABO_API_PASSWORD="$saved_password"
-            log_info "Using Contabo credentials from $config_file"
-            return 0
-        fi
-    fi
-
-    # Prompt for missing credentials
-    echo ""
-    log_warn "Contabo API Credentials Required"
-    log_warn "Get your credentials from: https://my.contabo.com/api/details"
-    echo ""
-
-    _prompt_contabo_cred "CONTABO_CLIENT_ID" "Enter Contabo Client ID: " || return 1
-    _prompt_contabo_cred "CONTABO_CLIENT_SECRET" "Enter Contabo Client Secret: " || return 1
-    _prompt_contabo_cred "CONTABO_API_USER" "Enter Contabo API User (username/email): " || return 1
-    _prompt_contabo_cred "CONTABO_API_PASSWORD" "Enter Contabo API Password: " || return 1
-
-    # Test credentials
-    log_info "Testing Contabo credentials..."
-    if ! test_contabo_credentials; then
-        return 1
-    fi
-
-    _save_json_config "$config_file" \
-        client_id "$CONTABO_CLIENT_ID" \
-        client_secret "$CONTABO_CLIENT_SECRET" \
-        api_user "$CONTABO_API_USER" \
-        api_password "$CONTABO_API_PASSWORD"
+    ensure_multi_credentials "Contabo" "$HOME/.config/spawn/contabo.json" \
+        "https://my.contabo.com/api/details" test_contabo_credentials \
+        "CONTABO_CLIENT_ID:client_id:Client ID" \
+        "CONTABO_CLIENT_SECRET:client_secret:Client Secret" \
+        "CONTABO_API_USER:api_user:API User (email)" \
+        "CONTABO_API_PASSWORD:api_password:API Password"
 }
 
 # Check if SSH key is registered with Contabo

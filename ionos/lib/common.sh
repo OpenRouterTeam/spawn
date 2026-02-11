@@ -72,60 +72,12 @@ test_ionos_credentials() {
     return 0
 }
 
-# Try loading IONOS credentials from config file
-# Returns 0 if loaded, 1 otherwise
-_ionos_load_config_credentials() {
-    local config_file="$1"
-    local creds
-    creds=$(_load_json_config_fields "$config_file" username password) || return 1
-
-    local saved_user saved_pass
-    { read -r saved_user; read -r saved_pass; } <<< "${creds}"
-    if [[ -z "$saved_user" ]] || [[ -z "$saved_pass" ]]; then
-        return 1
-    fi
-
-    log_info "Loading IONOS credentials from $config_file"
-    export IONOS_USERNAME="$saved_user" IONOS_PASSWORD="$saved_pass"
-}
-
-# Prompt user for IONOS credentials interactively
-# Returns 0 on success (exports credentials), 1 on failure
-_ionos_prompt_credentials() {
-    log_warn "IONOS Cloud credentials not found"
-    echo ""
-    log_info "Get credentials at: https://dcd.ionos.com/ → Management → Users & Keys"
-    echo ""
-
-    IONOS_USERNAME=$(safe_read "Enter IONOS username (email): ") || return 1
-    IONOS_PASSWORD=$(safe_read "Enter IONOS password/API key: ") || return 1
-    export IONOS_USERNAME IONOS_PASSWORD
-}
-
-# Ensure IONOS credentials are available (env vars → config file → prompt+save)
+# Ensure IONOS credentials are available (env vars -> config file -> prompt+save)
 ensure_ionos_credentials() {
-    local config_file="$HOME/.config/spawn/ionos.json"
-
-    # Try env vars, then config file, then prompt
-    if [[ -z "${IONOS_USERNAME:-}" ]] || [[ -z "${IONOS_PASSWORD:-}" ]]; then
-        _ionos_load_config_credentials "$config_file" || true
-    fi
-
-    local need_save=false
-    if [[ -z "${IONOS_USERNAME:-}" ]] || [[ -z "${IONOS_PASSWORD:-}" ]]; then
-        _ionos_prompt_credentials || return 1
-        need_save=true
-    fi
-
-    log_info "Testing IONOS credentials..."
-    if ! test_ionos_credentials; then
-        log_error "Invalid IONOS credentials. Please check IONOS_USERNAME and IONOS_PASSWORD."
-        return 1
-    fi
-
-    if [[ "$need_save" == "true" ]]; then
-        _save_json_config "$config_file" username "$IONOS_USERNAME" password "$IONOS_PASSWORD"
-    fi
+    ensure_multi_credentials "IONOS" "$HOME/.config/spawn/ionos.json" \
+        "https://dcd.ionos.com/ -> Management -> Users & Keys" test_ionos_credentials \
+        "IONOS_USERNAME:username:Username (email)" \
+        "IONOS_PASSWORD:password:Password/API Key"
 }
 
 # Check if SSH key is registered with IONOS

@@ -53,75 +53,12 @@ test_upcloud_credentials() {
 
 # Try loading UpCloud credentials from config file
 # Returns 0 if loaded, 1 otherwise
-_upcloud_load_config_credentials() {
-    local config_file="$1"
-    local creds
-    creds=$(_load_json_config_fields "$config_file" username password) || return 1
-
-    local saved_username saved_password
-    { read -r saved_username; read -r saved_password; } <<< "${creds}"
-    if [[ -z "${saved_username}" ]] || [[ -z "${saved_password}" ]]; then
-        return 1
-    fi
-
-    export UPCLOUD_USERNAME="${saved_username}"
-    export UPCLOUD_PASSWORD="${saved_password}"
-    log_info "Using UpCloud credentials from ${config_file}"
-}
-
-# Prompt user for UpCloud credentials interactively
-# Returns 0 on success (exports credentials), 1 on failure
-_upcloud_prompt_credentials() {
-    echo ""
-    log_warn "UpCloud API Credentials Required"
-    log_warn "Create API credentials at: https://hub.upcloud.com/people/account"
-    echo ""
-
-    local username
-    username=$(safe_read "Enter your UpCloud API username: ") || return 1
-    if [[ -z "${username}" ]]; then
-        log_error "Username is required"
-        return 1
-    fi
-
-    local password
-    password=$(safe_read "Enter your UpCloud API password: ") || return 1
-    if [[ -z "${password}" ]]; then
-        log_error "Password is required"
-        return 1
-    fi
-
-    export UPCLOUD_USERNAME="${username}"
-    export UPCLOUD_PASSWORD="${password}"
-}
-
 # Ensure UpCloud credentials are available (env var -> config file -> prompt+save)
 ensure_upcloud_credentials() {
-    check_python_available || return 1
-
-    local config_file="$HOME/.config/spawn/upcloud.json"
-
-    # 1. Check environment variables
-    if [[ -n "${UPCLOUD_USERNAME:-}" ]] && [[ -n "${UPCLOUD_PASSWORD:-}" ]]; then
-        log_info "Using UpCloud credentials from environment"
-        test_upcloud_credentials
-        return $?
-    fi
-
-    # 2. Check config file
-    if _upcloud_load_config_credentials "$config_file"; then
-        return 0
-    fi
-
-    # 3. Prompt and save
-    _upcloud_prompt_credentials || return 1
-
-    if ! test_upcloud_credentials; then
-        unset UPCLOUD_USERNAME UPCLOUD_PASSWORD
-        return 1
-    fi
-
-    _save_json_config "$config_file" username "$UPCLOUD_USERNAME" password "$UPCLOUD_PASSWORD"
+    ensure_multi_credentials "UpCloud" "$HOME/.config/spawn/upcloud.json" \
+        "https://hub.upcloud.com/people/account" test_upcloud_credentials \
+        "UPCLOUD_USERNAME:username:API Username" \
+        "UPCLOUD_PASSWORD:password:API Password"
 }
 
 # Get server name from env var or prompt
