@@ -1116,7 +1116,7 @@
     "contabo/aider": "implemented",
     "contabo/goose": "missing",
     "contabo/codex": "missing",
-    "contabo/interpreter": "missing",
+    "contabo/interpreter": "implemented",
     "contabo/gemini": "implemented",
     "contabo/amazonq": "implemented",
     "contabo/cline": "missing",
