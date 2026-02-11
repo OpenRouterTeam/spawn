@@ -404,6 +404,29 @@ for net_name, addrs in addresses.items():
     return 1
 }
 
+# Parse server ID from create response, or log error and return 1
+# Sets RAMNODE_SERVER_ID on success
+_ramnode_handle_create_response() {
+    local response="$1"
+
+    if echo "$response" | grep -q '"error"'; then
+        log_error "Failed to create RamNode server"
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        log_error "API Error: $error_msg"
+        log_error ""
+        log_error "Common issues:"
+        log_error "  - Insufficient cloud credit (minimum \$3 required)"
+        log_error "  - Flavor not available"
+        log_error "  - SSH key not found"
+        return 1
+    fi
+
+    RAMNODE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])")
+    export RAMNODE_SERVER_ID
+    log_info "Server created: ID=$RAMNODE_SERVER_ID"
+}
+
 # Create a RamNode server
 create_server() {
     local name="$1"
@@ -416,7 +439,6 @@ create_server() {
     log_info "Fetching Ubuntu 24.04 image..."
     local image_id
     image_id=$(_list_images)
-
     if [[ -z "$image_id" ]]; then
         log_error "Could not find Ubuntu 24.04 image"
         return 1
@@ -441,23 +463,7 @@ create_server() {
     local response
     response=$(ramnode_compute_api POST "/servers" "$body")
 
-    if echo "$response" | grep -q '"error"'; then
-        log_error "Failed to create RamNode server"
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient cloud credit (minimum \$3 required)"
-        log_error "  - Flavor not available"
-        log_error "  - SSH key not found"
-        return 1
-    fi
-
-    # Extract server ID
-    RAMNODE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])")
-    export RAMNODE_SERVER_ID
-    log_info "Server created: ID=$RAMNODE_SERVER_ID"
+    _ramnode_handle_create_response "$response" || return 1
 
     # Wait for IP assignment
     _ramnode_wait_for_ip
