@@ -227,7 +227,7 @@ describe("Compact List View", () => {
       // Compact view has "Agent", "Clouds", "Missing" header columns
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Not available on");
+      expect(output).toContain("Missing");
     });
 
     it("should use grid view when terminal is wide enough for small manifest", async () => {
@@ -242,7 +242,7 @@ describe("Compact List View", () => {
       expect(output).toContain("Sprite");
       expect(output).toContain("Hetzner Cloud");
       // Grid view should NOT have the "Missing" header column
-      expect(output).not.toContain("Not available on");
+      expect(output).not.toContain("Missing");
     });
 
     it("should default to 80 columns when process.stdout.columns is undefined", async () => {
@@ -255,14 +255,14 @@ describe("Compact List View", () => {
       // With 7 clouds at ~10+ chars each, the grid would be ~100+ chars
       // which exceeds the 80-column default, so compact view should trigger
       expect(output).toContain("Agent");
-      expect(output).toContain("Not available on");
+      expect(output).toContain("Missing");
     });
   });
 
   // ── Compact view header and structure ─────────────────────────────
 
   describe("compact view header", () => {
-    it("should show three column headers: Agent, Clouds, Not available on", async () => {
+    it("should show three column headers: Agent, Clouds, Missing", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
@@ -270,7 +270,7 @@ describe("Compact List View", () => {
       const output = getOutput();
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Not available on");
+      expect(output).toContain("Missing");
     });
 
     it("should include a separator line with dashes", async () => {

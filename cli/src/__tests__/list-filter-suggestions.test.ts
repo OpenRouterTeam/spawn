@@ -620,10 +620,10 @@ describe("cmdMatrix - compact vs grid view", () => {
       await cmdMatrix();
 
       const output = getOutput();
-      // Compact view shows "all clouds supported" or "Not available on" column
+      // Compact view shows "all clouds supported" or "Missing" column
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Not available on");
+      expect(output).toContain("Missing");
     });
 
     it("should show green for fully-supported agents in compact view", async () => {
