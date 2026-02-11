@@ -1209,7 +1209,7 @@
     "ramnode/codex": "missing",
     "ramnode/interpreter": "missing",
     "ramnode/gemini": "missing",
-    "ramnode/amazonq": "missing",
+    "ramnode/amazonq": "implemented",
     "ramnode/cline": "missing",
     "ramnode/gptme": "missing",
     "ramnode/opencode": "missing",
