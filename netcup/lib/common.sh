@@ -223,43 +223,9 @@ for p in sorted(products, key=lambda x: float(x.get('price', 999))):
 "
 }
 
-# Interactive VPS product picker
+# Interactive VPS product picker (delegates to shared interactive_pick)
 _pick_vps_product() {
-    if [[ -n "${NETCUP_VPS_PRODUCT:-}" ]]; then
-        echo "$NETCUP_VPS_PRODUCT"
-        return
-    fi
-
-    log_info "Fetching available VPS products..."
-    local products
-    products=$(_list_vps_products)
-
-    if [[ -z "$products" ]]; then
-        log_warn "Could not fetch VPS products, using default: VPS 200 G10"
-        echo "VPS 200 G10"
-        return
-    fi
-
-    log_info "Available VPS products:"
-    local i=1
-    local names=()
-    while IFS='|' read -r name cores ram disk price; do
-        printf "  %2d) %-15s  %-8s  %-12s  %-13s  %s\n" "$i" "$name" "$cores" "$ram" "$disk" "$price" >&2
-        names+=("$name")
-        i=$((i + 1))
-    done <<< "$products"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select VPS product [1]: ") || choice=""
-    choice="${choice:-1}"
-
-    if [[ "$choice" -ge 1 && "$choice" -le "${#names[@]}" ]] 2>/dev/null; then
-        echo "${names[$((choice - 1))]}"
-    else
-        log_warn "Invalid choice, using default: VPS 200 G10"
-        echo "VPS 200 G10"
-    fi
+    interactive_pick "NETCUP_VPS_PRODUCT" "VPS 200 G10" "VPS products" "_list_vps_products"
 }
 
 # List available datacenters
@@ -269,36 +235,9 @@ _list_datacenters() {
     echo "Vienna|AT|Austria"
 }
 
-# Interactive datacenter picker
+# Interactive datacenter picker (delegates to shared interactive_pick)
 _pick_datacenter() {
-    if [[ -n "${NETCUP_DATACENTER:-}" ]]; then
-        echo "$NETCUP_DATACENTER"
-        return
-    fi
-
-    log_info "Available datacenters:"
-    local datacenters
-    datacenters=$(_list_datacenters)
-
-    local i=1
-    local names=()
-    while IFS='|' read -r name country_code country; do
-        printf "  %2d) %-12s  %s (%s)\n" "$i" "$name" "$country" "$country_code" >&2
-        names+=("$name")
-        i=$((i + 1))
-    done <<< "$datacenters"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select datacenter [1]: ") || choice=""
-    choice="${choice:-1}"
-
-    if [[ "$choice" -ge 1 && "$choice" -le "${#names[@]}" ]] 2>/dev/null; then
-        echo "${names[$((choice - 1))]}"
-    else
-        log_warn "Invalid choice, using default: Nuremberg"
-        echo "Nuremberg"
-    fi
+    interactive_pick "NETCUP_DATACENTER" "Nuremberg" "datacenters" "_list_datacenters"
 }
 
 # Build JSON request body for Netcup VPS creation

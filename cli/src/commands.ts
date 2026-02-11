@@ -407,6 +407,56 @@ function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryS
   }
 }
 
+function reportDownloadError(ghUrl: string, err: unknown): never {
+  p.log.error("Failed to download spawn script");
+  console.error("\nError:", getErrorMessage(err));
+  console.error("\nTroubleshooting:");
+  console.error(`  1. Verify this combination exists: ${pc.cyan("spawn list")}`);
+  console.error("  2. Check your internet connection");
+  console.error(`  3. Try accessing the script directly: ${ghUrl}`);
+  process.exit(1);
+}
+
+export function getScriptFailureGuidance(exitCode: number | null, cloud: string): string[] {
+  switch (exitCode) {
+    case 127:
+      return [
+        "A required command was not found. Check that these are installed:",
+        "  - bash, curl, ssh, jq",
+        `  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`,
+      ];
+    case 126:
+      return ["A command was found but could not be executed (permission denied)."];
+    case 1:
+      return [
+        "Common causes:",
+        `  - Missing or invalid credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`,
+        "  - Cloud provider API error (quota, rate limit, or region issue)",
+        "  - Server provisioning failed (try again or pick a different region)",
+      ];
+    default:
+      return [
+        "Common causes:",
+        `  - Missing credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup instructions)`,
+        "  - Cloud provider API rate limit or quota exceeded",
+        "  - Missing local dependencies (SSH, curl, jq)",
+      ];
+  }
+}
+
+function reportScriptFailure(errMsg: string, cloud: string): never {
+  p.log.error("Spawn script failed");
+  console.error("\nError:", errMsg);
+
+  const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
+  const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : null;
+
+  const lines = getScriptFailureGuidance(exitCode, cloud);
+  console.error("");
+  for (const line of lines) console.error(line);
+  process.exit(1);
+}
+
 async function execScript(cloud: string, agent: string, prompt?: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
@@ -415,13 +465,7 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
   try {
     scriptContent = await downloadScriptWithFallback(url, ghUrl);
   } catch (err) {
-    p.log.error("Failed to download spawn script");
-    console.error("\nError:", getErrorMessage(err));
-    console.error("\nTroubleshooting:");
-    console.error(`  1. Verify this combination exists: ${pc.cyan("spawn list")}`);
-    console.error("  2. Check your internet connection");
-    console.error(`  3. Try accessing the script directly: ${ghUrl}`);
-    process.exit(1);
+    reportDownloadError(ghUrl, err);
   }
 
   try {
@@ -429,34 +473,9 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
   } catch (err) {
     const errMsg = getErrorMessage(err);
     if (errMsg.includes("interrupted by user")) {
-      // User pressed Ctrl+C - exit silently
       process.exit(130);
     }
-    p.log.error("Spawn script failed");
-    console.error("\nError:", errMsg);
-
-    // Extract exit code from error message for targeted guidance
-    const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
-    const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : null;
-
-    if (exitCode === 127) {
-      console.error("\nA required command was not found. Check that these are installed:");
-      console.error("  - bash, curl, ssh, jq");
-      console.error(`  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`);
-    } else if (exitCode === 126) {
-      console.error("\nA command was found but could not be executed (permission denied).");
-    } else if (exitCode === 1) {
-      console.error("\nCommon causes:");
-      console.error(`  - Missing or invalid credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`);
-      console.error("  - Cloud provider API error (quota, rate limit, or region issue)");
-      console.error("  - Server provisioning failed (try again or pick a different region)");
-    } else {
-      console.error("\nCommon causes:");
-      console.error(`  - Missing credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup instructions)`);
-      console.error("  - Cloud provider API rate limit or quota exceeded");
-      console.error("  - Missing local dependencies (SSH, curl, jq)");
-    }
-    process.exit(1);
+    reportScriptFailure(errMsg, cloud);
   }
 }
 
