@@ -194,13 +194,24 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
   }
 
   if (promptFile) {
-    const { readFileSync } = await import("fs");
+    const { readFileSync, existsSync } = await import("fs");
     try {
       prompt = readFileSync(promptFile, "utf-8");
     } catch (err) {
-      const msg = err && typeof err === "object" && "message" in err ? err.message : String(err);
-      console.error(`Error reading prompt file '${promptFile}': ${msg}`);
-      console.error(`\nMake sure the file exists and is readable.`);
+      const code = err && typeof err === "object" && "code" in err ? err.code : "";
+      if (code === "ENOENT" || !existsSync(promptFile)) {
+        console.error(`Prompt file not found: ${promptFile}`);
+        console.error(`\nCheck the path and try again.`);
+      } else if (code === "EACCES") {
+        console.error(`Permission denied reading prompt file: ${promptFile}`);
+        console.error(`\nCheck file permissions: ls -la ${promptFile}`);
+      } else if (code === "EISDIR") {
+        console.error(`'${promptFile}' is a directory, not a file.`);
+        console.error(`\nProvide a path to a text file containing your prompt.`);
+      } else {
+        const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+        console.error(`Error reading prompt file '${promptFile}': ${msg}`);
+      }
       process.exit(1);
     }
   }
@@ -239,12 +250,16 @@ async function main(): Promise<void> {
     }
 
     // Commands that print immediately (no help flag override)
+    const showVersion = () => {
+      console.log(`spawn v${VERSION}`);
+      console.log(pc.dim(`  ${process.argv[1] ?? "unknown path"}`));
+    };
     const immediateCommands: Record<string, () => void> = {
       "help": cmdHelp, "--help": cmdHelp, "-h": cmdHelp,
-      "version": () => console.log(`spawn v${VERSION}`),
-      "--version": () => console.log(`spawn v${VERSION}`),
-      "-v": () => console.log(`spawn v${VERSION}`),
-      "-V": () => console.log(`spawn v${VERSION}`),
+      "version": showVersion,
+      "--version": showVersion,
+      "-v": showVersion,
+      "-V": showVersion,
     };
 
     if (immediateCommands[cmd]) {
