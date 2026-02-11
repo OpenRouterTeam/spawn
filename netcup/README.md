@@ -22,6 +22,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/goose.sh)
 ```
 
+#### Amazon Q
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/amazonq.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
