@@ -263,7 +263,7 @@ validated_read() {
             return 0
         fi
 
-        log_warn "Invalid input. Please try again."
+        log_warn "Please try again."
     done
 }
 
@@ -712,7 +712,7 @@ _await_oauth_callback() {
         log_warn "How to fix:"
         log_warn "  1. Re-run the command to try again"
         log_warn "  2. Set the key manually: export OPENROUTER_API_KEY=sk-or-..."
-        log_warn "     (get a key at https://openrouter.ai/keys)"
+        log_warn "     (get a key at https://openrouter.ai/settings/keys)"
         return 1
     fi
 
@@ -1572,6 +1572,8 @@ _validate_token_with_provider() {
 
     if ! "${test_func}"; then
         log_error "Authentication failed: Invalid ${provider_name} API token"
+        log_error "The token may be expired, revoked, or incorrectly copied."
+        log_error "Please re-run the command to enter a new token."
         unset "${env_var_name}"
         return 1
     fi
@@ -1796,6 +1798,8 @@ ensure_multi_credentials() {
         log_info "Testing ${provider_name} credentials..."
         if ! "${test_func}"; then
             log_error "Invalid ${provider_name} credentials"
+            log_error "The credentials may be expired, revoked, or incorrectly copied."
+            log_error "Please re-run the command to enter new credentials."
             local v
             for v in "${env_vars[@]}"; do
                 unset "${v}"
