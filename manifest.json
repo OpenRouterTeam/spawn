@@ -215,6 +215,30 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'."
+    },
+    "continue": {
+      "name": "Continue",
+      "description": "Open-source AI coding assistant with CLI TUI and headless modes",
+      "url": "https://github.com/continuedev/continue",
+      "install": "npm install -g @continuedev/cli",
+      "launch": "cn",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "config_files": {
+        "~/.continue/config.json": {
+          "models": [
+            {
+              "title": "OpenRouter",
+              "provider": "openrouter",
+              "model": "openrouter/auto",
+              "apiBase": "https://openrouter.ai/api/v1",
+              "apiKey": "${OPENROUTER_API_KEY}"
+            }
+          ]
+        }
+      },
+      "notes": "Natively supports OpenRouter via config.json. CLI supports TUI mode (interactive) and headless mode (-p flag). 31K+ GitHub stars."
     }
   },
   "clouds": {
@@ -602,6 +626,39 @@
         "runtime": "docker"
       },
       "notes": "Developer-first platform with free Hobby plan (100GB bandwidth, 500 build minutes). Requires API key from https://dashboard.render.com/u/settings/api-keys. SSH not available on free tier."
+    },
+    "ionos": {
+      "name": "IONOS Cloud",
+      "description": "IONOS Cloud servers via REST API with minute-based billing",
+      "url": "https://cloud.ionos.com/",
+      "type": "api",
+      "auth": "IONOS_USERNAME + IONOS_PASSWORD",
+      "provision_method": "POST /cloudapi/v6/datacenters/{id}/servers with volumes",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "cores": 2,
+        "ram": 2048,
+        "disk_size": 20,
+        "location": "us/las"
+      },
+      "notes": "Budget European cloud provider with minute-based billing starting at $2/month. Requires IONOS_USERNAME (email) and IONOS_PASSWORD (API key) from https://dcd.ionos.com/ \u2192 Management \u2192 Users & Keys. Datacenters are created automatically if needed."
+    },
+    "exoscale": {
+      "name": "Exoscale",
+      "description": "Swiss cloud provider with per-second billing via exo CLI",
+      "url": "https://www.exoscale.com/",
+      "type": "cli",
+      "auth": "exo config (API key + secret)",
+      "provision_method": "exo compute instance create with --cloud-init-file",
+      "exec_method": "ssh ubuntu@IP",
+      "interactive_method": "ssh -t ubuntu@IP",
+      "defaults": {
+        "instance_type": "standard.small",
+        "zone": "ch-gva-2",
+        "template": "Ubuntu 24.04 LTS 64-bit"
+      },
+      "notes": "Swiss cloud provider with per-second billing. Uses ubuntu user for SSH. Requires exo CLI installed and configured with API credentials from https://portal.exoscale.com/iam/api-keys"
     }
   },
   "matrix": {
@@ -954,6 +1011,61 @@
     "cherry/gptme": "implemented",
     "cherry/opencode": "implemented",
     "cherry/plandex": "implemented",
-    "cherry/kilocode": "implemented"
+    "cherry/kilocode": "implemented",
+    "sprite/continue": "implemented",
+    "hetzner/continue": "implemented",
+    "digitalocean/continue": "missing",
+    "vultr/continue": "missing",
+    "linode/continue": "missing",
+    "aws-lightsail/continue": "missing",
+    "gcp/continue": "missing",
+    "github-codespaces/continue": "missing",
+    "e2b/continue": "missing",
+    "modal/continue": "missing",
+    "fly/continue": "missing",
+    "civo/continue": "missing",
+    "scaleway/continue": "missing",
+    "daytona/continue": "missing",
+    "upcloud/continue": "missing",
+    "binarylane/continue": "missing",
+    "latitude/continue": "missing",
+    "ovh/continue": "missing",
+    "kamatera/continue": "missing",
+    "cherry/continue": "missing",
+    "oracle/continue": "missing",
+    "koyeb/continue": "missing",
+    "northflank/continue": "missing",
+    "railway/continue": "missing",
+    "render/continue": "missing",
+    "ionos/claude": "implemented",
+    "ionos/openclaw": "missing",
+    "ionos/nanoclaw": "missing",
+    "ionos/aider": "implemented",
+    "ionos/goose": "implemented",
+    "ionos/codex": "missing",
+    "ionos/interpreter": "missing",
+    "ionos/gemini": "missing",
+    "ionos/amazonq": "missing",
+    "ionos/cline": "missing",
+    "ionos/gptme": "missing",
+    "ionos/opencode": "missing",
+    "ionos/plandex": "missing",
+    "ionos/kilocode": "missing",
+    "ionos/continue": "missing",
+    "exoscale/claude": "missing",
+    "exoscale/openclaw": "missing",
+    "exoscale/nanoclaw": "missing",
+    "exoscale/aider": "missing",
+    "exoscale/goose": "missing",
+    "exoscale/codex": "missing",
+    "exoscale/interpreter": "missing",
+    "exoscale/gemini": "missing",
+    "exoscale/amazonq": "missing",
+    "exoscale/cline": "missing",
+    "exoscale/gptme": "missing",
+    "exoscale/opencode": "missing",
+    "exoscale/plandex": "missing",
+    "exoscale/kilocode": "missing",
+    "exoscale/continue": "missing"
   }
 }
