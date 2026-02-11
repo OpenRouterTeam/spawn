@@ -158,12 +158,12 @@ describe("unknown flags with subcommands", () => {
     expect(result.exitCode).not.toBe(0);
   });
 
-  it("should reject --dry-run with valid agent and cloud", () => {
+  it("should handle --dry-run with valid agent and cloud", () => {
     const result = runCli(["claude", "sprite", "--dry-run"]);
     const out = output(result);
-    expect(out).toContain("Unknown flag");
-    expect(out).toContain("--dry-run");
-    expect(result.exitCode).not.toBe(0);
+    expect(out).toContain("Dry run");
+    expect(out).toContain("no resources");
+    expect(result.exitCode).toBe(0);
   });
 
   it("should show supported flags list in unknown flag error", () => {

@@ -325,7 +325,53 @@ function detectAndFixSwappedArgs(
   return { agent, cloud };
 }
 
-export async function cmdRun(agent: string, cloud: string, prompt?: string): Promise<void> {
+function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, prompt?: string): void {
+  p.log.info(pc.bold("Dry run -- no resources will be provisioned\n"));
+
+  const agentInfo = manifest.agents[agent];
+  p.log.step(pc.bold("Agent"));
+  console.log(`  Name:        ${agentInfo.name}`);
+  console.log(`  Description: ${agentInfo.description}`);
+  if (agentInfo.install) console.log(`  Install:     ${agentInfo.install}`);
+  if (agentInfo.launch) console.log(`  Launch:      ${agentInfo.launch}`);
+  console.log();
+
+  const cloudInfo = manifest.clouds[cloud];
+  p.log.step(pc.bold("Cloud"));
+  console.log(`  Name:        ${cloudInfo.name}`);
+  console.log(`  Description: ${cloudInfo.description}`);
+  if (cloudInfo.defaults) {
+    console.log(`  Defaults:`);
+    for (const [k, v] of Object.entries(cloudInfo.defaults)) {
+      console.log(`    ${k}: ${v}`);
+    }
+  }
+  console.log();
+
+  const scriptUrl = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
+  p.log.step(pc.bold("Script"));
+  console.log(`  URL: ${scriptUrl}`);
+  console.log();
+
+  if (agentInfo.env) {
+    p.log.step(pc.bold("Environment variables"));
+    for (const [k, v] of Object.entries(agentInfo.env)) {
+      const display = v.includes("OPENROUTER_API_KEY") ? "(from OpenRouter)" : v;
+      console.log(`  ${k}=${display}`);
+    }
+    console.log();
+  }
+
+  if (prompt) {
+    p.log.step(pc.bold("Prompt"));
+    console.log(`  ${prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt}`);
+    console.log();
+  }
+
+  p.log.success("Dry run complete -- no resources were provisioned");
+}
+
+export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean): Promise<void> {
   const manifest = await loadManifestWithSpinner();
   ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
 
@@ -348,6 +394,11 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
   validateEntity(manifest, agent, "agent");
   validateEntity(manifest, cloud, "cloud");
   validateImplementation(manifest, cloud, agent);
+
+  if (dryRun) {
+    showDryRunPreview(manifest, agent, cloud, prompt);
+    return;
+  }
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
@@ -932,6 +983,7 @@ ${pc.bold("spawn")} -- Launch any AI coding agent on any cloud
 ${pc.bold("USAGE")}
   spawn                              Interactive agent + cloud picker
   spawn <agent> <cloud>              Launch agent on cloud directly
+  spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
   spawn <agent> <cloud> --prompt "text"
                                      Execute agent with prompt (non-interactive)
   spawn <agent> <cloud> --prompt-file <file>  (or -f)
@@ -954,6 +1006,7 @@ ${pc.bold("EXAMPLES")}
   spawn aider sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
   spawn claude sprite -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
+  spawn claude sprite --dry-run      ${pc.dim("# Preview without provisioning")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# See the full agent x cloud matrix")}

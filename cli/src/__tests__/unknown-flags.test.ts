@@ -11,6 +11,7 @@ const KNOWN_FLAGS = new Set([
   "--help", "-h",
   "--version", "-v", "-V",
   "--prompt", "-p", "--prompt-file", "-f",
+  "--dry-run", "-n",
 ]);
 
 /** Replicated from index.ts for testability - returns the first unknown flag or null */
@@ -44,8 +45,8 @@ describe("Unknown Flag Detection", () => {
       expect(findUnknownFlag(["agents", "--output", "json"])).toBe("--output");
     });
 
-    it("should detect --dry-run as unknown", () => {
-      expect(findUnknownFlag(["claude", "sprite", "--dry-run"])).toBe("--dry-run");
+    it("should detect --verbose as unknown", () => {
+      expect(findUnknownFlag(["claude", "sprite", "--verbose"])).toBe("--verbose");
     });
 
     it("should detect unknown flag at the beginning", () => {
@@ -92,6 +93,14 @@ describe("Unknown Flag Detection", () => {
 
     it("should allow -f (short form of --prompt-file)", () => {
       expect(findUnknownFlag(["-f"])).toBeNull();
+    });
+
+    it("should allow --dry-run", () => {
+      expect(findUnknownFlag(["claude", "sprite", "--dry-run"])).toBeNull();
+    });
+
+    it("should allow -n (short form of --dry-run)", () => {
+      expect(findUnknownFlag(["claude", "sprite", "-n"])).toBeNull();
     });
   });
 
