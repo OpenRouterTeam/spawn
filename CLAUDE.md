@@ -56,13 +56,13 @@ We bias heavily toward adding more clouds/sandboxes over more agents. To add one
 4. Implement at least 2-3 agent scripts to prove the lib works
 5. Update the cloud's `README.md`
 
-**Good candidate clouds (cheap CPU compute for coding agents):**
+**Good candidate clouds (cheap CPU compute for agents using remote API inference):**
 - Container/sandbox platforms (fast spin-up, developer-friendly)
 - Budget VPS providers with cheap small instances ($5-20/mo range)
 - Regional providers with simple APIs (OVH, Scaleway, UpCloud)
 - Any provider with REST API or CLI + SSH/exec + affordable pay-per-hour pricing
 
-**DO NOT add GPU clouds** (CoreWeave, RunPod, etc.). Spawn runs coding agents that call LLM APIs — they need cheap CPU instances with SSH, not expensive GPU VMs.
+**DO NOT add GPU clouds** (CoreWeave, RunPod, etc.). Spawn agents call remote LLM APIs for inference — they need cheap CPU instances with SSH, not expensive GPU VMs.
 
 ### 3. Add a new agent (only with community demand)
 

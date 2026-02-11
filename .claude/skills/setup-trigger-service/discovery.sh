@@ -171,13 +171,13 @@ If there are "missing" entries in the matrix, spawn one teammate per gap (up to 
 Spawn these teammates in parallel:
 
 ### Cloud Scout (PRIORITY — spawn 2 of these)
-Research and add NEW cloud/sandbox providers. Focus on **cheap CPU compute** for running AI coding agents (not GPU workloads):
+Research and add NEW cloud/sandbox providers. Focus on **cheap CPU compute** for running AI agents that use remote API inference (not GPU workloads):
 - Container/sandbox platforms (like E2B, Modal, Fly.io — fast, developer-friendly)
 - Budget VPS providers with cheap small instances ($5-20/mo range)
 - Regional/niche clouds with simple APIs (OVH, Scaleway, UpCloud)
 - Any provider with a REST API or CLI for provisioning + SSH or exec access
 
-**DO NOT add GPU clouds.** Spawn runs coding agents that call LLM APIs — they need cheap CPU instances with SSH, not expensive GPU VMs.
+**DO NOT add GPU clouds.** Spawn agents call remote LLM APIs for inference — they need cheap CPU instances with SSH, not expensive GPU VMs.
 
 For each candidate, verify:
 - Has a public API or CLI for creating instances/containers
@@ -186,13 +186,13 @@ For each candidate, verify:
 - Is actually available (not waitlisted/invite-only)
 
 ### Agent Scout (spawn 1, only if justified)
-Research new AI coding agents, BUT only add one if there's REAL community demand:
+Research new AI agents, BUT only add one if there's REAL community demand:
 
 **Search these sources for buzz:**
 - Search Hacker News (https://hn.algolia.com/api/v1/search?query=...) for the agent name — look for posts with 50+ points
 - Search Reddit r/LocalLLaMA, r/MachineLearning, r/ChatGPT for the agent — look for posts with 100+ upvotes
 - Check the agent's GitHub repo — must have 1000+ stars
-- Search Twitter/X for the agent name + "coding agent" or "AI agent"
+- Search Twitter/X for the agent name + "AI agent"
 
 **Only add the agent if:**
 - It's installable via a single command (npm, pip, curl)
@@ -411,7 +411,7 @@ Read CLAUDE.md and manifest.json. The matrix is full.
 
 Your priority: find a NEW cloud/sandbox provider to add. Search for cheap CPU compute
 providers — container platforms, budget VPS providers, or regional clouds with simple
-REST APIs. We need affordable instances for running coding agents, NOT GPU clouds.
+REST APIs. We need affordable instances for running agents that use remote API inference, NOT GPU clouds.
 Create lib/common.sh, add to manifest, implement 2-3 agents, add "missing" entries for the rest.
 
 Only add a new AGENT if you find one with real community buzz:
