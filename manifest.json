@@ -643,6 +643,23 @@
         "location": "us/las"
       },
       "notes": "Budget European cloud provider with minute-based billing starting at $2/month. Requires IONOS_USERNAME (email) and IONOS_PASSWORD (API key) from https://dcd.ionos.com/ → Management → Users & Keys. Datacenters are created automatically if needed."
+    },
+    "contabo": {
+      "name": "Contabo",
+      "description": "Contabo VPS and cloud servers via REST API with CLI support",
+      "url": "https://contabo.com/",
+      "type": "api",
+      "auth": "CONTABO_API_TOKEN",
+      "provision_method": "POST /v1/compute/instances with cloud-init",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "product_id": "V92",
+        "region": "EU",
+        "image_id": "ubuntu-24.04",
+        "period": 1
+      },
+      "notes": "Budget cloud provider with powerful VPS plans starting under $5/month (3vCPUs, 8GB RAM, 150GB SSD). Requires CONTABO_API_TOKEN (OAuth2 access token) from https://my.contabo.com/api/details. Official CLI tool (cntb) available. 12 locations across 9 global regions."
     }
   },
   "matrix": {
@@ -1006,14 +1023,14 @@
     "github-codespaces/continue": "implemented",
     "e2b/continue": "implemented",
     "modal/continue": "implemented",
-    "fly/continue": "implemented",
-    "civo/continue": "implemented",
-    "scaleway/continue": "implemented",
-    "daytona/continue": "implemented",
-    "upcloud/continue": "implemented",
-    "binarylane/continue": "implemented",
-    "latitude/continue": "implemented",
-    "ovh/continue": "implemented",
+    "fly/continue": "missing",
+    "civo/continue": "missing",
+    "scaleway/continue": "missing",
+    "daytona/continue": "missing",
+    "upcloud/continue": "missing",
+    "binarylane/continue": "missing",
+    "latitude/continue": "missing",
+    "ovh/continue": "missing",
     "kamatera/continue": "implemented",
     "cherry/continue": "implemented",
     "oracle/continue": "implemented",
@@ -1035,6 +1052,21 @@
     "ionos/opencode": "implemented",
     "ionos/plandex": "implemented",
     "ionos/kilocode": "implemented",
-    "ionos/continue": "implemented"
+    "ionos/continue": "implemented",
+    "contabo/claude": "implemented",
+    "contabo/openclaw": "missing",
+    "contabo/nanoclaw": "missing",
+    "contabo/aider": "implemented",
+    "contabo/goose": "implemented",
+    "contabo/codex": "missing",
+    "contabo/interpreter": "missing",
+    "contabo/gemini": "missing",
+    "contabo/amazonq": "missing",
+    "contabo/cline": "missing",
+    "contabo/gptme": "missing",
+    "contabo/opencode": "missing",
+    "contabo/plandex": "missing",
+    "contabo/kilocode": "missing",
+    "contabo/continue": "missing"
   }
 }
