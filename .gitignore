@@ -2,3 +2,4 @@ node_modules/
 .docs/
 __pycache__/
 .claude/skills/setup-trigger-service/start-*.sh
+cli/cli.js
