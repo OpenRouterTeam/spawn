@@ -1116,7 +1116,7 @@
     "contabo/continue": "missing",
     "hostinger/claude": "implemented",
     "hostinger/openclaw": "implemented",
-    "hostinger/nanoclaw": "missing",
+    "hostinger/nanoclaw": "implemented",
     "hostinger/aider": "implemented",
     "hostinger/goose": "missing",
     "hostinger/codex": "missing",
