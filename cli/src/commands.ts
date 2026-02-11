@@ -263,9 +263,12 @@ export async function cmdInteractive(): Promise<void> {
 
 // ── Run ────────────────────────────────────────────────────────────────────────
 
-export async function cmdRun(agent: string, cloud: string, prompt?: string): Promise<void> {
-  // Try to resolve display names / casing before strict validation
-  const manifest = await loadManifestWithSpinner();
+/** Resolve display names / casing and log if resolved to a different key */
+function resolveAndLog(
+  manifest: Manifest,
+  agent: string,
+  cloud: string
+): { agent: string; cloud: string } {
   const resolvedAgent = resolveAgentKey(manifest, agent);
   const resolvedCloud = resolveCloudKey(manifest, cloud);
   if (resolvedAgent && resolvedAgent !== agent) {
@@ -276,6 +279,26 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
     p.log.info(`Resolved "${cloud}" to ${pc.cyan(resolvedCloud)}`);
     cloud = resolvedCloud;
   }
+  return { agent, cloud };
+}
+
+/** Detect and fix swapped arguments: "spawn <cloud> <agent>" -> "spawn <agent> <cloud>" */
+function detectAndFixSwappedArgs(
+  manifest: Manifest,
+  agent: string,
+  cloud: string
+): { agent: string; cloud: string } {
+  if (!manifest.agents[agent] && manifest.clouds[agent] && manifest.agents[cloud]) {
+    p.log.warn(`It looks like you swapped the agent and cloud arguments.`);
+    p.log.info(`Running: ${pc.cyan(`spawn ${cloud} ${agent}`)}`);
+    return { agent: cloud, cloud: agent };
+  }
+  return { agent, cloud };
+}
+
+export async function cmdRun(agent: string, cloud: string, prompt?: string): Promise<void> {
+  const manifest = await loadManifestWithSpinner();
+  ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
 
   // SECURITY: Validate input arguments for injection attacks
   try {
@@ -291,15 +314,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
 
   validateNonEmptyString(agent, "Agent name", "spawn agents");
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
-
-  // Detect swapped arguments: user typed "spawn <cloud> <agent>" instead of "spawn <agent> <cloud>"
-  if (!manifest.agents[agent] && manifest.clouds[agent] && manifest.agents[cloud]) {
-    p.log.warn(`It looks like you swapped the agent and cloud arguments.`);
-    p.log.info(`Running: ${pc.cyan(`spawn ${cloud} ${agent}`)}`);
-    const tmp = agent;
-    agent = cloud;
-    cloud = tmp;
-  }
+  ({ agent, cloud } = detectAndFixSwappedArgs(manifest, agent, cloud));
 
   validateAgent(manifest, agent);
   validateCloud(manifest, cloud);
@@ -307,12 +322,8 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
-
-  if (prompt) {
-    p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)} with prompt...`);
-  } else {
-    p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}...`);
-  }
+  const suffix = prompt ? " with prompt..." : "...";
+  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
   await execScript(cloud, agent, prompt);
 }
@@ -595,13 +606,7 @@ export async function cmdClouds(): Promise<void> {
   const allAgents = agentKeys(manifest);
   const allClouds = cloudKeys(manifest);
 
-  // Group clouds by type for easier scanning
-  const byType: Record<string, string[]> = {};
-  for (const key of allClouds) {
-    const type = manifest.clouds[key].type;
-    if (!byType[type]) byType[type] = [];
-    byType[type].push(key);
-  }
+  const byType = groupByType(allClouds, (key) => manifest.clouds[key].type);
 
   console.log();
   console.log(pc.bold("Cloud Providers") + pc.dim(` (${allClouds.length} total)`));
@@ -621,20 +626,48 @@ export async function cmdClouds(): Promise<void> {
   console.log();
 }
 
+// ── Info helpers ───────────────────────────────────────────────────────────────
+
+/** Print name, description, url, and notes for a manifest entry */
+function printInfoHeader(entry: { name: string; description: string; url?: string; notes?: string }): void {
+  console.log();
+  console.log(`${pc.bold(entry.name)} ${pc.dim("--")} ${entry.description}`);
+  if (entry.url) console.log(pc.dim(`  ${entry.url}`));
+  if (entry.notes) console.log(pc.dim(`  ${entry.notes}`));
+}
+
+/** Group keys by a classifier function (e.g., cloud type) */
+function groupByType(keys: string[], getType: (key: string) => string): Record<string, string[]> {
+  const byType: Record<string, string[]> = {};
+  for (const key of keys) {
+    const type = getType(key);
+    if (!byType[type]) byType[type] = [];
+    byType[type].push(key);
+  }
+  return byType;
+}
+
+/** Print a grouped list of items with command hints */
+function printGroupedList(
+  byType: Record<string, string[]>,
+  getName: (key: string) => string,
+  getHint: (key: string) => string,
+  indent: string = "  "
+): void {
+  for (const [type, keys] of Object.entries(byType)) {
+    console.log(`${indent}${pc.dim(type)}`);
+    for (const key of keys) {
+      console.log(`${indent}  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${getName(key).padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(getHint(key))}`);
+    }
+  }
+}
+
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
 export async function cmdAgentInfo(agent: string): Promise<void> {
   const [manifest, agentKey] = await validateAndGetAgent(agent);
 
-  const a = manifest.agents[agentKey];
-  console.log();
-  console.log(`${pc.bold(a.name)} ${pc.dim("--")} ${a.description}`);
-  if (a.url) {
-    console.log(pc.dim(`  ${a.url}`));
-  }
-  if (a.notes) {
-    console.log(pc.dim(`  ${a.notes}`));
-  }
+  printInfoHeader(manifest.agents[agentKey]);
 
   const allClouds = cloudKeys(manifest);
   const implClouds = getImplementedClouds(manifest, agentKey);
@@ -642,8 +675,7 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   // Show quick-start with first available cloud
   if (implClouds.length > 0) {
     const exampleCloud = implClouds[0];
-    const cloudAuth = manifest.clouds[exampleCloud].auth;
-    const authVars = parseAuthEnvVars(cloudAuth);
+    const authVars = parseAuthEnvVars(manifest.clouds[exampleCloud].auth);
     console.log();
     console.log(pc.bold("Quick start:"));
     console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}`);
@@ -663,21 +695,12 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     return;
   }
 
-  // Group implemented clouds by type for easier scanning
-  const byType: Record<string, string[]> = {};
-  for (const cloud of implClouds) {
-    const type = manifest.clouds[cloud].type;
-    if (!byType[type]) byType[type] = [];
-    byType[type].push(cloud);
-  }
-
-  for (const [type, clouds] of Object.entries(byType)) {
-    console.log(`  ${pc.dim(type)}`);
-    for (const cloud of clouds) {
-      const c = manifest.clouds[cloud];
-      console.log(`    ${pc.green(cloud.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agentKey + " " + cloud)}`);
-    }
-  }
+  const byType = groupByType(implClouds, (c) => manifest.clouds[c].type);
+  printGroupedList(
+    byType,
+    (c) => manifest.clouds[c].name,
+    (c) => `spawn ${agentKey} ${c}`
+  );
   console.log();
 }
 
@@ -703,15 +726,8 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   const [manifest, cloudKey] = await validateAndGetCloud(cloud);
 
   const c = manifest.clouds[cloudKey];
-  console.log();
-  console.log(`${pc.bold(c.name)} ${pc.dim("--")} ${c.description}`);
+  printInfoHeader(c);
   console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}`));
-  if (c.url) {
-    console.log(pc.dim(`  ${c.url}`));
-  }
-  if (c.notes) {
-    console.log(pc.dim(`  ${c.notes}`));
-  }
 
   // Show quick-start with auth setup
   const authVars = parseAuthEnvVars(c.auth);
