@@ -137,37 +137,30 @@ export function findClosestKeyByNameOrKey(
 }
 
 /**
- * Resolve user input to a valid agent key.
+ * Resolve user input to a valid entity key (agent or cloud).
  * Tries: exact key -> case-insensitive key -> display name match (case-insensitive).
  * Returns the key if found, or null.
  */
-export function resolveAgentKey(manifest: Manifest, input: string): string | null {
-  if (manifest.agents[input]) return input;
+function resolveEntityKey(manifest: Manifest, input: string, kind: "agent" | "cloud"): string | null {
+  const collection = getEntityCollection(manifest, kind);
+  if (collection[input]) return input;
+  const keys = getEntityKeys(manifest, kind);
   const lower = input.toLowerCase();
-  for (const key of agentKeys(manifest)) {
+  for (const key of keys) {
     if (key.toLowerCase() === lower) return key;
   }
-  for (const key of agentKeys(manifest)) {
-    if (manifest.agents[key].name.toLowerCase() === lower) return key;
+  for (const key of keys) {
+    if (collection[key].name.toLowerCase() === lower) return key;
   }
   return null;
 }
 
-/**
- * Resolve user input to a valid cloud key.
- * Tries: exact key -> case-insensitive key -> display name match (case-insensitive).
- * Returns the key if found, or null.
- */
+export function resolveAgentKey(manifest: Manifest, input: string): string | null {
+  return resolveEntityKey(manifest, input, "agent");
+}
+
 export function resolveCloudKey(manifest: Manifest, input: string): string | null {
-  if (manifest.clouds[input]) return input;
-  const lower = input.toLowerCase();
-  for (const key of cloudKeys(manifest)) {
-    if (key.toLowerCase() === lower) return key;
-  }
-  for (const key of cloudKeys(manifest)) {
-    if (manifest.clouds[key].name.toLowerCase() === lower) return key;
-  }
-  return null;
+  return resolveEntityKey(manifest, input, "cloud");
 }
 
 interface EntityDef { label: string; labelPlural: string; listCmd: string; opposite: string }
