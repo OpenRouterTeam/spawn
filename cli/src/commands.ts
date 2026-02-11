@@ -173,6 +173,17 @@ function getEntityKeys(manifest: Manifest, kind: "agent" | "cloud") {
   return kind === "agent" ? agentKeys(manifest) : cloudKeys(manifest);
 }
 
+/** Suggest a typo correction by fuzzy-matching against a set of keys */
+function suggestTypoCorrection(
+  value: string,
+  manifest: Manifest,
+  kind: "agent" | "cloud"
+): string | null {
+  const collection = getEntityCollection(manifest, kind);
+  const keys = getEntityKeys(manifest, kind);
+  return findClosestKeyByNameOrKey(value, keys, (k) => collection[k].name);
+}
+
 /** Report validation error for an entity and return false, or return true if valid */
 export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "cloud"): boolean {
   const def = ENTITY_DEFS[kind];
@@ -184,6 +195,8 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
   const oppositeKind = kind === "agent" ? "cloud" : "agent";
   const oppositeDef = ENTITY_DEFS[oppositeKind];
   const oppositeCollection = getEntityCollection(manifest, oppositeKind);
+
+  // Check if user provided an entity of the wrong kind
   if (oppositeCollection[value]) {
     p.log.info(`"${value}" is ${kind === "agent" ? "a cloud provider" : "an agent"}, not ${kind === "agent" ? "an agent" : "a cloud provider"}.`);
     p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
@@ -192,8 +205,7 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
   }
 
   // Check for typo matches in the same kind
-  const keys = getEntityKeys(manifest, kind);
-  const match = findClosestKeyByNameOrKey(value, keys, (k) => collection[k].name);
+  const match = suggestTypoCorrection(value, manifest, kind);
   if (match) {
     p.log.info(`Did you mean ${pc.cyan(match)} (${collection[match].name})?`);
     p.log.info(`  ${pc.cyan(`spawn ${match}`)}`);
@@ -202,8 +214,7 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
   }
 
   // Check for typo matches in the opposite kind (swapped arguments with typo)
-  const oppositeKeys = getEntityKeys(manifest, oppositeKind);
-  const oppositeMatch = findClosestKeyByNameOrKey(value, oppositeKeys, (k) => oppositeCollection[k].name);
+  const oppositeMatch = suggestTypoCorrection(value, manifest, oppositeKind);
   if (oppositeMatch) {
     p.log.info(`"${pc.bold(value)}" looks like ${oppositeDef.label} ${pc.cyan(oppositeMatch)} (${oppositeCollection[oppositeMatch].name}).`);
     p.log.info(`Did you swap the agent and cloud arguments?`);
@@ -702,6 +713,20 @@ function renderCompactList(manifest: Manifest, agents: string[], clouds: string[
   }
 }
 
+function renderMatrixFooter(manifest: Manifest, agents: string[], clouds: string[], isCompact: boolean): void {
+  const impl = countImplemented(manifest);
+  const total = agents.length * clouds.length;
+  console.log();
+  if (isCompact) {
+    console.log(`${pc.green("green")} = all clouds supported  ${pc.yellow("yellow")} = some clouds not yet available`);
+  } else {
+    console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
+  }
+  console.log(pc.green(`${impl}/${total} combinations implemented`));
+  console.log(pc.dim(`Launch: ${pc.cyan("spawn <agent> <cloud>")}  |  Details: ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")}`));
+  console.log();
+}
+
 export async function cmdMatrix(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
@@ -739,17 +764,7 @@ export async function cmdMatrix(): Promise<void> {
     }
   }
 
-  const impl = countImplemented(manifest);
-  const total = agents.length * clouds.length;
-  console.log();
-  if (isCompact) {
-    console.log(`${pc.green("green")} = all clouds supported  ${pc.yellow("yellow")} = some clouds not yet available`);
-  } else {
-    console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
-  }
-  console.log(pc.green(`${impl}/${total} combinations implemented`));
-  console.log(pc.dim(`Launch: ${pc.cyan("spawn <agent> <cloud>")}  |  Details: ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")}`));
-  console.log();
+  renderMatrixFooter(manifest, agents, clouds, isCompact);
 }
 
 // ── List (History) ──────────────────────────────────────────────────────────────
@@ -842,22 +857,7 @@ export function resolveDisplayName(manifest: Manifest | null, key: string, kind:
   return entry ? entry.name : key;
 }
 
-export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
-  const records = filterHistory(agentFilter, cloudFilter);
-
-  if (records.length === 0) {
-    await showEmptyListMessage(agentFilter, cloudFilter);
-    return;
-  }
-
-  // Try to load manifest for display names (fall back to raw keys if unavailable)
-  let manifest: Manifest | null = null;
-  try {
-    manifest = await loadManifest();
-  } catch {
-    // Manifest unavailable -- show raw keys
-  }
-
+function renderListTable(records: SpawnRecord[], manifest: Manifest | null): void {
   console.log();
   console.log(pc.bold("AGENT".padEnd(20)) + pc.bold("CLOUD".padEnd(20)) + pc.bold("WHEN"));
   console.log(pc.dim("-".repeat(60)));
@@ -876,8 +876,26 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     }
     console.log(line);
   }
-
   console.log();
+}
+
+export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
+  const records = filterHistory(agentFilter, cloudFilter);
+
+  if (records.length === 0) {
+    await showEmptyListMessage(agentFilter, cloudFilter);
+    return;
+  }
+
+  // Try to load manifest for display names (fall back to raw keys if unavailable)
+  let manifest: Manifest | null = null;
+  try {
+    manifest = await loadManifest();
+  } catch {
+    // Manifest unavailable -- show raw keys
+  }
+
+  renderListTable(records, manifest);
   showListFooter(records, agentFilter, cloudFilter);
 }
 
