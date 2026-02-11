@@ -170,6 +170,25 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   }
 }
 
+/** Print a descriptive error for a failed prompt file read and exit */
+function handlePromptFileError(promptFile: string, err: unknown): never {
+  const code = err && typeof err === "object" && "code" in err ? err.code : "";
+  if (code === "ENOENT") {
+    console.error(`Prompt file not found: ${promptFile}`);
+    console.error(`\nCheck the path and try again.`);
+  } else if (code === "EACCES") {
+    console.error(`Permission denied reading prompt file: ${promptFile}`);
+    console.error(`\nCheck file permissions: ls -la ${promptFile}`);
+  } else if (code === "EISDIR") {
+    console.error(`'${promptFile}' is a directory, not a file.`);
+    console.error(`\nProvide a path to a text file containing your prompt.`);
+  } else {
+    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+    console.error(`Error reading prompt file '${promptFile}': ${msg}`);
+  }
+  process.exit(1);
+}
+
 /** Parse --prompt / -p and --prompt-file flags, returning the resolved prompt text and remaining args */
 async function resolvePrompt(args: string[]): Promise<[string | undefined, string[]]> {
   let [prompt, filteredArgs] = extractFlagValue(
@@ -196,97 +215,88 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
   }
 
   if (promptFile) {
-    const { readFileSync, existsSync } = await import("fs");
+    const { readFileSync } = await import("fs");
     try {
       prompt = readFileSync(promptFile, "utf-8");
     } catch (err) {
-      const code = err && typeof err === "object" && "code" in err ? err.code : "";
-      if (code === "ENOENT" || !existsSync(promptFile)) {
-        console.error(`Prompt file not found: ${promptFile}`);
-        console.error(`\nCheck the path and try again.`);
-      } else if (code === "EACCES") {
-        console.error(`Permission denied reading prompt file: ${promptFile}`);
-        console.error(`\nCheck file permissions: ls -la ${promptFile}`);
-      } else if (code === "EISDIR") {
-        console.error(`'${promptFile}' is a directory, not a file.`);
-        console.error(`\nProvide a path to a text file containing your prompt.`);
-      } else {
-        const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-        console.error(`Error reading prompt file '${promptFile}': ${msg}`);
-      }
-      process.exit(1);
+      handlePromptFileError(promptFile, err);
     }
   }
 
   return [prompt, filteredArgs];
 }
 
+/** Handle the case when no command is given (interactive mode or help) */
+async function handleNoCommand(prompt: string | undefined): Promise<void> {
+  if (prompt) {
+    console.error("Error: --prompt requires both <agent> and <cloud>");
+    console.error(`\nUsage: spawn <agent> <cloud> --prompt "your prompt here"`);
+    process.exit(1);
+  }
+  if (isInteractiveTTY()) {
+    await cmdInteractive();
+  } else {
+    console.error(pc.yellow("Non-interactive terminal detected (no TTY). Showing help instead of interactive picker."));
+    console.error(pc.dim("To launch directly, use: spawn <agent> <cloud>\n"));
+    cmdHelp();
+  }
+}
+
+function showVersion(): void {
+  console.log(`spawn v${VERSION}`);
+  console.log(pc.dim(`  ${process.argv[1] ?? "unknown path"}`));
+}
+
+const IMMEDIATE_COMMANDS: Record<string, () => void> = {
+  "help": cmdHelp, "--help": cmdHelp, "-h": cmdHelp,
+  "version": showVersion,
+  "--version": showVersion,
+  "-v": showVersion,
+  "-V": showVersion,
+};
+
+const SUBCOMMANDS: Record<string, () => Promise<void>> = {
+  "list": cmdList, "ls": cmdList,
+  "agents": cmdAgents,
+  "clouds": cmdClouds,
+  "update": cmdUpdate,
+};
+
+/** Dispatch a named command or fall through to agent/cloud handling */
+async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined): Promise<void> {
+  if (IMMEDIATE_COMMANDS[cmd]) {
+    IMMEDIATE_COMMANDS[cmd]();
+    return;
+  }
+
+  if (SUBCOMMANDS[cmd]) {
+    const hasHelpFlag = filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
+    if (hasHelpFlag) {
+      cmdHelp();
+    } else {
+      await SUBCOMMANDS[cmd]();
+    }
+    return;
+  }
+
+  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt);
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
-  // Check for updates and auto-update if needed (blocking)
   await checkForUpdates();
 
   const [prompt, filteredArgs] = await resolvePrompt(args);
-
-  // Check for unknown flags before dispatching commands
   checkUnknownFlags(filteredArgs);
 
   const cmd = filteredArgs[0];
 
   try {
     if (!cmd) {
-      if (prompt) {
-        console.error("Error: --prompt requires both <agent> and <cloud>");
-        console.error(`\nUsage: spawn <agent> <cloud> --prompt "your prompt here"`);
-        process.exit(1);
-      }
-      if (isInteractiveTTY()) {
-        await cmdInteractive();
-      } else {
-        console.error(pc.yellow("Non-interactive terminal detected (no TTY). Showing help instead of interactive picker."));
-        console.error(pc.dim("To launch directly, use: spawn <agent> <cloud>\n"));
-        cmdHelp();
-      }
-      return;
-    }
-
-    // Commands that print immediately (no help flag override)
-    const showVersion = () => {
-      console.log(`spawn v${VERSION}`);
-      console.log(pc.dim(`  ${process.argv[1] ?? "unknown path"}`));
-    };
-    const immediateCommands: Record<string, () => void> = {
-      "help": cmdHelp, "--help": cmdHelp, "-h": cmdHelp,
-      "version": showVersion,
-      "--version": showVersion,
-      "-v": showVersion,
-      "-V": showVersion,
-    };
-
-    if (immediateCommands[cmd]) {
-      immediateCommands[cmd]();
-      return;
-    }
-
-    // Subcommands that show help when passed --help/-h
-    const subcommands: Record<string, () => Promise<void>> = {
-      "list": cmdList, "ls": cmdList,
-      "agents": cmdAgents,
-      "clouds": cmdClouds,
-      "update": cmdUpdate,
-    };
-
-    const hasHelpFlag = filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
-
-    if (subcommands[cmd]) {
-      if (hasHelpFlag) {
-        cmdHelp();
-      } else {
-        await subcommands[cmd]();
-      }
+      await handleNoCommand(prompt);
     } else {
-      await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt);
+      await dispatchCommand(cmd, filteredArgs, prompt);
     }
   } catch (err) {
     handleError(err);
