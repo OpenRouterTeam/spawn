@@ -1119,7 +1119,7 @@
     "contabo/interpreter": "implemented",
     "contabo/gemini": "implemented",
     "contabo/amazonq": "implemented",
-    "contabo/cline": "missing",
+    "contabo/cline": "implemented",
     "contabo/gptme": "implemented",
     "contabo/opencode": "missing",
     "contabo/plandex": "missing",
