@@ -691,6 +691,17 @@
         "os_template": "ubuntu-24.04"
       },
       "notes": "Budget VPS provider with cloud-init pre-installed. Starting at $4.95/mo. Requires HOSTINGER_API_KEY from hPanel → Profile → Account Information → API. API docs at developers.hostinger.com"
+    },
+    "local": {
+      "name": "Local Machine",
+      "description": "Run agents directly on your local machine without cloud provisioning",
+      "url": "https://github.com/OpenRouterTeam/spawn",
+      "type": "local",
+      "auth": "none",
+      "provision_method": "none (local execution)",
+      "exec_method": "bash -c",
+      "interactive_method": "exec",
+      "notes": "No cloud provisioning needed. Installs agents and injects OpenRouter credentials locally. Useful for local development and testing."
     }
   },
   "matrix": {
@@ -1128,6 +1139,21 @@
     "hostinger/opencode": "missing",
     "hostinger/plandex": "missing",
     "hostinger/kilocode": "missing",
-    "hostinger/continue": "missing"
+    "hostinger/continue": "missing",
+    "local/claude": "implemented",
+    "local/openclaw": "implemented",
+    "local/nanoclaw": "implemented",
+    "local/aider": "missing",
+    "local/goose": "missing",
+    "local/codex": "missing",
+    "local/interpreter": "missing",
+    "local/gemini": "missing",
+    "local/amazonq": "missing",
+    "local/cline": "missing",
+    "local/gptme": "missing",
+    "local/opencode": "missing",
+    "local/plandex": "missing",
+    "local/kilocode": "missing",
+    "local/continue": "missing"
   }
 }

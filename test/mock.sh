@@ -449,6 +449,9 @@ setup_env_for_cloud() {
             export HYPERSTACK_API_KEY="test-token-hyper"
             export HYPERSTACK_SERVER_NAME="test-srv"
             ;;
+        local)
+            # No cloud credentials needed for local
+            ;;
     esac
 }
 
@@ -542,11 +545,13 @@ run_test() {
     # --- Assertions ---
     assert_exit_code "${exit_code}" 0 "exits successfully"
 
-    # Check that API calls were made
+    # Check that API calls were made (curl for installs or cloud APIs)
     assert_log_contains "curl (GET|POST) https://" "makes API calls"
 
-    # Check that SSH was used (for remote execution)
-    assert_log_contains "ssh " "uses SSH"
+    # Check that SSH was used (for remote execution) — skip for local cloud
+    if [[ "$cloud" != "local" ]]; then
+        assert_log_contains "ssh " "uses SSH"
+    fi
 
     # Append result to RESULTS_FILE if set
     if [[ -n "${RESULTS_FILE:-}" ]]; then
