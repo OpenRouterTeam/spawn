@@ -1696,93 +1696,64 @@ _save_json_config() {
     log_info "Credentials saved to ${config_file}"
 }
 
-# Generic multi-credential ensure function
-# Eliminates duplicated env-var/config/prompt/test/save logic across providers
-# that need more than one credential (username+password, client_id+secret, etc.)
-#
-# Usage: ensure_multi_credentials PROVIDER_NAME CONFIG_FILE HELP_URL TEST_FUNC \
-#          "ENV_VAR:config_key:Prompt Label" ...
-#
-# Arguments:
-#   PROVIDER_NAME - Display name for logging (e.g., "Contabo")
-#   CONFIG_FILE   - Path to JSON config file (e.g., "$HOME/.config/spawn/contabo.json")
-#   HELP_URL      - URL where users can find their credentials
-#   TEST_FUNC     - Function to validate credentials (returns 0=ok, 1=fail); empty to skip
-#   ...           - One or more credential specs as "ENV_VAR:config_key:Prompt Label"
-#
-# Each credential spec is a colon-delimited triple:
-#   ENV_VAR    - Environment variable name (e.g., CONTABO_CLIENT_ID)
-#   config_key - JSON key in the config file (e.g., client_id)
-#   Prompt Label - Human-readable label for prompting (e.g., "Client ID")
-#
-# Example:
-#   ensure_multi_credentials "Contabo" "$HOME/.config/spawn/contabo.json" \
-#       "https://my.contabo.com/api/details" test_contabo_credentials \
-#       "CONTABO_CLIENT_ID:client_id:Client ID" \
-#       "CONTABO_CLIENT_SECRET:client_secret:Client Secret" \
-#       "CONTABO_API_USER:api_user:API User (email)" \
-#       "CONTABO_API_PASSWORD:api_password:API Password"
-ensure_multi_credentials() {
-    local provider_name="${1}"
-    local config_file="${2}"
-    local help_url="${3}"
-    local test_func="${4:-}"
-    shift 4
-
-    check_python_available || return 1
-
-    # Collect credential specs
-    local specs=("$@")
-    local env_vars=() config_keys=() labels=()
-    local spec
-    for spec in "${specs[@]}"; do
-        env_vars+=("${spec%%:*}")
-        local rest="${spec#*:}"
-        config_keys+=("${rest%%:*}")
-        labels+=("${rest#*:}")
-    done
-
-    # 1. Check if ALL env vars are already set
-    local all_set=true
+# Check if all env vars in a list are set (non-empty)
+# Returns 0 if all set, 1 if any missing
+_multi_creds_all_env_set() {
     local var
-    for var in "${env_vars[@]}"; do
+    for var in "$@"; do
         if [[ -z "${!var:-}" ]]; then
-            all_set=false
-            break
+            return 1
         fi
     done
-    if [[ "${all_set}" == "true" ]]; then
-        log_info "Using ${provider_name} credentials from environment"
-        return 0
-    fi
+    return 0
+}
 
-    # 2. Try loading from config file
+# Load multi-credentials from a JSON config file into env vars.
+# Returns 0 if all fields loaded, 1 if any missing.
+# Usage: _multi_creds_load_config CONFIG_FILE env_vars[@] config_keys[@]
+_multi_creds_load_config() {
+    local config_file="${1}"
+    shift
+    local env_count="${1}"
+    shift
+    local env_vars=("${@:1:$env_count}")
+    shift "${env_count}"
+    local config_keys=("$@")
+
     local creds
-    if creds=$(_load_json_config_fields "${config_file}" "${config_keys[@]}"); then
-        local all_loaded=true
-        local i=0
-        while IFS= read -r value; do
-            if [[ -z "${value}" ]]; then
-                all_loaded=false
-                break
-            fi
-            export "${env_vars[$i]}=${value}"
-            i=$((i + 1))
-        done <<< "${creds}"
+    creds=$(_load_json_config_fields "${config_file}" "${config_keys[@]}") || return 1
 
-        if [[ "${all_loaded}" == "true" && "${i}" -eq "${#env_vars[@]}" ]]; then
-            log_info "Using ${provider_name} credentials from ${config_file}"
-            return 0
+    local i=0
+    while IFS= read -r value; do
+        if [[ -z "${value}" ]]; then
+            return 1
         fi
-    fi
+        export "${env_vars[$i]}=${value}"
+        i=$((i + 1))
+    done <<< "${creds}"
 
-    # 3. Prompt for each credential
+    [[ "${i}" -eq "${#env_vars[@]}" ]] || return 1
+    return 0
+}
+
+# Prompt user for each credential interactively.
+# Returns 1 if any input is empty or read fails.
+_multi_creds_prompt() {
+    local provider_name="${1}"
+    local help_url="${2}"
+    shift 2
+    local env_count="${1}"
+    shift
+    local env_vars=("${@:1:$env_count}")
+    shift "${env_count}"
+    local labels=("$@")
+
     echo ""
     log_step "${provider_name} API Credentials Required"
     log_step "Get your credentials from: ${help_url}"
     echo ""
 
-    local idx=0
+    local idx
     for idx in $(seq 0 $((${#env_vars[@]} - 1))); do
         local val
         val=$(safe_read "Enter ${provider_name} ${labels[$idx]}: ") || return 1
@@ -1792,25 +1763,88 @@ ensure_multi_credentials() {
         fi
         export "${env_vars[$idx]}=${val}"
     done
+    return 0
+}
+
+# Validate multi-credentials using a test function.
+# Unsets all env vars on failure.
+_multi_creds_validate() {
+    local test_func="${1}"
+    local provider_name="${2}"
+    shift 2
+
+    if [[ -z "${test_func}" ]]; then
+        return 0
+    fi
+
+    log_info "Testing ${provider_name} credentials..."
+    if ! "${test_func}"; then
+        log_error "Invalid ${provider_name} credentials"
+        log_error "The credentials may be expired, revoked, or incorrectly copied."
+        log_error "Please re-run the command to enter new credentials."
+        local v
+        for v in "$@"; do
+            unset "${v}"
+        done
+        return 1
+    fi
+    return 0
+}
+
+# Generic multi-credential ensure function
+# Eliminates duplicated env-var/config/prompt/test/save logic across providers
+# that need more than one credential (username+password, client_id+secret, etc.)
+#
+# Usage: ensure_multi_credentials PROVIDER_NAME CONFIG_FILE HELP_URL TEST_FUNC \
+#          "ENV_VAR:config_key:Prompt Label" ...
+#
+# Each credential spec is a colon-delimited triple:
+#   ENV_VAR    - Environment variable name (e.g., CONTABO_CLIENT_ID)
+#   config_key - JSON key in the config file (e.g., client_id)
+#   Prompt Label - Human-readable label for prompting (e.g., "Client ID")
+ensure_multi_credentials() {
+    local provider_name="${1}"
+    local config_file="${2}"
+    local help_url="${3}"
+    local test_func="${4:-}"
+    shift 4
+
+    check_python_available || return 1
+
+    # Parse credential specs into parallel arrays
+    local env_vars=() config_keys=() labels=()
+    local spec
+    for spec in "$@"; do
+        env_vars+=("${spec%%:*}")
+        local rest="${spec#*:}"
+        config_keys+=("${rest%%:*}")
+        labels+=("${rest#*:}")
+    done
+
+    local n="${#env_vars[@]}"
+
+    # 1. All env vars already set?
+    if _multi_creds_all_env_set "${env_vars[@]}"; then
+        log_info "Using ${provider_name} credentials from environment"
+        return 0
+    fi
+
+    # 2. Try loading from config file
+    if _multi_creds_load_config "${config_file}" "${n}" "${env_vars[@]}" "${config_keys[@]}"; then
+        log_info "Using ${provider_name} credentials from ${config_file}"
+        return 0
+    fi
+
+    # 3. Prompt for each credential
+    _multi_creds_prompt "${provider_name}" "${help_url}" "${n}" "${env_vars[@]}" "${labels[@]}" || return 1
 
     # 4. Validate credentials
-    if [[ -n "${test_func}" ]]; then
-        log_info "Testing ${provider_name} credentials..."
-        if ! "${test_func}"; then
-            log_error "Invalid ${provider_name} credentials"
-            log_error "The credentials may be expired, revoked, or incorrectly copied."
-            log_error "Please re-run the command to enter new credentials."
-            local v
-            for v in "${env_vars[@]}"; do
-                unset "${v}"
-            done
-            return 1
-        fi
-    fi
+    _multi_creds_validate "${test_func}" "${provider_name}" "${env_vars[@]}" || return 1
 
     # 5. Save to config file
     local save_args=()
-    for idx in $(seq 0 $((${#env_vars[@]} - 1))); do
+    local idx
+    for idx in $(seq 0 $((n - 1))); do
         save_args+=("${config_keys[$idx]}" "${!env_vars[$idx]}")
     done
     _save_json_config "${config_file}" "${save_args[@]}"
