@@ -1006,7 +1006,7 @@
     "github-codespaces/continue": "implemented",
     "e2b/continue": "implemented",
     "modal/continue": "implemented",
-    "fly/continue": "missing",
+    "fly/continue": "implemented",
     "civo/continue": "missing",
     "scaleway/continue": "implemented",
     "daytona/continue": "missing",
