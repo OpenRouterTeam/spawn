@@ -77,10 +77,10 @@ safe_read() {
 
     if [[ -t 0 ]]; then
         # stdin is a terminal - read directly
-        read -r -p "${prompt}" result
+        read -r -p "${prompt}" result || return 1
     elif echo -n "" > /dev/tty 2>/dev/null; then
         # /dev/tty is functional - use it
-        read -r -p "${prompt}" result < /dev/tty
+        read -r -p "${prompt}" result < /dev/tty || return 1
     else
         # No interactive input available
         log_error "Cannot prompt for input: no interactive terminal available"
@@ -339,7 +339,14 @@ get_openrouter_api_key_manual() {
     echo ""
 
     local api_key=""
+    local attempts=0
+    local max_attempts=3
     while [[ -z "${api_key}" ]]; do
+        attempts=$((attempts + 1))
+        if [[ ${attempts} -gt ${max_attempts} ]]; then
+            log_error "Too many failed attempts. Set OPENROUTER_API_KEY environment variable and try again."
+            return 1
+        fi
         api_key=$(safe_read "Enter your OpenRouter API key: ") || return 1
 
         # Basic validation - OpenRouter keys typically start with "sk-or-"
