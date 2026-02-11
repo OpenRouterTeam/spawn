@@ -659,6 +659,22 @@
         "template": "Linux Ubuntu 24.04 LTS 64-bit"
       },
       "notes": "European cloud provider with per-second billing. Multiple zones available: ch-gva-2, ch-dk-2, de-fra-1, de-muc-1, at-vie-1, at-vie-2, bg-sof-1. Uses 'ubuntu' user for SSH. Requires exo CLI (auto-installed). Create API keys at https://portal.exoscale.com/iam/api-keys"
+    },
+    "hostinger": {
+      "name": "Hostinger",
+      "description": "Hostinger VPS hosting via REST API with cloud-init support",
+      "url": "https://www.hostinger.com/",
+      "type": "api",
+      "auth": "HOSTINGER_API_KEY",
+      "provision_method": "POST /vps/v1/virtual-machines with cloud_init",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "plan": "kvm1",
+        "location": "eu-central",
+        "os_template": "ubuntu-24.04"
+      },
+      "notes": "Budget VPS provider with cloud-init pre-installed. Starting at $4.95/mo. Requires HOSTINGER_API_KEY from hPanel → Profile → Account Information → API. API docs at developers.hostinger.com"
     }
   },
   "matrix": {
@@ -1066,6 +1082,21 @@
     "exoscale/opencode": "implemented",
     "exoscale/plandex": "implemented",
     "exoscale/kilocode": "implemented",
-    "exoscale/continue": "implemented"
+    "exoscale/continue": "implemented",
+    "hostinger/claude": "missing",
+    "hostinger/openclaw": "missing",
+    "hostinger/nanoclaw": "missing",
+    "hostinger/aider": "missing",
+    "hostinger/goose": "missing",
+    "hostinger/codex": "missing",
+    "hostinger/interpreter": "missing",
+    "hostinger/gemini": "missing",
+    "hostinger/amazonq": "missing",
+    "hostinger/cline": "missing",
+    "hostinger/gptme": "missing",
+    "hostinger/opencode": "missing",
+    "hostinger/plandex": "missing",
+    "hostinger/kilocode": "missing",
+    "hostinger/continue": "missing"
   }
 }
