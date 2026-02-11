@@ -92,36 +92,6 @@ test_contabo_credentials() {
     return 0
 }
 
-# Try to load Contabo credentials from config file
-# Returns 0 if all 4 credentials loaded, 1 otherwise
-_load_contabo_config() {
-    local config_file="$1"
-    [[ -f "$config_file" ]] || return 1
-
-    local creds
-    creds=$(python3 -c "
-import json, sys
-d = json.load(open(sys.argv[1]))
-print(d.get('client_id', ''))
-print(d.get('client_secret', ''))
-print(d.get('api_user', ''))
-print(d.get('api_password', ''))
-" "$config_file" 2>/dev/null) || return 1
-
-    local saved_client_id saved_secret saved_user saved_password
-    { read -r saved_client_id; read -r saved_secret; read -r saved_user; read -r saved_password; } <<< "${creds}"
-
-    if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]] && [[ -n "$saved_user" ]] && [[ -n "$saved_password" ]]; then
-        export CONTABO_CLIENT_ID="$saved_client_id"
-        export CONTABO_CLIENT_SECRET="$saved_secret"
-        export CONTABO_API_USER="$saved_user"
-        export CONTABO_API_PASSWORD="$saved_password"
-        log_info "Using Contabo credentials from $config_file"
-        return 0
-    fi
-    return 1
-}
-
 # Prompt for a single Contabo credential if not already set
 # Usage: _prompt_contabo_cred VAR_NAME "prompt text"
 _prompt_contabo_cred() {
@@ -135,19 +105,6 @@ _prompt_contabo_cred() {
     local value
     value=$(safe_read "$prompt_text") || return 1
     export "${var_name}=${value}"
-}
-
-# Save Contabo credentials to config file using json_escape
-_save_contabo_config() {
-    local config_file="$1"
-    mkdir -p "$(dirname "$config_file")"
-    printf '{\n  "client_id": %s,\n  "client_secret": %s,\n  "api_user": %s,\n  "api_password": %s\n}\n' \
-        "$(json_escape "$CONTABO_CLIENT_ID")" \
-        "$(json_escape "$CONTABO_CLIENT_SECRET")" \
-        "$(json_escape "$CONTABO_API_USER")" \
-        "$(json_escape "$CONTABO_API_PASSWORD")" > "$config_file"
-    chmod 600 "$config_file"
-    log_info "Credentials saved to $config_file"
 }
 
 # Ensure Contabo credentials are available
@@ -164,8 +121,18 @@ ensure_contabo_credentials() {
     fi
 
     # Try config file
-    if _load_contabo_config "$config_file"; then
-        return 0
+    local creds
+    if creds=$(_load_json_config_fields "$config_file" client_id client_secret api_user api_password); then
+        local saved_client_id saved_secret saved_user saved_password
+        { read -r saved_client_id; read -r saved_secret; read -r saved_user; read -r saved_password; } <<< "${creds}"
+        if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]] && [[ -n "$saved_user" ]] && [[ -n "$saved_password" ]]; then
+            export CONTABO_CLIENT_ID="$saved_client_id"
+            export CONTABO_CLIENT_SECRET="$saved_secret"
+            export CONTABO_API_USER="$saved_user"
+            export CONTABO_API_PASSWORD="$saved_password"
+            log_info "Using Contabo credentials from $config_file"
+            return 0
+        fi
     fi
 
     # Prompt for missing credentials
@@ -185,7 +152,11 @@ ensure_contabo_credentials() {
         return 1
     fi
 
-    _save_contabo_config "$config_file"
+    _save_json_config "$config_file" \
+        client_id "$CONTABO_CLIENT_ID" \
+        client_secret "$CONTABO_CLIENT_SECRET" \
+        api_user "$CONTABO_API_USER" \
+        api_password "$CONTABO_API_PASSWORD"
 }
 
 # Check if SSH key is registered with Contabo

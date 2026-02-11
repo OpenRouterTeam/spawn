@@ -51,36 +51,11 @@ test_upcloud_credentials() {
     fi
 }
 
-# Try to load UpCloud credentials from config file
-# Returns 0 if loaded, 1 otherwise
-_load_upcloud_config() {
-    local config_file="$1"
-    [[ -f "${config_file}" ]] || return 1
-
-    local creds
-    creds=$(python3 -c "
-import json, sys
-d = json.load(open(sys.argv[1]))
-print(d.get('username', ''))
-print(d.get('password', ''))
-" "${config_file}" 2>/dev/null) || return 1
-
-    [[ -n "${creds}" ]] || return 1
-
-    local saved_username saved_password
-    { read -r saved_username; read -r saved_password; } <<< "${creds}"
-    if [[ -n "${saved_username}" ]] && [[ -n "${saved_password}" ]]; then
-        export UPCLOUD_USERNAME="${saved_username}"
-        export UPCLOUD_PASSWORD="${saved_password}"
-        log_info "Using UpCloud credentials from ${config_file}"
-        return 0
-    fi
-    return 1
-}
-
 # Ensure UpCloud credentials are available (env var -> config file -> prompt+save)
 ensure_upcloud_credentials() {
     check_python_available || return 1
+
+    local config_file="$HOME/.config/spawn/upcloud.json"
 
     # 1. Check environment variables
     if [[ -n "${UPCLOUD_USERNAME:-}" ]] && [[ -n "${UPCLOUD_PASSWORD:-}" ]]; then
@@ -92,9 +67,16 @@ ensure_upcloud_credentials() {
     fi
 
     # 2. Check config file
-    local config_file="$HOME/.config/spawn/upcloud.json"
-    if _load_upcloud_config "${config_file}"; then
-        return 0
+    local creds
+    if creds=$(_load_json_config_fields "$config_file" username password); then
+        local saved_username saved_password
+        { read -r saved_username; read -r saved_password; } <<< "${creds}"
+        if [[ -n "${saved_username}" ]] && [[ -n "${saved_password}" ]]; then
+            export UPCLOUD_USERNAME="${saved_username}"
+            export UPCLOUD_PASSWORD="${saved_password}"
+            log_info "Using UpCloud credentials from ${config_file}"
+            return 0
+        fi
     fi
 
     # 3. Prompt and save
@@ -125,12 +107,7 @@ ensure_upcloud_credentials() {
         return 1
     fi
 
-    local config_dir
-    config_dir=$(dirname "${config_file}")
-    mkdir -p "${config_dir}"
-    printf '{\n  "username": %s,\n  "password": %s\n}\n' "$(json_escape "${username}")" "$(json_escape "${password}")" > "${config_file}"
-    chmod 600 "${config_file}"
-    log_info "Credentials saved to ${config_file}"
+    _save_json_config "$config_file" username "$username" password "$password"
 }
 
 # Get server name from env var or prompt

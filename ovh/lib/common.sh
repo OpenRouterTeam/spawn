@@ -96,53 +96,6 @@ test_ovh_token() {
     return 0
 }
 
-# Try to load OVH credentials from config file
-# Returns 0 if all 4 credentials loaded, 1 otherwise
-_load_ovh_config() {
-    local config_file="$1"
-    [[ -f "${config_file}" ]] || return 1
-
-    local creds
-    creds=$(python3 -c "
-import json, sys
-d = json.load(open(sys.argv[1]))
-for k in ('application_key','application_secret','consumer_key','project_id'):
-    print(d.get(k, ''))
-" "${config_file}" 2>/dev/null) || return 1
-
-    [[ -n "${creds}" ]] || return 1
-
-    local saved_ak saved_as saved_ck saved_pid
-    { read -r saved_ak; read -r saved_as; read -r saved_ck; read -r saved_pid; } <<< "${creds}"
-    if [[ -n "${saved_ak}" && -n "${saved_as}" && -n "${saved_ck}" && -n "${saved_pid}" ]]; then
-        export OVH_APPLICATION_KEY="${saved_ak}"
-        export OVH_APPLICATION_SECRET="${saved_as}"
-        export OVH_CONSUMER_KEY="${saved_ck}"
-        export OVH_PROJECT_ID="${saved_pid}"
-        log_info "Using OVHcloud credentials from ${config_file}"
-        return 0
-    fi
-    return 1
-}
-
-# Save OVH credentials to config file
-_save_ovh_config() {
-    local config_file="$1"
-    local app_key="$2"
-    local app_secret="$3"
-    local consumer_key="$4"
-    local project_id="$5"
-
-    local config_dir
-    config_dir=$(dirname "${config_file}")
-    mkdir -p "${config_dir}"
-    printf '{\n  "application_key": %s,\n  "application_secret": %s,\n  "consumer_key": %s,\n  "project_id": %s\n}\n' \
-        "$(json_escape "${app_key}")" "$(json_escape "${app_secret}")" \
-        "$(json_escape "${consumer_key}")" "$(json_escape "${project_id}")" > "${config_file}"
-    chmod 600 "${config_file}"
-    log_info "OVHcloud credentials saved to ${config_file}"
-}
-
 # Ensure OVH credentials are available (env vars -> config file -> prompt+save)
 ensure_ovh_authenticated() {
     check_python_available || return 1
@@ -156,8 +109,18 @@ ensure_ovh_authenticated() {
     fi
 
     # Try config file
-    if _load_ovh_config "${config_file}"; then
-        return 0
+    local creds
+    if creds=$(_load_json_config_fields "$config_file" application_key application_secret consumer_key project_id); then
+        local saved_ak saved_as saved_ck saved_pid
+        { read -r saved_ak; read -r saved_as; read -r saved_ck; read -r saved_pid; } <<< "${creds}"
+        if [[ -n "${saved_ak}" && -n "${saved_as}" && -n "${saved_ck}" && -n "${saved_pid}" ]]; then
+            export OVH_APPLICATION_KEY="${saved_ak}"
+            export OVH_APPLICATION_SECRET="${saved_as}"
+            export OVH_CONSUMER_KEY="${saved_ck}"
+            export OVH_PROJECT_ID="${saved_pid}"
+            log_info "Using OVHcloud credentials from ${config_file}"
+            return 0
+        fi
     fi
 
     # Prompt for credentials
@@ -195,7 +158,11 @@ ensure_ovh_authenticated() {
         return 1
     fi
 
-    _save_ovh_config "${config_file}" "${app_key}" "${app_secret}" "${consumer_key}" "${project_id}"
+    _save_json_config "${config_file}" \
+        application_key "${app_key}" \
+        application_secret "${app_secret}" \
+        consumer_key "${consumer_key}" \
+        project_id "${project_id}"
     return 0
 }
 
