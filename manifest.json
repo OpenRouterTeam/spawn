@@ -642,7 +642,7 @@
         "disk_size": 20,
         "location": "us/las"
       },
-      "notes": "Budget European cloud provider with minute-based billing starting at $2/month. Requires IONOS_USERNAME (email) and IONOS_PASSWORD (API key) from https://dcd.ionos.com/ → Management → Users & Keys. Datacenters are created automatically if needed."
+      "notes": "Budget European cloud provider with minute-based billing starting at $2/month. Requires IONOS_USERNAME (email) and IONOS_PASSWORD (API key) from https://dcd.ionos.com/ \u2192 Management \u2192 Users & Keys. Datacenters are created automatically if needed."
     },
     "exoscale": {
       "name": "Exoscale",
@@ -659,6 +659,22 @@
         "template": "Linux Ubuntu 24.04 LTS 64-bit"
       },
       "notes": "European cloud provider with per-second billing. Multiple zones available: ch-gva-2, ch-dk-2, de-fra-1, de-muc-1, at-vie-1, at-vie-2, bg-sof-1. Uses 'ubuntu' user for SSH. Requires exo CLI (auto-installed). Create API keys at https://portal.exoscale.com/iam/api-keys"
+    },
+    "contabo": {
+      "name": "Contabo",
+      "description": "Contabo budget VPS cloud via REST API with OAuth",
+      "url": "https://contabo.com/",
+      "type": "api",
+      "auth": "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET + CONTABO_API_USER + CONTABO_API_PASSWORD",
+      "provision_method": "POST /v1/compute/instances with userData (cloud-init)",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "product": "V45",
+        "region": "EU",
+        "image": "ubuntu-24.04"
+      },
+      "notes": "Budget European VPS provider starting at $4.95/mo. Uses OAuth2 password grant (client credentials + user credentials). Requires 4 values from https://my.contabo.com/api/details: Client ID, Client Secret, API User, API Password."
     },
     "hostinger": {
       "name": "Hostinger",
@@ -1083,10 +1099,25 @@
     "exoscale/plandex": "implemented",
     "exoscale/kilocode": "implemented",
     "exoscale/continue": "implemented",
-    "hostinger/claude": "missing",
-    "hostinger/openclaw": "missing",
+    "contabo/claude": "implemented",
+    "contabo/openclaw": "implemented",
+    "contabo/nanoclaw": "missing",
+    "contabo/aider": "implemented",
+    "contabo/goose": "missing",
+    "contabo/codex": "missing",
+    "contabo/interpreter": "missing",
+    "contabo/gemini": "missing",
+    "contabo/amazonq": "missing",
+    "contabo/cline": "missing",
+    "contabo/gptme": "missing",
+    "contabo/opencode": "missing",
+    "contabo/plandex": "missing",
+    "contabo/kilocode": "missing",
+    "contabo/continue": "missing",
+    "hostinger/claude": "implemented",
+    "hostinger/openclaw": "implemented",
     "hostinger/nanoclaw": "missing",
-    "hostinger/aider": "missing",
+    "hostinger/aider": "implemented",
     "hostinger/goose": "missing",
     "hostinger/codex": "missing",
     "hostinger/interpreter": "missing",
