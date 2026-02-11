@@ -1202,7 +1202,7 @@
     "local/kilocode": "missing",
     "local/continue": "missing",
     "ramnode/claude": "implemented",
-    "ramnode/openclaw": "missing",
+    "ramnode/openclaw": "implemented",
     "ramnode/nanoclaw": "missing",
     "ramnode/aider": "implemented",
     "ramnode/goose": "implemented",
