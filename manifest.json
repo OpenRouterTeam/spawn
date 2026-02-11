@@ -1133,7 +1133,7 @@
     "hostinger/codex": "implemented",
     "hostinger/interpreter": "missing",
     "hostinger/gemini": "implemented",
-    "hostinger/amazonq": "missing",
+    "hostinger/amazonq": "implemented",
     "hostinger/cline": "implemented",
     "hostinger/gptme": "implemented",
     "hostinger/opencode": "implemented",
