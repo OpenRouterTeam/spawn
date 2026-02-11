@@ -1,0 +1,537 @@
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { loadManifest } from "../manifest";
+
+/**
+ * Tests for untested display details in cmdCloudInfo and cmdAgentInfo.
+ *
+ * Existing tests cover:
+ * - commands-cloud-info.test.ts: happy path, notes, no-agents, error paths
+ * - commands-display.test.ts: agent info happy path, list, agents, clouds
+ *
+ * This file covers the UNTESTED branches:
+ * - cmdCloudInfo: "Not yet available" text when missing agents count <= 5
+ * - cmdCloudInfo: "Not yet available" NOT shown when missing agents > 5
+ * - cmdCloudInfo: setup URL at the bottom (github.com repo link)
+ * - cmdCloudInfo: auth field in Type/Auth line
+ * - cmdCloudInfo: count display (N of M agents)
+ * - cmdAgentInfo: agent URL display
+ * - cmdAgentInfo: agent notes display (verified via commands-display.test.ts
+ *   but the URL line was not)
+ * - cmdAgentInfo: count display (N of M clouds)
+ *
+ * Agent: test-engineer
+ */
+
+const mockManifest = createMockManifest();
+
+// Manifest where hetzner has 1 missing agent (aider) - triggers "Not yet available"
+// This is the same as the base mock manifest
+
+// Manifest with many agents (> 5 missing) to test that "Not yet available" is NOT shown
+const manyAgentsManifest = {
+  agents: {
+    claude: {
+      name: "Claude Code",
+      description: "AI coding assistant",
+      url: "https://claude.ai",
+      install: "npm install -g claude",
+      launch: "claude",
+      env: { ANTHROPIC_API_KEY: "test" },
+    },
+    aider: {
+      name: "Aider",
+      description: "AI pair programmer",
+      url: "https://aider.chat",
+      install: "pip install aider-chat",
+      launch: "aider",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    openclaw: {
+      name: "OpenClaw",
+      description: "Open source agent",
+      url: "https://openclaw.dev",
+      install: "npm install -g openclaw",
+      launch: "openclaw",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    nanoclaw: {
+      name: "NanoClaw",
+      description: "Lightweight agent",
+      url: "https://nanoclaw.dev",
+      install: "npm install -g nanoclaw",
+      launch: "nanoclaw",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    codex: {
+      name: "Codex CLI",
+      description: "OpenAI Codex",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    goose: {
+      name: "Goose",
+      description: "AI dev tool",
+      url: "https://goose.dev",
+      install: "pip install goose",
+      launch: "goose",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    kilocode: {
+      name: "KiloCode",
+      description: "Code assistant",
+      url: "https://kilocode.dev",
+      install: "npm install -g kilocode",
+      launch: "kilocode",
+      env: { OPENAI_API_KEY: "test" },
+    },
+  },
+  clouds: {
+    sprite: {
+      name: "Sprite",
+      description: "Lightweight VMs",
+      url: "https://sprite.sh",
+      type: "vm",
+      auth: "oauth",
+      provision_method: "api",
+      exec_method: "ssh",
+      interactive_method: "ssh",
+    },
+  },
+  matrix: {
+    "sprite/claude": "implemented",
+    "sprite/aider": "missing",
+    "sprite/openclaw": "missing",
+    "sprite/nanoclaw": "missing",
+    "sprite/codex": "missing",
+    "sprite/goose": "missing",
+    "sprite/kilocode": "missing",
+  },
+};
+
+// Manifest where sprite has exactly 3 missing agents (<= 5 triggers display)
+const fewMissingManifest = {
+  agents: {
+    claude: {
+      name: "Claude Code",
+      description: "AI coding assistant",
+      url: "https://claude.ai",
+      install: "npm install -g claude",
+      launch: "claude",
+      env: { ANTHROPIC_API_KEY: "test" },
+    },
+    aider: {
+      name: "Aider",
+      description: "AI pair programmer",
+      url: "https://aider.chat",
+      install: "pip install aider-chat",
+      launch: "aider",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    openclaw: {
+      name: "OpenClaw",
+      description: "Open source agent",
+      url: "https://openclaw.dev",
+      install: "npm install -g openclaw",
+      launch: "openclaw",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    nanoclaw: {
+      name: "NanoClaw",
+      description: "Lightweight agent",
+      url: "https://nanoclaw.dev",
+      install: "npm install -g nanoclaw",
+      launch: "nanoclaw",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    codex: {
+      name: "Codex CLI",
+      description: "OpenAI Codex",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
+      env: { OPENAI_API_KEY: "test" },
+    },
+  },
+  clouds: {
+    sprite: {
+      name: "Sprite",
+      description: "Lightweight VMs",
+      url: "https://sprite.sh",
+      type: "vm",
+      auth: "oauth",
+      provision_method: "api",
+      exec_method: "ssh",
+      interactive_method: "ssh",
+    },
+  },
+  matrix: {
+    "sprite/claude": "implemented",
+    "sprite/aider": "implemented",
+    "sprite/openclaw": "missing",
+    "sprite/nanoclaw": "missing",
+    "sprite/codex": "missing",
+  },
+};
+
+// Manifest where all agents are implemented (no "Not yet available" shown)
+const allImplManifest = {
+  ...mockManifest,
+  matrix: {
+    "sprite/claude": "implemented",
+    "sprite/aider": "implemented",
+    "hetzner/claude": "implemented",
+    "hetzner/aider": "implemented",
+  },
+};
+
+// Manifest with agent that has a URL and notes
+const agentWithUrlManifest = {
+  ...mockManifest,
+  agents: {
+    ...mockManifest.agents,
+    claude: {
+      ...mockManifest.agents.claude,
+      url: "https://claude.ai/docs",
+      notes: "Requires Anthropic API key for best results.",
+    },
+  },
+};
+
+// Mock @clack/prompts
+const mockLogError = mock(() => {});
+const mockLogInfo = mock(() => {});
+const mockLogStep = mock(() => {});
+const mockSpinnerStart = mock(() => {});
+const mockSpinnerStop = mock(() => {});
+
+mock.module("@clack/prompts", () => ({
+  spinner: () => ({
+    start: mockSpinnerStart,
+    stop: mockSpinnerStop,
+    message: mock(() => {}),
+  }),
+  log: {
+    step: mockLogStep,
+    info: mockLogInfo,
+    error: mockLogError,
+    warn: mock(() => {}),
+    success: mock(() => {}),
+  },
+  intro: mock(() => {}),
+  outro: mock(() => {}),
+  cancel: mock(() => {}),
+  select: mock(() => {}),
+  isCancel: () => false,
+}));
+
+// Import commands after mock setup
+const { cmdCloudInfo, cmdAgentInfo } = await import("../commands.js");
+
+describe("cmdCloudInfo - missing agents display", () => {
+  let consoleMocks: ReturnType<typeof createConsoleMocks>;
+  let originalFetch: typeof global.fetch;
+
+  function setManifest(manifest: any) {
+    global.fetch = mock(async () => ({
+      ok: true,
+      json: async () => manifest,
+      text: async () => JSON.stringify(manifest),
+    })) as any;
+    return loadManifest(true);
+  }
+
+  function getOutput(): string {
+    return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+  }
+
+  beforeEach(async () => {
+    consoleMocks = createConsoleMocks();
+    mockLogError.mockClear();
+    mockLogInfo.mockClear();
+    mockSpinnerStart.mockClear();
+    mockSpinnerStop.mockClear();
+
+    originalFetch = global.fetch;
+    await setManifest(mockManifest);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    restoreMocks(consoleMocks.log, consoleMocks.error);
+  });
+
+  // ── "Not yet available" display ──────────────────────────────────
+
+  describe("Not yet available text", () => {
+    it("should show 'Not yet available' when cloud has 1 missing agent (<=5)", async () => {
+      // hetzner has claude (implemented) but aider (missing) = 1 missing agent
+      await cmdCloudInfo("hetzner");
+      const output = getOutput();
+      expect(output).toContain("Not yet available");
+      expect(output).toContain("Aider");
+    });
+
+    it("should show missing agent display names in 'Not yet available'", async () => {
+      await setManifest(fewMissingManifest);
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("Not yet available");
+      expect(output).toContain("OpenClaw");
+      expect(output).toContain("NanoClaw");
+      expect(output).toContain("Codex CLI");
+    });
+
+    it("should NOT show 'Not yet available' when missing agents > 5", async () => {
+      await setManifest(manyAgentsManifest);
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      // 6 missing agents exceeds the <= 5 threshold
+      expect(output).not.toContain("Not yet available");
+    });
+
+    it("should NOT show 'Not yet available' when all agents are implemented", async () => {
+      await setManifest(allImplManifest);
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).not.toContain("Not yet available");
+    });
+
+    it("should separate multiple missing agent names with commas", async () => {
+      await setManifest(fewMissingManifest);
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      // Find the "Not yet available" line and check for comma separation
+      const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
+      const notAvailLine = lines.find((l: string) => l.includes("Not yet available"));
+      expect(notAvailLine).toBeDefined();
+      expect(notAvailLine!).toContain(", ");
+    });
+  });
+
+  // ── Setup URL at the bottom ──────────────────────────────────────
+
+  describe("setup URL", () => {
+    it("should show setup URL containing the cloud key", async () => {
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("Setup:");
+      expect(output).toContain("github.com");
+      expect(output).toContain("sprite");
+    });
+
+    it("should show setup URL for hetzner", async () => {
+      await cmdCloudInfo("hetzner");
+      const output = getOutput();
+      expect(output).toContain("Setup:");
+      expect(output).toContain("hetzner");
+    });
+
+    it("should include the REPO constant in the URL", async () => {
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("OpenRouterTeam/spawn");
+    });
+  });
+
+  // ── Auth field display ───────────────────────────────────────────
+
+  describe("auth field", () => {
+    it("should display auth type in the Type/Auth line", async () => {
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("Auth: token");
+    });
+
+    it("should display different auth type", async () => {
+      await setManifest(manyAgentsManifest);
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("Auth: oauth");
+    });
+  });
+
+  // ── Agent count display ──────────────────────────────────────────
+
+  describe("agent count", () => {
+    it("should show N of M format for available agents", async () => {
+      await cmdCloudInfo("hetzner");
+      const output = getOutput();
+      // hetzner has 1 implemented out of 2 total agents
+      expect(output).toContain("1 of 2");
+    });
+
+    it("should show all-implemented count", async () => {
+      await setManifest(allImplManifest);
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("2 of 2");
+    });
+
+    it("should show correct count with many agents", async () => {
+      await setManifest(manyAgentsManifest);
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      // 1 implemented out of 7 total
+      expect(output).toContain("1 of 7");
+    });
+
+    it("should show correct count with few missing", async () => {
+      await setManifest(fewMissingManifest);
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      // 2 implemented out of 5 total
+      expect(output).toContain("2 of 5");
+    });
+  });
+
+  // ── Cloud URL display ────────────────────────────────────────────
+
+  describe("cloud URL", () => {
+    it("should display the cloud URL", async () => {
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("https://sprite.sh");
+    });
+
+    it("should display hetzner URL", async () => {
+      await cmdCloudInfo("hetzner");
+      const output = getOutput();
+      expect(output).toContain("https://hetzner.com");
+    });
+  });
+});
+
+describe("cmdAgentInfo - URL and count details", () => {
+  let consoleMocks: ReturnType<typeof createConsoleMocks>;
+  let originalFetch: typeof global.fetch;
+
+  function setManifest(manifest: any) {
+    global.fetch = mock(async () => ({
+      ok: true,
+      json: async () => manifest,
+      text: async () => JSON.stringify(manifest),
+    })) as any;
+    return loadManifest(true);
+  }
+
+  function getOutput(): string {
+    return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+  }
+
+  beforeEach(async () => {
+    consoleMocks = createConsoleMocks();
+    mockLogError.mockClear();
+    mockLogInfo.mockClear();
+    mockSpinnerStart.mockClear();
+    mockSpinnerStop.mockClear();
+
+    originalFetch = global.fetch;
+    await setManifest(mockManifest);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    restoreMocks(consoleMocks.log, consoleMocks.error);
+  });
+
+  // ── Agent URL display ────────────────────────────────────────────
+
+  describe("agent URL", () => {
+    it("should display the agent URL", async () => {
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("https://claude.ai");
+    });
+
+    it("should display aider URL", async () => {
+      await cmdAgentInfo("aider");
+      const output = getOutput();
+      expect(output).toContain("https://aider.chat");
+    });
+
+    it("should display specific URL when agent has custom URL", async () => {
+      await setManifest(agentWithUrlManifest);
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("https://claude.ai/docs");
+    });
+  });
+
+  // ── Agent notes display ──────────────────────────────────────────
+
+  describe("agent notes", () => {
+    it("should display notes when agent has notes field", async () => {
+      await setManifest(agentWithUrlManifest);
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("Requires Anthropic API key for best results");
+    });
+  });
+
+  // ── Cloud count display ──────────────────────────────────────────
+
+  describe("cloud count", () => {
+    it("should show N of M format for available clouds", async () => {
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      // claude has 2 implemented out of 2 total clouds
+      expect(output).toContain("2 of 2");
+    });
+
+    it("should show partial count for aider", async () => {
+      await cmdAgentInfo("aider");
+      const output = getOutput();
+      // aider has 1 implemented out of 2 total clouds
+      expect(output).toContain("1 of 2");
+    });
+
+    it("should show 0 of N when agent has no implementations", async () => {
+      const noImplManifest = {
+        ...mockManifest,
+        matrix: {
+          "sprite/claude": "missing",
+          "sprite/aider": "missing",
+          "hetzner/claude": "missing",
+          "hetzner/aider": "missing",
+        },
+      };
+      await setManifest(noImplManifest);
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("0 of 2");
+    });
+  });
+
+  // ── Cloud grouping by type ───────────────────────────────────────
+
+  describe("cloud grouping by type", () => {
+    it("should group clouds by their type field", async () => {
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      // sprite is type "vm", hetzner is type "cloud"
+      // Both should appear as group headers
+      expect(output).toContain("vm");
+      expect(output).toContain("cloud");
+    });
+
+    it("should show cloud display name within its type group", async () => {
+      await cmdAgentInfo("claude");
+      const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
+      // Find lines containing cloud names
+      const spriteLine = lines.find((l: string) => l.includes("sprite") && l.includes("Sprite"));
+      const hetznerLine = lines.find((l: string) => l.includes("hetzner") && l.includes("Hetzner"));
+      expect(spriteLine).toBeDefined();
+      expect(hetznerLine).toBeDefined();
+    });
+
+    it("should show launch command within type group", async () => {
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("spawn claude sprite");
+      expect(output).toContain("spawn claude hetzner");
+    });
+  });
+});
