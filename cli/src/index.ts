@@ -27,12 +27,9 @@ function isInteractiveTTY(): boolean {
 
 function handleError(err: unknown): never {
   // Use duck typing instead of instanceof to avoid prototype chain issues
-  if (err && typeof err === "object" && "message" in err) {
-    console.error(`Error: ${err.message}`);
-  } else {
-    console.error(`Error: ${String(err)}`);
-  }
-  console.error(`\nRun 'spawn help' for usage information.`);
+  const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+  console.error(pc.red(`Error: ${msg}`));
+  console.error(`\nRun ${pc.cyan("spawn help")} for usage information.`);
   process.exit(1);
 }
 
@@ -47,8 +44,8 @@ function extractFlagValue(
   if (idx === -1) return [undefined, args];
 
   if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
-    console.error(`Error: ${args[idx]} requires a value`);
-    console.error(`\nUsage: ${usageHint}`);
+    console.error(pc.red(`Error: ${pc.bold(args[idx])} requires a value`));
+    console.error(`\nUsage: ${pc.cyan(usageHint)}`);
     process.exit(1);
   }
 
@@ -139,8 +136,8 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
     await cmdRun(agent, cloud, prompt);
   } else {
     if (prompt) {
-      console.error("Error: --prompt requires both <agent> and <cloud>");
-      console.error(`\nUsage: spawn ${agent} <cloud> --prompt "your prompt here"`);
+      console.error(pc.red("Error: --prompt requires both <agent> and <cloud>"));
+      console.error(`\nUsage: ${pc.cyan(`spawn ${agent} <cloud> --prompt "your prompt here"`)}`);
 
       // Try to suggest available clouds for the agent
       try {
@@ -151,7 +148,7 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
             (c: string) => manifest.matrix[`${c}/${resolvedAgent}`] === "implemented"
           );
           if (clouds.length > 0) {
-            console.error(`\nAvailable clouds for ${resolvedAgent}:`);
+            console.error(`\nAvailable clouds for ${pc.bold(resolvedAgent)}:`);
             for (const c of clouds.slice(0, 5)) {
               console.error(`  ${pc.cyan(`spawn ${resolvedAgent} ${c} --prompt "..."`)}`);
             }
@@ -174,17 +171,17 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
 function handlePromptFileError(promptFile: string, err: unknown): never {
   const code = err && typeof err === "object" && "code" in err ? err.code : "";
   if (code === "ENOENT") {
-    console.error(`Prompt file not found: ${promptFile}`);
+    console.error(pc.red(`Prompt file not found: ${pc.bold(promptFile)}`));
     console.error(`\nCheck the path and try again.`);
   } else if (code === "EACCES") {
-    console.error(`Permission denied reading prompt file: ${promptFile}`);
-    console.error(`\nCheck file permissions: ls -la ${promptFile}`);
+    console.error(pc.red(`Permission denied reading prompt file: ${pc.bold(promptFile)}`));
+    console.error(`\nCheck file permissions: ${pc.cyan(`ls -la ${promptFile}`)}`);
   } else if (code === "EISDIR") {
-    console.error(`'${promptFile}' is a directory, not a file.`);
+    console.error(pc.red(`'${promptFile}' is a directory, not a file.`));
     console.error(`\nProvide a path to a text file containing your prompt.`);
   } else {
     const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-    console.error(`Error reading prompt file '${promptFile}': ${msg}`);
+    console.error(pc.red(`Error reading prompt file '${promptFile}': ${msg}`));
   }
   process.exit(1);
 }
@@ -207,10 +204,10 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
   filteredArgs = finalArgs;
 
   if (prompt && promptFile) {
-    console.error("Error: --prompt and --prompt-file cannot be used together");
+    console.error(pc.red("Error: --prompt and --prompt-file cannot be used together"));
     console.error(`\nUse one or the other:`);
-    console.error(`  spawn <agent> <cloud> --prompt "your prompt here"`);
-    console.error(`  spawn <agent> <cloud> --prompt-file instructions.txt`);
+    console.error(`  ${pc.cyan('spawn <agent> <cloud> --prompt "your prompt here"')}`);
+    console.error(`  ${pc.cyan("spawn <agent> <cloud> --prompt-file instructions.txt")}`);
     process.exit(1);
   }
 
@@ -229,8 +226,8 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
 /** Handle the case when no command is given (interactive mode or help) */
 async function handleNoCommand(prompt: string | undefined): Promise<void> {
   if (prompt) {
-    console.error("Error: --prompt requires both <agent> and <cloud>");
-    console.error(`\nUsage: spawn <agent> <cloud> --prompt "your prompt here"`);
+    console.error(pc.red("Error: --prompt requires both <agent> and <cloud>"));
+    console.error(`\nUsage: ${pc.cyan('spawn <agent> <cloud> --prompt "your prompt here"')}`);
     process.exit(1);
   }
   if (isInteractiveTTY()) {
@@ -249,7 +246,10 @@ async function handleNoCommand(prompt: string | undefined): Promise<void> {
 
 function showVersion(): void {
   console.log(`spawn v${VERSION}`);
-  console.log(pc.dim(`  ${process.argv[1] ?? "unknown path"}`));
+  const binPath = process.argv[1];
+  if (binPath) {
+    console.log(pc.dim(`  ${binPath}`));
+  }
   console.log(pc.dim(`  ${process.versions.bun ? "bun" : "node"} ${process.versions.bun ?? process.versions.node}  ${process.platform} ${process.arch}`));
   console.log(pc.dim(`  Run ${pc.cyan("spawn update")} to check for updates.`));
 }

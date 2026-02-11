@@ -429,7 +429,7 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string)
       return [
         "Script was interrupted (Ctrl+C).",
         "Note: If a server was already created, it may still be running.",
-        `  Check your cloud provider dashboard or run ${pc.cyan(`spawn ${cloud}`)} for details.`,
+        "  Check your cloud provider dashboard to stop or delete any unused servers.",
       ];
     case 137:
       return ["Script was killed (likely by the system due to timeout or out of memory)."];
@@ -928,7 +928,7 @@ export async function cmdUpdate(): Promise<void> {
       console.log();
     }
   } catch (err) {
-    s.stop(pc.red(`Failed to check for updates ${pc.dim(`(current: v${VERSION})`)}`));
+    s.stop(pc.red("Failed to check for updates") + pc.dim(` (current: v${VERSION})`));
     console.error("Error:", getErrorMessage(err));
     console.error(`\nHow to fix:`);
     console.error(`  1. Check your internet connection`);

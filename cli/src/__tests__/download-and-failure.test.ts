@@ -446,9 +446,9 @@ describe("getScriptFailureGuidance - all exit codes", () => {
     expect(lines.some((l: string) => l.includes("still be running"))).toBe(true);
   });
 
-  it("should include cloud-specific command hint for 130", () => {
+  it("should include cloud provider dashboard hint for 130", () => {
     const lines = getScriptFailureGuidance(130, "hetzner");
-    expect(lines.some((l: string) => l.includes("spawn hetzner"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("cloud provider dashboard"))).toBe(true);
   });
 
   it("should return OOM/timeout guidance for exit code 137", () => {
