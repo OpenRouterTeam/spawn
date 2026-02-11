@@ -138,6 +138,29 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
     if (prompt) {
       console.error("Error: --prompt requires both <agent> and <cloud>");
       console.error(`\nUsage: spawn ${agent} <cloud> --prompt "your prompt here"`);
+
+      // Try to suggest available clouds for the agent
+      try {
+        const manifest = await loadManifest();
+        const resolvedAgent = resolveAgentKey(manifest, agent);
+        if (resolvedAgent) {
+          const clouds = cloudKeys(manifest).filter(
+            (c: string) => manifest.matrix[`${c}/${resolvedAgent}`] === "implemented"
+          );
+          if (clouds.length > 0) {
+            console.error(`\nAvailable clouds for ${resolvedAgent}:`);
+            for (const c of clouds.slice(0, 5)) {
+              console.error(`  ${pc.cyan(`spawn ${resolvedAgent} ${c} --prompt "..."`)}`);
+            }
+            if (clouds.length > 5) {
+              console.error(`  Run ${pc.cyan(`spawn ${resolvedAgent}`)} to see all ${clouds.length} clouds.`);
+            }
+          }
+        }
+      } catch {
+        // Manifest unavailable — skip cloud suggestions
+      }
+
       process.exit(1);
     }
     await showInfoOrError(agent);

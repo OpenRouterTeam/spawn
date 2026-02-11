@@ -607,6 +607,9 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   const a = manifest.agents[agentKey];
   console.log();
   console.log(`${pc.bold(a.name)} ${pc.dim("--")} ${a.description}`);
+  if (a.url) {
+    console.log(pc.dim(`  ${a.url}`));
+  }
   if (a.notes) {
     console.log(pc.dim(`  ${a.notes}`));
   }
@@ -655,6 +658,9 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   console.log();
   console.log(`${pc.bold(c.name)} ${pc.dim("--")} ${c.description}`);
   console.log(pc.dim(`  Type: ${c.type}`));
+  if (c.url) {
+    console.log(pc.dim(`  ${c.url}`));
+  }
   if (c.notes) {
     console.log(pc.dim(`  ${c.notes}`));
   }
@@ -675,6 +681,8 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   if (!found) {
     console.log(pc.dim("  No implemented agents yet."));
   }
+  console.log();
+  console.log(pc.dim(`  Setup instructions: ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloudKey}`)}`));
   console.log();
 }
 
@@ -737,7 +745,7 @@ ${pc.bold("USAGE")}
                                      Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
   spawn <cloud>                      Show available agents for cloud
-  spawn list                           Full matrix table (alias: ls)
+  spawn list                         Full matrix table (alias: ls)
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
   spawn update                       Check for CLI updates
