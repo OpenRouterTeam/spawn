@@ -1,10 +1,9 @@
 {
   "cloud": "civo",
-  "recorded_at": "2026-02-11T00:57:33Z",
+  "recorded_at": "2026-02-11T02:04:20Z",
   "fixtures": {
-    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-11T00:57:28Z"},
-    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-11T00:57:29Z"},
-    "ssh_keys": {"endpoint": "/sshkeys", "recorded_at": "2026-02-11T00:57:30Z"},
-    "create_server": {"endpoint": "POST /instances", "type": "live", "recorded_at": "2026-02-11T00:57:33Z"}
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-11T02:04:15Z"},
+    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-11T02:04:16Z"},
+    "ssh_keys": {"endpoint": "/sshkeys", "recorded_at": "2026-02-11T02:04:17Z"}
   }
 }

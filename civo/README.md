@@ -97,6 +97,6 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 |----------|-------------|---------|
 | `CIVO_API_TOKEN` | Civo API token | (prompted) |
 | `CIVO_SERVER_NAME` | Instance hostname | (prompted) |
-| `CIVO_REGION` | Civo region | `NYC1` |
-| `CIVO_SIZE` | Instance size | `g3.medium` |
+| `CIVO_REGION` | Civo region | `LON1` |
+| `CIVO_SIZE` | Instance size | `g3.small` |
 | `OPENROUTER_API_KEY` | OpenRouter API key | (prompted/OAuth) |

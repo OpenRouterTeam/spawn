@@ -47,7 +47,7 @@ printf '\n'
 # ── Phase 2: Run mock tests ──
 printf '%b\n' "${CYAN}Phase 2: Run mock tests${NC}"
 rm -f "${RESULTS_1}"
-RESULTS_FILE="${RESULTS_1}" bash test/mock.sh 2>&1
+RESULTS_FILE="${RESULTS_1}" bash test/mock.sh 2>&1 || true
 
 if [[ -n "${INJECT_FAIL}" ]]; then
     printf '%b\n' "\n  ${YELLOW}Injecting fake failure:${NC} ${INJECT_FAIL}"
@@ -104,7 +104,7 @@ printf '\n'
 # ── Phase 5: Re-run tests (same as phase 2 in dry run) ──
 printf '%b\n' "${CYAN}Phase 5: Re-run tests${NC}"
 rm -f "${RESULTS_2}"
-RESULTS_FILE="${RESULTS_2}" bash test/mock.sh 2>&1 | tail -3
+RESULTS_FILE="${RESULTS_2}" bash test/mock.sh 2>&1 | tail -3 || true
 
 PASS_2=$(grep -c ':pass$' "${RESULTS_2}" 2>/dev/null || echo 0)
 FAIL_2=$(grep -c ':fail$' "${RESULTS_2}" 2>/dev/null || echo 0)

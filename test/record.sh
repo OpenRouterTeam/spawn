@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
@@ -768,8 +768,8 @@ print(json.dumps(body))
 _live_civo() {
     local fixture_dir="$1"
     local server_name="spawn-record-$(date +%s)"
-    local size="g3.medium"
-    local region="NYC1"
+    local size="g3.small"
+    local region="LON1"
 
     printf '%b\n' "  ${CYAN}live${NC} Creating test Civo instance '${server_name}' (${size}, ${region})..."
 
