@@ -1136,7 +1136,7 @@
     "hostinger/amazonq": "missing",
     "hostinger/cline": "missing",
     "hostinger/gptme": "missing",
-    "hostinger/opencode": "missing",
+    "hostinger/opencode": "implemented",
     "hostinger/plandex": "missing",
     "hostinger/kilocode": "missing",
     "hostinger/continue": "missing",
