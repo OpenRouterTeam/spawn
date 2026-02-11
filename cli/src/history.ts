@@ -29,13 +29,19 @@ export function loadHistory(): SpawnRecord[] {
   }
 }
 
+const MAX_HISTORY_ENTRIES = 100;
+
 export function saveSpawnRecord(record: SpawnRecord): void {
   const dir = getSpawnDir();
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
-  const history = loadHistory();
+  let history = loadHistory();
   history.push(record);
+  // Trim to most recent entries to prevent unbounded growth
+  if (history.length > MAX_HISTORY_ENTRIES) {
+    history = history.slice(history.length - MAX_HISTORY_ENTRIES);
+  }
   writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
 }
 

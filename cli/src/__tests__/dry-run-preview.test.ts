@@ -391,12 +391,12 @@ describe("Dry-run preview (showDryRunPreview via cmdRun)", () => {
       expect(getLogText()).toContain("sprite/claude.sh");
     });
 
-    it("should use openrouter.ai lab URL", async () => {
+    it("should use GitHub raw URL", async () => {
       setupManifest(standardManifest);
       await loadManifest(true);
       await cmdRun("claude", "sprite", undefined, true);
 
-      expect(getLogText()).toContain("openrouter.ai/lab/spawn");
+      expect(getLogText()).toContain("raw.githubusercontent.com/OpenRouterTeam/spawn/main");
     });
   });
 

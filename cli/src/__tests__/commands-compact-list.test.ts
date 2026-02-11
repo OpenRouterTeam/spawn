@@ -224,10 +224,10 @@ describe("Compact List View", () => {
 
       await cmdMatrix();
       const output = getOutput();
-      // Compact view has "Agent", "Clouds", "Missing" header columns
+      // Compact view has "Agent", "Clouds", "Not yet available" header columns
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Missing");
+      expect(output).toContain("Not yet available");
     });
 
     it("should use grid view when terminal is wide enough for small manifest", async () => {
@@ -241,8 +241,8 @@ describe("Compact List View", () => {
       expect(output).toContain("+");
       expect(output).toContain("Sprite");
       expect(output).toContain("Hetzner Cloud");
-      // Grid view should NOT have the "Missing" header column
-      expect(output).not.toContain("Missing");
+      // Grid view should NOT have the "Not yet available" header column
+      expect(output).not.toContain("Not yet available");
     });
 
     it("should default to 80 columns when process.stdout.columns is undefined", async () => {
@@ -255,14 +255,14 @@ describe("Compact List View", () => {
       // With 7 clouds at ~10+ chars each, the grid would be ~100+ chars
       // which exceeds the 80-column default, so compact view should trigger
       expect(output).toContain("Agent");
-      expect(output).toContain("Missing");
+      expect(output).toContain("Not yet available");
     });
   });
 
   // ── Compact view header and structure ─────────────────────────────
 
   describe("compact view header", () => {
-    it("should show three column headers: Agent, Clouds, Missing", async () => {
+    it("should show three column headers: Agent, Clouds, Not yet available", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
@@ -270,7 +270,7 @@ describe("Compact List View", () => {
       const output = getOutput();
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Missing");
+      expect(output).toContain("Not yet available");
     });
 
     it("should include a separator line with dashes", async () => {
