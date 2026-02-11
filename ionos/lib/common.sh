@@ -50,14 +50,33 @@ ionos_api() {
     echo "$response"
 }
 
+# Parse error message from an IONOS API error response
+# Usage: error_msg=$(ionos_parse_api_error "$response")
+ionos_parse_api_error() {
+    local response="$1"
+    echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); msgs=d.get('messages',[]); print(msgs[0].get('message','Unknown error') if msgs else 'Unknown error')" 2>/dev/null || echo "$response"
+}
+
+# Check if an IONOS API response is an error, log it, and return 1 if so
+# Usage: ionos_check_api_error "$response" "Failed to create server" && return 1
+ionos_check_api_error() {
+    local response="$1"
+    local context="$2"
+
+    if echo "$response" | grep -q '"httpStatus"'; then
+        log_error "$context"
+        local error_msg
+        error_msg=$(ionos_parse_api_error "$response")
+        log_error "API Error: $error_msg"
+        return 0
+    fi
+    return 1
+}
+
 test_ionos_credentials() {
     local response
     response=$(ionos_api GET "/datacenters?depth=1&limit=1")
-    if echo "$response" | grep -q '"httpStatus"'; then
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('messages',[{}])[0].get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
+    if ionos_check_api_error "$response" "Authentication failed"; then
         log_error ""
         log_error "How to fix:"
         log_error "  1. Verify your credentials at: https://dcd.ionos.com/ → Management → Users & Keys"
@@ -152,11 +171,7 @@ print(json.dumps(body))
     local register_response
     register_response=$(ionos_api POST "/datacenters/${datacenter_id}/sshkeys" "$register_body")
 
-    if echo "$register_response" | grep -q '"httpStatus"'; then
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); msgs=d.get('messages',[]); print(msgs[0].get('message','Unknown error') if msgs else 'Unknown error')" 2>/dev/null || echo "$register_response")
-        log_error "API Error: $error_msg"
+    if ionos_check_api_error "$register_response" "Failed to register SSH key"; then
         log_error ""
         log_error "Common causes:"
         log_error "  - SSH key already registered with this name"
@@ -238,11 +253,7 @@ print(json.dumps(body))
         local dc_response
         dc_response=$(ionos_api POST "/datacenters" "$dc_body")
 
-        if echo "$dc_response" | grep -q '"httpStatus"'; then
-            log_error "Failed to create datacenter"
-            local error_msg
-            error_msg=$(echo "$dc_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); msgs=d.get('messages',[]); print(msgs[0].get('message','Unknown error') if msgs else 'Unknown error')" 2>/dev/null || echo "$dc_response")
-            log_error "API Error: $error_msg"
+        if ionos_check_api_error "$dc_response" "Failed to create datacenter"; then
             return 1
         fi
 
@@ -254,34 +265,14 @@ print(json.dumps(body))
     return 0
 }
 
-# Create a IONOS server with cloud-init
-create_server() {
-    local name="$1"
-    local cores="${IONOS_CORES:-2}"
-    local ram="${IONOS_RAM:-2048}"
-    local disk_size="${IONOS_DISK_SIZE:-20}"
-
-    # Validate env var inputs
-    validate_resource_name "$name" || { log_error "Invalid server name"; return 1; }
-
-    # Validate numeric env vars to prevent injection in Python strings
-    if [[ ! "$cores" =~ ^[0-9]+$ ]] || [[ ! "$ram" =~ ^[0-9]+$ ]] || [[ ! "$disk_size" =~ ^[0-9]+$ ]]; then
-        log_error "IONOS_CORES, IONOS_RAM, and IONOS_DISK_SIZE must be positive integers"
-        return 1
-    fi
-
-    log_warn "Creating IONOS server '$name' (cores: $cores, ram: ${ram}MB, disk: ${disk_size}GB)..."
-
-    # Ensure we have a datacenter
-    ensure_datacenter || return 1
-
-    # Get Ubuntu 24.04 image ID
+# Find Ubuntu 24.04 HDD image ID from IONOS API
+# Outputs the image ID on stdout
+_ionos_find_ubuntu_image() {
     log_info "Finding Ubuntu 24.04 image..."
     local images_response
     images_response=$(ionos_api GET "/images?depth=2")
 
-    local image_id
-    image_id=$(echo "$images_response" | python3 -c "
+    echo "$images_response" | python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
 for img in data.get('items', []):
@@ -291,22 +282,21 @@ for img in data.get('items', []):
     if 'ubuntu' in name and '24' in name and image_type == 'HDD':
         print(img['id'])
         break
-" 2>/dev/null)
+" 2>/dev/null
+}
 
-    if [[ -z "$image_id" ]]; then
-        log_error "Could not find Ubuntu 24.04 image"
-        return 1
-    fi
+# Create a boot volume in the datacenter and wait for it to become AVAILABLE
+# Usage: volume_id=$(_ionos_create_boot_volume NAME DISK_SIZE IMAGE_ID)
+_ionos_create_boot_volume() {
+    local name="$1"
+    local disk_size="$2"
+    local image_id="$3"
 
-    log_info "Using image ID: $image_id"
-
-    # Get cloud-init userdata
     local userdata
     userdata=$(get_cloud_init_userdata)
     local userdata_json
     userdata_json=$(echo "$userdata" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
 
-    # Create volume first
     log_warn "Creating boot volume..."
     local volume_body
     volume_body=$(python3 -c "
@@ -328,11 +318,7 @@ print(json.dumps(body))
     local volume_response
     volume_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/volumes" "$volume_body")
 
-    if echo "$volume_response" | grep -q '"httpStatus"'; then
-        log_error "Failed to create volume"
-        local error_msg
-        error_msg=$(echo "$volume_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); msgs=d.get('messages',[]); print(msgs[0].get('message','Unknown error') if msgs else 'Unknown error')" 2>/dev/null || echo "$volume_response")
-        log_error "API Error: $error_msg"
+    if ionos_check_api_error "$volume_response" "Failed to create volume"; then
         return 1
     fi
 
@@ -359,60 +345,15 @@ print(json.dumps(body))
         waited=$((waited + 5))
     done
 
-    # Register SSH key with datacenter
-    log_warn "Registering SSH key..."
-    local key_path="$HOME/.ssh/spawn_ed25519"
-    local pub_path="${key_path}.pub"
-    ionos_register_ssh_key "spawn-key-$(date +%s)" "$pub_path" "${IONOS_DATACENTER_ID}" || log_warn "SSH key registration failed, continuing anyway..."
-
-    # Create server
-    log_warn "Creating server instance..."
-    local server_body
-    server_body=$(python3 -c "
-import json
-body = {
-    'properties': {
-        'name': '$name',
-        'cores': $cores,
-        'ram': $ram,
-        'availabilityZone': 'AUTO',
-        'cpuFamily': 'AMD_OPTERON'
-    }
+    echo "$volume_id"
 }
-print(json.dumps(body))
-")
 
-    local server_response
-    server_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers" "$server_body")
-
-    if echo "$server_response" | grep -q '"httpStatus"'; then
-        log_error "Failed to create server"
-        local error_msg
-        error_msg=$(echo "$server_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); msgs=d.get('messages',[]); print(msgs[0].get('message','Unknown error') if msgs else 'Unknown error')" 2>/dev/null || echo "$server_response")
-        log_error "API Error: $error_msg"
-        return 1
-    fi
-
-    IONOS_SERVER_ID=$(echo "$server_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
-    log_info "Server created: $IONOS_SERVER_ID"
-    export IONOS_SERVER_ID
-
-    # Attach volume to server
-    log_warn "Attaching volume to server..."
-    local attach_response
-    attach_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}/volumes" "{\"id\": \"${volume_id}\"}")
-
-    if echo "$attach_response" | grep -q '"httpStatus"'; then
-        log_error "Failed to attach volume"
-        return 1
-    fi
-
-    log_info "Volume attached successfully"
-
-    # Wait for server to get an IP
+# Poll the IONOS API until the server has an IP address
+# Sets IONOS_SERVER_IP on success
+_ionos_wait_for_server_ip() {
     log_warn "Waiting for server to get IP address..."
-    max_wait=180
-    waited=0
+    local max_wait=180
+    local waited=0
     while [[ $waited -lt $max_wait ]]; do
         local server_status
         server_status=$(ionos_api GET "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}?depth=3")
@@ -433,17 +374,97 @@ for nic in nics:
         if [[ -n "$IONOS_SERVER_IP" ]]; then
             log_info "Server IP: $IONOS_SERVER_IP"
             export IONOS_SERVER_IP
-            break
+            return 0
         fi
 
         sleep 5
         waited=$((waited + 5))
     done
 
-    if [[ -z "$IONOS_SERVER_IP" ]]; then
-        log_error "Failed to get server IP address"
+    log_error "Failed to get server IP address"
+    return 1
+}
+
+# Create a IONOS server with cloud-init
+create_server() {
+    local name="$1"
+    local cores="${IONOS_CORES:-2}"
+    local ram="${IONOS_RAM:-2048}"
+    local disk_size="${IONOS_DISK_SIZE:-20}"
+
+    # Validate env var inputs
+    validate_resource_name "$name" || { log_error "Invalid server name"; return 1; }
+
+    # Validate numeric env vars to prevent injection in Python strings
+    if [[ ! "$cores" =~ ^[0-9]+$ ]] || [[ ! "$ram" =~ ^[0-9]+$ ]] || [[ ! "$disk_size" =~ ^[0-9]+$ ]]; then
+        log_error "IONOS_CORES, IONOS_RAM, and IONOS_DISK_SIZE must be positive integers"
         return 1
     fi
+
+    log_warn "Creating IONOS server '$name' (cores: $cores, ram: ${ram}MB, disk: ${disk_size}GB)..."
+
+    # Ensure we have a datacenter
+    ensure_datacenter || return 1
+
+    # Find Ubuntu image
+    local image_id
+    image_id=$(_ionos_find_ubuntu_image)
+    if [[ -z "$image_id" ]]; then
+        log_error "Could not find Ubuntu 24.04 image"
+        return 1
+    fi
+    log_info "Using image ID: $image_id"
+
+    # Create boot volume and wait for it
+    local volume_id
+    volume_id=$(_ionos_create_boot_volume "$name" "$disk_size" "$image_id") || return 1
+
+    # Register SSH key with datacenter
+    log_warn "Registering SSH key..."
+    local key_path="$HOME/.ssh/spawn_ed25519"
+    local pub_path="${key_path}.pub"
+    ionos_register_ssh_key "spawn-key-$(date +%s)" "$pub_path" "${IONOS_DATACENTER_ID}" || log_warn "SSH key registration failed, continuing anyway..."
+
+    # Create server instance
+    log_warn "Creating server instance..."
+    local server_body
+    server_body=$(python3 -c "
+import json
+body = {
+    'properties': {
+        'name': '$name',
+        'cores': $cores,
+        'ram': $ram,
+        'availabilityZone': 'AUTO',
+        'cpuFamily': 'AMD_OPTERON'
+    }
+}
+print(json.dumps(body))
+")
+
+    local server_response
+    server_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers" "$server_body")
+
+    if ionos_check_api_error "$server_response" "Failed to create server"; then
+        return 1
+    fi
+
+    IONOS_SERVER_ID=$(echo "$server_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    log_info "Server created: $IONOS_SERVER_ID"
+    export IONOS_SERVER_ID
+
+    # Attach volume to server
+    log_warn "Attaching volume to server..."
+    local attach_response
+    attach_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}/volumes" "{\"id\": \"${volume_id}\"}")
+
+    if ionos_check_api_error "$attach_response" "Failed to attach volume"; then
+        return 1
+    fi
+    log_info "Volume attached successfully"
+
+    # Wait for server IP
+    _ionos_wait_for_server_ip || return 1
 
     log_info "Server created successfully: ID=$IONOS_SERVER_ID, IP=$IONOS_SERVER_IP"
 }
@@ -491,8 +512,7 @@ destroy_server() {
     local response
     response=$(ionos_api DELETE "/datacenters/${datacenter_id}/servers/${server_id}")
 
-    if echo "$response" | grep -q '"httpStatus"'; then
-        log_error "Failed to destroy server: $response"
+    if ionos_check_api_error "$response" "Failed to destroy server"; then
         return 1
     fi
 
