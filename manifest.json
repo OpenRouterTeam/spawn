@@ -1215,6 +1215,6 @@
     "ramnode/opencode": "missing",
     "ramnode/plandex": "missing",
     "ramnode/kilocode": "missing",
-    "ramnode/continue": "missing"
+    "ramnode/continue": "implemented"
   }
 }
