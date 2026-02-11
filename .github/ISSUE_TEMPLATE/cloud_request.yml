@@ -6,16 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a new cloud provider! We bias heavily toward adding more clouds.
-
-  - type: input
-    id: cloud-name
-    attributes:
-      label: Cloud Provider Name
-      description: Name of the cloud provider
-      placeholder: e.g., OVH, Paperspace, Vast.ai
-    validations:
-      required: true
+        Thanks for suggesting a new cloud provider! Put the provider name in the issue title above.
 
   - type: input
     id: cloud-url
@@ -33,8 +24,8 @@ body:
       description: What kind of compute does it offer?
       options:
         - VPS / Cloud Servers (SSH access)
-        - GPU Cloud
         - Container / Sandbox Platform
+        - GPU Cloud
         - Serverless / Functions
         - Other (describe below)
     validations:
@@ -54,21 +45,6 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: billing
-    attributes:
-      label: Billing Model
-      description: How is compute billed?
-      options:
-        - Per-hour
-        - Per-minute / Per-second
-        - Monthly
-        - Pay-as-you-go (usage-based)
-        - Free tier available
-        - Other
-    validations:
-      required: true
-
   - type: textarea
     id: why
     attributes:
@@ -76,25 +52,19 @@ body:
       description: What makes this provider a good fit for spawn? (pricing, speed, regions, unique features)
       placeholder: |
         - Fast provisioning (~30s)
-        - Cheap GPU instances
+        - Cheap instances starting at $5/mo
         - Good API docs
     validations:
       required: true
 
   - type: textarea
-    id: api-docs
-    attributes:
-      label: API Documentation Link
-      description: Link to API docs or CLI reference (if available)
-      placeholder: https://docs.provider.com/api
-    validations:
-      required: false
-
-  - type: textarea
     id: additional
     attributes:
       label: Additional Context
-      description: Any other details (auth method, regions, OS support, limitations)
-      placeholder: Uses API key auth, available in US and EU regions
+      description: Any other details (API docs link, auth method, regions, billing model, limitations)
+      placeholder: |
+        - API docs: https://docs.provider.com/api
+        - Per-hour billing, API key auth
+        - Available in US and EU regions
     validations:
       required: false

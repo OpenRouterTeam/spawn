@@ -6,16 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a new agent! We prioritize agents with strong community demand.
-
-  - type: input
-    id: agent-name
-    attributes:
-      label: Agent Name
-      description: Name of the AI coding agent
-      placeholder: e.g., Cursor, Continue, Tabby
-    validations:
-      required: true
+        Thanks for suggesting a new agent! Put the agent name in the issue title above.
 
   - type: input
     id: agent-url
@@ -56,18 +47,17 @@ body:
   - type: textarea
     id: evidence
     attributes:
-      label: Community Demand Evidence
+      label: Why This Agent?
       description: |
-        We require at least 2 of the following:
-        - 1000+ GitHub stars
-        - Hacker News post with 50+ points
-        - Reddit post with 100+ upvotes (r/LocalLLaMA, r/MachineLearning, r/ChatGPT)
-        - Explicit user request in this repo's issues
-
-        Paste links or screenshots showing demand.
+        Any of the following count as evidence of traction:
+        - GitHub stars or active fork activity
+        - Hacker News, Reddit, or Twitter buzz
+        - Venture-funded or backed by a known company
+        - Personal experience / recommendation
       placeholder: |
-        - GitHub: 5k stars (https://github.com/org/agent)
-        - HN: 200 points (https://news.ycombinator.com/item?id=...)
+        - 5k GitHub stars, 200+ forks
+        - Backed by YC / raised Series A
+        - HN front page post (link)
     validations:
       required: true
 
