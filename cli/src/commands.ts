@@ -177,10 +177,11 @@ function getEntityKeys(manifest: Manifest, kind: "agent" | "cloud") {
   return kind === "agent" ? agentKeys(manifest) : cloudKeys(manifest);
 }
 
-function validateEntity(manifest: Manifest, value: string, kind: "agent" | "cloud"): void {
+/** Report validation error for an entity and return false, or return true if valid */
+export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "cloud"): boolean {
   const def = ENTITY_DEFS[kind];
   const collection = getEntityCollection(manifest, kind);
-  if (collection[value]) return;
+  if (collection[value]) return true;
 
   p.log.error(`Unknown ${def.label}: ${pc.bold(value)}`);
 
@@ -190,7 +191,7 @@ function validateEntity(manifest: Manifest, value: string, kind: "agent" | "clou
     p.log.info(`"${value}" is ${kind === "agent" ? "a cloud provider" : "an agent"}, not ${kind === "agent" ? "an agent" : "a cloud provider"}.`);
     p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
     p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
-    process.exit(1);
+    return false;
   }
 
   const keys = getEntityKeys(manifest, kind);
@@ -200,7 +201,13 @@ function validateEntity(manifest: Manifest, value: string, kind: "agent" | "clou
     p.log.info(`  ${pc.cyan(`spawn ${match}`)}`);
   }
   p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
-  process.exit(1);
+  return false;
+}
+
+function validateEntity(manifest: Manifest, value: string, kind: "agent" | "cloud"): void {
+  if (!checkEntity(manifest, value, kind)) {
+    process.exit(1);
+  }
 }
 
 async function validateAndGetEntity(value: string, kind: "agent" | "cloud"): Promise<[manifest: Manifest, key: string]> {
@@ -384,8 +391,12 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
   ({ agent, cloud } = detectAndFixSwappedArgs(manifest, agent, cloud));
 
-  validateEntity(manifest, agent, "agent");
-  validateEntity(manifest, cloud, "cloud");
+  // Validate both agent and cloud before exiting, so users see all errors at once
+  const agentValid = checkEntity(manifest, agent, "agent");
+  const cloudValid = checkEntity(manifest, cloud, "cloud");
+  if (!agentValid || !cloudValid) {
+    process.exit(1);
+  }
   validateImplementation(manifest, cloud, agent);
 
   if (dryRun) {
