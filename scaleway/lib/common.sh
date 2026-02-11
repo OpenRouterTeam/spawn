@@ -98,54 +98,43 @@ get_scaleway_project_id() {
     echo "$project_id"
 }
 
-# Get Ubuntu image ID for the current zone
-get_ubuntu_image_id() {
-    log_warn "Looking up Ubuntu image for zone ${SCALEWAY_ZONE}..."
-    local response
-    response=$(scaleway_instance_api GET "/images?name=Ubuntu+24.04+Jammy+Jellyfish&arch=x86_64&per_page=50")
-
-    local image_id
-    image_id=$(echo "$response" | python3 -c "
+# Extract best Ubuntu image ID from a Scaleway images API response
+# Prefers 24.04/noble, then 22.04/jammy, then any image
+_scaleway_pick_ubuntu_image() {
+    python3 -c "
 import json, sys
-data = json.loads(sys.stdin.read())
-images = data.get('images', [])
-# Find Ubuntu 24.04 or the latest Ubuntu
+images = json.loads(sys.stdin.read()).get('images', [])
 for img in images:
     name = img.get('name', '').lower()
     if '24.04' in name or 'noble' in name:
-        print(img['id'])
-        sys.exit(0)
-# Fallback: try broader search
-" 2>/dev/null)
-
-    if [[ -z "$image_id" ]]; then
-        # Try a broader search
-        response=$(scaleway_instance_api GET "/images?name=Ubuntu&arch=x86_64&per_page=50")
-        image_id=$(echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-images = data.get('images', [])
-for img in images:
-    name = img.get('name', '').lower()
-    if '24.04' in name or 'noble' in name:
-        print(img['id'])
-        sys.exit(0)
+        print(img['id']); sys.exit(0)
 for img in images:
     name = img.get('name', '').lower()
     if '22.04' in name or 'jammy' in name:
-        print(img['id'])
-        sys.exit(0)
+        print(img['id']); sys.exit(0)
 if images:
     print(images[0]['id'])
-" 2>/dev/null)
-    fi
+" 2>/dev/null
+}
 
-    if [[ -z "$image_id" ]]; then
-        log_error "Could not find Ubuntu image for zone ${SCALEWAY_ZONE}"
-        return 1
-    fi
+# Get Ubuntu image ID for the current zone
+get_ubuntu_image_id() {
+    log_warn "Looking up Ubuntu image for zone ${SCALEWAY_ZONE}..."
 
-    echo "$image_id"
+    # Try specific 24.04 search first, then broader Ubuntu search
+    local image_id="" query
+    for query in "Ubuntu+24.04+Jammy+Jellyfish" "Ubuntu"; do
+        local response
+        response=$(scaleway_instance_api GET "/images?name=${query}&arch=x86_64&per_page=50")
+        image_id=$(echo "$response" | _scaleway_pick_ubuntu_image)
+        if [[ -n "$image_id" ]]; then
+            echo "$image_id"
+            return 0
+        fi
+    done
+
+    log_error "Could not find Ubuntu image for zone ${SCALEWAY_ZONE}"
+    return 1
 }
 
 # Check if SSH key is registered with Scaleway

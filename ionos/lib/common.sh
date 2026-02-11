@@ -30,24 +30,9 @@ ionos_api() {
     local endpoint="$2"
     local body="${3:-}"
 
-    # IONOS API uses Basic Auth
-    local auth_header="Authorization: Basic $(printf '%s:%s' "${IONOS_USERNAME}" "${IONOS_PASSWORD}" | base64)"
-
-    local response
-    if [[ "$method" == "GET" || "$method" == "DELETE" ]]; then
-        response=$(curl -s -X "$method" \
-            -H "$auth_header" \
-            -H "Content-Type: application/json" \
-            "${IONOS_API_BASE}${endpoint}")
-    else
-        response=$(curl -s -X "$method" \
-            -H "$auth_header" \
-            -H "Content-Type: application/json" \
-            -d "$body" \
-            "${IONOS_API_BASE}${endpoint}")
-    fi
-
-    echo "$response"
+    # IONOS API uses Basic Auth — delegate to generic wrapper for retry logic
+    generic_cloud_api_custom_auth "$IONOS_API_BASE" "$method" "$endpoint" "$body" 3 \
+        -H "Authorization: Basic $(printf '%s:%s' "${IONOS_USERNAME}" "${IONOS_PASSWORD}" | base64)"
 }
 
 # Parse error message from an IONOS API error response
