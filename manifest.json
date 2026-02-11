@@ -1057,7 +1057,7 @@
     "exoscale/nanoclaw": "implemented",
     "exoscale/aider": "implemented",
     "exoscale/goose": "implemented",
-    "exoscale/codex": "missing",
+    "exoscale/codex": "implemented",
     "exoscale/interpreter": "implemented",
     "exoscale/gemini": "implemented",
     "exoscale/amazonq": "implemented",
