@@ -40,10 +40,7 @@ else
 fi
 
 # 7. Get model ID
-log_info "Aider natively supports OpenRouter"
-printf "Enter model ID [openrouter/auto]: "
-MODEL_ID=$(safe_read) || MODEL_ID=""
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
 log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CONTABO_SERVER_IP}" upload_file run_server \

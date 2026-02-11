@@ -39,11 +39,7 @@ else
 fi
 
 # 6. Get model preference
-echo ""
-log_warn "Browse models at: https://openrouter.ai/models"
-log_warn "Which model would you like to use with gptme?"
-MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
 # 7. Inject environment variables into ~/.zshrc
 log_step "Setting up environment variables..."
