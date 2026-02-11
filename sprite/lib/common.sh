@@ -53,7 +53,7 @@ ensure_sprite_installed() {
     done
 
     # sprite not found, install it
-    log_warn "Installing sprite CLI..."
+    log_step "Installing sprite CLI..."
     if ! curl -fsSL https://sprites.dev/install.sh | bash; then
         log_error "Failed to install sprite CLI"
         log_error ""
@@ -80,7 +80,7 @@ ensure_sprite_installed() {
 # Check if already authenticated with sprite
 ensure_sprite_authenticated() {
     if ! sprite org list &> /dev/null; then
-        log_warn "Logging in to sprite..."
+        log_step "Logging in to sprite..."
         sprite login || true
     fi
 }
@@ -107,10 +107,10 @@ ensure_sprite_exists() {
         return 0
     fi
 
-    log_warn "Creating sprite '${sprite_name}'..."
+    log_step "Creating sprite '${sprite_name}'..."
     sprite create -skip-console "${sprite_name}" || true
 
-    log_warn "Waiting for sprite to be provisioned..."
+    log_step "Waiting for sprite to be provisioned..."
     local elapsed=0
     while [[ "${elapsed}" -lt "${max_wait}" ]]; do
         if sprite list 2>/dev/null | grep -qE "^${sprite_name}( |$)"; then
@@ -131,13 +131,13 @@ verify_sprite_connectivity() {
     local max_attempts=${2:-6}
     local attempt=1
 
-    log_warn "Verifying sprite connectivity..."
+    log_step "Verifying sprite connectivity..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         if sprite exec -s "${sprite_name}" -- echo "ok" >/dev/null 2>&1; then
             log_info "Sprite '${sprite_name}' is ready"
             return 0
         fi
-        log_warn "Sprite not ready, retrying (${attempt}/${max_attempts})..."
+        log_step "Sprite not ready, retrying (${attempt}/${max_attempts})..."
         sleep "${SPRITE_CONNECTIVITY_POLL_DELAY}"
         ((attempt++))
     done
@@ -166,7 +166,7 @@ run_sprite() {
 # Configure shell environment (PATH, zsh setup)
 setup_shell_environment() {
     local sprite_name=${1}
-    log_warn "Configuring shell environment..."
+    log_step "Configuring shell environment..."
 
     # Create temp file with path config
     local path_temp

@@ -244,7 +244,7 @@ create_server() {
     validate_resource_name "$server_type" || { log_error "Invalid HETZNER_SERVER_TYPE"; return 1; }
     validate_region_name "$location" || { log_error "Invalid HETZNER_LOCATION"; return 1; }
 
-    log_warn "Creating Hetzner server '$name' (type: $server_type, location: $location)..."
+    log_step "Creating Hetzner server '$name' (type: $server_type, location: $location)..."
 
     # Get all SSH key IDs
     local ssh_keys_response
@@ -280,7 +280,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local server_id="$1"
 
-    log_warn "Destroying server $server_id..."
+    log_step "Destroying server $server_id..."
     local response
     response=$(hetzner_api DELETE "/servers/$server_id")
 

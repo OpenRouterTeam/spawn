@@ -15,6 +15,7 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Print colored messages (to stderr so they don't pollute command substitution output)
@@ -28,6 +29,11 @@ log_warn() {
 
 log_error() {
     printf '%b\n' "${RED}${1}${NC}" >&2
+}
+
+# Progress/status messages (use instead of log_warn for non-warning status updates)
+log_step() {
+    printf '%b\n' "${CYAN}${1}${NC}" >&2
 }
 
 # ============================================================
@@ -111,7 +117,7 @@ open_browser() {
     elif command -v xdg-open &> /dev/null; then
         xdg-open "${url}" </dev/null
     else
-        log_warn "Please open: ${url}"
+        log_step "Please open: ${url}"
     fi
 }
 
@@ -894,7 +900,7 @@ generate_ssh_key_if_missing() {
     if [[ -f "${key_path}" ]]; then
         return 0
     fi
-    log_warn "Generating SSH key..."
+    log_step "Generating SSH key..."
     mkdir -p "$(dirname "${key_path}")"
     ssh-keygen -t ed25519 -f "${key_path}" -N "" -q
     log_info "SSH key generated at ${key_path}"
@@ -1239,7 +1245,7 @@ verify_agent_installed() {
     local verify_arg="${2:---version}"
     local agent_name="${3:-${agent_cmd}}"
 
-    log_warn "Verifying ${agent_name} installation..."
+    log_step "Verifying ${agent_name} installation..."
 
     if ! command -v "${agent_cmd}" &> /dev/null; then
         log_error "${agent_name} installation failed: command '${agent_cmd}' not found in PATH"
@@ -1334,7 +1340,7 @@ generic_ssh_wait() {
     local max_interval=30
     local elapsed_time=0
 
-    log_warn "Waiting for ${description} to ${ip} (this usually takes 30-90 seconds)..."
+    log_step "Waiting for ${description} to ${ip} (this usually takes 30-90 seconds)..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         # shellcheck disable=SC2086
         if ssh ${ssh_opts} "${username}@${ip}" "${test_cmd}" >/dev/null 2>&1; then
@@ -1346,7 +1352,7 @@ generic_ssh_wait() {
         local jitter
         jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
 
-        log_warn "Waiting for ${description}... (attempt ${attempt}/${max_attempts}, elapsed ${elapsed_time}s, retry in ${jitter}s)"
+        log_step "Waiting for ${description}... (attempt ${attempt}/${max_attempts}, elapsed ${elapsed_time}s, retry in ${jitter}s)"
         sleep "${jitter}"
 
         elapsed_time=$((elapsed_time + jitter))
@@ -1452,7 +1458,7 @@ generic_wait_for_instance() {
     local poll_delay="${INSTANCE_STATUS_POLL_DELAY:-5}"
 
     local attempt=1
-    log_warn "Waiting for ${description} to become ${target_status}..."
+    log_step "Waiting for ${description} to become ${target_status}..."
 
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         local response
@@ -1472,7 +1478,7 @@ generic_wait_for_instance() {
             fi
         fi
 
-        log_warn "${description} status: ${status} (${attempt}/${max_attempts})"
+        log_step "${description} status: ${status} (${attempt}/${max_attempts})"
         sleep "${poll_delay}"
         attempt=$((attempt + 1))
     done
@@ -1583,8 +1589,8 @@ ensure_api_token_with_provider() {
 
     # Prompt for new token
     echo ""
-    log_warn "${provider_name} API Token Required"
-    log_warn "Get your token from: ${help_url}"
+    log_step "${provider_name} API Token Required"
+    log_step "Get your token from: ${help_url}"
     echo ""
 
     local token
@@ -1708,7 +1714,7 @@ setup_claude_code_config() {
     local upload_callback="${2}"
     local run_callback="${3}"
 
-    log_warn "Configuring Claude Code..."
+    log_step "Configuring Claude Code..."
 
     # Create ~/.claude directory
     ${run_callback} "mkdir -p ~/.claude"
@@ -1762,7 +1768,7 @@ setup_openclaw_config() {
     local upload_callback="${3}"
     local run_callback="${4}"
 
-    log_warn "Configuring openclaw..."
+    log_step "Configuring openclaw..."
 
     # Create ~/.openclaw directory
     ${run_callback} "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
@@ -1804,7 +1810,7 @@ setup_continue_config() {
     local upload_callback="${2}"
     local run_callback="${3}"
 
-    log_warn "Configuring Continue..."
+    log_step "Configuring Continue..."
 
     # Create ~/.continue directory
     ${run_callback} "mkdir -p ~/.continue"
@@ -1938,7 +1944,7 @@ ensure_ssh_key_with_provider() {
     fi
 
     # Register the key (provider-specific)
-    log_warn "Registering SSH key with ${provider_name}..."
+    log_step "Registering SSH key with ${provider_name}..."
     local key_name
     key_name="spawn-$(hostname)-$(date +%s)"
 

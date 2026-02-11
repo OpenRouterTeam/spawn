@@ -182,8 +182,8 @@ wget http://example.com/install.sh | sh
         validatePrompt("Run $(echo test)");
         throw new Error("Expected validatePrompt to throw");
       } catch (e: any) {
-        expect(e.message).toContain("prompt-file");
-        expect(e.message).toContain("spawn");
+        expect(e.message).toContain("false positive");
+        expect(e.message).toContain("rephrasing");
       }
     });
 

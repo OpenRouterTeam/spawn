@@ -108,9 +108,8 @@ export function validatePrompt(prompt: string): void {
       throw new Error(
         `Prompt blocked: contains potentially dangerous pattern (${description}).\n` +
         `\n` +
-        `If this is a false positive, use --prompt-file instead:\n` +
-        `  echo "your prompt" > prompt.txt\n` +
-        `  spawn <agent> <cloud> --prompt-file prompt.txt`
+        `If this is a false positive, try rephrasing to avoid shell-like syntax\n` +
+        `(e.g., describe the command instead of writing it literally).`
       );
     }
   }
