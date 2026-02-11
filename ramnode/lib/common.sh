@@ -348,6 +348,62 @@ if networks:
 "
 }
 
+# Build JSON request body for RamNode server creation
+# Usage: _ramnode_build_server_body NAME FLAVOR IMAGE_ID KEY_NAME USERDATA [NETWORK_ID]
+_ramnode_build_server_body() {
+    python3 -c "
+import json, sys
+name, flavor, image_id, key_name, userdata, network_id = sys.argv[1:7]
+body = {
+    'server': {
+        'name': name,
+        'flavorRef': flavor,
+        'imageRef': image_id,
+        'key_name': key_name,
+        'user_data': userdata
+    }
+}
+if network_id:
+    body['server']['networks'] = [{'uuid': network_id}]
+print(json.dumps(body))
+" "$@"
+}
+
+# Poll the RamNode API until the server has an IPv4 address
+# Sets RAMNODE_SERVER_IP on success
+_ramnode_wait_for_ip() {
+    log_info "Waiting for IP address..."
+    local max_attempts=30
+    local attempt=0
+    while [[ $attempt -lt $max_attempts ]]; do
+        sleep 2
+        local server_info
+        server_info=$(ramnode_compute_api GET "/servers/$RAMNODE_SERVER_ID")
+
+        RAMNODE_SERVER_IP=$(echo "$server_info" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+addresses = data.get('server', {}).get('addresses', {})
+for net_name, addrs in addresses.items():
+    for addr in addrs:
+        if addr.get('version') == 4:
+            print(addr['addr'])
+            sys.exit(0)
+" 2>/dev/null || echo "")
+
+        if [[ -n "$RAMNODE_SERVER_IP" ]]; then
+            export RAMNODE_SERVER_IP
+            log_info "IP address assigned: $RAMNODE_SERVER_IP"
+            return 0
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Timeout waiting for IP address"
+    return 1
+}
+
 # Create a RamNode server
 create_server() {
     local name="$1"
@@ -379,24 +435,8 @@ create_server() {
 
     log_warn "Creating RamNode instance '$name' (flavor: $flavor)..."
 
-    # Build request body
     local body
-    body=$(python3 -c "
-import json, sys
-name, flavor, image_id, key_name, userdata, network_id = sys.argv[1:7]
-body = {
-    'server': {
-        'name': name,
-        'flavorRef': flavor,
-        'imageRef': image_id,
-        'key_name': key_name,
-        'user_data': userdata
-    }
-}
-if network_id:
-    body['server']['networks'] = [{'uuid': network_id}]
-print(json.dumps(body))
-" "$name" "$flavor" "$image_id" "$key_name" "$userdata" "${network_id:-}")
+    body=$(_ramnode_build_server_body "$name" "$flavor" "$image_id" "$key_name" "$userdata" "${network_id:-}")
 
     local response
     response=$(ramnode_compute_api POST "/servers" "$body")
@@ -417,40 +457,10 @@ print(json.dumps(body))
     # Extract server ID
     RAMNODE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])")
     export RAMNODE_SERVER_ID
-
     log_info "Server created: ID=$RAMNODE_SERVER_ID"
 
-    # Wait for server to get IP address
-    log_info "Waiting for IP address..."
-    local max_attempts=30
-    local attempt=0
-    while [[ $attempt -lt $max_attempts ]]; do
-        sleep 2
-        local server_info
-        server_info=$(ramnode_compute_api GET "/servers/$RAMNODE_SERVER_ID")
-
-        RAMNODE_SERVER_IP=$(echo "$server_info" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-addresses = data.get('server', {}).get('addresses', {})
-for net_name, addrs in addresses.items():
-    for addr in addrs:
-        if addr.get('version') == 4:
-            print(addr['addr'])
-            sys.exit(0)
-" 2>/dev/null || echo "")
-
-        if [[ -n "$RAMNODE_SERVER_IP" ]]; then
-            export RAMNODE_SERVER_IP
-            log_info "IP address assigned: $RAMNODE_SERVER_IP"
-            return 0
-        fi
-
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Timeout waiting for IP address"
-    return 1
+    # Wait for IP assignment
+    _ramnode_wait_for_ip
 }
 
 # Wait for SSH connectivity

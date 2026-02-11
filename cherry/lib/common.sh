@@ -166,6 +166,36 @@ get_server_name() {
 
 # Create server
 # Sets CHERRY_SERVER_ID and CHERRY_SERVER_IP as exports
+# Poll the Cherry Servers API until the server has an IP address
+# Sets CHERRY_SERVER_IP on success
+_cherry_wait_for_ip() {
+    local server_id="$1"
+    log_info "Waiting for IP address assignment..."
+    local ip_address=""
+    local attempts=0
+    local max_attempts=60
+
+    while [[ -z "$ip_address" ]] && [[ $attempts -lt $max_attempts ]]; do
+        sleep "${POLL_INTERVAL}"
+
+        local server_info
+        server_info=$(cherry_api GET "/servers/${server_id}")
+
+        ip_address=$(printf '%s' "$server_info" | _cherry_extract_primary_ip)
+
+        attempts=$((attempts + 1))
+    done
+
+    if [[ -z "$ip_address" ]]; then
+        log_error "Failed to get server IP address"
+        return 1
+    fi
+
+    log_info "Server IP: $ip_address"
+    CHERRY_SERVER_IP="$ip_address"
+    export CHERRY_SERVER_IP
+}
+
 create_server() {
     local hostname="$1"
     local plan="${CHERRY_DEFAULT_PLAN}"
@@ -215,30 +245,7 @@ print(json.dumps(data))
     export CHERRY_SERVER_ID
 
     # Wait for IP assignment
-    log_info "Waiting for IP address assignment..."
-    local ip_address=""
-    local attempts=0
-    local max_attempts=60
-
-    while [[ -z "$ip_address" ]] && [[ $attempts -lt $max_attempts ]]; do
-        sleep "${POLL_INTERVAL}"
-
-        local server_info
-        server_info=$(cherry_api GET "/servers/${server_id}")
-
-        ip_address=$(printf '%s' "$server_info" | _cherry_extract_primary_ip)
-
-        attempts=$((attempts + 1))
-    done
-
-    if [[ -z "$ip_address" ]]; then
-        log_error "Failed to get server IP address"
-        return 1
-    fi
-
-    log_info "Server IP: $ip_address"
-    CHERRY_SERVER_IP="$ip_address"
-    export CHERRY_SERVER_IP
+    _cherry_wait_for_ip "$server_id"
 }
 
 # ============================================================

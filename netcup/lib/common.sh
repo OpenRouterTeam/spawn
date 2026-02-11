@@ -310,28 +310,11 @@ _pick_datacenter() {
     fi
 }
 
-# Create a Netcup VPS with cloud-init
-create_server() {
-    local name="$1"
-
-    # Interactive selections
-    local datacenter
-    datacenter=$(_pick_datacenter)
-
-    local product
-    product=$(_pick_vps_product)
-
-    local image="ubuntu-24.04"
-
-    log_warn "Creating Netcup VPS '$name' (product: $product, datacenter: $datacenter)..."
-
-    # Get cloud-init userdata
-    local userdata
-    userdata=$(get_cloud_init_userdata)
-
-    # Build request param
-    local param
-    param=$(echo "$userdata" | python3 -c "
+# Build JSON request body for Netcup VPS creation
+# Reads cloud-init userdata from stdin
+# Usage: get_cloud_init_userdata | _netcup_build_create_body NAME PRODUCT DATACENTER IMAGE
+_netcup_build_create_body() {
+    python3 -c "
 import json, sys
 userdata = sys.stdin.read()
 name, product, datacenter, image = sys.argv[1:5]
@@ -344,37 +327,12 @@ param = {
     'userdata': userdata
 }
 print(json.dumps(param))
-" "$name" "$product" "$datacenter" "$image")
+" "$@"
+}
 
-    local response
-    response=$(netcup_api "createVServer" "$param")
-
-    # Check for errors
-    local status
-    status=$(echo "$response" | python3 -c "import json, sys; print(json.loads(sys.stdin.read()).get('status', 'error'))")
-
-    if [[ "$status" != "success" ]]; then
-        log_error "Failed to create Netcup VPS"
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('longmessage','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient account balance"
-        log_error "  - Product not available in selected datacenter"
-        log_error "  - Account limits reached"
-        log_error ""
-        log_error "Check your account: https://ccp.netcup.net/"
-        return 1
-    fi
-
-    # Extract server ID
-    NETCUP_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['responsedata']['vserverid'])")
-    export NETCUP_SERVER_ID
-
-    log_info "VPS created: ID=$NETCUP_SERVER_ID"
-
-    # Wait for IP assignment (Netcup assigns IPs asynchronously)
+# Poll the Netcup API until the VPS has an IPv4 address
+# Sets NETCUP_SERVER_IP on success
+_netcup_wait_for_ip() {
     log_info "Waiting for IP assignment..."
     local ip=""
     local attempts=0
@@ -401,8 +359,57 @@ except:
 
     NETCUP_SERVER_IP="$ip"
     export NETCUP_SERVER_IP
-
     log_info "Server IP: $NETCUP_SERVER_IP"
+}
+
+# Create a Netcup VPS with cloud-init
+create_server() {
+    local name="$1"
+
+    # Interactive selections
+    local datacenter
+    datacenter=$(_pick_datacenter)
+
+    local product
+    product=$(_pick_vps_product)
+
+    local image="ubuntu-24.04"
+
+    log_warn "Creating Netcup VPS '$name' (product: $product, datacenter: $datacenter)..."
+
+    # Get cloud-init userdata and build request body
+    local param
+    param=$(get_cloud_init_userdata | _netcup_build_create_body "$name" "$product" "$datacenter" "$image")
+
+    local response
+    response=$(netcup_api "createVServer" "$param")
+
+    # Check for errors
+    local status
+    status=$(echo "$response" | python3 -c "import json, sys; print(json.loads(sys.stdin.read()).get('status', 'error'))")
+
+    if [[ "$status" != "success" ]]; then
+        log_error "Failed to create Netcup VPS"
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('longmessage','Unknown error'))" 2>/dev/null || echo "$response")
+        log_error "API Error: $error_msg"
+        log_error ""
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance"
+        log_error "  - Product not available in selected datacenter"
+        log_error "  - Account limits reached"
+        log_error ""
+        log_error "Check your account: https://ccp.netcup.net/"
+        return 1
+    fi
+
+    # Extract server ID
+    NETCUP_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['responsedata']['vserverid'])")
+    export NETCUP_SERVER_ID
+    log_info "VPS created: ID=$NETCUP_SERVER_ID"
+
+    # Wait for IP assignment
+    _netcup_wait_for_ip
 }
 
 # Wait for SSH connectivity
