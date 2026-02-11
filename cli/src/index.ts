@@ -319,6 +319,11 @@ function parseListFilters(args: string[]): { agentFilter?: string; cloudFilter?:
   return { agentFilter, cloudFilter };
 }
 
+/** Check if trailing args contain a help flag */
+function hasTrailingHelpFlag(args: string[]): boolean {
+  return args.slice(1).some(a => HELP_FLAGS.includes(a));
+}
+
 /** Dispatch a named command or fall through to agent/cloud handling */
 async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
@@ -328,24 +333,16 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
   }
 
   if (LIST_COMMANDS.has(cmd)) {
-    const hasHelpFlag = filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
-    if (hasHelpFlag) {
-      cmdHelp();
-    } else {
-      const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
-      await cmdList(agentFilter, cloudFilter);
-    }
+    if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+    const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
+    await cmdList(agentFilter, cloudFilter);
     return;
   }
 
   if (SUBCOMMANDS[cmd]) {
-    const hasHelpFlag = filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
-    if (hasHelpFlag) {
-      cmdHelp();
-    } else {
-      warnExtraArgs(filteredArgs, 1);
-      await SUBCOMMANDS[cmd]();
-    }
+    if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+    warnExtraArgs(filteredArgs, 1);
+    await SUBCOMMANDS[cmd]();
     return;
   }
 
@@ -357,7 +354,6 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
       await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun);
       return;
     }
-    // Bare verb with no args: "spawn run" -> show usage hint
     console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent and cloud`));
     console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud>")}`);
     console.error(pc.dim(`  The "${cmd}" keyword is optional -- just use ${pc.cyan("spawn <agent> <cloud>")} directly.`));

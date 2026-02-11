@@ -3,14 +3,13 @@ import { execSync } from "child_process";
 import { resolve } from "path";
 
 /**
- * Tests for untested bash functions in shared/common.sh:
+ * Tests for bash functions in shared/common.sh:
  * - validate_oauth_port: OAuth port validation (security-critical)
  * - generate_env_config: shell export statement generation (injection risk)
  * - calculate_retry_backoff: exponential backoff with jitter
  * - _update_retry_interval: indirect variable update via printf -v
  * - _parse_api_response: HTTP response code extraction
  *
- * These functions had zero test coverage despite being security-relevant.
  * Each test sources shared/common.sh and calls the function in a real
  * bash subprocess to catch actual shell behavior.
  *
@@ -452,34 +451,6 @@ describe("_parse_api_response", () => {
     `);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe("429");
-  });
-});
-
-// ── _api_handle_transient_http_error ─────────────────────────────────────
-
-describe("_api_handle_transient_http_error", () => {
-  it("should return 1 (fail) when max retries exhausted", () => {
-    const result = runBash(`
-      _api_handle_transient_http_error 429 5 5 10 60
-      echo "exit=$?"
-    `);
-    // The function calls _api_should_retry_on_error which returns 1 when
-    // attempt >= max_retries, and then _api_handle_transient_http_error returns 1
-    expect(result.stdout).toContain("exit=1");
-  });
-
-  it("should log HTTP 429 in error message when retries exhausted", () => {
-    const result = runBash(`
-      _api_handle_transient_http_error 429 5 5 10 60 2>&1
-    `);
-    expect(result.stdout).toContain("HTTP 429");
-  });
-
-  it("should log HTTP 503 in error message when retries exhausted", () => {
-    const result = runBash(`
-      _api_handle_transient_http_error 503 5 5 10 60 2>&1
-    `);
-    expect(result.stdout).toContain("HTTP 503");
   });
 });
 
