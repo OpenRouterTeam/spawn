@@ -1054,7 +1054,7 @@
     "ionos/continue": "implemented",
     "exoscale/claude": "implemented",
     "exoscale/openclaw": "implemented",
-    "exoscale/nanoclaw": "missing",
+    "exoscale/nanoclaw": "implemented",
     "exoscale/aider": "implemented",
     "exoscale/goose": "implemented",
     "exoscale/codex": "missing",
