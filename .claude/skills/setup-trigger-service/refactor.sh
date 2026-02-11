@@ -58,8 +58,9 @@ cleanup() {
     git worktree prune 2>/dev/null || true
     rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
 
-    # Clean up prompt file
+    # Clean up prompt and PID files
     rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
+    rm -f "${CLAUDE_PID_FILE:-}" 2>/dev/null || true
 
     log "=== Cycle Done (exit_code=${exit_code}) ==="
     exit $exit_code
@@ -522,9 +523,30 @@ log "Hard timeout: ${HARD_TIMEOUT}s"
 # few minutes) but short enough to catch truly hung API calls.
 IDLE_TIMEOUT=600  # 10 minutes of silence = hung
 
-# Run claude in background so we can monitor output activity
-claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" &
+# Run claude in background so we can monitor output activity.
+# Capture claude's actual PID via wrapper — $! gives tee's PID, not claude's.
+CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
+( claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose &
+  echo $! > "${CLAUDE_PID_FILE}"
+  wait
+) 2>&1 | tee -a "${LOG_FILE}" &
 PIPE_PID=$!
+sleep 2  # let claude start and write its PID
+
+# Kill claude and its full process tree reliably
+kill_claude() {
+    local cpid
+    cpid=$(cat "${CLAUDE_PID_FILE}" 2>/dev/null)
+    if [[ -n "${cpid}" ]] && kill -0 "${cpid}" 2>/dev/null; then
+        log "Killing claude (pid=${cpid}) and its process tree"
+        pkill -TERM -P "${cpid}" 2>/dev/null || true
+        kill -TERM "${cpid}" 2>/dev/null || true
+        sleep 5
+        pkill -KILL -P "${cpid}" 2>/dev/null || true
+        kill -KILL "${cpid}" 2>/dev/null || true
+    fi
+    kill "${PIPE_PID}" 2>/dev/null || true
+}
 
 # Watchdog loop: check log file growth and detect session completion
 LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
@@ -543,8 +565,7 @@ while kill -0 "${PIPE_PID}" 2>/dev/null; do
         SESSION_ENDED=true
         log "Session ended (result event detected) — waiting 30s for cleanup then killing"
         sleep 30
-        kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
-        pkill -P "${PIPE_PID}" 2>/dev/null || true
+        kill_claude
         break
     fi
 
@@ -552,8 +573,7 @@ while kill -0 "${PIPE_PID}" 2>/dev/null; do
         IDLE_SECONDS=$((IDLE_SECONDS + 10))
         if [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
             log "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
-            kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
-            pkill -P "${PIPE_PID}" 2>/dev/null || true
+            kill_claude
             break
         fi
     else
