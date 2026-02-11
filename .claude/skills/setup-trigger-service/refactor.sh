@@ -584,8 +584,7 @@ while kill -0 "${PIPE_PID}" 2>/dev/null; do
     # Hard wall-clock timeout as final safety net
     if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
         log "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
-        kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
-        pkill -P "${PIPE_PID}" 2>/dev/null || true
+        kill_claude
         break
     fi
 done
