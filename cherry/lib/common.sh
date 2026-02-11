@@ -252,41 +252,11 @@ print(json.dumps(data))
 # Execution Functions
 # ============================================================
 
-# Run command on server via SSH
-run_server() {
-    local ip="$1"
-    local cmd="$2"
-    # shellcheck disable=SC2086
-    ssh $SSH_OPTS "root@${ip}" "$cmd"
-}
-
-# Upload file to server via SCP
-upload_file() {
-    local ip="$1"
-    local local_path="$2"
-    local remote_path="$3"
-    # shellcheck disable=SC2086
-    scp $SSH_OPTS "$local_path" "root@${ip}:${remote_path}"
-}
-
-# Start interactive SSH session
-interactive_session() {
-    local ip="$1"
-    local cmd="${2:-}"
-    # shellcheck disable=SC2086
-    ssh -t $SSH_OPTS "root@${ip}" $cmd
-}
-
-# ============================================================
-# Connectivity and Readiness
-# ============================================================
-
-# Verify server is accessible via SSH
-verify_server_connectivity() {
-    local ip="$1"
-    local max_attempts=${2:-60}
-    generic_ssh_wait "root" "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
-}
+# SSH operations — delegates to shared helpers (SSH_USER defaults to root)
+run_server() { ssh_run_server "$@"; }
+upload_file() { ssh_upload_file "$@"; }
+interactive_session() { ssh_interactive_session "$@"; }
+verify_server_connectivity() { ssh_verify_connectivity "$@"; }
 
 # Wait for cloud-init to complete
 wait_for_cloud_init() {

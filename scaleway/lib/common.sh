@@ -327,12 +327,7 @@ print(json.dumps(body))
     _scaleway_power_on_and_wait "$SCALEWAY_SERVER_ID"
 }
 
-verify_server_connectivity() {
-    local ip="$1"
-    local max_attempts=${2:-30}
-    # shellcheck disable=SC2154
-    generic_ssh_wait "root" "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
-}
+verify_server_connectivity() { ssh_verify_connectivity "$@"; }
 
 wait_for_server_ready() {
     local ip="$1"
@@ -356,23 +351,10 @@ install_base_packages() {
     log_info "Base packages installed"
 }
 
-run_server() {
-    local ip="$1"; local cmd="$2"
-    # shellcheck disable=SC2086
-    ssh $SSH_OPTS "root@$ip" "$cmd"
-}
-
-upload_file() {
-    local ip="$1"; local local_path="$2"; local remote_path="$3"
-    # shellcheck disable=SC2086
-    scp $SSH_OPTS "$local_path" "root@$ip:$remote_path"
-}
-
-interactive_session() {
-    local ip="$1"; local cmd="$2"
-    # shellcheck disable=SC2086
-    ssh -t $SSH_OPTS "root@$ip" "$cmd"
-}
+# SSH operations — delegates to shared helpers (SSH_USER defaults to root)
+run_server() { ssh_run_server "$@"; }
+upload_file() { ssh_upload_file "$@"; }
+interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_id="$1"

@@ -270,32 +270,14 @@ create_server() {
     _wait_for_exoscale_instance "$EXOSCALE_SERVER_ID"
 }
 
-verify_server_connectivity() {
-    local ip="$1"
-    local max_attempts=${2:-30}
-    # SSH_OPTS is defined in shared/common.sh
-    # shellcheck disable=SC2154
-    # Default user for Ubuntu on Exoscale is 'ubuntu'
-    generic_ssh_wait "ubuntu" "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
-}
+# Exoscale Ubuntu images use 'ubuntu' user
+SSH_USER="ubuntu"
 
-run_server() {
-    local ip="$1"; local cmd="$2"
-    # shellcheck disable=SC2086
-    ssh $SSH_OPTS "ubuntu@$ip" "$cmd"
-}
-
-upload_file() {
-    local ip="$1"; local local_path="$2"; local remote_path="$3"
-    # shellcheck disable=SC2086
-    scp $SSH_OPTS "$local_path" "ubuntu@$ip:$remote_path"
-}
-
-interactive_session() {
-    local ip="$1"; local cmd="$2"
-    # shellcheck disable=SC2086
-    ssh -t $SSH_OPTS "ubuntu@$ip" "$cmd"
-}
+# SSH operations — delegates to shared helpers
+verify_server_connectivity() { ssh_verify_connectivity "$@"; }
+run_server() { ssh_run_server "$@"; }
+upload_file() { ssh_upload_file "$@"; }
+interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_id="$1"

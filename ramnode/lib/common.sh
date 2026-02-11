@@ -463,39 +463,11 @@ create_server() {
     _ramnode_wait_for_ip
 }
 
-# Wait for SSH connectivity
-verify_server_connectivity() {
-    local ip="$1"
-    local max_attempts=${2:-30}
-    # SSH_OPTS is defined in shared/common.sh
-    # shellcheck disable=SC2154
-    generic_ssh_wait "root" "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
-}
-
-# Run a command on the server
-run_server() {
-    local ip="$1"
-    local cmd="$2"
-    # shellcheck disable=SC2086
-    ssh $SSH_OPTS "root@$ip" "$cmd"
-}
-
-# Upload a file to the server
-upload_file() {
-    local ip="$1"
-    local local_path="$2"
-    local remote_path="$3"
-    # shellcheck disable=SC2086
-    scp $SSH_OPTS "$local_path" "root@$ip:$remote_path"
-}
-
-# Start an interactive SSH session
-interactive_session() {
-    local ip="$1"
-    local cmd="$2"
-    # shellcheck disable=SC2086
-    ssh -t $SSH_OPTS "root@$ip" "$cmd"
-}
+# SSH operations — delegates to shared helpers (SSH_USER defaults to root)
+verify_server_connectivity() { ssh_verify_connectivity "$@"; }
+run_server() { ssh_run_server "$@"; }
+upload_file() { ssh_upload_file "$@"; }
+interactive_session() { ssh_interactive_session "$@"; }
 
 # Destroy a RamNode server
 destroy_server() {
