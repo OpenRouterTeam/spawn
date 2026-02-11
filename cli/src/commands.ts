@@ -20,7 +20,7 @@ import { validateIdentifier, validateScriptContent, validatePrompt } from "./sec
 
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 
-function getErrorMessage(err: unknown): string {
+export function getErrorMessage(err: unknown): string {
   // Use duck typing instead of instanceof to avoid prototype chain issues
   return err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
 }
@@ -71,7 +71,7 @@ function mapToSelectOptions<T extends { name: string; description: string }>(
   }));
 }
 
-function getImplementedClouds(manifest: Manifest, agent: string): string[] {
+export function getImplementedClouds(manifest: Manifest, agent: string): string[] {
   return cloudKeys(manifest).filter(
     (c: string): boolean => matrixStatus(manifest, c, agent) === "implemented"
   );
@@ -317,7 +317,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
   await execScript(cloud, agent, prompt);
 }
 
-function getStatusDescription(status: number): string {
+export function getStatusDescription(status: number): string {
   return status === 404 ? "not found" : `HTTP ${status}`;
 }
 
@@ -439,11 +439,11 @@ const NAME_COLUMN_WIDTH = 18;
 const COMPACT_NAME_WIDTH = 20;
 const COMPACT_COUNT_WIDTH = 10;
 
-function getTerminalWidth(): number {
+export function getTerminalWidth(): number {
   return process.stdout.columns || 80;
 }
 
-function calculateColumnWidth(items: string[], minWidth: number): number {
+export function calculateColumnWidth(items: string[], minWidth: number): number {
   let maxWidth = minWidth;
   for (const item of items) {
     const width = item.length + COL_PADDING;
@@ -481,7 +481,7 @@ function renderMatrixRow(agent: string, clouds: string[], manifest: Manifest, ag
   return row;
 }
 
-function getMissingClouds(manifest: Manifest, agent: string, clouds: string[]): string[] {
+export function getMissingClouds(manifest: Manifest, agent: string, clouds: string[]): string[] {
   return clouds.filter((c) => matrixStatus(manifest, c, agent) !== "implemented");
 }
 
@@ -557,7 +557,7 @@ export async function cmdList(): Promise<void> {
 
 // ── Agents ─────────────────────────────────────────────────────────────────────
 
-function getImplementedAgents(manifest: Manifest, cloud: string): string[] {
+export function getImplementedAgents(manifest: Manifest, cloud: string): string[] {
   return agentKeys(manifest).filter(
     (a: string): boolean => matrixStatus(manifest, cloud, a) === "implemented"
   );
