@@ -10,7 +10,7 @@ import { describe, it, expect } from "bun:test";
 const KNOWN_FLAGS = new Set([
   "--help", "-h",
   "--version", "-v", "-V",
-  "--prompt", "-p", "--prompt-file",
+  "--prompt", "-p", "--prompt-file", "-f",
 ]);
 
 /** Replicated from index.ts for testability - returns the first unknown flag or null */
@@ -88,6 +88,10 @@ describe("Unknown Flag Detection", () => {
 
     it("should allow --prompt-file", () => {
       expect(findUnknownFlag(["--prompt-file"])).toBeNull();
+    });
+
+    it("should allow -f (short form of --prompt-file)", () => {
+      expect(findUnknownFlag(["-f"])).toBeNull();
     });
   });
 

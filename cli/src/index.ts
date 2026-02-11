@@ -60,7 +60,7 @@ const HELP_FLAGS = ["--help", "-h", "help"];
 const KNOWN_FLAGS = new Set([
   "--help", "-h",
   "--version", "-v", "-V",
-  "--prompt", "-p", "--prompt-file",
+  "--prompt", "-p", "--prompt-file", "-f",
 ]);
 
 /** Check for unknown flags and show an actionable error */
@@ -71,7 +71,7 @@ function checkUnknownFlags(args: string[]): void {
       console.error();
       console.error(`  Supported flags:`);
       console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
-      console.error(`    ${pc.cyan("--prompt-file")}       Read prompt from a file`);
+      console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
       console.error();
@@ -197,7 +197,7 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
 
   const [promptFile, finalArgs] = extractFlagValue(
     filteredArgs,
-    ["--prompt-file"],
+    ["--prompt-file", "-f"],
     "prompt file",
     "spawn <agent> <cloud> --prompt-file instructions.txt"
   );
