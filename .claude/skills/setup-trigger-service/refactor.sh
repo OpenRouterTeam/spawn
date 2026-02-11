@@ -417,13 +417,36 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 7. Community-coordinator engages issues FIRST — posts acknowledgments before other agents start investigating
 8. Community-coordinator delegates issue investigations to relevant teammates
 9. All agents use worktrees for their branch work (never git checkout in the main repo)
-10. Monitor teammate progress via their messages
+10. **Enter the monitoring loop** (see below) — stay alive and coordinate until all teammates finish
 11. Community-coordinator posts interim updates on issues as teammates report findings
 12. Create Sprite checkpoint after successful changes: sprite-env checkpoint create --comment 'Description'
 13. Community-coordinator posts final resolutions on all issues, closes them
 14. Branch-cleaner runs final pass to catch any branches created during the cycle
 15. Team lead runs: git worktree prune to clean stale worktree entries
 16. When all work is done, execute the Lifecycle Management shutdown sequence (below) — send shutdown_request to every teammate, wait for confirmations, clean up worktrees, then exit
+
+## CRITICAL: Monitoring Loop (DO NOT SKIP — your session MUST stay alive)
+
+**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. If you end your conversation after spawning, teammates become orphaned with no coordination.
+
+### Required pattern after spawning:
+```
+1. Spawn all teammates via Task tool
+2. Enter monitoring loop:
+   while teammates are still active:
+     - Wait for teammate messages (they arrive automatically as new conversation turns)
+     - When you receive a message, acknowledge it and update your task tracking
+     - If a teammate reports completion, mark their task done and merge their PR
+     - If a teammate reports an error, coordinate resolution
+     - If the time budget is almost up, send wrap-up messages to all teammates
+3. Only after ALL teammates have sent their final response, proceed to shutdown
+```
+
+### Common mistake (DO NOT DO THIS):
+```
+BAD:  Spawn teammates → "I'll wait for their messages" → session ends (agents orphaned!)
+GOOD: Spawn teammates → receive messages → merge PRs → shutdown sequence → session ends
+```
 
 ## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
 
@@ -491,7 +514,9 @@ log "Hard timeout: ${HARD_TIMEOUT}s"
 # Activity watchdog: kill claude if no output for IDLE_TIMEOUT seconds.
 # This catches hung API calls (pre-flight check hangs, network issues) much
 # faster than the hard timeout. The next cron trigger starts a fresh cycle.
-IDLE_TIMEOUT=180  # 3 minutes of silence = hung
+# 10 min is long enough for legitimate agent work (agents send messages every
+# few minutes) but short enough to catch truly hung API calls.
+IDLE_TIMEOUT=600  # 10 minutes of silence = hung
 
 # Run claude in background so we can monitor output activity
 claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" &
