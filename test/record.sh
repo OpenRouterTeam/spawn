@@ -1400,7 +1400,7 @@ list_clouds() {
     total_count=$(echo "$ALL_RECORDABLE_CLOUDS" | wc -w | tr -d ' ')
     printf '%b\n' "  ${ready_count}/${total_count} clouds have credentials set"
     printf '\n'
-    printf "  CLI-based clouds (not recordable): sprite, gcp, e2b, modal, fly, daytona, northflank, runpod, vastai, koyeb\n"
+    printf "  CLI-based clouds (not recordable): sprite, gcp, e2b, modal, fly, daytona, northflank, runpod, vastai, koyeb, local\n"
 }
 
 # --- Main ---
