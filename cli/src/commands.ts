@@ -30,12 +30,12 @@ function handleCancel(): never {
   process.exit(0);
 }
 
-async function withSpinner<T>(msg: string, fn: () => Promise<T>): Promise<T> {
+async function withSpinner<T>(msg: string, fn: () => Promise<T>, doneMsg?: string): Promise<T> {
   const s = p.spinner();
   s.start(msg);
   try {
     const result = await fn();
-    s.stop(msg);
+    s.stop(doneMsg ?? msg.replace(/\.{3}$/, ""));
     return result;
   } catch (err) {
     s.stop(pc.red("Failed"));
@@ -147,8 +147,15 @@ function validateAgent(manifest: Manifest, agent: string): asserts agent is keyo
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
     const keys = agentKeys(manifest);
     const suggestion = findClosestMatch(agent, keys);
+    const nameSuggestion = findClosestMatch(agent, keys.map((k) => manifest.agents[k].name));
     if (suggestion) {
       p.log.info(`Did you mean ${pc.cyan(suggestion)}?`);
+    } else if (nameSuggestion) {
+      // Find the key for the matched display name
+      const matchedKey = keys.find((k) => manifest.agents[k].name === nameSuggestion);
+      if (matchedKey) {
+        p.log.info(`Did you mean ${pc.cyan(matchedKey)} (${nameSuggestion})?`);
+      }
     }
     p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
     process.exit(1);
@@ -176,8 +183,15 @@ function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyo
     p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
     const keys = cloudKeys(manifest);
     const suggestion = findClosestMatch(cloud, keys);
+    const nameSuggestion = findClosestMatch(cloud, keys.map((k) => manifest.clouds[k].name));
     if (suggestion) {
       p.log.info(`Did you mean ${pc.cyan(suggestion)}?`);
+    } else if (nameSuggestion) {
+      // Find the key for the matched display name
+      const matchedKey = keys.find((k) => manifest.clouds[k].name === nameSuggestion);
+      if (matchedKey) {
+        p.log.info(`Did you mean ${pc.cyan(matchedKey)} (${nameSuggestion})?`);
+      }
     }
     p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
     process.exit(1);
@@ -354,16 +368,35 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
+  let scriptContent: string;
   try {
-    const scriptContent = await downloadScriptWithFallback(url, ghUrl);
-    await runBash(scriptContent, prompt);
+    scriptContent = await downloadScriptWithFallback(url, ghUrl);
   } catch (err) {
-    p.log.error("Failed to download or execute spawn script");
+    p.log.error("Failed to download spawn script");
     console.error("\nError:", getErrorMessage(err));
     console.error("\nTroubleshooting:");
     console.error(`  1. Verify this combination exists: ${pc.cyan("spawn list")}`);
     console.error("  2. Check your internet connection");
     console.error(`  3. Try accessing the script directly: ${ghUrl}`);
+    process.exit(1);
+  }
+
+  try {
+    await runBash(scriptContent, prompt);
+  } catch (err) {
+    const errMsg = getErrorMessage(err);
+    if (errMsg.includes("interrupted by user")) {
+      // User pressed Ctrl+C - exit silently
+      process.exit(130);
+    }
+    p.log.error("Spawn script failed");
+    console.error("\nError:", errMsg);
+    console.error("\nCommon causes:");
+    console.error("  - Missing cloud provider credentials (API key, token, etc.)");
+    console.error("  - Cloud provider API rate limit or quota exceeded");
+    console.error("  - Missing local dependencies (SSH, curl, etc.)");
+    console.error(`\nCheck the cloud provider README for setup instructions:`);
+    console.error(`  ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloud}`)}`);
     process.exit(1);
   }
 }
@@ -386,7 +419,12 @@ function runBash(script: string, prompt?: string): Promise<void> {
     });
     child.on("close", (code: number | null) => {
       if (code === 0) resolve();
-      else reject(new Error(`Script exited with code ${code}`));
+      else {
+        const msg = code === 130
+          ? "Script interrupted by user (Ctrl+C)"
+          : `Script exited with code ${code}`;
+        reject(new Error(msg));
+      }
     });
     child.on("error", reject);
   });
