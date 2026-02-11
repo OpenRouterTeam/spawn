@@ -96,34 +96,10 @@ test_ovh_token() {
     return 0
 }
 
-# Ensure OVH credentials are available (env vars -> config file -> prompt+save)
-ensure_ovh_authenticated() {
-    check_python_available || return 1
+# Interactively prompt for OVH credentials, validate, and save to config
+_ovh_prompt_credentials() {
+    local config_file="$1"
 
-    local config_file="$HOME/.config/spawn/ovh.json"
-
-    # Try environment variables first
-    if [[ -n "${OVH_APPLICATION_KEY:-}" && -n "${OVH_APPLICATION_SECRET:-}" && -n "${OVH_CONSUMER_KEY:-}" && -n "${OVH_PROJECT_ID:-}" ]]; then
-        log_info "Using OVHcloud credentials from environment"
-        return 0
-    fi
-
-    # Try config file
-    local creds
-    if creds=$(_load_json_config_fields "$config_file" application_key application_secret consumer_key project_id); then
-        local saved_ak saved_as saved_ck saved_pid
-        { read -r saved_ak; read -r saved_as; read -r saved_ck; read -r saved_pid; } <<< "${creds}"
-        if [[ -n "${saved_ak}" && -n "${saved_as}" && -n "${saved_ck}" && -n "${saved_pid}" ]]; then
-            export OVH_APPLICATION_KEY="${saved_ak}"
-            export OVH_APPLICATION_SECRET="${saved_as}"
-            export OVH_CONSUMER_KEY="${saved_ck}"
-            export OVH_PROJECT_ID="${saved_pid}"
-            log_info "Using OVHcloud credentials from ${config_file}"
-            return 0
-        fi
-    fi
-
-    # Prompt for credentials
     echo ""
     log_warn "OVHcloud API Credentials Required"
     log_warn "Create credentials at: https://api.ovh.com/createToken/"
@@ -152,7 +128,6 @@ ensure_ovh_authenticated() {
     export OVH_CONSUMER_KEY="${consumer_key}"
     export OVH_PROJECT_ID="${project_id}"
 
-    # Validate credentials
     if ! test_ovh_token; then
         unset OVH_APPLICATION_KEY OVH_APPLICATION_SECRET OVH_CONSUMER_KEY OVH_PROJECT_ID
         return 1
@@ -163,7 +138,37 @@ ensure_ovh_authenticated() {
         application_secret "${app_secret}" \
         consumer_key "${consumer_key}" \
         project_id "${project_id}"
-    return 0
+}
+
+# Ensure OVH credentials are available (env vars -> config file -> prompt+save)
+ensure_ovh_authenticated() {
+    check_python_available || return 1
+
+    local config_file="$HOME/.config/spawn/ovh.json"
+
+    # Try environment variables first
+    if [[ -n "${OVH_APPLICATION_KEY:-}" && -n "${OVH_APPLICATION_SECRET:-}" && -n "${OVH_CONSUMER_KEY:-}" && -n "${OVH_PROJECT_ID:-}" ]]; then
+        log_info "Using OVHcloud credentials from environment"
+        return 0
+    fi
+
+    # Try config file
+    local creds
+    if creds=$(_load_json_config_fields "$config_file" application_key application_secret consumer_key project_id); then
+        local saved_ak saved_as saved_ck saved_pid
+        { read -r saved_ak; read -r saved_as; read -r saved_ck; read -r saved_pid; } <<< "${creds}"
+        if [[ -n "${saved_ak}" && -n "${saved_as}" && -n "${saved_ck}" && -n "${saved_pid}" ]]; then
+            export OVH_APPLICATION_KEY="${saved_ak}"
+            export OVH_APPLICATION_SECRET="${saved_as}"
+            export OVH_CONSUMER_KEY="${saved_ck}"
+            export OVH_PROJECT_ID="${saved_pid}"
+            log_info "Using OVHcloud credentials from ${config_file}"
+            return 0
+        fi
+    fi
+
+    # Prompt, validate, and save credentials
+    _ovh_prompt_credentials "${config_file}"
 }
 
 # Check if SSH key is registered with OVH

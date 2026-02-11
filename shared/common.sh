@@ -670,46 +670,34 @@ _generate_csrf_state() {
     fi
 }
 
-try_oauth_flow() {
-    local callback_port=${1:-5180}
-
-    log_info "Attempting OAuth authentication..."
-
-    # Check prerequisites
-    if ! _check_oauth_prerequisites; then
-        return 1
-    fi
-
+# Create temp directory with OAuth session files and CSRF state
+_init_oauth_session() {
     local oauth_dir
     oauth_dir=$(mktemp -d)
-    local code_file="${oauth_dir}/code"
-    local port_file="${oauth_dir}/port"
-    local state_file="${oauth_dir}/state"
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
     csrf_state=$(_generate_csrf_state)
-    echo "${csrf_state}" > "${state_file}"
-    chmod 600 "${state_file}"
+    printf '%s' "${csrf_state}" > "${oauth_dir}/state"
+    chmod 600 "${oauth_dir}/state"
 
-    # Start server
-    local actual_port
-    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}") || {
-        cleanup_oauth_session "" "${oauth_dir}"
-        return 1
-    }
+    echo "${oauth_dir}"
+}
 
-    # Get server PID from the port file
-    local server_pid
-    server_pid=$(pgrep -f "start_oauth_server" | tail -1)
+# Open browser and wait for OAuth callback, returning the auth code
+# Outputs the OAuth code on success, returns 1 on timeout
+_await_oauth_callback() {
+    local code_file="${1}"
+    local server_pid="${2}"
+    local oauth_dir="${3}"
+    local actual_port="${4}"
+    local csrf_state="${5}"
 
-    # Open browser with CSRF state parameter
     local callback_url="http://localhost:${actual_port}/callback"
     local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}&state=${csrf_state}"
     log_info "Opening browser to authenticate with OpenRouter..."
     open_browser "${auth_url}"
 
-    # Wait for code
     if ! _wait_for_oauth "${code_file}"; then
         cleanup_oauth_session "${server_pid}" "${oauth_dir}"
         log_warn "OAuth timed out after 120 seconds. Common causes:"
@@ -719,8 +707,37 @@ try_oauth_flow() {
         return 1
     fi
 
+    cat "${code_file}"
+}
+
+try_oauth_flow() {
+    local callback_port=${1:-5180}
+
+    log_info "Attempting OAuth authentication..."
+
+    if ! _check_oauth_prerequisites; then
+        return 1
+    fi
+
+    local oauth_dir
+    oauth_dir=$(_init_oauth_session)
+    local code_file="${oauth_dir}/code"
+    local csrf_state
+    csrf_state=$(cat "${oauth_dir}/state")
+
+    # Start server
+    local actual_port
+    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${oauth_dir}/port" "${oauth_dir}/state") || {
+        cleanup_oauth_session "" "${oauth_dir}"
+        return 1
+    }
+
+    local server_pid
+    server_pid=$(pgrep -f "start_oauth_server" | tail -1)
+
+    # Open browser and wait for callback
     local oauth_code
-    oauth_code=$(cat "${code_file}")
+    oauth_code=$(_await_oauth_callback "${code_file}" "${server_pid}" "${oauth_dir}" "${actual_port}" "${csrf_state}") || return 1
     cleanup_oauth_session "${server_pid}" "${oauth_dir}"
 
     # Exchange code for API key
