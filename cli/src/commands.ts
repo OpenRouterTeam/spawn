@@ -319,7 +319,7 @@ function detectAndFixSwappedArgs(
   cloud: string
 ): { agent: string; cloud: string } {
   if (!manifest.agents[agent] && manifest.clouds[agent] && manifest.agents[cloud]) {
-    p.log.warn(`It looks like you swapped the agent and cloud arguments.`);
+    p.log.info(`It looks like you swapped the agent and cloud arguments.`);
     p.log.info(`Running: ${pc.cyan(`spawn ${cloud} ${agent}`)}`);
     return { agent: cloud, cloud: agent };
   }
@@ -762,18 +762,27 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
 
   for (const r of records) {
     const when = formatTimestamp(r.timestamp);
-    console.log(
+    let line =
       pc.green(r.agent.padEnd(20)) +
       r.cloud.padEnd(20) +
-      pc.dim(when)
-    );
+      pc.dim(when);
+    if (r.prompt) {
+      const preview = r.prompt.length > 40 ? r.prompt.slice(0, 40) + "..." : r.prompt;
+      line += pc.dim(`  --prompt "${preview}"`);
+    }
+    console.log(line);
   }
 
   console.log();
 
   // Show rerun hint for the most recent spawn (first record since list is newest-first)
   const latest = records[0];
-  console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud}`)}`);
+  if (latest.prompt) {
+    const shortPrompt = latest.prompt.length > 30 ? latest.prompt.slice(0, 30) + "..." : latest.prompt;
+    console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud} --prompt "${shortPrompt}"`)}`);
+  } else {
+    console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud}`)}`);
+  }
 
   console.log(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
   console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}`));
@@ -833,11 +842,12 @@ export async function cmdClouds(): Promise<void> {
       const c = manifest.clouds[key];
       const implCount = getImplementedAgents(manifest, key).length;
       const countStr = `${implCount}/${allAgents.length}`;
-      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}`);
+      const authHint = c.auth.toLowerCase() === "none" ? "" : `  auth: ${c.auth}`;
+      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${authHint ? pc.dim(authHint) : ""}`);
     }
   }
   console.log();
-  console.log(pc.dim(`  Run ${pc.cyan("spawn <cloud>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
+  console.log(pc.dim(`  Run ${pc.cyan("spawn <cloud>")} for setup instructions, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
   console.log();
 }
 

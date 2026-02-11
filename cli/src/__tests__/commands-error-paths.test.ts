@@ -359,8 +359,8 @@ describe("Commands Error Paths", () => {
       await expect(cmdRun("sprite", "claude")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
     });
 
     it("should suggest the correct argument order when swapped", async () => {
@@ -373,8 +373,8 @@ describe("Commands Error Paths", () => {
     it("should suggest correct order for hetzner/aider swap", async () => {
       await expect(cmdRun("hetzner", "aider")).rejects.toThrow("process.exit");
 
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
+      const infoCalls2 = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls2.some((msg: string) => msg.includes("swapped"))).toBe(true);
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn aider hetzner"))).toBe(true);

@@ -113,10 +113,8 @@ describe("detectAndFixSwappedArgs via cmdRun", () => {
         // May throw from script execution
       }
 
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
-
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
       expect(infoCalls.some((msg: string) => msg.includes("spawn claude sprite"))).toBe(true);
     });
 
@@ -221,8 +219,8 @@ describe("detectAndFixSwappedArgs via cmdRun", () => {
       }
 
       // Should detect the swap
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
 
       // Should then fail at implementation check
       const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
@@ -552,8 +550,8 @@ describe("prompt handling with swapped args", () => {
     }
 
     // Should detect swap
-    const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-    expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
+    const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+    expect(infoCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
 
     // Should show launch message with prompt
     const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
