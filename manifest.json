@@ -1172,7 +1172,7 @@
     "hostinger/kilocode": "implemented",
     "hostinger/continue": "implemented",
     "netcup/claude": "implemented",
-    "netcup/openclaw": "missing",
+    "netcup/openclaw": "implemented",
     "netcup/nanoclaw": "missing",
     "netcup/aider": "implemented",
     "netcup/goose": "implemented",
