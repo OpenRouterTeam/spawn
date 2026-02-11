@@ -263,9 +263,20 @@ const SUBCOMMANDS: Record<string, () => Promise<void>> = {
   "update": cmdUpdate,
 };
 
+/** Warn when extra positional arguments are silently ignored */
+function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
+  const extra = filteredArgs.slice(maxExpected);
+  if (extra.length > 0) {
+    console.error(pc.yellow(`Warning: extra argument${extra.length > 1 ? "s" : ""} ignored: ${extra.join(", ")}`));
+    console.error(pc.dim(`  Usage: spawn <agent> <cloud> [--prompt "..."]`));
+    console.error();
+  }
+}
+
 /** Dispatch a named command or fall through to agent/cloud handling */
 async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
+    warnExtraArgs(filteredArgs, 1);
     IMMEDIATE_COMMANDS[cmd]();
     return;
   }
@@ -275,11 +286,13 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
     if (hasHelpFlag) {
       cmdHelp();
     } else {
+      warnExtraArgs(filteredArgs, 1);
       await SUBCOMMANDS[cmd]();
     }
     return;
   }
 
+  warnExtraArgs(filteredArgs, 2);
   await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt);
 }
 

@@ -173,6 +173,15 @@ export function resolveCloudKey(manifest: Manifest, input: string): string | nul
 function validateAgent(manifest: Manifest, agent: string): asserts agent is keyof typeof manifest.agents {
   if (!manifest.agents[agent]) {
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+
+    // Check if the user passed a cloud as the first argument (e.g., "spawn hetzner sprite")
+    if (manifest.clouds[agent]) {
+      p.log.info(`"${agent}" is a cloud provider, not an agent.`);
+      p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
+      p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
+      process.exit(1);
+    }
+
     const keys = agentKeys(manifest);
     const match = findClosestKeyByNameOrKey(agent, keys, (k) => manifest.agents[k].name);
     if (match) {
@@ -202,6 +211,15 @@ async function validateAndGetAgent(agent: string): Promise<[manifest: Manifest, 
 function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyof typeof manifest.clouds {
   if (!manifest.clouds[cloud]) {
     p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
+
+    // Check if the user passed two agents instead of agent + cloud
+    if (manifest.agents[cloud]) {
+      p.log.info(`"${cloud}" is an agent, not a cloud provider.`);
+      p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
+      p.log.info(`Run ${pc.cyan("spawn clouds")} to see available cloud providers.`);
+      process.exit(1);
+    }
+
     const keys = cloudKeys(manifest);
     const match = findClosestKeyByNameOrKey(cloud, keys, (k) => manifest.clouds[k].name);
     if (match) {

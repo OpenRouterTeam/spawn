@@ -470,3 +470,72 @@ describe("SPAWN_NO_UPDATE_CHECK behavior", () => {
     expect(elapsed).toBeLessThan(10000);
   });
 });
+
+// ── Extra positional argument warnings ──────────────────────────────────
+
+describe("extra positional argument warnings", () => {
+  it("should warn when 3 positional args given (agent cloud extra)", () => {
+    const result = runCli(["claude", "sprite", "hetzner"]);
+    const out = output(result);
+    expect(out).toContain("extra argument");
+    expect(out).toContain("hetzner");
+    expect(out).toContain("Usage:");
+  });
+
+  it("should warn about multiple extra args", () => {
+    const result = runCli(["claude", "sprite", "foo", "bar"]);
+    const out = output(result);
+    expect(out).toContain("extra arguments ignored");
+    expect(out).toContain("foo");
+    expect(out).toContain("bar");
+  });
+
+  it("should still work for subcommands with extra args (warning on stderr)", () => {
+    // "spawn list extra" runs successfully - the warning goes to stderr
+    // which isn't captured by execSync on success, but the command should still work
+    const result = runCli(["list", "extra"]);
+    const out = output(result);
+    expect(out).toContain("combinations implemented");
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("should still work for version with extra args (warning on stderr)", () => {
+    // "spawn version extra" runs successfully - the warning goes to stderr
+    const result = runCli(["version", "extra"]);
+    const out = output(result);
+    expect(out).toMatch(/spawn v\d+\.\d+\.\d+/);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("should NOT warn when exactly 2 positional args given", () => {
+    const result = runCli(["claude", "sprite"]);
+    const out = output(result);
+    expect(out).not.toContain("extra argument");
+  });
+
+  it("should NOT warn when exactly 1 positional arg given", () => {
+    const result = runCli(["claude"]);
+    const out = output(result);
+    expect(out).not.toContain("extra argument");
+  });
+});
+
+// ── Mismatched argument type errors ─────────────────────────────────────
+
+describe("mismatched argument type detection", () => {
+  it("should detect two agents passed as agent+cloud", () => {
+    const result = runCli(["claude", "aider"]);
+    const out = output(result);
+    expect(out).toContain("is an agent");
+    expect(out).toContain("spawn <agent> <cloud>");
+  });
+
+  it("should detect two clouds passed as agent+cloud", () => {
+    const result = runCli(["hetzner", "sprite"]);
+    const out = output(result);
+    // The swap detection won't fire (sprite is not an agent), so validateAgent
+    // catches that hetzner is a cloud
+    expect(out).toContain("is a cloud provider");
+    expect(out).toContain("spawn <agent> <cloud>");
+  });
+});
