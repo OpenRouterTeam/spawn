@@ -1371,6 +1371,57 @@ wait_for_cloud_init() {
     generic_ssh_wait "root" "${ip}" "${SSH_OPTS}" "test -f /root/.cloud-init-complete" "cloud-init" "${max_attempts}" 5
 }
 
+# ============================================================
+# Standard SSH server operations
+# ============================================================
+
+# Most SSH-based cloud providers share identical implementations for
+# run_server, upload_file, interactive_session, and verify_server_connectivity.
+# These helpers let providers set SSH_USER (default: root) and get all four
+# functions automatically, eliminating ~20 lines of copy-paste per provider.
+
+# Run a command on a remote server via SSH
+# Usage: ssh_run_server IP COMMAND
+# Requires: SSH_USER (default: root), SSH_OPTS
+ssh_run_server() {
+    local ip="${1}"
+    local cmd="${2}"
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" "${cmd}"
+}
+
+# Upload a file to a remote server via SCP
+# Usage: ssh_upload_file IP LOCAL_PATH REMOTE_PATH
+# Requires: SSH_USER (default: root), SSH_OPTS
+ssh_upload_file() {
+    local ip="${1}"
+    local local_path="${2}"
+    local remote_path="${3}"
+    # shellcheck disable=SC2086
+    scp $SSH_OPTS "${local_path}" "${SSH_USER:-root}@${ip}:${remote_path}"
+}
+
+# Start an interactive SSH session
+# Usage: ssh_interactive_session IP COMMAND
+# Requires: SSH_USER (default: root), SSH_OPTS
+ssh_interactive_session() {
+    local ip="${1}"
+    local cmd="${2}"
+    # shellcheck disable=SC2086
+    ssh -t $SSH_OPTS "${SSH_USER:-root}@${ip}" "${cmd}"
+}
+
+# Wait for SSH connectivity to a server
+# Usage: ssh_verify_connectivity IP [MAX_ATTEMPTS] [INITIAL_INTERVAL]
+# Requires: SSH_USER (default: root), SSH_OPTS
+ssh_verify_connectivity() {
+    local ip="${1}"
+    local max_attempts=${2:-30}
+    local initial_interval=${3:-5}
+    # shellcheck disable=SC2154
+    generic_ssh_wait "${SSH_USER:-root}" "${ip}" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "${max_attempts}" "${initial_interval}"
+}
+
 # Generic instance status polling loop
 # Polls an API endpoint until the instance reaches the target status, then extracts the IP.
 # Usage: generic_wait_for_instance API_FUNC ENDPOINT TARGET_STATUS STATUS_PY IP_PY IP_VAR DESCRIPTION [MAX_ATTEMPTS]

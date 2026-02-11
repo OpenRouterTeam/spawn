@@ -497,55 +497,24 @@ destroy_ovh_instance() {
     log_info "Instance $instance_id destroyed"
 }
 
-# Wait for SSH connectivity
-verify_server_connectivity() {
-    local ip="$1"
-    local max_attempts=${2:-30}
-    # OVH Ubuntu instances use 'ubuntu' user by default for newer images,
-    # but some use 'root'. We use the configured user.
-    local user="${OVH_SSH_USER:-ubuntu}"
-    # shellcheck disable=SC2154
-    generic_ssh_wait "${user}" "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
-}
+# OVH uses configurable SSH user (ubuntu for newer images, root for older)
+SSH_USER="${OVH_SSH_USER:-ubuntu}"
 
-# Run a command on the server
-run_ovh() {
-    local ip="$1"
-    local cmd="$2"
-    local user="${OVH_SSH_USER:-ubuntu}"
-    # shellcheck disable=SC2086
-    ssh $SSH_OPTS "${user}@$ip" "$cmd"
-}
-
-# Upload a file to the server
-upload_file_ovh() {
-    local ip="$1"
-    local local_path="$2"
-    local remote_path="$3"
-    local user="${OVH_SSH_USER:-ubuntu}"
-    # shellcheck disable=SC2086
-    scp $SSH_OPTS "$local_path" "${user}@$ip:$remote_path"
-}
-
-# Start an interactive SSH session
-interactive_session() {
-    local ip="$1"
-    local cmd="$2"
-    local user="${OVH_SSH_USER:-ubuntu}"
-    # shellcheck disable=SC2086
-    ssh -t $SSH_OPTS "${user}@$ip" "$cmd"
-}
+# SSH operations — delegates to shared helpers
+verify_server_connectivity() { ssh_verify_connectivity "$@"; }
+run_ovh() { ssh_run_server "$@"; }
+upload_file_ovh() { ssh_upload_file "$@"; }
+interactive_session() { ssh_interactive_session "$@"; }
 
 # Install base dependencies on the server (since OVH doesn't use cloud-init by default)
 install_base_deps() {
     local ip="$1"
-    local user="${OVH_SSH_USER:-ubuntu}"
 
     log_warn "Installing base dependencies..."
 
     # Use sudo if not root
     local sudo_prefix=""
-    if [[ "${user}" != "root" ]]; then
+    if [[ "${SSH_USER}" != "root" ]]; then
         sudo_prefix="sudo "
     fi
 

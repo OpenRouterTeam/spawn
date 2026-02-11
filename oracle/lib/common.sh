@@ -384,29 +384,25 @@ create_server() {
     log_info "Instance created: IP=${OCI_SERVER_IP}"
 }
 
-verify_server_connectivity() {
-    local ip="${1}" max_attempts=${2:-30}
-    generic_ssh_wait "ubuntu" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" "${max_attempts}"
-}
+# OCI Ubuntu images use 'ubuntu' user
+SSH_USER="ubuntu"
+
+# SSH operations — delegates to shared helpers
+verify_server_connectivity() { ssh_verify_connectivity "$@"; }
+run_server() { ssh_run_server "$@"; }
+upload_file() { ssh_upload_file "$@"; }
+interactive_session() { ssh_interactive_session "$@"; }
 
 wait_for_cloud_init() {
     local ip="${1}"
     local max_attempts=${2:-60}
 
     # First ensure SSH connectivity
-    generic_ssh_wait "ubuntu" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" 30 5 || return 1
+    ssh_verify_connectivity "${ip}" 30 5 || return 1
 
     # Then wait for cloud-init completion marker
     generic_ssh_wait "ubuntu" "${ip}" "${SSH_OPTS}" "test -f /home/ubuntu/.cloud-init-complete" "cloud-init" "${max_attempts}" 5
 }
-
-# OCI Ubuntu images use 'ubuntu' user
-# shellcheck disable=SC2086
-run_server() { local ip="${1}" cmd="${2}"; ssh ${SSH_OPTS} "ubuntu@${ip}" "${cmd}"; }
-# shellcheck disable=SC2086
-upload_file() { local ip="${1}" local_path="${2}" remote_path="${3}"; scp ${SSH_OPTS} "${local_path}" "ubuntu@${ip}:${remote_path}"; }
-# shellcheck disable=SC2086
-interactive_session() { local ip="${1}" cmd="${2}"; ssh -t ${SSH_OPTS} "ubuntu@${ip}" "${cmd}"; }
 
 destroy_server() {
     local instance_id="${1:-${OCI_INSTANCE_ID:-}}"
