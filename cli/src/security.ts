@@ -71,7 +71,11 @@ export function validateScriptContent(script: string): void {
 
   // Ensure script starts with shebang
   if (!script.trim().startsWith("#!")) {
-    throw new Error("Script must start with a valid shebang (e.g., #!/bin/bash)");
+    throw new Error(
+      "Script must start with a valid shebang (e.g., #!/bin/bash).\n" +
+      "This usually means the download returned an error page instead of a script.\n" +
+      "Try again, or check your internet connection."
+    );
   }
 }
 
@@ -90,7 +94,10 @@ export function validatePrompt(prompt: string): void {
   // Check length constraints (10KB max to prevent DoS)
   const MAX_PROMPT_LENGTH = 10 * 1024;
   if (prompt.length > MAX_PROMPT_LENGTH) {
-    throw new Error(`Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters`);
+    throw new Error(
+      `Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters (${prompt.length} given).\n` +
+      `For longer prompts, use --prompt-file to read from a file instead.`
+    );
   }
 
   // Check for obvious command injection patterns
