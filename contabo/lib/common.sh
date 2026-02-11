@@ -239,6 +239,78 @@ get_server_name() {
     echo "$server_name"
 }
 
+# Get all SSH secret IDs from Contabo
+_contabo_get_ssh_secret_ids() {
+    local ssh_secrets_response
+    ssh_secrets_response=$(contabo_api GET "/compute/secrets")
+    echo "$ssh_secrets_response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+secrets = [s['secretId'] for s in data.get('data', []) if s.get('type') == 'ssh']
+print(json.dumps(secrets))
+" 2>/dev/null || echo "[]"
+}
+
+# Build Contabo instance creation request body
+# $1=name $2=product_id $3=region $4=image_id $5=period $6=ssh_secret_ids
+_contabo_build_instance_body() {
+    local name="$1" product_id="$2" region="$3" image_id="$4" period="$5" ssh_secret_ids="$6"
+
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+
+    echo "$userdata" | python3 -c "
+import json, sys
+userdata = sys.stdin.read()
+body = {
+    'displayName': '$name',
+    'productId': '$product_id',
+    'region': '$region',
+    'imageId': '$image_id',
+    'period': $period,
+    'sshKeys': $ssh_secret_ids,
+    'userData': userdata,
+    'defaultUser': 'root'
+}
+print(json.dumps(body))
+"
+}
+
+# Poll Contabo API until instance is running, then extract IP
+# Sets CONTABO_SERVER_IP on success
+_contabo_wait_for_instance() {
+    local instance_id="$1"
+    local max_attempts=60
+    local attempt=1
+
+    while [[ $attempt -le $max_attempts ]]; do
+        sleep 5
+        local instance_info
+        instance_info=$(contabo_api GET "/compute/instances/$instance_id")
+
+        local status
+        status=$(echo "$instance_info" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('data',[{}])[0].get('status',''))")
+
+        if [[ "$status" == "running" ]]; then
+            CONTABO_SERVER_IP=$(echo "$instance_info" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read()).get('data',[{}])[0]
+ip = data.get('ipConfig', {}).get('v4', {}).get('ip', '')
+print(ip)
+")
+            export CONTABO_SERVER_IP
+            log_info "Instance running with IP: $CONTABO_SERVER_IP"
+            return 0
+        fi
+
+        log_info "Instance status: $status (attempt $attempt/$max_attempts)"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Instance failed to reach running state within timeout"
+    return 1
+}
+
 # Create a Contabo instance with cloud-init
 create_server() {
     local name="$1"
@@ -253,7 +325,6 @@ create_server() {
     validate_resource_name "$product_id" || { log_error "Invalid CONTABO_PRODUCT_ID"; return 1; }
     validate_region_name "$region" || { log_error "Invalid CONTABO_REGION"; return 1; }
     validate_resource_name "$image_id" || { log_error "Invalid CONTABO_IMAGE_ID"; return 1; }
-    # Period must be a positive integer
     if [[ ! "$period" =~ ^[0-9]+$ ]]; then
         log_error "Invalid CONTABO_PERIOD: must be a positive integer"
         return 1
@@ -261,38 +332,11 @@ create_server() {
 
     log_warn "Creating Contabo instance '$name' (product: $product_id, region: $region)..."
 
-    # Get all SSH secret IDs
-    local ssh_secrets_response
-    ssh_secrets_response=$(contabo_api GET "/compute/secrets")
     local ssh_secret_ids
-    ssh_secret_ids=$(echo "$ssh_secrets_response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-secrets = [s['secretId'] for s in data.get('data', []) if s.get('type') == 'ssh']
-print(json.dumps(secrets))
-" 2>/dev/null || echo "[]")
+    ssh_secret_ids=$(_contabo_get_ssh_secret_ids)
 
-    # Get cloud-init userdata
-    local userdata
-    userdata=$(get_cloud_init_userdata)
-
-    # Build request body
     local body
-    body=$(echo "$userdata" | python3 -c "
-import json, sys
-userdata = sys.stdin.read()
-body = {
-    'displayName': '$name',
-    'productId': '$product_id',
-    'region': '$region',
-    'imageId': '$image_id',
-    'period': $period,
-    'sshKeys': $ssh_secret_ids,
-    'userData': userdata,
-    'defaultUser': 'root'
-}
-print(json.dumps(body))
-")
+    body=$(_contabo_build_instance_body "$name" "$product_id" "$region" "$image_id" "$period" "$ssh_secret_ids")
 
     local response
     response=$(contabo_api POST "/compute/instances" "$body")
@@ -318,35 +362,7 @@ print(json.dumps(body))
     log_info "Instance created: ID=$CONTABO_INSTANCE_ID"
     log_info "Waiting for instance to be provisioned..."
 
-    # Wait for instance to be running and get IP
-    local max_attempts=60
-    local attempt=1
-    while [[ $attempt -le $max_attempts ]]; do
-        sleep 5
-        local instance_info
-        instance_info=$(contabo_api GET "/compute/instances/$CONTABO_INSTANCE_ID")
-
-        local status
-        status=$(echo "$instance_info" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('data',[{}])[0].get('status',''))")
-
-        if [[ "$status" == "running" ]]; then
-            CONTABO_SERVER_IP=$(echo "$instance_info" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read()).get('data',[{}])[0]
-ip = data.get('ipConfig', {}).get('v4', {}).get('ip', '')
-print(ip)
-")
-            export CONTABO_SERVER_IP
-            log_info "Instance running with IP: $CONTABO_SERVER_IP"
-            return 0
-        fi
-
-        log_info "Instance status: $status (attempt $attempt/$max_attempts)"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance failed to reach running state within timeout"
-    return 1
+    _contabo_wait_for_instance "$CONTABO_INSTANCE_ID"
 }
 
 # Wait for SSH connectivity
