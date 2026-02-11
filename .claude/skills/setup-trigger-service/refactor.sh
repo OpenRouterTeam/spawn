@@ -526,23 +526,33 @@ IDLE_TIMEOUT=600  # 10 minutes of silence = hung
 claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" &
 PIPE_PID=$!
 
-# Watchdog loop: check log file growth every 10 seconds
+# Watchdog loop: check log file growth and detect session completion
 LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
 IDLE_SECONDS=0
 WALL_START=$(date +%s)
+SESSION_ENDED=false
 
 while kill -0 "${PIPE_PID}" 2>/dev/null; do
     sleep 10
     CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
     WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
 
+    # Check if the stream-json "result" event has been emitted (session complete).
+    # After this, claude hangs waiting for agent subprocesses — kill immediately.
+    if [[ "${SESSION_ENDED}" = false ]] && grep -q '"type":"result"' "${LOG_FILE}" 2>/dev/null; then
+        SESSION_ENDED=true
+        log "Session ended (result event detected) — waiting 30s for cleanup then killing"
+        sleep 30
+        kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
+        pkill -P "${PIPE_PID}" 2>/dev/null || true
+        break
+    fi
+
     if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
         IDLE_SECONDS=$((IDLE_SECONDS + 10))
         if [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
             log "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
-            # Kill the entire process group spawned by the pipe
             kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
-            # Also kill any claude processes we spawned
             pkill -P "${PIPE_PID}" 2>/dev/null || true
             break
         fi
@@ -563,7 +573,7 @@ done
 wait "${PIPE_PID}" 2>/dev/null
 CLAUDE_EXIT=$?
 
-if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+if [[ "${CLAUDE_EXIT}" -eq 0 ]] || [[ "${SESSION_ENDED}" = true ]]; then
     log "Cycle completed successfully"
 
     # Direct commit to main only in refactor mode
