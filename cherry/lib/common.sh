@@ -132,11 +132,14 @@ ensure_ssh_key() {
     log_info "Registering new SSH key with Cherry Servers..."
 
     local label="spawn-$(date +%s)"
+    local json_label json_key
+    json_label=$(json_escape "$label")
+    json_key=$(json_escape "$ssh_pub_key")
     local response
     response=$(curl -s -X POST \
         -H "Authorization: Bearer ${CHERRY_AUTH_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d "{\"label\": \"$label\", \"key\": \"$ssh_pub_key\"}" \
+        -d "{\"label\": ${json_label}, \"key\": ${json_key}}" \
         "${CHERRY_API_BASE}/ssh-keys" 2>&1)
 
     key_id=$(printf '%s' "$response" | _cherry_json_field "id")
@@ -193,6 +196,10 @@ get_server_name() {
         server_name="spawn-$(date +%s)"
     fi
 
+    if ! validate_server_name "$server_name"; then
+        return 1
+    fi
+
     printf '%s' "$server_name"
 }
 
@@ -205,6 +212,19 @@ create_server() {
     local image="${CHERRY_DEFAULT_IMAGE}"
 
     check_python_available
+
+    # Validate env var inputs to prevent injection in Python strings
+    validate_resource_name "$hostname" || { log_error "Invalid server hostname"; return 1; }
+    validate_resource_name "$plan" || { log_error "Invalid CHERRY_DEFAULT_PLAN"; return 1; }
+    validate_resource_name "$region" || { log_error "Invalid CHERRY_DEFAULT_REGION"; return 1; }
+    if [[ ! "$image" =~ ^[a-zA-Z0-9\ ._-]{1,63}$ ]]; then
+        log_error "Invalid CHERRY_DEFAULT_IMAGE: must be 1-63 chars: alphanumeric, spaces, dots, hyphens, underscores"
+        return 1
+    fi
+    if [[ ! "${CHERRY_SSH_KEY_ID}" =~ ^[0-9]+$ ]]; then
+        log_error "Invalid CHERRY_SSH_KEY_ID: must be a numeric ID"
+        return 1
+    fi
 
     local project_id
     project_id=$(get_cherry_project_id)
