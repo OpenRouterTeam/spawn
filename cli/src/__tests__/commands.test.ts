@@ -43,60 +43,10 @@ describe("commands", () => {
     });
   });
 
-  // TODO: These tests need refactoring - bun doesn't support module mocking
-  // Commands.ts should be refactored to use dependency injection for testability
-
-  describe.skip("cmdList - needs dependency injection", () => {
-    it("should display matrix table with all agents and clouds", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-  });
-
-  describe.skip("cmdAgents - needs dependency injection", () => {
-    it("should list all agents with descriptions", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-  });
-
-  describe.skip("cmdClouds - needs dependency injection", () => {
-    it("should list all clouds with descriptions", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-  });
-
-  describe.skip("cmdAgentInfo - needs dependency injection", () => {
-    it("should show info for a valid agent with implemented clouds", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-
-    it("should show no clouds message when agent has no implementations", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-
-    it("should exit with error for unknown agent", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-  });
-
-  describe.skip("cmdRun - needs dependency injection", () => {
-    it("should launch script for valid agent and cloud", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-
-    it("should exit with error for unknown agent", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-
-    it("should exit with error for unknown cloud", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-
-    it("should exit with error for unimplemented combination", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-
-    it("should fallback to GitHub raw URL when primary URL fails", async () => {
-      // Skipped: requires module mocking unsupported by bun
-    });
-  });
+  // These functions are tested in dedicated files using mock.module():
+  // - cmdList: commands-list-grid.test.ts, commands-compact-list.test.ts
+  // - cmdAgents/cmdClouds: commands-display.test.ts, commands-output.test.ts, commands-list-grid.test.ts
+  // - cmdAgentInfo/cmdCloudInfo: commands-info-details.test.ts, commands-display.test.ts, cloud-info.test.ts
+  // - cmdRun: commands-resolve-run.test.ts, commands-swap-resolve.test.ts, cmdrun-resolution.test.ts
+  // - Download/failure: download-and-failure.test.ts, commands-update-download.test.ts
 });
