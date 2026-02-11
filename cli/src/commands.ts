@@ -757,6 +757,10 @@ export async function cmdUpdate(): Promise<void> {
   } catch (err) {
     s.stop(pc.red("Failed to check for updates"));
     console.error("Error:", getErrorMessage(err));
+    console.error(`\nTroubleshooting:`);
+    console.error(`  1. Check your internet connection`);
+    console.error(`  2. Try again in a few moments`);
+    console.error(`  3. Update manually: ${pc.cyan(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`)}`);
   }
 }
 

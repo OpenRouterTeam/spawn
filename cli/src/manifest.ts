@@ -175,7 +175,15 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
     return stale;
   }
 
-  throw new Error("Cannot load manifest. Check your internet connection.");
+  throw new Error(
+    `Cannot load manifest: failed to fetch from GitHub and no local cache available.\n` +
+    `\n` +
+    `Troubleshooting:\n` +
+    `  1. Check your internet connection\n` +
+    `  2. Try again in a few moments (GitHub may be temporarily unreachable)\n` +
+    `  3. If the problem persists, clear the cache and retry:\n` +
+    `     rm -rf ${CACHE_DIR}`
+  );
 }
 
 export function agentKeys(m: Manifest): string[] {
