@@ -1176,7 +1176,7 @@
     "netcup/nanoclaw": "implemented",
     "netcup/aider": "implemented",
     "netcup/goose": "implemented",
-    "netcup/codex": "missing",
+    "netcup/codex": "implemented",
     "netcup/interpreter": "implemented",
     "netcup/gemini": "implemented",
     "netcup/amazonq": "missing",
