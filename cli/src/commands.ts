@@ -321,47 +321,55 @@ function detectAndFixSwappedArgs(
   return { agent, cloud };
 }
 
+/** Print a labeled section: bold header, body lines, then a blank line */
+function printDryRunSection(title: string, lines: string[]): void {
+  p.log.step(pc.bold(title));
+  for (const line of lines) console.log(line);
+  console.log();
+}
+
+function buildAgentLines(agentInfo: { name: string; description: string; install?: string; launch?: string }): string[] {
+  const lines = [
+    `  Name:        ${agentInfo.name}`,
+    `  Description: ${agentInfo.description}`,
+  ];
+  if (agentInfo.install) lines.push(`  Install:     ${agentInfo.install}`);
+  if (agentInfo.launch) lines.push(`  Launch:      ${agentInfo.launch}`);
+  return lines;
+}
+
+function buildCloudLines(cloudInfo: { name: string; description: string; defaults?: Record<string, string> }): string[] {
+  const lines = [
+    `  Name:        ${cloudInfo.name}`,
+    `  Description: ${cloudInfo.description}`,
+  ];
+  if (cloudInfo.defaults) {
+    lines.push(`  Defaults:`);
+    for (const [k, v] of Object.entries(cloudInfo.defaults)) {
+      lines.push(`    ${k}: ${v}`);
+    }
+  }
+  return lines;
+}
+
 function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, prompt?: string): void {
   p.log.info(pc.bold("Dry run -- no resources will be provisioned\n"));
 
-  const agentInfo = manifest.agents[agent];
-  p.log.step(pc.bold("Agent"));
-  console.log(`  Name:        ${agentInfo.name}`);
-  console.log(`  Description: ${agentInfo.description}`);
-  if (agentInfo.install) console.log(`  Install:     ${agentInfo.install}`);
-  if (agentInfo.launch) console.log(`  Launch:      ${agentInfo.launch}`);
-  console.log();
+  printDryRunSection("Agent", buildAgentLines(manifest.agents[agent]));
+  printDryRunSection("Cloud", buildCloudLines(manifest.clouds[cloud]));
+  printDryRunSection("Script", [`  URL: https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`]);
 
-  const cloudInfo = manifest.clouds[cloud];
-  p.log.step(pc.bold("Cloud"));
-  console.log(`  Name:        ${cloudInfo.name}`);
-  console.log(`  Description: ${cloudInfo.description}`);
-  if (cloudInfo.defaults) {
-    console.log(`  Defaults:`);
-    for (const [k, v] of Object.entries(cloudInfo.defaults)) {
-      console.log(`    ${k}: ${v}`);
-    }
-  }
-  console.log();
-
-  const scriptUrl = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
-  p.log.step(pc.bold("Script"));
-  console.log(`  URL: ${scriptUrl}`);
-  console.log();
-
-  if (agentInfo.env) {
-    p.log.step(pc.bold("Environment variables"));
-    for (const [k, v] of Object.entries(agentInfo.env)) {
+  const env = manifest.agents[agent].env;
+  if (env) {
+    const envLines = Object.entries(env).map(([k, v]) => {
       const display = v.includes("OPENROUTER_API_KEY") ? "(from OpenRouter)" : v;
-      console.log(`  ${k}=${display}`);
-    }
-    console.log();
+      return `  ${k}=${display}`;
+    });
+    printDryRunSection("Environment variables", envLines);
   }
 
   if (prompt) {
-    p.log.step(pc.bold("Prompt"));
-    console.log(`  ${prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt}`);
-    console.log();
+    printDryRunSection("Prompt", [`  ${prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt}`]);
   }
 
   p.log.success("Dry run complete -- no resources were provisioned");
@@ -1057,17 +1065,38 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
 
 // ── Update ─────────────────────────────────────────────────────────────────────
 
+async function fetchRemoteVersion(): Promise<string> {
+  const res = await fetch(`${RAW_BASE}/cli/package.json`, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT),
+  });
+  if (!res.ok) throw new Error("fetch failed");
+  const remotePkg = (await res.json()) as { version: string };
+  return remotePkg.version;
+}
+
+const INSTALL_CMD = `curl -fsSL ${RAW_BASE}/cli/install.sh | bash`;
+
+async function performUpdate(remoteVersion: string): Promise<void> {
+  const { execSync } = await import("child_process");
+  try {
+    execSync(INSTALL_CMD, { stdio: "inherit", shell: "/bin/bash" });
+    console.log();
+    p.log.success(`Updated to v${remoteVersion}`);
+    p.log.info("Run your spawn command again to use the new version.");
+  } catch {
+    p.log.error("Auto-update failed. Update manually:");
+    console.log();
+    console.log(`  ${pc.cyan(INSTALL_CMD)}`);
+    console.log();
+  }
+}
+
 export async function cmdUpdate(): Promise<void> {
   const s = p.spinner();
   s.start("Checking for updates...");
 
   try {
-    const res = await fetch(`${RAW_BASE}/cli/package.json`, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT),
-    });
-    if (!res.ok) throw new Error("fetch failed");
-    const remotePkg = (await res.json()) as { version: string };
-    const remoteVersion = remotePkg.version;
+    const remoteVersion = await fetchRemoteVersion();
 
     if (remoteVersion === VERSION) {
       s.stop(`Already up to date ${pc.dim(`(v${VERSION})`)}`);
@@ -1075,31 +1104,14 @@ export async function cmdUpdate(): Promise<void> {
     }
 
     s.stop(`Updating: v${VERSION} -> v${remoteVersion}`);
-
-    const { execSync } = await import("child_process");
-    try {
-      execSync(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`, {
-        stdio: "inherit",
-        shell: "/bin/bash",
-      });
-      console.log();
-      p.log.success(`Updated to v${remoteVersion}`);
-      p.log.info("Run your spawn command again to use the new version.");
-    } catch {
-      p.log.error("Auto-update failed. Update manually:");
-      console.log();
-      console.log(
-        `  ${pc.cyan(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`)}`
-      );
-      console.log();
-    }
+    await performUpdate(remoteVersion);
   } catch (err) {
     s.stop(pc.red("Failed to check for updates") + pc.dim(` (current: v${VERSION})`));
     console.error("Error:", getErrorMessage(err));
     console.error(`\nHow to fix:`);
     console.error(`  1. Check your internet connection`);
     console.error(`  2. Try again in a few moments`);
-    console.error(`  3. Update manually: ${pc.cyan(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`)}`);
+    console.error(`  3. Update manually: ${pc.cyan(INSTALL_CMD)}`);
   }
 }
 
