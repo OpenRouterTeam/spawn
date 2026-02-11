@@ -1,13 +1,13 @@
 {
   "cloud": "vultr",
-  "recorded_at": "2026-02-11T01:51:11Z",
+  "recorded_at": "2026-02-11T02:13:48Z",
   "fixtures": {
-    "account": {"endpoint": "/account", "recorded_at": "2026-02-11T01:50:21Z"},
-    "ssh_keys": {"endpoint": "/ssh-keys", "recorded_at": "2026-02-11T01:50:21Z"},
-    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-11T01:50:22Z"},
-    "plans": {"endpoint": "/plans", "recorded_at": "2026-02-11T01:50:23Z"},
-    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-11T01:50:24Z"},
-    "create_server": {"endpoint": "POST /instances", "type": "live", "recorded_at": "2026-02-11T01:50:26Z"},
-    "delete_server": {"endpoint": "DELETE /instances/{id}", "type": "live", "recorded_at": "2026-02-11T01:51:11Z"}
+    "account": {"endpoint": "/account", "recorded_at": "2026-02-11T02:12:45Z"},
+    "ssh_keys": {"endpoint": "/ssh-keys", "recorded_at": "2026-02-11T02:12:46Z"},
+    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-11T02:12:47Z"},
+    "plans": {"endpoint": "/plans", "recorded_at": "2026-02-11T02:12:48Z"},
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-11T02:12:49Z"},
+    "create_server": {"endpoint": "POST /instances", "type": "live", "recorded_at": "2026-02-11T02:12:51Z"},
+    "delete_server": {"endpoint": "DELETE /instances/{id}", "type": "live", "recorded_at": "2026-02-11T02:13:48Z"}
   }
 }
