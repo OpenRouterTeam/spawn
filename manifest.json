@@ -1211,7 +1211,7 @@
     "ramnode/gemini": "missing",
     "ramnode/amazonq": "missing",
     "ramnode/cline": "missing",
-    "ramnode/gptme": "missing",
+    "ramnode/gptme": "implemented",
     "ramnode/opencode": "missing",
     "ramnode/plandex": "missing",
     "ramnode/kilocode": "missing",
