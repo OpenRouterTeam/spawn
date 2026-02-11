@@ -449,7 +449,7 @@ describe("Script download and execution", () => {
     ).toBe(true);
   });
 
-  it("should show 'not yet' message when both URLs 404", async () => {
+  it("should show script-not-found message when both URLs 404", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
         return {
@@ -470,7 +470,9 @@ describe("Script download and execution", () => {
     }
 
     const allOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(allOutput).toContain("doesn't exist yet");
+    expect(allOutput).toContain("could not be found");
+    expect(allOutput).toContain("spawn list");
+    expect(allOutput).toContain("Report the issue");
   });
 
   it("should show network error message when primary 500 and fallback 502", async () => {
