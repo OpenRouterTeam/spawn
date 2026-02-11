@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install gemini
-log_warn "Installing gemini..."
+log_step "Installing gemini..."
 run_server "npm install -g @google/gemini-cli"
 log_info "gemini installed"
 
@@ -63,7 +63,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start gemini interactively
-log_warn "Starting gemini..."
+log_step "Starting gemini..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

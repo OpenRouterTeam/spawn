@@ -28,7 +28,7 @@ verify_server_connectivity "${HOSTINGER_VPS_IP}"
 wait_for_cloud_init "${HOSTINGER_VPS_IP}" 60
 
 # 5. Install Aider
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "${HOSTINGER_VPS_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 
 # Verify installation succeeded
@@ -50,7 +50,7 @@ fi
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${HOSTINGER_VPS_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -60,7 +60,7 @@ log_info "VPS: ${SERVER_NAME} (ID: ${HOSTINGER_VPS_ID}, IP: ${HOSTINGER_VPS_IP})
 echo ""
 
 # 9. Start Aider interactively
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "${HOSTINGER_VPS_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

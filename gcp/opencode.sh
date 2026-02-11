@@ -33,7 +33,7 @@ verify_server_connectivity "${GCP_SERVER_IP}"
 wait_for_cloud_init "${GCP_SERVER_IP}" 60
 
 # 5. Install OpenCode
-log_warn "Installing OpenCode..."
+log_step "Installing OpenCode..."
 run_server "${GCP_SERVER_IP}" "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 
@@ -46,7 +46,7 @@ else
 fi
 
 # 7. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -57,7 +57,7 @@ log_info "Instance: ${GCP_INSTANCE_NAME_ACTUAL} (Zone: ${GCP_ZONE}, IP: ${GCP_SE
 echo ""
 
 # 8. Start OpenCode interactively
-log_warn "Starting OpenCode..."
+log_step "Starting OpenCode..."
 sleep 1
 clear
 interactive_session "${GCP_SERVER_IP}" "source ~/.zshrc && opencode"

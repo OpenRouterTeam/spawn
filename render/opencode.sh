@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install OpenCode
-log_warn "Installing OpenCode..."
+log_step "Installing OpenCode..."
 run_server "$(opencode_install_cmd)"
 
 # Verify installation
@@ -43,7 +43,7 @@ else
 fi
 
 # 6. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -55,7 +55,7 @@ log_info "Service: $RENDER_SERVICE_NAME (ID: $RENDER_SERVICE_ID)"
 echo ""
 
 # 7. Start OpenCode interactively
-log_warn "Starting OpenCode..."
+log_step "Starting OpenCode..."
 sleep 1
 clear
 interactive_session "source /root/.bashrc && opencode"

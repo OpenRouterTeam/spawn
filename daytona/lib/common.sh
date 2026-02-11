@@ -27,7 +27,7 @@ fi
 
 ensure_daytona_cli() {
     if ! command -v daytona &>/dev/null; then
-        log_warn "Installing Daytona CLI..."
+        log_step "Installing Daytona CLI..."
         if command -v brew &>/dev/null; then
             brew install daytonaio/cli/daytona 2>/dev/null || {
                 log_error "Failed to install Daytona CLI via Homebrew"
@@ -105,7 +105,7 @@ create_server() {
     if [[ ! "${memory}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_MEMORY: must be numeric"; return 1; fi
     if [[ ! "${disk}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_DISK: must be numeric"; return 1; fi
 
-    log_warn "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
+    log_step "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
 
     # Create sandbox with resource flags and auto-stop disabled
     local output
@@ -143,7 +143,7 @@ create_server() {
 }
 
 wait_for_cloud_init() {
-    log_warn "Installing base tools in sandbox..."
+    log_step "Installing base tools in sandbox..."
     run_server "apt-get update -y && apt-get install -y curl unzip git zsh" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
@@ -199,7 +199,7 @@ destroy_server() {
         log_warn "No sandbox ID to destroy"
         return 0
     fi
-    log_warn "Destroying sandbox ${sandbox_id}..."
+    log_step "Destroying sandbox ${sandbox_id}..."
     daytona delete "${sandbox_id}" 2>/dev/null || true
     log_info "Sandbox destroyed"
 }

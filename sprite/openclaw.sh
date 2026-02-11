@@ -19,13 +19,13 @@ ensure_sprite_authenticated
 SPRITE_NAME=$(get_sprite_name)
 ensure_sprite_exists "${SPRITE_NAME}"
 
-log_warn "Setting up sprite environment..."
+log_step "Setting up sprite environment..."
 
 # Configure shell environment
 setup_shell_environment "${SPRITE_NAME}"
 
 # Install openclaw using bun
-log_warn "Installing openclaw..."
+log_step "Installing openclaw..."
 run_sprite "${SPRITE_NAME}" "/.sprite/languages/bun/bin/bun install -g openclaw"
 
 # Get OpenRouter API key
@@ -39,7 +39,7 @@ fi
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_sprite "${SPRITE_NAME}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -51,11 +51,11 @@ setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" \
     "run_sprite ${SPRITE_NAME}"
 
 echo ""
-log_info "✅ Sprite setup completed successfully!"
+log_info "Sprite setup completed successfully!"
 echo ""
 
 # Start openclaw gateway in background and run openclaw tui
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 sprite exec -s "${SPRITE_NAME}" -- zsh -c "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
 sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && openclaw tui"

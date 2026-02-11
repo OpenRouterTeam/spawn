@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Claude Code
-log_warn "Installing Claude Code..."
+log_step "Installing Claude Code..."
 run_server "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation
@@ -43,7 +43,7 @@ else
 fi
 
 # 6. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_fly \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -55,7 +55,7 @@ inject_env_vars_fly \
     "PATH=\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH"
 
 # 7. Configure Claude Code settings
-log_warn "Configuring Claude Code..."
+log_step "Configuring Claude Code..."
 
 run_server "mkdir -p ~/.claude"
 
@@ -103,7 +103,7 @@ log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
 echo ""
 
 # 8. Start Claude Code interactively
-log_warn "Starting Claude Code..."
+log_step "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "export PATH=\$HOME/.local/bin:\$PATH && source ~/.bashrc && claude"

@@ -19,7 +19,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${UPCLOUD_SERVER_IP}"
 install_base_tools "${UPCLOUD_SERVER_IP}"
 
-log_warn "Installing openclaw..."
+log_step "Installing openclaw..."
 run_server "${UPCLOUD_SERVER_IP}" "source ~/.bashrc && bun install -g openclaw"
 log_info "OpenClaw installed"
 
@@ -32,7 +32,7 @@ fi
 
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${UPCLOUD_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -47,7 +47,7 @@ log_info "UpCloud server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (UUID: ${UPCLOUD_SERVER_UUID}, IP: ${UPCLOUD_SERVER_IP})"
 echo ""
 
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 run_server "${UPCLOUD_SERVER_IP}" "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
 interactive_session "${UPCLOUD_SERVER_IP}" "source ~/.zshrc && openclaw tui"

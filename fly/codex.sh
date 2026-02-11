@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Codex CLI
-log_warn "Installing Codex CLI..."
+log_step "Installing Codex CLI..."
 run_server "npm install -g @openai/codex"
 log_info "Codex CLI installed"
 
@@ -37,7 +37,7 @@ else
 fi
 
 # 6. Inject environment variables into shell config
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_fly \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -51,7 +51,7 @@ log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
 echo ""
 
 # 7. Start Codex interactively
-log_warn "Starting Codex..."
+log_step "Starting Codex..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && codex"

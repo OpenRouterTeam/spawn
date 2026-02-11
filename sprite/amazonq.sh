@@ -18,10 +18,10 @@ SPRITE_NAME=$(get_sprite_name)
 ensure_sprite_exists "${SPRITE_NAME}"
 verify_sprite_connectivity "${SPRITE_NAME}"
 
-log_warn "Setting up sprite environment..."
+log_step "Setting up sprite environment..."
 setup_shell_environment "${SPRITE_NAME}"
 
-log_warn "Installing Amazon Q CLI..."
+log_step "Installing Amazon Q CLI..."
 run_sprite "${SPRITE_NAME}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 
 echo ""
@@ -31,7 +31,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_sprite "${SPRITE_NAME}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -41,7 +41,7 @@ echo ""
 log_info "Sprite setup completed successfully!"
 echo ""
 
-log_warn "Starting Amazon Q..."
+log_step "Starting Amazon Q..."
 sleep 1
 clear
 sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && q chat"

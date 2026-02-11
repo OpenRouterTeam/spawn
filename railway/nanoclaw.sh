@@ -24,12 +24,12 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install tsx dependency
-log_warn "Installing tsx..."
+log_step "Installing tsx..."
 run_server "curl -fsSL https://bun.sh/install | bash && export PATH=\"\$HOME/.bun/bin:\$PATH\" && bun install -g tsx"
 log_info "tsx installed"
 
 # 5. Clone and build nanoclaw
-log_warn "Cloning and building nanoclaw..."
+log_step "Cloning and building nanoclaw..."
 run_server "git clone https://github.com/gavrielc/nanoclaw.git /root/nanoclaw && cd /root/nanoclaw && npm install && npm run build"
 log_info "NanoClaw installed"
 
@@ -42,7 +42,7 @@ else
 fi
 
 # 7. Inject environment variables into shell config
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -51,7 +51,7 @@ inject_env_vars \
     "PATH=\$HOME/.bun/bin:\$PATH"
 
 # 8. Create nanoclaw .env file
-log_warn "Configuring nanoclaw..."
+log_step "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
 trap 'rm -f "${DOTENV_TEMP}"' EXIT
@@ -68,7 +68,7 @@ log_info "Service: $RAILWAY_SERVICE_NAME"
 echo ""
 
 # 9. Start nanoclaw
-log_warn "Starting nanoclaw..."
+log_step "Starting nanoclaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 interactive_session "cd /root/nanoclaw && source /root/.bashrc && npm run dev"

@@ -22,7 +22,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${HOSTINGER_VPS_IP}"
 wait_for_cloud_init "${HOSTINGER_VPS_IP}" 60
 
-log_warn "Installing Gemini CLI..."
+log_step "Installing Gemini CLI..."
 run_server "${HOSTINGER_VPS_IP}" "npm install -g @google/gemini-cli"
 log_info "Gemini CLI installed"
 
@@ -33,7 +33,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${HOSTINGER_VPS_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -46,7 +46,7 @@ log_info "Hostinger VPS setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${HOSTINGER_VPS_ID}, IP: ${HOSTINGER_VPS_IP})"
 echo ""
 
-log_warn "Starting Gemini..."
+log_step "Starting Gemini..."
 sleep 1
 clear
 interactive_session "${HOSTINGER_VPS_IP}" "source ~/.zshrc && gemini"

@@ -30,7 +30,7 @@ ensure_railway_cli() {
         return 0
     fi
 
-    log_warn "Installing Railway CLI..."
+    log_step "Installing Railway CLI..."
 
     # Railway CLI is installed via npm
     if ! command -v npm &>/dev/null; then
@@ -77,7 +77,7 @@ get_server_name() {
 _railway_create_project() {
     local name="$1"
 
-    log_warn "Creating Railway project: $name"
+    log_step "Creating Railway project: $name"
 
     local project_output
     project_output=$(railway init -n "$name" 2>&1)
@@ -99,7 +99,7 @@ _railway_create_project() {
 # Deploy an Ubuntu container to the linked Railway project
 # Usage: _railway_deploy_container
 _railway_deploy_container() {
-    log_warn "Deploying service..."
+    log_step "Deploying service..."
 
     local temp_dir=$(mktemp -d)
     cat > "$temp_dir/Dockerfile" <<'EOF'
@@ -125,7 +125,7 @@ _railway_wait_for_deployment() {
     local max_attempts="${1:-60}"
     local attempt=0
 
-    log_warn "Waiting for service to deploy..."
+    log_step "Waiting for service to deploy..."
 
     while [[ $attempt -lt $max_attempts ]]; do
         local status
@@ -199,7 +199,7 @@ upload_file() {
 
 # Wait for system readiness (Railway containers start with Ubuntu base)
 wait_for_cloud_init() {
-    log_warn "Verifying system packages..."
+    log_step "Verifying system packages..."
 
     # Update package lists if needed
     run_server "apt-get update -qq >/dev/null 2>&1 || true" || {
@@ -212,7 +212,7 @@ wait_for_cloud_init() {
 # Inject environment variables into shell config
 # Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    log_warn "Injecting environment variables..."
+    log_step "Injecting environment variables..."
 
     local env_temp
     env_temp=$(mktemp)
@@ -241,7 +241,7 @@ interactive_session() {
 # Cleanup: delete the project
 cleanup_server() {
     if [[ -n "${RAILWAY_SERVICE_NAME:-}" ]]; then
-        log_warn "Deleting Railway project: $RAILWAY_SERVICE_NAME"
+        log_step "Deleting Railway project: $RAILWAY_SERVICE_NAME"
         railway delete --yes >/dev/null 2>&1 || true
     fi
 }

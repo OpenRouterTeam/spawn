@@ -33,7 +33,7 @@ verify_server_connectivity "${OVH_SERVER_IP}"
 install_base_deps "${OVH_SERVER_IP}"
 
 # 7. Install Cline
-log_warn "Installing Cline..."
+log_step "Installing Cline..."
 run_ovh "${OVH_SERVER_IP}" "npm install -g cline"
 log_info "Cline installed"
 
@@ -45,7 +45,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ovh "${OVH_SERVER_IP}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -57,7 +57,7 @@ log_info "Instance: ${SERVER_NAME} (ID: ${OVH_INSTANCE_ID}, IP: ${OVH_SERVER_IP}
 echo ""
 
 # 9. Start Cline interactively
-log_warn "Starting Cline..."
+log_step "Starting Cline..."
 sleep 1
 clear
 interactive_session "${OVH_SERVER_IP}" "source ~/.zshrc && cline"

@@ -28,7 +28,7 @@ verify_server_connectivity "${DO_SERVER_IP}"
 wait_for_cloud_init "${DO_SERVER_IP}" 60
 
 # 5. Install Goose
-log_warn "Installing Goose..."
+log_step "Installing Goose..."
 run_server "${DO_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 log_info "Goose installed"
 
@@ -40,7 +40,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${DO_SERVER_IP}" upload_file run_server \
     "GOOSE_PROVIDER=openrouter" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -51,7 +51,7 @@ log_info "Droplet: ${DROPLET_NAME} (ID: ${DO_DROPLET_ID}, IP: ${DO_SERVER_IP})"
 echo ""
 
 # 8. Start Goose interactively
-log_warn "Starting Goose..."
+log_step "Starting Goose..."
 sleep 1
 clear
 interactive_session "${DO_SERVER_IP}" "source ~/.zshrc && goose"

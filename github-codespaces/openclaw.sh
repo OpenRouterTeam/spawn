@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install bun and openclaw
-log_warn "Installing bun..."
+log_step "Installing bun..."
 run_server "curl -fsSL https://bun.sh/install | bash && export BUN_INSTALL=\$HOME/.bun && export PATH=\$BUN_INSTALL/bin:\$PATH && bun install -g openclaw"
 log_info "openclaw installed"
 
@@ -60,7 +60,7 @@ inject_env_vars \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 8. Setup openclaw config
-log_warn "Configuring openclaw..."
+log_step "Configuring openclaw..."
 CONFIG_TEMP=$(mktemp)
 chmod 600 "${CONFIG_TEMP}"
 track_temp_file "${CONFIG_TEMP}"
@@ -81,7 +81,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 9. Start openclaw gateway in background, then TUI
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

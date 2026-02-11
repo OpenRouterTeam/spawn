@@ -30,7 +30,7 @@ verify_server_connectivity "${LIGHTSAIL_SERVER_IP}"
 wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}" 60
 
 # 5. Install Plandex
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 run_server "${LIGHTSAIL_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | bash"
 log_info "Plandex installed"
 
@@ -43,7 +43,7 @@ else
 fi
 
 # 7. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${LIGHTSAIL_INSTANCE_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -54,7 +54,7 @@ log_info "Instance: ${SERVER_NAME} (IP: ${LIGHTSAIL_SERVER_IP})"
 echo ""
 
 # 8. Start Plandex interactively
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "${LIGHTSAIL_SERVER_IP}" "source ~/.zshrc && plandex"

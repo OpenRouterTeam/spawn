@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Gemini CLI
-log_warn "Installing Gemini CLI..."
+log_step "Installing Gemini CLI..."
 run_server "npm install -g @google/gemini-cli"
 log_info "Gemini CLI installed"
 
@@ -37,7 +37,7 @@ else
 fi
 
 # 6. Inject environment variables into ~/.bashrc and ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_fly \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -52,7 +52,7 @@ log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
 echo ""
 
 # 7. Start Gemini interactively
-log_warn "Starting Gemini..."
+log_step "Starting Gemini..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && gemini"

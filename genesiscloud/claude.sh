@@ -20,9 +20,9 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${GENESIS_SERVER_IP}"
 wait_for_cloud_init "${GENESIS_SERVER_IP}" 60
 
-log_warn "Verifying Claude Code installation..."
+log_step "Verifying Claude Code installation..."
 if ! run_server "${GENESIS_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_warn "Claude Code not found, installing manually..."
+    log_step "Claude Code not found, installing manually..."
     run_server "${GENESIS_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
 log_info "Claude Code is installed"
@@ -34,7 +34,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${GENESIS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
@@ -52,7 +52,7 @@ log_info "Genesis Cloud server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${GENESIS_SERVER_ID}, IP: ${GENESIS_SERVER_IP})"
 echo ""
 
-log_warn "Starting Claude Code..."
+log_step "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${GENESIS_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

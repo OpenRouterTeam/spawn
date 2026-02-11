@@ -22,7 +22,7 @@ create_server "${DROPLET_NAME}"
 verify_server_connectivity "${DO_SERVER_IP}"
 wait_for_cloud_init "${DO_SERVER_IP}" 60
 
-log_warn "Installing Cline..."
+log_step "Installing Cline..."
 run_server "${DO_SERVER_IP}" "npm install -g cline"
 log_info "Cline installed"
 
@@ -33,7 +33,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${DO_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -45,7 +45,7 @@ log_info "DigitalOcean droplet setup completed successfully!"
 log_info "Droplet: ${DROPLET_NAME} (ID: ${DO_DROPLET_ID}, IP: ${DO_SERVER_IP})"
 echo ""
 
-log_warn "Starting Cline..."
+log_step "Starting Cline..."
 sleep 1
 clear
 interactive_session "${DO_SERVER_IP}" "source ~/.zshrc && cline"

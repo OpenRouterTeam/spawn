@@ -26,7 +26,7 @@ fi
 if command -v codex &>/dev/null; then
     log_info "Codex already installed"
 else
-    log_warn "Installing Codex..."
+    log_step "Installing Codex..."
     npm install -g @openai/codex
 fi
 
@@ -60,11 +60,11 @@ echo ""
 
 # 6. Start Codex
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_warn "Executing Codex with prompt..."
+    log_step "Executing Codex with prompt..."
     source ~/.zshrc 2>/dev/null || true
     codex -m "${SPAWN_PROMPT}"
 else
-    log_warn "Starting Codex..."
+    log_step "Starting Codex..."
     sleep 1
     clear 2>/dev/null || true
     source ~/.zshrc 2>/dev/null || true

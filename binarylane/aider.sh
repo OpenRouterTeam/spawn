@@ -20,7 +20,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${BINARYLANE_SERVER_IP}"
 wait_for_cloud_init "${BINARYLANE_SERVER_IP}" 60
 
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "${BINARYLANE_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 
 if ! run_server "${BINARYLANE_SERVER_IP}" "command -v aider &> /dev/null && aider --version &> /dev/null"; then
@@ -38,7 +38,7 @@ fi
 
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${BINARYLANE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -47,7 +47,7 @@ log_info "BinaryLane server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${BINARYLANE_SERVER_ID}, IP: ${BINARYLANE_SERVER_IP})"
 echo ""
 
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "${BINARYLANE_SERVER_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

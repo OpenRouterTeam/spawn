@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install kilocode
-log_warn "Installing kilocode..."
+log_step "Installing kilocode..."
 run_server "npm install -g @kilocode/cli"
 log_info "kilocode installed"
 
@@ -62,7 +62,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start kilocode interactively
-log_warn "Starting kilocode..."
+log_step "Starting kilocode..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

@@ -33,10 +33,10 @@ verify_server_connectivity "${GCP_SERVER_IP}"
 wait_for_cloud_init "${GCP_SERVER_IP}" 60
 
 # 5. Install Node.js deps and clone nanoclaw
-log_warn "Installing tsx..."
+log_step "Installing tsx..."
 run_server "${GCP_SERVER_IP}" "source ~/.bashrc && bun install -g tsx"
 
-log_warn "Cloning and building nanoclaw..."
+log_step "Cloning and building nanoclaw..."
 run_server "${GCP_SERVER_IP}" "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
 log_info "NanoClaw installed"
 
@@ -49,7 +49,7 @@ else
 fi
 
 # 7. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -57,7 +57,7 @@ inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 8. Create nanoclaw .env file
-log_warn "Configuring nanoclaw..."
+log_step "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
 cat > "${DOTENV_TEMP}" << EOF
@@ -72,7 +72,7 @@ log_info "Instance: ${GCP_INSTANCE_NAME_ACTUAL} (Zone: ${GCP_ZONE}, IP: ${GCP_SE
 echo ""
 
 # 9. Start nanoclaw
-log_warn "Starting nanoclaw..."
+log_step "Starting nanoclaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 interactive_session "${GCP_SERVER_IP}" "cd ~/nanoclaw && source ~/.zshrc && npm run dev"

@@ -30,7 +30,7 @@ ensure_koyeb_cli() {
         return 0
     fi
 
-    log_warn "Installing Koyeb CLI..."
+    log_step "Installing Koyeb CLI..."
 
     # Detect OS and architecture
     local os=""
@@ -97,7 +97,7 @@ get_server_name() {
 # Usage: _koyeb_create_app APP_NAME
 _koyeb_create_app() {
     local app_name="$1"
-    log_warn "Creating Koyeb app: $app_name"
+    log_step "Creating Koyeb app: $app_name"
     if ! koyeb app create "$app_name" >/dev/null 2>&1; then
         log_error "Failed to create Koyeb app"
         return 1
@@ -111,7 +111,7 @@ _koyeb_create_service() {
     local app_name="$1"
     local service_name="$2"
 
-    log_warn "Creating Koyeb service: $service_name"
+    log_step "Creating Koyeb service: $service_name"
 
     local create_output
     create_output=$(koyeb service create "$service_name" \
@@ -147,7 +147,7 @@ _koyeb_wait_for_service() {
     local max_attempts=${2:-60}
     local attempt=0
 
-    log_warn "Waiting for service to deploy..."
+    log_step "Waiting for service to deploy..."
     while [[ $attempt -lt $max_attempts ]]; do
         local status
         status=$(koyeb service get "$service_id" 2>/dev/null | grep "Status:" | awk '{print $2}')
@@ -241,7 +241,7 @@ upload_file() {
 
 # Wait for cloud-init or basic system readiness
 wait_for_cloud_init() {
-    log_warn "Installing base tools..."
+    log_step "Installing base tools..."
 
     # Update package lists and install essentials
     run_server "apt-get update -qq && apt-get install -y -qq curl wget git python3 python3-pip build-essential ca-certificates" || {

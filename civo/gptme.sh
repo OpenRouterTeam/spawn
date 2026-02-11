@@ -19,10 +19,10 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${CIVO_SERVER_IP}"
 
-log_warn "Waiting for cloud-init to complete..."
+log_step "Waiting for cloud-init to complete..."
 generic_ssh_wait "root" "${CIVO_SERVER_IP}" "${SSH_OPTS} -o ConnectTimeout=5" "test -f /root/.cloud-init-complete" "cloud-init" 60 5
 
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_server "${CIVO_SERVER_IP}" "pip install gptme 2>/dev/null || pip3 install gptme"
 
 # Verify installation succeeded
@@ -43,7 +43,7 @@ fi
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CIVO_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -52,7 +52,7 @@ log_info "Civo instance setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${CIVO_SERVER_ID}, IP: ${CIVO_SERVER_IP})"
 echo ""
 
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 interactive_session "${CIVO_SERVER_IP}" "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"

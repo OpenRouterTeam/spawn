@@ -30,7 +30,7 @@ verify_server_connectivity "${LIGHTSAIL_SERVER_IP}"
 wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}" 60
 
 # 5. Install Aider
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "${LIGHTSAIL_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 log_info "Aider installed"
 
@@ -50,7 +50,7 @@ MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
 
 # 8. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${LIGHTSAIL_INSTANCE_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -61,7 +61,7 @@ log_info "Instance: ${SERVER_NAME} (IP: ${LIGHTSAIL_SERVER_IP})"
 echo ""
 
 # 9. Start Aider interactively
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "${LIGHTSAIL_SERVER_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

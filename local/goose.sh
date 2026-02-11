@@ -19,7 +19,7 @@ ensure_local_ready
 if command -v goose &>/dev/null; then
     log_info "Goose already installed"
 else
-    log_warn "Installing Goose..."
+    log_step "Installing Goose..."
     CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash
 fi
 
@@ -52,12 +52,12 @@ echo ""
 
 # 5. Start Goose
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_warn "Executing Goose with prompt..."
+    log_step "Executing Goose with prompt..."
     export PATH="${HOME}/.local/bin:${PATH}"
     source ~/.zshrc 2>/dev/null || true
     goose -m "${SPAWN_PROMPT}"
 else
-    log_warn "Starting Goose..."
+    log_step "Starting Goose..."
     sleep 1
     clear 2>/dev/null || true
     export PATH="${HOME}/.local/bin:${PATH}"

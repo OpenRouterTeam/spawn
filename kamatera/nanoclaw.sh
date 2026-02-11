@@ -19,10 +19,10 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${KAMATERA_SERVER_IP}"
 
-log_warn "Waiting for init script to complete..."
+log_step "Waiting for init script to complete..."
 generic_ssh_wait "root" "${KAMATERA_SERVER_IP}" "${SSH_OPTS} -o ConnectTimeout=5" "test -f /root/.cloud-init-complete" "init script" 60 5
 
-log_warn "Installing NanoClaw..."
+log_step "Installing NanoClaw..."
 run_server "${KAMATERA_SERVER_IP}" "source ~/.bashrc && npm install -g tsx && git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
 log_info "NanoClaw installed"
 
@@ -33,7 +33,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${KAMATERA_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -47,7 +47,7 @@ log_info "Kamatera server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (IP: ${KAMATERA_SERVER_IP})"
 echo ""
 
-log_warn "Starting NanoClaw..."
+log_step "Starting NanoClaw..."
 sleep 1
 clear
 interactive_session "${KAMATERA_SERVER_IP}" "source ~/.zshrc && cd ~/nanoclaw && npm run dev"

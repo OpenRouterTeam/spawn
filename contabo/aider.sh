@@ -28,7 +28,7 @@ verify_server_connectivity "${CONTABO_SERVER_IP}"
 wait_for_cloud_init "${CONTABO_SERVER_IP}" 60
 
 # 5. Install Aider
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "${CONTABO_SERVER_IP}" "pip install aider-chat"
 
 # 6. Get OpenRouter API key
@@ -45,7 +45,7 @@ printf "Enter model ID [openrouter/auto]: "
 MODEL_ID=$(safe_read) || MODEL_ID=""
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CONTABO_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -55,7 +55,7 @@ log_info "Instance: ${SERVER_NAME} (ID: ${CONTABO_INSTANCE_ID}, IP: ${CONTABO_SE
 echo ""
 
 # 8. Start Aider interactively
-log_warn "Starting Aider with model: ${MODEL_ID}..."
+log_step "Starting Aider with model: ${MODEL_ID}..."
 sleep 1
 clear
 interactive_session "${CONTABO_SERVER_IP}" "source ~/.zshrc && aider --model ${MODEL_ID}"

@@ -31,7 +31,7 @@ verify_server_connectivity "${LATITUDE_SERVER_IP}"
 # 6. Install base tools and Claude Code
 install_base_tools "${LATITUDE_SERVER_IP}"
 
-log_warn "Installing Claude Code..."
+log_step "Installing Claude Code..."
 run_server "${LATITUDE_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation succeeded
@@ -50,7 +50,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${LATITUDE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
@@ -70,7 +70,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${LATITUDE_SERVER_ID}, IP: ${LATITUDE_SERV
 echo ""
 
 # 9. Start Claude Code interactively
-log_warn "Starting Claude Code..."
+log_step "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${LATITUDE_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Gemini CLI
-log_warn "Installing Gemini CLI..."
+log_step "Installing Gemini CLI..."
 run_server "npm install -g @google/gemini-cli"
 log_info "Gemini CLI installed"
 
@@ -37,7 +37,7 @@ else
 fi
 
 # 6. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -51,7 +51,7 @@ log_info "Service: $RAILWAY_SERVICE_NAME"
 echo ""
 
 # 7. Start Gemini interactively
-log_warn "Starting Gemini CLI..."
+log_step "Starting Gemini CLI..."
 sleep 1
 clear
 interactive_session "source /root/.bashrc && gemini"

@@ -17,7 +17,7 @@ ensure_local_ready
 
 # 2. Install bun if not available
 if ! command -v bun &>/dev/null; then
-    log_warn "Installing bun..."
+    log_step "Installing bun..."
     curl -fsSL https://bun.sh/install | bash
     export PATH="${HOME}/.bun/bin:${PATH}"
 fi
@@ -26,7 +26,7 @@ fi
 if command -v openclaw &>/dev/null; then
     log_info "OpenClaw already installed"
 else
-    log_warn "Installing openclaw..."
+    log_step "Installing openclaw..."
     bun install -g openclaw
 fi
 
@@ -58,7 +58,7 @@ log_info "Local setup completed successfully!"
 echo ""
 
 # 8. Start openclaw gateway and TUI
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 source ~/.zshrc 2>/dev/null || true
 nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &
 sleep 2

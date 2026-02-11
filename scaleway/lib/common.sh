@@ -119,7 +119,7 @@ if images:
 
 # Get Ubuntu image ID for the current zone
 get_ubuntu_image_id() {
-    log_warn "Looking up Ubuntu image for zone ${SCALEWAY_ZONE}..."
+    log_step "Looking up Ubuntu image for zone ${SCALEWAY_ZONE}..."
 
     # Try specific 24.04 search first, then broader Ubuntu search
     local image_id="" query
@@ -235,7 +235,7 @@ _scaleway_power_on_and_wait() {
         log_warn "Power on may have failed, checking status..."
     fi
 
-    log_warn "Waiting for instance to become active..."
+    log_step "Waiting for instance to become active..."
     local max_attempts=60
     local attempt=1
     while [[ "$attempt" -le "$max_attempts" ]]; do
@@ -271,7 +271,7 @@ create_server() {
     validate_resource_name "$commercial_type" || { log_error "Invalid SCALEWAY_TYPE"; return 1; }
     validate_region_name "$zone" || { log_error "Invalid SCALEWAY_ZONE"; return 1; }
 
-    log_warn "Creating Scaleway instance '$name' (type: $commercial_type, zone: $zone)..."
+    log_step "Creating Scaleway instance '$name' (type: $commercial_type, zone: $zone)..."
 
     local project_id
     project_id=$(get_scaleway_project_id) || return 1
@@ -322,17 +322,17 @@ wait_for_server_ready() {
     local ip="$1"
     local max_attempts=${2:-60}
     # Scaleway doesn't use cloud-init by default, so we wait for basic tools
-    log_warn "Waiting for server to be ready..."
+    log_step "Waiting for server to be ready..."
     generic_ssh_wait "root" "$ip" "$SSH_OPTS -o ConnectTimeout=5" "command -v curl" "server readiness" "$max_attempts" 5
 }
 
 install_base_packages() {
     local ip="$1"
-    log_warn "Installing base packages..."
+    log_step "Installing base packages..."
     run_server "$ip" "apt-get update -qq && apt-get install -y -qq curl unzip git zsh >/dev/null 2>&1"
-    log_warn "Installing Bun..."
+    log_step "Installing Bun..."
     run_server "$ip" "curl -fsSL https://bun.sh/install | bash"
-    log_warn "Installing Node.js..."
+    log_step "Installing Node.js..."
     run_server "$ip" "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y -qq nodejs >/dev/null 2>&1"
     # Set up PATH in shell configs
     run_server "$ip" "printf 'export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"\n' >> /root/.bashrc"
@@ -347,7 +347,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_id="$1"
-    log_warn "Destroying instance $server_id..."
+    log_step "Destroying instance $server_id..."
 
     # Scaleway requires powering off before deleting
     scaleway_instance_api POST "/servers/$server_id/action" '{"action":"poweroff"}' >/dev/null 2>&1 || true

@@ -160,7 +160,7 @@ create_server() {
     validate_region_name "$region" || { log_error "Invalid VULTR_REGION"; return 1; }
     if [[ ! "$os_id" =~ ^[0-9]+$ ]]; then log_error "Invalid VULTR_OS_ID: must be numeric"; return 1; fi
 
-    log_warn "Creating Vultr instance '$name' (plan: $plan, region: $region)..."
+    log_step "Creating Vultr instance '$name' (plan: $plan, region: $region)..."
 
     # Get all SSH key IDs
     local ssh_keys_response
@@ -208,7 +208,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_id="$1"
-    log_warn "Destroying instance $server_id..."
+    log_step "Destroying instance $server_id..."
     vultr_api DELETE "/instances/$server_id"
     log_info "Instance $server_id destroyed"
 }

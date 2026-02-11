@@ -11,20 +11,20 @@ SERVER_NAME=$(get_server_name)
 create_server "$SERVER_NAME"
 verify_server_connectivity "$LINODE_SERVER_IP"
 wait_for_cloud_init "$LINODE_SERVER_IP"
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_server "$LINODE_SERVER_IP" "pip install gptme 2>/dev/null || pip3 install gptme"
 log_info "gptme installed"
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "$LINODE_SERVER_IP" upload_file run_server \
     "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 echo ""
 log_info "Linode setup completed successfully!"
 echo ""
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 interactive_session "$LINODE_SERVER_IP" "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"

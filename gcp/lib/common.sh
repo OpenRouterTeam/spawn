@@ -90,7 +90,7 @@ create_server() {
     validate_resource_name "${machine_type}" || { log_error "Invalid GCP_MACHINE_TYPE"; return 1; }
     validate_region_name "${zone}" || { log_error "Invalid GCP_ZONE"; return 1; }
 
-    log_warn "Creating GCP instance '${name}' (type: ${machine_type}, zone: ${zone})..."
+    log_step "Creating GCP instance '${name}' (type: ${machine_type}, zone: ${zone})..."
 
     local userdata
     userdata=$(get_cloud_init_userdata)
@@ -165,7 +165,7 @@ interactive_session() {
 destroy_server() {
     local name="${1}"
     local zone="${GCP_ZONE:-us-central1-a}"
-    log_warn "Destroying GCP instance ${name}..."
+    log_step "Destroying GCP instance ${name}..."
     gcloud compute instances delete "${name}" --zone="${zone}" --project="${GCP_PROJECT}" --quiet >/dev/null 2>&1
     log_info "Instance ${name} destroyed"
 }

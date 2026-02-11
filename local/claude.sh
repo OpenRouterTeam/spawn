@@ -19,7 +19,7 @@ ensure_local_ready
 if command -v claude &>/dev/null; then
     log_info "Claude Code already installed"
 else
-    log_warn "Installing Claude Code..."
+    log_step "Installing Claude Code..."
     curl -fsSL https://claude.ai/install.sh | bash
     export PATH="${HOME}/.local/bin:${PATH}"
 fi
@@ -62,12 +62,12 @@ echo ""
 
 # 6. Start Claude Code
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_warn "Executing Claude Code with prompt..."
+    log_step "Executing Claude Code with prompt..."
     export PATH="${HOME}/.local/bin:${PATH}"
     source ~/.zshrc 2>/dev/null || true
     claude -p "${SPAWN_PROMPT}"
 else
-    log_warn "Starting Claude Code..."
+    log_step "Starting Claude Code..."
     sleep 1
     clear 2>/dev/null || true
     export PATH="${HOME}/.local/bin:${PATH}"

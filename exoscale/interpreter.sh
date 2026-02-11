@@ -20,7 +20,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${EXOSCALE_SERVER_IP}"
 wait_for_cloud_init "${EXOSCALE_SERVER_IP}" 60
 
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_server "${EXOSCALE_SERVER_IP}" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 log_info "Open Interpreter installed"
 
@@ -31,7 +31,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${EXOSCALE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -42,7 +42,7 @@ log_info "Exoscale server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${EXOSCALE_SERVER_ID}, IP: ${EXOSCALE_SERVER_IP})"
 echo ""
 
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "${EXOSCALE_SERVER_IP}" "source ~/.zshrc && interpreter"

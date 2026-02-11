@@ -34,7 +34,7 @@ ensure_exo_cli() {
         return 0
     fi
 
-    log_warn "exo CLI not found, installing..."
+    log_step "exo CLI not found, installing..."
 
     # Detect OS and architecture
     local os arch exo_url
@@ -56,7 +56,7 @@ ensure_exo_cli() {
     local version="1.90.1"
     exo_url="https://github.com/exoscale/cli/releases/download/v${version}/exoscale-cli_${version}_${os}_${arch}.tar.gz"
 
-    log_warn "Downloading exo CLI from GitHub..."
+    log_step "Downloading exo CLI from GitHub..."
     local temp_dir
     temp_dir=$(mktemp -d)
     if ! curl -fsSL "$exo_url" -o "${temp_dir}/exo.tar.gz"; then
@@ -143,7 +143,7 @@ exoscale_register_ssh_key() {
     local key_name="$1"
     local pub_path="$2"
 
-    log_warn "Registering SSH key '$key_name' with Exoscale..."
+    log_step "Registering SSH key '$key_name' with Exoscale..."
     if exo compute ssh-key register "$key_name" "$pub_path"; then
         log_info "SSH key registered successfully"
         return 0
@@ -180,7 +180,7 @@ _wait_for_exoscale_instance() {
     local max_attempts=${2:-60}
     local attempt=1
 
-    log_warn "Waiting for instance to become running..."
+    log_step "Waiting for instance to become running..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
         local status_json
         status_json=$(exo compute instance show "$instance_id" -O json 2>/dev/null || echo '{}')
@@ -240,7 +240,7 @@ create_server() {
     validate_resource_name "$instance_type" || { log_error "Invalid EXOSCALE_INSTANCE_TYPE"; return 1; }
     validate_region_name "$zone" || { log_error "Invalid EXOSCALE_ZONE"; return 1; }
 
-    log_warn "Creating Exoscale instance '$name' (type: $instance_type, zone: $zone)..."
+    log_step "Creating Exoscale instance '$name' (type: $instance_type, zone: $zone)..."
 
     local ssh_key_name="spawn-${USER}-$(hostname)"
 
@@ -281,7 +281,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_id="$1"
-    log_warn "Destroying instance $server_id..."
+    log_step "Destroying instance $server_id..."
     exo compute instance delete "$server_id" --force
     log_info "Instance $server_id destroyed"
 }

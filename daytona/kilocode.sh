@@ -26,7 +26,7 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # 4. Install Kilo Code
-log_warn "Installing Kilo Code..."
+log_step "Installing Kilo Code..."
 run_server "npm install -g @kilocode/cli"
 log_info "Kilo Code installed"
 
@@ -39,7 +39,7 @@ else
 fi
 
 # 6. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -52,7 +52,7 @@ log_info "Sandbox: ${SERVER_NAME} (ID: ${DAYTONA_SANDBOX_ID})"
 echo ""
 
 # 7. Start Kilo Code interactively
-log_warn "Starting Kilo Code..."
+log_step "Starting Kilo Code..."
 sleep 1
 clear
 interactive_session "source ~/.zshrc && kilocode"

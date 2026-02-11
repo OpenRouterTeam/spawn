@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install amazon q
-log_warn "Installing Amazon Q CLI..."
+log_step "Installing Amazon Q CLI..."
 run_server "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 log_info "Amazon Q CLI installed"
 
@@ -62,7 +62,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start amazon q interactively
-log_warn "Starting Amazon Q CLI..."
+log_step "Starting Amazon Q CLI..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

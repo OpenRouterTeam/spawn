@@ -22,7 +22,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${GCP_SERVER_IP}"
 wait_for_cloud_init "${GCP_SERVER_IP}" 60
 
-log_warn "Installing Continue CLI..."
+log_step "Installing Continue CLI..."
 run_server "${GCP_SERVER_IP}" "npm install -g @continuedev/cli"
 log_info "Continue installed"
 
@@ -33,7 +33,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -47,7 +47,7 @@ log_info "GCP instance setup completed successfully!"
 log_info "Instance: ${SERVER_NAME} (IP: ${GCP_SERVER_IP})"
 echo ""
 
-log_warn "Starting Continue CLI in TUI mode..."
+log_step "Starting Continue CLI in TUI mode..."
 sleep 1
 clear
 interactive_session "${GCP_SERVER_IP}" "source ~/.zshrc && cn"

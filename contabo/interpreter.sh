@@ -20,7 +20,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${CONTABO_SERVER_IP}"
 wait_for_cloud_init "${CONTABO_SERVER_IP}" 60
 
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_server "${CONTABO_SERVER_IP}" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 log_info "Open Interpreter installed"
 
@@ -31,7 +31,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CONTABO_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -42,7 +42,7 @@ log_info "Contabo server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${CONTABO_INSTANCE_ID}, IP: ${CONTABO_SERVER_IP})"
 echo ""
 
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "${CONTABO_SERVER_IP}" "source ~/.zshrc && interpreter"

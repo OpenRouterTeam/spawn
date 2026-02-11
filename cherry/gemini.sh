@@ -28,7 +28,7 @@ verify_server_connectivity "${CHERRY_SERVER_IP}"
 wait_for_cloud_init "${CHERRY_SERVER_IP}" 60
 
 # 5. Install Gemini CLI
-log_warn "Installing Gemini CLI..."
+log_step "Installing Gemini CLI..."
 run_server "${CHERRY_SERVER_IP}" "npm install -g @google/gemini-cli"
 log_info "Gemini CLI installed"
 
@@ -40,7 +40,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CHERRY_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -53,7 +53,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${CHERRY_SERVER_ID}, IP: ${CHERRY_SERVER_I
 echo ""
 
 # 7. Start Gemini interactively
-log_warn "Starting Gemini..."
+log_step "Starting Gemini..."
 sleep 1
 clear
 interactive_session "${CHERRY_SERVER_IP}" "source ~/.zshrc && gemini"

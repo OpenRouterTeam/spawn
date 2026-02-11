@@ -219,7 +219,7 @@ create_server() {
         return 1
     fi
 
-    log_warn "Creating Contabo instance '$name' (product: $product_id, region: $region)..."
+    log_step "Creating Contabo instance '$name' (product: $product_id, region: $region)..."
 
     local ssh_secret_ids
     ssh_secret_ids=$(_contabo_get_ssh_secret_ids)
@@ -264,7 +264,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local instance_id="$1"
 
-    log_warn "Destroying instance $instance_id..."
+    log_step "Destroying instance $instance_id..."
     local response
     response=$(contabo_api DELETE "/compute/instances/$instance_id")
 

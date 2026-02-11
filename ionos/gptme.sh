@@ -28,7 +28,7 @@ verify_server_connectivity "${IONOS_SERVER_IP}"
 wait_for_cloud_init "${IONOS_SERVER_IP}" 60
 
 # 5. Install gptme
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 if ! run_server "${IONOS_SERVER_IP}" "command -v gptme" >/dev/null 2>&1; then
     run_server "${IONOS_SERVER_IP}" "pip install gptme 2>/dev/null || pip3 install gptme"
 fi
@@ -52,7 +52,7 @@ fi
 # 7. Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -62,7 +62,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP}
 echo ""
 
 # 8. Start gptme interactively
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 interactive_session "${IONOS_SERVER_IP}" "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"

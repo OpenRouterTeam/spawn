@@ -20,7 +20,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${SCALEWAY_SERVER_IP}"
 install_base_packages "${SCALEWAY_SERVER_IP}"
 
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_server "${SCALEWAY_SERVER_IP}" "pip install gptme 2>/dev/null || pip3 install gptme"
 log_info "gptme installed"
 
@@ -33,7 +33,7 @@ fi
 
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${SCALEWAY_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -42,7 +42,7 @@ log_info "Scaleway instance setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${SCALEWAY_SERVER_ID}, IP: ${SCALEWAY_SERVER_IP})"
 echo ""
 
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 interactive_session "${SCALEWAY_SERVER_IP}" "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"

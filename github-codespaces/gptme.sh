@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install gptme
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_server "pip install gptme 2>/dev/null || pip3 install gptme"
 log_info "gptme installed"
 
@@ -63,7 +63,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 8. Start gptme interactively
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

@@ -21,7 +21,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${SCALEWAY_SERVER_IP}"
 install_base_packages "${SCALEWAY_SERVER_IP}"
 
-log_warn "Installing Amazon Q CLI..."
+log_step "Installing Amazon Q CLI..."
 run_server "${SCALEWAY_SERVER_IP}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 log_info "Amazon Q CLI installed"
 
@@ -32,7 +32,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${SCALEWAY_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -43,7 +43,7 @@ log_info "Scaleway instance setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${SCALEWAY_SERVER_ID}, IP: ${SCALEWAY_SERVER_IP})"
 echo ""
 
-log_warn "Starting Amazon Q..."
+log_step "Starting Amazon Q..."
 sleep 1
 clear
 interactive_session "${SCALEWAY_SERVER_IP}" "source ~/.zshrc && q chat"

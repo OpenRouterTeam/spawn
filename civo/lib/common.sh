@@ -269,7 +269,7 @@ create_server() {
     validate_resource_name "$size" || { log_error "Invalid CIVO_SIZE"; return 1; }
     validate_region_name "$region" || { log_error "Invalid CIVO_REGION"; return 1; }
 
-    log_warn "Creating Civo instance '$name' (size: $size, region: $region)..."
+    log_step "Creating Civo instance '$name' (size: $size, region: $region)..."
 
     # Gather required resource IDs
     local network_id template_id ssh_key_id
@@ -308,7 +308,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local server_id="$1"
     local region="${CIVO_REGION:-lon1}"
-    log_warn "Destroying instance $server_id..."
+    log_step "Destroying instance $server_id..."
     civo_api DELETE "/instances/$server_id?region=$region"
     log_info "Instance $server_id destroyed"
 }

@@ -26,7 +26,7 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # 4. Install Plandex
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 run_server "curl -sL https://plandex.ai/install.sh | bash"
 log_info "Plandex installed"
 
@@ -39,7 +39,7 @@ else
 fi
 
 # 6. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -50,7 +50,7 @@ log_info "Sandbox: ${SERVER_NAME} (ID: ${DAYTONA_SANDBOX_ID})"
 echo ""
 
 # 7. Start Plandex interactively
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "source ~/.zshrc && plandex"

@@ -20,10 +20,10 @@ SPRITE_NAME=$(get_sprite_name)
 ensure_sprite_exists "${SPRITE_NAME}"
 verify_sprite_connectivity "${SPRITE_NAME}"
 
-log_warn "Setting up sprite environment..."
+log_step "Setting up sprite environment..."
 setup_shell_environment "${SPRITE_NAME}"
 
-log_warn "Installing OpenCode..."
+log_step "Installing OpenCode..."
 run_sprite "${SPRITE_NAME}" "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 
@@ -35,7 +35,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_sprite "${SPRITE_NAME}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -44,7 +44,7 @@ log_info "Sprite setup completed successfully!"
 echo ""
 
 # Start OpenCode interactively
-log_warn "Starting OpenCode..."
+log_step "Starting OpenCode..."
 sleep 1
 clear
 sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && opencode"

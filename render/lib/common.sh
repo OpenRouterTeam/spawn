@@ -30,7 +30,7 @@ ensure_render_cli() {
         return 0
     fi
 
-    log_warn "Installing Render CLI..."
+    log_step "Installing Render CLI..."
 
     # Render CLI installation via npm
     local node_runtime
@@ -90,7 +90,7 @@ get_server_name() {
 # Sets: RENDER_SERVICE_ID
 _render_create_service() {
     local service_name="$1"
-    log_warn "Creating Render web service: $service_name"
+    log_step "Creating Render web service: $service_name"
 
     # Build JSON body safely via Python to prevent injection
     local body
@@ -146,7 +146,7 @@ _render_wait_for_service() {
     local max_attempts=${2:-60}
     local attempt=0
 
-    log_warn "Waiting for service to be live..."
+    log_step "Waiting for service to be live..."
     while [[ $attempt -lt $max_attempts ]]; do
         local status
         status=$(curl -s "https://api.render.com/v1/services/${service_id}" \

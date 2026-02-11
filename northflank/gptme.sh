@@ -21,7 +21,7 @@ PROJECT_NAME=$(get_project_name)
 create_server "${SERVICE_NAME}"
 wait_for_cloud_init
 
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_server "pip install gptme 2>/dev/null || pip3 install gptme"
 
 # Verify installation
@@ -42,7 +42,7 @@ fi
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_northflank \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -50,7 +50,7 @@ echo ""
 log_info "Northflank service setup completed successfully!"
 echo ""
 
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && gptme -m openrouter/${MODEL_ID}"

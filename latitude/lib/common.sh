@@ -229,7 +229,7 @@ create_server() {
     validate_region_name "$site" || { log_error "Invalid LATITUDE_SITE"; return 1; }
     validate_resource_name "$os" || { log_error "Invalid LATITUDE_OS"; return 1; }
 
-    log_warn "Creating Latitude.sh server '$hostname' (plan: $plan, site: $site)..."
+    log_step "Creating Latitude.sh server '$hostname' (plan: $plan, site: $site)..."
 
     # Get project ID
     local project_id
@@ -266,7 +266,7 @@ create_server() {
     export LATITUDE_SERVER_ID
 
     log_info "Server created: ID=$LATITUDE_SERVER_ID"
-    log_warn "Waiting for server provisioning (this may take a few minutes for bare metal)..."
+    log_step "Waiting for server provisioning (this may take a few minutes for bare metal)..."
 }
 
 # Extract the IPv4 address from a Latitude.sh server API response
@@ -313,7 +313,7 @@ wait_for_server_ready() {
     local max_attempts=${2:-60}
     local attempt=1
 
-    log_warn "Waiting for server $server_id to become active..."
+    log_step "Waiting for server $server_id to become active..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
         local response
         response=$(latitude_api GET "/servers/$server_id")
@@ -357,7 +357,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local server_id="$1"
 
-    log_warn "Destroying server $server_id..."
+    log_step "Destroying server $server_id..."
     local response
     response=$(latitude_api DELETE "/servers/$server_id")
 
@@ -397,9 +397,9 @@ for s in servers:
 # Install basic tools on the server (cloud-init equivalent for Latitude.sh)
 install_base_tools() {
     local ip="$1"
-    log_warn "Installing base tools..."
+    log_step "Installing base tools..."
     run_server "$ip" "apt-get update -qq && apt-get install -y -qq curl unzip git zsh > /dev/null 2>&1"
-    log_warn "Installing Bun..."
+    log_step "Installing Bun..."
     run_server "$ip" "curl -fsSL https://bun.sh/install | bash"
     run_server "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.bun/bin:\${PATH}\"' >> /root/.bashrc"
     run_server "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.bun/bin:\${PATH}\"' >> /root/.zshrc"

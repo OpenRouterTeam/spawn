@@ -12,20 +12,20 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
 wait_for_cloud_init "${LINODE_SERVER_IP}" 60
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "${LINODE_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 log_info "Aider installed"
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${LINODE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 echo ""
 log_info "Linode setup completed successfully!"
 echo ""
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "${LINODE_SERVER_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

@@ -233,7 +233,7 @@ create_server() {
     validate_region_name "$location" || { log_error "Invalid HOSTINGER_LOCATION"; return 1; }
     validate_resource_name "$os_template" || { log_error "Invalid HOSTINGER_OS_TEMPLATE"; return 1; }
 
-    log_warn "Creating Hostinger VPS '$name' (plan: $plan, location: $location)..."
+    log_step "Creating Hostinger VPS '$name' (plan: $plan, location: $location)..."
 
     # Get all SSH key IDs
     local ssh_keys_response
@@ -269,7 +269,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local vps_id="$1"
 
-    log_warn "Destroying VPS $vps_id..."
+    log_step "Destroying VPS $vps_id..."
     local response
     response=$(hostinger_api DELETE "/virtual-machines/$vps_id")
 

@@ -31,7 +31,7 @@ verify_server_connectivity "${DO_SERVER_IP}"
 wait_for_cloud_init "${DO_SERVER_IP}" 60
 
 # 5. Install OpenCode
-log_warn "Installing OpenCode..."
+log_step "Installing OpenCode..."
 run_server "${DO_SERVER_IP}" "$(opencode_install_cmd)"
 log_info "OpenCode installed"
 
@@ -44,7 +44,7 @@ else
 fi
 
 # 7. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${DO_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -54,7 +54,7 @@ log_info "Droplet: ${DROPLET_NAME} (ID: ${DO_DROPLET_ID}, IP: ${DO_SERVER_IP})"
 echo ""
 
 # 8. Start OpenCode interactively
-log_warn "Starting OpenCode..."
+log_step "Starting OpenCode..."
 sleep 1
 clear
 interactive_session "${DO_SERVER_IP}" "source ~/.zshrc && opencode"

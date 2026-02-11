@@ -31,7 +31,7 @@ verify_server_connectivity "${LATITUDE_SERVER_IP}"
 # 6. Install base tools and Aider
 install_base_tools "${LATITUDE_SERVER_IP}"
 
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "${LATITUDE_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 
 # Verify installation succeeded
@@ -53,7 +53,7 @@ fi
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${LATITUDE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -63,7 +63,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${LATITUDE_SERVER_ID}, IP: ${LATITUDE_SERV
 echo ""
 
 # 8. Start Aider interactively
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "${LATITUDE_SERVER_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

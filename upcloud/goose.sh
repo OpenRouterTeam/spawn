@@ -19,7 +19,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${UPCLOUD_SERVER_IP}"
 install_base_tools "${UPCLOUD_SERVER_IP}"
 
-log_warn "Installing Goose..."
+log_step "Installing Goose..."
 run_server "${UPCLOUD_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 
 if ! run_server "${UPCLOUD_SERVER_IP}" "command -v goose &> /dev/null && goose --version &> /dev/null"; then
@@ -35,7 +35,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${UPCLOUD_SERVER_IP}" upload_file run_server \
     "GOOSE_PROVIDER=openrouter" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -45,7 +45,7 @@ log_info "UpCloud server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (UUID: ${UPCLOUD_SERVER_UUID}, IP: ${UPCLOUD_SERVER_IP})"
 echo ""
 
-log_warn "Starting Goose..."
+log_step "Starting Goose..."
 sleep 1
 clear
 interactive_session "${UPCLOUD_SERVER_IP}" "source ~/.zshrc && goose"
