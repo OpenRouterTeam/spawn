@@ -1012,7 +1012,7 @@
     "daytona/continue": "missing",
     "upcloud/continue": "missing",
     "binarylane/continue": "missing",
-    "latitude/continue": "missing",
+    "latitude/continue": "implemented",
     "ovh/continue": "missing",
     "kamatera/continue": "implemented",
     "cherry/continue": "implemented",
