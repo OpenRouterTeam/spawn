@@ -309,7 +309,10 @@ export async function cmdInteractive(): Promise<void> {
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(cloudChoice, agentChoice);
+  const authVars = parseAuthEnvVars(manifest.clouds[cloudChoice].auth);
+  const authHint = authVars.length > 0 ? authVars.join(" + ") : undefined;
+
+  await execScript(cloudChoice, agentChoice, undefined, authHint);
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────
@@ -439,7 +442,11 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
   const suffix = prompt ? " with prompt..." : "...";
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
-  await execScript(cloud, agent, prompt);
+  // Extract auth env var names so error messages can show what credentials are needed
+  const authVars = parseAuthEnvVars(manifest.clouds[cloud].auth);
+  const authHint = authVars.length > 0 ? authVars.join(" + ") : undefined;
+
+  await execScript(cloud, agent, prompt, authHint);
 }
 
 export function getStatusDescription(status: number): string {
@@ -509,7 +516,7 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   process.exit(1);
 }
 
-export function getScriptFailureGuidance(exitCode: number | null, cloud: string): string[] {
+export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
   switch (exitCode) {
     case 130:
       return [
@@ -539,37 +546,51 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string)
         "Shell syntax or argument error. This is likely a bug in the script.",
         `  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
       ];
-    case 1:
-      return [
-        "Common causes:",
-        `  - Missing or invalid credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`,
+    case 1: {
+      const lines = ["Common causes:"];
+      if (authHint) {
+        lines.push(`  - Missing or invalid credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`);
+      } else {
+        lines.push(`  - Missing or invalid credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`);
+      }
+      lines.push(
         "  - Cloud provider API error (quota, rate limit, or region issue)",
         "  - Server provisioning failed (try again or pick a different region)",
-      ];
-    default:
-      return [
-        "Common causes:",
-        `  - Missing credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup instructions)`,
+      );
+      return lines;
+    }
+    default: {
+      const lines = ["Common causes:"];
+      if (authHint) {
+        lines.push(`  - Missing credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`);
+      } else {
+        lines.push(`  - Missing credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup instructions)`);
+      }
+      lines.push(
         "  - Cloud provider API rate limit or quota exceeded",
         "  - Missing local dependencies (SSH, curl, jq)",
-      ];
+      );
+      return lines;
+    }
   }
 }
 
-function reportScriptFailure(errMsg: string, cloud: string): never {
+function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
 
   const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
   const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : null;
 
-  const lines = getScriptFailureGuidance(exitCode, cloud);
+  const lines = getScriptFailureGuidance(exitCode, cloud, authHint);
   console.error("");
   for (const line of lines) console.error(line);
+  console.error("");
+  console.error(`Retry: ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
   process.exit(1);
 }
 
-async function execScript(cloud: string, agent: string, prompt?: string): Promise<void> {
+async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
@@ -599,7 +620,7 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
     if (errMsg.includes("interrupted by user")) {
       process.exit(130);
     }
-    reportScriptFailure(errMsg, cloud);
+    reportScriptFailure(errMsg, cloud, agent, authHint);
   }
 }
 
