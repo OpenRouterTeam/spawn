@@ -261,7 +261,7 @@ describe("extractFlagValue in actual CLI", () => {
     it("should error when prompt file does not exist", () => {
       const result = runCli(["claude", "sprite", "--prompt-file", "/tmp/nonexistent-spawn-test-file.txt"]);
       const output = result.stderr + result.stdout;
-      expect(output).toContain("Error reading prompt file");
+      expect(output).toContain("Prompt file not found");
       expect(result.exitCode).not.toBe(0);
     });
   });

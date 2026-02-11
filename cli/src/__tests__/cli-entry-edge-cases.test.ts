@@ -305,7 +305,7 @@ describe("--prompt-file with real files", () => {
       "/tmp/spawn-nonexistent-test-file-12345.txt",
     ]);
     const out = output(result);
-    expect(out).toContain("Error reading prompt file");
+    expect(out).toContain("Prompt file not found");
     expect(result.exitCode).not.toBe(0);
   });
 
@@ -328,7 +328,7 @@ describe("--prompt-file with real files", () => {
       "/tmp/spawn-missing-file.txt",
     ]);
     const out = output(result);
-    expect(out).toContain("Make sure the file exists");
+    expect(out).toContain("Check the path and try again");
     expect(result.exitCode).not.toBe(0);
   });
 });
