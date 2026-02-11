@@ -3,11 +3,11 @@
     "command": "create_server",
     "error": null,
     "finished": null,
-    "id": 610821665885201,
+    "id": 610847435783274,
     "progress": 0,
     "resources": [
       {
-        "id": 120682780,
+        "id": 120695731,
         "type": "server"
       },
       {
@@ -15,7 +15,7 @@
         "type": "image"
       }
     ],
-    "started": "2026-02-10T21:55:23Z",
+    "started": "2026-02-11T00:52:08Z",
     "status": "running"
   },
   "next_actions": [
@@ -23,23 +23,23 @@
       "command": "start_server",
       "error": null,
       "finished": null,
-      "id": 610821665885202,
-      "parent_id": 610821665885201,
+      "id": 610847435783275,
+      "parent_id": 610847435783274,
       "progress": 0,
       "resources": [
         {
-          "id": 120682780,
+          "id": 120695731,
           "type": "server"
         }
       ],
-      "started": "2026-02-10T21:55:23Z",
+      "started": "2026-02-11T00:52:08Z",
       "status": "running"
     }
   ],
   "root_password": null,
   "server": {
     "backup_window": null,
-    "created": "2026-02-10T21:55:23Z",
+    "created": "2026-02-11T00:52:08Z",
     "datacenter": {
       "description": "Nuremberg 1 virtual DC 3",
       "id": 2,
@@ -166,7 +166,7 @@
         ]
       }
     },
-    "id": 120682780,
+    "id": 120695731,
     "image": {
       "architecture": "x86",
       "bound_to": null,
@@ -205,7 +205,7 @@
       "network_zone": "eu-central"
     },
     "locked": false,
-    "name": "spawn-record-1770760522",
+    "name": "spawn-record-1770771126",
     "outgoing_traffic": 0,
     "placement_group": null,
     "primary_disk_size": 40,
@@ -220,13 +220,13 @@
       "ipv4": {
         "blocked": false,
         "dns_ptr": "static.197.210.245.188.clients.your-server.de",
-        "id": 117603379,
+        "id": 117629503,
         "ip": "188.245.210.197"
       },
       "ipv6": {
         "blocked": false,
         "dns_ptr": [],
-        "id": 117603380,
+        "id": 117629504,
         "ip": "2a01:4f8:1c1e:bc55::/64"
       }
     },

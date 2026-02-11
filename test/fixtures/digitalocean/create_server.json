@@ -1,7 +1,7 @@
 {
   "droplet": {
     "backup_ids": [],
-    "created_at": "2026-02-10T23:48:26Z",
+    "created_at": "2026-02-11T00:52:16Z",
     "disk": 10,
     "disk_info": [
       {
@@ -15,7 +15,7 @@
     "features": [
       "droplet_agent"
     ],
-    "id": 550811891,
+    "id": 550820282,
     "image": {
       "created_at": "2025-08-08T15:11:27Z",
       "description": "Ubuntu 24.04 (LTS) x64",
@@ -51,7 +51,7 @@
     "kernel": null,
     "locked": false,
     "memory": 512,
-    "name": "spawn-record-1770767305",
+    "name": "spawn-record-1770771135",
     "networks": {
       "v4": [],
       "v6": []
@@ -276,8 +276,8 @@
   "links": {
     "actions": [
       {
-        "href": "/v2/actions/3037826056",
-        "id": 3037826056,
+        "href": "/v2/actions/3037933744",
+        "id": 3037933744,
         "rel": "create"
       }
     ]

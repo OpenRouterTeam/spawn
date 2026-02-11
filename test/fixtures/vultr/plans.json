@@ -5362,8 +5362,7 @@
       "invoice_type": "hourly",
       "location_cost": {},
       "locations": [
-        "ewr",
-        "nrt"
+        "ewr"
       ],
       "monthly_cost": 315,
       "monthly_cost_preemptible": 315,

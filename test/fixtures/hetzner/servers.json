@@ -163,7 +163,7 @@
         "type": "system"
       },
       "included_traffic": 21990232555520,
-      "ingoing_traffic": 0,
+      "ingoing_traffic": 1474970000,
       "iso": null,
       "labels": {},
       "load_balancers": [],
@@ -179,7 +179,7 @@
       },
       "locked": false,
       "name": "claude",
-      "outgoing_traffic": 0,
+      "outgoing_traffic": 12980000,
       "placement_group": null,
       "primary_disk_size": 40,
       "private_net": [],
