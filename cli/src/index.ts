@@ -230,6 +230,8 @@ async function main(): Promise<void> {
       if (isInteractiveTTY()) {
         await cmdInteractive();
       } else {
+        console.error(pc.yellow("Non-interactive terminal detected (no TTY). Showing help instead of interactive picker."));
+        console.error(pc.dim("To launch directly, use: spawn <agent> <cloud>\n"));
         cmdHelp();
       }
       return;
