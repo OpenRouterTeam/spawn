@@ -1130,7 +1130,7 @@
     "hostinger/nanoclaw": "implemented",
     "hostinger/aider": "implemented",
     "hostinger/goose": "implemented",
-    "hostinger/codex": "missing",
+    "hostinger/codex": "implemented",
     "hostinger/interpreter": "missing",
     "hostinger/gemini": "missing",
     "hostinger/amazonq": "missing",
