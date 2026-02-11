@@ -82,6 +82,18 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/opencode.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/plandex.sh)
 ```
 
+#### Kilo Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/kilocode.sh)
+```
+
+#### Continue
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/sprite/continue.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
