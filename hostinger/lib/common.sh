@@ -256,6 +256,7 @@ create_server() {
     # Validate inputs to prevent injection into Python code
     validate_resource_name "$plan" || { log_error "Invalid HOSTINGER_PLAN"; return 1; }
     validate_region_name "$location" || { log_error "Invalid HOSTINGER_LOCATION"; return 1; }
+    validate_resource_name "$os_template" || { log_error "Invalid HOSTINGER_OS_TEMPLATE"; return 1; }
 
     log_warn "Creating Hostinger VPS '$name' (plan: $plan, location: $location)..."
 

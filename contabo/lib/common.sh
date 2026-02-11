@@ -249,6 +249,16 @@ create_server() {
     local image_id="${CONTABO_IMAGE_ID:-ubuntu-24.04}"
     local period="${CONTABO_PERIOD:-1}"  # 1 month
 
+    # Validate inputs to prevent injection into Python code
+    validate_resource_name "$product_id" || { log_error "Invalid CONTABO_PRODUCT_ID"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid CONTABO_REGION"; return 1; }
+    validate_resource_name "$image_id" || { log_error "Invalid CONTABO_IMAGE_ID"; return 1; }
+    # Period must be a positive integer
+    if [[ ! "$period" =~ ^[0-9]+$ ]]; then
+        log_error "Invalid CONTABO_PERIOD: must be a positive integer"
+        return 1
+    fi
+
     log_warn "Creating Contabo instance '$name' (product: $product_id, region: $region)..."
 
     # Get all SSH secret IDs
