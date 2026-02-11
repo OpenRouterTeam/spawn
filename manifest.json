@@ -1181,7 +1181,7 @@
     "netcup/gemini": "implemented",
     "netcup/amazonq": "implemented",
     "netcup/cline": "implemented",
-    "netcup/gptme": "missing",
+    "netcup/gptme": "implemented",
     "netcup/opencode": "missing",
     "netcup/plandex": "missing",
     "netcup/kilocode": "missing",
