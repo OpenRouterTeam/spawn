@@ -434,12 +434,23 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
     }
     p.log.error("Spawn script failed");
     console.error("\nError:", errMsg);
-    console.error("\nCheck your credentials:");
-    console.error(`  - OPENROUTER_API_KEY  ${pc.dim("https://openrouter.ai/settings/keys")}`);
-    console.error(`  - Cloud credentials   ${pc.dim(`run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`)}`);
-    console.error("\nOther causes:");
-    console.error("  - Cloud provider API rate limit or quota exceeded");
-    console.error("  - Missing local dependencies (SSH, curl, etc.)");
+
+    // Extract exit code from error message for targeted guidance
+    const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
+    const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : null;
+
+    if (exitCode === 127) {
+      console.error("\nA required command was not found. Check that these are installed:");
+      console.error("  - bash, curl, ssh, jq");
+      console.error(`  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`);
+    } else if (exitCode === 126) {
+      console.error("\nA command was found but could not be executed (permission denied).");
+    } else {
+      console.error("\nCommon causes:");
+      console.error(`  - Missing credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup instructions)`);
+      console.error("  - Cloud provider API rate limit or quota exceeded");
+      console.error("  - Missing local dependencies (SSH, curl, jq)");
+    }
     process.exit(1);
   }
 }
@@ -768,8 +779,9 @@ function printCloudQuickStart(
   console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
   if (authVars.length > 0) {
     const hint = cloud.url ? `  ${pc.dim(`# ${cloud.url}`)}` : "";
-    for (const v of authVars) {
-      console.log(`  ${pc.cyan(`export ${v}=...`)}${hint}`);
+    for (let i = 0; i < authVars.length; i++) {
+      // Only show the URL hint on the first auth var to avoid repetition
+      console.log(`  ${pc.cyan(`export ${authVars[i]}=...`)}${i === 0 ? hint : ""}`);
     }
   } else if (cloud.auth.toLowerCase() !== "none") {
     console.log(`  ${pc.dim(`Auth: ${cloud.auth}`)}`);
