@@ -1191,7 +1191,7 @@
     "local/nanoclaw": "implemented",
     "local/aider": "missing",
     "local/goose": "implemented",
-    "local/codex": "missing",
+    "local/codex": "implemented",
     "local/interpreter": "missing",
     "local/gemini": "missing",
     "local/amazonq": "missing",
