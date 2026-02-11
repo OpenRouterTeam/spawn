@@ -680,7 +680,7 @@ function renderCompactList(manifest: Manifest, agents: string[], clouds: string[
   const totalClouds = clouds.length;
 
   console.log();
-  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Not available on"));
+  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Missing"));
   console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + 30)));
 
   for (const a of agents) {
@@ -723,6 +723,10 @@ export async function cmdMatrix(): Promise<void> {
 
   // Use compact view if grid would be wider than the terminal
   const isCompact = gridWidth > termWidth;
+
+  console.log();
+  console.log(pc.bold("Availability Matrix") + pc.dim(` (${agents.length} agents, ${clouds.length} clouds)`));
+
   if (isCompact) {
     renderCompactList(manifest, agents, clouds);
   } else {
@@ -831,6 +835,13 @@ function showListFooter(records: SpawnRecord[], agentFilter?: string, cloudFilte
   console.log();
 }
 
+/** Resolve an agent/cloud key to its display name, or return the key as-is */
+export function resolveDisplayName(manifest: Manifest | null, key: string, kind: "agent" | "cloud"): string {
+  if (!manifest) return key;
+  const entry = kind === "agent" ? manifest.agents[key] : manifest.clouds[key];
+  return entry ? entry.name : key;
+}
+
 export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
   const records = filterHistory(agentFilter, cloudFilter);
 
@@ -839,15 +850,25 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     return;
   }
 
+  // Try to load manifest for display names (fall back to raw keys if unavailable)
+  let manifest: Manifest | null = null;
+  try {
+    manifest = await loadManifest();
+  } catch {
+    // Manifest unavailable -- show raw keys
+  }
+
   console.log();
   console.log(pc.bold("AGENT".padEnd(20)) + pc.bold("CLOUD".padEnd(20)) + pc.bold("WHEN"));
   console.log(pc.dim("-".repeat(60)));
 
   for (const r of records) {
     const when = formatTimestamp(r.timestamp);
+    const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
+    const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
     let line =
-      pc.green(r.agent.padEnd(20)) +
-      r.cloud.padEnd(20) +
+      pc.green(agentDisplay.padEnd(20)) +
+      cloudDisplay.padEnd(20) +
       pc.dim(when);
     if (r.prompt) {
       const preview = r.prompt.length > 40 ? r.prompt.slice(0, 40) + "..." : r.prompt;
