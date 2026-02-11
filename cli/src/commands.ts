@@ -182,6 +182,7 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
   p.log.error(`Unknown ${def.label}: ${pc.bold(value)}`);
 
   const oppositeKind = kind === "agent" ? "cloud" : "agent";
+  const oppositeDef = ENTITY_DEFS[oppositeKind];
   const oppositeCollection = getEntityCollection(manifest, oppositeKind);
   if (oppositeCollection[value]) {
     p.log.info(`"${value}" is ${kind === "agent" ? "a cloud provider" : "an agent"}, not ${kind === "agent" ? "an agent" : "a cloud provider"}.`);
@@ -190,12 +191,26 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
     return false;
   }
 
+  // Check for typo matches in the same kind
   const keys = getEntityKeys(manifest, kind);
   const match = findClosestKeyByNameOrKey(value, keys, (k) => collection[k].name);
   if (match) {
     p.log.info(`Did you mean ${pc.cyan(match)} (${collection[match].name})?`);
     p.log.info(`  ${pc.cyan(`spawn ${match}`)}`);
+    p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
+    return false;
   }
+
+  // Check for typo matches in the opposite kind (swapped arguments with typo)
+  const oppositeKeys = getEntityKeys(manifest, oppositeKind);
+  const oppositeMatch = findClosestKeyByNameOrKey(value, oppositeKeys, (k) => oppositeCollection[k].name);
+  if (oppositeMatch) {
+    p.log.info(`"${pc.bold(value)}" looks like ${oppositeDef.label} ${pc.cyan(oppositeMatch)} (${oppositeCollection[oppositeMatch].name}).`);
+    p.log.info(`Did you swap the agent and cloud arguments?`);
+    p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
+    return false;
+  }
+
   p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
   return false;
 }
