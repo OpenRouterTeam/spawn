@@ -1008,7 +1008,7 @@
     "modal/continue": "implemented",
     "fly/continue": "missing",
     "civo/continue": "missing",
-    "scaleway/continue": "missing",
+    "scaleway/continue": "implemented",
     "daytona/continue": "missing",
     "upcloud/continue": "missing",
     "binarylane/continue": "missing",
