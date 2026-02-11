@@ -204,6 +204,7 @@ function validateEntity(manifest: Manifest, value: string, kind: "agent" | "clou
   const match = findClosestKeyByNameOrKey(value, keys, (k) => collection[k].name);
   if (match) {
     p.log.info(`Did you mean ${pc.cyan(match)} (${collection[match].name})?`);
+    p.log.info(`  ${pc.cyan(`spawn ${match}`)}`);
   }
   p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
   process.exit(1);
@@ -676,10 +677,11 @@ export function parseAuthEnvVars(auth: string): string[] {
 export async function cmdAgents(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
+  const allAgents = agentKeys(manifest);
   console.log();
-  console.log(pc.bold("Agents"));
+  console.log(pc.bold("Agents") + pc.dim(` (${allAgents.length} total)`));
   console.log();
-  for (const key of agentKeys(manifest)) {
+  for (const key of allAgents) {
     const a = manifest.agents[key];
     const implCount = getImplementedClouds(manifest, key).length;
     console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} cloud${implCount !== 1 ? "s" : ""}  ${a.description}`)}`);
@@ -758,7 +760,11 @@ function printGroupedList(
 export async function cmdAgentInfo(agent: string): Promise<void> {
   const [manifest, agentKey] = await validateAndGetEntity(agent, "agent");
 
-  printInfoHeader(manifest.agents[agentKey]);
+  const agentDef = manifest.agents[agentKey];
+  printInfoHeader(agentDef);
+  if (agentDef.install) {
+    console.log(pc.dim(`  Install: ${agentDef.install}`));
+  }
 
   const allClouds = cloudKeys(manifest);
   const implClouds = getImplementedClouds(manifest, agentKey);
@@ -928,7 +934,7 @@ ${pc.bold("USAGE")}
   spawn <agent> <cloud>              Launch agent on cloud directly
   spawn <agent> <cloud> --prompt "text"
                                      Execute agent with prompt (non-interactive)
-  spawn <agent> <cloud> --prompt-file <file>
+  spawn <agent> <cloud> --prompt-file <file>  (or -f)
                                      Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
   spawn <cloud>                      Show available agents for cloud
@@ -946,8 +952,8 @@ ${pc.bold("EXAMPLES")}
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
   spawn aider sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
-  spawn claude sprite --prompt-file instructions.txt
-                                     ${pc.dim("# Read prompt from file")}
+  spawn claude sprite -f instructions.txt
+                                     ${pc.dim("# Read prompt from file (short for --prompt-file)")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# See the full agent x cloud matrix")}
