@@ -190,15 +190,21 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("interrupted");
     });
 
-    it("should reassure no server was left running", () => {
+    it("should warn server may still be running", () => {
       const lines = getScriptFailureGuidance(130, "sprite");
       const joined = lines.join("\n");
-      expect(joined).toContain("No server was left running");
+      expect(joined).toContain("may still be running");
     });
 
-    it("should return exactly 1 guidance line", () => {
+    it("should suggest checking cloud provider dashboard", () => {
       const lines = getScriptFailureGuidance(130, "sprite");
-      expect(lines).toHaveLength(1);
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+    });
+
+    it("should return exactly 3 guidance lines", () => {
+      const lines = getScriptFailureGuidance(130, "sprite");
+      expect(lines).toHaveLength(3);
     });
   });
 

@@ -195,9 +195,9 @@ validate_api_token() {
 
     # Block shell metacharacters that could enable command injection
     if [[ "${token}" =~ [\;\'\"\<\>\|\&\$\`\\\(\)] ]]; then
-        log_error "Invalid token format: contains shell metacharacters"
-        log_error "Tokens should not contain: ; ' \" < > | & \$ \` \\ ( )"
-        log_error "Copy the token directly from your provider's dashboard"
+        log_error "Invalid token format: contains special characters"
+        log_error "API tokens should only contain letters, numbers, dashes, and underscores."
+        log_error "Copy the token directly from your provider's dashboard without extra characters."
         return 1
     fi
 
@@ -764,7 +764,8 @@ get_openrouter_api_key_oauth() {
 
     # OAuth failed, offer manual entry
     echo ""
-    log_warn "Browser-based OAuth login was not completed (timed out or browser not available)."
+    log_warn "Browser-based OAuth login was not completed."
+    log_warn "This is normal on remote servers, SSH sessions, or headless environments."
     log_info "You can paste an API key instead. Create one at: https://openrouter.ai/settings/keys"
     echo ""
     local manual_choice
@@ -1905,7 +1906,7 @@ interactive_pick() {
     if [[ "${choice}" -ge 1 && "${choice}" -le "${#ids[@]}" ]] 2>/dev/null; then
         echo "${ids[$((choice - 1))]}"
     else
-        log_warn "Invalid choice, using default: ${default_value}"
+        log_warn "Invalid selection '${choice}' (enter a number between 1 and ${#ids[@]}). Using default: ${default_value}"
         echo "${default_value}"
     fi
 }

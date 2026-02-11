@@ -85,7 +85,7 @@ function performAutoUpdate(latestVersion: string): void {
 
     console.error();
     console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
-    console.error(pc.dim("  Restart your command to use the new version."));
+    console.error(pc.dim("  Run your spawn command again to use the new version."));
     console.error();
 
     // Exit cleanly after update
