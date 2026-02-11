@@ -1371,6 +1371,65 @@ wait_for_cloud_init() {
     generic_ssh_wait "root" "${ip}" "${SSH_OPTS}" "test -f /root/.cloud-init-complete" "cloud-init" "${max_attempts}" 5
 }
 
+# Generic instance status polling loop
+# Polls an API endpoint until the instance reaches the target status, then extracts the IP.
+# Usage: generic_wait_for_instance API_FUNC ENDPOINT TARGET_STATUS STATUS_PY IP_PY IP_VAR DESCRIPTION [MAX_ATTEMPTS]
+#
+# Arguments:
+#   API_FUNC       - Cloud API function name (e.g., "vultr_api", "do_api")
+#   ENDPOINT       - API endpoint path (e.g., "/instances/$id")
+#   TARGET_STATUS  - Status value that means "ready" (e.g., "active", "running")
+#   STATUS_PY      - Python expression to extract status from JSON (receives 'd' as parsed dict)
+#   IP_PY          - Python expression to extract IP from JSON (receives 'd' as parsed dict)
+#   IP_VAR         - Environment variable name to export with the IP (e.g., "VULTR_SERVER_IP")
+#   DESCRIPTION    - Human-readable label for logging (e.g., "Vultr instance")
+#   MAX_ATTEMPTS   - Optional, defaults to 60
+#
+# Example:
+#   generic_wait_for_instance vultr_api "/instances/$id" "active" \
+#       "d['instance']['status']" "d['instance']['main_ip']" \
+#       VULTR_SERVER_IP "Instance" 60
+generic_wait_for_instance() {
+    local api_func="${1}"
+    local endpoint="${2}"
+    local target_status="${3}"
+    local status_py="${4}"
+    local ip_py="${5}"
+    local ip_var="${6}"
+    local description="${7}"
+    local max_attempts="${8:-60}"
+    local poll_delay="${INSTANCE_STATUS_POLL_DELAY:-5}"
+
+    local attempt=1
+    log_warn "Waiting for ${description} to become ${target_status}..."
+
+    while [[ "${attempt}" -le "${max_attempts}" ]]; do
+        local response
+        response=$("${api_func}" GET "${endpoint}" 2>/dev/null) || true
+
+        local status
+        status=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${status_py})" 2>/dev/null || echo "unknown")
+
+        if [[ "${status}" == "${target_status}" ]]; then
+            local ip
+            ip=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${ip_py})" 2>/dev/null || echo "")
+
+            if [[ -n "${ip}" ]]; then
+                export "${ip_var}=${ip}"
+                log_info "${description} ${target_status}: IP=${ip}"
+                return 0
+            fi
+        fi
+
+        log_warn "${description} status: ${status} (${attempt}/${max_attempts})"
+        sleep "${poll_delay}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "${description} did not become ${target_status} in time"
+    return 1
+}
+
 # ============================================================
 # API token management helpers
 # ============================================================
