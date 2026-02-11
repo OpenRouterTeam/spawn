@@ -1011,7 +1011,7 @@
     "scaleway/continue": "missing",
     "daytona/continue": "missing",
     "upcloud/continue": "missing",
-    "binarylane/continue": "missing",
+    "binarylane/continue": "implemented",
     "latitude/continue": "missing",
     "ovh/continue": "missing",
     "kamatera/continue": "implemented",
