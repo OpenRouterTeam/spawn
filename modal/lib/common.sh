@@ -114,7 +114,7 @@ _report_modal_create_error() {
     log_error "  - Network connectivity issues"
     log_error "  - Invalid sandbox name (must be alphanumeric with dashes)"
     log_error ""
-    log_error "Troubleshooting:"
+    log_error "How to fix:"
     log_error "  1. Re-authenticate: modal setup"
     log_error "  2. Verify account status: https://modal.com/settings"
     log_error "  3. Check Modal status: https://status.modal.com"

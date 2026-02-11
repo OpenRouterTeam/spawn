@@ -704,10 +704,15 @@ _await_oauth_callback() {
 
     if ! _wait_for_oauth "${code_file}"; then
         cleanup_oauth_session "${server_pid}" "${oauth_dir}"
-        log_warn "OAuth timed out after 120 seconds. Common causes:"
+        log_warn "OAuth timed out after 120 seconds. Possible causes:"
         log_warn "  - Browser did not open (try visiting the URL manually)"
         log_warn "  - Authentication was not completed in the browser"
         log_warn "  - Firewall or proxy blocked the local callback on port ${actual_port}"
+        log_warn ""
+        log_warn "How to fix:"
+        log_warn "  1. Re-run the command to try again"
+        log_warn "  2. Set the key manually: export OPENROUTER_API_KEY=sk-or-..."
+        log_warn "     (get a key at https://openrouter.ai/keys)"
         return 1
     fi
 
@@ -1155,11 +1160,12 @@ _handle_api_transient_error() {
 # Example: generic_cloud_api "$DO_API_BASE" "$DO_API_TOKEN" GET "/account" "" 5
 # Retries on: 429 (rate limit), 503 (service unavailable), network errors
 # Internal retry loop shared by generic_cloud_api and generic_cloud_api_custom_auth
-# Usage: _cloud_api_retry_loop REQUEST_FUNC MAX_RETRIES [REQUEST_FUNC_ARGS...]
+# Usage: _cloud_api_retry_loop REQUEST_FUNC MAX_RETRIES API_DESCRIPTION [REQUEST_FUNC_ARGS...]
 _cloud_api_retry_loop() {
     local request_func="${1}"
     local max_retries="${2}"
-    shift 2
+    local api_description="${3}"
+    shift 3
 
     local attempt=1
     local interval=2
@@ -1187,7 +1193,7 @@ _cloud_api_retry_loop() {
         return 0
     done
 
-    log_error "Cloud API request failed after ${max_retries} attempts"
+    log_error "Cloud API request failed after ${max_retries} attempts (${api_description})"
     log_warn "This is usually caused by rate limiting or temporary provider issues."
     log_warn "Wait a minute and try again, or check the provider's status page."
     return 1
@@ -1201,7 +1207,7 @@ generic_cloud_api() {
     local body="${5:-}"
     local max_retries="${6:-3}"
 
-    _cloud_api_retry_loop _make_api_request "${max_retries}" "${base_url}" "${auth_token}" "${method}" "${endpoint}" "${body}"
+    _cloud_api_retry_loop _make_api_request "${max_retries}" "${method} ${endpoint}" "${base_url}" "${auth_token}" "${method}" "${endpoint}" "${body}"
 }
 
 # Helper to make API request with custom curl auth args (e.g., Basic Auth, custom headers)
@@ -1249,7 +1255,7 @@ generic_cloud_api_custom_auth() {
     shift 5
     # Remaining args are custom curl auth flags
 
-    _cloud_api_retry_loop _make_api_request_custom_auth "${max_retries}" "${base_url}${endpoint}" "${method}" "${body}" "$@"
+    _cloud_api_retry_loop _make_api_request_custom_auth "${max_retries}" "${method} ${endpoint}" "${base_url}${endpoint}" "${method}" "${body}" "$@"
 }
 
 # ============================================================
@@ -1275,23 +1281,26 @@ verify_agent_installed() {
         log_error ""
         log_error "Possible causes:"
         log_error "  - The installation script encountered an error (check logs above)"
-        log_error "  - Network connectivity issues during download"
-        log_error "  - Insufficient disk space or permissions"
+        log_error "  - The binary was installed to a directory not in PATH"
+        log_error "  - Network issues prevented the download from completing"
         log_error ""
-        log_error "Try running the script again, or install ${agent_name} manually."
+        log_error "How to fix:"
+        log_error "  1. Re-run the script to retry the installation"
+        log_error "  2. Install ${agent_name} manually and ensure it is in PATH"
         return 1
     fi
 
     if ! "${agent_cmd}" "${verify_arg}" &> /dev/null; then
-        log_error "${agent_name} installation failed: '${agent_cmd} ${verify_arg}' returned an error"
+        log_error "${agent_name} verification failed: '${agent_cmd} ${verify_arg}' returned an error"
         log_error ""
-        log_error "The command was installed but doesn't execute properly."
+        log_error "The command exists but does not run correctly."
         log_error "Possible causes:"
         log_error "  - Missing runtime dependencies (Python, Node.js, etc.)"
         log_error "  - Incompatible system architecture or OS version"
-        log_error "  - Corrupted download or partial installation"
         log_error ""
-        log_error "Try running the script again, or check ${agent_name}'s installation docs."
+        log_error "How to fix:"
+        log_error "  1. Check ${agent_name}'s installation docs for prerequisites"
+        log_error "  2. Run '${agent_cmd} ${verify_arg}' manually to see the error"
         return 1
     fi
 
