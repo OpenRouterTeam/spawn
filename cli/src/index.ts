@@ -234,7 +234,12 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
 }
 
 /** Handle the case when no command is given (interactive mode or help) */
-async function handleNoCommand(prompt: string | undefined): Promise<void> {
+async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Promise<void> {
+  if (dryRun) {
+    console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --dry-run")}`);
+    process.exit(1);
+  }
   if (prompt) {
     console.error(pc.red("Error: --prompt requires both <agent> and <cloud>"));
     console.error(`\nUsage: ${pc.cyan('spawn <agent> <cloud> --prompt "your prompt here"')}`);
@@ -330,7 +335,7 @@ async function main(): Promise<void> {
 
   try {
     if (!cmd) {
-      await handleNoCommand(prompt);
+      await handleNoCommand(prompt, dryRun);
     } else {
       await dispatchCommand(cmd, filteredArgs, prompt, dryRun);
     }
