@@ -231,10 +231,9 @@ describe("Display Name Suggestions in Validation Errors", () => {
       await expect(cmdRun("claud", "sprite")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      // Should suggest via key match, not display name match
+      // Should suggest via key match and always show display name for clarity
       expect(infoCalls.some((msg: string) => msg.includes("claude"))).toBe(true);
-      // Should NOT show display name in parentheses (that's the name suggestion format)
-      expect(infoCalls.some((msg: string) => msg.includes("Claude Code"))).toBe(false);
+      expect(infoCalls.some((msg: string) => msg.includes("Claude Code"))).toBe(true);
     });
   });
 
@@ -285,8 +284,8 @@ describe("Display Name Suggestions in Validation Errors", () => {
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("sprite"))).toBe(true);
-      // Should be plain suggestion, not display name format with parentheses
-      expect(infoCalls.some((msg: string) => msg.includes("Sprite"))).toBe(false);
+      // Should always show display name for clarity
+      expect(infoCalls.some((msg: string) => msg.includes("Sprite"))).toBe(true);
     });
   });
 

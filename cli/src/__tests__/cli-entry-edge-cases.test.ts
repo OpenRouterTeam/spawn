@@ -435,7 +435,7 @@ describe("fuzzy matching edge cases in showInfoOrError", () => {
     const out = output(result);
     // Should suggest sprite as a cloud
     expect(out).toContain("sprite");
-    expect(out).toContain("(cloud)");
+    expect(out).toContain("(cloud:");
   });
 });
 
