@@ -6,9 +6,8 @@ set -eo pipefail
 #
 # Phase 1: Record fixtures (bash test/record.sh allsaved)
 # Phase 2: Run mock tests → results file
-# Phase 3: Update README matrix with pass/fail markers
-# Phase 4: Spawn agents to fix failures
-# Phase 5: Re-run tests → update README → commit + push
+# Phase 3: Spawn agents to fix failures
+# Phase 4: Re-run tests → update README → commit + push
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -21,7 +20,7 @@ CYCLE_TIMEOUT=2700  # 45 min total
 
 # Results files
 RESULTS_PHASE2="/tmp/spawn-qa-results.txt"
-RESULTS_PHASE5="/tmp/spawn-qa-results-retry.txt"
+RESULTS_PHASE4="/tmp/spawn-qa-results-retry.txt"
 
 # Ensure directories
 mkdir -p "$(dirname "${LOG_FILE}")" "${WORKTREE_BASE}"
@@ -36,7 +35,7 @@ cleanup() {
     cd "${REPO_ROOT}" 2>/dev/null || true
     git worktree prune 2>/dev/null || true
     rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
-    rm -f "${RESULTS_PHASE2}" "${RESULTS_PHASE5}" "/tmp/spawn-qa-record-output.txt" 2>/dev/null || true
+    rm -f "${RESULTS_PHASE2}" "${RESULTS_PHASE4}" "/tmp/spawn-qa-record-output.txt" 2>/dev/null || true
     log "=== QA Cycle Done (exit_code=${exit_code}) ==="
     exit $exit_code
 }
@@ -61,10 +60,59 @@ check_timeout() {
     return 0
 }
 
-# Fetch latest
-log "Fetching latest refs..."
+# ============================================================
+# Pre-cycle cleanup (stale branches, worktrees, PRs from prior runs)
+# ============================================================
+log "Pre-cycle cleanup..."
+
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
+
+# Clean stale worktrees
+git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
+if [[ -d "${WORKTREE_BASE}" ]]; then
+    rm -rf "${WORKTREE_BASE}" 2>&1 | tee -a "${LOG_FILE}" || true
+    log "Removed stale ${WORKTREE_BASE} directory"
+fi
+mkdir -p "${WORKTREE_BASE}"
+
+# Delete merged qa/* remote branches
+MERGED_BRANCHES=$(git branch -r --merged origin/main | grep 'origin/qa/' | sed 's|origin/||' | tr -d ' ') || true
+for branch in $MERGED_BRANCHES; do
+    if [[ -n "$branch" ]]; then
+        git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
+    fi
+done
+
+# Delete stale local qa/* branches
+LOCAL_QA_BRANCHES=$(git branch --list 'qa/*' | tr -d ' *') || true
+for branch in $LOCAL_QA_BRANCHES; do
+    if [[ -n "$branch" ]]; then
+        git branch -D "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
+    fi
+done
+
+# Close stale qa PRs (open > 2 hours)
+STALE_PRS=$(gh pr list --state open --label '' --json number,headRefName,updatedAt \
+    --jq '[.[] | select(.headRefName | startswith("qa/")) | select(.updatedAt < (now - 7200 | todate)) | .number] | .[]' 2>/dev/null) || true
+for pr_num in $STALE_PRS; do
+    if [[ -n "$pr_num" ]]; then
+        PR_MERGEABLE=$(gh pr view "$pr_num" --json mergeable --jq '.mergeable' 2>/dev/null) || PR_MERGEABLE="UNKNOWN"
+        if [[ "$PR_MERGEABLE" == "MERGEABLE" ]]; then
+            log "Merging stale QA PR #${pr_num}..."
+            gh pr merge "$pr_num" --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
+        else
+            log "Closing unmergeable stale QA PR #${pr_num}..."
+            gh pr close "$pr_num" --comment "Auto-closing: stale QA PR from a previous cycle." 2>&1 | tee -a "${LOG_FILE}" || true
+        fi
+    fi
+done
+
+# Re-sync after any merges from cleanup
+git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
+git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
+
+log "Pre-cycle cleanup complete"
 
 # ============================================================
 # Phase 1: Record fixtures
@@ -155,7 +203,7 @@ Only modify ${cloud}/lib/common.sh — do not change test/record.sh." \
                     PR_URL=$(gh pr create \
                         --title "fix: Update ${cloud} API for fixture recording" \
                         --body "Automated fix from QA cycle. API recording was failing for ${cloud}." \
-                        --head "${branch_name}" 2>/dev/null) || true
+                        --base main --head "${branch_name}" 2>/dev/null) || true
                     if [[ -n "${PR_URL:-}" ]]; then
                         gh pr merge --squash --delete-branch 2>/dev/null || true
                     fi
@@ -212,39 +260,12 @@ fi
 check_timeout || exit 0
 
 # ============================================================
-# Phase 3: Update README matrix
+# Phase 3: Fix mock failures
 # ============================================================
-log "=== Phase 3: Update README matrix ==="
-
-if [[ -f "${RESULTS_PHASE2}" ]]; then
-    python3 test/update-readme.py "${RESULTS_PHASE2}" 2>&1 | tee -a "${LOG_FILE}"
-
-    # Commit if README changed
-    if [[ -n "$(git diff --name-only README.md 2>/dev/null)" ]]; then
-        git add README.md
-        git commit -m "$(cat <<'EOF'
-test: Update README matrix with QA results
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
-EOF
-        )" 2>&1 | tee -a "${LOG_FILE}" || true
-        log "Phase 3: README updated and committed"
-    else
-        log "Phase 3: No README changes needed"
-    fi
-else
-    log "Phase 3: Skipped — no results file"
-fi
-
-check_timeout || exit 0
-
-# ============================================================
-# Phase 4: Fix mock failures
-# ============================================================
-log "=== Phase 4: Fix failures ==="
+log "=== Phase 3: Fix failures ==="
 
 if [[ "${FAIL_COUNT:-0}" -eq 0 ]]; then
-    log "Phase 4: No failures to fix"
+    log "Phase 3: No failures to fix"
 else
     # Collect failures
     FAILURES=""
@@ -261,7 +282,7 @@ else
         script_path="${cloud}/${agent}.sh"
         worktree="${WORKTREE_BASE}/fix-${cloud}-${agent}"
 
-        log "Phase 4: Spawning agent to fix ${script_path}"
+        log "Phase 3: Spawning agent to fix ${script_path}"
 
         # Get error context from mock test output
         error_context=""
@@ -272,7 +293,7 @@ else
         # Create worktree for this fix
         branch_name="qa/fix-${cloud}-${agent}"
         git worktree add "${worktree}" -b "${branch_name}" origin/main 2>&1 | tee -a "${LOG_FILE}" || {
-            log "Phase 4: Could not create worktree for ${combo}, skipping"
+            log "Phase 3: Could not create worktree for ${combo}, skipping"
             continue
         }
 
@@ -318,13 +339,13 @@ FIXEOF
                         PR_URL=$(gh pr create \
                             --title "fix: Fix ${script_path} mock test" \
                             --body "Automated fix from QA cycle. Mock test was failing for ${cloud}/${agent}." \
-                            --head "${branch_name}" 2>/dev/null) || true
+                            --base main --head "${branch_name}" 2>/dev/null) || true
                         if [[ -n "${PR_URL:-}" ]]; then
                             gh pr merge --squash --delete-branch 2>/dev/null || true
                         fi
                     fi
                 else
-                    log "Phase 4: Syntax check failed for ${script_path}, discarding fix"
+                    log "Phase 3: Syntax check failed for ${script_path}, discarding fix"
                 fi
             fi
         ) &
@@ -347,52 +368,52 @@ FIXEOF
     done
     git worktree prune 2>/dev/null || true
 
-    log "Phase 4: Fix agents complete"
+    log "Phase 3: Fix agents complete"
 fi
 
 check_timeout || exit 0
 
 # ============================================================
-# Phase 5: Re-run mock tests (NO agents, just update README)
+# Phase 4: Re-run mock tests + update README + push
 # ============================================================
-log "=== Phase 5: Re-run tests and update README ==="
+log "=== Phase 4: Re-run tests and update README ==="
 
 # Pull any merged fixes
 git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
-rm -f "${RESULTS_PHASE5}"
-RESULTS_FILE="${RESULTS_PHASE5}" bash test/mock.sh 2>&1 | tee -a "${LOG_FILE}" || true
+rm -f "${RESULTS_PHASE4}"
+RESULTS_FILE="${RESULTS_PHASE4}" bash test/mock.sh 2>&1 | tee -a "${LOG_FILE}" || true
 
-if [[ -f "${RESULTS_PHASE5}" ]]; then
-    RETRY_PASS=$(grep -c ':pass$' "${RESULTS_PHASE5}" || true)
-    RETRY_FAIL=$(grep -c ':fail$' "${RESULTS_PHASE5}" || true)
-    log "Phase 5: ${RETRY_PASS} passed, ${RETRY_FAIL} failed"
+if [[ -f "${RESULTS_PHASE4}" ]]; then
+    RETRY_PASS=$(grep -c ':pass$' "${RESULTS_PHASE4}" || true)
+    RETRY_FAIL=$(grep -c ':fail$' "${RESULTS_PHASE4}" || true)
+    log "Phase 4: ${RETRY_PASS} passed, ${RETRY_FAIL} failed"
 
-    python3 test/update-readme.py "${RESULTS_PHASE5}" 2>&1 | tee -a "${LOG_FILE}"
+    python3 test/update-readme.py "${RESULTS_PHASE4}" 2>&1 | tee -a "${LOG_FILE}"
 
     # Commit + push if README changed
     if [[ -n "$(git diff --name-only README.md 2>/dev/null)" ]]; then
         git add README.md
         git commit -m "$(cat <<'EOF'
-test: Update README matrix after QA fixes
+test: Update README matrix after QA cycle
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
         )" 2>&1 | tee -a "${LOG_FILE}" || true
         git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
-        log "Phase 5: README updated, committed, and pushed"
+        log "Phase 4: README updated, committed, and pushed"
     else
-        log "Phase 5: No README changes needed"
+        log "Phase 4: No README changes needed"
     fi
 else
-    log "Phase 5: No results file generated"
+    log "Phase 4: No results file generated"
 fi
 
 # Final summary
 log "=== QA Cycle Summary ==="
 log "Phase 2: ${PASS_COUNT:-0} pass / ${FAIL_COUNT:-0} fail"
-log "Phase 5: ${RETRY_PASS:-0} pass / ${RETRY_FAIL:-0} fail"
+log "Phase 4: ${RETRY_PASS:-0} pass / ${RETRY_FAIL:-0} fail"
 if [[ "${FAIL_COUNT:-0}" -gt 0 ]] && [[ "${RETRY_FAIL:-0}" -lt "${FAIL_COUNT:-0}" ]]; then
     FIXED=$(( ${FAIL_COUNT:-0} - ${RETRY_FAIL:-0} ))
     log "Fixed ${FIXED} failure(s) this cycle"

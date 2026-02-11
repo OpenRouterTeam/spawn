@@ -370,6 +370,7 @@ setup_env_for_cloud() {
 
     # Universal env vars
     export OPENROUTER_API_KEY="sk-or-v1-0000000000000000000000000000000000000000000000000000000000000000"
+    export MODEL_ID="openrouter/auto"
     export INSTANCE_STATUS_POLL_DELAY=0
 
     case "$cloud" in
@@ -483,6 +484,7 @@ run_test() {
     local cloud="$1"
     local agent="$2"
     local script_path="${REPO_ROOT}/${cloud}/${agent}.sh"
+    local _prev_failed="$FAILED"
 
     if [[ ! -f "$script_path" ]]; then
         printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}/${agent}.sh — file not found"
@@ -545,6 +547,15 @@ run_test() {
 
     # Check that SSH was used (for remote execution)
     assert_log_contains "ssh " "uses SSH"
+
+    # Append result to RESULTS_FILE if set
+    if [[ -n "${RESULTS_FILE:-}" ]]; then
+        if [[ "$FAILED" -gt "$_prev_failed" ]] || [[ "$exit_code" -ne 0 ]]; then
+            printf '%s/%s:fail\n' "$cloud" "$agent" >> "${RESULTS_FILE}"
+        else
+            printf '%s/%s:pass\n' "$cloud" "$agent" >> "${RESULTS_FILE}"
+        fi
+    fi
 
     printf '\n'
 }
