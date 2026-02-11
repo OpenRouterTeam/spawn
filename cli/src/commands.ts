@@ -1257,8 +1257,9 @@ ${pc.bold("USAGE")}
   spawn <agent>                      Show available clouds for agent
   spawn <cloud>                      Show available agents for cloud
   spawn list                         Browse and rerun previous spawns
-  spawn list -a <agent>              Filter spawn history by agent
-  spawn list -c <cloud>              Filter spawn history by cloud
+  spawn list <filter>                Filter history by agent or cloud name
+  spawn list -a <agent>              Filter spawn history by agent (or --agent)
+  spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
                                      Aliases: ls, history
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
@@ -1280,6 +1281,7 @@ ${pc.bold("EXAMPLES")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
+  spawn list claude                  ${pc.dim("# Filter history by agent name")}
   spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}
 
 ${pc.bold("AUTHENTICATION")}

@@ -64,6 +64,7 @@ mock.module("@clack/prompts", () => ({
 
 // Import after mock setup
 const { cmdList, resolveDisplayName } = await import("../commands.js");
+const { loadManifest, _resetCacheForTesting } = await import("../manifest.js");
 
 // ── Test Setup ──────────────────────────────────────────────────────────────────
 
@@ -90,12 +91,15 @@ describe("cmdList integration", () => {
     return consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
   }
 
-  beforeEach(() => {
+
+  beforeEach(async () => {
     testDir = join(tmpdir(), `spawn-cmdlist-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
 
     originalEnv = { ...process.env };
     process.env.SPAWN_HOME = testDir;
+    // Isolate disk cache so tests don't read/write the real ~/.cache/spawn
+    process.env.XDG_CACHE_HOME = join(testDir, "cache");
 
     consoleMocks = createConsoleMocks();
     mockLogError.mockClear();
@@ -106,6 +110,15 @@ describe("cmdList integration", () => {
     mockSpinnerStop.mockClear();
 
     originalFetch = global.fetch;
+
+    // Prime the manifest in-memory cache with mock data so tests don't
+    // depend on network availability or stale values from other test files.
+    global.fetch = mock(() =>
+      Promise.resolve({ ok: true, json: async () => mockManifest }) as any
+    );
+    await loadManifest(true);
+    global.fetch = originalFetch;
+
     processExitSpy = spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit");
     }) as any);
@@ -258,7 +271,8 @@ describe("cmdList integration", () => {
     it("should fall back to raw keys when manifest is unavailable", async () => {
       writeHistory(sampleRecords);
 
-      // Mock fetch to fail
+      // Clear in-memory cache and mock fetch to fail
+      _resetCacheForTesting();
       global.fetch = mock(() => Promise.reject(new Error("Network error")));
 
       await cmdList();
