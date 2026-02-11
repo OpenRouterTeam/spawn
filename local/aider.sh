@@ -19,7 +19,7 @@ ensure_local_ready
 if command -v aider &>/dev/null; then
     log_info "Aider already installed"
 else
-    log_warn "Installing Aider..."
+    log_step "Installing Aider..."
     pip install aider-chat 2>/dev/null || pip3 install aider-chat
 fi
 
@@ -44,7 +44,7 @@ fi
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
 # 5. Inject environment variables
-log_warn "Appending environment variables to ~/.zshrc..."
+log_step "Setting up environment variables..."
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -54,12 +54,12 @@ echo ""
 
 # 6. Start Aider
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_warn "Executing Aider with prompt..."
+    log_step "Executing Aider with prompt..."
     source ~/.zshrc 2>/dev/null || true
     escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
     aider --model "openrouter/${MODEL_ID}" -m "${escaped_prompt}"
 else
-    log_warn "Starting Aider..."
+    log_step "Starting Aider..."
     sleep 1
     clear 2>/dev/null || true
     source ~/.zshrc 2>/dev/null || true
