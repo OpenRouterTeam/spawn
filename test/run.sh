@@ -229,11 +229,8 @@ run_script_test() {
 }
 
 # --- Test common.sh sourcing ---
-test_common_source() {
-    echo ""
-    printf '%b\n' "${YELLOW}━━━ Testing common.sh ━━━${NC}"
-
-    # Test 1: Source locally and check all functions exist
+_test_sprite_functions_and_syntax() {
+    # Source locally and check all functions exist
     local output
     output=$(bash -c '
         source "'"${REPO_ROOT}"'/sprite/lib/common.sh"
@@ -257,7 +254,18 @@ test_common_source() {
         ((FAILED++))
     fi
 
-    # Test 2: log functions write to stderr, not stdout
+    # Syntax check
+    if bash -n "${REPO_ROOT}/sprite/lib/common.sh" 2>/dev/null; then
+        printf '%b\n' "  ${GREEN}✓${NC} Syntax valid"
+        ((PASSED++))
+    else
+        printf '%b\n' "  ${RED}✗${NC} Syntax errors"
+        ((FAILED++))
+    fi
+}
+
+_test_sprite_log_and_name() {
+    # log functions write to stderr, not stdout
     local stdout stderr
     stdout=$(timeout 5 bash -c 'source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && log_info "test"' </dev/null 2>/dev/null)
     stderr=$(timeout 5 bash -c 'source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && log_info "test"' </dev/null 2>&1 >/dev/null)
@@ -269,7 +277,7 @@ test_common_source() {
         ((FAILED++))
     fi
 
-    # Test 3: get_sprite_name uses SPRITE_NAME env var
+    # get_sprite_name uses SPRITE_NAME env var
     local name
     name=$(timeout 5 bash -c 'SPRITE_NAME=from-env; source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && get_sprite_name' 2>/dev/null)
     if [[ "${name}" == "from-env" ]]; then
@@ -280,7 +288,7 @@ test_common_source() {
         ((FAILED++))
     fi
 
-    # Test 4: get_sprite_name fails gracefully without TTY or env var
+    # get_sprite_name fails gracefully without TTY or env var
     local rc=0
     timeout 5 bash -c 'SPRITE_NAME=""; source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && get_sprite_name' </dev/null >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
@@ -290,31 +298,33 @@ test_common_source() {
         printf '%b\n' "  ${RED}✗${NC} get_sprite_name should fail without input"
         ((FAILED++))
     fi
+}
 
-    # Test 5: Syntax check
-    if bash -n "${REPO_ROOT}/sprite/lib/common.sh" 2>/dev/null; then
-        printf '%b\n' "  ${GREEN}✓${NC} Syntax valid"
+_test_sprite_remote_source() {
+    if [[ "${REMOTE}" != true ]]; then
+        return 0
+    fi
+    local remote_fns
+    remote_fns=$(bash -c '
+        source <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)
+        type log_info &>/dev/null && echo "OK" || echo "FAIL"
+    ' 2>/dev/null)
+    if [[ "${remote_fns}" == "OK" ]]; then
+        printf '%b\n' "  ${GREEN}✓${NC} Remote source from GitHub works"
         ((PASSED++))
     else
-        printf '%b\n' "  ${RED}✗${NC} Syntax errors"
+        printf '%b\n' "  ${RED}✗${NC} Remote source from GitHub failed"
         ((FAILED++))
     fi
+}
 
-    # Test 6: Remote source (if --remote)
-    if [[ "${REMOTE}" == true ]]; then
-        local remote_fns
-        remote_fns=$(bash -c '
-            source <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)
-            type log_info &>/dev/null && echo "OK" || echo "FAIL"
-        ' 2>/dev/null)
-        if [[ "${remote_fns}" == "OK" ]]; then
-            printf '%b\n' "  ${GREEN}✓${NC} Remote source from GitHub works"
-            ((PASSED++))
-        else
-            printf '%b\n' "  ${RED}✗${NC} Remote source from GitHub failed"
-            ((FAILED++))
-        fi
-    fi
+test_common_source() {
+    echo ""
+    printf '%b\n' "${YELLOW}━━━ Testing common.sh ━━━${NC}"
+
+    _test_sprite_functions_and_syntax
+    _test_sprite_log_and_name
+    _test_sprite_remote_source
 }
 
 # --- Test shared/common.sh functions ---
@@ -353,8 +363,7 @@ _test_model_validation() {
     fi
 }
 
-_test_json_ssh_utils() {
-    # json_escape
+_test_json_escape() {
     local result
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && json_escape "test\"quote"' 2>/dev/null)
     if [[ "${result}" == *'\\"'* ]] || [[ "${result}" == *'\"'* ]]; then
@@ -364,7 +373,9 @@ _test_json_ssh_utils() {
         printf '%b\n' "  ${RED}✗${NC} json_escape should escape quotes"
         ((FAILED++))
     fi
+}
 
+_test_ssh_key_utils() {
     # generate_ssh_key_if_missing - creates key
     local test_key="${TEST_DIR}/test_id_ed25519"
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && generate_ssh_key_if_missing "'"${test_key}"'"' >/dev/null 2>&1
@@ -392,6 +403,7 @@ _test_json_ssh_utils() {
     fi
 
     # get_ssh_fingerprint
+    local result
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && get_ssh_fingerprint "'"${test_key}.pub"'"' 2>/dev/null)
     if [[ -n "${result}" && "${result}" =~ ^[a-f0-9:]+$ ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_ssh_fingerprint returns valid fingerprint"
@@ -439,7 +451,7 @@ _test_syntax_and_logging() {
     fi
 }
 
-_test_browser_and_cloud_init() {
+_test_open_browser() {
     # open_browser: termux
     local result
     result=$(bash -c '
@@ -492,8 +504,11 @@ _test_browser_and_cloud_init() {
         printf '%b\n' "  ${RED}✗${NC} open_browser should show fallback message, got '${stderr_output}'"
         ((FAILED++))
     fi
+}
 
+_test_cloud_init() {
     # get_cloud_init_userdata
+    local result
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && get_cloud_init_userdata' 2>/dev/null)
     if [[ "${result}" == *"#cloud-config"* ]] && [[ "${result}" == *"package_update"* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_cloud_init_userdata returns valid YAML"
@@ -647,9 +662,11 @@ test_shared_common() {
     printf '%b\n' "${YELLOW}━━━ Testing shared/common.sh ━━━${NC}"
 
     _test_model_validation
-    _test_json_ssh_utils
+    _test_json_escape
+    _test_ssh_key_utils
     _test_syntax_and_logging
-    _test_browser_and_cloud_init
+    _test_open_browser
+    _test_cloud_init
     _test_oauth_functions
     _test_ssh_wait
     _test_input_and_server_validation
