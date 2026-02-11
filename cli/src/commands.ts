@@ -563,6 +563,14 @@ function getImplementedAgents(manifest: Manifest, cloud: string): string[] {
   );
 }
 
+/** Extract environment variable names from a cloud's auth field (e.g. "HCLOUD_TOKEN" or "UPCLOUD_USERNAME + UPCLOUD_PASSWORD") */
+export function parseAuthEnvVars(auth: string): string[] {
+  return auth
+    .split(/\s*\+\s*/)
+    .map((s) => s.trim())
+    .filter((s) => /^[A-Z][A-Z0-9_]{3,}$/.test(s));
+}
+
 export async function cmdAgents(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
@@ -630,6 +638,21 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
 
   const allClouds = cloudKeys(manifest);
   const implClouds = getImplementedClouds(manifest, agentKey);
+
+  // Show quick-start with first available cloud
+  if (implClouds.length > 0) {
+    const exampleCloud = implClouds[0];
+    const cloudAuth = manifest.clouds[exampleCloud].auth;
+    const authVars = parseAuthEnvVars(cloudAuth);
+    console.log();
+    console.log(pc.bold("Quick start:"));
+    console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}`);
+    if (authVars.length > 0) {
+      console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}`);
+    }
+    console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
+  }
+
   console.log();
   console.log(pc.bold(`Available clouds:`) + pc.dim(` ${implClouds.length} of ${allClouds.length}`));
   console.log();
@@ -690,8 +713,25 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
     console.log(pc.dim(`  ${c.notes}`));
   }
 
-  const allAgents = agentKeys(manifest);
+  // Show quick-start with auth setup
+  const authVars = parseAuthEnvVars(c.auth);
   const implAgents = getImplementedAgents(manifest, cloudKey);
+  const exampleAgent = implAgents[0];
+
+  console.log();
+  console.log(pc.bold("Quick start:"));
+  if (authVars.length > 0) {
+    for (const v of authVars) {
+      console.log(`  ${pc.cyan(`export ${v}=your-${v.toLowerCase().replace(/_/g, "-")}-here`)}`);
+    }
+  } else {
+    console.log(`  ${pc.cyan(c.auth)}`);
+  }
+  if (exampleAgent) {
+    console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
+  }
+
+  const allAgents = agentKeys(manifest);
   const missingAgents = allAgents.filter((a) => !implAgents.includes(a));
   console.log();
   console.log(pc.bold(`Available agents:`) + pc.dim(` ${implAgents.length} of ${allAgents.length}`));
@@ -712,7 +752,7 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   }
 
   console.log();
-  console.log(pc.dim(`  Setup: ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloudKey}`)}`));
+  console.log(pc.dim(`  Full setup guide: ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloudKey}`)}`));
   console.log();
 }
 
