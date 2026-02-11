@@ -451,8 +451,8 @@ function renderCompactList(manifest: Manifest, agents: string[], clouds: string[
   const totalClouds = clouds.length;
 
   console.log();
-  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Missing"));
-  console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + 20)));
+  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Not available on"));
+  console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + 30)));
 
   for (const a of agents) {
     const implCount = getImplementedClouds(manifest, a).length;
@@ -464,7 +464,7 @@ function renderCompactList(manifest: Manifest, agents: string[], clouds: string[
     line += colorFn(countStr.padEnd(COMPACT_COUNT_WIDTH));
 
     if (missing.length === 0) {
-      line += pc.green("all clouds");
+      line += pc.green("-- all clouds supported");
     } else {
       line += pc.dim(missing.map((c) => manifest.clouds[c].name).join(", "));
     }
@@ -493,7 +493,8 @@ export async function cmdList(): Promise<void> {
   const termWidth = getTerminalWidth();
 
   // Use compact view if grid would be wider than the terminal
-  if (gridWidth > termWidth) {
+  const isCompact = gridWidth > termWidth;
+  if (isCompact) {
     renderCompactList(manifest, agents, clouds);
   } else {
     console.log();
@@ -508,7 +509,9 @@ export async function cmdList(): Promise<void> {
   const impl = countImplemented(manifest);
   const total = agents.length * clouds.length;
   console.log();
-  console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
+  if (!isCompact) {
+    console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
+  }
   console.log(pc.green(`${impl}/${total} combinations implemented`));
   console.log(pc.dim(`Run ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")} for details.`));
   console.log();
@@ -696,7 +699,7 @@ ${pc.bold("USAGE")}
                                      Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
   spawn <cloud>                      Show available agents for cloud
-  spawn list (or ls)                   Full matrix table
+  spawn list                           Full matrix table (alias: ls)
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
   spawn update                       Check for CLI updates
