@@ -1023,7 +1023,7 @@ _api_handle_transient_http_error() {
         error_msg="service unavailable"
     fi
 
-    if ! _api_should_retry_on_error "http_${http_code}" "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API returned ${error_msg} (HTTP ${http_code})"; then
+    if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API returned ${error_msg} (HTTP ${http_code})"; then
         log_error "Cloud API returned HTTP ${http_code} after ${max_retries} attempts"
         return 1
     fi
