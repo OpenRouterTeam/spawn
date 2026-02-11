@@ -120,6 +120,8 @@ PROMPT_EOF
 
 Your job: coordinate teammates to expand the spawn matrix. Use delegate mode — do NOT implement anything yourself. Only coordinate, review, and synthesize.
 
+**CRITICAL: Your session MUST stay alive for the entire cycle.** After spawning teammates, you MUST call WaitForMessage in a loop to receive their results. Do NOT end your conversation after spawning — that orphans teammates. Spawning is the BEGINNING of your work.
+
 ## FIRST STEP: Update README Matrix (MANDATORY — do this BEFORE spawning teammates)
 
 Before doing anything else, sync the root `README.md` matrix table with `manifest.json`. This ensures the README reflects the current state before any new work begins. Run this script, then replace the matrix table between `## Matrix` and `### How it works` in README.md. Also update the stats line near the top (`**X agents. Y clouds. Z combinations. Zero config.**`).
@@ -222,6 +224,35 @@ Clean up stale remote branches before and after the cycle:
 
 ### Gap Filler (spawn remaining)
 After scouts commit new entries, pick up the newly-created "missing" matrix entries and implement them.
+
+## CRITICAL: Monitoring Loop (DO NOT SKIP — your session MUST stay alive)
+
+**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them by entering a WaitForMessage loop. If you end your conversation after spawning, teammates become orphaned with no coordination.
+
+### Required pattern after spawning:
+```
+1. Spawn all teammates via SendMessage
+2. Enter monitoring loop:
+   while teammates are still active:
+     - Call WaitForMessage (this blocks until a teammate sends you an update)
+     - When you receive a message, acknowledge it and update your task tracking
+     - If a teammate reports completion, mark their task done
+     - If a teammate reports an error, coordinate resolution
+     - If 35 minutes have elapsed, send wrap-up messages to all teammates
+3. Only after ALL teammates have sent their final response, proceed to shutdown
+```
+
+### What WaitForMessage does:
+- It pauses your session until a teammate sends a message to you
+- This is how you stay alive while teammates work in parallel
+- Without WaitForMessage, your session ends and teammates are abandoned
+- You MUST call WaitForMessage repeatedly in a loop — one call per teammate response
+
+### Common mistake (DO NOT DO THIS):
+```
+BAD:  Spawn teammates → "I've assigned the work, my job is done" → session ends
+GOOD: Spawn teammates → WaitForMessage loop → receive all results → shutdown sequence → session ends
+```
 
 ## Commit Markers (MANDATORY)
 
@@ -376,7 +407,12 @@ The cycle is NOT complete until this final README update is committed and pushed
 - Clean up worktrees after every PR: `git worktree remove PATH`
 - NEVER revert prior macOS/curl-bash compatibility fixes
 
-Begin now. Spawn the team and start working. DO NOT EXIT until all teammates are shut down and all cleanup is complete per the Lifecycle Management section above.
+Begin now. Your session has THREE phases — all are mandatory:
+1. **Setup** — Update README, create team, spawn teammates via SendMessage
+2. **Monitor** — Call WaitForMessage in a loop until ALL teammates report back. This is the longest phase. Do NOT skip it.
+3. **Shutdown** — Run the full shutdown sequence, update README, then exit
+
+If you end your conversation after phase 1, the cycle FAILS — teammates are orphaned. You MUST reach phase 3.
 PROMPT_EOF
 }
 
