@@ -1063,7 +1063,7 @@
     "exoscale/amazonq": "missing",
     "exoscale/cline": "implemented",
     "exoscale/gptme": "implemented",
-    "exoscale/opencode": "missing",
+    "exoscale/opencode": "implemented",
     "exoscale/plandex": "implemented",
     "exoscale/kilocode": "missing",
     "exoscale/continue": "missing"
