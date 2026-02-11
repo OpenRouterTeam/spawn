@@ -1007,7 +1007,7 @@
     "e2b/continue": "implemented",
     "modal/continue": "implemented",
     "fly/continue": "implemented",
-    "civo/continue": "missing",
+    "civo/continue": "implemented",
     "scaleway/continue": "implemented",
     "daytona/continue": "implemented",
     "upcloud/continue": "implemented",
