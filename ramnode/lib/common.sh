@@ -128,16 +128,15 @@ ensure_ramnode_credentials() {
         fi
     fi
 
-    # Try to load from config file
+    # Try to load from config file (single python3 call instead of 3)
     local config_file="$HOME/.config/spawn/ramnode.json"
-    if [[ -f "$config_file" ]]; then
-        log_info "Loading RamNode credentials from $config_file..."
-        RAMNODE_USERNAME=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('username', ''))" "$config_file" 2>/dev/null || echo "")
-        RAMNODE_PASSWORD=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('password', ''))" "$config_file" 2>/dev/null || echo "")
-        RAMNODE_PROJECT_ID=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('project_id', ''))" "$config_file" 2>/dev/null || echo "")
-
-        if [[ -n "$RAMNODE_USERNAME" && -n "$RAMNODE_PASSWORD" && -n "$RAMNODE_PROJECT_ID" ]]; then
-            export RAMNODE_USERNAME RAMNODE_PASSWORD RAMNODE_PROJECT_ID
+    local creds
+    if creds=$(_load_json_config_fields "$config_file" username password project_id); then
+        local saved_user saved_pass saved_pid
+        { read -r saved_user; read -r saved_pass; read -r saved_pid; } <<< "${creds}"
+        if [[ -n "$saved_user" ]] && [[ -n "$saved_pass" ]] && [[ -n "$saved_pid" ]]; then
+            log_info "Loading RamNode credentials from $config_file..."
+            export RAMNODE_USERNAME="$saved_user" RAMNODE_PASSWORD="$saved_pass" RAMNODE_PROJECT_ID="$saved_pid"
             if test_ramnode_credentials; then
                 return 0
             fi
@@ -161,20 +160,10 @@ ensure_ramnode_credentials() {
         return 1
     fi
 
-    # Save to config file
-    log_info "Saving credentials to $config_file..."
-    mkdir -p "$(dirname "$config_file")"
-    python3 -c "
-import json, sys
-config = {
-    'username': sys.argv[2],
-    'password': sys.argv[3],
-    'project_id': sys.argv[4]
-}
-with open(sys.argv[1], 'w') as f:
-    json.dump(config, f, indent=2)
-" "$config_file" "$RAMNODE_USERNAME" "$RAMNODE_PASSWORD" "$RAMNODE_PROJECT_ID"
-    chmod 600 "$config_file"
+    _save_json_config "$config_file" \
+        username "$RAMNODE_USERNAME" \
+        password "$RAMNODE_PASSWORD" \
+        project_id "$RAMNODE_PROJECT_ID"
 
     return 0
 }

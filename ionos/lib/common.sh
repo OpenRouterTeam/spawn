@@ -93,12 +93,15 @@ ensure_ionos_credentials() {
 
     # Check environment variables first
     if [[ -z "${IONOS_USERNAME:-}" ]] || [[ -z "${IONOS_PASSWORD:-}" ]]; then
-        # Try loading from config file
-        if [[ -f "$config_file" ]]; then
-            log_info "Loading IONOS credentials from $config_file"
-            IONOS_USERNAME=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('username',''))" "$config_file" 2>/dev/null || echo "")
-            IONOS_PASSWORD=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('password',''))" "$config_file" 2>/dev/null || echo "")
-            export IONOS_USERNAME IONOS_PASSWORD
+        # Try loading from config file (single python3 call instead of 2)
+        local creds
+        if creds=$(_load_json_config_fields "$config_file" username password); then
+            local saved_user saved_pass
+            { read -r saved_user; read -r saved_pass; } <<< "${creds}"
+            if [[ -n "$saved_user" ]] && [[ -n "$saved_pass" ]]; then
+                log_info "Loading IONOS credentials from $config_file"
+                export IONOS_USERNAME="$saved_user" IONOS_PASSWORD="$saved_pass"
+            fi
         fi
     fi
 
@@ -120,11 +123,7 @@ ensure_ionos_credentials() {
             return 1
         fi
 
-        # Save to config file (use json_escape to prevent injection)
-        mkdir -p "$(dirname "$config_file")"
-        printf '{\n  "username": %s,\n  "password": %s\n}\n' "$(json_escape "$IONOS_USERNAME")" "$(json_escape "$IONOS_PASSWORD")" > "$config_file"
-        chmod 600 "$config_file"
-        log_info "Credentials saved to $config_file"
+        _save_json_config "$config_file" username "$IONOS_USERNAME" password "$IONOS_PASSWORD"
     else
         # Test existing credentials
         log_info "Testing IONOS credentials..."

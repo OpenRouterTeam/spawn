@@ -1603,6 +1603,60 @@ ensure_api_token_with_provider() {
 }
 
 # ============================================================
+# Multi-credential configuration helpers
+# ============================================================
+
+# Load multiple fields from a JSON config file in a single python3 call.
+# Outputs each field value on a separate line. Returns 1 if file missing or parse fails.
+# Usage: local creds; creds=$(_load_json_config_fields CONFIG_FILE field1 field2 ...)
+# Then:  { read -r var1; read -r var2; ... } <<< "${creds}"
+_load_json_config_fields() {
+    local config_file="${1}"; shift
+    [[ -f "${config_file}" ]] || return 1
+
+    local py_fields=""
+    for field in "$@"; do
+        py_fields="${py_fields}print(d.get('${field}', ''));"
+    done
+
+    python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+${py_fields}
+" "${config_file}" 2>/dev/null || return 1
+}
+
+# Save key-value pairs to a JSON config file using json_escape for safe encoding.
+# Usage: _save_json_config CONFIG_FILE key1 val1 key2 val2 ...
+_save_json_config() {
+    local config_file="${1}"; shift
+
+    mkdir -p "$(dirname "${config_file}")"
+
+    # Build JSON object from key=value pairs
+    local json="{"
+    local first=true
+    while [[ $# -ge 2 ]]; do
+        local key="${1}"; shift
+        local val="${1}"; shift
+        if [[ "${first}" == "true" ]]; then
+            first=false
+        else
+            json="${json},"
+        fi
+        json="${json}
+  \"${key}\": $(json_escape "${val}")"
+    done
+    json="${json}
+}
+"
+
+    printf '%s\n' "${json}" > "${config_file}"
+    chmod 600 "${config_file}"
+    log_info "Credentials saved to ${config_file}"
+}
+
+# ============================================================
 # Configuration file helpers
 # ============================================================
 

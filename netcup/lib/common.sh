@@ -133,16 +133,17 @@ ensure_netcup_credentials() {
         fi
     fi
 
-    # Try loading from config file
-    if [[ -f "$config_file" ]]; then
-        log_info "Loading Netcup credentials from $config_file"
-        NETCUP_CUSTOMER_NUMBER=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('customer_number',''))" "$config_file" 2>/dev/null || echo "")
-        NETCUP_API_KEY=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_key',''))" "$config_file" 2>/dev/null || echo "")
-        NETCUP_API_PASSWORD=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_password',''))" "$config_file" 2>/dev/null || echo "")
-        export NETCUP_CUSTOMER_NUMBER NETCUP_API_KEY NETCUP_API_PASSWORD
-
-        if test_netcup_credentials; then
-            return 0
+    # Try loading from config file (single python3 call instead of 3)
+    local creds
+    if creds=$(_load_json_config_fields "$config_file" customer_number api_key api_password); then
+        local saved_num saved_key saved_pass
+        { read -r saved_num; read -r saved_key; read -r saved_pass; } <<< "${creds}"
+        if [[ -n "$saved_num" ]] && [[ -n "$saved_key" ]] && [[ -n "$saved_pass" ]]; then
+            log_info "Loading Netcup credentials from $config_file"
+            export NETCUP_CUSTOMER_NUMBER="$saved_num" NETCUP_API_KEY="$saved_key" NETCUP_API_PASSWORD="$saved_pass"
+            if test_netcup_credentials; then
+                return 0
+            fi
         fi
     fi
 
@@ -162,20 +163,10 @@ ensure_netcup_credentials() {
         return 1
     fi
 
-    # Save to config file
-    log_info "Saving credentials to $config_file"
-    mkdir -p "$(dirname "$config_file")"
-    python3 -c "
-import json, sys
-config = {
-    'customer_number': sys.argv[2],
-    'api_key': sys.argv[3],
-    'api_password': sys.argv[4]
-}
-with open(sys.argv[1], 'w') as f:
-    json.dump(config, f, indent=2)
-" "$config_file" "$NETCUP_CUSTOMER_NUMBER" "$NETCUP_API_KEY" "$NETCUP_API_PASSWORD"
-    chmod 600 "$config_file"
+    _save_json_config "$config_file" \
+        customer_number "$NETCUP_CUSTOMER_NUMBER" \
+        api_key "$NETCUP_API_KEY" \
+        api_password "$NETCUP_API_PASSWORD"
 
     return 0
 }
