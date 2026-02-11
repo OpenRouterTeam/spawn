@@ -250,6 +250,7 @@ async function handleNoCommand(prompt: string | undefined): Promise<void> {
 function showVersion(): void {
   console.log(`spawn v${VERSION}`);
   console.log(pc.dim(`  ${process.argv[1] ?? "unknown path"}`));
+  console.log(pc.dim(`  ${process.versions.bun ? "bun" : "node"} ${process.versions.bun ?? process.versions.node}  ${process.platform} ${process.arch}`));
   console.log(pc.dim(`  Run ${pc.cyan("spawn update")} to check for updates.`));
 }
 
