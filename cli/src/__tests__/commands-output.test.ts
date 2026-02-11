@@ -187,10 +187,9 @@ describe("Command Output Functions", () => {
     it("should show agent count per cloud", async () => {
       await cmdClouds();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      // sprite has 2 agents (claude, aider), hetzner has 1 (claude)
-      expect(output).toContain("2 agents");
-      expect(output).toContain("1 agent");
-      expect(output).not.toContain("1 agents");
+      // sprite has 2 agents (claude, aider), hetzner has 1 (claude) - shown as X/Y ratio
+      expect(output).toContain("2/2");
+      expect(output).toContain("1/2");
     });
 
     it("should show cloud descriptions", async () => {

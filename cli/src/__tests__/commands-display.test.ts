@@ -386,26 +386,24 @@ describe("Commands Display Output", () => {
       expect(output).toContain("Hetzner Cloud");
     });
 
-    it("should show agent counts for each cloud", async () => {
+    it("should show agent counts for each cloud as ratio", async () => {
       await cmdClouds();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
-      // sprite has 2 agents, hetzner has 1 agent
-      expect(output).toContain("2 agents");
-      expect(output).toContain("1 agent");
+      // sprite has 2/2 agents, hetzner has 1/2 agents - shown as X/Y ratio
+      expect(output).toContain("2/2");
+      expect(output).toContain("1/2");
     });
 
-    it("should show correct singular/plural for agent count", async () => {
+    it("should group clouds by type", async () => {
       await cmdClouds();
-      const calls = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
-      // hetzner has 1 agent (singular)
-      const hetznerLine = calls.find(
-        (line: string) => line.includes("hetzner") && line.includes("agent")
-      );
-      expect(hetznerLine).toBeDefined();
-      expect(hetznerLine).toContain("1 agent");
-      expect(hetznerLine).not.toContain("1 agents");
+      const output = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .join("\n");
+      // Mock manifest has clouds with types "vm" and "cloud"
+      expect(output).toContain("vm");
+      expect(output).toContain("cloud");
     });
 
     it("should show cloud descriptions", async () => {
