@@ -42,10 +42,8 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-# 6. Prompt for model ID
-echo ""
-MODEL_ID=$(safe_read "Enter model ID (default: openrouter/auto): ")
-MODEL_ID="${MODEL_ID:-openrouter/auto}"
+# 6. Get model preference
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
 
 # 7. Inject environment variables
 log_step "Setting up environment variables..."

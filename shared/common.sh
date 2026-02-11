@@ -338,8 +338,12 @@ get_model_id_interactive() {
     local default_model="${1:-openrouter/auto}"
     local agent_name="${2:-}"
 
-    # If MODEL_ID is already set in the environment, use it without prompting
+    # If MODEL_ID is already set in the environment, validate and use it without prompting
     if [[ -n "${MODEL_ID:-}" ]]; then
+        if ! validate_model_id "${MODEL_ID}"; then
+            log_error "MODEL_ID environment variable contains invalid characters"
+            return 1
+        fi
         echo "${MODEL_ID}"
         return 0
     fi
