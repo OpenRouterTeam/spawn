@@ -386,7 +386,7 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
 
   printDryRunSection("Agent", buildAgentLines(manifest.agents[agent]));
   printDryRunSection("Cloud", buildCloudLines(manifest.clouds[cloud]));
-  printDryRunSection("Script", [`  URL: https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`]);
+  printDryRunSection("Script", [`  URL: ${RAW_BASE}/${cloud}/${agent}.sh`]);
 
   const env = manifest.agents[agent].env;
   if (env) {
@@ -706,7 +706,7 @@ function renderCompactList(manifest: Manifest, agents: string[], clouds: string[
   const totalClouds = clouds.length;
 
   console.log();
-  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Missing"));
+  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Not yet available"));
   console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + 30)));
 
   for (const a of agents) {
@@ -849,7 +849,9 @@ function showListFooter(records: SpawnRecord[], agentFilter?: string, cloudFilte
   const latest = records[0];
   if (latest.prompt) {
     const shortPrompt = latest.prompt.length > 30 ? latest.prompt.slice(0, 30) + "..." : latest.prompt;
-    console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud} --prompt "${shortPrompt}"`)}`);
+    // Escape double quotes so the suggested command is valid shell
+    const safePrompt = shortPrompt.replace(/"/g, '\\"');
+    console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud} --prompt "${safePrompt}"`)}`);
   } else {
     console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud}`)}`);
   }
@@ -916,19 +918,29 @@ function buildRecordHint(r: SpawnRecord): string {
 }
 
 export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
-  const records = filterHistory(agentFilter, cloudFilter);
-
-  if (records.length === 0) {
-    await showEmptyListMessage(agentFilter, cloudFilter);
-    return;
-  }
-
-  // Try to load manifest for display names (fall back to raw keys if unavailable)
+  // Try to load manifest early so we can resolve display names in filters
   let manifest: Manifest | null = null;
   try {
     manifest = await loadManifest();
   } catch {
     // Manifest unavailable -- show raw keys
+  }
+
+  // Resolve display names to keys (e.g., "Claude Code" -> "claude")
+  if (manifest && agentFilter) {
+    const resolved = resolveAgentKey(manifest, agentFilter);
+    if (resolved) agentFilter = resolved;
+  }
+  if (manifest && cloudFilter) {
+    const resolved = resolveCloudKey(manifest, cloudFilter);
+    if (resolved) cloudFilter = resolved;
+  }
+
+  const records = filterHistory(agentFilter, cloudFilter);
+
+  if (records.length === 0) {
+    await showEmptyListMessage(agentFilter, cloudFilter);
+    return;
   }
 
   // Interactive mode: show a select picker so user can choose a spawn to rerun

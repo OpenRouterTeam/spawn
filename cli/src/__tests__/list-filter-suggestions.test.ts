@@ -266,7 +266,7 @@ describe("cmdList - filter suggestions", () => {
       expect(infoCalls.some((msg: string) => msg.includes("Did you mean") && msg.includes("claude"))).toBe(true);
     });
 
-    it("should suggest agent when filter matches display name case-insensitively", async () => {
+    it("should resolve display name to key and find matching records", async () => {
       writeFileSync(
         join(testDir, "history.json"),
         JSON.stringify([{ agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" }])
@@ -274,10 +274,13 @@ describe("cmdList - filter suggestions", () => {
       await setManifest(mockManifest);
 
       // "Claude Code" resolves to "claude" via resolveAgentKey display name match
+      // so records should be found directly without needing a suggestion
       await cmdList("Claude Code");
 
-      const infoCalls = getAllClackInfo();
-      expect(infoCalls.some((msg: string) => msg.includes("Did you mean") && msg.includes("claude"))).toBe(true);
+      const logCalls = consoleMocks.log.mock.calls.map((c: any[]) => String(c[0] ?? "")).join("\n");
+      // Should find the record and show it (table header visible)
+      expect(logCalls).toContain("AGENT");
+      expect(logCalls).toContain("claude");
     });
 
     it("should not suggest when agent filter is completely unrelated", async () => {
@@ -325,7 +328,7 @@ describe("cmdList - filter suggestions", () => {
       expect(infoCalls.some((msg: string) => msg.includes("Did you mean") && msg.includes("sprite"))).toBe(true);
     });
 
-    it("should suggest cloud when filter matches display name", async () => {
+    it("should resolve cloud display name to key and find matching records", async () => {
       writeFileSync(
         join(testDir, "history.json"),
         JSON.stringify([{ agent: "claude", cloud: "hetzner", timestamp: "2026-01-01T00:00:00Z" }])
@@ -333,10 +336,13 @@ describe("cmdList - filter suggestions", () => {
       await setManifest(mockManifest);
 
       // "Hetzner Cloud" resolves to "hetzner" via resolveCloudKey display name match
+      // so records should be found directly without needing a suggestion
       await cmdList(undefined, "Hetzner Cloud");
 
-      const infoCalls = getAllClackInfo();
-      expect(infoCalls.some((msg: string) => msg.includes("Did you mean") && msg.includes("hetzner"))).toBe(true);
+      const logCalls = consoleMocks.log.mock.calls.map((c: any[]) => String(c[0] ?? "")).join("\n");
+      // Should find the record and show it (table header visible)
+      expect(logCalls).toContain("AGENT");
+      expect(logCalls).toContain("hetzner");
     });
 
     it("should not suggest cloud when filter is completely unrelated", async () => {
@@ -620,10 +626,10 @@ describe("cmdMatrix - compact vs grid view", () => {
       await cmdMatrix();
 
       const output = getOutput();
-      // Compact view shows "all clouds supported" or "Missing" column
+      // Compact view shows "all clouds supported" or "Not yet available" column
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Missing");
+      expect(output).toContain("Not yet available");
     });
 
     it("should show green for fully-supported agents in compact view", async () => {
