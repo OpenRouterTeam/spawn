@@ -77,8 +77,8 @@ ensure_ionos_credentials() {
         # Try loading from config file
         if [[ -f "$config_file" ]]; then
             log_info "Loading IONOS credentials from $config_file"
-            IONOS_USERNAME=$(python3 -c "import json; print(json.load(open('$config_file')).get('username',''))" 2>/dev/null || echo "")
-            IONOS_PASSWORD=$(python3 -c "import json; print(json.load(open('$config_file')).get('password',''))" 2>/dev/null || echo "")
+            IONOS_USERNAME=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('username',''))" "$config_file" 2>/dev/null || echo "")
+            IONOS_PASSWORD=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('password',''))" "$config_file" 2>/dev/null || echo "")
             export IONOS_USERNAME IONOS_PASSWORD
         fi
     fi
@@ -101,9 +101,9 @@ ensure_ionos_credentials() {
             return 1
         fi
 
-        # Save to config file
+        # Save to config file (use json_escape to prevent injection)
         mkdir -p "$(dirname "$config_file")"
-        python3 -c "import json; json.dump({'username': '$IONOS_USERNAME', 'password': '$IONOS_PASSWORD'}, open('$config_file', 'w'))"
+        printf '{\n  "username": %s,\n  "password": %s\n}\n' "$(json_escape "$IONOS_USERNAME")" "$(json_escape "$IONOS_PASSWORD")" > "$config_file"
         chmod 600 "$config_file"
         log_info "Credentials saved to $config_file"
     else
@@ -196,6 +196,12 @@ get_server_name() {
 ensure_datacenter() {
     local location="${IONOS_LOCATION:-us/las}"
 
+    # Validate location format (e.g., us/las, de/fra, de/txl)
+    if [[ ! "$location" =~ ^[a-z]{2}/[a-z]{2,4}$ ]]; then
+        log_error "Invalid IONOS_LOCATION format: '$location' (expected format: us/las)"
+        return 1
+    fi
+
     log_warn "Checking for existing IONOS datacenter..."
 
     # List datacenters
@@ -257,6 +263,12 @@ create_server() {
 
     # Validate env var inputs
     validate_resource_name "$name" || { log_error "Invalid server name"; return 1; }
+
+    # Validate numeric env vars to prevent injection in Python strings
+    if [[ ! "$cores" =~ ^[0-9]+$ ]] || [[ ! "$ram" =~ ^[0-9]+$ ]] || [[ ! "$disk_size" =~ ^[0-9]+$ ]]; then
+        log_error "IONOS_CORES, IONOS_RAM, and IONOS_DISK_SIZE must be positive integers"
+        return 1
+    fi
 
     log_warn "Creating IONOS server '$name' (cores: $cores, ram: ${ram}MB, disk: ${disk_size}GB)..."
 

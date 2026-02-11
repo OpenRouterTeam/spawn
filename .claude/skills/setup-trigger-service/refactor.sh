@@ -488,10 +488,51 @@ log "Hard timeout: ${HARD_TIMEOUT}s"
 # NOTE: VM keep-alive is handled by the trigger server streaming output back
 # to the GitHub Actions runner. The long-lived HTTP response keeps Sprite alive.
 
-# Run Claude Code with the prompt file, enforcing a hard timeout
-CLAUDE_EXIT=0
-timeout --signal=TERM --kill-after=60 "${HARD_TIMEOUT}" \
-    claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+# Activity watchdog: kill claude if no output for IDLE_TIMEOUT seconds.
+# This catches hung API calls (pre-flight check hangs, network issues) much
+# faster than the hard timeout. The next cron trigger starts a fresh cycle.
+IDLE_TIMEOUT=180  # 3 minutes of silence = hung
+
+# Run claude in background so we can monitor output activity
+claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" &
+PIPE_PID=$!
+
+# Watchdog loop: check log file growth every 10 seconds
+LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+IDLE_SECONDS=0
+WALL_START=$(date +%s)
+
+while kill -0 "${PIPE_PID}" 2>/dev/null; do
+    sleep 10
+    CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+    WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
+
+    if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
+        IDLE_SECONDS=$((IDLE_SECONDS + 10))
+        if [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
+            log "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
+            # Kill the entire process group spawned by the pipe
+            kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
+            # Also kill any claude processes we spawned
+            pkill -P "${PIPE_PID}" 2>/dev/null || true
+            break
+        fi
+    else
+        IDLE_SECONDS=0
+        LAST_SIZE="${CURR_SIZE}"
+    fi
+
+    # Hard wall-clock timeout as final safety net
+    if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
+        log "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
+        kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
+        pkill -P "${PIPE_PID}" 2>/dev/null || true
+        break
+    fi
+done
+
+wait "${PIPE_PID}" 2>/dev/null
+CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
     log "Cycle completed successfully"
@@ -513,10 +554,15 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" 2>&1 | tee -a "${LOG_
     # Create checkpoint
     log "Creating checkpoint..."
     sprite-env checkpoint create --comment "${RUN_MODE} cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
+    log "Cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
+
+    # Still checkpoint partial work
+    log "Creating checkpoint for partial work..."
+    sprite-env checkpoint create --comment "${RUN_MODE} cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
 elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     log "Cycle timed out after ${HARD_TIMEOUT}s — killed by hard timeout"
 
-    # Still create checkpoint for any partial work that was merged
     log "Creating checkpoint for partial work..."
     sprite-env checkpoint create --comment "${RUN_MODE} cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
 else
