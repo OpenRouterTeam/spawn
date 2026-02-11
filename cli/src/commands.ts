@@ -435,11 +435,11 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
     p.log.error("Spawn script failed");
     console.error("\nError:", errMsg);
     console.error("\nCommon causes:");
+    console.error("  - Missing OPENROUTER_API_KEY (get one at https://openrouter.ai/settings/keys)");
     console.error("  - Missing cloud provider credentials (API key, token, etc.)");
     console.error("  - Cloud provider API rate limit or quota exceeded");
     console.error("  - Missing local dependencies (SSH, curl, etc.)");
-    console.error(`\nCheck the cloud provider README for setup instructions:`);
-    console.error(`  ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloud}`)}`);
+    console.error(`\nRun ${pc.cyan(`spawn ${cloud}`)} to see setup instructions for this provider.`);
     process.exit(1);
   }
 }
@@ -708,11 +708,12 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   if (implClouds.length > 0) {
     const exampleCloud = implClouds[0];
     const authVars = parseAuthEnvVars(manifest.clouds[exampleCloud].auth);
+    const cloudName = manifest.clouds[exampleCloud].name;
     console.log();
     console.log(pc.bold("Quick start:"));
-    console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}`);
+    console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
     if (authVars.length > 0) {
-      console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}`);
+      console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}  ${pc.dim(`# ${cloudName} credential`)}`);
     }
     console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
   }
@@ -763,7 +764,7 @@ function printCloudQuickStart(
 ): void {
   console.log();
   console.log(pc.bold("Quick start:"));
-  console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}`);
+  console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
   if (authVars.length > 0) {
     for (const v of authVars) {
       console.log(`  ${pc.cyan(`export ${v}=your-${v.toLowerCase().replace(/_/g, "-")}-here`)}`);
@@ -913,7 +914,7 @@ ${pc.bold("AUTHENTICATION")}
   ${pc.dim("OPENROUTER_API_KEY")}=sk-or-v1-... spawn claude sprite
 
   Each cloud provider has its own auth requirements.
-  Run ${pc.cyan("spawn <agent> <cloud>")} to see specific instructions.
+  Run ${pc.cyan("spawn <cloud>")} to see setup instructions for a specific provider.
 
 ${pc.bold("INSTALL")}
   curl -fsSL ${RAW_BASE}/cli/install.sh | bash
