@@ -1207,7 +1207,7 @@
     "ramnode/aider": "implemented",
     "ramnode/goose": "implemented",
     "ramnode/codex": "missing",
-    "ramnode/interpreter": "missing",
+    "ramnode/interpreter": "implemented",
     "ramnode/gemini": "missing",
     "ramnode/amazonq": "missing",
     "ramnode/cline": "missing",
