@@ -262,7 +262,7 @@
       "exec_method": "ssh root@IP",
       "interactive_method": "ssh -t root@IP",
       "defaults": {
-        "server_type": "cx22",
+        "server_type": "cx23",
         "location": "fsn1",
         "image": "ubuntu-24.04"
       }
@@ -415,8 +415,8 @@
       "exec_method": "ssh root@IP",
       "interactive_method": "ssh -t root@IP",
       "defaults": {
-        "size": "g3.medium",
-        "region": "NYC1",
+        "size": "g4s.small",
+        "region": "lon1",
         "image": "ubuntu-jammy"
       },
       "notes": "Fast provisioning (~45s), free data transfer, hourly billing. NVMe storage."

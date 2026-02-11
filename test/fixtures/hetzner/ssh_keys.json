@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "pagination": {
+      "last_page": 1,
+      "next_page": null,
+      "page": 1,
+      "per_page": 25,
+      "previous_page": null,
+      "total_entries": 1
+    }
+  },
+  "ssh_keys": [
+    {
+      "created": "2026-02-10T20:10:10Z",
+      "fingerprint": "af:0d:c5:57:a8:fd:b2:82:5e:d4:c1:65:f0:0c:8a:9d",
+      "id": 107129777,
+      "labels": {},
+      "name": "spawn-OusamaMacbook.local-1770754210",
+      "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHmcVdzydp72a/B69nmENZvCvjuk7xGpKdi5CvhkmNsv ahmed"
+    }
+  ]
+}

@@ -105,7 +105,7 @@ get_server_name() {
 
 # Get the default network ID for the region
 get_default_network_id() {
-    local region="${1:-NYC1}"
+    local region="${1:-lon1}"
     local response
     response=$(civo_api GET "/networks?region=$region")
     local network_id
@@ -131,9 +131,9 @@ if data:
 
 # Get Ubuntu disk image template ID
 get_ubuntu_template_id() {
-    local region="${1:-NYC1}"
+    local region="${1:-lon1}"
     local response
-    response=$(civo_api GET "/disk_images")
+    response=$(civo_api GET "/disk_images?region=${region}")
     local template_id
     template_id=$(python3 -c "
 import json, sys
@@ -222,7 +222,8 @@ wait_for_civo_instance() {
     local attempt=1
     while [[ "$attempt" -le "$max_attempts" ]]; do
         local status_response
-        status_response=$(civo_api GET "/instances/$server_id")
+        local region="${CIVO_REGION:-lon1}"
+        status_response=$(civo_api GET "/instances/$server_id?region=$region")
         local status
         status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('status',''))")
 
@@ -246,8 +247,8 @@ wait_for_civo_instance() {
 
 create_server() {
     local name="$1"
-    local size="${CIVO_SIZE:-g3.medium}"
-    local region="${CIVO_REGION:-NYC1}"
+    local size="${CIVO_SIZE:-g4s.small}"
+    local region="${CIVO_REGION:-lon1}"
 
     # Validate env var inputs to prevent injection into Python code
     validate_resource_name "$size" || { log_error "Invalid CIVO_SIZE"; return 1; }
@@ -335,13 +336,14 @@ interactive_session() {
 
 destroy_server() {
     local server_id="$1"
+    local region="${CIVO_REGION:-lon1}"
     log_warn "Destroying instance $server_id..."
-    civo_api DELETE "/instances/$server_id"
+    civo_api DELETE "/instances/$server_id?region=$region"
     log_info "Instance $server_id destroyed"
 }
 
 list_servers() {
-    local region="${CIVO_REGION:-NYC1}"
+    local region="${CIVO_REGION:-lon1}"
     local response
     response=$(civo_api GET "/instances?region=$region")
     python3 -c "

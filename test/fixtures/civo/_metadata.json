@@ -1,0 +1,9 @@
+{
+  "cloud": "civo",
+  "recorded_at": "2026-02-11T02:07:07Z",
+  "fixtures": {
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-11T02:07:02Z"},
+    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-11T02:07:03Z"},
+    "ssh_keys": {"endpoint": "/sshkeys", "recorded_at": "2026-02-11T02:07:04Z"}
+  }
+}

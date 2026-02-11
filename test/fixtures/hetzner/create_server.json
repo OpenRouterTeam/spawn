@@ -1,0 +1,318 @@
+{
+  "action": {
+    "command": "create_server",
+    "error": null,
+    "finished": null,
+    "id": 610873205655089,
+    "progress": 0,
+    "resources": [
+      {
+        "id": 120704776,
+        "type": "server"
+      },
+      {
+        "id": 161547269,
+        "type": "image"
+      }
+    ],
+    "started": "2026-02-11T03:07:26Z",
+    "status": "running"
+  },
+  "next_actions": [
+    {
+      "command": "start_server",
+      "error": null,
+      "finished": null,
+      "id": 610873205655090,
+      "parent_id": 610873205655089,
+      "progress": 0,
+      "resources": [
+        {
+          "id": 120704776,
+          "type": "server"
+        }
+      ],
+      "started": "2026-02-11T03:07:26Z",
+      "status": "running"
+    }
+  ],
+  "root_password": null,
+  "server": {
+    "backup_window": null,
+    "created": "2026-02-11T03:07:26Z",
+    "datacenter": {
+      "description": "Nuremberg 1 virtual DC 3",
+      "id": 2,
+      "location": {
+        "city": "Nuremberg",
+        "country": "DE",
+        "description": "Nuremberg DC Park 1",
+        "id": 2,
+        "latitude": 49.452102,
+        "longitude": 11.076665,
+        "name": "nbg1",
+        "network_zone": "eu-central"
+      },
+      "name": "nbg1-dc3",
+      "server_types": {
+        "available": [
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          45,
+          93,
+          94,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117
+        ],
+        "available_for_migration": [
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          45,
+          93,
+          94,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117
+        ],
+        "supported": [
+          1,
+          3,
+          5,
+          7,
+          9,
+          11,
+          12,
+          13,
+          14,
+          15,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          104,
+          105,
+          106,
+          107,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117
+        ]
+      }
+    },
+    "id": 120704776,
+    "image": {
+      "architecture": "x86",
+      "bound_to": null,
+      "created": "2024-04-25T13:26:27Z",
+      "created_from": null,
+      "deleted": null,
+      "deprecated": null,
+      "description": "Ubuntu 24.04",
+      "disk_size": 5,
+      "id": 161547269,
+      "image_size": null,
+      "labels": {},
+      "name": "ubuntu-24.04",
+      "os_flavor": "ubuntu",
+      "os_version": "24.04",
+      "protection": {
+        "delete": false
+      },
+      "rapid_deploy": true,
+      "status": "available",
+      "type": "system"
+    },
+    "included_traffic": 0,
+    "ingoing_traffic": 0,
+    "iso": null,
+    "labels": {},
+    "load_balancers": [],
+    "location": {
+      "city": "Nuremberg",
+      "country": "DE",
+      "description": "Nuremberg DC Park 1",
+      "id": 2,
+      "latitude": 49.452102,
+      "longitude": 11.076665,
+      "name": "nbg1",
+      "network_zone": "eu-central"
+    },
+    "locked": false,
+    "name": "spawn-record-1770779245",
+    "outgoing_traffic": 0,
+    "placement_group": null,
+    "primary_disk_size": 40,
+    "private_net": [],
+    "protection": {
+      "delete": false,
+      "rebuild": false
+    },
+    "public_net": {
+      "firewalls": [],
+      "floating_ips": [],
+      "ipv4": {
+        "blocked": false,
+        "dns_ptr": "static.236.114.98.91.clients.your-server.de",
+        "id": 117647239,
+        "ip": "91.98.114.236"
+      },
+      "ipv6": {
+        "blocked": false,
+        "dns_ptr": [],
+        "id": 117647240,
+        "ip": "2a01:4f8:1c1e:e2da::/64"
+      }
+    },
+    "rescue_enabled": false,
+    "server_type": {
+      "architecture": "x86",
+      "category": "cost_optimized",
+      "cores": 2,
+      "cpu_type": "shared",
+      "deprecated": false,
+      "deprecation": null,
+      "description": "CX 23",
+      "disk": 40,
+      "id": 114,
+      "locations": [
+        {
+          "deprecation": null,
+          "id": 1,
+          "name": "fsn1"
+        },
+        {
+          "deprecation": null,
+          "id": 2,
+          "name": "nbg1"
+        },
+        {
+          "deprecation": null,
+          "id": 3,
+          "name": "hel1"
+        }
+      ],
+      "memory": 4,
+      "name": "cx23",
+      "prices": [
+        {
+          "included_traffic": 21990232555520,
+          "location": "fsn1",
+          "price_hourly": {
+            "gross": "0.0056000000000000",
+            "net": "0.0056000000"
+          },
+          "price_monthly": {
+            "gross": "3.4900000000000000",
+            "net": "3.4900000000"
+          },
+          "price_per_tb_traffic": {
+            "gross": "1.2000000000000000",
+            "net": "1.2000000000"
+          }
+        },
+        {
+          "included_traffic": 21990232555520,
+          "location": "hel1",
+          "price_hourly": {
+            "gross": "0.0056000000000000",
+            "net": "0.0056000000"
+          },
+          "price_monthly": {
+            "gross": "3.4900000000000000",
+            "net": "3.4900000000"
+          },
+          "price_per_tb_traffic": {
+            "gross": "1.2000000000000000",
+            "net": "1.2000000000"
+          }
+        },
+        {
+          "included_traffic": 21990232555520,
+          "location": "nbg1",
+          "price_hourly": {
+            "gross": "0.0056000000000000",
+            "net": "0.0056000000"
+          },
+          "price_monthly": {
+            "gross": "3.4900000000000000",
+            "net": "3.4900000000"
+          },
+          "price_per_tb_traffic": {
+            "gross": "1.2000000000000000",
+            "net": "1.2000000000"
+          }
+        }
+      ],
+      "storage_type": "local"
+    },
+    "status": "initializing",
+    "volumes": []
+  }
+}
