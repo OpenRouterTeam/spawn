@@ -1200,7 +1200,7 @@
     "local/opencode": "missing",
     "local/plandex": "missing",
     "local/kilocode": "missing",
-    "local/continue": "missing",
+    "local/continue": "implemented",
     "ramnode/claude": "implemented",
     "ramnode/openclaw": "implemented",
     "ramnode/nanoclaw": "missing",
