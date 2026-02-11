@@ -589,6 +589,22 @@
       },
       "notes": "European cloud provider with bare metal and VPS. Hourly billing. Full root access. Requires CHERRY_AUTH_TOKEN from https://portal.cherryservers.com/"
     },
+    "crusoe": {
+      "name": "Crusoe Cloud",
+      "description": "Crusoe Cloud GPU instances via CLI",
+      "url": "https://crusoecloud.com/",
+      "type": "cli",
+      "auth": "~/.crusoe/config (access_key_id + secret_key)",
+      "provision_method": "crusoe compute vms create with --keyfile and --startup-script",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "vm_type": "a40.1x",
+        "location": "us-east1-a",
+        "image": "ubuntu22.04:latest"
+      },
+      "notes": "GPU cloud provider with NVIDIA H200/H100/L40S/A100 and AMD MI300X. Carbon-reducing infrastructure. Starting at $1.45/GPU-hr. Requires Crusoe CLI and ~/.crusoe/config with API credentials from https://console.crusoecloud.com/"
+    },
     "oracle": {
       "name": "Oracle Cloud Infrastructure",
       "description": "Oracle Cloud compute instances via OCI CLI",
@@ -1148,6 +1164,20 @@
     "cherry/opencode": "implemented",
     "cherry/plandex": "implemented",
     "cherry/kilocode": "implemented",
+    "crusoe/claude": "implemented",
+    "crusoe/openclaw": "implemented",
+    "crusoe/nanoclaw": "missing",
+    "crusoe/aider": "implemented",
+    "crusoe/goose": "missing",
+    "crusoe/codex": "missing",
+    "crusoe/interpreter": "missing",
+    "crusoe/gemini": "missing",
+    "crusoe/amazonq": "missing",
+    "crusoe/cline": "missing",
+    "crusoe/gptme": "missing",
+    "crusoe/opencode": "missing",
+    "crusoe/plandex": "missing",
+    "crusoe/kilocode": "missing",
     "paperspace/claude": "implemented",
     "paperspace/openclaw": "implemented",
     "paperspace/nanoclaw": "implemented",
