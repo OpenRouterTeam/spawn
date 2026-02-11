@@ -1060,7 +1060,7 @@
     "exoscale/codex": "missing",
     "exoscale/interpreter": "implemented",
     "exoscale/gemini": "implemented",
-    "exoscale/amazonq": "missing",
+    "exoscale/amazonq": "implemented",
     "exoscale/cline": "implemented",
     "exoscale/gptme": "implemented",
     "exoscale/opencode": "missing",
