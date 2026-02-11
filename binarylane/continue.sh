@@ -32,7 +32,8 @@ else
 fi
 
 log_warn "Setting up environment variables..."
-run_server "${BINARYLANE_SERVER_IP}" "echo 'export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}' >> ~/.bashrc"
+inject_env_vars_ssh "${BINARYLANE_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 setup_continue_config "${OPENROUTER_API_KEY}" \
     "upload_file ${BINARYLANE_SERVER_IP}" \
