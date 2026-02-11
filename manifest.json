@@ -1066,6 +1066,6 @@
     "exoscale/opencode": "missing",
     "exoscale/plandex": "implemented",
     "exoscale/kilocode": "missing",
-    "exoscale/continue": "missing"
+    "exoscale/continue": "implemented"
   }
 }
