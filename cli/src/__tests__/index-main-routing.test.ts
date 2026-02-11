@@ -174,12 +174,11 @@ describe("index.ts main() routing", () => {
   // ── non-TTY mode with no args ──────────────────────────────────────
 
   describe("non-TTY mode", () => {
-    it("should show help when run without args in non-TTY mode", () => {
-      // When stdin is not a TTY (piped), and no args, it shows help
+    it("should show non-TTY hint when run without args in non-TTY mode", () => {
+      // When stdin is not a TTY (piped), and no args, it shows the non-TTY hint
       const result = runCli([]);
       const output = result.stdout + result.stderr;
-      // In non-TTY mode (subprocess), it should show help output
-      expect(output).toContain("USAGE");
+      expect(output).toContain("No interactive terminal detected");
     });
   });
 });

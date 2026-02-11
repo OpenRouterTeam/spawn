@@ -247,24 +247,24 @@ describe("version flag edge cases", () => {
 // ── Non-TTY behavior ──────────────────────────────────────────────────────
 
 describe("non-TTY behavior", () => {
-  it("should show help output when no args in non-TTY (subprocess) mode", () => {
+  it("should show non-TTY hint when no args in non-TTY (subprocess) mode", () => {
     // Subprocesses don't have TTY stdin, so isInteractiveTTY returns false
     const result = runCli([]);
     const out = output(result);
-    expect(out).toContain("USAGE");
-    expect(result.exitCode).toBe(0);
+    expect(out).toContain("No interactive terminal detected");
+    expect(result.exitCode).toBe(1);
   });
 
-  it("should include EXAMPLES section in non-TTY help", () => {
+  it("should include launch hint in non-TTY output", () => {
     const result = runCli([]);
     const out = output(result);
-    expect(out).toContain("EXAMPLES");
+    expect(out).toContain("spawn <agent> <cloud>");
   });
 
-  it("should include AUTHENTICATION section in non-TTY help", () => {
+  it("should include help hint in non-TTY output", () => {
     const result = runCli([]);
     const out = output(result);
-    expect(out).toContain("AUTHENTICATION");
+    expect(out).toContain("spawn help");
   });
 });
 
