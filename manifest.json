@@ -1177,7 +1177,7 @@
     "netcup/aider": "implemented",
     "netcup/goose": "implemented",
     "netcup/codex": "implemented",
-    "netcup/interpreter": "missing",
+    "netcup/interpreter": "implemented",
     "netcup/gemini": "missing",
     "netcup/amazonq": "missing",
     "netcup/cline": "missing",
