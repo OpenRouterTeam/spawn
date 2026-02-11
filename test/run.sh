@@ -136,6 +136,34 @@ assert_exit_code() {
     fi
 }
 
+# Run a shared/common.sh function and assert it succeeds (exit 0)
+assert_common_succeeds() {
+    local msg="$1" cmd="$2"
+    local result
+    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && '"${cmd}" 2>/dev/null)
+    if [[ "${result}" == "valid" ]]; then
+        printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
+        ((PASSED++))
+    else
+        printf '%b\n' "  ${RED}✗${NC} ${msg}"
+        ((FAILED++))
+    fi
+}
+
+# Run a shared/common.sh function and assert it fails (exit non-zero)
+assert_common_fails() {
+    local msg="$1" cmd="$2"
+    local rc=0
+    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && '"${cmd}" </dev/null >/dev/null 2>&1 || rc=$?
+    if [[ "${rc}" -ne 0 ]]; then
+        printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
+        ((PASSED++))
+    else
+        printf '%b\n' "  ${RED}✗${NC} ${msg}"
+        ((FAILED++))
+    fi
+}
+
 # --- Test runner for a single script ---
 run_script_test() {
     local script_name="$1"
@@ -290,43 +318,44 @@ test_common_source() {
 }
 
 # --- Test shared/common.sh functions ---
-test_shared_common() {
-    echo ""
-    printf '%b\n' "${YELLOW}━━━ Testing shared/common.sh ━━━${NC}"
+# --- shared/common.sh sub-tests (grouped by feature) ---
 
-    # Test 1: validate_model_id accepts valid model IDs
+_test_model_validation() {
+    assert_common_succeeds "validate_model_id accepts valid model IDs" \
+        'validate_model_id "anthropic/claude-3.5-sonnet" && echo "valid"'
+    assert_common_fails "validate_model_id rejects invalid characters" \
+        'validate_model_id "bad;model"'
+    assert_common_succeeds "validate_model_id accepts empty string" \
+        'validate_model_id "" && echo "valid"'
+    assert_common_succeeds "validate_model_id accepts openrouter/auto" \
+        'validate_model_id "openrouter/auto" && echo "valid"'
+    assert_common_succeeds "validate_model_id accepts model IDs with colons" \
+        'validate_model_id "provider/model:version" && echo "valid"'
+
+    # Bulk test: all shell metacharacters must be rejected
+    # Note: backtick excluded due to shell escaping complexity
+    local dangerous_chars=('$' '&' '|' '>' '<' '(' ')' '{' '}' ';' '*' '?' '[' ']')
+    local rejected_count=0
+    local rc
+    for char in "${dangerous_chars[@]}"; do
+        rc=0
+        local test_str
+        test_str=$(printf 'bad%smodel' "${char}")
+        bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id '"$(printf '%q' "${test_str}")" </dev/null >/dev/null 2>&1 || rc=$?
+        [[ "${rc}" -ne 0 ]] && ((rejected_count++))
+    done
+    if [[ "${rejected_count}" -eq "${#dangerous_chars[@]}" ]]; then
+        printf '%b\n' "  ${GREEN}✓${NC} validate_model_id rejects shell metacharacters"
+        ((PASSED++))
+    else
+        printf '%b\n' "  ${RED}✗${NC} validate_model_id should reject all shell metacharacters (${rejected_count}/${#dangerous_chars[@]})"
+        ((FAILED++))
+    fi
+}
+
+_test_json_ssh_utils() {
+    # json_escape
     local result
-    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id "anthropic/claude-3.5-sonnet" && echo "valid"' 2>/dev/null)
-    if [[ "${result}" == "valid" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_model_id accepts valid model IDs"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_model_id should accept 'anthropic/claude-3.5-sonnet'"
-        ((FAILED++))
-    fi
-
-    # Test 2: validate_model_id rejects invalid characters
-    local rc=0
-    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id "bad;model"' </dev/null >/dev/null 2>&1 || rc=$?
-    if [[ "${rc}" -ne 0 ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_model_id rejects invalid characters"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_model_id should reject 'bad;model'"
-        ((FAILED++))
-    fi
-
-    # Test 3: validate_model_id accepts empty string
-    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id "" && echo "valid"' 2>/dev/null)
-    if [[ "${result}" == "valid" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_model_id accepts empty string"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_model_id should accept empty string"
-        ((FAILED++))
-    fi
-
-    # Test 4: json_escape handles special characters
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && json_escape "test\"quote"' 2>/dev/null)
     if [[ "${result}" == *'\\"'* ]] || [[ "${result}" == *'\"'* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} json_escape handles special characters"
@@ -336,7 +365,7 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 5: generate_ssh_key_if_missing creates key if missing
+    # generate_ssh_key_if_missing - creates key
     local test_key="${TEST_DIR}/test_id_ed25519"
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && generate_ssh_key_if_missing "'"${test_key}"'"' >/dev/null 2>&1
     if [[ -f "${test_key}" && -f "${test_key}.pub" ]]; then
@@ -347,7 +376,7 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 6: generate_ssh_key_if_missing skips if key exists
+    # generate_ssh_key_if_missing - skips existing
     local mtime_before
     mtime_before=$(stat -c %Y "${test_key}" 2>/dev/null || stat -f %m "${test_key}" 2>/dev/null)
     sleep 1
@@ -362,7 +391,7 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 7: get_ssh_fingerprint returns fingerprint
+    # get_ssh_fingerprint
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && get_ssh_fingerprint "'"${test_key}.pub"'"' 2>/dev/null)
     if [[ -n "${result}" && "${result}" =~ ^[a-f0-9:]+$ ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_ssh_fingerprint returns valid fingerprint"
@@ -372,7 +401,19 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 8: Syntax check for shared/common.sh
+    # extract_ssh_key_ids
+    local mock_json='{"ssh_keys":[{"id":123},{"id":456}]}'
+    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && echo '"'${mock_json}'"' | extract_ssh_key_ids "$(cat)" "ssh_keys"' 2>/dev/null)
+    if [[ "${result}" == "[123, 456]" ]] || [[ "${result}" == "[123,456]" ]]; then
+        printf '%b\n' "  ${GREEN}✓${NC} extract_ssh_key_ids parses JSON correctly"
+        ((PASSED++))
+    else
+        printf '%b\n' "  ${RED}✗${NC} extract_ssh_key_ids should return [123, 456], got '${result}'"
+        ((FAILED++))
+    fi
+}
+
+_test_syntax_and_logging() {
     if bash -n "${REPO_ROOT}/shared/common.sh" 2>/dev/null; then
         printf '%b\n' "  ${GREEN}✓${NC} shared/common.sh syntax valid"
         ((PASSED++))
@@ -381,7 +422,7 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 9: All logging functions exist in shared/common.sh
+    local output missing
     output=$(bash -c '
         source "'"${REPO_ROOT}"'/shared/common.sh"
         for fn in log_info log_warn log_error; do
@@ -396,19 +437,11 @@ test_shared_common() {
         printf '%b\n' "  ${RED}✗${NC} Missing logging functions: ${missing}"
         ((FAILED++))
     fi
+}
 
-    # Test 10: extract_ssh_key_ids parses JSON correctly
-    local mock_json='{"ssh_keys":[{"id":123},{"id":456}]}'
-    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && echo '"'${mock_json}'"' | extract_ssh_key_ids "$(cat)" "ssh_keys"' 2>/dev/null)
-    if [[ "${result}" == "[123, 456]" ]] || [[ "${result}" == "[123,456]" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} extract_ssh_key_ids parses JSON correctly"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} extract_ssh_key_ids should return [123, 456], got '${result}'"
-        ((FAILED++))
-    fi
-
-    # Test 11: open_browser detects termux-open-url
+_test_browser_and_cloud_init() {
+    # open_browser: termux
+    local result
     result=$(bash -c '
         source "'"${REPO_ROOT}"'/shared/common.sh"
         termux-open-url() { echo "termux: $*"; }
@@ -423,7 +456,7 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 14: open_browser detects macOS open
+    # open_browser: macOS open
     result=$(bash -c '
         source "'"${REPO_ROOT}"'/shared/common.sh"
         open() { echo "macOS: $*"; }
@@ -438,13 +471,11 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 15: open_browser handles missing browsers gracefully
+    # open_browser: fallback message
     local stderr_output
     stderr_output=$(bash -c '
-        # Use minimal PATH to force fallback behavior
         PATH="/usr/bin:/bin"
         source "'"${REPO_ROOT}"'/shared/common.sh"
-        # Mock all browser detection to fail
         command() {
             if [[ "$2" == "termux-open-url" || "$2" == "open" || "$2" == "xdg-open" ]]; then
                 return 1
@@ -462,7 +493,7 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 16: get_cloud_init_userdata returns valid YAML
+    # get_cloud_init_userdata
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && get_cloud_init_userdata' 2>/dev/null)
     if [[ "${result}" == *"#cloud-config"* ]] && [[ "${result}" == *"package_update"* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_cloud_init_userdata returns valid YAML"
@@ -472,7 +503,6 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 17: get_cloud_init_userdata includes required packages
     if [[ "${result}" == *"curl"* ]] && [[ "${result}" == *"git"* ]] && [[ "${result}" == *"zsh"* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_cloud_init_userdata includes required packages"
         ((PASSED++))
@@ -481,7 +511,6 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 18: get_cloud_init_userdata includes Bun and Claude installation
     if [[ "${result}" == *"bun.sh/install"* ]] && [[ "${result}" == *"claude.ai/install"* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_cloud_init_userdata includes Bun and Claude installation"
         ((PASSED++))
@@ -490,7 +519,25 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 19: wait_for_oauth_code returns success when file exists
+    # check_openrouter_connectivity
+    if command -v curl &> /dev/null; then
+        result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && check_openrouter_connectivity && echo "reachable"' 2>/dev/null)
+        if [[ "${result}" == "reachable" ]] || [[ -z "${result}" ]]; then
+            printf '%b\n' "  ${GREEN}✓${NC} check_openrouter_connectivity handles connectivity check"
+            ((PASSED++))
+        else
+            printf '%b\n' "  ${RED}✗${NC} check_openrouter_connectivity should return success or failure gracefully"
+            ((FAILED++))
+        fi
+    else
+        printf '%b\n' "  ${YELLOW}⚠${NC} check_openrouter_connectivity test skipped (curl not available)"
+    fi
+}
+
+_test_oauth_functions() {
+    local rc
+
+    # wait_for_oauth_code - success
     local code_test_file="${TEST_DIR}/oauth_code_test"
     echo "test_code" > "${code_test_file}"
     rc=0
@@ -503,7 +550,7 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 21: wait_for_oauth_code returns failure on timeout
+    # wait_for_oauth_code - timeout
     local missing_file="${TEST_DIR}/missing_oauth_code"
     rc=0
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && wait_for_oauth_code "'"${missing_file}"'" 1' >/dev/null 2>&1 || rc=$?
@@ -515,7 +562,7 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 22: cleanup_oauth_session removes directory
+    # cleanup_oauth_session
     local cleanup_test_dir="${TEST_DIR}/oauth_cleanup_test"
     mkdir -p "${cleanup_test_dir}"
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && cleanup_oauth_session "" "'"${cleanup_test_dir}"'"' >/dev/null 2>&1
@@ -526,11 +573,13 @@ test_shared_common() {
         printf '%b\n' "  ${RED}✗${NC} cleanup_oauth_session should remove directory"
         ((FAILED++))
     fi
+}
 
-    # Test 23: generic_ssh_wait succeeds when command passes
+_test_ssh_wait() {
+    # generic_ssh_wait - success
+    local result
     result=$(bash -c '
         source "'"${REPO_ROOT}"'/shared/common.sh"
-        # Mock ssh that always succeeds
         ssh() { return 0; }
         export -f ssh
         generic_ssh_wait "root" "1.2.3.4" "-o Test" "true" "test" 2 1 2>&1
@@ -544,10 +593,9 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 24: generic_ssh_wait fails after max attempts
+    # generic_ssh_wait - failure
     result=$(bash -c '
         source "'"${REPO_ROOT}"'/shared/common.sh"
-        # Mock ssh that always fails
         ssh() { return 1; }
         export -f ssh
         generic_ssh_wait "root" "1.2.3.4" "-o Test" "false" "test" 2 1 2>&1
@@ -560,9 +608,11 @@ test_shared_common() {
         printf '%b\n' "  ${RED}✗${NC} generic_ssh_wait should return 1 after max attempts, got '${result}'"
         ((FAILED++))
     fi
+}
 
-    # Test 25: safe_read fails when no TTY available
-    rc=0
+_test_input_and_server_validation() {
+    # safe_read without TTY
+    local rc=0
     timeout 5 bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && safe_read "test: "' </dev/null >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} safe_read fails when no TTY available"
@@ -572,138 +622,37 @@ test_shared_common() {
         ((FAILED++))
     fi
 
-    # Test 26: validate_model_id accepts openrouter/auto
-    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id "openrouter/auto" && echo "valid"' 2>/dev/null)
-    if [[ "${result}" == "valid" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_model_id accepts openrouter/auto"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_model_id should accept 'openrouter/auto'"
-        ((FAILED++))
-    fi
+    # validate_server_name
+    assert_common_succeeds "validate_server_name accepts valid names" \
+        'validate_server_name "dev-server-01" && echo "valid"'
+    assert_common_fails "validate_server_name rejects names too short" \
+        'validate_server_name "ab"'
 
-    # Test 27: validate_model_id accepts model IDs with colons
-    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id "provider/model:version" && echo "valid"' 2>/dev/null)
-    if [[ "${result}" == "valid" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_model_id accepts model IDs with colons"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_model_id should accept colons in model IDs"
-        ((FAILED++))
-    fi
-
-    # Test 28: validate_model_id rejects shell metacharacters
-    # Note: backtick excluded due to shell escaping complexity
-    local dangerous_chars=('$' '&' '|' '>' '<' '(' ')' '{' '}' ';' '*' '?' '[' ']')
-    local rejected_count=0
-    for char in "${dangerous_chars[@]}"; do
-        rc=0
-        # Use printf %q to properly escape the character
-        local test_str
-        test_str=$(printf 'bad%smodel' "${char}")
-        bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id '"$(printf '%q' "${test_str}")" </dev/null >/dev/null 2>&1 || rc=$?
-        [[ "${rc}" -ne 0 ]] && ((rejected_count++))
-    done
-    if [[ "${rejected_count}" -eq "${#dangerous_chars[@]}" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_model_id rejects shell metacharacters"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_model_id should reject all shell metacharacters (${rejected_count}/${#dangerous_chars[@]})"
-        ((FAILED++))
-    fi
-
-    # Test 29: validate_server_name accepts valid names
-    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_server_name "dev-server-01" && echo "valid"' 2>/dev/null)
-    if [[ "${result}" == "valid" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_server_name accepts valid names"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_server_name should accept 'dev-server-01'"
-        ((FAILED++))
-    fi
-
-    # Test 30: validate_server_name rejects names too short
-    rc=0
-    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_server_name "ab"' </dev/null >/dev/null 2>&1 || rc=$?
-    if [[ "${rc}" -ne 0 ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_server_name rejects names too short"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_server_name should reject names < 3 characters"
-        ((FAILED++))
-    fi
-
-    # Test 31: validate_server_name rejects names too long
-    rc=0
     local long_name
     long_name=$(printf 'a%.0s' {1..64})
-    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_server_name "'"${long_name}"'"' </dev/null >/dev/null 2>&1 || rc=$?
-    if [[ "${rc}" -ne 0 ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_server_name rejects names too long"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_server_name should reject names > 63 characters"
-        ((FAILED++))
-    fi
+    assert_common_fails "validate_server_name rejects names too long" \
+        'validate_server_name "'"${long_name}"'"'
+    assert_common_fails "validate_server_name rejects leading dash" \
+        'validate_server_name "-server"'
+    assert_common_fails "validate_server_name rejects trailing dash" \
+        'validate_server_name "server-"'
+    assert_common_fails "validate_server_name rejects invalid characters" \
+        'validate_server_name "server_01"'
+    assert_common_fails "validate_server_name rejects empty string" \
+        'validate_server_name ""'
+}
 
-    # Test 32: validate_server_name rejects leading dash
-    rc=0
-    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_server_name "-server"' </dev/null >/dev/null 2>&1 || rc=$?
-    if [[ "${rc}" -ne 0 ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_server_name rejects leading dash"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_server_name should reject names starting with dash"
-        ((FAILED++))
-    fi
+test_shared_common() {
+    echo ""
+    printf '%b\n' "${YELLOW}━━━ Testing shared/common.sh ━━━${NC}"
 
-    # Test 33: validate_server_name rejects trailing dash
-    rc=0
-    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_server_name "server-"' </dev/null >/dev/null 2>&1 || rc=$?
-    if [[ "${rc}" -ne 0 ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_server_name rejects trailing dash"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_server_name should reject names ending with dash"
-        ((FAILED++))
-    fi
-
-    # Test 34: validate_server_name rejects invalid characters
-    rc=0
-    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_server_name "server_01"' </dev/null >/dev/null 2>&1 || rc=$?
-    if [[ "${rc}" -ne 0 ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_server_name rejects invalid characters"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_server_name should reject underscore and special characters"
-        ((FAILED++))
-    fi
-
-    # Test 35: validate_server_name rejects empty string
-    rc=0
-    bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_server_name ""' </dev/null >/dev/null 2>&1 || rc=$?
-    if [[ "${rc}" -ne 0 ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} validate_server_name rejects empty string"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} validate_server_name should reject empty string"
-        ((FAILED++))
-    fi
-
-    # Test 36: check_openrouter_connectivity succeeds with real network
-    # Only run if curl is available and we have network access
-    if command -v curl &> /dev/null; then
-        result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && check_openrouter_connectivity && echo "reachable"' 2>/dev/null)
-        if [[ "${result}" == "reachable" ]] || [[ -z "${result}" ]]; then
-            printf '%b\n' "  ${GREEN}✓${NC} check_openrouter_connectivity handles connectivity check"
-            ((PASSED++))
-        else
-            printf '%b\n' "  ${RED}✗${NC} check_openrouter_connectivity should return success or failure gracefully"
-            ((FAILED++))
-        fi
-    else
-        printf '%b\n' "  ${YELLOW}⚠${NC} check_openrouter_connectivity test skipped (curl not available)"
-    fi
+    _test_model_validation
+    _test_json_ssh_utils
+    _test_syntax_and_logging
+    _test_browser_and_cloud_init
+    _test_oauth_functions
+    _test_ssh_wait
+    _test_input_and_server_validation
 }
 
 # --- Test source detection in each script ---
