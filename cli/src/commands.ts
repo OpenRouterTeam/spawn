@@ -736,18 +736,13 @@ async function validateAndGetCloud(cloud: string): Promise<[manifest: Manifest, 
   return [manifest, cloud];
 }
 
-export async function cmdCloudInfo(cloud: string): Promise<void> {
-  const [manifest, cloudKey] = await validateAndGetCloud(cloud);
-
-  const c = manifest.clouds[cloudKey];
-  printInfoHeader(c);
-  console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}`));
-
-  // Show quick-start with auth setup
-  const authVars = parseAuthEnvVars(c.auth);
-  const implAgents = getImplementedAgents(manifest, cloudKey);
-  const exampleAgent = implAgents[0];
-
+/** Print quick-start auth instructions for a cloud provider */
+function printCloudQuickStart(
+  cloud: { auth: string },
+  authVars: string[],
+  exampleAgent: string | undefined,
+  cloudKey: string
+): void {
   console.log();
   console.log(pc.bold("Quick start:"));
   console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}`);
@@ -755,19 +750,21 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
     for (const v of authVars) {
       console.log(`  ${pc.cyan(`export ${v}=your-${v.toLowerCase().replace(/_/g, "-")}-here`)}`);
     }
-  } else if (c.auth.toLowerCase() !== "none") {
-    console.log(`  ${pc.dim(`Auth: ${c.auth}`)}`);
+  } else if (cloud.auth.toLowerCase() !== "none") {
+    console.log(`  ${pc.dim(`Auth: ${cloud.auth}`)}`);
   }
   if (exampleAgent) {
     console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
   }
+}
 
-  const allAgents = agentKeys(manifest);
-  const missingAgents = allAgents.filter((a) => !implAgents.includes(a));
-  console.log();
-  console.log(pc.bold(`Available agents:`) + pc.dim(` ${implAgents.length} of ${allAgents.length}`));
-  console.log();
-
+/** Print the list of implemented agents and any missing ones */
+function printAgentList(
+  manifest: Manifest,
+  implAgents: string[],
+  missingAgents: string[],
+  cloudKey: string
+): void {
   if (implAgents.length === 0) {
     console.log(pc.dim("  No implemented agents yet."));
   } else {
@@ -781,6 +778,26 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
     console.log();
     console.log(pc.dim(`  Not yet available: ${missingAgents.map((a) => manifest.agents[a].name).join(", ")}`));
   }
+}
+
+export async function cmdCloudInfo(cloud: string): Promise<void> {
+  const [manifest, cloudKey] = await validateAndGetCloud(cloud);
+
+  const c = manifest.clouds[cloudKey];
+  printInfoHeader(c);
+  console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}`));
+
+  const authVars = parseAuthEnvVars(c.auth);
+  const implAgents = getImplementedAgents(manifest, cloudKey);
+  printCloudQuickStart(c, authVars, implAgents[0], cloudKey);
+
+  const allAgents = agentKeys(manifest);
+  const missingAgents = allAgents.filter((a) => !implAgents.includes(a));
+  console.log();
+  console.log(pc.bold(`Available agents:`) + pc.dim(` ${implAgents.length} of ${allAgents.length}`));
+  console.log();
+
+  printAgentList(manifest, implAgents, missingAgents, cloudKey);
 
   console.log();
   console.log(pc.dim(`  Full setup guide: ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloudKey}`)}`));
