@@ -168,6 +168,53 @@ _pick_plan() {
     interactive_pick "HOSTINGER_PLAN" "kvm1" "VPS plans" _list_vps_plans "kvm1"
 }
 
+# Build JSON body for Hostinger VPS creation
+# Pipes cloud-init userdata via stdin to avoid bash quoting issues
+_hostinger_build_create_body() {
+    local name="$1" plan="$2" location="$3" os_template="$4" ssh_key_ids="$5"
+
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+
+    echo "$userdata" | python3 -c "
+import json, sys
+userdata = sys.stdin.read()
+body = {
+    'hostname': '$name',
+    'plan': '$plan',
+    'location': '$location',
+    'os_template': '$os_template',
+    'ssh_keys': $ssh_key_ids,
+    'cloud_init': userdata,
+    'start_after_create': True
+}
+print(json.dumps(body))
+"
+}
+
+# Check Hostinger API response for errors and log diagnostics
+# Returns 0 if error detected, 1 if no error
+_hostinger_handle_create_error() {
+    local response="$1"
+
+    if echo "$response" | grep -q '"error"\|"message".*fail'; then
+        log_error "Failed to create Hostinger VPS"
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','') or d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
+        log_error "API Error: $error_msg"
+        log_error ""
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance or payment method required"
+        log_error "  - Plan/location unavailable (try different HOSTINGER_PLAN or HOSTINGER_LOCATION)"
+        log_error "  - VPS limit reached for your account"
+        log_error "  - Invalid cloud-init userdata"
+        log_error ""
+        log_error "Check your account status: https://hpanel.hostinger.com/"
+        return 0
+    fi
+    return 1
+}
+
 # Create a Hostinger VPS with cloud-init
 create_server() {
     local name="$1"
@@ -194,45 +241,13 @@ create_server() {
     local ssh_key_ids
     ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "keys")
 
-    # Build request body — pipe cloud-init userdata via stdin to avoid bash quoting issues
-    local userdata
-    userdata=$(get_cloud_init_userdata)
-
     local body
-    body=$(echo "$userdata" | python3 -c "
-import json, sys
-userdata = sys.stdin.read()
-body = {
-    'hostname': '$name',
-    'plan': '$plan',
-    'location': '$location',
-    'os_template': '$os_template',
-    'ssh_keys': $ssh_key_ids,
-    'cloud_init': userdata,
-    'start_after_create': True
-}
-print(json.dumps(body))
-")
+    body=$(_hostinger_build_create_body "$name" "$plan" "$location" "$os_template" "$ssh_key_ids")
 
     local response
     response=$(hostinger_api POST "/virtual-machines" "$body")
 
-    # Check for errors
-    if echo "$response" | grep -q '"error"\|"message".*fail'; then
-        log_error "Failed to create Hostinger VPS"
-
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','') or d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient account balance or payment method required"
-        log_error "  - Plan/location unavailable (try different HOSTINGER_PLAN or HOSTINGER_LOCATION)"
-        log_error "  - VPS limit reached for your account"
-        log_error "  - Invalid cloud-init userdata"
-        log_error ""
-        log_error "Check your account status: https://hpanel.hostinger.com/"
+    if _hostinger_handle_create_error "$response"; then
         return 1
     fi
 

@@ -170,6 +170,63 @@ _pick_server_type() {
     unset -f _list_server_types_for_current_location
 }
 
+# Build JSON body for Hetzner server creation
+# Pipes cloud-init userdata via stdin to avoid bash quoting issues
+_hetzner_build_create_body() {
+    local name="$1" server_type="$2" location="$3" image="$4" ssh_key_ids="$5"
+
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+
+    echo "$userdata" | python3 -c "
+import json, sys
+userdata = sys.stdin.read()
+body = {
+    'name': '$name',
+    'server_type': '$server_type',
+    'location': '$location',
+    'image': '$image',
+    'ssh_keys': $ssh_key_ids,
+    'user_data': userdata,
+    'start_after_create': True
+}
+print(json.dumps(body))
+"
+}
+
+# Check Hetzner API response for errors and log diagnostics
+# Hetzner success responses contain "error": null in the action,
+# so we must check if the top-level error is a real object (not null)
+# Returns 0 if error detected, 1 if no error
+_hetzner_check_create_error() {
+    local response="$1"
+
+    local has_error
+    has_error=$(echo "$response" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+err = d.get('error')
+print('yes' if err and isinstance(err, dict) else 'no')
+" 2>/dev/null || echo "unknown")
+
+    if [[ "$has_error" != "no" ]] && ! echo "$response" | grep -q '"server"'; then
+        log_error "Failed to create Hetzner server"
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        log_error "API Error: $error_msg"
+        log_error ""
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance or payment method required"
+        log_error "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
+        log_error "  - Server limit reached for your account"
+        log_error "  - Invalid cloud-init userdata"
+        log_error ""
+        log_error "Check your account status: https://console.hetzner.cloud/"
+        return 0
+    fi
+    return 1
+}
+
 # Create a Hetzner server with cloud-init
 create_server() {
     local name="$1"
@@ -195,54 +252,13 @@ create_server() {
     local ssh_key_ids
     ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
-    # Build request body — pipe cloud-init userdata via stdin to avoid bash quoting issues
-    local userdata
-    userdata=$(get_cloud_init_userdata)
-
     local body
-    body=$(echo "$userdata" | python3 -c "
-import json, sys
-userdata = sys.stdin.read()
-body = {
-    'name': '$name',
-    'server_type': '$server_type',
-    'location': '$location',
-    'image': '$image',
-    'ssh_keys': $ssh_key_ids,
-    'user_data': userdata,
-    'start_after_create': True
-}
-print(json.dumps(body))
-")
+    body=$(_hetzner_build_create_body "$name" "$server_type" "$location" "$image" "$ssh_key_ids")
 
     local response
     response=$(hetzner_api POST "/servers" "$body")
 
-    # Check for errors — Hetzner success responses contain "error": null in the action,
-    # so we must check if the top-level error is a real object (not null)
-    local has_error
-    has_error=$(echo "$response" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-err = d.get('error')
-print('yes' if err and isinstance(err, dict) else 'no')
-" 2>/dev/null || echo "unknown")
-
-    if [[ "$has_error" != "no" ]] && ! echo "$response" | grep -q '"server"'; then
-        log_error "Failed to create Hetzner server"
-
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient account balance or payment method required"
-        log_error "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
-        log_error "  - Server limit reached for your account"
-        log_error "  - Invalid cloud-init userdata"
-        log_error ""
-        log_error "Check your account status: https://console.hetzner.cloud/"
+    if _hetzner_check_create_error "$response"; then
         return 1
     fi
 
