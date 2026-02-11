@@ -51,35 +51,27 @@ test_upcloud_credentials() {
     fi
 }
 
-# Ensure UpCloud credentials are available (env var -> config file -> prompt+save)
-ensure_upcloud_credentials() {
-    check_python_available || return 1
-
-    local config_file="$HOME/.config/spawn/upcloud.json"
-
-    # 1. Check environment variables
-    if [[ -n "${UPCLOUD_USERNAME:-}" ]] && [[ -n "${UPCLOUD_PASSWORD:-}" ]]; then
-        log_info "Using UpCloud credentials from environment"
-        if ! test_upcloud_credentials; then
-            return 1
-        fi
-        return 0
-    fi
-
-    # 2. Check config file
+# Try loading UpCloud credentials from config file
+# Returns 0 if loaded, 1 otherwise
+_upcloud_load_config_credentials() {
+    local config_file="$1"
     local creds
-    if creds=$(_load_json_config_fields "$config_file" username password); then
-        local saved_username saved_password
-        { read -r saved_username; read -r saved_password; } <<< "${creds}"
-        if [[ -n "${saved_username}" ]] && [[ -n "${saved_password}" ]]; then
-            export UPCLOUD_USERNAME="${saved_username}"
-            export UPCLOUD_PASSWORD="${saved_password}"
-            log_info "Using UpCloud credentials from ${config_file}"
-            return 0
-        fi
+    creds=$(_load_json_config_fields "$config_file" username password) || return 1
+
+    local saved_username saved_password
+    { read -r saved_username; read -r saved_password; } <<< "${creds}"
+    if [[ -z "${saved_username}" ]] || [[ -z "${saved_password}" ]]; then
+        return 1
     fi
 
-    # 3. Prompt and save
+    export UPCLOUD_USERNAME="${saved_username}"
+    export UPCLOUD_PASSWORD="${saved_password}"
+    log_info "Using UpCloud credentials from ${config_file}"
+}
+
+# Prompt user for UpCloud credentials interactively
+# Returns 0 on success (exports credentials), 1 on failure
+_upcloud_prompt_credentials() {
     echo ""
     log_warn "UpCloud API Credentials Required"
     log_warn "Create API credentials at: https://hub.upcloud.com/people/account"
@@ -101,13 +93,35 @@ ensure_upcloud_credentials() {
 
     export UPCLOUD_USERNAME="${username}"
     export UPCLOUD_PASSWORD="${password}"
+}
+
+# Ensure UpCloud credentials are available (env var -> config file -> prompt+save)
+ensure_upcloud_credentials() {
+    check_python_available || return 1
+
+    local config_file="$HOME/.config/spawn/upcloud.json"
+
+    # 1. Check environment variables
+    if [[ -n "${UPCLOUD_USERNAME:-}" ]] && [[ -n "${UPCLOUD_PASSWORD:-}" ]]; then
+        log_info "Using UpCloud credentials from environment"
+        test_upcloud_credentials
+        return $?
+    fi
+
+    # 2. Check config file
+    if _upcloud_load_config_credentials "$config_file"; then
+        return 0
+    fi
+
+    # 3. Prompt and save
+    _upcloud_prompt_credentials || return 1
 
     if ! test_upcloud_credentials; then
         unset UPCLOUD_USERNAME UPCLOUD_PASSWORD
         return 1
     fi
 
-    _save_json_config "$config_file" username "$username" password "$password"
+    _save_json_config "$config_file" username "$UPCLOUD_USERNAME" password "$UPCLOUD_PASSWORD"
 }
 
 # Get server name from env var or prompt
