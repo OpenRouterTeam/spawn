@@ -21,7 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/insta
 ```bash
 spawn                         # Interactive picker
 spawn <agent> <cloud>         # Launch directly
-spawn list                    # Show the full matrix
+spawn matrix                  # Show the full agent x cloud matrix
 ```
 
 ### Examples
@@ -45,7 +45,8 @@ spawn claude                             # Show clouds available for Claude
 | `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
 | `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
 | `spawn <agent>` | Show available clouds for an agent |
-| `spawn list` | Full agent x cloud matrix |
+| `spawn matrix` | Full agent x cloud matrix |
+| `spawn list` | Show previously launched spawns |
 | `spawn agents` | List all agents |
 | `spawn clouds` | List all cloud providers |
 | `spawn update` | Check for CLI updates |
