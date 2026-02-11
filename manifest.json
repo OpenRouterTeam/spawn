@@ -1061,7 +1061,7 @@
     "exoscale/interpreter": "missing",
     "exoscale/gemini": "missing",
     "exoscale/amazonq": "missing",
-    "exoscale/cline": "missing",
+    "exoscale/cline": "implemented",
     "exoscale/gptme": "missing",
     "exoscale/opencode": "missing",
     "exoscale/plandex": "missing",
