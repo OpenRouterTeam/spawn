@@ -158,86 +158,16 @@ for loc in sorted(data.get('locations', []), key=lambda l: l['name']):
 
 # Interactive location picker (skipped if HETZNER_LOCATION is set)
 _pick_location() {
-    if [[ -n "${HETZNER_LOCATION:-}" ]]; then
-        echo "$HETZNER_LOCATION"
-        return
-    fi
-
-    log_info "Fetching available locations..."
-    local locations
-    locations=$(_list_locations)
-
-    if [[ -z "$locations" ]]; then
-        log_warn "Could not fetch locations, using default: fsn1"
-        echo "fsn1"
-        return
-    fi
-
-    log_info "Available locations:"
-    local i=1
-    local names=()
-    while IFS='|' read -r name city country; do
-        printf "  %2d) %-6s  %s, %s\n" "$i" "$name" "$city" "$country" >&2
-        names+=("$name")
-        i=$((i + 1))
-    done <<< "$locations"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select location [1]: ") || choice=""
-    choice="${choice:-1}"
-
-    if [[ "$choice" -ge 1 && "$choice" -le "${#names[@]}" ]] 2>/dev/null; then
-        echo "${names[$((choice - 1))]}"
-    else
-        log_warn "Invalid choice, using default: fsn1"
-        echo "fsn1"
-    fi
+    interactive_pick "HETZNER_LOCATION" "fsn1" "locations" _list_locations
 }
 
 # Interactive server type picker (skipped if HETZNER_SERVER_TYPE is set)
 _pick_server_type() {
     local location="$1"
-
-    if [[ -n "${HETZNER_SERVER_TYPE:-}" ]]; then
-        echo "$HETZNER_SERVER_TYPE"
-        return
-    fi
-
-    log_info "Fetching server types available in ${location}..."
-    local types
-    types=$(_list_server_types_for_location "$location")
-
-    if [[ -z "$types" ]]; then
-        log_warn "Could not fetch server types, using default: cpx11"
-        echo "cpx11"
-        return
-    fi
-
-    log_info "Available server types in ${location}:"
-    local i=1
-    local names=()
-    local default_idx=1
-    while IFS='|' read -r name cores ram disk cpu price; do
-        printf "  %2d) %-10s  %-8s  %-10s  %-12s  %-8s  %s\n" "$i" "$name" "$cores" "$ram" "$disk" "$cpu" "$price" >&2
-        names+=("$name")
-        if [[ "$name" == "cpx11" ]]; then
-            default_idx=$i
-        fi
-        i=$((i + 1))
-    done <<< "$types"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select server type [${default_idx}]: ") || choice=""
-    choice="${choice:-$default_idx}"
-
-    if [[ "$choice" -ge 1 && "$choice" -le "${#names[@]}" ]] 2>/dev/null; then
-        echo "${names[$((choice - 1))]}"
-    else
-        log_warn "Invalid choice, using default: cpx11"
-        echo "cpx11"
-    fi
+    # Wrap the location-specific list function for interactive_pick
+    _list_server_types_for_current_location() { _list_server_types_for_location "$location"; }
+    interactive_pick "HETZNER_SERVER_TYPE" "cpx11" "server types" _list_server_types_for_current_location "cpx11"
+    unset -f _list_server_types_for_current_location
 }
 
 # Create a Hetzner server with cloud-init

@@ -67,55 +67,14 @@ ensure_render_cli() {
     log_info "Render CLI installed"
 }
 
-# Save Render API key to config file
-_save_render_api_key() {
-    local api_key="$1"
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/render.json"
-    mkdir -p "$config_dir"
-    printf '{\n  "api_key": "%s"\n}\n' "$(json_escape "$api_key")" > "$config_file"
-    chmod 600 "$config_file"
-}
-
 # Ensure RENDER_API_KEY is available (env var -> config file -> prompt+save)
 ensure_render_api_key() {
-    check_python_available || return 1
-
-    # 1. Check environment variable
-    if [[ -n "${RENDER_API_KEY:-}" ]]; then
-        log_info "Using Render API key from environment"
-        return 0
-    fi
-
-    local config_file="$HOME/.config/spawn/render.json"
-
-    # 2. Check config file
-    if [[ -f "$config_file" ]]; then
-        local saved_key
-        saved_key=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_key',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_key" ]]; then
-            export RENDER_API_KEY="$saved_key"
-            log_info "Using Render API key from $config_file"
-            return 0
-        fi
-    fi
-
-    # 3. Prompt user for API key
-    log_warn "Render API key required"
-    echo ""
-    echo "Get your API key at: https://dashboard.render.com/u/settings/api-keys"
-    echo ""
-
-    local api_key
-    api_key=$(safe_read "Enter Render API key: ")
-    if [[ -z "$api_key" ]]; then
-        log_error "No API key provided"
-        return 1
-    fi
-
-    export RENDER_API_KEY="$api_key"
-    _save_render_api_key "$api_key"
-    log_info "Render API key saved"
+    ensure_api_token_with_provider \
+        "Render" \
+        "RENDER_API_KEY" \
+        "$HOME/.config/spawn/render.json" \
+        "https://dashboard.render.com/u/settings/api-keys" \
+        ""
 }
 
 # Generate a unique server name for Render (must be lowercase alphanumeric + hyphens)

@@ -1646,6 +1646,77 @@ setup_continue_config() {
 }
 
 # ============================================================
+# Interactive selection helpers
+# ============================================================
+
+# Generic interactive picker for numbered menu selection
+# Eliminates duplicate _pick_location/_pick_server_type patterns across providers
+#
+# Usage: interactive_pick ENV_VAR_NAME DEFAULT_VALUE PROMPT_TEXT LIST_CALLBACK [FORMAT_CALLBACK]
+#
+# Arguments:
+#   ENV_VAR_NAME     - Environment variable to check first (e.g., "HETZNER_LOCATION")
+#   DEFAULT_VALUE    - Default value if env var unset and list is empty or choice invalid
+#   PROMPT_TEXT      - Label shown above the menu (e.g., "locations", "server types")
+#   LIST_CALLBACK    - Function that outputs pipe-delimited lines (first field = ID)
+#   DEFAULT_ID       - Optional: ID to pre-select as default (e.g., "cpx11")
+#
+# LIST_CALLBACK must output pipe-delimited lines where the first field is the selectable ID.
+# Example output: "fsn1|Falkenstein|DE" or "cpx11|2 vCPU|4 GB RAM|40 GB disk"
+#
+# Returns: selected ID via stdout
+interactive_pick() {
+    local env_var_name="${1}"
+    local default_value="${2}"
+    local prompt_text="${3}"
+    local list_callback="${4}"
+    local default_id="${5:-}"
+
+    # Check environment variable first
+    local env_value="${!env_var_name:-}"
+    if [[ -n "${env_value}" ]]; then
+        echo "${env_value}"
+        return
+    fi
+
+    log_info "Fetching available ${prompt_text}..."
+    local items
+    items=$("${list_callback}")
+
+    if [[ -z "${items}" ]]; then
+        log_warn "Could not fetch ${prompt_text}, using default: ${default_value}"
+        echo "${default_value}"
+        return
+    fi
+
+    log_info "Available ${prompt_text}:"
+    local i=1
+    local ids=()
+    local default_idx=1
+    while IFS= read -r line; do
+        local id="${line%%|*}"
+        printf "  %2d) %s\n" "${i}" "$(echo "${line}" | tr '|' '\t')" >&2
+        ids+=("${id}")
+        if [[ -n "${default_id}" && "${id}" == "${default_id}" ]]; then
+            default_idx=${i}
+        fi
+        i=$((i + 1))
+    done <<< "${items}"
+
+    local choice
+    printf "\n" >&2
+    choice=$(safe_read "Select ${prompt_text%s} [${default_idx}]: ") || choice=""
+    choice="${choice:-${default_idx}}"
+
+    if [[ "${choice}" -ge 1 && "${choice}" -le "${#ids[@]}" ]] 2>/dev/null; then
+        echo "${ids[$((choice - 1))]}"
+    else
+        log_warn "Invalid choice, using default: ${default_value}"
+        echo "${default_value}"
+    fi
+}
+
+# ============================================================
 # SSH key registration helpers
 # ============================================================
 

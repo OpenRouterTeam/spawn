@@ -160,84 +160,12 @@ for loc in sorted(data.get('locations', []), key=lambda l: l.get('name', '')):
 
 # Interactive location picker (skipped if HOSTINGER_LOCATION is set)
 _pick_location() {
-    if [[ -n "${HOSTINGER_LOCATION:-}" ]]; then
-        echo "$HOSTINGER_LOCATION"
-        return
-    fi
-
-    log_info "Fetching available locations..."
-    local locations
-    locations=$(_list_locations)
-
-    if [[ -z "$locations" ]]; then
-        log_warn "Could not fetch locations, using default: eu-central"
-        echo "eu-central"
-        return
-    fi
-
-    log_info "Available locations:"
-    local i=1
-    local ids=()
-    while IFS='|' read -r id name country; do
-        printf "  %2d) %-15s  %s, %s\n" "$i" "$id" "$name" "$country" >&2
-        ids+=("$id")
-        i=$((i + 1))
-    done <<< "$locations"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select location [1]: ") || choice=""
-    choice="${choice:-1}"
-
-    if [[ "$choice" -ge 1 && "$choice" -le "${#ids[@]}" ]] 2>/dev/null; then
-        echo "${ids[$((choice - 1))]}"
-    else
-        log_warn "Invalid choice, using default: eu-central"
-        echo "eu-central"
-    fi
+    interactive_pick "HOSTINGER_LOCATION" "eu-central" "locations" _list_locations
 }
 
 # Interactive VPS plan picker (skipped if HOSTINGER_PLAN is set)
 _pick_plan() {
-    if [[ -n "${HOSTINGER_PLAN:-}" ]]; then
-        echo "$HOSTINGER_PLAN"
-        return
-    fi
-
-    log_info "Fetching available VPS plans..."
-    local plans
-    plans=$(_list_vps_plans)
-
-    if [[ -z "$plans" ]]; then
-        log_warn "Could not fetch plans, using default: kvm1"
-        echo "kvm1"
-        return
-    fi
-
-    log_info "Available VPS plans:"
-    local i=1
-    local ids=()
-    local default_idx=1
-    while IFS='|' read -r id name vcpus ram disk price; do
-        printf "  %2d) %-10s  %-20s  %-8s  %-12s  %-12s  %s\n" "$i" "$id" "$name" "$vcpus" "$ram" "$disk" "$price" >&2
-        ids+=("$id")
-        if [[ "$id" == "kvm1" ]]; then
-            default_idx=$i
-        fi
-        i=$((i + 1))
-    done <<< "$plans"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select plan [${default_idx}]: ") || choice=""
-    choice="${choice:-$default_idx}"
-
-    if [[ "$choice" -ge 1 && "$choice" -le "${#ids[@]}" ]] 2>/dev/null; then
-        echo "${ids[$((choice - 1))]}"
-    else
-        log_warn "Invalid choice, using default: kvm1"
-        echo "kvm1"
-    fi
+    interactive_pick "HOSTINGER_PLAN" "kvm1" "VPS plans" _list_vps_plans "kvm1"
 }
 
 # Create a Hostinger VPS with cloud-init

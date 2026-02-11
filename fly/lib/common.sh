@@ -67,16 +67,7 @@ ensure_fly_cli() {
     log_info "flyctl CLI installed"
 }
 
-# Ensure FLY_API_TOKEN is available (env var -> config file -> prompt+save)
-# Save Fly.io token to config file
-_save_fly_token() {
-    local token="$1"
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/fly.json"
-    mkdir -p "$config_dir"
-    printf '{\n  "token": %s\n}\n' "$(json_escape "$token")" > "$config_file"
-    chmod 600 "$config_file"
-}
+# Ensure FLY_API_TOKEN is available (env var -> config file -> flyctl CLI -> prompt+save)
 
 # Try to get token from flyctl CLI if available
 _try_flyctl_auth() {
@@ -117,58 +108,23 @@ _validate_fly_token() {
 }
 
 ensure_fly_token() {
-    check_python_available || return 1
-
-    # 1. Check environment variable
-    if [[ -n "${FLY_API_TOKEN:-}" ]]; then
-        log_info "Using Fly.io API token from environment"
-        return 0
-    fi
-
-    local config_file="$HOME/.config/spawn/fly.json"
-
-    # 2. Check config file
-    if [[ -f "$config_file" ]]; then
-        local saved_token
-        saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_token" ]]; then
-            export FLY_API_TOKEN="$saved_token"
-            log_info "Using Fly.io API token from $config_file"
+    # Try flyctl CLI auth first (unique to Fly.io), then fall through to generic flow
+    if [[ -z "${FLY_API_TOKEN:-}" ]]; then
+        local token
+        token=$(_try_flyctl_auth 2>/dev/null) && {
+            export FLY_API_TOKEN="$token"
+            log_info "Using Fly.io API token from flyctl auth"
+            _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
             return 0
-        fi
+        }
     fi
 
-    # 3. Try flyctl CLI auth
-    local token
-    token=$(_try_flyctl_auth) && {
-        export FLY_API_TOKEN="$token"
-        log_info "Using Fly.io API token from flyctl auth"
-        _save_fly_token "$token"
-        return 0
-    }
-
-    # 4. Prompt and validate
-    echo ""
-    log_warn "Fly.io API Token Required"
-    printf '%b\n' "${YELLOW}Get your token by running: fly tokens deploy${NC}"
-    printf '%b\n' "${YELLOW}Or create one at: https://fly.io/dashboard → Tokens${NC}"
-    echo ""
-
-    token=$(safe_read "Enter your Fly.io API token: ") || return 1
-    if [[ -z "$token" ]]; then
-        log_error "API token cannot be empty"
-        log_warn "For non-interactive usage, set: FLY_API_TOKEN=your-token"
-        return 1
-    fi
-
-    export FLY_API_TOKEN="$token"
-    if ! _validate_fly_token; then
-        unset FLY_API_TOKEN
-        return 1
-    fi
-
-    _save_fly_token "$token"
-    log_info "API token saved to $config_file"
+    ensure_api_token_with_provider \
+        "Fly.io" \
+        "FLY_API_TOKEN" \
+        "$HOME/.config/spawn/fly.json" \
+        "https://fly.io/dashboard → Tokens" \
+        "_validate_fly_token"
 }
 
 # Get the Fly.io org slug (default: personal)
