@@ -183,6 +183,25 @@ if data:
     echo "$ssh_key_id"
 }
 
+# Generate cloud-init userdata script for Civo instances
+get_cloud_init_userdata() {
+    cat << 'CLOUD_INIT_EOF'
+#!/bin/bash
+set -e
+apt-get update -qq
+apt-get install -y -qq curl unzip git zsh
+# Install Bun
+curl -fsSL https://bun.sh/install | bash
+# Install Claude Code
+curl -fsSL https://claude.ai/install.sh | bash
+# Configure PATH
+echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
+echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
+# Signal completion
+touch /root/.cloud-init-complete
+CLOUD_INIT_EOF
+}
+
 # Build the JSON request body for instance creation
 # Usage: build_create_instance_body NAME SIZE REGION NETWORK_ID TEMPLATE_ID SSH_KEY_ID INIT_SCRIPT
 build_create_instance_body() {
@@ -245,6 +264,24 @@ wait_for_civo_instance() {
     return 1
 }
 
+# Handle Civo instance creation API error response
+# Usage: _handle_civo_create_error RESPONSE
+_handle_civo_create_error() {
+    local response="$1"
+
+    log_error "Failed to create Civo instance"
+
+    local error_msg
+    error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('reason', d.get('message', 'Unknown error')))" 2>/dev/null || echo "$response")
+    log_error "API Error: $error_msg"
+
+    log_warn "Common issues:"
+    log_warn "  - Insufficient account balance"
+    log_warn "  - Size unavailable in region (try different CIVO_SIZE or CIVO_REGION)"
+    log_warn "  - Instance limit reached"
+    log_warn "Remediation: Check https://dashboard.civo.com/"
+}
+
 create_server() {
     local name="$1"
     local size="${CIVO_SIZE:-g4s.small}"
@@ -262,50 +299,24 @@ create_server() {
     template_id=$(get_ubuntu_template_id "$region") || return 1
     ssh_key_id=$(get_ssh_key_id) || return 1
 
-    # Build init script for cloud-init equivalent
+    # Build request body with cloud-init userdata
     local init_script
-    init_script=$(cat << 'INIT_EOF'
-#!/bin/bash
-set -e
-apt-get update -qq
-apt-get install -y -qq curl unzip git zsh
-# Install Bun
-curl -fsSL https://bun.sh/install | bash
-# Install Claude Code
-curl -fsSL https://claude.ai/install.sh | bash
-# Configure PATH
-echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
-echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
-# Signal completion
-touch /root/.cloud-init-complete
-INIT_EOF
-)
+    init_script=$(get_cloud_init_userdata)
 
-    # Build request body and create instance
     local body
     body=$(build_create_instance_body "$name" "$size" "$region" "$network_id" "$template_id" "$ssh_key_id" "$init_script")
 
     local response
     response=$(civo_api POST "/instances" "$body")
 
-    if echo "$response" | grep -q '"id"'; then
-        CIVO_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
-        export CIVO_SERVER_ID
-        log_info "Instance created: ID=$CIVO_SERVER_ID"
-    else
-        log_error "Failed to create Civo instance"
-
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('reason', d.get('message', 'Unknown error')))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Size unavailable in region (try different CIVO_SIZE or CIVO_REGION)"
-        log_warn "  - Instance limit reached"
-        log_warn "Remediation: Check https://dashboard.civo.com/"
+    if ! echo "$response" | grep -q '"id"'; then
+        _handle_civo_create_error "$response"
         return 1
     fi
+
+    CIVO_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    export CIVO_SERVER_ID
+    log_info "Instance created: ID=$CIVO_SERVER_ID"
 
     wait_for_civo_instance "$CIVO_SERVER_ID"
 }
