@@ -418,6 +418,26 @@ create_ovh_instance() {
     log_info "Instance created: ID=$OVH_INSTANCE_ID"
 }
 
+# Extract public IPv4 address from OVH instance API response
+# Usage: _ovh_extract_ipv4 RESPONSE_JSON
+_ovh_extract_ipv4() {
+    local response="$1"
+    echo "$response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+for addr in data.get('ipAddresses', []):
+    if addr.get('version', 0) == 4 and addr.get('type', '') == 'public':
+        print(addr['ip'])
+        sys.exit(0)
+# Fallback: first IPv4
+for addr in data.get('ipAddresses', []):
+    if addr.get('version', 0) == 4:
+        print(addr['ip'])
+        sys.exit(0)
+print('')
+"
+}
+
 # Wait for OVH instance to be ACTIVE and get IP
 wait_for_ovh_instance() {
     local instance_id="$1"
@@ -435,20 +455,7 @@ wait_for_ovh_instance() {
         status=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('status',''))" 2>/dev/null || echo "")
 
         if [[ "${status}" == "ACTIVE" ]]; then
-            OVH_SERVER_IP=$(echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for addr in data.get('ipAddresses', []):
-    if addr.get('version', 0) == 4 and addr.get('type', '') == 'public':
-        print(addr['ip'])
-        sys.exit(0)
-# Fallback: first IPv4
-for addr in data.get('ipAddresses', []):
-    if addr.get('version', 0) == 4:
-        print(addr['ip'])
-        sys.exit(0)
-print('')
-")
+            OVH_SERVER_IP=$(_ovh_extract_ipv4 "$response")
             export OVH_SERVER_IP
             if [[ -n "${OVH_SERVER_IP}" ]]; then
                 log_info "Instance active: IP=$OVH_SERVER_IP"
