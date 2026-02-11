@@ -246,7 +246,7 @@ wait_for_civo_instance() {
 
 create_server() {
     local name="$1"
-    local size="${CIVO_SIZE:-g3.small}"
+    local size="${CIVO_SIZE:-g4s.small}"
     local region="${CIVO_REGION:-LON1}"
 
     # Validate env var inputs to prevent injection into Python code

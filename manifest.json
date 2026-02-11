@@ -415,7 +415,7 @@
       "exec_method": "ssh root@IP",
       "interactive_method": "ssh -t root@IP",
       "defaults": {
-        "size": "g3.small",
+        "size": "g4s.small",
         "region": "LON1",
         "image": "ubuntu-jammy"
       },

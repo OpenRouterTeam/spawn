@@ -768,7 +768,7 @@ print(json.dumps(body))
 _live_civo() {
     local fixture_dir="$1"
     local server_name="spawn-record-$(date +%s)"
-    local size="g3.small"
+    local size="g4s.xsmall"
     local region="LON1"
 
     printf '%b\n' "  ${CYAN}live${NC} Creating test Civo instance '${server_name}' (${size}, ${region})..."

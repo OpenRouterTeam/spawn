@@ -1,0 +1,31 @@
+{
+  "account_id": "d2449447-ac9e-4a4e-90a8-bb1aae89cb9a",
+  "attached_volumes": [],
+  "civostatsd_token": "79673ec1-d766-4177-a16a-618b36d09fdc",
+  "cpu_cores": 1,
+  "created_at": "2026-02-11T02:10:51Z",
+  "disk_gb": 25,
+  "firewall_id": "a12fd86a-a517-46de-90e7-3c9428b164ca",
+  "hostname": "spawn-record-1770775848",
+  "id": "0ae82021-cfff-4978-83cb-3f07ca4b938c",
+  "initial_password": "QrVAJWeq5k",
+  "initial_user": "root",
+  "name": "spawn-record-1770775848-c786-5c0f96",
+  "namespace_id": "cust-default-d2449447-75057246b722",
+  "network_id": "1773d9a7-fec1-4478-b45a-665e39528c79",
+  "notes": "",
+  "placement_rule": {
+    "affinity_rules": null,
+    "node_selector": null
+  },
+  "ram_mb": 1024,
+  "reverse_dns": "",
+  "script": "",
+  "size": "g4s.xsmall",
+  "source_id": "ubuntu-noble",
+  "source_type": "diskimage",
+  "status": "BUILDING",
+  "tags": [],
+  "template_id": "d2c2c728-512d-4087-906a-8486fcf4a1c7",
+  "volume_type": "standard"
+}
