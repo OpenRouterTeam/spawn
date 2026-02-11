@@ -91,11 +91,17 @@ printf '%b\n' "${CYAN}Phase 4: Fix failures${NC}"
 if [[ "${FAIL_1}" -eq 0 ]]; then
     printf '%b\n' "  ${GREEN}No failures to fix${NC}"
 else
-    printf '%b\n' "  Would spawn agents for:"
-    grep ':fail$' "${RESULTS_1}" | sed 's/:fail$//' | while read -r combo; do
-        cloud=$(printf '%s' "$combo" | cut -d/ -f1)
-        agent=$(printf '%s' "$combo" | cut -d/ -f2)
-        printf '%b\n' "    ${RED}•${NC} ${cloud}/${agent}.sh → worktree /tmp/spawn-worktrees/qa/fix-${cloud}-${agent}/"
+    # Group failures by cloud — one agent per cloud, not per script
+    FAILED_CLOUDS=$(grep ':fail$' "${RESULTS_1}" | sed 's/:fail$//' | cut -d/ -f1 | sort -u)
+    CLOUD_COUNT=$(printf '%s\n' $FAILED_CLOUDS | wc -l | tr -d ' ')
+    printf '%b\n' "  Would spawn ${CLOUD_COUNT} agent(s) (one per cloud):"
+    for cloud in $FAILED_CLOUDS; do
+        scripts=$(grep "^${cloud}/.*:fail$" "${RESULTS_1}" | sed 's/:fail$//' | sed "s|^|    |")
+        script_count=$(grep -c "^${cloud}/.*:fail$" "${RESULTS_1}")
+        printf '%b\n' "    ${RED}•${NC} ${cloud}/ (${script_count} scripts) → worktree /tmp/spawn-worktrees/qa/fix-${cloud}/"
+        printf '%s\n' "$scripts" | while read -r combo; do
+            printf '%b\n' "      ${combo}.sh"
+        done
     done
     printf '%b\n' "  ${YELLOW}(skipped — dry run)${NC}"
 fi

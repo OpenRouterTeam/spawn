@@ -416,7 +416,7 @@
       "interactive_method": "ssh -t root@IP",
       "defaults": {
         "size": "g4s.small",
-        "region": "LON1",
+        "region": "lon1",
         "image": "ubuntu-jammy"
       },
       "notes": "Fast provisioning (~45s), free data transfer, hourly billing. NVMe storage."

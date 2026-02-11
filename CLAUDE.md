@@ -55,6 +55,9 @@ We bias heavily toward adding more clouds/sandboxes over more agents. To add one
 3. Add `"missing"` entries to the matrix for every existing agent
 4. Implement at least 2-3 agent scripts to prove the lib works
 5. Update the cloud's `README.md`
+6. **Add test coverage** (mandatory):
+   - `test/record.sh` — add to `ALL_RECORDABLE_CLOUDS`, add cases in `get_endpoints()`, `get_auth_env_var()`, `call_api()`, `has_api_error()`, and add a `_live_{cloud}()` function
+   - `test/mock.sh` — add a URL-stripping case in the curl mock (`case "$URL" in` block)
 
 **Good candidate clouds (cheap CPU compute for agents using remote API inference):**
 - Container/sandbox platforms (fast spin-up, developer-friendly)

@@ -267,85 +267,101 @@ log "=== Phase 3: Fix failures ==="
 if [[ "${FAIL_COUNT:-0}" -eq 0 ]]; then
     log "Phase 3: No failures to fix"
 else
-    # Collect failures
+    # Collect failures grouped by cloud (one agent per cloud, not per script)
     FAILURES=""
+    FAILED_CLOUDS=""
     if [[ -f "${RESULTS_PHASE2}" ]]; then
         FAILURES=$(grep ':fail$' "${RESULTS_PHASE2}" | sed 's/:fail$//' || true)
+        FAILED_CLOUDS=$(grep ':fail$' "${RESULTS_PHASE2}" | sed 's/:fail$//' | cut -d/ -f1 | sort -u || true)
     fi
 
     AGENT_PIDS=""
-    for combo in $FAILURES; do
+    for cloud in $FAILED_CLOUDS; do
         check_timeout || break
 
-        cloud=$(printf '%s' "$combo" | cut -d/ -f1)
-        agent=$(printf '%s' "$combo" | cut -d/ -f2)
-        script_path="${cloud}/${agent}.sh"
-        worktree="${WORKTREE_BASE}/fix-${cloud}-${agent}"
-
-        log "Phase 3: Spawning agent to fix ${script_path}"
-
-        # Get error context from mock test output
+        # Collect all failing scripts for this cloud
+        cloud_failures=$(printf '%s\n' $FAILURES | grep "^${cloud}/" || true)
+        failing_scripts=""
+        failing_agents=""
         error_context=""
-        if [[ -f "${LOG_FILE}" ]]; then
-            error_context=$(grep -A 20 "test ${script_path}" "${LOG_FILE}" | tail -20 || true)
-        fi
+        for combo in $cloud_failures; do
+            agent=$(printf '%s' "$combo" | cut -d/ -f2)
+            script_path="${cloud}/${agent}.sh"
+            failing_scripts="${failing_scripts} ${script_path}"
+            failing_agents="${failing_agents} ${agent}"
+            if [[ -f "${LOG_FILE}" ]]; then
+                ctx=$(grep -A 10 "test ${script_path}" "${LOG_FILE}" | tail -10 || true)
+                if [[ -n "$ctx" ]]; then
+                    error_context="${error_context}
+--- ${script_path} ---
+${ctx}
+"
+                fi
+            fi
+        done
+        failing_scripts=$(printf '%s' "$failing_scripts" | sed 's/^ //')
+        failing_agents=$(printf '%s' "$failing_agents" | sed 's/^ //')
 
-        # Create worktree for this fix
-        branch_name="qa/fix-${cloud}-${agent}"
+        fail_count=$(printf '%s\n' $cloud_failures | wc -l | tr -d ' ')
+        log "Phase 3: Spawning agent to fix ${fail_count} failing script(s) in ${cloud}"
+
+        worktree="${WORKTREE_BASE}/fix-${cloud}"
+        branch_name="qa/fix-${cloud}"
+
         git worktree add "${worktree}" -b "${branch_name}" origin/main 2>&1 | tee -a "${LOG_FILE}" || {
-            log "Phase 3: Could not create worktree for ${combo}, skipping"
+            log "Phase 3: Could not create worktree for ${cloud}, skipping"
             continue
         }
 
-        # Spawn Claude to fix the script (10 min timeout per agent)
+        # Spawn ONE Claude agent per cloud to fix all its failing scripts (15 min timeout)
         (
             cd "${worktree}"
             FIX_EXIT=0
-            timeout --signal=TERM --kill-after=60 600 \
-                claude -p "Fix the failing mock test for ${script_path} in the spawn codebase.
+            timeout --signal=TERM --kill-after=60 900 \
+                claude -p "Fix the failing mock tests for cloud '${cloud}' in the spawn codebase.
 
-The script is at: ${worktree}/${script_path}
+Failing scripts: ${failing_scripts}
 
 Error context from test run:
 ${error_context}
 
 Instructions:
-1. Read the failing script and understand what it does
+1. Read ${cloud}/lib/common.sh to understand the cloud's API functions
 2. Read test/mock.sh to understand how mock tests work
-3. Fix the script so it passes mock tests
-4. Run: RESULTS_FILE=/tmp/fix-test.txt bash test/mock.sh ${cloud} ${agent}
-5. Verify it passes
-6. Run: bash -n ${script_path} to syntax check
-
-Only modify ${script_path} — do not change test infrastructure.
-Commit your fix with a descriptive message." \
+3. For EACH failing script, read it and fix it so mock tests pass
+4. Test each fix: RESULTS_FILE=/tmp/fix-test.txt bash test/mock.sh ${cloud}
+5. Run: bash -n on each modified script to syntax check
+6. Only modify scripts in ${cloud}/ — do not change test infrastructure
+7. Commit all fixes together with a descriptive message" \
                 2>&1 | tee -a "${LOG_FILE}" || FIX_EXIT=$?
 
             if [[ "${FIX_EXIT}" -eq 0 ]]; then
-                # Verify syntax
-                if bash -n "${script_path}" 2>/dev/null; then
-                    # Check if there are changes to push
-                    if [[ -n "$(git status --porcelain)" ]]; then
-                        git add "${script_path}"
-                        git commit -m "$(cat <<FIXEOF
-fix: Fix ${script_path} mock test failure
+                # Verify syntax on all modified scripts
+                syntax_ok=true
+                for script in ${failing_scripts}; do
+                    if [[ -f "${script}" ]] && ! bash -n "${script}" 2>/dev/null; then
+                        log "Phase 3: Syntax check failed for ${script}"
+                        syntax_ok=false
+                    fi
+                done
+
+                if [[ "$syntax_ok" == "true" ]] && [[ -n "$(git status --porcelain)" ]]; then
+                    git add ${failing_scripts} "${cloud}/lib/common.sh" 2>/dev/null || true
+                    git commit -m "$(cat <<FIXEOF
+fix: Fix ${cloud} mock test failures (${fail_count} scripts)
 
 Agent: qa-fixer
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 FIXEOF
-                        )" || true
-                        git push -u origin "${branch_name}" || true
-                        # Create and merge PR
-                        PR_URL=$(gh pr create \
-                            --title "fix: Fix ${script_path} mock test" \
-                            --body "Automated fix from QA cycle. Mock test was failing for ${cloud}/${agent}." \
-                            --base main --head "${branch_name}" 2>/dev/null) || true
-                        if [[ -n "${PR_URL:-}" ]]; then
-                            gh pr merge --squash --delete-branch 2>/dev/null || true
-                        fi
+                    )" || true
+                    git push -u origin "${branch_name}" || true
+                    PR_URL=$(gh pr create \
+                        --title "fix: Fix ${cloud} mock test failures" \
+                        --body "Automated fix from QA cycle. ${fail_count} mock test(s) were failing for ${cloud}: ${failing_scripts}" \
+                        --base main --head "${branch_name}" 2>/dev/null) || true
+                    if [[ -n "${PR_URL:-}" ]]; then
+                        gh pr merge --squash --delete-branch 2>/dev/null || true
                     fi
-                else
-                    log "Phase 3: Syntax check failed for ${script_path}, discarding fix"
                 fi
             fi
         ) &
@@ -357,14 +373,10 @@ FIXEOF
         wait "$pid" 2>/dev/null || true
     done
 
-    # Clean up worktrees
-    for combo in $FAILURES; do
-        cloud=$(printf '%s' "$combo" | cut -d/ -f1)
-        agent=$(printf '%s' "$combo" | cut -d/ -f2)
-        worktree="${WORKTREE_BASE}/fix-${cloud}-${agent}"
-        branch_name="qa/fix-${cloud}-${agent}"
-        git worktree remove "${worktree}" 2>/dev/null || true
-        git branch -D "${branch_name}" 2>/dev/null || true
+    # Clean up worktrees (one per cloud)
+    for cloud in $FAILED_CLOUDS; do
+        git worktree remove "${WORKTREE_BASE}/fix-${cloud}" 2>/dev/null || true
+        git branch -D "qa/fix-${cloud}" 2>/dev/null || true
     done
     git worktree prune 2>/dev/null || true
 

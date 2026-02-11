@@ -3,15 +3,15 @@
     "command": "delete_server",
     "error": null,
     "finished": null,
-    "id": 610864615685441,
+    "id": 610873205655095,
     "progress": 0,
     "resources": [
       {
-        "id": 120701335,
+        "id": 120704776,
         "type": "server"
       }
     ],
-    "started": "2026-02-11T02:12:35Z",
+    "started": "2026-02-11T03:07:29Z",
     "status": "running"
   }
 }

@@ -631,7 +631,7 @@ sys.exit(0 if not d or 'error' not in d else 1)
         printf '%b\n' "  ${YELLOW}retry${NC} Delete attempt ${attempt}/${max_attempts} — instance not ready yet"
     done
 
-    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /instances/{id}" "$delete_response"
+    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /instances/{id}" "$delete_response" || true
 
     if [[ "$attempt" -ge "$max_attempts" ]]; then
         printf '%b\n' "  ${RED}WARNING: Could not delete Vultr instance ${server_id} — delete it manually!${NC}"
@@ -833,34 +833,38 @@ print(json.dumps(body))
         return 0
     fi
 
-    printf '%b\n' "  ${CYAN}live${NC} Civo instance created (ID: ${server_id}). Waiting for it to become active before deleting..."
+    printf '%b\n' "  ${CYAN}live${NC} Civo instance created (ID: ${server_id}). Waiting for it to register before deleting..."
 
-    # Civo requires the instance to be active before it can be deleted
+    # Civo needs time to register the instance in its internal DB before deletion works
+    sleep 15
+
     local attempt=0
     local max_attempts=12
     local delete_response=""
     while [[ "$attempt" -lt "$max_attempts" ]]; do
-        sleep 10
         attempt=$((attempt + 1))
-        delete_response=$(civo_api DELETE "/instances/${server_id}" 2>/dev/null) || true
+        delete_response=$(civo_api DELETE "/instances/${server_id}?region=${region}" 2>/dev/null) || true
         if [[ -z "$delete_response" ]]; then
             delete_response='{}'
         fi
-        # Civo returns {"result":"...","reason":"..."} — check for success
+        # Civo returns {"result":"failed","reason":"..."} or just {"reason":"..."} on error
+        # Success is empty {} or {"result":"success"}
         if echo "$delete_response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
-# Civo success: empty, {}, or result != 'failed'
-if not d or d.get('result','') != 'failed':
-    sys.exit(0)
-sys.exit(1)
+if not d:
+    sys.exit(0)  # empty = success
+if d.get('result') == 'failed' or 'reason' in d:
+    sys.exit(1)  # error
+sys.exit(0)
 " 2>/dev/null; then
             break
         fi
         printf '%b\n' "  ${YELLOW}retry${NC} Delete attempt ${attempt}/${max_attempts} — instance not ready yet"
+        sleep 10
     done
 
-    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /instances/{id}" "$delete_response"
+    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /instances/{id}" "$delete_response" || true
 
     if [[ "$attempt" -ge "$max_attempts" ]]; then
         printf '%b\n' "  ${RED}WARNING: Could not delete Civo instance ${server_id} — delete it manually!${NC}"
@@ -1325,7 +1329,8 @@ record_cloud() {
     done <<< "$endpoints"
 
     # --- Live create+delete cycle for write endpoint fixtures ---
-    _record_live_cycle "$cloud" "$fixture_dir" cloud_recorded cloud_errors metadata_entries
+    # || true: live cycle failures (e.g. delete timeout) must not abort the whole script
+    _record_live_cycle "$cloud" "$fixture_dir" cloud_recorded cloud_errors metadata_entries || true
 
     # Write metadata
     local meta_timestamp
