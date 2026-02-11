@@ -200,6 +200,18 @@ const agentWithUrlManifest = {
   },
 };
 
+// Manifest with env-var-based auth for quick start testing
+const envVarAuthManifest = {
+  ...mockManifest,
+  clouds: {
+    ...mockManifest.clouds,
+    hetzner: {
+      ...mockManifest.clouds.hetzner,
+      auth: "HCLOUD_TOKEN",
+    },
+  },
+};
+
 // Mock @clack/prompts
 const mockLogError = mock(() => {});
 const mockLogInfo = mock(() => {});
@@ -228,7 +240,50 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import commands after mock setup
-const { cmdCloudInfo, cmdAgentInfo } = await import("../commands.js");
+const { cmdCloudInfo, cmdAgentInfo, parseAuthEnvVars } = await import("../commands.js");
+
+describe("parseAuthEnvVars", () => {
+  it("should extract single env var", () => {
+    expect(parseAuthEnvVars("HCLOUD_TOKEN")).toEqual(["HCLOUD_TOKEN"]);
+  });
+
+  it("should extract multiple env vars separated by +", () => {
+    expect(parseAuthEnvVars("UPCLOUD_USERNAME + UPCLOUD_PASSWORD")).toEqual([
+      "UPCLOUD_USERNAME",
+      "UPCLOUD_PASSWORD",
+    ]);
+  });
+
+  it("should return empty array for CLI auth commands", () => {
+    expect(parseAuthEnvVars("sprite login")).toEqual([]);
+    expect(parseAuthEnvVars("gcloud auth login")).toEqual([]);
+    expect(parseAuthEnvVars("modal setup")).toEqual([]);
+  });
+
+  it("should return empty array for short tokens", () => {
+    expect(parseAuthEnvVars("token")).toEqual([]);
+    expect(parseAuthEnvVars("oauth")).toEqual([]);
+  });
+
+  it("should handle complex auth strings with parenthetical notes", () => {
+    const result = parseAuthEnvVars("aws configure (AWS credentials)");
+    // "aws", "configure", "AWS", "credentials" - none match the env var pattern
+    expect(result).toEqual([]);
+  });
+
+  it("should extract four env vars from Contabo-style auth", () => {
+    expect(
+      parseAuthEnvVars(
+        "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET + CONTABO_API_USER + CONTABO_API_PASSWORD"
+      )
+    ).toEqual([
+      "CONTABO_CLIENT_ID",
+      "CONTABO_CLIENT_SECRET",
+      "CONTABO_API_USER",
+      "CONTABO_API_PASSWORD",
+    ]);
+  });
+});
 
 describe("cmdCloudInfo - missing agents display", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -317,7 +372,7 @@ describe("cmdCloudInfo - missing agents display", () => {
     it("should show setup URL containing the cloud key", async () => {
       await cmdCloudInfo("sprite");
       const output = getOutput();
-      expect(output).toContain("Setup:");
+      expect(output).toContain("Full setup guide:");
       expect(output).toContain("github.com");
       expect(output).toContain("sprite");
     });
@@ -325,7 +380,7 @@ describe("cmdCloudInfo - missing agents display", () => {
     it("should show setup URL for hetzner", async () => {
       await cmdCloudInfo("hetzner");
       const output = getOutput();
-      expect(output).toContain("Setup:");
+      expect(output).toContain("Full setup guide:");
       expect(output).toContain("hetzner");
     });
 
@@ -350,6 +405,37 @@ describe("cmdCloudInfo - missing agents display", () => {
       await cmdCloudInfo("sprite");
       const output = getOutput();
       expect(output).toContain("Auth: oauth");
+    });
+  });
+
+  // ── Quick start section ─────────────────────────────────────────
+
+  describe("quick start", () => {
+    it("should show Quick start header", async () => {
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("Quick start:");
+    });
+
+    it("should show export commands for env var auth", async () => {
+      await setManifest(envVarAuthManifest);
+      await cmdCloudInfo("hetzner");
+      const output = getOutput();
+      expect(output).toContain("export HCLOUD_TOKEN=");
+    });
+
+    it("should show CLI command for non-env-var auth", async () => {
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      // "token" doesn't match env var pattern, so shown as CLI command
+      expect(output).toContain("Quick start:");
+      expect(output).toContain("token");
+    });
+
+    it("should show example spawn command with first agent", async () => {
+      await cmdCloudInfo("sprite");
+      const output = getOutput();
+      expect(output).toContain("spawn claude sprite");
     });
   });
 
@@ -468,6 +554,44 @@ describe("cmdAgentInfo - URL and count details", () => {
       await cmdAgentInfo("claude");
       const output = getOutput();
       expect(output).toContain("Requires Anthropic API key for best results");
+    });
+  });
+
+  // ── Quick start section ─────────────────────────────────────────
+
+  describe("quick start", () => {
+    it("should show Quick start header", async () => {
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("Quick start:");
+    });
+
+    it("should show OPENROUTER_API_KEY export", async () => {
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("export OPENROUTER_API_KEY=");
+    });
+
+    it("should show example spawn command with first cloud", async () => {
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("spawn claude sprite");
+    });
+
+    it("should not show quick start when agent has no implemented clouds", async () => {
+      const noImplManifest = {
+        ...mockManifest,
+        matrix: {
+          "sprite/claude": "missing",
+          "sprite/aider": "missing",
+          "hetzner/claude": "missing",
+          "hetzner/aider": "missing",
+        },
+      };
+      await setManifest(noImplManifest);
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).not.toContain("Quick start:");
     });
   });
 
