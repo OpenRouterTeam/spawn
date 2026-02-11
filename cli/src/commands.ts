@@ -392,30 +392,33 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
 }
 
 function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryStatus: number, fallbackStatus: number): void {
-  p.log.error("Script download failed");
-
   if (primaryStatus === 404 && fallbackStatus === 404) {
+    p.log.error("Script download failed (HTTP 404: not found)");
     console.error("\nThe script file could not be found.");
     console.error("This usually means the combination hasn't been published yet,");
     console.error("even though it may appear in the matrix.");
-    console.error(`\nWhat to do:`);
+    console.error(`\nHow to fix:`);
     console.error(`  1. Verify the combination is implemented: ${pc.cyan("spawn list")}`);
     console.error(`  2. Try again later (the script may be deploying)`);
     console.error(`  3. Report the issue: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
   } else {
-    console.error(`\nNetwork or server error (HTTP ${primaryStatus}) - try again in a few moments.`);
+    p.log.error(`Script download failed (HTTP ${primaryStatus}/${fallbackStatus})`);
+    console.error(`\nBoth download sources returned errors.`);
     if (primaryStatus >= 500 || fallbackStatus >= 500) {
       console.error("The server may be experiencing temporary issues.");
     }
+    console.error(`\nHow to fix:`);
+    console.error(`  1. Wait a moment and try again`);
+    console.error(`  2. Check GitHub status: ${pc.cyan("https://www.githubstatus.com")}`);
   }
 }
 
 function reportDownloadError(ghUrl: string, err: unknown): never {
-  p.log.error("Failed to download spawn script");
+  p.log.error("Script download failed (network error)");
   console.error("\nError:", getErrorMessage(err));
-  console.error("\nTroubleshooting:");
-  console.error(`  1. Verify this combination exists: ${pc.cyan("spawn list")}`);
-  console.error("  2. Check your internet connection");
+  console.error("\nHow to fix:");
+  console.error("  1. Check your internet connection");
+  console.error(`  2. Verify this combination exists: ${pc.cyan("spawn list")}`);
   console.error(`  3. Try accessing the script directly: ${ghUrl}`);
   process.exit(1);
 }
@@ -927,7 +930,7 @@ export async function cmdUpdate(): Promise<void> {
   } catch (err) {
     s.stop(pc.red(`Failed to check for updates ${pc.dim(`(current: v${VERSION})`)}`));
     console.error("Error:", getErrorMessage(err));
-    console.error(`\nTroubleshooting:`);
+    console.error(`\nHow to fix:`);
     console.error(`  1. Check your internet connection`);
     console.error(`  2. Try again in a few moments`);
     console.error(`  3. Update manually: ${pc.cyan(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`)}`);

@@ -144,7 +144,7 @@ verify_sprite_connectivity() {
 
     log_error "Sprite '${sprite_name}' failed to respond after ${max_attempts} attempts"
     log_error ""
-    log_error "Troubleshooting:"
+    log_error "How to fix:"
     log_error "  1. Check sprite status: sprite list"
     log_error "  2. View sprite logs: sprite logs ${sprite_name}"
     log_error "  3. Try recreating the sprite: sprite delete ${sprite_name} && sprite create ${sprite_name}"
