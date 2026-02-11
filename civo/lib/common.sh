@@ -236,32 +236,10 @@ print(json.dumps(body))
 wait_for_civo_instance() {
     local server_id="$1"
     local max_attempts=${2:-60}
-
-    log_warn "Waiting for instance to become active..."
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        local region="${CIVO_REGION:-lon1}"
-        status_response=$(civo_api GET "/instances/$server_id?region=$region")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('status',''))")
-
-        if [[ "$status" == "ACTIVE" ]]; then
-            CIVO_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('public_ip',''))")
-            export CIVO_SERVER_IP
-            if [[ -n "$CIVO_SERVER_IP" ]]; then
-                log_info "Instance active: IP=$CIVO_SERVER_IP"
-                return 0
-            fi
-        fi
-
-        log_warn "Instance status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
+    local region="${CIVO_REGION:-lon1}"
+    generic_wait_for_instance civo_api "/instances/${server_id}?region=${region}" \
+        "ACTIVE" "d.get('status','')" "d.get('public_ip','')" \
+        CIVO_SERVER_IP "Instance" "${max_attempts}"
 }
 
 # Handle Civo instance creation API error response

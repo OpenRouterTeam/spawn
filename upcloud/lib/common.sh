@@ -183,39 +183,10 @@ else:
 _wait_for_upcloud_server_ip() {
     local server_uuid="$1"
     local max_attempts=${2:-60}
-    local attempt=1
-
-    log_warn "Waiting for server to become active..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(upcloud_api GET "/server/$server_uuid")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['state'])" 2>/dev/null || echo "unknown")
-
-        if [[ "$status" == "started" ]]; then
-            UPCLOUD_SERVER_IP=$(echo "$status_response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for iface in data['server'].get('ip_addresses', {}).get('ip_address', []):
-    if iface.get('access') == 'public' and iface.get('family') == 'IPv4':
-        print(iface['address'])
-        break
-" 2>/dev/null)
-            export UPCLOUD_SERVER_IP
-
-            if [[ -n "${UPCLOUD_SERVER_IP}" ]]; then
-                log_info "Server active: IP=$UPCLOUD_SERVER_IP"
-                return 0
-            fi
-        fi
-
-        log_warn "Server status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Server did not become active in time"
-    return 1
+    generic_wait_for_instance upcloud_api "/server/${server_uuid}" \
+        "started" "d['server']['state']" \
+        "next((i['address'] for i in d['server'].get('ip_addresses',{}).get('ip_address',[]) if i.get('access')=='public' and i.get('family')=='IPv4'), '')" \
+        UPCLOUD_SERVER_IP "Server" "${max_attempts}"
 }
 
 # Build JSON request body for UpCloud server creation

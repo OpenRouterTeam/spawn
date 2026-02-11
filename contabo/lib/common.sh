@@ -280,35 +280,10 @@ print(json.dumps(body))
 # Sets CONTABO_SERVER_IP on success
 _contabo_wait_for_instance() {
     local instance_id="$1"
-    local max_attempts=60
-    local attempt=1
-
-    while [[ $attempt -le $max_attempts ]]; do
-        sleep 5
-        local instance_info
-        instance_info=$(contabo_api GET "/compute/instances/$instance_id")
-
-        local status
-        status=$(echo "$instance_info" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('data',[{}])[0].get('status',''))")
-
-        if [[ "$status" == "running" ]]; then
-            CONTABO_SERVER_IP=$(echo "$instance_info" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read()).get('data',[{}])[0]
-ip = data.get('ipConfig', {}).get('v4', {}).get('ip', '')
-print(ip)
-")
-            export CONTABO_SERVER_IP
-            log_info "Instance running with IP: $CONTABO_SERVER_IP"
-            return 0
-        fi
-
-        log_info "Instance status: $status (attempt $attempt/$max_attempts)"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance failed to reach running state within timeout"
-    return 1
+    generic_wait_for_instance contabo_api "/compute/instances/${instance_id}" \
+        "running" "d.get('data',[{}])[0].get('status','')" \
+        "d.get('data',[{}])[0].get('ipConfig',{}).get('v4',{}).get('ip','')" \
+        CONTABO_SERVER_IP "Instance" 60
 }
 
 # Create a Contabo instance with cloud-init

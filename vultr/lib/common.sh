@@ -141,31 +141,11 @@ print(json.dumps(body))
 _wait_for_vultr_instance() {
     local instance_id="$1"
     local max_attempts=${2:-60}
-    local attempt=1
-
-    log_warn "Waiting for instance to become active..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(vultr_api GET "/instances/$instance_id")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
-        local power
-        power=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['power_status'])")
-
-        if [[ "$status" == "active" && "$power" == "running" ]]; then
-            VULTR_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['main_ip'])")
-            export VULTR_SERVER_IP
-            log_info "Instance active: IP=$VULTR_SERVER_IP"
-            return 0
-        fi
-
-        log_warn "Instance status: $status/$power ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
+    generic_wait_for_instance vultr_api "/instances/${instance_id}" \
+        "active/running" \
+        "d['instance']['status']+'/'+d['instance']['power_status']" \
+        "d['instance']['main_ip']" \
+        VULTR_SERVER_IP "Instance" "${max_attempts}"
 }
 
 create_server() {

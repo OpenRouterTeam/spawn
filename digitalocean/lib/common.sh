@@ -149,36 +149,10 @@ print(json.dumps(body))
 _wait_for_droplet_active() {
     local droplet_id="$1"
     local max_attempts="${2:-60}"
-    local attempt=1
-
-    log_warn "Waiting for droplet to become active..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(do_api GET "/droplets/$droplet_id")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['status'])")
-
-        if [[ "$status" == "active" ]]; then
-            DO_SERVER_IP=$(echo "$status_response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for net in data['droplet']['networks']['v4']:
-    if net['type'] == 'public':
-        print(net['ip_address'])
-        break
-")
-            export DO_SERVER_IP
-            log_info "Droplet active: IP=$DO_SERVER_IP"
-            return 0
-        fi
-
-        log_warn "Droplet status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Droplet did not become active in time"
-    return 1
+    generic_wait_for_instance do_api "/droplets/${droplet_id}" \
+        "active" "d['droplet']['status']" \
+        "next(n['ip_address'] for n in d['droplet']['networks']['v4'] if n['type']=='public')" \
+        DO_SERVER_IP "Droplet" "${max_attempts}"
 }
 
 # Create a DigitalOcean droplet with cloud-init

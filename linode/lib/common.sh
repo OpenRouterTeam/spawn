@@ -158,24 +158,9 @@ print(json.dumps(body))
 # Poll Linode API until instance is running, sets LINODE_SERVER_IP
 _linode_wait_for_active() {
     local server_id="$1"
-    log_warn "Waiting for Linode to become active..."
-    local max_attempts=60 attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(linode_api GET "/linode/instances/$server_id")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['status'])")
-
-        if [[ "$status" == "running" ]]; then
-            LINODE_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['ipv4'][0])")
-            export LINODE_SERVER_IP
-            log_info "Linode active: IP=$LINODE_SERVER_IP"
-            return 0
-        fi
-        log_warn "Linode status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"; attempt=$((attempt + 1))
-    done
-    log_error "Linode did not become active in time"; return 1
+    generic_wait_for_instance linode_api "/linode/instances/${server_id}" \
+        "running" "d['status']" "d['ipv4'][0]" \
+        LINODE_SERVER_IP "Linode" 60
 }
 
 create_server() {

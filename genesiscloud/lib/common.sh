@@ -151,30 +151,9 @@ print(json.dumps(body))
 # Sets GENESIS_SERVER_IP on success
 _genesis_wait_for_instance() {
     local server_id="$1"
-    local max_attempts=60
-    local attempt=1
-
-    log_warn "Waiting for instance to become active..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(genesis_api GET "/instances/$server_id")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
-
-        if [[ "$status" == "active" ]]; then
-            GENESIS_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['public_ip'])")
-            export GENESIS_SERVER_IP
-            log_info "Instance active: IP=$GENESIS_SERVER_IP"
-            return 0
-        fi
-
-        log_warn "Instance status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
+    generic_wait_for_instance genesis_api "/instances/${server_id}" \
+        "active" "d['instance']['status']" "d['instance']['public_ip']" \
+        GENESIS_SERVER_IP "Instance" 60
 }
 
 create_server() {
