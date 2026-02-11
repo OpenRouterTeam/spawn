@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack ramnode"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
@@ -123,6 +123,12 @@ get_endpoints() {
                 "flavors:/core/flavors" \
                 "ssh_keys:/core/keypairs"
             ;;
+        ramnode)
+            printf '%s\n' \
+                "flavors:/flavors/detail" \
+                "images:/images/detail" \
+                "servers:/servers/detail"
+            ;;
     esac
 }
 
@@ -144,6 +150,7 @@ get_auth_env_var() {
         kamatera)      printf "KAMATERA_API_CLIENT_ID" ;;
         latitude)      printf "LATITUDE_API_KEY" ;;
         hyperstack)    printf "HYPERSTACK_API_KEY" ;;
+        ramnode)       printf "RAMNODE_USERNAME" ;;
     esac
 }
 
@@ -206,6 +213,9 @@ has_credentials() {
         kamatera)
             [[ -n "${KAMATERA_API_CLIENT_ID:-}" ]] && [[ -n "${KAMATERA_API_SECRET:-}" ]]
             ;;
+        ramnode)
+            [[ -n "${RAMNODE_USERNAME:-}" ]] && [[ -n "${RAMNODE_PASSWORD:-}" ]] && [[ -n "${RAMNODE_PROJECT_ID:-}" ]]
+            ;;
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
@@ -242,6 +252,12 @@ import json
 print(json.dumps({'client_id': '${KAMATERA_API_CLIENT_ID:-}', 'secret': '${KAMATERA_API_SECRET:-}'}, indent=2))
 " > "$config_file"
             ;;
+        ramnode)
+            python3 -c "
+import json
+print(json.dumps({'username': '${RAMNODE_USERNAME:-}', 'password': '${RAMNODE_PASSWORD:-}', 'project_id': '${RAMNODE_PROJECT_ID:-}'}, indent=2))
+" > "$config_file"
+            ;;
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
@@ -267,6 +283,9 @@ prompt_credentials() {
             ;;
         kamatera)
             vars_needed="KAMATERA_API_CLIENT_ID KAMATERA_API_SECRET"
+            ;;
+        ramnode)
+            vars_needed="RAMNODE_USERNAME RAMNODE_PASSWORD RAMNODE_PROJECT_ID"
             ;;
         *)
             vars_needed=$(get_auth_env_var "$cloud")
@@ -311,6 +330,7 @@ call_api() {
         kamatera)      kamatera_api GET "$endpoint" ;;
         latitude)      latitude_api GET "$endpoint" ;;
         hyperstack)    hyperstack_api GET "$endpoint" ;;
+        ramnode)       ramnode_compute_api GET "$endpoint" ;;
     esac
 }
 
@@ -349,6 +369,10 @@ elif cloud == 'kamatera':
     sys.exit(0 if d.get('status') == 'error' else 1)
 elif cloud == 'latitude':
     sys.exit(0 if 'error' in d or ('errors' in d and d['errors']) else 1)
+elif cloud == 'ramnode':
+    # OpenStack API error format
+    err = d.get('error')
+    sys.exit(0 if err and isinstance(err, dict) else 1)
 else:
     sys.exit(1)
 " 2>/dev/null
@@ -368,7 +392,7 @@ _record_live_cycle() {
     local fixture_dir="$2"
 
     case "$cloud" in
-        hetzner|digitalocean|vultr|linode|lambda|civo|upcloud|binarylane|scaleway|genesiscloud|latitude)
+        hetzner|digitalocean|vultr|linode|lambda|civo|upcloud|binarylane|scaleway|genesiscloud|latitude|ramnode)
             source "${REPO_ROOT}/${cloud}/lib/common.sh" 2>/dev/null || true
             "_live_${cloud}" "$fixture_dir"
             ;;
@@ -1237,6 +1261,104 @@ print(json.dumps(body))
     _save_live_fixture "$fixture_dir" "delete_server" "DELETE /servers/{id}" "$delete_response"
 
     printf '%b\n' "  ${CYAN}live${NC} Latitude server ${server_id} deleted"
+}
+
+_live_ramnode() {
+    local fixture_dir="$1"
+    local server_name="spawn-record-$(date +%s)"
+    local flavor="1GB"
+
+    printf '%b\n' "  ${CYAN}live${NC} Creating test RamNode server '${server_name}' (${flavor})..."
+
+    # Ensure we have auth token
+    if [[ -z "${RAMNODE_AUTH_TOKEN:-}" ]]; then
+        RAMNODE_AUTH_TOKEN=$(_get_ramnode_token "${RAMNODE_USERNAME}" "${RAMNODE_PASSWORD}" "${RAMNODE_PROJECT_ID}") || {
+            printf '%b\n' "  ${RED}fail${NC} Could not get RamNode auth token"
+            cloud_errors=$((cloud_errors + 1))
+            return 0
+        }
+        export RAMNODE_AUTH_TOKEN
+    fi
+
+    # Get image ID (Ubuntu 24.04)
+    local images_response
+    images_response=$(ramnode_compute_api GET "/images/detail")
+    local image_id
+    image_id=$(echo "$images_response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+images = data.get('images', [])
+ubuntu_images = [img for img in images if 'ubuntu' in img.get('name', '').lower() and '24.04' in img.get('name', '')]
+if ubuntu_images:
+    print(ubuntu_images[0]['id'])
+elif images:
+    print(images[0]['id'])
+" 2>/dev/null) || image_id=""
+
+    if [[ -z "$image_id" ]]; then
+        printf '%b\n' "  ${YELLOW}warn${NC} Could not find Ubuntu 24.04 image"
+        cloud_errors=$((cloud_errors + 1))
+        return 0
+    fi
+
+    # Get network ID
+    local network_response
+    network_response=$(curl -fsSL -X GET \
+        "https://openstack.ramnode.com:9696/v2.0/networks" \
+        -H "X-Auth-Token: ${RAMNODE_AUTH_TOKEN}" \
+        -H "Content-Type: application/json" 2>/dev/null || echo '{"networks":[]}')
+    local network_id
+    network_id=$(echo "$network_response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+networks = data.get('networks', [])
+if networks:
+    print(networks[0]['id'])
+" 2>/dev/null) || network_id=""
+
+    # Build server creation request
+    local body
+    body=$(python3 -c "
+import json
+body = {
+    'server': {
+        'name': '${server_name}',
+        'flavorRef': '${flavor}',
+        'imageRef': '${image_id}'
+    }
+}
+if '${network_id}':
+    body['server']['networks'] = [{'uuid': '${network_id}'}]
+print(json.dumps(body))
+")
+
+    local create_response
+    create_response=$(ramnode_compute_api POST "/servers" "$body")
+
+    _save_live_fixture "$fixture_dir" "create_server" "POST /servers" "$create_response" || {
+        printf '%b\n' "  ${YELLOW}warn${NC} Could not create RamNode server (may be out of credit)"
+        return 0
+    }
+
+    local server_id
+    server_id=$(echo "$create_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])" 2>/dev/null) || true
+
+    if [[ -z "${server_id:-}" ]]; then
+        printf '%b\n' "  ${YELLOW}warn${NC} Could not extract RamNode server ID"
+        return 0
+    fi
+
+    printf '%b\n' "  ${CYAN}live${NC} RamNode server created (ID: ${server_id}). Deleting..."
+    sleep 3
+
+    local delete_response
+    delete_response=$(ramnode_compute_api DELETE "/servers/${server_id}") || true
+    if [[ -z "$delete_response" ]]; then
+        delete_response='{}'
+    fi
+    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /servers/{id}" "$delete_response"
+
+    printf '%b\n' "  ${CYAN}live${NC} RamNode server ${server_id} deleted"
 }
 
 # --- Record one cloud ---

@@ -702,6 +702,21 @@
       "exec_method": "bash -c",
       "interactive_method": "exec",
       "notes": "No cloud provisioning needed. Installs agents and injects OpenRouter credentials locally. Useful for local development and testing."
+    },
+    "ramnode": {
+      "name": "RamNode",
+      "description": "RamNode budget VPS cloud via OpenStack API",
+      "url": "https://www.ramnode.com/",
+      "type": "api",
+      "auth": "RAMNODE_USERNAME + RAMNODE_PASSWORD + RAMNODE_PROJECT_ID",
+      "provision_method": "OpenStack Compute API POST /servers with user_data",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "flavor": "1GB",
+        "image": "Ubuntu 24.04"
+      },
+      "notes": "Budget VPS provider with OpenStack API. Hourly billing starting at $0.006/hr (~$4.38/mo). Full OpenStack compatibility. Get credentials from https://manage.ramnode.com/ → Cloud → API Users. Requires RAMNODE_USERNAME, RAMNODE_PASSWORD, and RAMNODE_PROJECT_ID."
     }
   },
   "matrix": {
@@ -1154,6 +1169,21 @@
     "local/opencode": "missing",
     "local/plandex": "missing",
     "local/kilocode": "missing",
-    "local/continue": "missing"
+    "local/continue": "missing",
+    "ramnode/claude": "implemented",
+    "ramnode/openclaw": "missing",
+    "ramnode/nanoclaw": "missing",
+    "ramnode/aider": "implemented",
+    "ramnode/goose": "implemented",
+    "ramnode/codex": "missing",
+    "ramnode/interpreter": "missing",
+    "ramnode/gemini": "missing",
+    "ramnode/amazonq": "missing",
+    "ramnode/cline": "missing",
+    "ramnode/gptme": "missing",
+    "ramnode/opencode": "missing",
+    "ramnode/plandex": "missing",
+    "ramnode/kilocode": "missing",
+    "ramnode/continue": "missing"
   }
 }

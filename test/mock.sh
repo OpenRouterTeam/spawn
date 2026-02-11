@@ -145,6 +145,9 @@ case "$URL" in
     https://api.latitude.sh*)           ENDPOINT="${URL#https://api.latitude.sh}" ;;
     https://infrahub-api.nexgencloud.com/v1*) ENDPOINT="${URL#https://infrahub-api.nexgencloud.com/v1}" ;;
     *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
+    https://openstack.ramnode.com:5000/v3*)   ENDPOINT="${URL#https://openstack.ramnode.com:5000/v3}" ;;
+    https://openstack.ramnode.com:8774/v2.1*) ENDPOINT="${URL#https://openstack.ramnode.com:8774/v2.1}" ;;
+    https://openstack.ramnode.com:9696/v2.0*) ENDPOINT="${URL#https://openstack.ramnode.com:9696/v2.0}" ;;
 esac
 
 # Strip query params for matching
