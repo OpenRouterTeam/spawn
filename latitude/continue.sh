@@ -35,21 +35,9 @@ log_warn "Setting up environment variables..."
 run_server "$LATITUDE_SERVER_IP" "printf '%s\n' 'export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}' >> /root/.bashrc"
 run_server "$LATITUDE_SERVER_IP" "printf '%s\n' 'export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}' >> /root/.zshrc"
 
-log_warn "Creating Continue config file..."
-run_server "$LATITUDE_SERVER_IP" "mkdir -p ~/.continue"
-run_server "$LATITUDE_SERVER_IP" "cat > ~/.continue/config.json << 'EOF'
-{
-  \"models\": [
-    {
-      \"title\": \"OpenRouter\",
-      \"provider\": \"openrouter\",
-      \"model\": \"openrouter/auto\",
-      \"apiBase\": \"https://openrouter.ai/api/v1\",
-      \"apiKey\": \"${OPENROUTER_API_KEY}\"
-    }
-  ]
-}
-EOF"
+setup_continue_config "${OPENROUTER_API_KEY}" \
+    "upload_file ${LATITUDE_SERVER_IP}" \
+    "run_server ${LATITUDE_SERVER_IP}"
 
 echo ""
 log_info "Latitude.sh setup completed successfully!"

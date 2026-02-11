@@ -35,21 +35,9 @@ log_warn "Setting up environment variables..."
 inject_env_vars_sprite "${SPRITE_NAME}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
-log_warn "Creating Continue config file..."
-run_sprite "${SPRITE_NAME}" "mkdir -p ~/.continue"
-run_sprite "${SPRITE_NAME}" "cat > ~/.continue/config.json << 'EOF'
-{
-  \"models\": [
-    {
-      \"title\": \"OpenRouter\",
-      \"provider\": \"openrouter\",
-      \"model\": \"openrouter/auto\",
-      \"apiBase\": \"https://openrouter.ai/api/v1\",
-      \"apiKey\": \"${OPENROUTER_API_KEY}\"
-    }
-  ]
-}
-EOF"
+setup_continue_config "${OPENROUTER_API_KEY}" \
+    "upload_file_sprite ${SPRITE_NAME}" \
+    "run_sprite ${SPRITE_NAME}"
 
 echo ""
 log_info "Sprite setup completed successfully!"
