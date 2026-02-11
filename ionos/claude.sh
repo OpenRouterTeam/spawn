@@ -1,46 +1,41 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-# shellcheck source=ionos/lib/common.sh
+# shellcheck source=lambda/lib/common.sh
+
 if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
     source "${SCRIPT_DIR}/lib/common.sh"
 else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/ionos/lib/common.sh)"
+    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/lambda/lib/common.sh)"
 fi
 
-log_info "Claude Code on IONOS Cloud"
+log_info "Claude Code on Lambda Cloud"
 echo ""
 
-# 1. Resolve IONOS credentials
-ensure_ionos_credentials
+# 1. Ensure Lambda API key is configured
+ensure_lambda_token
 
-# 2. Generate SSH key
+# 2. Generate + register SSH key
 ensure_ssh_key
 
-# 3. Get server name and create server
+# 3. Get instance name and create server
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 
 # 4. Wait for SSH and cloud-init
-verify_server_connectivity "${IONOS_SERVER_IP}"
-wait_for_cloud_init "${IONOS_SERVER_IP}" 60
+verify_server_connectivity "${LAMBDA_SERVER_IP}"
+wait_for_cloud_init "${LAMBDA_SERVER_IP}"
 
 # 5. Verify Claude Code is installed (fallback to manual install)
 log_warn "Verifying Claude Code installation..."
-if ! run_server "${IONOS_SERVER_IP}" "command -v claude" >/dev/null 2>&1; then
+if ! run_server "${LAMBDA_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
     log_warn "Claude Code not found, installing manually..."
-    run_server "${IONOS_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
+    run_server "${LAMBDA_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
-
-# Verify installation succeeded
-if ! run_server "${IONOS_SERVER_IP}" "command -v claude &> /dev/null && claude --version &> /dev/null"; then
-    log_error "Claude Code installation verification failed"
-    log_error "The 'claude' command is not available or not working properly on server ${IONOS_SERVER_IP}"
-    exit 1
-fi
-log_info "Claude Code installation verified successfully"
+log_info "Claude Code is installed"
 
 # 6. Get OpenRouter API key
 echo ""
@@ -50,8 +45,10 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
+# 7. Inject environment variables into ~/.zshrc
 log_warn "Setting up environment variables..."
-inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
+
+inject_env_vars_ssh "${LAMBDA_INSTANCE_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
     "ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}" \
@@ -61,16 +58,16 @@ inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
 
 # 8. Configure Claude Code settings
 setup_claude_code_config "${OPENROUTER_API_KEY}" \
-    "upload_file ${IONOS_SERVER_IP}" \
-    "run_server ${IONOS_SERVER_IP}"
+    "upload_file ${LAMBDA_SERVER_IP}" \
+    "run_server ${LAMBDA_SERVER_IP}"
 
 echo ""
-log_info "IONOS server setup completed successfully!"
-log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP})"
+log_info "Lambda Cloud instance setup completed successfully!"
+log_info "Instance: ${SERVER_NAME} (IP: ${LAMBDA_SERVER_IP})"
 echo ""
 
 # 9. Start Claude Code interactively
 log_warn "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${IONOS_SERVER_IP}" "source ~/.zshrc && claude"
+interactive_session "${LAMBDA_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

@@ -213,15 +213,14 @@ ovh_register_ssh_key() {
     local pub_path="$2"
     local pub_key
     pub_key=$(cat "$pub_path")
-    local json_pub_key
-    json_pub_key=$(json_escape "$pub_key")
 
     local body
-    body=$(python3 -c "
-import json
+    body=$(echo "$pub_key" | python3 -c "
+import json, sys
+pub_key = sys.stdin.read().strip()
 body = {
-    'name': '${key_name}',
-    'publicKey': json.loads(${json_pub_key})
+    'name': '$key_name',
+    'publicKey': pub_key
 }
 print(json.dumps(body))
 ")

@@ -1,0 +1,224 @@
+{
+  "images": [
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-02-10T16:31:15.771530+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "374b4139-51c8-4497-80da-bde105394f09",
+      "modification_date": "2026-02-10T16:31:15.771530+00:00",
+      "name": "Windows Server 2025",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "6a1029ca-329a-4202-9b6d-3445bdbf0916",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-02-10T11:30:39.697503+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "ca5e7780-a7c3-451f-a528-0eabc745343c",
+      "modification_date": "2026-02-10T11:30:39.697503+00:00",
+      "name": "Windows Server 2025 Core",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "955c1e88-d75b-4ca1-b53e-b5c9c07a7bb1",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-02-05T15:28:32.401289+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "ca115f77-d927-4483-b1f8-354107143e8c",
+      "modification_date": "2026-02-05T15:28:32.401289+00:00",
+      "name": "Windows Server 2025",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "e7d1c335-e70a-419b-8a71-07f61e21b729",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-02-05T14:56:51.105141+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "3fea98bc-5e72-4f0c-a4bd-28d38010ff34",
+      "modification_date": "2026-02-05T14:56:51.105141+00:00",
+      "name": "Windows Server 2025 Core",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "93775898-0256-4eac-a773-cb154aab73ba",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "arm64",
+      "creation_date": "2026-02-04T12:02:05.696710+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "2a3ad407-ad47-4b6a-89b3-7d6d820d24bb",
+      "modification_date": "2026-02-04T12:02:05.696710+00:00",
+      "name": "debian-trixie",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "77cd231f-aa0c-4bff-a180-7d5cde4f048e",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-02-04T12:00:27.604925+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "024676ab-6b3c-4473-b538-181a688d62e7",
+      "modification_date": "2026-02-04T12:00:27.604925+00:00",
+      "name": "debian-trixie",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "c5af243c-1e63-4799-8f01-d3302d6fea72",
+        "name": "debian-trixie",
+        "size": 10000000000,
+        "volume_type": "l_ssd"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-02-04T12:00:22.720696+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "71d4a59b-5c9a-4084-b62b-f32bc066b1c3",
+      "modification_date": "2026-02-04T12:00:22.720696+00:00",
+      "name": "debian-trixie",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "8f813bfe-0ad8-4ff1-aeb3-663d9e1670af",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "arm64",
+      "creation_date": "2026-01-28T16:28:07.893202+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "2dcbfb4f-1b77-4733-b734-954b09c2b17b",
+      "modification_date": "2026-01-28T16:28:07.893202+00:00",
+      "name": "debian-trixie",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "a33ea2ec-9531-4ce2-b2c1-6e4979c371f6",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-01-28T16:27:26.694891+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "69982b79-5db1-487a-8fd4-cdb3547f4bb2",
+      "modification_date": "2026-01-28T16:27:26.694891+00:00",
+      "name": "debian-trixie",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "a6ed67b9-9789-4b18-875b-4e747eda3dc9",
+        "name": "debian-trixie",
+        "size": 10000000000,
+        "volume_type": "l_ssd"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-01-28T16:27:25.789355+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "6d173ed8-ae70-4671-a8f1-584921c4e706",
+      "modification_date": "2026-01-28T16:27:25.789355+00:00",
+      "name": "debian-trixie",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "5f780810-ef25-4def-987b-b03409862d08",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    }
+  ]
+}

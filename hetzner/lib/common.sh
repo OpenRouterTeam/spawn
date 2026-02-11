@@ -115,14 +115,145 @@ get_server_name() {
 
 # get_cloud_init_userdata is now defined in shared/common.sh
 
+# Fetch available server types for a given location, sorted by price
+# Outputs: "name  vcpus  ram_gb  disk_gb  price" lines
+_list_server_types_for_location() {
+    local location="$1"
+    local response
+    response=$(hetzner_api GET "/server_types?per_page=50")
+
+    echo "$response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+types = []
+for t in data.get('server_types', []):
+    if t.get('deprecation') is not None:
+        continue
+    # Check if this type is available in the requested location
+    avail = {p['location']: p for p in t.get('prices', [])}
+    if '$location' not in avail:
+        continue
+    price = float(avail['$location']['price_hourly']['gross'])
+    ram_gb = t['memory']
+    types.append((price, t['name'], t['cores'], ram_gb, t['disk'], t['cpu_type']))
+types.sort()
+for price, name, cores, ram, disk, cpu in types:
+    print(f'{name}|{cores} vCPU|{ram:.0f} GB RAM|{disk} GB disk|{cpu}|\$  {price:.4f}/hr')
+"
+}
+
+# Fetch available locations
+# Outputs: "name|city|country" lines
+_list_locations() {
+    local response
+    response=$(hetzner_api GET "/locations")
+
+    echo "$response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+for loc in sorted(data.get('locations', []), key=lambda l: l['name']):
+    print(f\"{loc['name']}|{loc['city']}|{loc['country']}\")
+"
+}
+
+# Interactive location picker (skipped if HETZNER_LOCATION is set)
+_pick_location() {
+    if [[ -n "${HETZNER_LOCATION:-}" ]]; then
+        echo "$HETZNER_LOCATION"
+        return
+    fi
+
+    log_info "Fetching available locations..."
+    local locations
+    locations=$(_list_locations)
+
+    if [[ -z "$locations" ]]; then
+        log_warn "Could not fetch locations, using default: fsn1"
+        echo "fsn1"
+        return
+    fi
+
+    log_info "Available locations:"
+    local i=1
+    local names=()
+    while IFS='|' read -r name city country; do
+        printf "  %2d) %-6s  %s, %s\n" "$i" "$name" "$city" "$country" >&2
+        names+=("$name")
+        i=$((i + 1))
+    done <<< "$locations"
+
+    local choice
+    printf "\n" >&2
+    choice=$(safe_read "Select location [1]: ") || choice=""
+    choice="${choice:-1}"
+
+    if [[ "$choice" -ge 1 && "$choice" -le "${#names[@]}" ]] 2>/dev/null; then
+        echo "${names[$((choice - 1))]}"
+    else
+        log_warn "Invalid choice, using default: fsn1"
+        echo "fsn1"
+    fi
+}
+
+# Interactive server type picker (skipped if HETZNER_SERVER_TYPE is set)
+_pick_server_type() {
+    local location="$1"
+
+    if [[ -n "${HETZNER_SERVER_TYPE:-}" ]]; then
+        echo "$HETZNER_SERVER_TYPE"
+        return
+    fi
+
+    log_info "Fetching server types available in ${location}..."
+    local types
+    types=$(_list_server_types_for_location "$location")
+
+    if [[ -z "$types" ]]; then
+        log_warn "Could not fetch server types, using default: cpx11"
+        echo "cpx11"
+        return
+    fi
+
+    log_info "Available server types in ${location}:"
+    local i=1
+    local names=()
+    local default_idx=1
+    while IFS='|' read -r name cores ram disk cpu price; do
+        printf "  %2d) %-10s  %-8s  %-10s  %-12s  %-8s  %s\n" "$i" "$name" "$cores" "$ram" "$disk" "$cpu" "$price" >&2
+        names+=("$name")
+        if [[ "$name" == "cpx11" ]]; then
+            default_idx=$i
+        fi
+        i=$((i + 1))
+    done <<< "$types"
+
+    local choice
+    printf "\n" >&2
+    choice=$(safe_read "Select server type [${default_idx}]: ") || choice=""
+    choice="${choice:-$default_idx}"
+
+    if [[ "$choice" -ge 1 && "$choice" -le "${#names[@]}" ]] 2>/dev/null; then
+        echo "${names[$((choice - 1))]}"
+    else
+        log_warn "Invalid choice, using default: cpx11"
+        echo "cpx11"
+    fi
+}
+
 # Create a Hetzner server with cloud-init
 create_server() {
     local name="$1"
-    local server_type="${HETZNER_SERVER_TYPE:-cx22}"
-    local location="${HETZNER_LOCATION:-fsn1}"
+
+    # Interactive location + server type selection (skipped if env vars are set)
+    local location
+    location=$(_pick_location)
+
+    local server_type
+    server_type=$(_pick_server_type "$location")
+
     local image="ubuntu-24.04"
 
-    # Validate env var inputs to prevent injection into Python code
+    # Validate inputs to prevent injection into Python code
     validate_resource_name "$server_type" || { log_error "Invalid HETZNER_SERVER_TYPE"; return 1; }
     validate_region_name "$location" || { log_error "Invalid HETZNER_LOCATION"; return 1; }
 
@@ -134,22 +265,21 @@ create_server() {
     local ssh_key_ids
     ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
-    # JSON-escape the cloud-init userdata
+    # Build request body — pipe cloud-init userdata via stdin to avoid bash quoting issues
     local userdata
     userdata=$(get_cloud_init_userdata)
-    local userdata_json
-    userdata_json=$(echo "$userdata" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
 
     local body
-    body=$(python3 -c "
-import json
+    body=$(echo "$userdata" | python3 -c "
+import json, sys
+userdata = sys.stdin.read()
 body = {
     'name': '$name',
     'server_type': '$server_type',
     'location': '$location',
     'image': '$image',
     'ssh_keys': $ssh_key_ids,
-    'user_data': json.loads($userdata_json),
+    'user_data': userdata,
     'start_after_create': True
 }
 print(json.dumps(body))
@@ -158,8 +288,17 @@ print(json.dumps(body))
     local response
     response=$(hetzner_api POST "/servers" "$body")
 
-    # Check for errors
-    if echo "$response" | grep -q '"error"'; then
+    # Check for errors — Hetzner success responses contain "error": null in the action,
+    # so we must check if the top-level error is a real object (not null)
+    local has_error
+    has_error=$(echo "$response" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+err = d.get('error')
+print('yes' if err and isinstance(err, dict) else 'no')
+" 2>/dev/null || echo "unknown")
+
+    if [[ "$has_error" != "no" ]] && ! echo "$response" | grep -q '"server"'; then
         log_error "Failed to create Hetzner server"
 
         # Parse error details

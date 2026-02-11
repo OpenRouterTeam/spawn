@@ -30,7 +30,7 @@ log_warn "Installing Claude Code..."
 run_sprite "${SPRITE_NAME}" "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation succeeded
-if ! run_sprite "${SPRITE_NAME}" "command -v claude &> /dev/null && claude --version &> /dev/null"; then
+if ! run_sprite "${SPRITE_NAME}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
     log_error "Claude Code installation verification failed"
     log_error "The 'claude' command is not available or not working properly"
     exit 1
@@ -72,11 +72,11 @@ if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
 
     # Execute without -tty flag
-    sprite exec -s "${SPRITE_NAME}" -- zsh -c "source ~/.zshrc && claude -p ${escaped_prompt}"
+    sprite exec -s "${SPRITE_NAME}" -- zsh -c "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude -p ${escaped_prompt}"
 else
     # Interactive mode: start Claude Code normally
     log_warn "Starting Claude Code..."
     sleep 1
     clear 2>/dev/null || true
-    sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && claude"
+    sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"
 fi

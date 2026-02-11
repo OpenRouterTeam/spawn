@@ -1,0 +1,40 @@
+{
+  "account": {
+    "TAXID": "",
+    "acls": [
+      "root",
+      "manage_users",
+      "subscriptions",
+      "subscriptions_view",
+      "provisioning",
+      "upgrade",
+      "billing",
+      "support",
+      "dns",
+      "firewall",
+      "objstore",
+      "loadbalancer",
+      "vke",
+      "abuse",
+      "alerts",
+      "activity_logs"
+    ],
+    "address1": "821 Gravina Court",
+    "address2": "",
+    "balance": 0,
+    "city": "San Jose",
+    "company_industry_id": "0",
+    "company_info": "",
+    "company_name": "",
+    "company_size_id": 0,
+    "company_url": "",
+    "country": "US",
+    "email": "ahmed@abushagur.com",
+    "interest": "",
+    "name": "Ahmed Abushagur",
+    "org_name": "",
+    "pending_charges": 0.02,
+    "prepayment_remaining": "0.00",
+    "state": "CA"
+  }
+}

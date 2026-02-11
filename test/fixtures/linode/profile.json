@@ -1,0 +1,23 @@
+{
+  "authentication_type": "google",
+  "authorized_keys": null,
+  "email": "ahmed@abushagur.com",
+  "email_notifications": true,
+  "ip_whitelist_enabled": false,
+  "lish_auth_method": "keys_only",
+  "referrals": {
+    "code": "",
+    "completed": 0,
+    "credit": 0,
+    "pending": 0,
+    "total": 0,
+    "url": ""
+  },
+  "restricted": false,
+  "timezone": "GMT",
+  "two_factor_auth": false,
+  "uid": 8062417,
+  "user_type": "default",
+  "username": "ahmedtheg",
+  "verified_phone_number": "+16692249928"
+}

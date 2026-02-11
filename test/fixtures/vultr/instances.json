@@ -1,0 +1,46 @@
+{
+  "instances": [
+    {
+      "allowed_bandwidth": 3,
+      "app_id": 0,
+      "date_created": "2026-02-10T23:48:34+00:00",
+      "disk": 25,
+      "features": [],
+      "firewall_group_id": "",
+      "gateway_v4": "108.61.155.129",
+      "hostname": "spawn-record-1770767313",
+      "id": "96b1eaec-9a56-46a0-9f67-a9d143ee985a",
+      "image_id": "",
+      "internal_ip": "",
+      "kvm": "https://my.vultr.com/subs/vps/novnc/api.php?data=djJ8a0lGZUlNazd5UDFESzV0czcxeTNwRDlSaG4wblZXVUZ8EwUN1kRXa94PTNwjmdiCsc-e7kvWaS2Sn831aMRfDuMffBd4FOXikMntjtzq5c0NOXosaTSNYAXYhAlbH3qZHy945DcTlnYkXv9wg_0I-FMfC4wdvHBBjQzpPbw7eS5JNd73vY2oQtTN_6nmyf3_I6-ZEAUlzl6EoTdasMnXDH6wlxRFE5lMvtcOrbuPX4E",
+      "label": "spawn-record-1770767313",
+      "main_ip": "108.61.155.246",
+      "netmask_v4": "255.255.255.128",
+      "os": "Ubuntu 24.04 LTS x64",
+      "os_id": 2284,
+      "plan": "vc2-1c-1gb",
+      "power_status": "running",
+      "ram": 1024,
+      "region": "ewr",
+      "server_status": "ok",
+      "snapshot_id": "",
+      "status": "active",
+      "tag": "",
+      "tags": [],
+      "user_scheme": "root",
+      "v6_main_ip": "",
+      "v6_network": "",
+      "v6_network_size": 0,
+      "vcpu_count": 1,
+      "vpc_only": false,
+      "vpcs": []
+    }
+  ],
+  "meta": {
+    "links": {
+      "next": "",
+      "prev": ""
+    },
+    "total": 1
+  }
+}

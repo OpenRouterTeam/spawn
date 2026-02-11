@@ -1,0 +1,13 @@
+{
+  "cloud": "vultr",
+  "recorded_at": "2026-02-11T00:52:34Z",
+  "fixtures": {
+    "account": {"endpoint": "/account", "recorded_at": "2026-02-11T00:52:22Z"},
+    "ssh_keys": {"endpoint": "/ssh-keys", "recorded_at": "2026-02-11T00:52:23Z"},
+    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-11T00:52:24Z"},
+    "plans": {"endpoint": "/plans", "recorded_at": "2026-02-11T00:52:25Z"},
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-11T00:52:25Z"},
+    "create_server": {"endpoint": "POST /instances", "type": "live", "recorded_at": "2026-02-11T00:52:28Z"},
+    "delete_server": {"endpoint": "DELETE /instances/{id}", "type": "live", "recorded_at": "2026-02-11T00:52:34Z"}
+  }
+}
