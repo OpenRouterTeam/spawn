@@ -1685,6 +1685,125 @@ _save_json_config() {
     log_info "Credentials saved to ${config_file}"
 }
 
+# Generic multi-credential ensure function
+# Eliminates duplicated env-var/config/prompt/test/save logic across providers
+# that need more than one credential (username+password, client_id+secret, etc.)
+#
+# Usage: ensure_multi_credentials PROVIDER_NAME CONFIG_FILE HELP_URL TEST_FUNC \
+#          "ENV_VAR:config_key:Prompt Label" ...
+#
+# Arguments:
+#   PROVIDER_NAME - Display name for logging (e.g., "Contabo")
+#   CONFIG_FILE   - Path to JSON config file (e.g., "$HOME/.config/spawn/contabo.json")
+#   HELP_URL      - URL where users can find their credentials
+#   TEST_FUNC     - Function to validate credentials (returns 0=ok, 1=fail); empty to skip
+#   ...           - One or more credential specs as "ENV_VAR:config_key:Prompt Label"
+#
+# Each credential spec is a colon-delimited triple:
+#   ENV_VAR    - Environment variable name (e.g., CONTABO_CLIENT_ID)
+#   config_key - JSON key in the config file (e.g., client_id)
+#   Prompt Label - Human-readable label for prompting (e.g., "Client ID")
+#
+# Example:
+#   ensure_multi_credentials "Contabo" "$HOME/.config/spawn/contabo.json" \
+#       "https://my.contabo.com/api/details" test_contabo_credentials \
+#       "CONTABO_CLIENT_ID:client_id:Client ID" \
+#       "CONTABO_CLIENT_SECRET:client_secret:Client Secret" \
+#       "CONTABO_API_USER:api_user:API User (email)" \
+#       "CONTABO_API_PASSWORD:api_password:API Password"
+ensure_multi_credentials() {
+    local provider_name="${1}"
+    local config_file="${2}"
+    local help_url="${3}"
+    local test_func="${4:-}"
+    shift 4
+
+    check_python_available || return 1
+
+    # Collect credential specs
+    local specs=("$@")
+    local env_vars=() config_keys=() labels=()
+    local spec
+    for spec in "${specs[@]}"; do
+        env_vars+=("${spec%%:*}")
+        local rest="${spec#*:}"
+        config_keys+=("${rest%%:*}")
+        labels+=("${rest#*:}")
+    done
+
+    # 1. Check if ALL env vars are already set
+    local all_set=true
+    local var
+    for var in "${env_vars[@]}"; do
+        if [[ -z "${!var:-}" ]]; then
+            all_set=false
+            break
+        fi
+    done
+    if [[ "${all_set}" == "true" ]]; then
+        log_info "Using ${provider_name} credentials from environment"
+        return 0
+    fi
+
+    # 2. Try loading from config file
+    local creds
+    if creds=$(_load_json_config_fields "${config_file}" "${config_keys[@]}"); then
+        local all_loaded=true
+        local i=0
+        while IFS= read -r value; do
+            if [[ -z "${value}" ]]; then
+                all_loaded=false
+                break
+            fi
+            export "${env_vars[$i]}=${value}"
+            i=$((i + 1))
+        done <<< "${creds}"
+
+        if [[ "${all_loaded}" == "true" && "${i}" -eq "${#env_vars[@]}" ]]; then
+            log_info "Using ${provider_name} credentials from ${config_file}"
+            return 0
+        fi
+    fi
+
+    # 3. Prompt for each credential
+    echo ""
+    log_step "${provider_name} API Credentials Required"
+    log_step "Get your credentials from: ${help_url}"
+    echo ""
+
+    local idx=0
+    for idx in $(seq 0 $((${#env_vars[@]} - 1))); do
+        local val
+        val=$(safe_read "Enter ${provider_name} ${labels[$idx]}: ") || return 1
+        if [[ -z "${val}" ]]; then
+            log_error "${labels[$idx]} is required"
+            return 1
+        fi
+        export "${env_vars[$idx]}=${val}"
+    done
+
+    # 4. Validate credentials
+    if [[ -n "${test_func}" ]]; then
+        log_info "Testing ${provider_name} credentials..."
+        if ! "${test_func}"; then
+            log_error "Invalid ${provider_name} credentials"
+            local v
+            for v in "${env_vars[@]}"; do
+                unset "${v}"
+            done
+            return 1
+        fi
+    fi
+
+    # 5. Save to config file
+    local save_args=()
+    for idx in $(seq 0 $((${#env_vars[@]} - 1))); do
+        save_args+=("${config_keys[$idx]}" "${!env_vars[$idx]}")
+    done
+    _save_json_config "${config_file}" "${save_args[@]}"
+    return 0
+}
+
 # ============================================================
 # Configuration file helpers
 # ============================================================

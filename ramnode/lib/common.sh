@@ -121,51 +121,11 @@ test_ramnode_credentials() {
 
 # Ensure RamNode credentials are available
 ensure_ramnode_credentials() {
-    # Check for required environment variables
-    if [[ -n "${RAMNODE_USERNAME:-}" && -n "${RAMNODE_PASSWORD:-}" && -n "${RAMNODE_PROJECT_ID:-}" ]]; then
-        if test_ramnode_credentials; then
-            return 0
-        fi
-    fi
-
-    # Try to load from config file (single python3 call instead of 3)
-    local config_file="$HOME/.config/spawn/ramnode.json"
-    local creds
-    if creds=$(_load_json_config_fields "$config_file" username password project_id); then
-        local saved_user saved_pass saved_pid
-        { read -r saved_user; read -r saved_pass; read -r saved_pid; } <<< "${creds}"
-        if [[ -n "$saved_user" ]] && [[ -n "$saved_pass" ]] && [[ -n "$saved_pid" ]]; then
-            log_info "Loading RamNode credentials from $config_file..."
-            export RAMNODE_USERNAME="$saved_user" RAMNODE_PASSWORD="$saved_pass" RAMNODE_PROJECT_ID="$saved_pid"
-            if test_ramnode_credentials; then
-                return 0
-            fi
-        fi
-    fi
-
-    # Prompt for credentials
-    log_warn "RamNode OpenStack credentials not found"
-    log_info ""
-    log_info "Get credentials from: https://manage.ramnode.com/ → Cloud → API Users"
-    log_info ""
-
-    RAMNODE_USERNAME=$(safe_read "Enter RamNode username: ") || return 1
-    RAMNODE_PASSWORD=$(safe_read "Enter RamNode password: ") || return 1
-    RAMNODE_PROJECT_ID=$(safe_read "Enter RamNode project ID: ") || return 1
-
-    export RAMNODE_USERNAME RAMNODE_PASSWORD RAMNODE_PROJECT_ID
-
-    if ! test_ramnode_credentials; then
-        log_error "Invalid credentials"
-        return 1
-    fi
-
-    _save_json_config "$config_file" \
-        username "$RAMNODE_USERNAME" \
-        password "$RAMNODE_PASSWORD" \
-        project_id "$RAMNODE_PROJECT_ID"
-
-    return 0
+    ensure_multi_credentials "RamNode" "$HOME/.config/spawn/ramnode.json" \
+        "https://manage.ramnode.com/ -> Cloud -> API Users" test_ramnode_credentials \
+        "RAMNODE_USERNAME:username:Username" \
+        "RAMNODE_PASSWORD:password:Password" \
+        "RAMNODE_PROJECT_ID:project_id:Project ID"
 }
 
 # Check if SSH key is registered with RamNode

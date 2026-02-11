@@ -124,51 +124,11 @@ test_netcup_credentials() {
 
 # Ensure Netcup credentials are available
 ensure_netcup_credentials() {
-    local config_file="$HOME/.config/spawn/netcup.json"
-
-    # Try loading from env vars first
-    if [[ -n "${NETCUP_CUSTOMER_NUMBER:-}" && -n "${NETCUP_API_KEY:-}" && -n "${NETCUP_API_PASSWORD:-}" ]]; then
-        if test_netcup_credentials; then
-            return 0
-        fi
-    fi
-
-    # Try loading from config file (single python3 call instead of 3)
-    local creds
-    if creds=$(_load_json_config_fields "$config_file" customer_number api_key api_password); then
-        local saved_num saved_key saved_pass
-        { read -r saved_num; read -r saved_key; read -r saved_pass; } <<< "${creds}"
-        if [[ -n "$saved_num" ]] && [[ -n "$saved_key" ]] && [[ -n "$saved_pass" ]]; then
-            log_info "Loading Netcup credentials from $config_file"
-            export NETCUP_CUSTOMER_NUMBER="$saved_num" NETCUP_API_KEY="$saved_key" NETCUP_API_PASSWORD="$saved_pass"
-            if test_netcup_credentials; then
-                return 0
-            fi
-        fi
-    fi
-
-    # Prompt for credentials
-    log_info "Netcup credentials not found"
-    log_info "Get your API credentials at: https://ccp.netcup.net/ → Settings → API"
-    log_info ""
-
-    NETCUP_CUSTOMER_NUMBER=$(safe_read "Enter Netcup customer number: ") || return 1
-    NETCUP_API_KEY=$(safe_read "Enter Netcup API key: ") || return 1
-    NETCUP_API_PASSWORD=$(safe_read "Enter Netcup API password: ") || return 1
-    export NETCUP_CUSTOMER_NUMBER NETCUP_API_KEY NETCUP_API_PASSWORD
-
-    # Test credentials
-    if ! test_netcup_credentials; then
-        log_error "Invalid Netcup credentials"
-        return 1
-    fi
-
-    _save_json_config "$config_file" \
-        customer_number "$NETCUP_CUSTOMER_NUMBER" \
-        api_key "$NETCUP_API_KEY" \
-        api_password "$NETCUP_API_PASSWORD"
-
-    return 0
+    ensure_multi_credentials "Netcup" "$HOME/.config/spawn/netcup.json" \
+        "https://ccp.netcup.net/ -> Settings -> API" test_netcup_credentials \
+        "NETCUP_CUSTOMER_NUMBER:customer_number:Customer Number" \
+        "NETCUP_API_KEY:api_key:API Key" \
+        "NETCUP_API_PASSWORD:api_password:API Password"
 }
 
 # Check if SSH key is registered with Netcup
