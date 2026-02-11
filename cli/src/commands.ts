@@ -1155,6 +1155,13 @@ ${pc.bold("TROUBLESHOOTING")}
   ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output
   ${pc.dim("*")} Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update
 
+${pc.bold("ENVIRONMENT VARIABLES")}
+  ${pc.cyan("OPENROUTER_API_KEY")}        OpenRouter API key (all agents require this)
+  ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")}   Skip auto-update check on startup
+  ${pc.cyan("SPAWN_NO_UNICODE=1")}        Force ASCII output (no unicode symbols)
+  ${pc.cyan("SPAWN_HOME")}                Override spawn data directory (default: ~/.spawn)
+  ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)
+
 ${pc.bold("MORE INFO")}
   Repository:  https://github.com/${REPO}
   OpenRouter:  https://openrouter.ai

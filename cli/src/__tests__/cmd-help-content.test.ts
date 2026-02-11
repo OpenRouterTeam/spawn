@@ -208,6 +208,39 @@ describe("cmdHelp - content completeness", () => {
     });
   });
 
+  // ── Environment variables section ──────────────────────────────────
+
+  describe("environment variables section", () => {
+    it("should have an ENVIRONMENT VARIABLES section", () => {
+      expect(getHelpOutput()).toContain("ENVIRONMENT VARIABLES");
+    });
+
+    it("should document OPENROUTER_API_KEY", () => {
+      const output = getHelpOutput();
+      expect(output).toContain("OPENROUTER_API_KEY");
+    });
+
+    it("should document SPAWN_NO_UPDATE_CHECK", () => {
+      const output = getHelpOutput();
+      expect(output).toContain("SPAWN_NO_UPDATE_CHECK");
+    });
+
+    it("should document SPAWN_NO_UNICODE", () => {
+      const output = getHelpOutput();
+      expect(output).toContain("SPAWN_NO_UNICODE");
+    });
+
+    it("should document SPAWN_HOME", () => {
+      const output = getHelpOutput();
+      expect(output).toContain("SPAWN_HOME");
+    });
+
+    it("should document SPAWN_DEBUG", () => {
+      const output = getHelpOutput();
+      expect(output).toContain("SPAWN_DEBUG");
+    });
+  });
+
   // ── Links ──────────────────────────────────────────────────────────
 
   describe("repository links", () => {
