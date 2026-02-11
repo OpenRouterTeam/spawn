@@ -400,37 +400,21 @@ _validate_oauth_server_args() {
     fi
 }
 
-# Start OAuth callback server using Node.js/Bun HTTP server
-# Proper HTTP server — handles multiple connections, favicon requests, etc.
-# Tries a range of ports if the initial port is busy
-# $1=starting_port $2=code_file $3=port_file (writes actual port used) $4=state_file (CSRF token)
-# Returns: server PID
-# SECURITY: Validates port number and CSRF state parameter
-start_oauth_server() {
-    local starting_port="${1}"
-    local code_file="${2}"
-    local port_file="${3}"
-    local state_file="${4}"
-
-    _validate_oauth_server_args "${starting_port}" "${state_file}" || return 1
-    local runtime="${OAUTH_RUNTIME}"
-    local expected_state="${OAUTH_STATE}"
-
-    _generate_oauth_html
-    local oauth_success_html="${OAUTH_SUCCESS_HTML}"
-    local oauth_error_html="${OAUTH_ERROR_HTML}"
-
-    "${runtime}" -e "
+# Generate the Node.js script for the OAuth callback server
+# $1=expected_state $2=success_html $3=error_html $4=code_file $5=port_file $6=starting_port
+_generate_oauth_server_script() {
+    local expected_state="${1}" success_html="${2}" error_html="${3}"
+    local code_file="${4}" port_file="${5}" starting_port="${6}"
+    printf '%s' "
 const http = require('http');
 const fs = require('fs');
 const url = require('url');
 const expectedState = '${expected_state}';
-const html = '${oauth_success_html}';
-const errorHtml = '${oauth_error_html}';
+const html = '${success_html}';
+const errorHtml = '${error_html}';
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url, true);
   if (parsed.pathname === '/callback' && parsed.query.code) {
-    // SECURITY: Validate CSRF state parameter
     if (!parsed.query.state || parsed.query.state !== expectedState) {
       res.writeHead(403, {'Content-Type':'text/html','Connection':'close'});
       res.end(errorHtml);
@@ -446,19 +430,14 @@ const server = http.createServer((req, res) => {
     res.end('<html><body>Waiting for OAuth callback...</body></html>');
   }
 });
-
-// Try port range: starting_port, starting_port+1, ..., starting_port+10
-// SECURITY: Port number validated in bash before interpolation
 let currentPort = ${starting_port};
 const maxPort = ${starting_port} + 10;
-
 function tryListen() {
   server.listen(currentPort, '127.0.0.1', () => {
     fs.writeFileSync('${port_file}', currentPort.toString());
     fs.writeFileSync('/dev/fd/1', '');
   });
 }
-
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE' && currentPort < maxPort) {
     currentPort++;
@@ -467,10 +446,31 @@ server.on('error', (err) => {
     process.exit(1);
   }
 });
-
 setTimeout(() => process.exit(0), 300000);
 tryListen();
-" </dev/null >/dev/null 2>&1 &
+"
+}
+
+# Start OAuth callback server using Node.js/Bun HTTP server
+# Proper HTTP server — handles multiple connections, favicon requests, etc.
+# Tries a range of ports if the initial port is busy
+# $1=starting_port $2=code_file $3=port_file (writes actual port used) $4=state_file (CSRF token)
+# Returns: server PID
+# SECURITY: Validates port number and CSRF state parameter
+start_oauth_server() {
+    local starting_port="${1}"
+    local code_file="${2}"
+    local port_file="${3}"
+    local state_file="${4}"
+
+    _validate_oauth_server_args "${starting_port}" "${state_file}" || return 1
+
+    _generate_oauth_html
+    local script
+    script=$(_generate_oauth_server_script "${OAUTH_STATE}" "${OAUTH_SUCCESS_HTML}" "${OAUTH_ERROR_HTML}" \
+        "${code_file}" "${port_file}" "${starting_port}")
+
+    "${OAUTH_RUNTIME}" -e "${script}" </dev/null >/dev/null 2>&1 &
 
     echo $!
 }
