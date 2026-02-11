@@ -434,12 +434,12 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
     }
     p.log.error("Spawn script failed");
     console.error("\nError:", errMsg);
-    console.error("\nCommon causes:");
-    console.error("  - Missing OPENROUTER_API_KEY (get one at https://openrouter.ai/settings/keys)");
-    console.error("  - Missing cloud provider credentials (API key, token, etc.)");
+    console.error("\nCheck your credentials:");
+    console.error(`  - OPENROUTER_API_KEY  ${pc.dim("https://openrouter.ai/settings/keys")}`);
+    console.error(`  - Cloud credentials   ${pc.dim(`run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`)}`);
+    console.error("\nOther causes:");
     console.error("  - Cloud provider API rate limit or quota exceeded");
     console.error("  - Missing local dependencies (SSH, curl, etc.)");
-    console.error(`\nRun ${pc.cyan(`spawn ${cloud}`)} to see setup instructions for this provider.`);
     process.exit(1);
   }
 }
@@ -594,7 +594,7 @@ export async function cmdList(): Promise<void> {
     console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   }
   console.log(pc.green(`${impl}/${total} combinations implemented`));
-  console.log(pc.dim(`Run ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")} for details.`));
+  console.log(pc.dim(`Launch: ${pc.cyan("spawn <agent> <cloud>")}  |  Details: ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")}`));
   console.log();
 }
 
@@ -707,13 +707,14 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   // Show quick-start with first available cloud
   if (implClouds.length > 0) {
     const exampleCloud = implClouds[0];
-    const authVars = parseAuthEnvVars(manifest.clouds[exampleCloud].auth);
-    const cloudName = manifest.clouds[exampleCloud].name;
+    const cloudDef = manifest.clouds[exampleCloud];
+    const authVars = parseAuthEnvVars(cloudDef.auth);
     console.log();
     console.log(pc.bold("Quick start:"));
     console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
     if (authVars.length > 0) {
-      console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}  ${pc.dim(`# ${cloudName} credential`)}`);
+      const hint = cloudDef.url ? `  ${pc.dim(`# ${cloudDef.url}`)}` : `  ${pc.dim(`# ${cloudDef.name} credential`)}`;
+      console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}${hint}`);
     }
     console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
   }
@@ -757,7 +758,7 @@ async function validateAndGetCloud(cloud: string): Promise<[manifest: Manifest, 
 
 /** Print quick-start auth instructions for a cloud provider */
 function printCloudQuickStart(
-  cloud: { auth: string },
+  cloud: { auth: string; url?: string },
   authVars: string[],
   exampleAgent: string | undefined,
   cloudKey: string
@@ -766,8 +767,9 @@ function printCloudQuickStart(
   console.log(pc.bold("Quick start:"));
   console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
   if (authVars.length > 0) {
+    const hint = cloud.url ? `  ${pc.dim(`# ${cloud.url}`)}` : "";
     for (const v of authVars) {
-      console.log(`  ${pc.cyan(`export ${v}=your-${v.toLowerCase().replace(/_/g, "-")}-here`)}`);
+      console.log(`  ${pc.cyan(`export ${v}=...`)}${hint}`);
     }
   } else if (cloud.auth.toLowerCase() !== "none") {
     console.log(`  ${pc.dim(`Auth: ${cloud.auth}`)}`);
@@ -921,7 +923,7 @@ ${pc.bold("INSTALL")}
 
 ${pc.bold("TROUBLESHOOTING")}
   ${pc.dim("*")} Script not found: Run ${pc.cyan("spawn list")} to verify the combination exists
-  ${pc.dim("*")} Missing credentials: Check cloud-specific READMEs in the repo
+  ${pc.dim("*")} Missing credentials: Run ${pc.cyan("spawn <cloud>")} to see setup instructions
   ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
   ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output
   ${pc.dim("*")} Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update

@@ -237,8 +237,13 @@ async function handleNoCommand(prompt: string | undefined): Promise<void> {
     await cmdInteractive();
   } else {
     console.error(pc.yellow("No interactive terminal detected."));
-    console.error(pc.dim(`To launch directly: ${pc.cyan("spawn <agent> <cloud>")}\n`));
-    cmdHelp();
+    console.error();
+    console.error(`  Launch directly:  ${pc.cyan("spawn <agent> <cloud>")}`);
+    console.error(`  Browse agents:    ${pc.cyan("spawn agents")}`);
+    console.error(`  Browse clouds:    ${pc.cyan("spawn clouds")}`);
+    console.error(`  Full help:        ${pc.cyan("spawn help")}`);
+    console.error();
+    process.exit(1);
   }
 }
 
