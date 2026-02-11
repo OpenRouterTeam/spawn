@@ -607,17 +607,37 @@ print(json.dumps(body))
         return 0
     fi
 
-    printf '%b\n' "  ${CYAN}live${NC} Instance created (ID: ${server_id}). Deleting..."
-    sleep 5  # Vultr needs a moment before the instance can be deleted
+    printf '%b\n' "  ${CYAN}live${NC} Instance created (ID: ${server_id}). Waiting for it to become active before deleting..."
 
-    local delete_response
-    delete_response=$(vultr_api DELETE "/instances/${server_id}") || true
-    if [[ -z "$delete_response" ]]; then
-        delete_response='{}'
-    fi
+    # Vultr requires the instance to be fully active before it can be deleted
+    local attempt=0
+    local max_attempts=12
+    local delete_response=""
+    while [[ "$attempt" -lt "$max_attempts" ]]; do
+        sleep 10
+        attempt=$((attempt + 1))
+        delete_response=$(vultr_api DELETE "/instances/${server_id}" 2>/dev/null) || true
+        if [[ -z "$delete_response" ]]; then
+            delete_response='{}'
+        fi
+        # Empty or {} response means success for DELETE
+        if echo "$delete_response" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+sys.exit(0 if not d or 'error' not in str(d).lower() else 1)
+" 2>/dev/null; then
+            break
+        fi
+        printf '%b\n' "  ${YELLOW}retry${NC} Delete attempt ${attempt}/${max_attempts} — instance not ready yet"
+    done
+
     _save_live_fixture "$fixture_dir" "delete_server" "DELETE /instances/{id}" "$delete_response"
 
-    printf '%b\n' "  ${CYAN}live${NC} Instance ${server_id} deleted"
+    if [[ "$attempt" -ge "$max_attempts" ]]; then
+        printf '%b\n' "  ${RED}WARNING: Could not delete Vultr instance ${server_id} — delete it manually!${NC}"
+    else
+        printf '%b\n' "  ${CYAN}live${NC} Instance ${server_id} deleted"
+    fi
 }
 
 _live_linode() {
@@ -813,17 +833,37 @@ print(json.dumps(body))
         return 0
     fi
 
-    printf '%b\n' "  ${CYAN}live${NC} Civo instance created (ID: ${server_id}). Deleting..."
-    sleep 3
+    printf '%b\n' "  ${CYAN}live${NC} Civo instance created (ID: ${server_id}). Waiting for it to become active before deleting..."
 
-    local delete_response
-    delete_response=$(civo_api DELETE "/instances/${server_id}") || true
-    if [[ -z "$delete_response" ]]; then
-        delete_response='{}'
-    fi
+    # Civo requires the instance to be active before it can be deleted
+    local attempt=0
+    local max_attempts=12
+    local delete_response=""
+    while [[ "$attempt" -lt "$max_attempts" ]]; do
+        sleep 10
+        attempt=$((attempt + 1))
+        delete_response=$(civo_api DELETE "/instances/${server_id}" 2>/dev/null) || true
+        if [[ -z "$delete_response" ]]; then
+            delete_response='{}'
+        fi
+        # Empty or {} response means success for DELETE
+        if echo "$delete_response" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+sys.exit(0 if not d or 'error' not in str(d).lower() else 1)
+" 2>/dev/null; then
+            break
+        fi
+        printf '%b\n' "  ${YELLOW}retry${NC} Delete attempt ${attempt}/${max_attempts} — instance not ready yet"
+    done
+
     _save_live_fixture "$fixture_dir" "delete_server" "DELETE /instances/{id}" "$delete_response"
 
-    printf '%b\n' "  ${CYAN}live${NC} Civo instance ${server_id} deleted"
+    if [[ "$attempt" -ge "$max_attempts" ]]; then
+        printf '%b\n' "  ${RED}WARNING: Could not delete Civo instance ${server_id} — delete it manually!${NC}"
+    else
+        printf '%b\n' "  ${CYAN}live${NC} Civo instance ${server_id} deleted"
+    fi
 }
 
 _live_upcloud() {

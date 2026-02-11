@@ -295,6 +295,12 @@ get_model_id_interactive() {
     local default_model="${1:-openrouter/auto}"
     local agent_name="${2:-}"
 
+    # If MODEL_ID is already set in the environment, use it without prompting
+    if [[ -n "${MODEL_ID:-}" ]]; then
+        echo "${MODEL_ID}"
+        return 0
+    fi
+
     echo ""
     log_warn "Browse models at: https://openrouter.ai/models"
     if [[ -n "${agent_name}" ]]; then

@@ -19,20 +19,20 @@
     "Block Storage Encryption",
     "Maintenance Policy"
   ],
-  "created": "2026-02-11T00:52:37",
+  "created": "2026-02-11T01:47:39",
   "disk_encryption": "enabled",
   "group": "",
   "has_user_data": false,
-  "host_uuid": "e36b971087c98564b67156145d654ec2cb99733a",
+  "host_uuid": "774cc68de583dafa7c17969a50420c1e93690d24",
   "hypervisor": "kvm",
-  "id": 91476597,
+  "id": 91478491,
   "image": "linode/ubuntu24.04",
   "interface_generation": "legacy_config",
   "ipv4": [
-    "172.104.11.219"
+    "23.239.13.141"
   ],
-  "ipv6": "2600:3c03::2000:15ff:febb:dd8a/128",
-  "label": "spawn-record-1770771156",
+  "ipv6": "2600:3c03::2000:3fff:fed6:5713/128",
+  "label": "spawn-record-1770774459",
   "lke_cluster_id": null,
   "maintenance_policy": "linode/migrate",
   "placement_group": null,
@@ -49,6 +49,6 @@
   "status": "provisioning",
   "tags": [],
   "type": "g6-nanode-1",
-  "updated": "2026-02-11T00:52:37",
+  "updated": "2026-02-11T01:47:39",
   "watchdog_enabled": true
 }
