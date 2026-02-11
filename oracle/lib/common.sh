@@ -308,26 +308,15 @@ _get_instance_public_ip() {
     echo "${ip}"
 }
 
-create_server() {
-    local name="${1}"
-    local shape="${OCI_SHAPE:-VM.Standard.E2.1.Micro}"
+# Encode cloud-init userdata as base64 (macOS and Linux compatible)
+_encode_userdata_b64() {
+    get_cloud_init_userdata | base64 -w0 2>/dev/null || get_cloud_init_userdata | base64
+}
 
-    log_warn "Creating OCI instance '${name}' (shape: ${shape})..."
-
-    local image_id
-    image_id=$(_get_ubuntu_image_id "${shape}") || return 1
-
-    local ad
-    ad=$(_get_availability_domain) || return 1
-
-    local subnet_id="${OCI_SUBNET_ID:-}"
-    if [[ -z "${subnet_id}" ]]; then
-        subnet_id=$(_get_subnet_id) || return 1
-    fi
-
-    # Encode cloud-init userdata (macOS and Linux compatible)
-    local userdata_b64
-    userdata_b64=$(get_cloud_init_userdata | base64 -w0 2>/dev/null || get_cloud_init_userdata | base64)
+# Launch an OCI compute instance and return its OCID on stdout
+# Usage: instance_id=$(_launch_oci_instance NAME SHAPE IMAGE_ID AD SUBNET_ID USERDATA_B64)
+_launch_oci_instance() {
+    local name="${1}" shape="${2}" image_id="${3}" ad="${4}" subnet_id="${5}" userdata_b64="${6}"
 
     # Build shape config for flex shapes
     local shape_config_args=()
@@ -358,6 +347,32 @@ create_server() {
         log_error "Check your quota and compartment permissions"
         return 1
     fi
+
+    echo "${instance_id}"
+}
+
+create_server() {
+    local name="${1}"
+    local shape="${OCI_SHAPE:-VM.Standard.E2.1.Micro}"
+
+    log_warn "Creating OCI instance '${name}' (shape: ${shape})..."
+
+    local image_id
+    image_id=$(_get_ubuntu_image_id "${shape}") || return 1
+
+    local ad
+    ad=$(_get_availability_domain) || return 1
+
+    local subnet_id="${OCI_SUBNET_ID:-}"
+    if [[ -z "${subnet_id}" ]]; then
+        subnet_id=$(_get_subnet_id) || return 1
+    fi
+
+    local userdata_b64
+    userdata_b64=$(_encode_userdata_b64)
+
+    local instance_id
+    instance_id=$(_launch_oci_instance "${name}" "${shape}" "${image_id}" "${ad}" "${subnet_id}" "${userdata_b64}") || return 1
 
     export OCI_INSTANCE_ID="${instance_id}"
     export OCI_INSTANCE_NAME_ACTUAL="${name}"

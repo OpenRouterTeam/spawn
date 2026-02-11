@@ -385,6 +385,57 @@ for nic in nics:
     return 1
 }
 
+# Build JSON request body for IONOS server creation
+# Usage: _ionos_build_server_body NAME CORES RAM
+_ionos_build_server_body() {
+    local name="$1" cores="$2" ram="$3"
+    python3 -c "
+import json
+body = {
+    'properties': {
+        'name': '$name',
+        'cores': $cores,
+        'ram': $ram,
+        'availabilityZone': 'AUTO',
+        'cpuFamily': 'AMD_OPTERON'
+    }
+}
+print(json.dumps(body))
+"
+}
+
+# Create an IONOS server instance via API and attach a boot volume
+# Sets IONOS_SERVER_ID on success
+# Usage: _ionos_launch_and_attach VOLUME_ID NAME CORES RAM
+_ionos_launch_and_attach() {
+    local volume_id="$1" name="$2" cores="$3" ram="$4"
+
+    log_warn "Creating server instance..."
+    local server_body
+    server_body=$(_ionos_build_server_body "$name" "$cores" "$ram")
+
+    local server_response
+    server_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers" "$server_body")
+
+    if ionos_check_api_error "$server_response" "Failed to create server"; then
+        return 1
+    fi
+
+    IONOS_SERVER_ID=$(echo "$server_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    log_info "Server created: $IONOS_SERVER_ID"
+    export IONOS_SERVER_ID
+
+    # Attach volume to server
+    log_warn "Attaching volume to server..."
+    local attach_response
+    attach_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}/volumes" "{\"id\": \"${volume_id}\"}")
+
+    if ionos_check_api_error "$attach_response" "Failed to attach volume"; then
+        return 1
+    fi
+    log_info "Volume attached successfully"
+}
+
 # Create a IONOS server with cloud-init
 create_server() {
     local name="$1"
@@ -425,43 +476,8 @@ create_server() {
     local pub_path="${key_path}.pub"
     ionos_register_ssh_key "spawn-key-$(date +%s)" "$pub_path" "${IONOS_DATACENTER_ID}" || log_warn "SSH key registration failed, continuing anyway..."
 
-    # Create server instance
-    log_warn "Creating server instance..."
-    local server_body
-    server_body=$(python3 -c "
-import json
-body = {
-    'properties': {
-        'name': '$name',
-        'cores': $cores,
-        'ram': $ram,
-        'availabilityZone': 'AUTO',
-        'cpuFamily': 'AMD_OPTERON'
-    }
-}
-print(json.dumps(body))
-")
-
-    local server_response
-    server_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers" "$server_body")
-
-    if ionos_check_api_error "$server_response" "Failed to create server"; then
-        return 1
-    fi
-
-    IONOS_SERVER_ID=$(echo "$server_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
-    log_info "Server created: $IONOS_SERVER_ID"
-    export IONOS_SERVER_ID
-
-    # Attach volume to server
-    log_warn "Attaching volume to server..."
-    local attach_response
-    attach_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}/volumes" "{\"id\": \"${volume_id}\"}")
-
-    if ionos_check_api_error "$attach_response" "Failed to attach volume"; then
-        return 1
-    fi
-    log_info "Volume attached successfully"
+    # Create server and attach volume
+    _ionos_launch_and_attach "$volume_id" "$name" "$cores" "$ram" || return 1
 
     # Wait for server IP
     _ionos_wait_for_server_ip || return 1
