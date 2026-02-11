@@ -86,49 +86,39 @@ function checkUnknownFlags(args: string[]): void {
 }
 
 /** Show info for a name that could be an agent or cloud, or show an error with suggestions */
-async function showInfoOrError(name: string): Promise<void> {
-  const manifest = await loadManifestWithSpinner();
-  if (manifest.agents[name]) {
-    await cmdAgentInfo(name);
-    return;
-  }
-  if (manifest.clouds[name]) {
-    await cmdCloudInfo(name);
-    return;
-  }
-
-  // Try resolving display names and case-insensitive matches
-  const resolvedAgent = resolveAgentKey(manifest, name);
-  if (resolvedAgent) {
-    await cmdAgentInfo(resolvedAgent);
-    return;
-  }
-  const resolvedCloud = resolveCloudKey(manifest, name);
-  if (resolvedCloud) {
-    await cmdCloudInfo(resolvedCloud);
-    return;
-  }
-
-  // Fall back to fuzzy matching suggestions (checks both keys and display names)
+function showUnknownCommandError(name: string, manifest: { agents: Record<string, { name: string }>; clouds: Record<string, { name: string }> }): never {
   const agentMatch = findClosestKeyByNameOrKey(name, agentKeys(manifest), (k) => manifest.agents[k].name);
   const cloudMatch = findClosestKeyByNameOrKey(name, cloudKeys(manifest), (k) => manifest.clouds[k].name);
 
   console.error(pc.red(`Unknown command: ${pc.bold(name)}`));
   console.error();
-  const fmtAgent = agentMatch ? `${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})` : "";
-  const fmtCloud = cloudMatch ? `${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})` : "";
-  if (agentMatch && cloudMatch) {
-    console.error(`  Did you mean ${fmtAgent} or ${fmtCloud}?`);
-  } else if (agentMatch) {
-    console.error(`  Did you mean ${fmtAgent}?`);
-  } else if (cloudMatch) {
-    console.error(`  Did you mean ${fmtCloud}?`);
+  if (agentMatch || cloudMatch) {
+    const suggestions: string[] = [];
+    if (agentMatch) suggestions.push(`${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})`);
+    if (cloudMatch) suggestions.push(`${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})`);
+    console.error(`  Did you mean ${suggestions.join(" or ")}?`);
   }
   console.error();
   console.error(`  Run ${pc.cyan("spawn agents")} to see available agents.`);
   console.error(`  Run ${pc.cyan("spawn clouds")} to see available clouds.`);
   console.error(`  Run ${pc.cyan("spawn help")} for usage information.`);
   process.exit(1);
+}
+
+async function showInfoOrError(name: string): Promise<void> {
+  const manifest = await loadManifestWithSpinner();
+
+  // Direct key match
+  if (manifest.agents[name]) { await cmdAgentInfo(name); return; }
+  if (manifest.clouds[name]) { await cmdCloudInfo(name); return; }
+
+  // Try resolving display names and case-insensitive matches
+  const resolvedAgent = resolveAgentKey(manifest, name);
+  if (resolvedAgent) { await cmdAgentInfo(resolvedAgent); return; }
+  const resolvedCloud = resolveCloudKey(manifest, name);
+  if (resolvedCloud) { await cmdCloudInfo(resolvedCloud); return; }
+
+  showUnknownCommandError(name, manifest);
 }
 
 async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean): Promise<void> {
