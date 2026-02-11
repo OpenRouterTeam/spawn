@@ -429,23 +429,27 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 
 **Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. If you end your conversation after spawning, teammates become orphaned with no coordination.
 
+### TECHNICAL REQUIREMENT: You are running in `claude -p` (print) mode. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response. If you have nothing else to do, run `Bash("sleep 30")` to keep the session active while waiting for teammate messages.
+
 ### Required pattern after spawning:
 ```
 1. Spawn all teammates via Task tool
-2. Enter monitoring loop:
+2. Immediately start a polling loop — do NOT just output text saying "I'll wait":
    while teammates are still active:
-     - Wait for teammate messages (they arrive automatically as new conversation turns)
-     - When you receive a message, acknowledge it and update your task tracking
-     - If a teammate reports completion, mark their task done and merge their PR
-     - If a teammate reports an error, coordinate resolution
-     - If the time budget is almost up, send wrap-up messages to all teammates
-3. Only after ALL teammates have sent their final response, proceed to shutdown
+     a. Run TaskList to check task status
+     b. Run `gh pr list --repo OpenRouterTeam/spawn --state open` to check for PRs to merge
+     c. When you receive a teammate message, acknowledge it and update task tracking
+     d. If a teammate reports completion, mark their task done and merge their PR
+     e. If a teammate reports an error, coordinate resolution
+     f. If the time budget is almost up, send wrap-up messages to all teammates
+     g. If no messages received yet, run `Bash("sleep 30")` then loop back to (a)
+3. Only after ALL teammates have finished, proceed to shutdown
 ```
 
 ### Common mistake (DO NOT DO THIS):
 ```
 BAD:  Spawn teammates → "I'll wait for their messages" → session ends (agents orphaned!)
-GOOD: Spawn teammates → receive messages → merge PRs → shutdown sequence → session ends
+GOOD: Spawn teammates → TaskList → sleep 30 → TaskList → receive message → merge PR → ... → shutdown
 ```
 
 ## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
