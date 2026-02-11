@@ -620,11 +620,11 @@ print(json.dumps(body))
         if [[ -z "$delete_response" ]]; then
             delete_response='{}'
         fi
-        # Empty or {} response means success for DELETE
+        # Vultr returns {"error":"..."} on failure, empty/{} on success
         if echo "$delete_response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
-sys.exit(0 if not d or 'error' not in str(d).lower() else 1)
+sys.exit(0 if not d or 'error' not in d else 1)
 " 2>/dev/null; then
             break
         fi
@@ -846,11 +846,14 @@ print(json.dumps(body))
         if [[ -z "$delete_response" ]]; then
             delete_response='{}'
         fi
-        # Empty or {} response means success for DELETE
+        # Civo returns {"result":"...","reason":"..."} — check for success
         if echo "$delete_response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
-sys.exit(0 if not d or 'error' not in str(d).lower() else 1)
+# Civo success: empty, {}, or result != 'failed'
+if not d or d.get('result','') != 'failed':
+    sys.exit(0)
+sys.exit(1)
 " 2>/dev/null; then
             break
         fi
