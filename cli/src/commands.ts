@@ -109,6 +109,34 @@ export function findClosestMatch(input: string, candidates: string[]): string | 
 }
 
 /**
+ * Find the closest matching key by checking both keys and display names.
+ * Returns the key (not display name) of the best match, or null if no match within distance 3.
+ */
+export function findClosestKeyByNameOrKey(
+  input: string,
+  keys: string[],
+  getName: (key: string) => string
+): string | null {
+  let bestKey: string | null = null;
+  let bestDist = Infinity;
+  const lower = input.toLowerCase();
+
+  for (const key of keys) {
+    const keyDist = levenshtein(lower, key.toLowerCase());
+    if (keyDist < bestDist) {
+      bestDist = keyDist;
+      bestKey = key;
+    }
+    const nameDist = levenshtein(lower, getName(key).toLowerCase());
+    if (nameDist < bestDist) {
+      bestDist = nameDist;
+      bestKey = key;
+    }
+  }
+  return bestDist <= 3 ? bestKey : null;
+}
+
+/**
  * Resolve user input to a valid agent key.
  * Tries: exact key -> case-insensitive key -> display name match (case-insensitive).
  * Returns the key if found, or null.
@@ -146,16 +174,9 @@ function validateAgent(manifest: Manifest, agent: string): asserts agent is keyo
   if (!manifest.agents[agent]) {
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
     const keys = agentKeys(manifest);
-    const suggestion = findClosestMatch(agent, keys);
-    const nameSuggestion = findClosestMatch(agent, keys.map((k) => manifest.agents[k].name));
-    if (suggestion) {
-      p.log.info(`Did you mean ${pc.cyan(suggestion)}?`);
-    } else if (nameSuggestion) {
-      // Find the key for the matched display name
-      const matchedKey = keys.find((k) => manifest.agents[k].name === nameSuggestion);
-      if (matchedKey) {
-        p.log.info(`Did you mean ${pc.cyan(matchedKey)} (${nameSuggestion})?`);
-      }
+    const match = findClosestKeyByNameOrKey(agent, keys, (k) => manifest.agents[k].name);
+    if (match) {
+      p.log.info(`Did you mean ${pc.cyan(match)} (${manifest.agents[match].name})?`);
     }
     p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
     process.exit(1);
@@ -182,16 +203,9 @@ function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyo
   if (!manifest.clouds[cloud]) {
     p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
     const keys = cloudKeys(manifest);
-    const suggestion = findClosestMatch(cloud, keys);
-    const nameSuggestion = findClosestMatch(cloud, keys.map((k) => manifest.clouds[k].name));
-    if (suggestion) {
-      p.log.info(`Did you mean ${pc.cyan(suggestion)}?`);
-    } else if (nameSuggestion) {
-      // Find the key for the matched display name
-      const matchedKey = keys.find((k) => manifest.clouds[k].name === nameSuggestion);
-      if (matchedKey) {
-        p.log.info(`Did you mean ${pc.cyan(matchedKey)} (${nameSuggestion})?`);
-      }
+    const match = findClosestKeyByNameOrKey(cloud, keys, (k) => manifest.clouds[k].name);
+    if (match) {
+      p.log.info(`Did you mean ${pc.cyan(match)} (${manifest.clouds[match].name})?`);
     }
     p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
     process.exit(1);

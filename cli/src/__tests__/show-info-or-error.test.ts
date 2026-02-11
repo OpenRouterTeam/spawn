@@ -193,8 +193,8 @@ describe("showInfoOrError - single argument routing", () => {
       // "aidr" should match "aider" (an agent)
       const result = runCli(["aidr"]);
       const output = result.stdout + result.stderr;
-      // showInfoOrError labels suggestions as "(agent)" or "(cloud)"
-      expect(output).toMatch(/\(agent\)|\(cloud\)/);
+      // showInfoOrError labels suggestions as "(agent: Name)" or "(cloud: Name)"
+      expect(output).toMatch(/\(agent:|\(cloud:/);
     });
   });
 

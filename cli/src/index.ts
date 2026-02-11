@@ -9,7 +9,7 @@ import {
   cmdCloudInfo,
   cmdUpdate,
   cmdHelp,
-  findClosestMatch,
+  findClosestKeyByNameOrKey,
   resolveAgentKey,
   resolveCloudKey,
   loadManifestWithSpinner,
@@ -108,18 +108,20 @@ async function showInfoOrError(name: string): Promise<void> {
     return;
   }
 
-  // Fall back to fuzzy matching suggestions
-  const agentMatch = findClosestMatch(name, agentKeys(manifest));
-  const cloudMatch = findClosestMatch(name, cloudKeys(manifest));
+  // Fall back to fuzzy matching suggestions (checks both keys and display names)
+  const agentMatch = findClosestKeyByNameOrKey(name, agentKeys(manifest), (k) => manifest.agents[k].name);
+  const cloudMatch = findClosestKeyByNameOrKey(name, cloudKeys(manifest), (k) => manifest.clouds[k].name);
 
   console.error(pc.red(`Unknown command: ${pc.bold(name)}`));
   console.error();
+  const fmtAgent = agentMatch ? `${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})` : "";
+  const fmtCloud = cloudMatch ? `${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})` : "";
   if (agentMatch && cloudMatch) {
-    console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent) or ${pc.cyan(cloudMatch)} (cloud)?`);
+    console.error(`  Did you mean ${fmtAgent} or ${fmtCloud}?`);
   } else if (agentMatch) {
-    console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent)?`);
+    console.error(`  Did you mean ${fmtAgent}?`);
   } else if (cloudMatch) {
-    console.error(`  Did you mean ${pc.cyan(cloudMatch)} (cloud)?`);
+    console.error(`  Did you mean ${fmtCloud}?`);
   }
   console.error();
   console.error(`  Run ${pc.cyan("spawn agents")} to see available agents.`);
