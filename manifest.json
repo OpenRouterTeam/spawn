@@ -675,6 +675,22 @@
         "image": "ubuntu-24.04"
       },
       "notes": "Budget European VPS provider starting at $4.95/mo. Uses OAuth2 password grant (client credentials + user credentials). Requires 4 values from https://my.contabo.com/api/details: Client ID, Client Secret, API User, API Password."
+    },
+    "hostinger": {
+      "name": "Hostinger",
+      "description": "Hostinger VPS hosting via REST API with cloud-init support",
+      "url": "https://www.hostinger.com/",
+      "type": "api",
+      "auth": "HOSTINGER_API_KEY",
+      "provision_method": "POST /vps/v1/virtual-machines with cloud_init",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "plan": "kvm1",
+        "location": "eu-central",
+        "os_template": "ubuntu-24.04"
+      },
+      "notes": "Budget VPS provider with cloud-init pre-installed. Starting at $4.95/mo. Requires HOSTINGER_API_KEY from hPanel → Profile → Account Information → API. API docs at developers.hostinger.com"
     }
   },
   "matrix": {
@@ -1097,6 +1113,21 @@
     "contabo/opencode": "missing",
     "contabo/plandex": "missing",
     "contabo/kilocode": "missing",
-    "contabo/continue": "missing"
+    "contabo/continue": "missing",
+    "hostinger/claude": "implemented",
+    "hostinger/openclaw": "implemented",
+    "hostinger/nanoclaw": "missing",
+    "hostinger/aider": "implemented",
+    "hostinger/goose": "missing",
+    "hostinger/codex": "missing",
+    "hostinger/interpreter": "missing",
+    "hostinger/gemini": "missing",
+    "hostinger/amazonq": "missing",
+    "hostinger/cline": "missing",
+    "hostinger/gptme": "missing",
+    "hostinger/opencode": "missing",
+    "hostinger/plandex": "missing",
+    "hostinger/kilocode": "missing",
+    "hostinger/continue": "missing"
   }
 }
