@@ -1009,7 +1009,7 @@
     "fly/continue": "implemented",
     "civo/continue": "missing",
     "scaleway/continue": "implemented",
-    "daytona/continue": "missing",
+    "daytona/continue": "implemented",
     "upcloud/continue": "implemented",
     "binarylane/continue": "implemented",
     "latitude/continue": "implemented",
