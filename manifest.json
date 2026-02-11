@@ -706,7 +706,7 @@
         "datacenter": "Nuremberg",
         "image": "ubuntu-24.04"
       },
-      "notes": "German budget VPS provider starting at €3.86/mo. Session-based REST API launched Oct 2025. Requires NETCUP_CUSTOMER_NUMBER, NETCUP_API_KEY, and NETCUP_API_PASSWORD from https://ccp.netcup.net/ → Settings → API"
+      "notes": "German budget VPS provider starting at \u20ac3.86/mo. Session-based REST API launched Oct 2025. Requires NETCUP_CUSTOMER_NUMBER, NETCUP_API_KEY, and NETCUP_API_PASSWORD from https://ccp.netcup.net/ \u2192 Settings \u2192 API"
     },
     "local": {
       "name": "Local Machine",
@@ -732,7 +732,7 @@
         "flavor": "1GB",
         "image": "Ubuntu 24.04"
       },
-      "notes": "Budget VPS provider with OpenStack API. Hourly billing starting at $0.006/hr (~$4.38/mo). Full OpenStack compatibility. Get credentials from https://manage.ramnode.com/ → Cloud → API Users. Requires RAMNODE_USERNAME, RAMNODE_PASSWORD, and RAMNODE_PROJECT_ID."
+      "notes": "Budget VPS provider with OpenStack API. Hourly billing starting at $0.006/hr (~$4.38/mo). Full OpenStack compatibility. Get credentials from https://manage.ramnode.com/ \u2192 Cloud \u2192 API Users. Requires RAMNODE_USERNAME, RAMNODE_PASSWORD, and RAMNODE_PROJECT_ID."
     }
   },
   "matrix": {
@@ -1185,7 +1185,7 @@
     "netcup/opencode": "missing",
     "netcup/plandex": "missing",
     "netcup/kilocode": "missing",
-    "netcup/continue": "missing",
+    "netcup/continue": "implemented",
     "local/claude": "implemented",
     "local/openclaw": "implemented",
     "local/nanoclaw": "implemented",
