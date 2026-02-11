@@ -32,19 +32,25 @@ function formatTimestamp(iso: string): string {
   }
 }
 
-// ── Exact replica of parseListFilters from index.ts lines 303-316 ───────────
+// ── Exact replica of parseListFilters from index.ts ─────────────────────────
 
 function parseListFilters(args: string[]): { agentFilter?: string; cloudFilter?: string } {
   let agentFilter: string | undefined;
   let cloudFilter: string | undefined;
+  const positional: string[] = [];
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "-a" && args[i + 1] && !args[i + 1].startsWith("-")) {
+    if ((args[i] === "-a" || args[i] === "--agent") && args[i + 1] && !args[i + 1].startsWith("-")) {
       agentFilter = args[i + 1];
       i++;
-    } else if (args[i] === "-c" && args[i + 1] && !args[i + 1].startsWith("-")) {
+    } else if ((args[i] === "-c" || args[i] === "--cloud") && args[i + 1] && !args[i + 1].startsWith("-")) {
       cloudFilter = args[i + 1];
       i++;
+    } else if (!args[i].startsWith("-")) {
+      positional.push(args[i]);
     }
+  }
+  if (!agentFilter && !cloudFilter && positional.length > 0) {
+    agentFilter = positional[0];
   }
   return { agentFilter, cloudFilter };
 }
@@ -205,9 +211,9 @@ describe("parseListFilters", () => {
       expect(result.cloudFilter).toBeUndefined();
     });
 
-    it("should return no filters for unrelated args", () => {
-      const result = parseListFilters(["list", "extra"]);
-      expect(result.agentFilter).toBeUndefined();
+    it("should use first positional arg as agent filter", () => {
+      const result = parseListFilters(["claude"]);
+      expect(result.agentFilter).toBe("claude");
       expect(result.cloudFilter).toBeUndefined();
     });
 
@@ -246,11 +252,10 @@ describe("parseListFilters", () => {
       expect(result.cloudFilter).toBe("sprite");
     });
 
-    it("should not confuse -a and --agent or -c and --cloud", () => {
-      // Only short flags -a and -c are supported
+    it("should support --agent and --cloud long flags", () => {
       const result = parseListFilters(["--agent", "claude", "--cloud", "sprite"]);
-      expect(result.agentFilter).toBeUndefined();
-      expect(result.cloudFilter).toBeUndefined();
+      expect(result.agentFilter).toBe("claude");
+      expect(result.cloudFilter).toBe("sprite");
     });
 
     it("should handle value with hyphens (e.g., agent name with hyphen)", () => {
@@ -262,6 +267,30 @@ describe("parseListFilters", () => {
       const result = parseListFilters(["-a", "x", "-c", "y"]);
       expect(result.agentFilter).toBe("x");
       expect(result.cloudFilter).toBe("y");
+    });
+
+    it("should not use positional arg when -a flag is present", () => {
+      const result = parseListFilters(["-a", "aider", "extra"]);
+      expect(result.agentFilter).toBe("aider");
+      expect(result.cloudFilter).toBeUndefined();
+    });
+
+    it("should not use positional arg when -c flag is present", () => {
+      const result = parseListFilters(["-c", "sprite", "extra"]);
+      expect(result.agentFilter).toBeUndefined();
+      expect(result.cloudFilter).toBe("sprite");
+    });
+
+    it("should return no filters for empty args", () => {
+      const result = parseListFilters([]);
+      expect(result.agentFilter).toBeUndefined();
+      expect(result.cloudFilter).toBeUndefined();
+    });
+
+    it("should support mixing --agent long flag with -c short flag", () => {
+      const result = parseListFilters(["--agent", "claude", "-c", "hetzner"]);
+      expect(result.agentFilter).toBe("claude");
+      expect(result.cloudFilter).toBe("hetzner");
     });
   });
 });

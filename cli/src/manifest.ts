@@ -208,4 +208,9 @@ export function countImplemented(m: Manifest): number {
   return count;
 }
 
+/** Clear the in-memory manifest cache (for testing only) */
+export function _resetCacheForTesting(): void {
+  _cached = null;
+}
+
 export { RAW_BASE, REPO, CACHE_DIR };
