@@ -584,13 +584,29 @@ export async function cmdAgents(): Promise<void> {
 export async function cmdClouds(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
+  const allAgents = agentKeys(manifest);
+  const allClouds = cloudKeys(manifest);
+
+  // Group clouds by type for easier scanning
+  const byType: Record<string, string[]> = {};
+  for (const key of allClouds) {
+    const type = manifest.clouds[key].type;
+    if (!byType[type]) byType[type] = [];
+    byType[type].push(key);
+  }
+
   console.log();
-  console.log(pc.bold("Cloud Providers"));
-  console.log();
-  for (const key of cloudKeys(manifest)) {
-    const c = manifest.clouds[key];
-    const implCount = getImplementedAgents(manifest, key).length;
-    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} agent${implCount !== 1 ? "s" : ""}  ${c.description}`)}`);
+  console.log(pc.bold("Cloud Providers") + pc.dim(` (${allClouds.length} total)`));
+
+  for (const [type, keys] of Object.entries(byType)) {
+    console.log();
+    console.log(`  ${pc.dim(type)}`);
+    for (const key of keys) {
+      const c = manifest.clouds[key];
+      const implCount = getImplementedAgents(manifest, key).length;
+      const countStr = `${implCount}/${allAgents.length}`;
+      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}`);
+    }
   }
   console.log();
   console.log(pc.dim(`  Run ${pc.cyan("spawn <cloud>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
@@ -598,8 +614,6 @@ export async function cmdClouds(): Promise<void> {
 }
 
 // ── Agent Info ─────────────────────────────────────────────────────────────────
-
-const TYPE_COLUMN_WIDTH = 10;
 
 export async function cmdAgentInfo(agent: string): Promise<void> {
   const [manifest, agentKey] = await validateAndGetAgent(agent);
@@ -613,22 +627,33 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   if (a.notes) {
     console.log(pc.dim(`  ${a.notes}`));
   }
+
+  const allClouds = cloudKeys(manifest);
+  const implClouds = getImplementedClouds(manifest, agentKey);
   console.log();
-  console.log(pc.bold("Available clouds:"));
+  console.log(pc.bold(`Available clouds:`) + pc.dim(` ${implClouds.length} of ${allClouds.length}`));
   console.log();
 
-  let found = false;
-  for (const cloud of cloudKeys(manifest)) {
-    const status = matrixStatus(manifest, cloud, agentKey);
-    if (status === "implemented") {
-      const c = manifest.clouds[cloud];
-      console.log(`  ${pc.green(cloud.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(c.type.padEnd(TYPE_COLUMN_WIDTH))}${pc.dim("spawn " + agentKey + " " + cloud)}`);
-      found = true;
-    }
+  if (implClouds.length === 0) {
+    console.log(pc.dim("  No implemented clouds yet."));
+    console.log();
+    return;
   }
 
-  if (!found) {
-    console.log(pc.dim("  No implemented clouds yet."));
+  // Group implemented clouds by type for easier scanning
+  const byType: Record<string, string[]> = {};
+  for (const cloud of implClouds) {
+    const type = manifest.clouds[cloud].type;
+    if (!byType[type]) byType[type] = [];
+    byType[type].push(cloud);
+  }
+
+  for (const [type, clouds] of Object.entries(byType)) {
+    console.log(`  ${pc.dim(type)}`);
+    for (const cloud of clouds) {
+      const c = manifest.clouds[cloud];
+      console.log(`    ${pc.green(cloud.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agentKey + " " + cloud)}`);
+    }
   }
   console.log();
 }
@@ -657,32 +682,37 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   const c = manifest.clouds[cloudKey];
   console.log();
   console.log(`${pc.bold(c.name)} ${pc.dim("--")} ${c.description}`);
-  console.log(pc.dim(`  Type: ${c.type}`));
+  console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}`));
   if (c.url) {
     console.log(pc.dim(`  ${c.url}`));
   }
   if (c.notes) {
     console.log(pc.dim(`  ${c.notes}`));
   }
+
+  const allAgents = agentKeys(manifest);
+  const implAgents = getImplementedAgents(manifest, cloudKey);
+  const missingAgents = allAgents.filter((a) => !implAgents.includes(a));
   console.log();
-  console.log(pc.bold("Available agents:"));
+  console.log(pc.bold(`Available agents:`) + pc.dim(` ${implAgents.length} of ${allAgents.length}`));
   console.log();
 
-  let found = false;
-  for (const agent of agentKeys(manifest)) {
-    const status = matrixStatus(manifest, cloudKey, agent);
-    if (status === "implemented") {
+  if (implAgents.length === 0) {
+    console.log(pc.dim("  No implemented agents yet."));
+  } else {
+    for (const agent of implAgents) {
       const a = manifest.agents[agent];
       console.log(`  ${pc.green(agent.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agent + " " + cloudKey)}`);
-      found = true;
     }
   }
 
-  if (!found) {
-    console.log(pc.dim("  No implemented agents yet."));
+  if (missingAgents.length > 0 && missingAgents.length <= 5) {
+    console.log();
+    console.log(pc.dim(`  Not yet available: ${missingAgents.map((a) => manifest.agents[a].name).join(", ")}`));
   }
+
   console.log();
-  console.log(pc.dim(`  Setup instructions: ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloudKey}`)}`));
+  console.log(pc.dim(`  Setup: ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloudKey}`)}`));
   console.log();
 }
 
