@@ -35,28 +35,29 @@ _get_ramnode_token() {
     local auth_body
     auth_body=$(python3 -c "
 import json, sys
+username, password, project_id = sys.argv[1], sys.argv[2], sys.argv[3]
 body = {
     'auth': {
         'identity': {
             'methods': ['password'],
             'password': {
                 'user': {
-                    'name': '$username',
+                    'name': username,
                     'domain': {'id': 'default'},
-                    'password': '$password'
+                    'password': password
                 }
             }
         },
         'scope': {
             'project': {
-                'id': '$project_id',
+                'id': project_id,
                 'domain': {'id': 'default'}
             }
         }
     }
 }
 print(json.dumps(body))
-")
+" "$username" "$password" "$project_id")
 
     local response
     response=$(curl -fsSL -X POST \
@@ -131,9 +132,9 @@ ensure_ramnode_credentials() {
     local config_file="$HOME/.config/spawn/ramnode.json"
     if [[ -f "$config_file" ]]; then
         log_info "Loading RamNode credentials from $config_file..."
-        RAMNODE_USERNAME=$(python3 -c "import json; print(json.load(open('$config_file')).get('username', ''))" 2>/dev/null || echo "")
-        RAMNODE_PASSWORD=$(python3 -c "import json; print(json.load(open('$config_file')).get('password', ''))" 2>/dev/null || echo "")
-        RAMNODE_PROJECT_ID=$(python3 -c "import json; print(json.load(open('$config_file')).get('project_id', ''))" 2>/dev/null || echo "")
+        RAMNODE_USERNAME=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('username', ''))" "$config_file" 2>/dev/null || echo "")
+        RAMNODE_PASSWORD=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('password', ''))" "$config_file" 2>/dev/null || echo "")
+        RAMNODE_PROJECT_ID=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('project_id', ''))" "$config_file" 2>/dev/null || echo "")
 
         if [[ -n "$RAMNODE_USERNAME" && -n "$RAMNODE_PASSWORD" && -n "$RAMNODE_PROJECT_ID" ]]; then
             export RAMNODE_USERNAME RAMNODE_PASSWORD RAMNODE_PROJECT_ID
@@ -164,15 +165,15 @@ ensure_ramnode_credentials() {
     log_info "Saving credentials to $config_file..."
     mkdir -p "$(dirname "$config_file")"
     python3 -c "
-import json
+import json, sys
 config = {
-    'username': '$RAMNODE_USERNAME',
-    'password': '$RAMNODE_PASSWORD',
-    'project_id': '$RAMNODE_PROJECT_ID'
+    'username': sys.argv[2],
+    'password': sys.argv[3],
+    'project_id': sys.argv[4]
 }
-with open('$config_file', 'w') as f:
+with open(sys.argv[1], 'w') as f:
     json.dump(config, f, indent=2)
-"
+" "$config_file" "$RAMNODE_USERNAME" "$RAMNODE_PASSWORD" "$RAMNODE_PROJECT_ID"
     chmod 600 "$config_file"
 
     return 0
@@ -191,31 +192,30 @@ ramnode_check_ssh_key() {
 import json, sys
 data = json.loads(sys.stdin.read())
 keypairs = data.get('keypairs', [])
+key_name = sys.argv[1]
 for kp in keypairs:
-    if kp.get('keypair', {}).get('name') == '$key_name':
+    if kp.get('keypair', {}).get('name') == key_name:
         sys.exit(0)
 sys.exit(1)
-" && return 0 || return 1
+" "$key_name" && return 0 || return 1
 }
 
 # Register SSH key with RamNode
 ramnode_register_ssh_key() {
     local key_name="$1"
     local pub_path="$2"
-    local pub_key
-    pub_key=$(cat "$pub_path")
 
     local body
     body=$(python3 -c "
-import json
+import json, sys
 body = {
     'keypair': {
-        'name': '$key_name',
-        'public_key': '''$pub_key'''
+        'name': sys.argv[1],
+        'public_key': sys.stdin.read().strip()
     }
 }
 print(json.dumps(body))
-")
+" "$key_name" < "$pub_path")
 
     local response
     response=$(ramnode_compute_api POST "/os-keypairs" "$body")
@@ -382,20 +382,21 @@ create_server() {
     # Build request body
     local body
     body=$(python3 -c "
-import json
+import json, sys
+name, flavor, image_id, key_name, userdata, network_id = sys.argv[1:7]
 body = {
     'server': {
-        'name': '$name',
-        'flavorRef': '$flavor',
-        'imageRef': '$image_id',
-        'key_name': '$key_name',
-        'user_data': '$userdata'
+        'name': name,
+        'flavorRef': flavor,
+        'imageRef': image_id,
+        'key_name': key_name,
+        'user_data': userdata
     }
 }
-if '$network_id':
-    body['server']['networks'] = [{'uuid': '$network_id'}]
+if network_id:
+    body['server']['networks'] = [{'uuid': network_id}]
 print(json.dumps(body))
-")
+" "$name" "$flavor" "$image_id" "$key_name" "$userdata" "${network_id:-}")
 
     local response
     response=$(ramnode_compute_api POST "/servers" "$body")
