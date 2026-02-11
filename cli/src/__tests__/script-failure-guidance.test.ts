@@ -292,6 +292,66 @@ describe("getScriptFailureGuidance", () => {
     });
   });
 
+  // ── Auth hint parameter ──────────────────────────────────────────────────
+
+  describe("auth hint parameter", () => {
+    it("should show specific env var name for exit code 1 when authHint is provided", () => {
+      const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
+      const joined = lines.join("\n");
+      expect(joined).toContain("HCLOUD_TOKEN");
+      expect(joined).toContain("OPENROUTER_API_KEY");
+    });
+
+    it("should show generic setup hint for exit code 1 when no authHint", () => {
+      const lines = getScriptFailureGuidance(1, "hetzner");
+      const joined = lines.join("\n");
+      expect(joined).toContain("spawn hetzner");
+      expect(joined).not.toContain("HCLOUD_TOKEN");
+    });
+
+    it("should show specific env var name for default case when authHint is provided", () => {
+      const lines = getScriptFailureGuidance(42, "digitalocean", "DO_API_TOKEN");
+      const joined = lines.join("\n");
+      expect(joined).toContain("DO_API_TOKEN");
+      expect(joined).toContain("OPENROUTER_API_KEY");
+    });
+
+    it("should show generic setup hint for default case when no authHint", () => {
+      const lines = getScriptFailureGuidance(42, "digitalocean");
+      const joined = lines.join("\n");
+      expect(joined).toContain("spawn digitalocean");
+      expect(joined).not.toContain("DO_API_TOKEN");
+    });
+
+    it("should handle multi-credential auth hint", () => {
+      const lines = getScriptFailureGuidance(1, "contabo", "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
+      const joined = lines.join("\n");
+      expect(joined).toContain("CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
+    });
+
+    it("should not affect non-credential exit codes (130, 137, etc.)", () => {
+      const lines130 = getScriptFailureGuidance(130, "hetzner", "HCLOUD_TOKEN");
+      const joined130 = lines130.join("\n");
+      expect(joined130).not.toContain("HCLOUD_TOKEN");
+      expect(joined130).toContain("Ctrl+C");
+
+      const lines255 = getScriptFailureGuidance(255, "hetzner", "HCLOUD_TOKEN");
+      const joined255 = lines255.join("\n");
+      expect(joined255).not.toContain("HCLOUD_TOKEN");
+      expect(joined255).toContain("SSH");
+    });
+
+    it("should preserve line count for exit code 1 with authHint", () => {
+      const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
+      expect(lines).toHaveLength(4);
+    });
+
+    it("should preserve line count for default case with authHint", () => {
+      const lines = getScriptFailureGuidance(42, "hetzner", "HCLOUD_TOKEN");
+      expect(lines).toHaveLength(4);
+    });
+  });
+
   // ── Edge cases ────────────────────────────────────────────────────────────
 
   describe("edge cases", () => {
