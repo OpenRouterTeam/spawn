@@ -1521,15 +1521,20 @@ generic_wait_for_instance() {
         local status
         status=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${status_py})" 2>/dev/null || echo "unknown")
 
-        if [[ "${status}" == "${target_status}" ]]; then
-            local ip
-            ip=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${ip_py})" 2>/dev/null || echo "")
+        if [[ "${status}" != "${target_status}" ]]; then
+            log_step "${description} status: ${status} (${attempt}/${max_attempts})"
+            sleep "${poll_delay}"
+            attempt=$((attempt + 1))
+            continue
+        fi
 
-            if [[ -n "${ip}" ]]; then
-                export "${ip_var}=${ip}"
-                log_info "${description} ${target_status}: IP=${ip}"
-                return 0
-            fi
+        local ip
+        ip=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${ip_py})" 2>/dev/null || echo "")
+
+        if [[ -n "${ip}" ]]; then
+            export "${ip_var}=${ip}"
+            log_info "${description} ${target_status}: IP=${ip}"
+            return 0
         fi
 
         log_step "${description} status: ${status} (${attempt}/${max_attempts})"
