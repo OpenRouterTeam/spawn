@@ -471,7 +471,7 @@ describe("Script download and execution", () => {
 
     const allOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
     expect(allOutput).toContain("could not be found");
-    expect(allOutput).toContain("spawn list");
+    expect(allOutput).toContain("spawn matrix");
     expect(allOutput).toContain("Report the issue");
   });
 

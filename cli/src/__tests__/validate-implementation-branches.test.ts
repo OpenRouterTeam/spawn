@@ -433,13 +433,13 @@ describe("validateImplementation branching", () => {
       expect(infos.some((msg: string) => msg.includes("no implemented cloud providers"))).toBe(true);
     });
 
-    it("should suggest 'spawn list' when agent has 0 clouds", async () => {
+    it("should suggest 'spawn matrix' when agent has 0 clouds", async () => {
       await setManifest(noCloudManifest);
 
       await expect(cmdRun("aider", "hetzner")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
-      expect(infos.some((msg: string) => msg.includes("spawn list"))).toBe(true);
+      expect(infos.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);
     });
 
     it("should NOT show example spawn commands when agent has 0 clouds", async () => {
@@ -449,7 +449,7 @@ describe("validateImplementation branching", () => {
 
       const infos = getInfoMessages();
       // Should not have any "spawn aider <cloud>" examples
-      expect(infos.some((msg: string) => /spawn aider \w+/.test(msg) && !msg.includes("spawn list"))).toBe(false);
+      expect(infos.some((msg: string) => /spawn aider \w+/.test(msg) && !msg.includes("spawn matrix"))).toBe(false);
     });
 
     it("should show 'not yet implemented' error message", async () => {
@@ -630,7 +630,7 @@ describe("validateImplementation branching", () => {
       const infos = getInfoMessages();
       // aider has 0 implemented clouds in this manifest
       expect(infos.some((msg: string) => msg.includes("no implemented cloud providers"))).toBe(true);
-      expect(infos.some((msg: string) => msg.includes("spawn list"))).toBe(true);
+      expect(infos.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);
     });
   });
 

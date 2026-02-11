@@ -38,7 +38,7 @@ const IMMEDIATE_COMMAND_KEYS = new Set([
 ]);
 
 const SUBCOMMAND_KEYS = new Set([
-  "list", "ls", "agents", "clouds", "update",
+  "list", "ls", "matrix", "m", "agents", "clouds", "update",
 ]);
 
 type DispatchResult =

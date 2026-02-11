@@ -38,7 +38,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import commands after @clack/prompts mock is set up
-const { cmdList, cmdAgents, cmdClouds, cmdAgentInfo, cmdHelp } = await import("../commands.js");
+const { cmdMatrix, cmdAgents, cmdClouds, cmdAgentInfo, cmdHelp } = await import("../commands.js");
 
 describe("Command Output Functions", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -70,42 +70,42 @@ describe("Command Output Functions", () => {
 
   // ── cmdList ─────────────────────────────────────────────────────────────
 
-  describe("cmdList", () => {
+  describe("cmdMatrix", () => {
     it("should load manifest and display matrix table", async () => {
-      await cmdList();
+      await cmdMatrix();
       expect(consoleMocks.log).toHaveBeenCalled();
     });
 
     it("should show agent names in the matrix", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("Claude Code");
       expect(output).toContain("Aider");
     });
 
     it("should show cloud names in the header", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("Sprite");
       expect(output).toContain("Hetzner Cloud");
     });
 
     it("should show implementation count", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       // 3 implemented out of 4 total (2 agents x 2 clouds)
       expect(output).toContain("3/4");
     });
 
     it("should show legend with implemented and not-yet-available labels", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("implemented");
       expect(output).toContain("not yet available");
     });
 
     it("should use spinner while loading", async () => {
-      await cmdList();
+      await cmdMatrix();
       expect(mockSpinnerStart).toHaveBeenCalled();
       expect(mockSpinnerStop).toHaveBeenCalled();
     });

@@ -180,7 +180,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import commands after mock setup
-const { cmdList, cmdClouds } = await import("../commands.js");
+const { cmdMatrix, cmdClouds } = await import("../commands.js");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -203,7 +203,7 @@ function getLines(consoleMocks: ReturnType<typeof createConsoleMocks>): string[]
 
 // ── cmdList Grid View ────────────────────────────────────────────────────────
 
-describe("cmdList - grid view rendering", () => {
+describe("cmdMatrix - grid view rendering", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
   let originalFetch: typeof global.fetch;
   let originalColumns: number | undefined;
@@ -232,7 +232,7 @@ describe("cmdList - grid view rendering", () => {
 
   describe("grid header", () => {
     it("should show cloud display names in the header row", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("Sprite");
       expect(output).toContain("Hetzner Cloud");
@@ -240,7 +240,7 @@ describe("cmdList - grid view rendering", () => {
 
     it("should show all cloud names when multiple types exist", async () => {
       await setManifest(multiTypeManifest);
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("Sprite");
       expect(output).toContain("Hetzner Cloud");
@@ -253,7 +253,7 @@ describe("cmdList - grid view rendering", () => {
 
   describe("grid separator", () => {
     it("should render a separator line with dashes", async () => {
-      await cmdList();
+      await cmdMatrix();
       const lines = getLines(consoleMocks);
       const separatorLine = lines.find((l: string) => l.includes("--") && !l.includes("Agent"));
       expect(separatorLine).toBeDefined();
@@ -264,13 +264,13 @@ describe("cmdList - grid view rendering", () => {
 
   describe("matrix rows", () => {
     it("should show '+' for implemented entries", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("+");
     });
 
     it("should show '-' for missing entries", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       // hetzner/aider is missing
       expect(output).toContain("-");
@@ -278,7 +278,7 @@ describe("cmdList - grid view rendering", () => {
 
     it("should show all '+' when everything is implemented", async () => {
       await setManifest(allImplManifest);
-      await cmdList();
+      await cmdMatrix();
       const lines = getLines(consoleMocks);
       // Find agent rows (contain agent display names)
       const agentRows = lines.filter(
@@ -291,7 +291,7 @@ describe("cmdList - grid view rendering", () => {
     });
 
     it("should show agent display names in rows", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("Claude Code");
       expect(output).toContain("Aider");
@@ -299,7 +299,7 @@ describe("cmdList - grid view rendering", () => {
 
     it("should render single agent grid correctly", async () => {
       await setManifest(singleAgentManifest);
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("Claude Code");
       expect(output).toContain("+");
@@ -308,7 +308,7 @@ describe("cmdList - grid view rendering", () => {
 
     it("should render single cloud grid correctly", async () => {
       await setManifest(singleCloudManifest);
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("Sprite");
       expect(output).toContain("Claude Code");
@@ -320,14 +320,14 @@ describe("cmdList - grid view rendering", () => {
 
   describe("grid legend", () => {
     it("should show legend with implemented and not-yet-available labels", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("implemented");
       expect(output).toContain("not yet available");
     });
 
     it("should show '+' symbol in legend", async () => {
-      await cmdList();
+      await cmdMatrix();
       const lines = getLines(consoleMocks);
       const legendLine = lines.find(
         (l: string) => l.includes("implemented") && l.includes("not yet available")
@@ -341,7 +341,7 @@ describe("cmdList - grid view rendering", () => {
 
   describe("grid footer", () => {
     it("should show correct implementation count for mixed matrix", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       // 3 implemented out of 4 total
       expect(output).toContain("3/4");
@@ -350,28 +350,28 @@ describe("cmdList - grid view rendering", () => {
 
     it("should show N/N for all-implemented matrix", async () => {
       await setManifest(allImplManifest);
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("4/4");
     });
 
     it("should show 0/N for all-missing matrix", async () => {
       await setManifest(allMissingManifest);
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("0/4");
     });
 
     it("should show correct count for multi-type manifest", async () => {
       await setManifest(multiTypeManifest);
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       // 6 implemented out of 8 total (2 agents x 4 clouds)
       expect(output).toContain("6/8");
     });
 
     it("should show usage hints with spawn <agent> and spawn <cloud>", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("spawn <agent>");
       expect(output).toContain("spawn <cloud>");
@@ -379,14 +379,14 @@ describe("cmdList - grid view rendering", () => {
 
     it("should show 1/2 for single agent with one implementation", async () => {
       await setManifest(singleAgentManifest);
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("1/2");
     });
 
     it("should show 1/2 for single cloud with one implementation", async () => {
       await setManifest(singleCloudManifest);
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("1/2");
     });

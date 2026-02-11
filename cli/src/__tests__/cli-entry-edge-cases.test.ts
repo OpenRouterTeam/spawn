@@ -274,7 +274,14 @@ describe("command aliases", () => {
   it("should treat 'ls' as alias for 'list'", () => {
     const result = runCli(["ls"]);
     const out = output(result);
-    // 'ls' should produce list output with matrix
+    // 'ls' should produce spawn history output
+    expect(out).toMatch(/AGENT|No spawns recorded/);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("should treat 'm' as alias for 'matrix'", () => {
+    const result = runCli(["m"]);
+    const out = output(result);
     expect(out).toContain("combinations implemented");
     expect(result.exitCode).toBe(0);
   });
@@ -386,15 +393,23 @@ describe("subcommand output format verification", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("'list' should show the availability matrix", () => {
+  it("'list' should show spawn history", () => {
     const result = runCli(["list"]);
+    const out = output(result);
+    // list now shows spawn history (may be empty or have entries)
+    expect(out).toMatch(/AGENT|No spawns recorded/);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("'matrix' should show the availability matrix", () => {
+    const result = runCli(["matrix"]);
     const out = output(result);
     expect(out).toContain("combinations implemented");
     expect(result.exitCode).toBe(0);
   });
 
-  it("'list' should show usage hints at the bottom", () => {
-    const result = runCli(["list"]);
+  it("'matrix' should show usage hints at the bottom", () => {
+    const result = runCli(["matrix"]);
     const out = output(result);
     expect(out).toContain("spawn <agent>");
     expect(out).toContain("spawn <cloud>");
@@ -491,9 +506,9 @@ describe("extra positional argument warnings", () => {
   });
 
   it("should still work for subcommands with extra args (warning on stderr)", () => {
-    // "spawn list extra" runs successfully - the warning goes to stderr
+    // "spawn matrix extra" runs successfully - the warning goes to stderr
     // which isn't captured by execSync on success, but the command should still work
-    const result = runCli(["list", "extra"]);
+    const result = runCli(["matrix", "extra"]);
     const out = output(result);
     expect(out).toContain("combinations implemented");
     expect(result.exitCode).toBe(0);

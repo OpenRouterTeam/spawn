@@ -15,6 +15,7 @@ import {
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
+import { saveSpawnRecord, filterHistory, type SpawnRecord } from "./history.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -246,7 +247,7 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
       }
     } else {
       p.log.info(`This agent has no implemented cloud providers yet.`);
-      p.log.info(`Run ${pc.cyan("spawn list")} to see the full availability matrix.`);
+      p.log.info(`Run ${pc.cyan("spawn matrix")} to see the full availability matrix.`);
     }
     process.exit(1);
   }
@@ -271,7 +272,7 @@ export async function cmdInteractive(): Promise<void> {
   if (clouds.length === 0) {
     p.log.error(`No clouds available for ${manifest.agents[agentChoice].name}`);
     p.log.info(`This agent has no implemented cloud providers yet.`);
-    p.log.info(`Run ${pc.cyan("spawn list")} to see the full availability matrix.`);
+    p.log.info(`Run ${pc.cyan("spawn matrix")} to see the full availability matrix.`);
     process.exit(1);
   }
 
@@ -450,7 +451,7 @@ function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryS
     console.error("This usually means the combination hasn't been published yet,");
     console.error("even though it may appear in the matrix.");
     console.error(`\nHow to fix:`);
-    console.error(`  1. Verify the combination is implemented: ${pc.cyan("spawn list")}`);
+    console.error(`  1. Verify the combination is implemented: ${pc.cyan("spawn matrix")}`);
     console.error(`  2. Try again later (the script may be deploying)`);
     console.error(`  3. Report the issue: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
   } else {
@@ -470,7 +471,7 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   console.error("\nError:", getErrorMessage(err));
   console.error("\nHow to fix:");
   console.error("  1. Check your internet connection");
-  console.error(`  2. Verify this combination exists: ${pc.cyan("spawn list")}`);
+  console.error(`  2. Verify this combination exists: ${pc.cyan("spawn matrix")}`);
   console.error(`  3. Try accessing the script directly: ${ghUrl}`);
   process.exit(1);
 }
@@ -544,6 +545,18 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
     scriptContent = await downloadScriptWithFallback(url, ghUrl);
   } catch (err) {
     reportDownloadError(ghUrl, err);
+  }
+
+  // Record the spawn before execution (so it's logged even if the script fails midway)
+  try {
+    saveSpawnRecord({
+      agent,
+      cloud,
+      timestamp: new Date().toISOString(),
+      ...(prompt ? { prompt } : {}),
+    });
+  } catch {
+    // Non-fatal: don't block the spawn if history write fails
   }
 
   try {
@@ -667,7 +680,7 @@ function renderCompactList(manifest: Manifest, agents: string[], clouds: string[
   }
 }
 
-export async function cmdList(): Promise<void> {
+export async function cmdMatrix(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   const agents = agentKeys(manifest);
@@ -710,6 +723,55 @@ export async function cmdList(): Promise<void> {
   }
   console.log(pc.green(`${impl}/${total} combinations implemented`));
   console.log(pc.dim(`Launch: ${pc.cyan("spawn <agent> <cloud>")}  |  Details: ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")}`));
+  console.log();
+}
+
+// ── List (History) ──────────────────────────────────────────────────────────────
+
+function formatTimestamp(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${date} ${time}`;
+  } catch {
+    return iso;
+  }
+}
+
+export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
+  const records = filterHistory(agentFilter, cloudFilter);
+
+  if (records.length === 0) {
+    if (agentFilter || cloudFilter) {
+      const parts: string[] = [];
+      if (agentFilter) parts.push(`agent=${pc.bold(agentFilter)}`);
+      if (cloudFilter) parts.push(`cloud=${pc.bold(cloudFilter)}`);
+      p.log.info(`No spawns found matching ${parts.join(", ")}.`);
+    } else {
+      p.log.info("No spawns recorded yet.");
+      p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to launch your first agent.`);
+    }
+    return;
+  }
+
+  console.log();
+  console.log(pc.bold("AGENT".padEnd(20)) + pc.bold("CLOUD".padEnd(20)) + pc.bold("WHEN"));
+  console.log(pc.dim("-".repeat(60)));
+
+  for (const r of records) {
+    const when = formatTimestamp(r.timestamp);
+    console.log(
+      pc.green(r.agent.padEnd(20)) +
+      r.cloud.padEnd(20) +
+      pc.dim(when)
+    );
+  }
+
+  console.log();
+  console.log(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
+  console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}`));
   console.log();
 }
 
@@ -994,7 +1056,10 @@ ${pc.bold("USAGE")}
                                      Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
   spawn <cloud>                      Show available agents for cloud
-  spawn list                         Full matrix table (alias: ls)
+  spawn list                         Show previously launched spawns (alias: ls)
+  spawn list -a <agent>              Filter spawn history by agent
+  spawn list -c <cloud>              Filter spawn history by cloud
+  spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
   spawn update                       Check for CLI updates
@@ -1013,7 +1078,8 @@ ${pc.bold("EXAMPLES")}
   spawn claude sprite --dry-run      ${pc.dim("# Preview without provisioning")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
-  spawn list                         ${pc.dim("# See the full agent x cloud matrix")}
+  spawn list                         ${pc.dim("# Show your previously launched spawns")}
+  spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}
 
 ${pc.bold("AUTHENTICATION")}
   All agents use OpenRouter for LLM access. Get your API key at:
@@ -1029,7 +1095,7 @@ ${pc.bold("INSTALL")}
   curl -fsSL ${RAW_BASE}/cli/install.sh | bash
 
 ${pc.bold("TROUBLESHOOTING")}
-  ${pc.dim("*")} Script not found: Run ${pc.cyan("spawn list")} to verify the combination exists
+  ${pc.dim("*")} Script not found: Run ${pc.cyan("spawn matrix")} to verify the combination exists
   ${pc.dim("*")} Missing credentials: Run ${pc.cyan("spawn <cloud>")} to see setup instructions
   ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
   ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output

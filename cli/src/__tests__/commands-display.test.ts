@@ -123,7 +123,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import commands after mock setup
-const { cmdAgentInfo, cmdList, cmdAgents, cmdClouds, cmdHelp, cmdUpdate } =
+const { cmdAgentInfo, cmdMatrix, cmdAgents, cmdClouds, cmdHelp, cmdUpdate } =
   await import("../commands.js");
 
 describe("Commands Display Output", () => {
@@ -234,9 +234,9 @@ describe("Commands Display Output", () => {
 
   // ── cmdList ────────────────────────────────────────────────────────
 
-  describe("cmdList", () => {
+  describe("cmdMatrix", () => {
     it("should display cloud names in header", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
@@ -245,7 +245,7 @@ describe("Commands Display Output", () => {
     });
 
     it("should display agent names in rows", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
@@ -254,7 +254,7 @@ describe("Commands Display Output", () => {
     });
 
     it("should show implemented count", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
@@ -263,7 +263,7 @@ describe("Commands Display Output", () => {
     });
 
     it("should show legend for + and -", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
@@ -272,7 +272,7 @@ describe("Commands Display Output", () => {
     });
 
     it("should show + for implemented and - for missing", async () => {
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
@@ -288,7 +288,7 @@ describe("Commands Display Output", () => {
       })) as any;
       await loadManifest(true);
 
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
@@ -296,7 +296,7 @@ describe("Commands Display Output", () => {
     });
 
     it("should use spinner while loading manifest", async () => {
-      await cmdList();
+      await cmdMatrix();
       expect(mockSpinnerStart).toHaveBeenCalled();
       expect(mockSpinnerStop).toHaveBeenCalled();
     });
@@ -572,7 +572,7 @@ describe("Commands Display Output", () => {
       })) as any;
       await loadManifest(true);
 
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
@@ -587,7 +587,7 @@ describe("Commands Display Output", () => {
       })) as any;
       await loadManifest(true);
 
-      await cmdList();
+      await cmdMatrix();
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");

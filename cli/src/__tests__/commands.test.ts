@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import {
   cmdRun,
-  cmdList,
+  cmdMatrix,
   cmdAgents,
   cmdClouds,
   cmdAgentInfo,
