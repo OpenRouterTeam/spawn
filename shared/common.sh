@@ -747,14 +747,13 @@ get_openrouter_api_key_oauth() {
 
     # OAuth failed, offer manual entry
     echo ""
-    log_warn "OAuth authentication was not completed."
-    log_info "You can enter your API key manually instead."
-    log_info "Get a free key at: https://openrouter.ai/settings/keys"
+    log_warn "Browser-based OAuth login was not completed (timed out or browser not available)."
+    log_info "You can paste an API key instead. Create one at: https://openrouter.ai/settings/keys"
     echo ""
     local manual_choice
-    manual_choice=$(safe_read "Would you like to enter your API key manually? (Y/n): ") || {
+    manual_choice=$(safe_read "Paste your API key manually? (Y/n): ") || {
         log_error "Cannot prompt for manual entry in non-interactive mode"
-        log_warn "Set OPENROUTER_API_KEY environment variable for non-interactive usage"
+        log_warn "Set OPENROUTER_API_KEY environment variable before running spawn"
         return 1
     }
 
@@ -763,12 +762,11 @@ get_openrouter_api_key_oauth() {
         echo "${api_key}"
         return 0
     else
-        log_error "Authentication cancelled by user"
-        log_error ""
-        log_error "An OpenRouter API key is required to use spawn."
-        log_error "Get your free API key at: https://openrouter.ai/settings/keys"
-        log_error ""
-        log_error "For non-interactive usage, set: OPENROUTER_API_KEY=sk-or-v1-..."
+        log_error "Authentication cancelled. An OpenRouter API key is required to use spawn."
+        log_warn "To authenticate, either:"
+        log_warn "  - Re-run this command and complete the OAuth flow in your browser"
+        log_warn "  - Set OPENROUTER_API_KEY=sk-or-v1-... before running spawn"
+        log_warn "  - Create a key at: https://openrouter.ai/settings/keys"
         return 1
     fi
 }
@@ -1112,6 +1110,7 @@ _handle_api_transient_error() {
     if [[ "${error_type}" == "network" ]]; then
         if ! _api_should_retry_on_error "network" "${attempt}" "${max_retries}" "${!interval_var}" "${!max_interval_var}" "Cloud API network error"; then
             log_error "Cloud API network error after ${max_retries} attempts"
+            log_warn "Check your internet connection and verify the provider's API is reachable."
             return 1
         fi
     else
@@ -1166,7 +1165,9 @@ _cloud_api_retry_loop() {
         return 0
     done
 
-    log_error "Cloud API retry logic exhausted"
+    log_error "Cloud API request failed after ${max_retries} attempts"
+    log_warn "This is usually caused by rate limiting or temporary provider issues."
+    log_warn "Wait a minute and try again, or check the provider's status page."
     return 1
 }
 

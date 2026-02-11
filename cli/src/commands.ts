@@ -424,6 +424,17 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
 
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string): string[] {
   switch (exitCode) {
+    case 130:
+      return ["Script was interrupted (Ctrl+C). No server was left running."];
+    case 137:
+      return ["Script was killed (likely by the system due to timeout or out of memory)."];
+    case 255:
+      return [
+        "SSH connection failed. Common causes:",
+        "  - Server is still booting (wait a moment and retry)",
+        "  - Firewall blocking SSH port 22",
+        "  - Server was terminated before the session started",
+      ];
     case 127:
       return [
         "A required command was not found. Check that these are installed:",
@@ -432,6 +443,11 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string)
       ];
     case 126:
       return ["A command was found but could not be executed (permission denied)."];
+    case 2:
+      return [
+        "Shell syntax or argument error. This is likely a bug in the script.",
+        `  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
+      ];
     case 1:
       return [
         "Common causes:",
