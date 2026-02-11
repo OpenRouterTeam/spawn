@@ -695,6 +695,22 @@
         "runtime": "docker"
       },
       "notes": "Developer-first platform with free Hobby plan (100GB bandwidth, 500 build minutes). Requires API key from https://dashboard.render.com/u/settings/api-keys. SSH not available on free tier."
+    },
+    "paperspace": {
+      "name": "Paperspace",
+      "description": "Paperspace GPU cloud (DigitalOcean) via CLI and REST API",
+      "url": "https://www.paperspace.com/",
+      "type": "cli+api",
+      "auth": "PAPERSPACE_API_KEY",
+      "provision_method": "POST /v1/machines with machineType and templateId",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "machine_type": "C4",
+        "region": "NY2",
+        "disk_size": 50
+      },
+      "notes": "GPU cloud now part of DigitalOcean. Hourly billing. Uses pspace CLI (curl -fsSL https://www.paperspace.com/install.sh | sh) and REST API. Free unlimited bandwidth."
     }
   },
   "matrix": {
@@ -1131,6 +1147,20 @@
     "cherry/gptme": "implemented",
     "cherry/opencode": "implemented",
     "cherry/plandex": "implemented",
-    "cherry/kilocode": "implemented"
+    "cherry/kilocode": "implemented",
+    "paperspace/claude": "implemented",
+    "paperspace/openclaw": "implemented",
+    "paperspace/nanoclaw": "implemented",
+    "paperspace/aider": "implemented",
+    "paperspace/goose": "implemented",
+    "paperspace/codex": "implemented",
+    "paperspace/interpreter": "implemented",
+    "paperspace/gemini": "implemented",
+    "paperspace/amazonq": "implemented",
+    "paperspace/cline": "implemented",
+    "paperspace/gptme": "implemented",
+    "paperspace/opencode": "implemented",
+    "paperspace/plandex": "implemented",
+    "paperspace/kilocode": "implemented"
   }
 }
