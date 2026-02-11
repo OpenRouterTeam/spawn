@@ -131,7 +131,7 @@ describe("verify_agent_installed", () => {
         const result2 = runBash(`PATH="${tempDir}:$PATH" verify_agent_installed "fake-agent" "--version" "FakeAgent"`);
         expect(result2.exitCode).toBe(1);
         expect(result2.stderr).toContain("verification failed");
-        expect(result2.stderr).toContain("does not run correctly");
+        expect(result2.stderr).toContain("returned an error");
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }
