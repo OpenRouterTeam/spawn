@@ -1131,7 +1131,7 @@
     "hostinger/aider": "implemented",
     "hostinger/goose": "implemented",
     "hostinger/codex": "implemented",
-    "hostinger/interpreter": "missing",
+    "hostinger/interpreter": "implemented",
     "hostinger/gemini": "missing",
     "hostinger/amazonq": "missing",
     "hostinger/cline": "missing",
