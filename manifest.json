@@ -1101,7 +1101,7 @@
     "exoscale/continue": "implemented",
     "contabo/claude": "implemented",
     "contabo/openclaw": "implemented",
-    "contabo/nanoclaw": "missing",
+    "contabo/nanoclaw": "implemented",
     "contabo/aider": "implemented",
     "contabo/goose": "missing",
     "contabo/codex": "missing",
