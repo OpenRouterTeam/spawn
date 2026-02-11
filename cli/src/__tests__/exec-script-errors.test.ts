@@ -239,7 +239,7 @@ describe("execScript bash execution error handling", () => {
       expect(errors).toContain("API error");
     });
 
-    it("should mention local dependencies for other exit codes", async () => {
+    it("should show shell syntax error guidance for exit code 2", async () => {
       mockFetchWithScript("exit 2");
       await loadManifest(true);
 
@@ -250,9 +250,8 @@ describe("execScript bash execution error handling", () => {
       }
 
       const errors = getErrorOutput();
-      expect(errors).toContain("Missing credentials");
-      expect(errors).toContain("curl");
-      expect(errors).toContain("jq");
+      expect(errors).toContain("Shell syntax or argument error");
+      expect(errors).toContain("bug in the script");
     });
 
     it("should suggest spawn <cloud> for setup instructions", async () => {
@@ -358,7 +357,7 @@ describe("execScript bash execution error handling", () => {
       expect(errors).toContain("command was not found");
     });
 
-    it("should give generic guidance for exit code 2", async () => {
+    it("should give shell syntax guidance for exit code 2", async () => {
       mockFetchWithScript("exit 2");
       await loadManifest(true);
 
@@ -369,7 +368,7 @@ describe("execScript bash execution error handling", () => {
       }
 
       const errors = getErrorOutput();
-      expect(errors).toContain("Common causes");
+      expect(errors).toContain("Shell syntax or argument error");
     });
   });
 
