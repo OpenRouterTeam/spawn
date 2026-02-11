@@ -139,6 +139,34 @@ get_server_name() {
 
 # get_cloud_init_userdata is now defined in shared/common.sh
 
+# Poll the BinaryLane API until the server becomes active and has an IP
+# Sets BINARYLANE_SERVER_IP on success
+_binarylane_wait_for_active() {
+    log_warn "Waiting for server to become active..."
+    local max_attempts=60
+    local attempt=1
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local status_response
+        status_response=$(binarylane_api GET "/servers/$BINARYLANE_SERVER_ID")
+        local status
+        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['status'])")
+
+        if [[ "$status" == "active" ]]; then
+            BINARYLANE_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; networks = json.loads(sys.stdin.read())['server']['networks']['v4']; print([n['ip_address'] for n in networks if n['type'] == 'public'][0])")
+            export BINARYLANE_SERVER_IP
+            log_info "Server active: IP=$BINARYLANE_SERVER_IP"
+            return 0
+        fi
+
+        log_warn "Server status: $status ($attempt/$max_attempts)"
+        sleep "${INSTANCE_STATUS_POLL_DELAY}"
+        attempt=$((attempt + 1))
+    done
+
+    log_error "Server did not become active in time"
+    return 1
+}
+
 create_server() {
     local name="$1"
     local size="${BINARYLANE_SIZE:-std-1vcpu}"
@@ -205,30 +233,8 @@ print(json.dumps(body))
         return 1
     fi
 
-    # Wait for server to get an IP
-    log_warn "Waiting for server to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(binarylane_api GET "/servers/$BINARYLANE_SERVER_ID")
-        local status
-        status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['status'])")
-
-        if [[ "$status" == "active" ]]; then
-            BINARYLANE_SERVER_IP=$(echo "$status_response" | python3 -c "import json,sys; networks = json.loads(sys.stdin.read())['server']['networks']['v4']; print([n['ip_address'] for n in networks if n['type'] == 'public'][0])")
-            export BINARYLANE_SERVER_IP
-            log_info "Server active: IP=$BINARYLANE_SERVER_IP"
-            return 0
-        fi
-
-        log_warn "Server status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Server did not become active in time"
-    return 1
+    # Wait for server to become active with IP
+    _binarylane_wait_for_active
 }
 
 verify_server_connectivity() {
