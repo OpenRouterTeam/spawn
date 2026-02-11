@@ -1210,7 +1210,7 @@
     "ramnode/interpreter": "implemented",
     "ramnode/gemini": "missing",
     "ramnode/amazonq": "missing",
-    "ramnode/cline": "missing",
+    "ramnode/cline": "implemented",
     "ramnode/gptme": "implemented",
     "ramnode/opencode": "missing",
     "ramnode/plandex": "missing",
