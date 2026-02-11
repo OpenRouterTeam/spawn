@@ -206,6 +206,30 @@ _wait_for_exoscale_instance() {
     return 1
 }
 
+# Write cloud-init userdata to a temporary file for exo CLI
+# Outputs the temp file path; caller is responsible for cleanup
+_write_cloud_init_tempfile() {
+    local userdata_file
+    userdata_file=$(mktemp)
+    get_cloud_init_userdata > "$userdata_file"
+    echo "$userdata_file"
+}
+
+# Handle Exoscale instance creation error output
+# Usage: _handle_exoscale_create_error OUTPUT
+_handle_exoscale_create_error() {
+    local create_output="$1"
+
+    log_error "Failed to create Exoscale instance"
+    log_error "Output: $create_output"
+    log_warn "Common issues:"
+    log_warn "  - Insufficient account balance"
+    log_warn "  - Instance type/zone unavailable"
+    log_warn "  - Template not found"
+    log_warn "  - SSH key not registered"
+    log_warn "Remediation: Check https://portal.exoscale.com/"
+}
+
 create_server() {
     local name="$1"
     local instance_type="${EXOSCALE_INSTANCE_TYPE:-standard.small}"
@@ -218,19 +242,12 @@ create_server() {
 
     log_warn "Creating Exoscale instance '$name' (type: $instance_type, zone: $zone)..."
 
-    # Get SSH key name (assuming default naming pattern)
     local ssh_key_name="spawn-${USER}-$(hostname)"
 
-    # Get cloud-init userdata
-    local userdata
-    userdata=$(get_cloud_init_userdata)
-
-    # Write userdata to temp file
     local userdata_file
-    userdata_file=$(mktemp)
-    echo "$userdata" > "$userdata_file"
+    userdata_file=$(_write_cloud_init_tempfile)
 
-    # Create instance
+    # Create instance via exo CLI
     local create_output
     create_output=$(exo compute instance create "$name" \
         --zone "$zone" \
@@ -241,22 +258,14 @@ create_server() {
 
     rm -f "$userdata_file"
 
-    if echo "$create_output" | grep -q "success"; then
-        # Extract instance ID from output
-        EXOSCALE_SERVER_ID=$(echo "$create_output" | grep -oP 'ID:\s+\K[a-f0-9-]+' | head -1)
-        export EXOSCALE_SERVER_ID
-        log_info "Instance created: ID=$EXOSCALE_SERVER_ID"
-    else
-        log_error "Failed to create Exoscale instance"
-        log_error "Output: $create_output"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Instance type/zone unavailable"
-        log_warn "  - Template not found"
-        log_warn "  - SSH key not registered"
-        log_warn "Remediation: Check https://portal.exoscale.com/"
+    if ! echo "$create_output" | grep -q "success"; then
+        _handle_exoscale_create_error "$create_output"
         return 1
     fi
+
+    EXOSCALE_SERVER_ID=$(echo "$create_output" | grep -oP 'ID:\s+\K[a-f0-9-]+' | head -1)
+    export EXOSCALE_SERVER_ID
+    log_info "Instance created: ID=$EXOSCALE_SERVER_ID"
 
     _wait_for_exoscale_instance "$EXOSCALE_SERVER_ID"
 }
