@@ -626,6 +626,23 @@
         "runtime": "docker"
       },
       "notes": "Developer-first platform with free Hobby plan (100GB bandwidth, 500 build minutes). Requires API key from https://dashboard.render.com/u/settings/api-keys. SSH not available on free tier."
+    },
+    "ionos": {
+      "name": "IONOS Cloud",
+      "description": "IONOS Cloud servers via REST API with minute-based billing",
+      "url": "https://cloud.ionos.com/",
+      "type": "api",
+      "auth": "IONOS_USERNAME + IONOS_PASSWORD",
+      "provision_method": "POST /cloudapi/v6/datacenters/{id}/servers with volumes",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "cores": 2,
+        "ram": 2048,
+        "disk_size": 20,
+        "location": "us/las"
+      },
+      "notes": "Budget European cloud provider with minute-based billing starting at $2/month. Requires IONOS_USERNAME (email) and IONOS_PASSWORD (API key) from https://dcd.ionos.com/ → Management → Users & Keys. Datacenters are created automatically if needed."
     }
   },
   "matrix": {
@@ -1003,6 +1020,21 @@
     "koyeb/continue": "missing",
     "northflank/continue": "missing",
     "railway/continue": "missing",
-    "render/continue": "missing"
+    "render/continue": "missing",
+    "ionos/claude": "implemented",
+    "ionos/openclaw": "missing",
+    "ionos/nanoclaw": "missing",
+    "ionos/aider": "implemented",
+    "ionos/goose": "implemented",
+    "ionos/codex": "missing",
+    "ionos/interpreter": "missing",
+    "ionos/gemini": "missing",
+    "ionos/amazonq": "missing",
+    "ionos/cline": "missing",
+    "ionos/gptme": "missing",
+    "ionos/opencode": "missing",
+    "ionos/plandex": "missing",
+    "ionos/kilocode": "missing",
+    "ionos/continue": "missing"
   }
 }
