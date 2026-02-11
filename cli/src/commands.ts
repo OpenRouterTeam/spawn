@@ -720,12 +720,13 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
 
   console.log();
   console.log(pc.bold("Quick start:"));
+  console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}`);
   if (authVars.length > 0) {
     for (const v of authVars) {
       console.log(`  ${pc.cyan(`export ${v}=your-${v.toLowerCase().replace(/_/g, "-")}-here`)}`);
     }
-  } else {
-    console.log(`  ${pc.cyan(c.auth)}`);
+  } else if (c.auth.toLowerCase() !== "none") {
+    console.log(`  ${pc.dim(`Auth: ${c.auth}`)}`);
   }
   if (exampleAgent) {
     console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
