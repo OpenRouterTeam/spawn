@@ -395,4 +395,29 @@ describe("Commands Error Paths", () => {
       expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(false);
     });
   });
+
+  // ── cmdRun: two agents or two clouds ────────────────────────────────
+
+  describe("cmdRun - mismatched argument types", () => {
+    it("should tell user when cloud arg is actually an agent", async () => {
+      // "spawn claude aider" - both are agents, not cloud
+      await expect(cmdRun("claude", "aider")).rejects.toThrow("process.exit");
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes('"aider" is an agent'))).toBe(true);
+      expect(infoCalls.some((msg: string) => msg.includes("spawn <agent> <cloud>"))).toBe(true);
+    });
+
+    it("should tell user when agent arg is actually a cloud (not swappable)", async () => {
+      // "spawn hetzner sprite" - both are clouds, swap detection won't fire
+      // because sprite is not an agent
+      await expect(cmdRun("hetzner", "sprite")).rejects.toThrow("process.exit");
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes('"hetzner" is a cloud provider'))).toBe(true);
+      expect(infoCalls.some((msg: string) => msg.includes("spawn <agent> <cloud>"))).toBe(true);
+    });
+  });
 });
