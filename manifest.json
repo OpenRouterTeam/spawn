@@ -1121,7 +1121,7 @@
     "contabo/amazonq": "implemented",
     "contabo/cline": "implemented",
     "contabo/gptme": "implemented",
-    "contabo/opencode": "missing",
+    "contabo/opencode": "implemented",
     "contabo/plandex": "implemented",
     "contabo/kilocode": "implemented",
     "contabo/continue": "implemented",
