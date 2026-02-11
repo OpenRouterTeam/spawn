@@ -690,7 +690,7 @@
         "location": "eu-central",
         "os_template": "ubuntu-24.04"
       },
-      "notes": "Budget VPS provider with cloud-init pre-installed. Starting at $4.95/mo. Requires HOSTINGER_API_KEY from hPanel → Profile → Account Information → API. API docs at developers.hostinger.com"
+      "notes": "Budget VPS provider with cloud-init pre-installed. Starting at $4.95/mo. Requires HOSTINGER_API_KEY from hPanel \u2192 Profile \u2192 Account Information \u2192 API. API docs at developers.hostinger.com"
     },
     "local": {
       "name": "Local Machine",
@@ -1114,7 +1114,7 @@
     "contabo/openclaw": "implemented",
     "contabo/nanoclaw": "implemented",
     "contabo/aider": "implemented",
-    "contabo/goose": "missing",
+    "contabo/goose": "implemented",
     "contabo/codex": "missing",
     "contabo/interpreter": "implemented",
     "contabo/gemini": "implemented",
