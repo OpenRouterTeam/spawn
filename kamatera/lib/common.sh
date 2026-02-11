@@ -134,6 +134,22 @@ get_server_name() {
     echo "$server_name"
 }
 
+# Extract a field from a Kamatera queue response (handles both list and dict responses)
+# Usage: _kamatera_queue_field JSON_DATA FIELD_NAME [DEFAULT]
+_kamatera_queue_field() {
+    local json_data="$1" field="$2" default="${3:-}"
+    python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+if isinstance(data, list) and len(data) > 0:
+    print(data[0].get('$field', '$default'))
+elif isinstance(data, dict):
+    print(data.get('$field', '$default'))
+else:
+    print('$default')
+" <<< "$json_data" 2>/dev/null
+}
+
 # Wait for an async Kamatera command to complete
 # Kamatera API returns command IDs for long-running operations
 # We poll the queue endpoint until the command completes
@@ -150,16 +166,7 @@ wait_for_command() {
         queue_response=$(kamatera_api GET "/service/queue?id=${command_ids}")
 
         local status
-        status=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-if isinstance(data, list) and len(data) > 0:
-    print(data[0].get('status', ''))
-elif isinstance(data, dict):
-    print(data.get('status', ''))
-else:
-    print('')
-" <<< "$queue_response" 2>/dev/null)
+        status=$(_kamatera_queue_field "$queue_response" "status")
 
         if [[ "$status" == "complete" ]]; then
             log_info "Command completed successfully"
@@ -167,14 +174,7 @@ else:
             return 0
         elif [[ "$status" == "error" ]]; then
             local error_log
-            error_log=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-if isinstance(data, list) and len(data) > 0:
-    print(data[0].get('log', 'Unknown error'))
-elif isinstance(data, dict):
-    print(data.get('log', 'Unknown error'))
-" <<< "$queue_response" 2>/dev/null)
+            error_log=$(_kamatera_queue_field "$queue_response" "log" "Unknown error")
             log_error "Command failed: $error_log"
             return 1
         fi
@@ -219,6 +219,25 @@ else:
 " <<< "$response" 2>/dev/null
 }
 
+# Extract WAN IP from a Kamatera server info response
+# Falls back to any IP if the server is powered on
+# Usage: _extract_kamatera_wan_ip JSON_DATA
+_extract_kamatera_wan_ip() {
+    python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+server = data[0] if isinstance(data, list) and len(data) > 0 else data
+networks = server.get('networks', [])
+for net in networks:
+    if net.get('network', '').startswith('wan') and net.get('ips'):
+        print(net['ips'][0]); sys.exit(0)
+if server.get('power') == 'on':
+    for net in networks:
+        if net.get('ips'):
+            print(net['ips'][0]); sys.exit(0)
+" <<< "$1" 2>/dev/null
+}
+
 # Poll Kamatera server info until a WAN IP address is available
 # Sets: KAMATERA_SERVER_IP
 # Usage: get_kamatera_server_ip SERVER_NAME [MAX_ATTEMPTS]
@@ -232,30 +251,7 @@ get_kamatera_server_ip() {
         local info_response
         info_response=$(kamatera_api POST "/service/server/info" "{\"name\":\"$name\"}")
 
-        KAMATERA_SERVER_IP=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-if isinstance(data, list) and len(data) > 0:
-    server = data[0]
-else:
-    server = data
-networks = server.get('networks', [])
-for net in networks:
-    net_name = net.get('network', '')
-    if net_name.startswith('wan'):
-        ips = net.get('ips', [])
-        if ips:
-            print(ips[0])
-            sys.exit(0)
-# Fallback: try power_on field or any IP
-power = server.get('power', '')
-if power == 'on':
-    for net in networks:
-        ips = net.get('ips', [])
-        if ips:
-            print(ips[0])
-            sys.exit(0)
-" <<< "$info_response" 2>/dev/null)
+        KAMATERA_SERVER_IP=$(_extract_kamatera_wan_ip "$info_response")
 
         if [[ -n "$KAMATERA_SERVER_IP" ]]; then
             export KAMATERA_SERVER_IP

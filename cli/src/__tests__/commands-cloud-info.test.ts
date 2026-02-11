@@ -157,6 +157,18 @@ describe("cmdCloudInfo", () => {
       expect(output).toContain("Hetzner Cloud");
       expect(output).toContain("European cloud provider");
     });
+
+    it("should show cloud type in output", async () => {
+      await cmdCloudInfo("sprite");
+      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(output).toContain("Type: vm");
+    });
+
+    it("should show cloud type for hetzner", async () => {
+      await cmdCloudInfo("hetzner");
+      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(output).toContain("Type: cloud");
+    });
   });
 
   // ── Cloud with notes ──────────────────────────────────────────────

@@ -57,13 +57,24 @@ It reads env vars:
 **Stale run detection:**
 Before accepting a trigger, the server checks if tracked processes are still alive (`kill -0`). Dead processes are reaped automatically. Runs exceeding `RUN_TIMEOUT_MS` are force-killed to free the slot.
 
+**Output streaming:**
+The `/trigger` endpoint returns a **streaming `text/plain` response** — the script's stdout/stderr are piped back as chunked output in real-time. This serves two critical purposes:
+1. **Keeps the Sprite VM alive** — Sprite pauses VMs with no active HTTP requests. The long-lived streaming response counts as an active request for the entire duration of the cycle.
+2. **Gives visibility** — GitHub Actions logs show the full cycle output in real-time.
+
+A heartbeat line (`[heartbeat] Run #N active (Xs elapsed)`) is emitted every 15 seconds during silent periods to prevent proxy idle timeouts. If the client disconnects mid-stream, the script keeps running — output continues to drain to the server console.
+
+**Bun idle timeout:** The server calls `server.timeout(req, 0)` on streaming requests to fully disable Bun's per-connection idle timeout (which defaults to 10 seconds and would otherwise kill the connection during silent periods like Claude thinking).
+
 **Endpoints:**
 - `GET /health` → `{"status":"ok","running":N,"max":N,"timeoutSec":N,"runs":[...]}` (no auth, shows per-run pid/age)
-- `POST /trigger` → validates `Authorization: Bearer <secret>`, reaps stale runs, then runs target script in background
+- `POST /trigger` → validates `Authorization: Bearer <secret>`, reaps stale runs, then streams script output back
 
 **Responses:**
-- `200` — `{"triggered":true,"reason":"...","running":N,"max":N}` on success
+- `200` — Streaming `text/plain` response with script output (success)
+- `400` — `{"error":"issue must be a positive integer"}` if issue param is invalid
 - `401` — `{"error":"unauthorized"}` if bearer token is wrong
+- `409` — `{"error":"run for this issue already in progress"}` if duplicate issue trigger
 - `429` — `{"error":"max concurrent runs reached","oldestAgeSec":N}` if at limit
 - `503` — `{"error":"server is shutting down"}` during graceful shutdown
 
@@ -193,25 +204,44 @@ concurrency:
 jobs:
   trigger:
     runs-on: ubuntu-latest
+    timeout-minutes: 90          # Must exceed longest expected cycle
     steps:
-      - name: Trigger <service-name> sprite
+      - name: Trigger and stream <service-name> cycle
         env:
           SPRITE_URL: ${{ secrets.<SERVICE_NAME>_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.<SERVICE_NAME>_TRIGGER_SECRET }}
         run: |
-          HTTP_CODE=$(curl -s -o /tmp/response.json -w '%{http_code}' -X POST \
+          set +e
+          # --http1.1: avoid HTTP/2 stream errors on long-lived responses
+          # --fail-with-body: exit 22 on HTTP errors but still print the body
+          # -N: no output buffering (stream chunks in real-time)
+          # --max-time: hard cap matching the Sprite's cycle timeout + grace
+          curl -sSN --http1.1 --fail-with-body --max-time 5400 -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
-            -H "Authorization: Bearer ${TRIGGER_SECRET}")
-          cat /tmp/response.json
-          if [ "$HTTP_CODE" = "429" ]; then
-            echo "Cycle already running, skipping"
-          elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-            echo "Triggered successfully"
+            -H "Authorization: Bearer ${TRIGGER_SECRET}"
+          CURL_EXIT=$?
+          set -e
+
+          if [ "$CURL_EXIT" -eq 0 ]; then
+            echo ""
+            echo "=== Cycle completed ==="
+          elif [ "$CURL_EXIT" -eq 22 ]; then
+            # HTTP error — body was already printed above (429, 409, etc.)
+            echo ""
+            echo "=== Trigger returned HTTP error (see output above) ==="
           else
-            echo "Failed with HTTP $HTTP_CODE"
+            echo ""
+            echo "=== curl failed (exit=$CURL_EXIT) ==="
             exit 1
           fi
 ```
+
+**Important curl flags for streaming:**
+- `--http1.1` — **Required.** HTTP/2 has strict stream lifecycle management that kills long-lived chunked responses with `error 92: INTERNAL_ERROR`.
+- `-N` — Disables curl's output buffering so chunks appear in the GH Actions log in real-time.
+- `--fail-with-body` — Returns exit code 22 on HTTP errors (429/409/401) while still printing the JSON response body for debugging.
+- `--max-time 5400` — Hard cap (90 min) as a safety net. Should exceed your longest expected cycle.
+- `timeout-minutes: 90` — The GH Actions job timeout. Must match or exceed `--max-time`.
 
 **Cron examples:**
 - `'*/30 * * * *'` — every 30 minutes
@@ -395,6 +425,30 @@ To add a new automation script (beyond discovery.sh and refactor.sh):
 4. Create a corresponding `start-<script-name>.sh` wrapper with the appropriate env vars
 5. Follow the setup steps above to register the service and create the GitHub Actions workflow
 
+## Sprite Lifecycle & Keep-Alive
+
+**Critical:** Sprite VMs pause when there is no active HTTP request being serviced through the proxy AND no detachable session generating output. This means:
+
+- **Localhost requests do NOT count.** `curl http://localhost:8080/health` bypasses the Sprite proxy entirely and will NOT prevent the VM from pausing.
+- **The streaming response IS the keep-alive.** The trigger server streams script output back as a long-lived HTTP response. As long as GH Actions holds the curl connection open, the Sprite sees an active inbound request and stays alive.
+- **Heartbeats prevent proxy idle timeouts.** The server emits a `[heartbeat]` line every 15 seconds during silent periods. This keeps intermediate proxies from closing the connection during long silences (e.g., while Claude is thinking).
+- **Do NOT add separate keep-alive loops.** The streaming architecture handles this naturally. Adding synthetic pings or background loops is unnecessary and was proven ineffective.
+
+### Bun `idleTimeout` Gotcha
+
+Bun's HTTP server has a default `idleTimeout` of **10 seconds** — it will close connections with no data flowing after 10s. For streaming responses that may be silent for minutes (Claude thinking, waiting for API responses), you MUST disable it:
+
+```ts
+// In the fetch handler, before returning the streaming response:
+server.timeout(req, 0); // 0 = disable idle timeout for this request
+```
+
+The `server.timeout(req, seconds)` API is per-request. Setting `idleTimeout` globally in `Bun.serve()` options has a max of 255 seconds, which is insufficient for long cycles. Always use `server.timeout(req, 0)` for streaming endpoints.
+
+### HTTP/1.1 Required for Streaming
+
+HTTP/2's stream multiplexing does not handle long-lived chunked responses well. curl will fail with `error 92: HTTP/2 stream was not closed cleanly: INTERNAL_ERROR`. Always use `--http1.1` in the curl command.
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -402,6 +456,9 @@ To add a new automation script (beyond discovery.sh and refactor.sh):
 | Service won't start | Check `sprite-env services list` — is another service using `--http-port 8080`? |
 | 401 on trigger | Verify `TRIGGER_SECRET` matches between wrapper script and GitHub secret |
 | curl exits with code 22 | The sprite URL may require auth — run Step 5 to set `auth: "public"` |
+| curl exits with code 92 | HTTP/2 stream error — add `--http1.1` flag to curl |
+| curl exits with code 18 | Connection closed prematurely — ensure `server.timeout(req, 0)` is set for streaming requests in trigger-server.ts |
+| Sprite pauses mid-cycle | The streaming connection dropped. Check that GH Actions `timeout-minutes` exceeds cycle length and curl uses `--http1.1 -N` flags |
 | Script runs but nothing happens | Check the target script works standalone: `bash /path/to/script.sh` |
 | Sprite doesn't wake | Verify `<SERVICE>_SPRITE_URL` secret matches the Sprite's public URL |
 | `{"error":"max concurrent runs reached"}` | Max concurrent limit reached (default 1) — wait for runs to finish or increase `MAX_CONCURRENT` env var in wrapper script |

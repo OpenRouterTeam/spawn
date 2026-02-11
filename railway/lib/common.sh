@@ -54,55 +54,13 @@ ensure_railway_cli() {
     log_info "Railway CLI installed"
 }
 
-# Save Railway token to config file
-_save_railway_token() {
-    local token="$1"
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/railway.json"
-    mkdir -p "$config_dir"
-    printf '{\n  "token": "%s"\n}\n' "$(json_escape "$token")" > "$config_file"
-    chmod 600 "$config_file"
-}
-
 # Ensure RAILWAY_TOKEN is available (env var -> config file -> prompt+save)
 ensure_railway_token() {
-    check_python_available || return 1
-
-    # 1. Check environment variable
-    if [[ -n "${RAILWAY_TOKEN:-}" ]]; then
-        log_info "Using Railway API token from environment"
-        return 0
-    fi
-
-    local config_file="$HOME/.config/spawn/railway.json"
-
-    # 2. Check config file
-    if [[ -f "$config_file" ]]; then
-        local saved_token
-        saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_token" ]]; then
-            export RAILWAY_TOKEN="$saved_token"
-            log_info "Using Railway API token from $config_file"
-            return 0
-        fi
-    fi
-
-    # 3. Prompt user for token
-    log_warn "Railway API token required"
-    echo ""
-    echo "Get your API token at: https://railway.app/account/tokens"
-    echo ""
-
-    local token
-    token=$(safe_read "Enter Railway API token: ")
-    if [[ -z "$token" ]]; then
-        log_error "No token provided"
-        return 1
-    fi
-
-    export RAILWAY_TOKEN="$token"
-    _save_railway_token "$token"
-    log_info "Railway API token saved"
+    ensure_api_token_with_provider \
+        "Railway" \
+        "RAILWAY_TOKEN" \
+        "$HOME/.config/spawn/railway.json" \
+        "https://railway.app/account/tokens"
 }
 
 # Generate a unique project and service name for Railway

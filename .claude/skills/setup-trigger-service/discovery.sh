@@ -39,6 +39,10 @@ log_error() { printf "${RED}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%
 
 # --- Cleanup trap (from refactor.sh) ---
 cleanup() {
+    # Guard against re-entry (SIGTERM trap calls exit, which fires EXIT trap again)
+    if [[ -n "${_cleanup_done:-}" ]]; then return; fi
+    _cleanup_done=1
+
     local exit_code=$?
     log_info "Running cleanup (exit_code=${exit_code})..."
 
@@ -167,16 +171,18 @@ If there are "missing" entries in the matrix, spawn one teammate per gap (up to 
 Spawn these teammates in parallel:
 
 ### Cloud Scout (PRIORITY — spawn 2 of these)
-Research and add NEW cloud/sandbox providers. Focus on:
+Research and add NEW cloud/sandbox providers. Focus on **cheap CPU compute** for running AI coding agents (not GPU workloads):
 - Container/sandbox platforms (like E2B, Modal, Fly.io — fast, developer-friendly)
-- GPU clouds (CoreWeave, RunPod, Vast.ai, Together AI)
+- Budget VPS providers with cheap small instances ($5-20/mo range)
 - Regional/niche clouds with simple APIs (OVH, Scaleway, UpCloud)
 - Any provider with a REST API or CLI for provisioning + SSH or exec access
+
+**DO NOT add GPU clouds.** Spawn runs coding agents that call LLM APIs — they need cheap CPU instances with SSH, not expensive GPU VMs.
 
 For each candidate, verify:
 - Has a public API or CLI for creating instances/containers
 - Supports SSH, exec, or console access to the created environment
-- Has pay-per-hour or pay-per-second pricing
+- Has affordable CPU instances (pay-per-hour or pay-per-second pricing)
 - Is actually available (not waitlisted/invite-only)
 
 ### Agent Scout (spawn 1, only if justified)
@@ -224,7 +230,7 @@ Format: `Agent: <role>` as the last trailer line before Co-Authored-By.
 
 Example:
 ```
-feat: Add RunPod cloud provider
+feat: Add Kamatera cloud provider
 
 Agent: cloud-scout
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
@@ -403,9 +409,10 @@ EOF
         cat <<'EOF'
 Read CLAUDE.md and manifest.json. The matrix is full.
 
-Your priority: find a NEW cloud/sandbox provider to add. Search for container platforms,
-GPU clouds, or regional providers with REST APIs. Create lib/common.sh, add to manifest,
-implement 2-3 agents, add "missing" entries for the rest.
+Your priority: find a NEW cloud/sandbox provider to add. Search for cheap CPU compute
+providers — container platforms, budget VPS providers, or regional clouds with simple
+REST APIs. We need affordable instances for running coding agents, NOT GPU clouds.
+Create lib/common.sh, add to manifest, implement 2-3 agents, add "missing" entries for the rest.
 
 Only add a new AGENT if you find one with real community buzz:
 - 1000+ GitHub stars
@@ -552,7 +559,7 @@ run_team_cycle() {
     # The trigger server's RUN_TIMEOUT_MS is the safety net if it hangs.
     local CLAUDE_EXIT=0
     claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
-        2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+        --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Cycle completed successfully"

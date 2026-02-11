@@ -187,18 +187,19 @@ function startStreamingRun(reason: string, issue: string): Response {
       const header = `[trigger] Run #${id} started (reason=${reason}${issue ? `, issue=#${issue}` : ""}, concurrent=${runs.size}/${MAX_CONCURRENT})\n`;
       enqueue(controller, encoder.encode(header));
 
-      // --- Heartbeat: emit every 30s of silence to keep proxy alive ---
+      // --- Heartbeat: emit every 15s of silence to keep connection alive ---
+      // Must fire well before Bun's idleTimeout (255s) and any proxy timeouts.
       let lastActivity = Date.now();
       const heartbeat = setInterval(() => {
         if (!clientConnected) return;
         const silentMs = Date.now() - lastActivity;
-        if (silentMs >= 29_000) {
+        if (silentMs >= 14_000) {
           const elapsed = Math.round((Date.now() - startedAt) / 1000);
           const msg = `[heartbeat] Run #${id} active (${elapsed}s elapsed)\n`;
           enqueue(controller, encoder.encode(msg));
           lastActivity = Date.now();
         }
-      }, 30_000);
+      }, 15_000);
 
       // --- Drain stdout + stderr concurrently ---
       async function drain(src: ReadableStream<Uint8Array> | null) {
@@ -219,21 +220,28 @@ function startStreamingRun(reason: string, issue: string): Response {
         }
       }
 
-      await Promise.all([drain(proc.stdout), drain(proc.stderr)]);
-
-      // --- Wait for exit ---
-      const exitCode = await proc.exited;
-      runs.delete(id);
-      clearInterval(heartbeat);
-
-      const elapsed = Math.round((Date.now() - startedAt) / 1000);
-      const footer = `\n[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size}/${MAX_CONCURRENT})\n`;
-      console.log(footer.trim());
-      enqueue(controller, encoder.encode(footer));
-
       try {
-        controller.close();
-      } catch {}
+        await Promise.all([drain(proc.stdout), drain(proc.stderr)]);
+
+        // --- Wait for exit ---
+        const exitCode = await proc.exited;
+
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        const footer = `\n[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size}/${MAX_CONCURRENT})\n`;
+        console.log(footer.trim());
+        enqueue(controller, encoder.encode(footer));
+      } catch (err) {
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        const errMsg = `\n[trigger] Run #${id} stream error after ${elapsed}s: ${err}\n`;
+        console.error(errMsg.trim());
+        enqueue(controller, encoder.encode(errMsg));
+      } finally {
+        runs.delete(id);
+        clearInterval(heartbeat);
+        try {
+          controller.close();
+        } catch {}
+      }
     },
 
     cancel() {
@@ -270,7 +278,7 @@ function startStreamingRun(reason: string, issue: string): Response {
 
 const server = Bun.serve({
   port: PORT,
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
 
     if (req.method === "GET" && url.pathname === "/health") {
@@ -353,6 +361,10 @@ const server = Bun.serve({
           }
         }
       }
+
+      // Disable idle timeout for this request — the stream may be silent for
+      // minutes at a time while Claude thinks. 0 = no timeout.
+      server.timeout(req, 0);
 
       // Stream the script output back as the response body.
       // The long-lived HTTP connection keeps the Sprite VM alive.
