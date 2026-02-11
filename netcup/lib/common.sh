@@ -36,17 +36,17 @@ netcup_get_session() {
     fi
 
     local body
-    body=$(cat <<EOF
-{
-    "action": "login",
-    "param": {
-        "customernumber": "$customer_number",
-        "apikey": "$api_key",
-        "apipassword": "$api_password"
+    body=$(python3 -c "
+import json, sys
+print(json.dumps({
+    'action': 'login',
+    'param': {
+        'customernumber': sys.argv[1],
+        'apikey': sys.argv[2],
+        'apipassword': sys.argv[3]
     }
-}
-EOF
-)
+}))
+" "$customer_number" "$api_key" "$api_password")
 
     local response
     response=$(curl -fsSL -X POST "$NETCUP_API_BASE" \
@@ -89,13 +89,11 @@ netcup_api() {
     fi
 
     local body
-    body=$(cat <<EOF
-{
-    "action": "$action",
-    "param": $(echo "$param" | python3 -c "import json, sys; print(json.dumps(json.loads(sys.stdin.read())))")
-}
-EOF
-)
+    body=$(echo "$param" | python3 -c "
+import json, sys
+param = json.loads(sys.stdin.read())
+print(json.dumps({'action': sys.argv[1], 'param': param}))
+" "$action")
 
     curl -fsSL -X POST "$NETCUP_API_BASE" \
         -H "Content-Type: application/json" \
@@ -138,9 +136,9 @@ ensure_netcup_credentials() {
     # Try loading from config file
     if [[ -f "$config_file" ]]; then
         log_info "Loading Netcup credentials from $config_file"
-        NETCUP_CUSTOMER_NUMBER=$(python3 -c "import json; print(json.load(open('$config_file')).get('customer_number',''))" 2>/dev/null || echo "")
-        NETCUP_API_KEY=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_key',''))" 2>/dev/null || echo "")
-        NETCUP_API_PASSWORD=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_password',''))" 2>/dev/null || echo "")
+        NETCUP_CUSTOMER_NUMBER=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('customer_number',''))" "$config_file" 2>/dev/null || echo "")
+        NETCUP_API_KEY=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_key',''))" "$config_file" 2>/dev/null || echo "")
+        NETCUP_API_PASSWORD=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_password',''))" "$config_file" 2>/dev/null || echo "")
         export NETCUP_CUSTOMER_NUMBER NETCUP_API_KEY NETCUP_API_PASSWORD
 
         if test_netcup_credentials; then
@@ -167,13 +165,16 @@ ensure_netcup_credentials() {
     # Save to config file
     log_info "Saving credentials to $config_file"
     mkdir -p "$(dirname "$config_file")"
-    cat > "$config_file" <<EOF
-{
-    "customer_number": "$NETCUP_CUSTOMER_NUMBER",
-    "api_key": "$NETCUP_API_KEY",
-    "api_password": "$NETCUP_API_PASSWORD"
+    python3 -c "
+import json, sys
+config = {
+    'customer_number': sys.argv[2],
+    'api_key': sys.argv[3],
+    'api_password': sys.argv[4]
 }
-EOF
+with open(sys.argv[1], 'w') as f:
+    json.dump(config, f, indent=2)
+" "$config_file" "$NETCUP_CUSTOMER_NUMBER" "$NETCUP_API_KEY" "$NETCUP_API_PASSWORD"
     chmod 600 "$config_file"
 
     return 0
@@ -333,16 +334,17 @@ create_server() {
     param=$(echo "$userdata" | python3 -c "
 import json, sys
 userdata = sys.stdin.read()
+name, product, datacenter, image = sys.argv[1:5]
 param = {
-    'vservername': '$name',
-    'product': '$product',
-    'datacenter': '$datacenter',
-    'image': '$image',
-    'password': 'TempPass123!',  # Required but will be overridden by cloud-init
+    'vservername': name,
+    'product': product,
+    'datacenter': datacenter,
+    'image': image,
+    'password': 'TempPass123!',
     'userdata': userdata
 }
 print(json.dumps(param))
-")
+" "$name" "$product" "$datacenter" "$image")
 
     local response
     response=$(netcup_api "createVServer" "$param")
