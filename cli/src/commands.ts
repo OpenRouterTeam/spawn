@@ -417,7 +417,9 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
   s.start("Downloading spawn script...");
 
   try {
-    const res = await fetch(primaryUrl);
+    const res = await fetch(primaryUrl, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    });
     if (res.ok) {
       s.stop("Script downloaded");
       return res.text();
@@ -425,7 +427,9 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
 
     // Fallback to GitHub raw
     s.message("Trying fallback source...");
-    const ghRes = await fetch(fallbackUrl);
+    const ghRes = await fetch(fallbackUrl, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    });
     if (!ghRes.ok) {
       s.stop(pc.red("Download failed"));
       reportDownloadFailure(primaryUrl, fallbackUrl, res.status, ghRes.status);

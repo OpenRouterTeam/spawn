@@ -304,10 +304,20 @@ function parseListFilters(args: string[]): { agentFilter?: string; cloudFilter?:
   let agentFilter: string | undefined;
   let cloudFilter: string | undefined;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "-a" && args[i + 1] && !args[i + 1].startsWith("-")) {
+    if (args[i] === "-a") {
+      if (!args[i + 1] || args[i + 1].startsWith("-")) {
+        console.error(pc.red(`Error: ${pc.bold("-a")} requires an agent name`));
+        console.error(`\nUsage: ${pc.cyan("spawn list -a <agent>")}`);
+        process.exit(1);
+      }
       agentFilter = args[i + 1];
       i++;
-    } else if (args[i] === "-c" && args[i + 1] && !args[i + 1].startsWith("-")) {
+    } else if (args[i] === "-c") {
+      if (!args[i + 1] || args[i + 1].startsWith("-")) {
+        console.error(pc.red(`Error: ${pc.bold("-c")} requires a cloud name`));
+        console.error(`\nUsage: ${pc.cyan("spawn list -c <cloud>")}`);
+        process.exit(1);
+      }
       cloudFilter = args[i + 1];
       i++;
     }
