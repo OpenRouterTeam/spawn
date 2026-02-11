@@ -1189,7 +1189,7 @@
     "local/claude": "implemented",
     "local/openclaw": "implemented",
     "local/nanoclaw": "implemented",
-    "local/aider": "missing",
+    "local/aider": "implemented",
     "local/goose": "implemented",
     "local/codex": "implemented",
     "local/interpreter": "missing",
