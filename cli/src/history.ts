@@ -52,5 +52,7 @@ export function filterHistory(
     const lower = cloudFilter.toLowerCase();
     records = records.filter((r) => r.cloud.toLowerCase() === lower);
   }
+  // Show newest first (reverse chronological order)
+  records.reverse();
   return records;
 }

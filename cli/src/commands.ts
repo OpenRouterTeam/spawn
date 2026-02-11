@@ -770,6 +770,11 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
   }
 
   console.log();
+
+  // Show rerun hint for the most recent spawn (first record since list is newest-first)
+  const latest = records[0];
+  console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud}`)}`);
+
   console.log(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
   console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}`));
   console.log();
