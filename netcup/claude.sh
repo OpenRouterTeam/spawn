@@ -28,7 +28,7 @@ verify_server_connectivity "${NETCUP_SERVER_IP}"
 wait_for_cloud_init "${NETCUP_SERVER_IP}" 60
 
 # 5. Verify Claude Code is installed (fallback to manual install)
-log_warn "Verifying Claude Code installation..."
+log_step "Verifying Claude Code installation..."
 if ! run_server "${NETCUP_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
     log_warn "Claude Code not found, installing manually..."
     run_server "${NETCUP_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
@@ -50,7 +50,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${NETCUP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
@@ -70,7 +70,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${NETCUP_SERVER_ID}, IP: ${NETCUP_SERVER_I
 echo ""
 
 # 9. Start Claude Code interactively
-log_warn "Starting Claude Code..."
+log_step "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${NETCUP_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

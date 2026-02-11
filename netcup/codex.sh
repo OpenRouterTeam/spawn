@@ -20,7 +20,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${NETCUP_SERVER_IP}"
 wait_for_cloud_init "${NETCUP_SERVER_IP}" 60
 
-log_warn "Installing Codex CLI..."
+log_step "Installing Codex CLI..."
 run_server "${NETCUP_SERVER_IP}" "npm install -g @openai/codex"
 log_info "Codex CLI installed"
 
@@ -31,7 +31,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${NETCUP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -42,7 +42,7 @@ log_info "Netcup server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${NETCUP_SERVER_ID}, IP: ${NETCUP_SERVER_IP})"
 echo ""
 
-log_warn "Starting Codex..."
+log_step "Starting Codex..."
 sleep 1
 clear
 interactive_session "${NETCUP_SERVER_IP}" "source ~/.zshrc && codex"

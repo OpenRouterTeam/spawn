@@ -366,7 +366,7 @@ create_server() {
 
     local image="ubuntu-24.04"
 
-    log_warn "Creating Netcup VPS '$name' (product: $product, datacenter: $datacenter)..."
+    log_step "Creating Netcup VPS '$name' (product: $product, datacenter: $datacenter)..."
 
     # Get cloud-init userdata and build request body
     local param

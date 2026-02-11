@@ -28,11 +28,11 @@ verify_server_connectivity "${NETCUP_SERVER_IP}"
 wait_for_cloud_init "${NETCUP_SERVER_IP}" 60
 
 # 5. Install bun
-log_warn "Installing bun..."
+log_step "Installing bun..."
 run_server "${NETCUP_SERVER_IP}" "curl -fsSL https://bun.sh/install | bash"
 
 # 6. Install openclaw
-log_warn "Installing openclaw..."
+log_step "Installing openclaw..."
 run_server "${NETCUP_SERVER_IP}" "export PATH=\$HOME/.bun/bin:\$PATH && bun install -g openclaw"
 
 # 7. Get OpenRouter API key
@@ -46,7 +46,7 @@ fi
 # 8. Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${NETCUP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -63,7 +63,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${NETCUP_SERVER_ID}, IP: ${NETCUP_SERVER_I
 echo ""
 
 # 10. Start openclaw gateway in background and run openclaw tui
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 run_server "${NETCUP_SERVER_IP}" "export PATH=\$HOME/.bun/bin:\$PATH && source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
 interactive_session "${NETCUP_SERVER_IP}" "export PATH=\$HOME/.bun/bin:\$PATH && source ~/.zshrc && openclaw tui"
