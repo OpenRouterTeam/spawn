@@ -111,37 +111,28 @@ get_server_name() {
     echo "$server_name"
 }
 
-create_server() {
-    local name="$1"
-    local instance_type="${GENESIS_INSTANCE_TYPE:-vcpu-4_memory-12g_nvidia-rtx-3080-1}"
-    local region="${GENESIS_REGION:-ARC-IS-HAF-1}"
-    local image="${GENESIS_IMAGE:-Ubuntu 24.04}"
-
-    # Validate env var inputs to prevent injection into Python code
-    validate_resource_name "$instance_type" || { log_error "Invalid GENESIS_INSTANCE_TYPE"; return 1; }
-    validate_region_name "$region" || { log_error "Invalid GENESIS_REGION"; return 1; }
-    # Image names may contain spaces (e.g. "Ubuntu 24.04") but must not contain quotes or shell metacharacters
-    if [[ "$image" =~ [\'\"\`\$\;\\] ]]; then log_error "Invalid GENESIS_IMAGE: contains unsafe characters"; return 1; fi
-
-    log_warn "Creating Genesis Cloud instance '$name' (type: $instance_type, region: $region)..."
-
-    # Get all SSH key IDs
+# Get all SSH key IDs from Genesis Cloud
+_genesis_get_ssh_key_ids() {
     local ssh_keys_response
     ssh_keys_response=$(genesis_api GET "/ssh-keys")
-    local ssh_key_ids
-    ssh_key_ids=$(echo "$ssh_keys_response" | python3 -c "
+    echo "$ssh_keys_response" | python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
 keys = data.get('ssh_keys', [])
 ids = [k['id'] for k in keys]
 print(json.dumps(ids))
-")
+"
+}
+
+# Build Genesis Cloud instance creation request body
+# $1=name $2=instance_type $3=region $4=image $5=ssh_key_ids
+_genesis_build_instance_body() {
+    local name="$1" instance_type="$2" region="$3" image="$4" ssh_key_ids="$5"
 
     local userdata
     userdata=$(get_cloud_init_userdata)
 
-    local body
-    body=$(echo "$userdata" | python3 -c "
+    echo "$userdata" | python3 -c "
 import json, sys
 userdata = sys.stdin.read()
 body = {
@@ -153,37 +144,20 @@ body = {
     'startup_script': userdata
 }
 print(json.dumps(body))
-")
+"
+}
 
-    local response
-    response=$(genesis_api POST "/instances" "$body")
-
-    if echo "$response" | grep -q '"instance"'; then
-        GENESIS_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['id'])")
-        export GENESIS_SERVER_ID
-        log_info "Instance created: ID=$GENESIS_SERVER_ID"
-    else
-        log_error "Failed to create Genesis Cloud instance"
-
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message', d.get('message','Unknown error')))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Instance type unavailable in region (try different GENESIS_INSTANCE_TYPE or GENESIS_REGION)"
-        log_warn "  - Instance limit reached"
-        log_warn "Remediation: Check https://console.genesiscloud.com/"
-        return 1
-    fi
-
-    # Wait for instance to get an IP and become active
-    log_warn "Waiting for instance to become active..."
+# Poll Genesis Cloud API until instance is active, then extract IP
+# Sets GENESIS_SERVER_IP on success
+_genesis_wait_for_instance() {
+    local server_id="$1"
     local max_attempts=60
     local attempt=1
+
+    log_warn "Waiting for instance to become active..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
         local status_response
-        status_response=$(genesis_api GET "/instances/$GENESIS_SERVER_ID")
+        status_response=$(genesis_api GET "/instances/$server_id")
         local status
         status=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['status'])")
 
@@ -201,6 +175,49 @@ print(json.dumps(body))
 
     log_error "Instance did not become active in time"
     return 1
+}
+
+create_server() {
+    local name="$1"
+    local instance_type="${GENESIS_INSTANCE_TYPE:-vcpu-4_memory-12g_nvidia-rtx-3080-1}"
+    local region="${GENESIS_REGION:-ARC-IS-HAF-1}"
+    local image="${GENESIS_IMAGE:-Ubuntu 24.04}"
+
+    # Validate env var inputs to prevent injection into Python code
+    validate_resource_name "$instance_type" || { log_error "Invalid GENESIS_INSTANCE_TYPE"; return 1; }
+    validate_region_name "$region" || { log_error "Invalid GENESIS_REGION"; return 1; }
+    # Image names may contain spaces (e.g. "Ubuntu 24.04") but must not contain quotes or shell metacharacters
+    if [[ "$image" =~ [\'\"\`\$\;\\] ]]; then log_error "Invalid GENESIS_IMAGE: contains unsafe characters"; return 1; fi
+
+    log_warn "Creating Genesis Cloud instance '$name' (type: $instance_type, region: $region)..."
+
+    local ssh_key_ids
+    ssh_key_ids=$(_genesis_get_ssh_key_ids)
+
+    local body
+    body=$(_genesis_build_instance_body "$name" "$instance_type" "$region" "$image" "$ssh_key_ids")
+
+    local response
+    response=$(genesis_api POST "/instances" "$body")
+
+    if echo "$response" | grep -q '"instance"'; then
+        GENESIS_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['id'])")
+        export GENESIS_SERVER_ID
+        log_info "Instance created: ID=$GENESIS_SERVER_ID"
+    else
+        log_error "Failed to create Genesis Cloud instance"
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message', d.get('message','Unknown error')))" 2>/dev/null || echo "$response")
+        log_error "API Error: $error_msg"
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance"
+        log_warn "  - Instance type unavailable in region (try different GENESIS_INSTANCE_TYPE or GENESIS_REGION)"
+        log_warn "  - Instance limit reached"
+        log_warn "Remediation: Check https://console.genesiscloud.com/"
+        return 1
+    fi
+
+    _genesis_wait_for_instance "$GENESIS_SERVER_ID"
 }
 
 verify_server_connectivity() {
