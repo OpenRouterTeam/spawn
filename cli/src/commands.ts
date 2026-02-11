@@ -354,16 +354,32 @@ async function execScript(cloud: string, agent: string, prompt?: string): Promis
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
+  let scriptContent: string;
   try {
-    const scriptContent = await downloadScriptWithFallback(url, ghUrl);
-    await runBash(scriptContent, prompt);
+    scriptContent = await downloadScriptWithFallback(url, ghUrl);
   } catch (err) {
-    p.log.error("Failed to download or execute spawn script");
+    p.log.error("Failed to download spawn script");
     console.error("\nError:", getErrorMessage(err));
     console.error("\nTroubleshooting:");
-    console.error(`  1. Verify this combination exists: ${pc.cyan("spawn list")}`);
-    console.error("  2. Check your internet connection");
+    console.error(`  1. Check your internet connection`);
+    console.error(`  2. Verify this combination exists: ${pc.cyan("spawn list")}`);
     console.error(`  3. Try accessing the script directly: ${ghUrl}`);
+    process.exit(1);
+  }
+
+  try {
+    await runBash(scriptContent, prompt);
+  } catch (err) {
+    const msg = getErrorMessage(err);
+    const exitMatch = msg.match(/code (\d+)/);
+    const exitCode = exitMatch ? exitMatch[1] : "unknown";
+    p.log.error(`Spawn script failed (exit code ${exitCode})`);
+    console.error("\nThe script downloaded successfully but encountered an error during execution.");
+    console.error("Common causes:");
+    console.error("  1. Missing or invalid cloud provider credentials");
+    console.error("  2. Cloud provider quota or rate limit exceeded");
+    console.error("  3. Network connectivity issue during provisioning");
+    console.error(`\nTo retry: ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
     process.exit(1);
   }
 }
@@ -574,11 +590,13 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   console.log();
 
   let found = false;
+  let firstCloud: string | null = null;
   for (const cloud of cloudKeys(manifest)) {
     const status = matrixStatus(manifest, cloud, agentKey);
     if (status === "implemented") {
       const c = manifest.clouds[cloud];
       console.log(`  ${pc.green(cloud.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(c.type.padEnd(TYPE_COLUMN_WIDTH))}${pc.dim("spawn " + agentKey + " " + cloud)}`);
+      if (!firstCloud) firstCloud = cloud;
       found = true;
     }
   }
@@ -587,6 +605,11 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     console.log(pc.dim("  No implemented clouds yet."));
   }
   console.log();
+  if (found) {
+    console.log(pc.dim(`  Launch with: ${pc.cyan(`spawn ${agentKey} <cloud>`)}`));
+    console.log(pc.dim(`  Example:     ${pc.cyan(`spawn ${agentKey} ${firstCloud}`)}`));
+    console.log();
+  }
 }
 
 // ── Cloud Info ─────────────────────────────────────────────────────────────────
@@ -622,11 +645,13 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   console.log();
 
   let found = false;
+  let firstAgent: string | null = null;
   for (const agent of agentKeys(manifest)) {
     const status = matrixStatus(manifest, cloudKey, agent);
     if (status === "implemented") {
       const a = manifest.agents[agent];
       console.log(`  ${pc.green(agent.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agent + " " + cloudKey)}`);
+      if (!firstAgent) firstAgent = agent;
       found = true;
     }
   }
@@ -635,6 +660,11 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
     console.log(pc.dim("  No implemented agents yet."));
   }
   console.log();
+  if (found) {
+    console.log(pc.dim(`  Launch with: ${pc.cyan(`spawn <agent> ${cloudKey}`)}`));
+    console.log(pc.dim(`  Example:     ${pc.cyan(`spawn ${firstAgent} ${cloudKey}`)}`));
+    console.log();
+  }
 }
 
 // ── Update ─────────────────────────────────────────────────────────────────────
