@@ -229,7 +229,7 @@ describe("cmdInteractive", () => {
       expect(errorCalls.some((msg: string) => msg.includes("Aider"))).toBe(true);
     });
 
-    it("should suggest 'spawn list' when no clouds available", async () => {
+    it("should suggest 'spawn matrix' when no clouds available", async () => {
       const noCloudManifest = {
         ...mockManifest,
         matrix: {
@@ -256,7 +256,7 @@ describe("cmdInteractive", () => {
       }
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("spawn list"))).toBe(true);
+      expect(infoCalls.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);
     });
   });
 

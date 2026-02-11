@@ -3,6 +3,7 @@ import {
   cmdInteractive,
   cmdRun,
   cmdList,
+  cmdMatrix,
   cmdAgents,
   cmdClouds,
   cmdAgentInfo,
@@ -62,6 +63,7 @@ const KNOWN_FLAGS = new Set([
   "--version", "-v", "-V",
   "--prompt", "-p", "--prompt-file", "-f",
   "--dry-run", "-n",
+  "-a", "-c",
 ]);
 
 /** Check for unknown flags and show an actionable error */
@@ -278,11 +280,14 @@ const IMMEDIATE_COMMANDS: Record<string, () => void> = {
 };
 
 const SUBCOMMANDS: Record<string, () => Promise<void>> = {
-  "list": cmdList, "ls": cmdList,
+  "matrix": cmdMatrix, "m": cmdMatrix,
   "agents": cmdAgents,
   "clouds": cmdClouds,
   "update": cmdUpdate,
 };
+
+// list/ls handled separately for -a/-c flag parsing
+const LIST_COMMANDS = new Set(["list", "ls"]);
 
 /** Warn when extra positional arguments are silently ignored */
 function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
@@ -294,11 +299,38 @@ function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
   }
 }
 
+/** Parse -a <agent> and -c <cloud> filter flags from args */
+function parseListFilters(args: string[]): { agentFilter?: string; cloudFilter?: string } {
+  let agentFilter: string | undefined;
+  let cloudFilter: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "-a" && args[i + 1] && !args[i + 1].startsWith("-")) {
+      agentFilter = args[i + 1];
+      i++;
+    } else if (args[i] === "-c" && args[i + 1] && !args[i + 1].startsWith("-")) {
+      cloudFilter = args[i + 1];
+      i++;
+    }
+  }
+  return { agentFilter, cloudFilter };
+}
+
 /** Dispatch a named command or fall through to agent/cloud handling */
 async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
     warnExtraArgs(filteredArgs, 1);
     IMMEDIATE_COMMANDS[cmd]();
+    return;
+  }
+
+  if (LIST_COMMANDS.has(cmd)) {
+    const hasHelpFlag = filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
+    if (hasHelpFlag) {
+      cmdHelp();
+    } else {
+      const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
+      await cmdList(agentFilter, cloudFilter);
+    }
     return;
   }
 

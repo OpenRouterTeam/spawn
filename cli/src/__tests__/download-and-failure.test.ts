@@ -254,7 +254,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("spawn list");
+      expect(errorOutput).toContain("spawn matrix");
     });
 
     it("should suggest reporting the issue when both return 404", async () => {
@@ -369,7 +369,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("spawn list");
+      expect(errorOutput).toContain("spawn matrix");
     });
 
     it("should show the GitHub raw URL for manual access on network error", async () => {

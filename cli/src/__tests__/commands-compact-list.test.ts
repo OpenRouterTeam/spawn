@@ -177,7 +177,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import commands after mock setup
-const { cmdList } = await import("../commands.js");
+const { cmdMatrix } = await import("../commands.js");
 
 describe("Compact List View", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -222,7 +222,7 @@ describe("Compact List View", () => {
       // Force narrow terminal - compact view triggered
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // Compact view has "Agent", "Clouds", "Missing" header columns
       expect(output).toContain("Agent");
@@ -235,7 +235,7 @@ describe("Compact List View", () => {
       // Force wide terminal
       process.stdout.columns = 200;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // Grid view shows + and - symbols and cloud names in header
       expect(output).toContain("+");
@@ -250,7 +250,7 @@ describe("Compact List View", () => {
       // Simulate no tty (columns undefined)
       (process.stdout as any).columns = undefined;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // With 7 clouds at ~10+ chars each, the grid would be ~100+ chars
       // which exceeds the 80-column default, so compact view should trigger
@@ -266,7 +266,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
@@ -277,7 +277,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // The separator is a line of dashes (at least 20 chars: NAME_WIDTH + COUNT_WIDTH + 20)
       expect(output).toContain("----------");
@@ -291,7 +291,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // claude is implemented on all 7 clouds -> "7/7"
       expect(output).toContain("7/7");
@@ -301,7 +301,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // aider is implemented on sprite + linode = 2 out of 7
       expect(output).toContain("2/7");
@@ -311,7 +311,7 @@ describe("Compact List View", () => {
       await setManifest(allMissingManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       expect(output).toContain("0/7");
     });
@@ -320,7 +320,7 @@ describe("Compact List View", () => {
       await setManifest(allImplementedManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // Both agents should show 7/7
       // Check that "7/7" appears (for both claude and aider)
@@ -337,7 +337,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // claude is implemented everywhere -> "all clouds supported"
       expect(output).toContain("all clouds supported");
@@ -347,7 +347,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // aider is missing: hetzner, vultr, digitalocean, aws, gcp
       expect(output).toContain("Hetzner Cloud");
@@ -361,7 +361,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // Find the line containing "Aider" to isolate the aider row
       const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
@@ -380,7 +380,7 @@ describe("Compact List View", () => {
       await setManifest(allMissingManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // All cloud names should appear in the missing column
       expect(output).toContain("Sprite");
@@ -396,7 +396,7 @@ describe("Compact List View", () => {
       await setManifest(allImplementedManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       const allCloudsMatches = output.match(/all clouds supported/g);
       expect(allCloudsMatches).not.toBeNull();
@@ -412,7 +412,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       expect(output).toContain("Claude Code");
       expect(output).toContain("Aider");
@@ -426,7 +426,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       // claude: 7 implemented, aider: 2 implemented = 9 total out of 14
       expect(output).toContain("9/14");
@@ -436,7 +436,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       expect(output).toContain("implemented");
       // The +/- legend is grid-only, not shown in compact view
@@ -447,7 +447,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       expect(output).toContain("spawn <agent>");
       expect(output).toContain("spawn <cloud>");
@@ -474,7 +474,7 @@ describe("Compact List View", () => {
       await setManifest(singleAgent);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const output = getOutput();
       expect(output).toContain("Claude Code");
       expect(output).toContain("2/7");
@@ -490,7 +490,7 @@ describe("Compact List View", () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
-      await cmdList();
+      await cmdMatrix();
       const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
       const aiderLine = lines.find(
         (line: string) => line.includes("Aider") && line.includes("/7")
