@@ -279,6 +279,10 @@ const SUBCOMMANDS: Record<string, () => Promise<void>> = {
 // list/ls handled separately for -a/-c flag parsing
 const LIST_COMMANDS = new Set(["list", "ls"]);
 
+// Common verb prefixes that users naturally try (e.g. "spawn run claude sprite")
+// These are not real subcommands -- we strip them and forward to the default handler
+const VERB_ALIASES = new Set(["run", "launch", "start", "deploy", "exec"]);
+
 /** Warn when extra positional arguments are silently ignored */
 function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
   const extra = filteredArgs.slice(maxExpected);
@@ -343,6 +347,21 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
       await SUBCOMMANDS[cmd]();
     }
     return;
+  }
+
+  // Handle verb aliases: "spawn run claude sprite" -> "spawn claude sprite"
+  if (VERB_ALIASES.has(cmd)) {
+    if (filteredArgs.length > 1) {
+      const remaining = filteredArgs.slice(1);
+      warnExtraArgs(remaining, 2);
+      await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun);
+      return;
+    }
+    // Bare verb with no args: "spawn run" -> show usage hint
+    console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent and cloud`));
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud>")}`);
+    console.error(pc.dim(`  The "${cmd}" keyword is optional -- just use ${pc.cyan("spawn <agent> <cloud>")} directly.`));
+    process.exit(1);
   }
 
   warnExtraArgs(filteredArgs, 2);
