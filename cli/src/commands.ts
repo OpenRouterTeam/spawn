@@ -516,6 +516,12 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   process.exit(1);
 }
 
+function credentialHint(cloud: string, authHint?: string, verb = "Missing or invalid"): string {
+  return authHint
+    ? `  - ${verb} credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`
+    : `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`;
+}
+
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
   switch (exitCode) {
     case 130:
@@ -546,32 +552,20 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         "Shell syntax or argument error. This is likely a bug in the script.",
         `  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
       ];
-    case 1: {
-      const lines = ["Common causes:"];
-      if (authHint) {
-        lines.push(`  - Missing or invalid credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`);
-      } else {
-        lines.push(`  - Missing or invalid credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`);
-      }
-      lines.push(
+    case 1:
+      return [
+        "Common causes:",
+        credentialHint(cloud, authHint),
         "  - Cloud provider API error (quota, rate limit, or region issue)",
         "  - Server provisioning failed (try again or pick a different region)",
-      );
-      return lines;
-    }
-    default: {
-      const lines = ["Common causes:"];
-      if (authHint) {
-        lines.push(`  - Missing credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`);
-      } else {
-        lines.push(`  - Missing credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup instructions)`);
-      }
-      lines.push(
+      ];
+    default:
+      return [
+        "Common causes:",
+        credentialHint(cloud, authHint, "Missing"),
         "  - Cloud provider API rate limit or quota exceeded",
         "  - Missing local dependencies (SSH, curl, jq)",
-      );
-      return lines;
-    }
+      ];
   }
 }
 
