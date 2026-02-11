@@ -115,15 +115,18 @@ run_server() {
 upload_file() {
     local local_path="${1}"
     local remote_path="${2}"
-    # Upload via base64 encoding through exec
+
+    # SECURITY: Validate remote_path to prevent command injection via single-quote breakout
+    if [[ "$remote_path" == *"'"* || "$remote_path" == *'$'* || "$remote_path" == *'`'* || "$remote_path" == *$'\n'* ]]; then
+        log_error "Invalid remote path (contains unsafe characters): $remote_path"
+        return 1
+    fi
+
+    # base64 output is safe (alphanumeric + /+=) so no injection risk
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
-    # SECURITY: Properly escape the remote path
-    local escaped_path
-    escaped_path=$(printf '%q' "${remote_path}")
-    local escaped_content
-    escaped_content=$(printf '%q' "${content}")
-    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "echo ${escaped_content} | base64 -d > ${escaped_path}"
+
+    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "printf '%s' '${content}' | base64 -d > '${remote_path}'"
 }
 
 interactive_session() {

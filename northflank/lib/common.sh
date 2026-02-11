@@ -166,16 +166,18 @@ run_server() {
 upload_file() {
     local local_path="${1}"
     local remote_path="${2}"
+
+    # SECURITY: Validate remote_path to prevent command injection via single-quote breakout
+    if [[ "$remote_path" == *"'"* || "$remote_path" == *'$'* || "$remote_path" == *'`'* || "$remote_path" == *$'\n'* ]]; then
+        log_error "Invalid remote path (contains unsafe characters): $remote_path"
+        return 1
+    fi
+
+    # base64 output is safe (alphanumeric + /+=) so no injection risk
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
 
-    # SECURITY: Properly escape paths and content to prevent injection
-    local escaped_path
-    escaped_path=$(printf '%q' "${remote_path}")
-    local escaped_content
-    escaped_content=$(printf '%q' "${content}")
-
-    run_server "echo ${escaped_content} | base64 -d > ${escaped_path}"
+    run_server "printf '%s' '${content}' | base64 -d > '${remote_path}'"
 }
 
 # Start an interactive shell session on the Northflank service
