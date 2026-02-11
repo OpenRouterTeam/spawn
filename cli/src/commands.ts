@@ -647,7 +647,7 @@ export async function cmdList(): Promise<void> {
   const total = agents.length * clouds.length;
   console.log();
   if (isCompact) {
-    console.log(`${pc.green("N/N")} all clouds  ${pc.yellow("N/N")} some missing`);
+    console.log(`Color: ${pc.green("green")} = all clouds  ${pc.yellow("yellow")} = some missing`);
   } else {
     console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   }

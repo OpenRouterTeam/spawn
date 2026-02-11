@@ -368,9 +368,12 @@ describe("dispatchCommand routing", () => {
 describe("showVersion output format", () => {
   // Replica of the showVersion output structure
   function formatVersionOutput(version: string, binaryPath: string | undefined): string[] {
+    const runtime = process.versions.bun ? "bun" : "node";
+    const runtimeVersion = process.versions.bun ?? process.versions.node;
     return [
       `spawn v${version}`,
       `  ${binaryPath ?? "unknown path"}`,
+      `  ${runtime} ${runtimeVersion}  ${process.platform} ${process.arch}`,
       `  Run spawn update to check for updates.`,
     ];
   }
@@ -390,9 +393,15 @@ describe("showVersion output format", () => {
     expect(lines[1]).toContain("unknown path");
   });
 
+  it("should include runtime and platform info", () => {
+    const lines = formatVersionOutput("0.2.15", "/usr/local/bin/spawn");
+    expect(lines[2]).toContain(process.platform);
+    expect(lines[2]).toContain(process.arch);
+  });
+
   it("should suggest spawn update", () => {
     const lines = formatVersionOutput("0.2.15", "/usr/local/bin/spawn");
-    expect(lines[2]).toContain("spawn update");
+    expect(lines[3]).toContain("spawn update");
   });
 });
 
