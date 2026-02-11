@@ -1178,7 +1178,7 @@
     "netcup/goose": "implemented",
     "netcup/codex": "missing",
     "netcup/interpreter": "implemented",
-    "netcup/gemini": "missing",
+    "netcup/gemini": "implemented",
     "netcup/amazonq": "missing",
     "netcup/cline": "missing",
     "netcup/gptme": "missing",
