@@ -1058,7 +1058,7 @@
     "exoscale/aider": "implemented",
     "exoscale/goose": "implemented",
     "exoscale/codex": "missing",
-    "exoscale/interpreter": "missing",
+    "exoscale/interpreter": "implemented",
     "exoscale/gemini": "missing",
     "exoscale/amazonq": "missing",
     "exoscale/cline": "missing",
