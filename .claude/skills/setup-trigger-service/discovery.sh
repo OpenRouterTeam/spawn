@@ -584,23 +584,71 @@ run_team_cycle() {
     # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
 
-    # NOTE: VM keep-alive is handled by the trigger server streaming output back
-    # to the GitHub Actions runner. The long-lived HTTP response keeps Sprite alive.
-
     log_info "Launching agent team..."
     log_info "Worktree base: ${WORKTREE_BASE}"
     echo ""
 
-    # No hard timeout — let the cycle run to completion.
-    # The trigger server's RUN_TIMEOUT_MS is the safety net if it hangs.
-    local CLAUDE_EXIT=0
+    # Activity watchdog: kill claude if no output for IDLE_TIMEOUT seconds.
+    # This catches hung API calls (pre-flight check hangs, network issues) much
+    # faster than the trigger server's RUN_TIMEOUT_MS. The next cron trigger
+    # starts a fresh cycle. 10 min is long enough for legitimate agent work
+    # (agents send messages every few minutes) but short enough to catch hangs.
+    local IDLE_TIMEOUT=600  # 10 minutes of silence = hung
+    local HARD_TIMEOUT=3600 # 60 min wall-clock safety net
+
+    log_info "Idle timeout: ${IDLE_TIMEOUT}s, Hard timeout: ${HARD_TIMEOUT}s"
+
+    # Run claude in background so we can monitor output activity
     claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
-        --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+        --output-format stream-json --verbose 2>&1 | tee -a "${LOG_FILE}" &
+    local PIPE_PID=$!
+
+    # Watchdog loop: check log file growth every 10 seconds
+    local LAST_SIZE
+    LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+    local IDLE_SECONDS=0
+    local WALL_START
+    WALL_START=$(date +%s)
+
+    while kill -0 "${PIPE_PID}" 2>/dev/null; do
+        sleep 10
+        local CURR_SIZE
+        CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+        local WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
+
+        if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
+            IDLE_SECONDS=$((IDLE_SECONDS + 10))
+            if [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
+                log_warn "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
+                kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
+                pkill -P "${PIPE_PID}" 2>/dev/null || true
+                break
+            fi
+        else
+            IDLE_SECONDS=0
+            LAST_SIZE="${CURR_SIZE}"
+        fi
+
+        # Hard wall-clock timeout as final safety net
+        if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
+            log_warn "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
+            kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
+            pkill -P "${PIPE_PID}" 2>/dev/null || true
+            break
+        fi
+    done
+
+    wait "${PIPE_PID}" 2>/dev/null
+    local CLAUDE_EXIT=$?
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Cycle completed successfully"
         log_info "Creating checkpoint..."
         sprite-env checkpoint create --comment "discovery cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+    elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
+        log_warn "Cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
+        log_info "Creating checkpoint for partial work..."
+        sprite-env checkpoint create --comment "discovery cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Cycle failed (exit_code=${CLAUDE_EXIT})"
     fi
@@ -628,13 +676,57 @@ run_single_cycle() {
     log_info "Launching single agent..."
     echo ""
 
-    local CLAUDE_EXIT=0
+    local IDLE_TIMEOUT=600  # 10 minutes of silence = hung
+    local HARD_TIMEOUT=2100 # 35 min wall-clock for single agent
+
+    log_info "Idle timeout: ${IDLE_TIMEOUT}s, Hard timeout: ${HARD_TIMEOUT}s"
+
     claude --print -p "$(cat "${PROMPT_FILE}")" --model sonnet \
-        2>&1 | tee -a "${LOG_FILE}" || CLAUDE_EXIT=$?
+        2>&1 | tee -a "${LOG_FILE}" &
+    local PIPE_PID=$!
+
+    local LAST_SIZE
+    LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+    local IDLE_SECONDS=0
+    local WALL_START
+    WALL_START=$(date +%s)
+
+    while kill -0 "${PIPE_PID}" 2>/dev/null; do
+        sleep 10
+        local CURR_SIZE
+        CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+        local WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
+
+        if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
+            IDLE_SECONDS=$((IDLE_SECONDS + 10))
+            if [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
+                log_warn "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
+                kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
+                pkill -P "${PIPE_PID}" 2>/dev/null || true
+                break
+            fi
+        else
+            IDLE_SECONDS=0
+            LAST_SIZE="${CURR_SIZE}"
+        fi
+
+        if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
+            log_warn "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
+            kill -- -"${PIPE_PID}" 2>/dev/null || kill "${PIPE_PID}" 2>/dev/null || true
+            pkill -P "${PIPE_PID}" 2>/dev/null || true
+            break
+        fi
+    done
+
+    wait "${PIPE_PID}" 2>/dev/null
+    local CLAUDE_EXIT=$?
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Single cycle completed successfully"
         sprite-env checkpoint create --comment "discovery single cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+    elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
+        log_warn "Single cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
+        sprite-env checkpoint create --comment "discovery single cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Single cycle failed (exit_code=${CLAUDE_EXIT})"
     fi
