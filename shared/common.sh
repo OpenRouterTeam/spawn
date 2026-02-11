@@ -36,6 +36,27 @@ log_step() {
     printf '%b\n' "${CYAN}${1}${NC}" >&2
 }
 
+# Print a structured diagnostic: header, possible causes, and how-to-fix steps.
+# Arguments: HEADER CAUSE... --- FIX...
+# The literal "---" separates causes from fixes.
+_log_diagnostic() {
+    local header="${1}"; shift
+    log_error "${header}"
+    log_error ""
+    log_error "Possible causes:"
+    while [[ $# -gt 0 && "${1}" != "---" ]]; do
+        log_error "  - ${1}"; shift
+    done
+    shift  # skip ---
+    log_error ""
+    log_error "How to fix:"
+    local i=1
+    while [[ $# -gt 0 ]]; do
+        log_error "  ${i}. ${1}"; shift
+        i=$((i + 1))
+    done
+}
+
 # ============================================================
 # Configurable timing constants
 # ============================================================
@@ -791,11 +812,7 @@ get_openrouter_api_key_oauth() {
         return 1
     }
 
-    if [[ ! "${manual_choice}" =~ ^[Nn]$ ]]; then
-        api_key=$(get_openrouter_api_key_manual)
-        echo "${api_key}"
-        return 0
-    else
+    if [[ "${manual_choice}" =~ ^[Nn]$ ]]; then
         log_error "Authentication cancelled. An OpenRouter API key is required to use spawn."
         log_warn "To authenticate, either:"
         log_warn "  - Re-run this command and complete the OAuth flow in your browser"
@@ -803,6 +820,9 @@ get_openrouter_api_key_oauth() {
         log_warn "  - Create a key at: https://openrouter.ai/settings/keys"
         return 1
     fi
+
+    api_key=$(get_openrouter_api_key_manual)
+    echo "${api_key}"
 }
 
 # ============================================================
@@ -1284,30 +1304,25 @@ verify_agent_installed() {
     log_step "Verifying ${agent_name} installation..."
 
     if ! command -v "${agent_cmd}" &> /dev/null; then
-        log_error "${agent_name} installation failed: command '${agent_cmd}' not found in PATH"
-        log_error ""
-        log_error "Possible causes:"
-        log_error "  - The installation script encountered an error (check logs above)"
-        log_error "  - The binary was installed to a directory not in PATH"
-        log_error "  - Network issues prevented the download from completing"
-        log_error ""
-        log_error "How to fix:"
-        log_error "  1. Re-run the script to retry the installation"
-        log_error "  2. Install ${agent_name} manually and ensure it is in PATH"
+        _log_diagnostic \
+            "${agent_name} installation failed: command '${agent_cmd}' not found in PATH" \
+            "The installation script encountered an error (check logs above)" \
+            "The binary was installed to a directory not in PATH" \
+            "Network issues prevented the download from completing" \
+            --- \
+            "Re-run the script to retry the installation" \
+            "Install ${agent_name} manually and ensure it is in PATH"
         return 1
     fi
 
     if ! "${agent_cmd}" "${verify_arg}" &> /dev/null; then
-        log_error "${agent_name} verification failed: '${agent_cmd} ${verify_arg}' returned an error"
-        log_error ""
-        log_error "The command exists but does not run correctly."
-        log_error "Possible causes:"
-        log_error "  - Missing runtime dependencies (Python, Node.js, etc.)"
-        log_error "  - Incompatible system architecture or OS version"
-        log_error ""
-        log_error "How to fix:"
-        log_error "  1. Check ${agent_name}'s installation docs for prerequisites"
-        log_error "  2. Run '${agent_cmd} ${verify_arg}' manually to see the error"
+        _log_diagnostic \
+            "${agent_name} verification failed: '${agent_cmd} ${verify_arg}' returned an error" \
+            "Missing runtime dependencies (Python, Node.js, etc.)" \
+            "Incompatible system architecture or OS version" \
+            --- \
+            "Check ${agent_name}'s installation docs for prerequisites" \
+            "Run '${agent_cmd} ${verify_arg}' manually to see the error"
         return 1
     fi
 
