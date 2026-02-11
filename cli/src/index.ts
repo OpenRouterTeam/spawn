@@ -244,8 +244,8 @@ async function main(): Promise<void> {
       if (isInteractiveTTY()) {
         await cmdInteractive();
       } else {
-        console.error(pc.yellow("Non-interactive terminal detected (no TTY). Showing help instead of interactive picker."));
-        console.error(pc.dim("To launch directly, use: spawn <agent> <cloud>\n"));
+        console.error(pc.yellow("No interactive terminal detected."));
+        console.error(pc.dim(`To launch directly: ${pc.cyan("spawn <agent> <cloud>")}\n`));
         cmdHelp();
       }
       return;
@@ -255,6 +255,7 @@ async function main(): Promise<void> {
     const showVersion = () => {
       console.log(`spawn v${VERSION}`);
       console.log(pc.dim(`  ${process.argv[1] ?? "unknown path"}`));
+      console.log(pc.dim(`  Run ${pc.cyan("spawn update")} to check for updates.`));
     };
     const immediateCommands: Record<string, () => void> = {
       "help": cmdHelp, "--help": cmdHelp, "-h": cmdHelp,
