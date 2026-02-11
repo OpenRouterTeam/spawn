@@ -550,6 +550,7 @@ kill_claude() {
 
 # Watchdog loop: check log file growth and detect session completion
 LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+LOG_START_SIZE="${LAST_SIZE}"  # bytes written before this cycle — skip old content
 IDLE_SECONDS=0
 WALL_START=$(date +%s)
 SESSION_ENDED=false
@@ -560,8 +561,9 @@ while kill -0 "${PIPE_PID}" 2>/dev/null; do
     WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
 
     # Check if the stream-json "result" event has been emitted (session complete).
+    # Only check content written SINCE this cycle started (skip old log entries).
     # After this, claude hangs waiting for agent subprocesses — kill immediately.
-    if [[ "${SESSION_ENDED}" = false ]] && grep -q '"type":"result"' "${LOG_FILE}" 2>/dev/null; then
+    if [[ "${SESSION_ENDED}" = false ]] && tail -c +"$((LOG_START_SIZE + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
         SESSION_ENDED=true
         log "Session ended (result event detected) — waiting 30s for cleanup then killing"
         sleep 30
