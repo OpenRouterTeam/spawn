@@ -9,14 +9,14 @@ import { loadManifest } from "../manifest";
  * to a compact view that shows each agent on one line with:
  *   - Agent name
  *   - Implemented cloud count (e.g. "3/5")
- *   - Missing clouds or "all clouds" when fully implemented
+ *   - Missing clouds or "all clouds supported" when fully implemented
  *
  * This file tests:
  * - Compact view is triggered when grid exceeds terminal width
  * - Grid view is used when terminal is wide enough
  * - Compact header and separator rendering
  * - Per-agent count and missing cloud list
- * - "all clouds" display when agent is fully implemented
+ * - "all clouds supported" display when agent is fully implemented
  * - Edge cases: all missing, single agent, many clouds
  *
  * Agent: test-engineer
@@ -227,7 +227,7 @@ describe("Compact List View", () => {
       // Compact view has "Agent", "Clouds", "Missing" header columns
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Missing");
+      expect(output).toContain("Not available on");
     });
 
     it("should use grid view when terminal is wide enough for small manifest", async () => {
@@ -242,7 +242,7 @@ describe("Compact List View", () => {
       expect(output).toContain("Sprite");
       expect(output).toContain("Hetzner Cloud");
       // Grid view should NOT have the "Missing" header column
-      expect(output).not.toContain("Missing");
+      expect(output).not.toContain("Not available on");
     });
 
     it("should default to 80 columns when process.stdout.columns is undefined", async () => {
@@ -255,14 +255,14 @@ describe("Compact List View", () => {
       // With 7 clouds at ~10+ chars each, the grid would be ~100+ chars
       // which exceeds the 80-column default, so compact view should trigger
       expect(output).toContain("Agent");
-      expect(output).toContain("Missing");
+      expect(output).toContain("Not available on");
     });
   });
 
   // ── Compact view header and structure ─────────────────────────────
 
   describe("compact view header", () => {
-    it("should show three column headers: Agent, Clouds, Missing", async () => {
+    it("should show three column headers: Agent, Clouds, Not available on", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
@@ -270,7 +270,7 @@ describe("Compact List View", () => {
       const output = getOutput();
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Missing");
+      expect(output).toContain("Not available on");
     });
 
     it("should include a separator line with dashes", async () => {
@@ -333,14 +333,14 @@ describe("Compact List View", () => {
   // ── Missing clouds column ─────────────────────────────────────────
 
   describe("compact view missing clouds column", () => {
-    it("should show 'all clouds' when agent is fully implemented", async () => {
+    it("should show 'all clouds supported' when agent is fully implemented", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
       await cmdList();
       const output = getOutput();
-      // claude is implemented everywhere -> "all clouds"
-      expect(output).toContain("all clouds");
+      // claude is implemented everywhere -> "all clouds supported"
+      expect(output).toContain("all clouds supported");
     });
 
     it("should list missing cloud names when agent is partially implemented", async () => {
@@ -392,15 +392,15 @@ describe("Compact List View", () => {
       expect(output).toContain("Google Cloud");
     });
 
-    it("should show 'all clouds' for every agent when everything is implemented", async () => {
+    it("should show 'all clouds supported' for every agent when everything is implemented", async () => {
       await setManifest(allImplementedManifest);
       process.stdout.columns = 60;
 
       await cmdList();
       const output = getOutput();
-      const allCloudsMatches = output.match(/all clouds/g);
+      const allCloudsMatches = output.match(/all clouds supported/g);
       expect(allCloudsMatches).not.toBeNull();
-      // Both agents fully implemented -> 2 "all clouds"
+      // Both agents fully implemented -> 2 "all clouds supported"
       expect(allCloudsMatches!.length).toBe(2);
     });
   });
@@ -432,14 +432,15 @@ describe("Compact List View", () => {
       expect(output).toContain("9/14");
     });
 
-    it("should show legend text", async () => {
+    it("should not show grid legend in compact view", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
       await cmdList();
       const output = getOutput();
       expect(output).toContain("implemented");
-      expect(output).toContain("not yet available");
+      // The +/- legend is grid-only, not shown in compact view
+      expect(output).not.toContain("not yet available");
     });
 
     it("should show usage hints", async () => {

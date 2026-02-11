@@ -594,9 +594,9 @@ describe("Commands Display Output", () => {
         .map((c: any[]) => c.join(" "))
         .join("\n");
       // With many clouds, compact view is used when grid exceeds terminal width
-      // All 5 clouds are implemented so it shows "all clouds"
+      // All 5 clouds are implemented so it shows "all clouds supported"
       expect(output).toContain("Claude Code");
-      expect(output).toContain("all clouds");
+      expect(output).toContain("all clouds supported");
       // 5 out of 5 (1 agent x 5 clouds, all implemented)
       expect(output).toContain("5/5");
     });
