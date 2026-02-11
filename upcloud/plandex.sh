@@ -19,7 +19,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${UPCLOUD_SERVER_IP}"
 install_base_tools "${UPCLOUD_SERVER_IP}"
 
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 run_server "${UPCLOUD_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | bash"
 
 if ! run_server "${UPCLOUD_SERVER_IP}" "command -v plandex &> /dev/null && plandex version &> /dev/null"; then
@@ -35,7 +35,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${UPCLOUD_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -44,7 +44,7 @@ log_info "UpCloud server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (UUID: ${UPCLOUD_SERVER_UUID}, IP: ${UPCLOUD_SERVER_IP})"
 echo ""
 
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "${UPCLOUD_SERVER_IP}" "source ~/.zshrc && plandex"

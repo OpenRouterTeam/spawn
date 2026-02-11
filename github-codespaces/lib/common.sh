@@ -30,7 +30,7 @@ ensure_gh_cli() {
         return 0
     fi
 
-    log_warn "Installing GitHub CLI (gh)..."
+    log_step "Installing GitHub CLI (gh)..."
 
     # Detect OS and install accordingly
     if [[ "$OSTYPE" == "darwin"* ]]; then

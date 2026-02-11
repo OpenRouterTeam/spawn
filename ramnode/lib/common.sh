@@ -404,7 +404,7 @@ create_server() {
     local userdata
     userdata=$(get_cloud_init_userdata | base64 -w 0 || get_cloud_init_userdata | base64)
 
-    log_warn "Creating RamNode instance '$name' (flavor: $flavor)..."
+    log_step "Creating RamNode instance '$name' (flavor: $flavor)..."
 
     local body
     body=$(_ramnode_build_server_body "$name" "$flavor" "$image_id" "$key_name" "$userdata" "${network_id:-}")
@@ -428,7 +428,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local server_id="$1"
 
-    log_warn "Destroying server $server_id..."
+    log_step "Destroying server $server_id..."
     local response
     response=$(ramnode_compute_api DELETE "/servers/$server_id")
 

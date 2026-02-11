@@ -12,20 +12,20 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
 wait_for_cloud_init "${LINODE_SERVER_IP}" 60
-log_warn "Installing Goose..."
+log_step "Installing Goose..."
 run_server "${LINODE_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 log_info "Goose installed"
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${LINODE_SERVER_IP}" upload_file run_server \
     "GOOSE_PROVIDER=openrouter" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 echo ""
 log_info "Linode setup completed successfully!"
 echo ""
-log_warn "Starting Goose..."
+log_step "Starting Goose..."
 sleep 1
 clear
 interactive_session "${LINODE_SERVER_IP}" "source ~/.zshrc && goose"

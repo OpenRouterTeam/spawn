@@ -20,7 +20,7 @@ PROJECT_NAME=$(get_project_name)
 create_server "${SERVICE_NAME}"
 wait_for_cloud_init
 
-log_warn "Installing Gemini CLI..."
+log_step "Installing Gemini CLI..."
 run_server "export PATH=\"\$HOME/.bun/bin:\$PATH\" && npm install -g @google/gemini-cli"
 
 echo ""
@@ -30,7 +30,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_northflank \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -41,7 +41,7 @@ echo ""
 log_info "Northflank setup completed successfully!"
 echo ""
 
-log_warn "Starting Gemini..."
+log_step "Starting Gemini..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && gemini"

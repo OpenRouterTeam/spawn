@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install plandex
-log_warn "Installing plandex..."
+log_step "Installing plandex..."
 run_server "curl -sL https://plandex.ai/install.sh | bash"
 log_info "plandex installed"
 
@@ -60,7 +60,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start plandex interactively
-log_warn "Starting plandex..."
+log_step "Starting plandex..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

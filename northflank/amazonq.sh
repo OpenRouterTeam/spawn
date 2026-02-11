@@ -21,7 +21,7 @@ PROJECT_NAME=$(get_project_name)
 create_server "${SERVICE_NAME}"
 wait_for_cloud_init
 
-log_warn "Installing Amazon Q CLI..."
+log_step "Installing Amazon Q CLI..."
 run_server "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 
 echo ""
@@ -31,7 +31,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_northflank \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -41,7 +41,7 @@ echo ""
 log_info "Northflank service setup completed successfully!"
 echo ""
 
-log_warn "Starting Amazon Q..."
+log_step "Starting Amazon Q..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && q chat"

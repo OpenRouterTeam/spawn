@@ -33,7 +33,7 @@ verify_server_connectivity "${GCP_SERVER_IP}"
 wait_for_cloud_init "${GCP_SERVER_IP}" 60
 
 # 5. Install openclaw via bun
-log_warn "Installing openclaw..."
+log_step "Installing openclaw..."
 run_server "${GCP_SERVER_IP}" "source ~/.bashrc && bun install -g openclaw"
 log_info "OpenClaw installed"
 
@@ -49,7 +49,7 @@ fi
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
 # 8. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -66,7 +66,7 @@ log_info "Instance: ${GCP_INSTANCE_NAME_ACTUAL} (Zone: ${GCP_ZONE}, IP: ${GCP_SE
 echo ""
 
 # 10. Start openclaw gateway in background and launch TUI
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 run_server "${GCP_SERVER_IP}" "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
 interactive_session "${GCP_SERVER_IP}" "source ~/.zshrc && openclaw tui"

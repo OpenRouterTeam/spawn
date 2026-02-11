@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install kilocode
-log_warn "Installing Kilo Code..."
+log_step "Installing Kilo Code..."
 run_server "curl -fsSL https://bun.sh/install | bash && export PATH=\"\$HOME/.bun/bin:\$PATH\" && bun install -g @kilocode/cli"
 log_info "Kilo Code installed"
 
@@ -37,7 +37,7 @@ else
 fi
 
 # 6. Inject environment variables into shell config
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "KILO_PROVIDER_TYPE=openrouter" \
@@ -51,7 +51,7 @@ log_info "Project: $SERVER_NAME"
 echo ""
 
 # 7. Start kilocode interactively
-log_warn "Starting Kilo Code..."
+log_step "Starting Kilo Code..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && kilocode"

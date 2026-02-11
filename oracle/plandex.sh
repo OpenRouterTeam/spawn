@@ -32,7 +32,7 @@ verify_server_connectivity "${OCI_SERVER_IP}"
 wait_for_cloud_init "${OCI_SERVER_IP}" 60
 
 # 5. Install Plandex
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 run_server "${OCI_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | bash"
 
 # Verify installation succeeded
@@ -52,7 +52,7 @@ else
 fi
 
 # 7. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${OCI_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -62,7 +62,7 @@ log_info "Instance: ${OCI_INSTANCE_NAME_ACTUAL} (IP: ${OCI_SERVER_IP})"
 echo ""
 
 # 8. Start Plandex interactively
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "${OCI_SERVER_IP}" "source ~/.zshrc && plandex"

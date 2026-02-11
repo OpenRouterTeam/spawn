@@ -28,9 +28,9 @@ verify_server_connectivity "${IONOS_SERVER_IP}"
 wait_for_cloud_init "${IONOS_SERVER_IP}" 60
 
 # 5. Verify Goose is installed (fallback to manual install)
-log_warn "Verifying Goose installation..."
+log_step "Verifying Goose installation..."
 if ! run_server "${IONOS_SERVER_IP}" "command -v goose" >/dev/null 2>&1; then
-    log_warn "Goose not found, installing manually..."
+    log_step "Goose not found, installing manually..."
     run_server "${IONOS_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 fi
 
@@ -50,7 +50,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5182)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "GOOSE_PROVIDER=openrouter"
@@ -61,7 +61,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP}
 echo ""
 
 # 7. Start Goose interactively
-log_warn "Starting Goose..."
+log_step "Starting Goose..."
 sleep 1
 clear
 interactive_session "${IONOS_SERVER_IP}" "source ~/.zshrc && goose"

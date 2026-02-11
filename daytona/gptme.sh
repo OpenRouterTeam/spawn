@@ -26,7 +26,7 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # 4. Install gptme
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_server "pip install gptme 2>/dev/null || pip3 install gptme"
 log_info "gptme installed"
 
@@ -46,7 +46,7 @@ MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
 
 # 7. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -57,7 +57,7 @@ log_info "Sandbox: ${SERVER_NAME} (ID: ${DAYTONA_SANDBOX_ID})"
 echo ""
 
 # 8. Start gptme interactively
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 interactive_session "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"

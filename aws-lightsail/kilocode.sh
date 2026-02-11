@@ -30,7 +30,7 @@ verify_server_connectivity "${LIGHTSAIL_SERVER_IP}"
 wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}" 60
 
 # 5. Install Kilo Code
-log_warn "Installing Kilo Code..."
+log_step "Installing Kilo Code..."
 run_server "${LIGHTSAIL_SERVER_IP}" "npm install -g @kilocode/cli"
 log_info "Kilo Code installed"
 
@@ -43,7 +43,7 @@ else
 fi
 
 # 7. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${LIGHTSAIL_INSTANCE_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -56,7 +56,7 @@ log_info "Instance: ${SERVER_NAME} (IP: ${LIGHTSAIL_SERVER_IP})"
 echo ""
 
 # 8. Start Kilo Code interactively
-log_warn "Starting Kilo Code..."
+log_step "Starting Kilo Code..."
 sleep 1
 clear
 interactive_session "${LIGHTSAIL_SERVER_IP}" "source ~/.zshrc && kilocode"

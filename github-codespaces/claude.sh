@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install Claude Code
-log_warn "Installing Claude Code..."
+log_step "Installing Claude Code..."
 run_server "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation

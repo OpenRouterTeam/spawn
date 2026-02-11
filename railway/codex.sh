@@ -22,11 +22,11 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # Install Node.js and npm if needed
-log_warn "Installing Node.js and npm..."
+log_step "Installing Node.js and npm..."
 run_server "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs"
 
 # Install Codex CLI
-log_warn "Installing Codex CLI..."
+log_step "Installing Codex CLI..."
 run_server "npm install -g @openai/codex"
 
 # Get OpenRouter API key via OAuth
@@ -48,7 +48,7 @@ log_info "Railway service setup completed successfully!"
 echo ""
 
 # Start Codex interactively
-log_warn "Starting Codex..."
+log_step "Starting Codex..."
 sleep 1
 clear
 interactive_session "bash -c 'source ~/.bashrc && codex'"

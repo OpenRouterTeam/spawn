@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install goose
-log_warn "Installing goose..."
+log_step "Installing goose..."
 run_server "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 log_info "goose installed"
 
@@ -61,7 +61,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start goose interactively
-log_warn "Starting goose..."
+log_step "Starting goose..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

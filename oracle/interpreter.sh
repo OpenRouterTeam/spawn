@@ -33,7 +33,7 @@ verify_server_connectivity "${OCI_SERVER_IP}"
 wait_for_cloud_init "${OCI_SERVER_IP}" 60
 
 # 5. Install Open Interpreter
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_server "${OCI_SERVER_IP}" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 log_info "Open Interpreter installed"
 
@@ -46,7 +46,7 @@ else
 fi
 
 # 7. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${OCI_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -58,7 +58,7 @@ log_info "Instance: ${OCI_INSTANCE_NAME_ACTUAL} (IP: ${OCI_SERVER_IP})"
 echo ""
 
 # 8. Start Open Interpreter
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "${OCI_SERVER_IP}" "source ~/.zshrc && interpreter"

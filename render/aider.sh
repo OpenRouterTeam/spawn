@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Aider
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "pip install aider-chat"
 
 # Verify installation
@@ -48,7 +48,7 @@ MODEL_ID=$(safe_read "Enter model ID (default: openrouter/auto): ")
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
 
 # 7. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -60,7 +60,7 @@ log_info "Service: $RENDER_SERVICE_NAME (ID: $RENDER_SERVICE_ID)"
 echo ""
 
 # 8. Start Aider interactively
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "source /root/.bashrc && aider --model openrouter/\${MODEL_ID}"

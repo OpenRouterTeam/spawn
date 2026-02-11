@@ -38,11 +38,11 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install dependencies and nanoclaw
-log_warn "Installing Node.js dependencies..."
+log_step "Installing Node.js dependencies..."
 run_server "npm install -g tsx"
 log_info "tsx installed"
 
-log_warn "Cloning and building nanoclaw..."
+log_step "Cloning and building nanoclaw..."
 run_server "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
 log_info "nanoclaw installed"
 
@@ -61,7 +61,7 @@ inject_env_vars \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 7. Create nanoclaw .env file
-log_warn "Configuring nanoclaw..."
+log_step "Configuring nanoclaw..."
 DOTENV_TEMP=$(mktemp)
 chmod 600 "${DOTENV_TEMP}"
 track_temp_file "${DOTENV_TEMP}"
@@ -79,7 +79,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 8. Start nanoclaw
-log_warn "Starting nanoclaw..."
+log_step "Starting nanoclaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""

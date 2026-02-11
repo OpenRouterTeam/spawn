@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Cline
-log_warn "Installing Cline..."
+log_step "Installing Cline..."
 run_server "npm install -g cline"
 log_info "Cline installed"
 
@@ -37,7 +37,7 @@ else
 fi
 
 # 6. Inject environment variables into ~/.bashrc and ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_fly \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -51,7 +51,7 @@ log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
 echo ""
 
 # 7. Start Cline interactively
-log_warn "Starting Cline..."
+log_step "Starting Cline..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && cline"

@@ -12,7 +12,7 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
 wait_for_cloud_init "${LINODE_SERVER_IP}" 60
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 run_server "${LINODE_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | bash"
 if ! run_server "${LINODE_SERVER_IP}" "command -v plandex &> /dev/null && plandex version &> /dev/null"; then
     log_error "Plandex installation verification failed"
@@ -22,13 +22,13 @@ log_info "Plandex installed"
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${LINODE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 echo ""
 log_info "Linode setup completed successfully!"
 echo ""
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "${LINODE_SERVER_IP}" "source ~/.zshrc && plandex"

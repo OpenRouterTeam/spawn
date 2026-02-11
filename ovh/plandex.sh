@@ -33,7 +33,7 @@ verify_server_connectivity "${OVH_SERVER_IP}"
 install_base_deps "${OVH_SERVER_IP}"
 
 # 7. Install Plandex
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 run_ovh "${OVH_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | bash"
 
 # Verify installation succeeded
@@ -52,7 +52,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ovh "${OVH_SERVER_IP}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -62,7 +62,7 @@ log_info "Instance: ${SERVER_NAME} (ID: ${OVH_INSTANCE_ID}, IP: ${OVH_SERVER_IP}
 echo ""
 
 # 9. Start Plandex interactively
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "${OVH_SERVER_IP}" "source ~/.zshrc && plandex"

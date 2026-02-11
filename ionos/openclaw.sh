@@ -28,7 +28,7 @@ verify_server_connectivity "${IONOS_SERVER_IP}"
 wait_for_cloud_init "${IONOS_SERVER_IP}" 60
 
 # 5. Install openclaw using bun
-log_warn "Installing openclaw..."
+log_step "Installing openclaw..."
 if ! run_server "${IONOS_SERVER_IP}" "command -v openclaw" >/dev/null 2>&1; then
     run_server "${IONOS_SERVER_IP}" "bun install -g openclaw"
 fi
@@ -52,7 +52,7 @@ fi
 # 7. Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "openclaw") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -69,11 +69,11 @@ log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP}
 echo ""
 
 # 9. Start openclaw interactively
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 log_info "First starting openclaw gateway in background..."
 run_server "${IONOS_SERVER_IP}" "nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
-log_warn "Starting openclaw tui..."
+log_step "Starting openclaw tui..."
 sleep 1
 clear
 interactive_session "${IONOS_SERVER_IP}" "source ~/.zshrc && openclaw tui"

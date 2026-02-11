@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install cline
-log_warn "Installing cline..."
+log_step "Installing cline..."
 run_server "npm install -g cline"
 log_info "cline installed"
 
@@ -62,7 +62,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start cline interactively
-log_warn "Starting cline..."
+log_step "Starting cline..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

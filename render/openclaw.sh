@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Bun
-log_warn "Installing Bun..."
+log_step "Installing Bun..."
 run_server "curl -fsSL https://bun.sh/install | bash"
 
 # Verify Bun installation
@@ -35,7 +35,7 @@ fi
 log_info "Bun installed"
 
 # 5. Install openclaw using Bun
-log_warn "Installing openclaw..."
+log_step "Installing openclaw..."
 run_server "/root/.bun/bin/bun install -g openclaw"
 
 # 6. Get OpenRouter API key
@@ -50,7 +50,7 @@ fi
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
 # 8. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -67,7 +67,7 @@ log_info "Service: $RENDER_SERVICE_NAME (ID: $RENDER_SERVICE_ID)"
 echo ""
 
 # 10. Start openclaw
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 log_info "Starting gateway in background, then launching TUI..."
 sleep 1
 clear

@@ -27,7 +27,7 @@ fi
 
 ensure_northflank_cli() {
     if ! command -v northflank &>/dev/null; then
-        log_warn "Installing Northflank CLI..."
+        log_step "Installing Northflank CLI..."
         npm install -g @northflank/cli 2>/dev/null || {
             log_error "Failed to install Northflank CLI. Install manually: npm install -g @northflank/cli"
             return 1
@@ -75,7 +75,7 @@ _northflank_wait_for_service() {
     local max_attempts="${3:-60}"
     local attempt=1
 
-    log_warn "Waiting for service to start..."
+    log_step "Waiting for service to start..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         local status
         status=$(northflank get service --name "${name}" --project "${project_name}" 2>/dev/null | grep -i "status" || true)
@@ -84,7 +84,7 @@ _northflank_wait_for_service() {
             return 0
         fi
 
-        log_warn "Waiting for service to start (${attempt}/${max_attempts})..."
+        log_step "Waiting for service to start (${attempt}/${max_attempts})..."
         sleep 3
         attempt=$((attempt + 1))
     done
@@ -98,7 +98,7 @@ create_server() {
     local image="${NORTHFLANK_IMAGE:-ubuntu:24.04}"
     local project_name="${NORTHFLANK_PROJECT_NAME:-spawn-project}"
 
-    log_warn "Creating Northflank project '${project_name}'..."
+    log_step "Creating Northflank project '${project_name}'..."
 
     # Create project (idempotent - won't fail if exists)
     northflank create project \
@@ -108,7 +108,7 @@ create_server() {
     log_info "Project '${project_name}' ready"
     export NORTHFLANK_PROJECT_NAME="${project_name}"
 
-    log_warn "Creating service '${name}' with image: ${image}"
+    log_step "Creating service '${name}' with image: ${image}"
 
     # Create deployment service with Docker image
     local service_output
@@ -132,7 +132,7 @@ create_server() {
 }
 
 wait_for_cloud_init() {
-    log_warn "Installing base tools in container..."
+    log_step "Installing base tools in container..."
 
     # Update package lists and install essentials
     run_server "apt-get update -y && apt-get install -y curl git unzip python3 pip" >/dev/null 2>&1 || true
@@ -202,7 +202,7 @@ destroy_server() {
     local service_name="${1:-${NORTHFLANK_SERVICE_NAME}}"
     local project_name="${NORTHFLANK_PROJECT_NAME}"
 
-    log_warn "Destroying service '${service_name}'..."
+    log_step "Destroying service '${service_name}'..."
 
     northflank delete service \
         --name "${service_name}" \

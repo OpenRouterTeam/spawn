@@ -32,7 +32,7 @@ fi
 wait_for_cloud_init
 
 # 4. Install Aider
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 log_info "Aider installed"
 
@@ -52,7 +52,7 @@ MODEL_ID=$(safe_read "Enter model ID [openrouter/auto]: ") || MODEL_ID=""
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
 
 # 7. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -62,7 +62,7 @@ log_info "Sandbox: ${SERVER_NAME} (ID: ${MODAL_SANDBOX_ID})"
 echo ""
 
 # 8. Start Aider interactively
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

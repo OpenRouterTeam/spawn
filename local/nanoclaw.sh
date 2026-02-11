@@ -20,14 +20,14 @@ if ! command -v npm &>/dev/null; then
     if command -v bun &>/dev/null; then
         log_info "Using bun as package manager"
     else
-        log_warn "Installing bun..."
+        log_step "Installing bun..."
         curl -fsSL https://bun.sh/install | bash
         export PATH="${HOME}/.bun/bin:${PATH}"
     fi
 fi
 
 # 3. Install tsx dependency
-log_warn "Installing tsx..."
+log_step "Installing tsx..."
 if command -v bun &>/dev/null; then
     bun install -g tsx
 elif command -v npm &>/dev/null; then
@@ -38,7 +38,7 @@ fi
 if [[ -d "${HOME}/nanoclaw" ]]; then
     log_info "NanoClaw already cloned"
 else
-    log_warn "Cloning nanoclaw..."
+    log_step "Cloning nanoclaw..."
     git clone https://github.com/gavrielc/nanoclaw.git "${HOME}/nanoclaw"
     cd "${HOME}/nanoclaw" && npm install && npm run build
 fi
@@ -59,7 +59,7 @@ inject_env_vars_local upload_file run_server \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 7. Create nanoclaw .env file
-log_warn "Configuring nanoclaw..."
+log_step "Configuring nanoclaw..."
 DOTENV_TEMP=$(mktemp)
 chmod 600 "${DOTENV_TEMP}"
 track_temp_file "${DOTENV_TEMP}"
@@ -71,7 +71,7 @@ log_info "Local setup completed successfully!"
 echo ""
 
 # 8. Start nanoclaw
-log_warn "Starting nanoclaw..."
+log_step "Starting nanoclaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 source ~/.zshrc 2>/dev/null || true

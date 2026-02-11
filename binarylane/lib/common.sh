@@ -117,7 +117,7 @@ get_server_name() {
 # Poll the BinaryLane API until the server becomes active and has an IP
 # Sets BINARYLANE_SERVER_IP on success
 _binarylane_wait_for_active() {
-    log_warn "Waiting for server to become active..."
+    log_step "Waiting for server to become active..."
     local max_attempts=60
     local attempt=1
     while [[ "$attempt" -le "$max_attempts" ]]; do
@@ -204,7 +204,7 @@ create_server() {
     validate_region_name "$region" || { log_error "Invalid BINARYLANE_REGION"; return 1; }
     validate_resource_name "$image" || { log_error "Invalid BINARYLANE_IMAGE"; return 1; }
 
-    log_warn "Creating BinaryLane server '$name' (size: $size, region: $region, image: $image)..."
+    log_step "Creating BinaryLane server '$name' (size: $size, region: $region, image: $image)..."
 
     # Get all SSH key IDs
     local ssh_keys_response
@@ -233,7 +233,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_id="$1"
-    log_warn "Destroying server $server_id..."
+    log_step "Destroying server $server_id..."
     binarylane_api DELETE "/servers/$server_id"
     log_info "Server $server_id destroyed"
 }

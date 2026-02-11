@@ -145,7 +145,7 @@ wait_for_command() {
     local timeout="${2:-$KAMATERA_COMMAND_TIMEOUT}"
 
     local elapsed=0
-    log_warn "Waiting for Kamatera command to complete (timeout: ${timeout}s)..."
+    log_step "Waiting for Kamatera command to complete (timeout: ${timeout}s)..."
 
     while [[ "$elapsed" -lt "$timeout" ]]; do
         local queue_response
@@ -245,7 +245,7 @@ get_kamatera_server_ip() {
             return 0
         fi
 
-        log_warn "Waiting for server IP... (attempt $attempt/$max_attempts)"
+        log_step "Waiting for server IP... (attempt $attempt/$max_attempts)"
         sleep "$INSTANCE_STATUS_POLL_DELAY"
         attempt=$((attempt + 1))
     done
@@ -373,7 +373,7 @@ create_server() {
 
     validate_kamatera_params "$datacenter" "$cpu" "$ram" "$disk" "$image" "$billing" || return 1
 
-    log_warn "Creating Kamatera server '$name' (datacenter: $datacenter, cpu: $cpu, ram: ${ram}MB)..."
+    log_step "Creating Kamatera server '$name' (datacenter: $datacenter, cpu: $cpu, ram: ${ram}MB)..."
 
     local password ssh_key script_content body
     password=$(generate_server_password)

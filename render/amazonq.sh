@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Amazon Q CLI
-log_warn "Installing Amazon Q CLI..."
+log_step "Installing Amazon Q CLI..."
 run_server "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 
 # Verify installation
@@ -43,7 +43,7 @@ else
 fi
 
 # 6. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -57,7 +57,7 @@ log_info "Service: $RENDER_SERVICE_NAME (ID: $RENDER_SERVICE_ID)"
 echo ""
 
 # 7. Start Amazon Q interactively
-log_warn "Starting Amazon Q..."
+log_step "Starting Amazon Q..."
 sleep 1
 clear
 interactive_session "source /root/.bashrc && q chat"

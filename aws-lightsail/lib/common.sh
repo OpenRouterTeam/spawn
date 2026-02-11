@@ -95,7 +95,7 @@ _wait_for_lightsail_instance() {
     local max_attempts=${2:-60}
     local attempt=1
 
-    log_warn "Waiting for instance to become running..."
+    log_step "Waiting for instance to become running..."
     while [[ ${attempt} -le ${max_attempts} ]]; do
         local state
         state=$(aws lightsail get-instance --instance-name "${name}" \
@@ -128,7 +128,7 @@ create_server() {
     validate_resource_name "${bundle}" || { log_error "Invalid LIGHTSAIL_BUNDLE"; return 1; }
     validate_region_name "${region}" || { log_error "Invalid AWS_DEFAULT_REGION"; return 1; }
 
-    log_warn "Creating Lightsail instance '${name}' (bundle: ${bundle}, AZ: ${az})..."
+    log_step "Creating Lightsail instance '${name}' (bundle: ${bundle}, AZ: ${az})..."
 
     local userdata
     userdata=$(get_cloud_init_userdata)
@@ -173,7 +173,7 @@ wait_for_cloud_init() {
 
 destroy_server() {
     local name="${1}"
-    log_warn "Destroying Lightsail instance ${name}..."
+    log_step "Destroying Lightsail instance ${name}..."
     aws lightsail delete-instance --instance-name "${name}" >/dev/null
     log_info "Instance ${name} destroyed"
 }

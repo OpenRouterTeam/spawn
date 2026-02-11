@@ -26,7 +26,7 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # 4. Install Claude Code
-log_warn "Installing Claude Code..."
+log_step "Installing Claude Code..."
 run_server "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation
@@ -45,7 +45,7 @@ else
 fi
 
 # 6. Inject environment variables into shell configs
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_northflank \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -66,7 +66,7 @@ log_info "Service: ${SERVER_NAME} (Project: ${NORTHFLANK_PROJECT_NAME})"
 echo ""
 
 # 8. Start Claude Code interactively
-log_warn "Starting Claude Code..."
+log_step "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "export PATH=\$HOME/.local/bin:\$PATH && source ~/.bashrc && claude"

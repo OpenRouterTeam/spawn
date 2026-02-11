@@ -33,7 +33,7 @@ verify_server_connectivity "${OCI_SERVER_IP}"
 wait_for_cloud_init "${OCI_SERVER_IP}" 60
 
 # 5. Install Amazon Q CLI
-log_warn "Installing Amazon Q CLI..."
+log_step "Installing Amazon Q CLI..."
 run_server "${OCI_SERVER_IP}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 log_info "Amazon Q CLI installed"
 
@@ -46,7 +46,7 @@ else
 fi
 
 # 7. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${OCI_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -59,7 +59,7 @@ log_info "Instance: ${OCI_INSTANCE_NAME_ACTUAL} (IP: ${OCI_SERVER_IP})"
 echo ""
 
 # 8. Start Amazon Q interactively
-log_warn "Starting Amazon Q..."
+log_step "Starting Amazon Q..."
 sleep 1
 clear
 interactive_session "${OCI_SERVER_IP}" "source ~/.zshrc && q chat"

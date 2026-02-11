@@ -20,7 +20,7 @@ PROJECT_NAME=$(get_project_name)
 create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_server "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 
 echo ""
@@ -30,7 +30,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_northflank \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -40,7 +40,7 @@ echo ""
 log_info "Northflank setup completed successfully!"
 echo ""
 
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && interpreter"

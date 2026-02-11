@@ -29,9 +29,9 @@ verify_server_connectivity
 install_base_tools
 
 # 5. Verify Claude Code is installed (fallback to manual install)
-log_warn "Verifying Claude Code installation..."
+log_step "Verifying Claude Code installation..."
 if ! run_server "${RUNPOD_POD_ID}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_warn "Claude Code not found, installing manually..."
+    log_step "Claude Code not found, installing manually..."
     run_server "${RUNPOD_POD_ID}" "curl -fsSL https://claude.ai/install.sh | bash"
 fi
 log_info "Claude Code is installed"
@@ -45,7 +45,7 @@ else
 fi
 
 # 7. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${RUNPOD_POD_ID}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
@@ -65,7 +65,7 @@ log_info "Pod: ${SERVER_NAME} (ID: ${RUNPOD_POD_ID})"
 echo ""
 
 # 9. Start Claude Code interactively
-log_warn "Starting Claude Code..."
+log_step "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${RUNPOD_POD_ID}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"

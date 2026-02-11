@@ -19,10 +19,10 @@ create_ovh_instance "${SERVER_NAME}"
 wait_for_ovh_instance "${OVH_INSTANCE_ID}"
 verify_server_connectivity "${OVH_SERVER_IP}"
 
-log_warn "Installing base dependencies..."
+log_step "Installing base dependencies..."
 install_base_deps "${OVH_SERVER_IP}"
 
-log_warn "Installing Continue CLI..."
+log_step "Installing Continue CLI..."
 run_ovh "${OVH_SERVER_IP}" "npm install -g @continuedev/cli"
 
 echo ""
@@ -32,7 +32,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ovh "${OVH_SERVER_IP}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -44,7 +44,7 @@ echo ""
 log_info "OVHcloud instance setup completed successfully!"
 echo ""
 
-log_warn "Starting Continue CLI in TUI mode..."
+log_step "Starting Continue CLI in TUI mode..."
 sleep 1
 clear
 interactive_session "${OVH_SERVER_IP}" "zsh -c 'source ~/.zshrc && cn'"

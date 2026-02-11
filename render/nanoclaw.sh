@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Node.js and dependencies
-log_warn "Installing Node.js..."
+log_step "Installing Node.js..."
 run_server "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs"
 
 # Verify Node.js installation
@@ -35,11 +35,11 @@ fi
 log_info "Node.js installed"
 
 # 5. Install tsx globally
-log_warn "Installing tsx..."
+log_step "Installing tsx..."
 run_server "npm install -g tsx"
 
 # 6. Clone and build nanoclaw
-log_warn "Cloning nanoclaw..."
+log_step "Cloning nanoclaw..."
 run_server "git clone https://github.com/gavrielc/nanoclaw.git /root/nanoclaw && cd /root/nanoclaw && npm install && npm run build"
 
 # 7. Get OpenRouter API key
@@ -51,7 +51,7 @@ else
 fi
 
 # 8. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -59,7 +59,7 @@ inject_env_vars \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 9. Create nanoclaw .env file safely via temp file
-log_warn "Configuring nanoclaw..."
+log_step "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
 chmod 600 "$DOTENV_TEMP"
@@ -74,7 +74,7 @@ log_info "Service: $RENDER_SERVICE_NAME (ID: $RENDER_SERVICE_ID)"
 echo ""
 
 # 10. Start nanoclaw
-log_warn "Starting nanoclaw..."
+log_step "Starting nanoclaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
 sleep 1
 clear

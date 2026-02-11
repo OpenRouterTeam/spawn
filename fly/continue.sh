@@ -18,7 +18,7 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
-log_warn "Installing Continue CLI..."
+log_step "Installing Continue CLI..."
 run_server "npm install -g @continuedev/cli"
 
 echo ""
@@ -28,7 +28,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_fly \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -38,7 +38,7 @@ echo ""
 log_info "Fly.io setup completed successfully!"
 echo ""
 
-log_warn "Starting Continue CLI in TUI mode..."
+log_step "Starting Continue CLI in TUI mode..."
 sleep 1
 clear
 interactive_session "source ~/.zshrc && cn"

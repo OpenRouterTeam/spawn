@@ -12,13 +12,13 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${LINODE_SERVER_IP}"
 wait_for_cloud_init "${LINODE_SERVER_IP}" 60
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_server "${LINODE_SERVER_IP}" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 log_info "Open Interpreter installed"
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then log_info "Using OpenRouter API key from environment"
 else OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180); fi
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${LINODE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -26,7 +26,7 @@ inject_env_vars_ssh "${LINODE_SERVER_IP}" upload_file run_server \
 echo ""
 log_info "Linode setup completed successfully!"
 echo ""
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "${LINODE_SERVER_IP}" "source ~/.zshrc && interpreter"

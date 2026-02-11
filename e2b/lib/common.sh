@@ -27,7 +27,7 @@ fi
 
 ensure_e2b_cli() {
     if ! command -v e2b &>/dev/null; then
-        log_warn "Installing E2B CLI..."
+        log_step "Installing E2B CLI..."
         npm install -g @e2b/cli 2>/dev/null || {
             log_error "Failed to install E2B CLI. Install manually: npm install -g @e2b/cli"
             return 1
@@ -72,7 +72,7 @@ create_server() {
     local name="${1}"
     local template="${E2B_TEMPLATE:-base}"
 
-    log_warn "Creating E2B sandbox '${name}' (template: ${template})..."
+    log_step "Creating E2B sandbox '${name}' (template: ${template})..."
 
     # Create sandbox and capture ID
     local output
@@ -94,7 +94,7 @@ create_server() {
 }
 
 wait_for_cloud_init() {
-    log_warn "Installing base tools in sandbox..."
+    log_step "Installing base tools in sandbox..."
     run_server "apt-get update -y && apt-get install -y curl unzip git zsh" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
@@ -138,7 +138,7 @@ interactive_session() {
 
 destroy_server() {
     local sandbox_id="${1:-${E2B_SANDBOX_ID}}"
-    log_warn "Destroying sandbox ${sandbox_id}..."
+    log_step "Destroying sandbox ${sandbox_id}..."
     e2b sandbox kill "${sandbox_id}" 2>/dev/null || true
     log_info "Sandbox destroyed"
 }

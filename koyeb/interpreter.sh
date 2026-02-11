@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Open Interpreter
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_server "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 log_info "Open Interpreter installed"
 
@@ -37,7 +37,7 @@ else
 fi
 
 # 6. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -51,7 +51,7 @@ log_info "Service: $KOYEB_SERVICE_NAME (Instance: $KOYEB_INSTANCE_ID)"
 echo ""
 
 # 7. Start Open Interpreter interactively
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "source /root/.bashrc && interpreter"

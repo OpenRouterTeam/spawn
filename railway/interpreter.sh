@@ -22,7 +22,7 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # Install Open Interpreter
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_server "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 
 # Get OpenRouter API key via OAuth
@@ -44,7 +44,7 @@ log_info "Railway service setup completed successfully!"
 echo ""
 
 # Start Open Interpreter interactively
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "bash -c 'source ~/.bashrc && interpreter'"

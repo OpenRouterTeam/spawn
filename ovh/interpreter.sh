@@ -33,7 +33,7 @@ verify_server_connectivity "${OVH_SERVER_IP}"
 install_base_deps "${OVH_SERVER_IP}"
 
 # 7. Install Open Interpreter
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_ovh "${OVH_SERVER_IP}" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 log_info "Open Interpreter installed"
 
@@ -45,7 +45,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ovh "${OVH_SERVER_IP}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -57,7 +57,7 @@ log_info "Instance: ${SERVER_NAME} (ID: ${OVH_INSTANCE_ID}, IP: ${OVH_SERVER_IP}
 echo ""
 
 # 9. Start Open Interpreter interactively
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "${OVH_SERVER_IP}" "source ~/.zshrc && interpreter"

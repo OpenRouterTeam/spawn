@@ -28,7 +28,7 @@ verify_server_connectivity "${CHERRY_SERVER_IP}"
 wait_for_cloud_init "${CHERRY_SERVER_IP}" 60
 
 # 5. Install Open Interpreter
-log_warn "Installing Open Interpreter..."
+log_step "Installing Open Interpreter..."
 run_server "${CHERRY_SERVER_IP}" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 log_info "Open Interpreter installed"
 
@@ -40,7 +40,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CHERRY_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -52,7 +52,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${CHERRY_SERVER_ID}, IP: ${CHERRY_SERVER_I
 echo ""
 
 # 7. Start Open Interpreter interactively
-log_warn "Starting Open Interpreter..."
+log_step "Starting Open Interpreter..."
 sleep 1
 clear
 interactive_session "${CHERRY_SERVER_IP}" "source ~/.zshrc && interpreter"

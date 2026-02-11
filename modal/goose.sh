@@ -32,7 +32,7 @@ fi
 wait_for_cloud_init
 
 # 4. Install Goose
-log_warn "Installing Goose..."
+log_step "Installing Goose..."
 run_server "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 log_info "Goose installed"
 
@@ -45,7 +45,7 @@ else
 fi
 
 # 6. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_local upload_file run_server \
     "GOOSE_PROVIDER=openrouter" \
@@ -57,7 +57,7 @@ log_info "Sandbox: ${SERVER_NAME} (ID: ${MODAL_SANDBOX_ID})"
 echo ""
 
 # 7. Start Goose interactively
-log_warn "Starting Goose..."
+log_step "Starting Goose..."
 sleep 1
 clear
 interactive_session "source ~/.zshrc && goose"

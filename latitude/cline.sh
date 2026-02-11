@@ -20,7 +20,7 @@ wait_for_server_ready "${LATITUDE_SERVER_ID}" 60
 verify_server_connectivity "${LATITUDE_SERVER_IP}"
 install_base_tools "${LATITUDE_SERVER_IP}"
 
-log_warn "Installing Cline..."
+log_step "Installing Cline..."
 run_server "${LATITUDE_SERVER_IP}" "npm install -g cline"
 log_info "Cline installed"
 
@@ -31,7 +31,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${LATITUDE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -42,7 +42,7 @@ log_info "Latitude.sh server setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${LATITUDE_SERVER_ID}, IP: ${LATITUDE_SERVER_IP})"
 echo ""
 
-log_warn "Starting Cline..."
+log_step "Starting Cline..."
 sleep 1
 clear
 interactive_session "${LATITUDE_SERVER_IP}" "source ~/.zshrc && cline"

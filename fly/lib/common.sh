@@ -47,7 +47,7 @@ ensure_fly_cli() {
         return 0
     fi
 
-    log_warn "Installing flyctl CLI..."
+    log_step "Installing flyctl CLI..."
     curl -L https://fly.io/install.sh | sh 2>/dev/null || {
         log_error "Failed to install flyctl CLI"
         log_error "Install manually: curl -L https://fly.io/install.sh | sh"
@@ -170,7 +170,7 @@ _fly_create_app() {
         return 1
     fi
 
-    log_warn "Creating Fly.io app '$name'..."
+    log_step "Creating Fly.io app '$name'..."
     # SECURITY: Use json_escape to prevent JSON injection
     local app_body
     app_body=$(printf '{"app_name":%s,"org_slug":%s}' "$(json_escape "$name")" "$(json_escape "$org")")
@@ -203,7 +203,7 @@ _fly_create_machine() {
     local region="$2"
     local vm_memory="$3"
 
-    log_warn "Creating Fly.io machine (region: $region, memory: ${vm_memory}MB)..."
+    log_step "Creating Fly.io machine (region: $region, memory: ${vm_memory}MB)..."
 
     # SECURITY: Pass values via environment variables to prevent Python injection
     local machine_body
@@ -257,7 +257,7 @@ _fly_wait_for_machine_start() {
     local max_attempts="${3:-30}"
     local attempt=1
 
-    log_warn "Waiting for machine to start..."
+    log_step "Waiting for machine to start..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
         local status_response
         status_response=$(fly_api GET "/apps/$name/machines/$machine_id")
@@ -297,7 +297,7 @@ create_server() {
 
 # Wait for base tools to be installed (Fly.io uses bare Ubuntu image)
 wait_for_cloud_init() {
-    log_warn "Installing base tools on Fly.io machine..."
+    log_step "Installing base tools on Fly.io machine..."
     run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 pip" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
     run_server 'echo "export PATH=\"\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' >/dev/null 2>&1 || true
@@ -349,7 +349,7 @@ interactive_session() {
 destroy_server() {
     local app_name="${1:-$FLY_APP_NAME}"
 
-    log_warn "Destroying Fly.io app and machines for '$app_name'..."
+    log_step "Destroying Fly.io app and machines for '$app_name'..."
 
     # List and destroy all machines in the app
     local machines=$(fly_api GET "/apps/$app_name/machines")
@@ -362,10 +362,10 @@ if isinstance(data, list):
 " 2>/dev/null || true)
 
     for mid in $machine_ids; do
-        log_warn "Stopping machine $mid..."
+        log_step "Stopping machine $mid..."
         fly_api POST "/apps/$app_name/machines/$mid/stop" '{}' >/dev/null 2>&1 || true
         sleep 2
-        log_warn "Destroying machine $mid..."
+        log_step "Destroying machine $mid..."
         fly_api DELETE "/apps/$app_name/machines/$mid?force=true" >/dev/null 2>&1 || true
     done
 

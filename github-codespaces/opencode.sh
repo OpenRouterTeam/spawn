@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install opencode
-log_warn "Installing opencode..."
+log_step "Installing opencode..."
 run_server "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
 log_info "opencode installed"
 
@@ -60,7 +60,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start opencode interactively
-log_warn "Starting opencode..."
+log_step "Starting opencode..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

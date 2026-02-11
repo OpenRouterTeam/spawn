@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Node.js and Cline
-log_warn "Installing Node.js and Cline..."
+log_step "Installing Node.js and Cline..."
 run_server "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs && npm install -g cline"
 log_info "Cline installed"
 
@@ -37,7 +37,7 @@ else
 fi
 
 # 6. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -50,7 +50,7 @@ log_info "Service: $KOYEB_SERVICE_NAME (Instance: $KOYEB_INSTANCE_ID)"
 echo ""
 
 # 7. Start Cline interactively
-log_warn "Starting Cline..."
+log_step "Starting Cline..."
 sleep 1
 clear
 interactive_session "source /root/.bashrc && cline"

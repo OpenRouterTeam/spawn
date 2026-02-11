@@ -26,7 +26,7 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # 4. Install openclaw via bun
-log_warn "Installing openclaw..."
+log_step "Installing openclaw..."
 run_server "source ~/.bashrc && bun install -g openclaw"
 log_info "OpenClaw installed"
 
@@ -42,7 +42,7 @@ fi
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
 # 7. Inject environment variables into shell configs
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_northflank \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -60,7 +60,7 @@ log_info "Service: ${SERVER_NAME} (Project: ${NORTHFLANK_PROJECT_NAME})"
 echo ""
 
 # 9. Start openclaw gateway in background and launch TUI
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 run_server "source ~/.bashrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
 interactive_session "source ~/.bashrc && openclaw tui"

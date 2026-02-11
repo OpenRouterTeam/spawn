@@ -28,9 +28,9 @@ verify_server_connectivity "${RAMNODE_SERVER_IP}"
 wait_for_cloud_init "${RAMNODE_SERVER_IP}" 60
 
 # 5. Verify Aider is installed (fallback to manual install)
-log_warn "Verifying Aider installation..."
+log_step "Verifying Aider installation..."
 if ! run_server "${RAMNODE_SERVER_IP}" "command -v aider" >/dev/null 2>&1; then
-    log_warn "Aider not found, installing manually..."
+    log_step "Aider not found, installing manually..."
     run_server "${RAMNODE_SERVER_IP}" "pip install aider-chat"
 fi
 
@@ -53,7 +53,7 @@ fi
 echo ""
 MODEL_ID=$(get_model_id "openrouter/auto")
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${RAMNODE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -64,7 +64,7 @@ log_info "Model: ${MODEL_ID}"
 echo ""
 
 # 8. Start Aider interactively
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "${RAMNODE_SERVER_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"

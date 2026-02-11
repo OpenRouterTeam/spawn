@@ -30,7 +30,7 @@ ensure_modal_cli() {
     check_python_available || return 1
 
     if ! command -v modal &>/dev/null; then
-        log_warn "Installing Modal CLI..."
+        log_step "Installing Modal CLI..."
         if ! pip install modal 2>/dev/null && ! pip3 install modal 2>/dev/null; then
             log_error "Failed to install Modal CLI"
             log_error ""
@@ -126,7 +126,7 @@ create_server() {
 
     _validate_modal_params "${name}" "${image}" || return 1
 
-    log_warn "Creating Modal sandbox '${name}'..."
+    log_step "Creating Modal sandbox '${name}'..."
 
     local create_output create_exitcode
     create_output=$(_invoke_modal_create "${name}" "${image}")
@@ -145,7 +145,7 @@ create_server() {
 }
 
 wait_for_cloud_init() {
-    log_warn "Installing tools in sandbox..."
+    log_step "Installing tools in sandbox..."
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
     run_server 'echo "export PATH=\"${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true

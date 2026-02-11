@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install Aider
-log_warn "Installing Aider..."
+log_step "Installing Aider..."
 run_server "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 log_info "Aider installed"
 
@@ -63,7 +63,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 8. Start Aider interactively
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

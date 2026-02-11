@@ -20,13 +20,13 @@ SPRITE_NAME=$(get_sprite_name)
 ensure_sprite_exists "${SPRITE_NAME}"
 verify_sprite_connectivity "$SPRITE_NAME"
 
-log_warn "Setting up sprite environment..."
+log_step "Setting up sprite environment..."
 
 # Configure shell environment
 setup_shell_environment "$SPRITE_NAME"
 
 # Install gptme
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_sprite "$SPRITE_NAME" "pip install gptme 2>/dev/null || pip3 install gptme"
 
 # Verify installation succeeded
@@ -48,7 +48,7 @@ fi
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_sprite "$SPRITE_NAME" \
     "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
 
@@ -57,7 +57,7 @@ log_info "Sprite setup completed successfully!"
 echo ""
 
 # Start gptme interactively
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 sprite exec -s "$SPRITE_NAME" -tty -- zsh -c "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"

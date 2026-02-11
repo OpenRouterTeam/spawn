@@ -271,7 +271,7 @@ _get_subnet_id() {
     fi
 
     # No public subnet found - create VCN with networking and subnet
-    log_warn "No public subnet found. Creating VCN and subnet..."
+    log_step "No public subnet found. Creating VCN and subnet..."
 
     local vcn_id
     vcn_id=$(_create_vcn "${compartment}") || return 1
@@ -355,7 +355,7 @@ create_server() {
     local name="${1}"
     local shape="${OCI_SHAPE:-VM.Standard.E2.1.Micro}"
 
-    log_warn "Creating OCI instance '${name}' (shape: ${shape})..."
+    log_step "Creating OCI instance '${name}' (shape: ${shape})..."
 
     local image_id
     image_id=$(_get_ubuntu_image_id "${shape}") || return 1
@@ -410,7 +410,7 @@ destroy_server() {
         log_error "No instance ID provided. Usage: destroy_server INSTANCE_OCID"
         return 1
     fi
-    log_warn "Terminating OCI instance ${instance_id}..."
+    log_step "Terminating OCI instance ${instance_id}..."
     oci compute instance terminate \
         --instance-id "${instance_id}" \
         --preserve-boot-volume false \

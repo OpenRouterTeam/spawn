@@ -26,7 +26,7 @@ fi
 if command -v cn &>/dev/null; then
     log_info "Continue already installed"
 else
-    log_warn "Installing Continue..."
+    log_step "Installing Continue..."
     npm install -g @continuedev/cli
 fi
 
@@ -53,7 +53,7 @@ inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 # 6. Configure Continue
-log_warn "Configuring Continue..."
+log_step "Configuring Continue..."
 CONTINUE_CONFIG_DIR="${HOME}/.continue"
 mkdir -p "${CONTINUE_CONFIG_DIR}"
 
@@ -77,11 +77,11 @@ echo ""
 
 # 7. Start Continue
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_warn "Executing Continue with prompt..."
+    log_step "Executing Continue with prompt..."
     source ~/.zshrc 2>/dev/null || true
     cn -p "${SPAWN_PROMPT}"
 else
-    log_warn "Starting Continue..."
+    log_step "Starting Continue..."
     sleep 1
     clear 2>/dev/null || true
     source ~/.zshrc 2>/dev/null || true

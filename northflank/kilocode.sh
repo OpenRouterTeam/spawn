@@ -21,7 +21,7 @@ PROJECT_NAME=$(get_project_name)
 create_server "${SERVICE_NAME}"
 wait_for_cloud_init
 
-log_warn "Installing Kilo Code..."
+log_step "Installing Kilo Code..."
 run_server "curl -fsSL https://bun.sh/install | bash && export PATH=\"\$HOME/.bun/bin:\$PATH\" && bun install -g @kilocode/cli"
 
 # Verify installation
@@ -39,7 +39,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_northflank \
     "KILO_PROVIDER_TYPE=openrouter" \
     "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -49,7 +49,7 @@ echo ""
 log_info "Northflank service setup completed successfully!"
 echo ""
 
-log_warn "Starting Kilo Code..."
+log_step "Starting Kilo Code..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && kilocode"

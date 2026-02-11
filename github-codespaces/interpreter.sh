@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install open-interpreter
-log_warn "Installing open-interpreter..."
+log_step "Installing open-interpreter..."
 run_server "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
 log_info "open-interpreter installed"
 
@@ -62,7 +62,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start interpreter interactively
-log_warn "Starting open-interpreter..."
+log_step "Starting open-interpreter..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

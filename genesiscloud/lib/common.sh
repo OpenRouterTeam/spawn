@@ -168,7 +168,7 @@ create_server() {
     # Image names may contain spaces (e.g. "Ubuntu 24.04") but must not contain quotes or shell metacharacters
     if [[ "$image" =~ [\'\"\`\$\;\\] ]]; then log_error "Invalid GENESIS_IMAGE: contains unsafe characters"; return 1; fi
 
-    log_warn "Creating Genesis Cloud instance '$name' (type: $instance_type, region: $region)..."
+    log_step "Creating Genesis Cloud instance '$name' (type: $instance_type, region: $region)..."
 
     local ssh_key_ids
     ssh_key_ids=$(_genesis_get_ssh_key_ids)
@@ -207,7 +207,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_id="$1"
-    log_warn "Destroying instance $server_id..."
+    log_step "Destroying instance $server_id..."
     genesis_api DELETE "/instances/$server_id"
     log_info "Instance $server_id destroyed"
 }

@@ -28,9 +28,9 @@ verify_server_connectivity "${IONOS_SERVER_IP}"
 wait_for_cloud_init "${IONOS_SERVER_IP}" 60
 
 # 5. Verify Aider is installed (fallback to manual install)
-log_warn "Verifying Aider installation..."
+log_step "Verifying Aider installation..."
 if ! run_server "${IONOS_SERVER_IP}" "command -v aider" >/dev/null 2>&1; then
-    log_warn "Aider not found, installing manually..."
+    log_step "Aider not found, installing manually..."
     run_server "${IONOS_SERVER_IP}" "pip install aider-chat"
 fi
 
@@ -58,7 +58,7 @@ log_info "Examples: openrouter/auto, openrouter/anthropic/claude-3-5-sonnet"
 echo ""
 MODEL_ID=$(get_interactive_value "MODEL_ID" "Enter model ID" "openrouter/auto") || return 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "MODEL_ID=${MODEL_ID}"
@@ -69,7 +69,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP}
 echo ""
 
 # 8. Start Aider interactively
-log_warn "Starting Aider..."
+log_step "Starting Aider..."
 sleep 1
 clear
 interactive_session "${IONOS_SERVER_IP}" "source ~/.zshrc && aider --model \${MODEL_ID}"

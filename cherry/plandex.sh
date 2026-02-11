@@ -28,7 +28,7 @@ verify_server_connectivity "${CHERRY_SERVER_IP}"
 wait_for_cloud_init "${CHERRY_SERVER_IP}" 60
 
 # 5. Install Plandex
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 run_server "${CHERRY_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | bash"
 
 # Verify installation succeeded
@@ -47,7 +47,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CHERRY_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -57,7 +57,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${CHERRY_SERVER_ID}, IP: ${CHERRY_SERVER_I
 echo ""
 
 # 7. Start Plandex interactively
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "${CHERRY_SERVER_IP}" "source ~/.zshrc && plandex"

@@ -28,7 +28,7 @@ verify_server_connectivity "${CHERRY_SERVER_IP}"
 wait_for_cloud_init "${CHERRY_SERVER_IP}" 60
 
 # 5. Install gptme
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_server "${CHERRY_SERVER_IP}" "pip install gptme 2>/dev/null || pip3 install gptme"
 
 # Verify installation succeeded
@@ -50,7 +50,7 @@ fi
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CHERRY_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -60,7 +60,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${CHERRY_SERVER_ID}, IP: ${CHERRY_SERVER_I
 echo ""
 
 # 7. Start gptme interactively
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 interactive_session "${CHERRY_SERVER_IP}" "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"

@@ -28,7 +28,7 @@ verify_server_connectivity "${CONTABO_SERVER_IP}"
 wait_for_cloud_init "${CONTABO_SERVER_IP}" 60
 
 # 5. Install OpenClaw
-log_warn "Installing OpenClaw..."
+log_step "Installing OpenClaw..."
 run_server "${CONTABO_SERVER_IP}" "bun install -g openclaw"
 
 # 6. Get OpenRouter API key
@@ -45,7 +45,7 @@ printf "Enter model ID [openrouter/auto]: "
 MODEL_ID=$(safe_read) || MODEL_ID=""
 MODEL_ID="${MODEL_ID:-openrouter/auto}"
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${CONTABO_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -60,7 +60,7 @@ sleep 2
 
 echo ""
 # 8. Start OpenClaw TUI interactively
-log_warn "Starting OpenClaw TUI..."
+log_step "Starting OpenClaw TUI..."
 sleep 1
 clear
 interactive_session "${CONTABO_SERVER_IP}" "source ~/.zshrc && openclaw tui"

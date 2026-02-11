@@ -22,7 +22,7 @@ create_server "${SERVER_NAME}"
 wait_for_cloud_init
 
 # Install Goose
-log_warn "Installing Goose..."
+log_step "Installing Goose..."
 run_server "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 
 # Verify installation succeeded
@@ -51,7 +51,7 @@ log_info "Railway service setup completed successfully!"
 echo ""
 
 # Start Goose interactively
-log_warn "Starting Goose..."
+log_step "Starting Goose..."
 sleep 1
 clear
 interactive_session "bash -c 'source ~/.bashrc && goose'"

@@ -313,7 +313,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local server_id="$1"
 
-    log_warn "Destroying VPS $server_id..."
+    log_step "Destroying VPS $server_id..."
     local response
     response=$(netcup_api "deleteVServer" "{\"vserverid\": \"$server_id\"}")
 

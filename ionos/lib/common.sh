@@ -207,7 +207,7 @@ ensure_datacenter() {
         return 1
     fi
 
-    log_warn "Checking for existing IONOS datacenter..."
+    log_step "Checking for existing IONOS datacenter..."
     local response
     response=$(ionos_api GET "/datacenters?depth=1")
 
@@ -271,7 +271,7 @@ _ionos_wait_for_volume() {
     local volume_id="$1"
     local max_wait="${2:-120}"
 
-    log_warn "Waiting for volume provisioning..."
+    log_step "Waiting for volume provisioning..."
     local waited=0
     while [[ $waited -lt $max_wait ]]; do
         local vol_status
@@ -297,7 +297,7 @@ _ionos_create_boot_volume() {
     local disk_size="$2"
     local image_id="$3"
 
-    log_warn "Creating boot volume..."
+    log_step "Creating boot volume..."
     local volume_body
     volume_body=$(_ionos_build_volume_body "$name" "$disk_size" "$image_id")
 
@@ -320,7 +320,7 @@ _ionos_create_boot_volume() {
 # Poll the IONOS API until the server has an IP address
 # Sets IONOS_SERVER_IP on success
 _ionos_wait_for_server_ip() {
-    log_warn "Waiting for server to get IP address..."
+    log_step "Waiting for server to get IP address..."
     local max_wait=180
     local waited=0
     while [[ $waited -lt $max_wait ]]; do
@@ -379,7 +379,7 @@ print(json.dumps(body))
 _ionos_launch_and_attach() {
     local volume_id="$1" name="$2" cores="$3" ram="$4"
 
-    log_warn "Creating server instance..."
+    log_step "Creating server instance..."
     local server_body
     server_body=$(_ionos_build_server_body "$name" "$cores" "$ram")
 
@@ -421,7 +421,7 @@ create_server() {
         return 1
     fi
 
-    log_warn "Creating IONOS server '$name' (cores: $cores, ram: ${ram}MB, disk: ${disk_size}GB)..."
+    log_step "Creating IONOS server '$name' (cores: $cores, ram: ${ram}MB, disk: ${disk_size}GB)..."
 
     # Ensure we have a datacenter
     ensure_datacenter || return 1
@@ -440,7 +440,7 @@ create_server() {
     volume_id=$(_ionos_create_boot_volume "$name" "$disk_size" "$image_id") || return 1
 
     # Register SSH key with datacenter
-    log_warn "Registering SSH key..."
+    log_step "Registering SSH key..."
     local key_path="$HOME/.ssh/spawn_ed25519"
     local pub_path="${key_path}.pub"
     ionos_register_ssh_key "spawn-key-$(date +%s)" "$pub_path" "${IONOS_DATACENTER_ID}" || log_warn "SSH key registration failed, continuing anyway..."
@@ -465,7 +465,7 @@ destroy_server() {
     local datacenter_id="$1"
     local server_id="$2"
 
-    log_warn "Destroying server $server_id in datacenter $datacenter_id..."
+    log_step "Destroying server $server_id in datacenter $datacenter_id..."
     local response
     response=$(ionos_api DELETE "/datacenters/${datacenter_id}/servers/${server_id}")
 

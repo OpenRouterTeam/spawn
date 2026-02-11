@@ -32,7 +32,7 @@ fi
 wait_for_cloud_init
 
 # 4. Install Amazon Q CLI
-log_warn "Installing Amazon Q CLI..."
+log_step "Installing Amazon Q CLI..."
 run_server "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 log_info "Amazon Q CLI installed"
 
@@ -45,7 +45,7 @@ else
 fi
 
 # 6. Inject environment variables into ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -57,7 +57,7 @@ log_info "Sandbox: ${SERVER_NAME} (ID: ${MODAL_SANDBOX_ID})"
 echo ""
 
 # 7. Start Amazon Q interactively
-log_warn "Starting Amazon Q..."
+log_step "Starting Amazon Q..."
 sleep 1
 clear
 interactive_session "source ~/.zshrc && q chat"

@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Goose
-log_warn "Installing Goose..."
+log_step "Installing Goose..."
 run_server "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 
 # Verify installation
@@ -43,7 +43,7 @@ else
 fi
 
 # 6. Inject environment variables into shell config
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_fly \
     "GOOSE_PROVIDER=openrouter" \
@@ -56,7 +56,7 @@ log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
 echo ""
 
 # 7. Start Goose interactively
-log_warn "Starting Goose..."
+log_step "Starting Goose..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && goose"

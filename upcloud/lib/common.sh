@@ -188,7 +188,7 @@ create_server() {
     validate_resource_name "$plan" || { log_error "Invalid UPCLOUD_PLAN"; return 1; }
     validate_region_name "$zone" || { log_error "Invalid UPCLOUD_ZONE"; return 1; }
 
-    log_warn "Creating UpCloud server '$name' (plan: $plan, zone: $zone)..."
+    log_step "Creating UpCloud server '$name' (plan: $plan, zone: $zone)..."
 
     # Find Ubuntu template
     local template_uuid
@@ -229,7 +229,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local server_uuid="$1"
 
-    log_warn "Stopping server $server_uuid..."
+    log_step "Stopping server $server_uuid..."
     upcloud_api POST "/server/$server_uuid/stop" '{"stop_server":{"stop_type":"soft","timeout":"60"}}' >/dev/null 2>&1 || true
 
     # Wait for server to stop
@@ -247,7 +247,7 @@ destroy_server() {
         attempt=$((attempt + 1))
     done
 
-    log_warn "Destroying server $server_uuid..."
+    log_step "Destroying server $server_uuid..."
     local response
     response=$(upcloud_api DELETE "/server/$server_uuid?storages=1")
 
@@ -286,13 +286,13 @@ for s in servers:
 install_base_tools() {
     local ip="$1"
 
-    log_warn "Installing base tools..."
+    log_step "Installing base tools..."
     run_server "$ip" "apt-get update -qq && apt-get install -y -qq curl unzip git zsh python3 > /dev/null 2>&1"
 
-    log_warn "Installing Bun..."
+    log_step "Installing Bun..."
     run_server "$ip" "curl -fsSL https://bun.sh/install | bash"
 
-    log_warn "Installing Node.js..."
+    log_step "Installing Node.js..."
     run_server "$ip" "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - > /dev/null 2>&1 && apt-get install -y -qq nodejs > /dev/null 2>&1"
 
     # Configure PATH

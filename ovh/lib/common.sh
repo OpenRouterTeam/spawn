@@ -352,7 +352,7 @@ create_ovh_instance() {
     validate_resource_name "$flavor" || { log_error "Invalid OVH_FLAVOR"; return 1; }
     validate_region_name "$region" || { log_error "Invalid OVH_REGION"; return 1; }
 
-    log_warn "Creating OVHcloud instance '$name' (flavor: $flavor, region: $region)..."
+    log_step "Creating OVHcloud instance '$name' (flavor: $flavor, region: $region)..."
 
     # Resolve image, flavor, and SSH key IDs
     local resources
@@ -420,7 +420,7 @@ wait_for_ovh_instance() {
     local interval=5
     local max_interval=15
 
-    log_warn "Waiting for OVHcloud instance to become active..."
+    log_step "Waiting for OVHcloud instance to become active..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         local response
         response=$(ovh_api_call GET "/cloud/project/${OVH_PROJECT_ID}/instance/${instance_id}")
@@ -457,7 +457,7 @@ wait_for_ovh_instance() {
 destroy_ovh_instance() {
     local instance_id="$1"
 
-    log_warn "Destroying OVHcloud instance $instance_id..."
+    log_step "Destroying OVHcloud instance $instance_id..."
     local response
     response=$(ovh_api_call DELETE "/cloud/project/${OVH_PROJECT_ID}/instance/${instance_id}")
 
@@ -482,7 +482,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 install_base_deps() {
     local ip="$1"
 
-    log_warn "Installing base dependencies..."
+    log_step "Installing base dependencies..."
 
     # Use sudo if not root
     local sudo_prefix=""

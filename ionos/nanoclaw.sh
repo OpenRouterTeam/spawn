@@ -28,10 +28,10 @@ verify_server_connectivity "${IONOS_SERVER_IP}"
 wait_for_cloud_init "${IONOS_SERVER_IP}" 60
 
 # 5. Install Node.js and clone nanoclaw
-log_warn "Installing Node.js dependencies..."
+log_step "Installing Node.js dependencies..."
 run_server "${IONOS_SERVER_IP}" "bun install -g tsx"
 
-log_warn "Cloning nanoclaw..."
+log_step "Cloning nanoclaw..."
 run_server "${IONOS_SERVER_IP}" "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
 
 # 6. Get OpenRouter API key
@@ -42,14 +42,14 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 7. Create nanoclaw .env file
-log_warn "Configuring nanoclaw..."
+log_step "Configuring nanoclaw..."
 DOTENV_TEMP=$(mktemp)
 trap 'rm -f "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
@@ -66,7 +66,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP}
 echo ""
 
 # 8. Start nanoclaw
-log_warn "Starting nanoclaw..."
+log_step "Starting nanoclaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 sleep 1

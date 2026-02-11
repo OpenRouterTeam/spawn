@@ -28,7 +28,7 @@ verify_server_connectivity "${IONOS_SERVER_IP}"
 wait_for_cloud_init "${IONOS_SERVER_IP}" 60
 
 # 5. Install Cline
-log_warn "Installing Cline..."
+log_step "Installing Cline..."
 if ! run_server "${IONOS_SERVER_IP}" "command -v cline" >/dev/null 2>&1; then
     run_server "${IONOS_SERVER_IP}" "npm install -g cline"
 fi
@@ -49,7 +49,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
@@ -61,7 +61,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP}
 echo ""
 
 # 7. Start Cline interactively
-log_warn "Starting Cline..."
+log_step "Starting Cline..."
 sleep 1
 clear
 interactive_session "${IONOS_SERVER_IP}" "source ~/.zshrc && cline"

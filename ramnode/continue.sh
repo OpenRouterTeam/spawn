@@ -28,9 +28,9 @@ verify_server_connectivity "${RAMNODE_SERVER_IP}"
 wait_for_cloud_init "${RAMNODE_SERVER_IP}" 60
 
 # 5. Verify Continue is installed (fallback to manual install)
-log_warn "Verifying Continue installation..."
+log_step "Verifying Continue installation..."
 if ! run_server "${RAMNODE_SERVER_IP}" "command -v cn" >/dev/null 2>&1; then
-    log_warn "Continue not found, installing manually..."
+    log_step "Continue not found, installing manually..."
     run_server "${RAMNODE_SERVER_IP}" "npm install -g @continuedev/cli"
 fi
 
@@ -49,12 +49,12 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${RAMNODE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 # 7. Configure Continue config.json
-log_warn "Configuring Continue..."
+log_step "Configuring Continue..."
 CONFIG_CONTENT=$(python3 -c "
 import json, sys
 config = {
@@ -80,7 +80,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${RAMNODE_SERVER_ID}, IP: ${RAMNODE_SERVER
 echo ""
 
 # 8. Start Continue interactively
-log_warn "Starting Continue..."
+log_step "Starting Continue..."
 sleep 1
 clear
 interactive_session "${RAMNODE_SERVER_IP}" "source ~/.zshrc && cn"

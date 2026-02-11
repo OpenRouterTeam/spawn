@@ -20,7 +20,7 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${SCALEWAY_SERVER_IP}"
 install_base_packages "${SCALEWAY_SERVER_IP}"
 
-log_warn "Installing Goose..."
+log_step "Installing Goose..."
 run_server "${SCALEWAY_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 log_info "Goose installed"
 
@@ -31,7 +31,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${SCALEWAY_SERVER_IP}" upload_file run_server \
     "GOOSE_PROVIDER=openrouter" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
@@ -41,7 +41,7 @@ log_info "Scaleway instance setup completed successfully!"
 log_info "Server: ${SERVER_NAME} (ID: ${SCALEWAY_SERVER_ID}, IP: ${SCALEWAY_SERVER_IP})"
 echo ""
 
-log_warn "Starting Goose..."
+log_step "Starting Goose..."
 sleep 1
 clear
 interactive_session "${SCALEWAY_SERVER_IP}" "source ~/.zshrc && goose"

@@ -18,7 +18,7 @@ SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${CIVO_SERVER_IP}"
 
-log_warn "Installing Continue CLI..."
+log_step "Installing Continue CLI..."
 run_server "${CIVO_SERVER_IP}" "curl -fsSL https://bun.sh/install | bash"
 run_server "${CIVO_SERVER_IP}" "export PATH=\"\$HOME/.bun/bin:\$PATH\" && bun install -g @continuedev/cli"
 
@@ -29,7 +29,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 run_server "${CIVO_SERVER_IP}" "cat >> ~/.bashrc << 'ENV_EOF'
 export PATH=\"\$HOME/.bun/bin:\$PATH\"
 export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
@@ -48,7 +48,7 @@ echo ""
 log_info "Server setup completed successfully!"
 echo ""
 
-log_warn "Starting Continue CLI in TUI mode..."
+log_step "Starting Continue CLI in TUI mode..."
 sleep 1
 clear
 interactive_session "${CIVO_SERVER_IP}" "source ~/.zshrc && cn"

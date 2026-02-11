@@ -173,7 +173,7 @@ create_server() {
     validate_resource_name "$type" || { log_error "Invalid LINODE_TYPE"; return 1; }
     validate_region_name "$region" || { log_error "Invalid LINODE_REGION"; return 1; }
 
-    log_warn "Creating Linode '$name' (type: $type, region: $region)..."
+    log_step "Creating Linode '$name' (type: $type, region: $region)..."
 
     local authorized_keys
     authorized_keys=$(_linode_fetch_ssh_keys)
@@ -220,7 +220,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_id="$1"
-    log_warn "Destroying Linode $server_id..."
+    log_step "Destroying Linode $server_id..."
     linode_api DELETE "/linode/instances/$server_id"
     log_info "Linode $server_id destroyed"
 }

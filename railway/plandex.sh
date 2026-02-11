@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install plandex
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 run_server "curl -sL https://plandex.ai/install.sh | bash"
 log_info "Plandex installed"
 
@@ -37,7 +37,7 @@ else
 fi
 
 # 6. Inject environment variables into shell config
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -49,7 +49,7 @@ log_info "Project: $SERVER_NAME"
 echo ""
 
 # 7. Start plandex interactively
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && plandex"

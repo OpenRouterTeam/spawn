@@ -28,7 +28,7 @@ verify_server_connectivity "${IONOS_SERVER_IP}"
 wait_for_cloud_init "${IONOS_SERVER_IP}" 60
 
 # 5. Install Plandex
-log_warn "Installing Plandex..."
+log_step "Installing Plandex..."
 if ! run_server "${IONOS_SERVER_IP}" "command -v plandex" >/dev/null 2>&1; then
     run_server "${IONOS_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | bash"
 fi
@@ -49,7 +49,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
@@ -59,7 +59,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP}
 echo ""
 
 # 7. Start Plandex interactively
-log_warn "Starting Plandex..."
+log_step "Starting Plandex..."
 sleep 1
 clear
 interactive_session "${IONOS_SERVER_IP}" "source ~/.zshrc && plandex"

@@ -24,12 +24,12 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install Node.js and tsx
-log_warn "Installing Node.js and tsx..."
+log_step "Installing Node.js and tsx..."
 run_server "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs && npm install -g tsx"
 log_info "Node.js and tsx installed"
 
 # 5. Clone and build NanoClaw
-log_warn "Cloning and building NanoClaw..."
+log_step "Cloning and building NanoClaw..."
 run_server "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
 log_info "NanoClaw installed"
 
@@ -42,7 +42,7 @@ else
 fi
 
 # 7. Inject environment variables
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -50,7 +50,7 @@ inject_env_vars \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 8. Create NanoClaw .env file
-log_warn "Configuring NanoClaw..."
+log_step "Configuring NanoClaw..."
 run_server "cat > ~/nanoclaw/.env << 'EOF'
 ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
 EOF"
@@ -61,7 +61,7 @@ log_info "Service: $KOYEB_SERVICE_NAME (Instance: $KOYEB_INSTANCE_ID)"
 echo ""
 
 # 9. Start NanoClaw interactively
-log_warn "Starting NanoClaw..."
+log_step "Starting NanoClaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 sleep 1

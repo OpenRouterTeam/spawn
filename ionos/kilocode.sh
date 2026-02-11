@@ -28,7 +28,7 @@ verify_server_connectivity "${IONOS_SERVER_IP}"
 wait_for_cloud_init "${IONOS_SERVER_IP}" 60
 
 # 5. Install Kilo Code CLI
-log_warn "Installing Kilo Code CLI..."
+log_step "Installing Kilo Code CLI..."
 if ! run_server "${IONOS_SERVER_IP}" "command -v kilocode" >/dev/null 2>&1; then
     run_server "${IONOS_SERVER_IP}" "npm install -g @kilocode/cli"
 fi
@@ -49,7 +49,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${IONOS_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "KILO_PROVIDER_TYPE=openrouter" \
@@ -61,7 +61,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${IONOS_SERVER_ID}, IP: ${IONOS_SERVER_IP}
 echo ""
 
 # 7. Start Kilo Code interactively
-log_warn "Starting Kilo Code..."
+log_step "Starting Kilo Code..."
 sleep 1
 clear
 interactive_session "${IONOS_SERVER_IP}" "source ~/.zshrc && kilocode"

@@ -28,10 +28,10 @@ verify_server_connectivity "${EXOSCALE_SERVER_IP}"
 wait_for_cloud_init "${EXOSCALE_SERVER_IP}" 60
 
 # 5. Install Node.js deps and clone nanoclaw
-log_warn "Installing tsx..."
+log_step "Installing tsx..."
 run_server "${EXOSCALE_SERVER_IP}" "source ~/.bashrc && bun install -g tsx"
 
-log_warn "Cloning and building nanoclaw..."
+log_step "Cloning and building nanoclaw..."
 run_server "${EXOSCALE_SERVER_IP}" "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
 log_info "NanoClaw installed"
 
@@ -43,14 +43,14 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ssh "${EXOSCALE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # 8. Create nanoclaw .env file
-log_warn "Configuring nanoclaw..."
+log_step "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
 trap 'rm -f "${DOTENV_TEMP}"' EXIT
@@ -67,7 +67,7 @@ log_info "Server: ${SERVER_NAME} (ID: ${EXOSCALE_SERVER_ID}, IP: ${EXOSCALE_SERV
 echo ""
 
 # 9. Start nanoclaw
-log_warn "Starting nanoclaw..."
+log_step "Starting nanoclaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 interactive_session "${EXOSCALE_SERVER_IP}" "cd ~/nanoclaw && source ~/.zshrc && npm run dev"

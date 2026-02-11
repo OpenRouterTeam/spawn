@@ -38,7 +38,7 @@ CODESPACE_NAME="$CODESPACE"
 wait_for_codespace "$CODESPACE"
 
 # 4. Install codex
-log_warn "Installing codex..."
+log_step "Installing codex..."
 run_server "npm install -g @openai/codex"
 log_info "codex installed"
 
@@ -62,7 +62,7 @@ log_info "Codespace: $CODESPACE"
 echo ""
 
 # 7. Start codex interactively
-log_warn "Starting codex..."
+log_step "Starting codex..."
 log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1

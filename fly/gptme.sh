@@ -24,7 +24,7 @@ create_server "$SERVER_NAME"
 wait_for_cloud_init
 
 # 4. Install gptme
-log_warn "Installing gptme..."
+log_step "Installing gptme..."
 run_server "pip install gptme 2>/dev/null || pip3 install gptme"
 log_info "gptme installed"
 
@@ -40,7 +40,7 @@ fi
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
 # 7. Inject environment variables into ~/.bashrc and ~/.zshrc
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 
 inject_env_vars_fly \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -52,7 +52,7 @@ log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
 echo ""
 
 # 8. Start gptme interactively
-log_warn "Starting gptme..."
+log_step "Starting gptme..."
 sleep 1
 clear
 interactive_session "source ~/.bashrc && gptme -m openrouter/${MODEL_ID}"

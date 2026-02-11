@@ -33,7 +33,7 @@ verify_server_connectivity "${OVH_SERVER_IP}"
 install_base_deps "${OVH_SERVER_IP}"
 
 # 7. Install openclaw via bun
-log_warn "Installing openclaw..."
+log_step "Installing openclaw..."
 run_ovh "${OVH_SERVER_IP}" "source ~/.bashrc && bun install -g openclaw"
 log_info "OpenClaw installed"
 
@@ -48,7 +48,7 @@ fi
 # Get model preference
 MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 inject_env_vars_ovh "${OVH_SERVER_IP}" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -65,7 +65,7 @@ log_info "Instance: ${SERVER_NAME} (ID: ${OVH_INSTANCE_ID}, IP: ${OVH_SERVER_IP}
 echo ""
 
 # 10. Start openclaw gateway in background and launch TUI
-log_warn "Starting openclaw..."
+log_step "Starting openclaw..."
 run_ovh "${OVH_SERVER_IP}" "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
 interactive_session "${OVH_SERVER_IP}" "source ~/.zshrc && openclaw tui"

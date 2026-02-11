@@ -20,7 +20,7 @@ verify_server_connectivity "$UPCLOUD_SERVER_IP"
 
 install_base_tools "$UPCLOUD_SERVER_IP"
 
-log_warn "Installing Continue CLI..."
+log_step "Installing Continue CLI..."
 run_server "$UPCLOUD_SERVER_IP" "npm install -g @continuedev/cli"
 
 echo ""
@@ -30,7 +30,7 @@ else
     OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
 fi
 
-log_warn "Setting up environment variables..."
+log_step "Setting up environment variables..."
 run_server "$UPCLOUD_SERVER_IP" "printf '%s\n' 'export OPENROUTER_API_KEY=\"${OPENROUTER_API_KEY}\"' >> /root/.bashrc"
 run_server "$UPCLOUD_SERVER_IP" "printf '%s\n' 'export OPENROUTER_API_KEY=\"${OPENROUTER_API_KEY}\"' >> /root/.zshrc"
 
@@ -42,7 +42,7 @@ echo ""
 log_info "UpCloud server setup completed successfully!"
 echo ""
 
-log_warn "Starting Continue CLI in TUI mode..."
+log_step "Starting Continue CLI in TUI mode..."
 sleep 1
 clear
 interactive_session "$UPCLOUD_SERVER_IP" "source ~/.zshrc && cn"
