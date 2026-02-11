@@ -1053,7 +1053,7 @@
     "ionos/kilocode": "implemented",
     "ionos/continue": "implemented",
     "exoscale/claude": "implemented",
-    "exoscale/openclaw": "missing",
+    "exoscale/openclaw": "implemented",
     "exoscale/nanoclaw": "missing",
     "exoscale/aider": "implemented",
     "exoscale/goose": "implemented",
