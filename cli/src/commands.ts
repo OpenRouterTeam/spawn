@@ -740,6 +740,31 @@ function formatTimestamp(iso: string): string {
   }
 }
 
+export function formatRelativeTime(iso: string, now?: Date): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const ref = now ?? new Date();
+    const diffMs = ref.getTime() - d.getTime();
+    if (diffMs < 0) return "";
+
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo ago`;
+    const years = Math.floor(months / 12);
+    return `${years}y ago`;
+  } catch {
+    return "";
+  }
+}
+
 export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
   const records = filterHistory(agentFilter, cloudFilter);
 
@@ -756,13 +781,21 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     return;
   }
 
-  console.log();
-  console.log(pc.bold("AGENT".padEnd(20)) + pc.bold("CLOUD".padEnd(20)) + pc.bold("WHEN"));
-  console.log(pc.dim("-".repeat(60)));
+  const NUM_COL = 4; // "#1 " width
 
-  for (const r of records) {
-    const when = formatTimestamp(r.timestamp);
+  console.log();
+  console.log(pc.bold(" #".padEnd(NUM_COL)) + pc.bold("AGENT".padEnd(20)) + pc.bold("CLOUD".padEnd(20)) + pc.bold("WHEN"));
+  console.log(pc.dim("-".repeat(64)));
+
+  const now = new Date();
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const relative = formatRelativeTime(r.timestamp, now);
+    const absolute = formatTimestamp(r.timestamp);
+    const when = relative ? `${relative.padEnd(10)} ${absolute}` : absolute;
+    const num = pc.dim(`${i + 1}`.padEnd(NUM_COL));
     let line =
+      num +
       pc.green(r.agent.padEnd(20)) +
       r.cloud.padEnd(20) +
       pc.dim(when);
@@ -779,14 +812,42 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
   const latest = records[0];
   if (latest.prompt) {
     const shortPrompt = latest.prompt.length > 30 ? latest.prompt.slice(0, 30) + "..." : latest.prompt;
-    console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud} --prompt "${shortPrompt}"`)}`);
+    console.log(`Rerun last: ${pc.cyan(`spawn rerun`)}  or  ${pc.cyan(`spawn ${latest.agent} ${latest.cloud} --prompt "${shortPrompt}"`)}`);
   } else {
-    console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud}`)}`);
+    console.log(`Rerun last: ${pc.cyan(`spawn rerun`)}  or  ${pc.cyan(`spawn ${latest.agent} ${latest.cloud}`)}`);
   }
 
   console.log(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
-  console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}`));
+  console.log(pc.dim(`Rerun: ${pc.cyan("spawn rerun [#]")}  |  Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}`));
   console.log();
+}
+
+// ── Rerun ───────────────────────────────────────────────────────────────────────
+
+export async function cmdRerun(index?: number): Promise<void> {
+  const records = filterHistory();
+
+  if (records.length === 0) {
+    p.log.error("No spawns recorded yet.");
+    p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to launch your first agent.`);
+    process.exit(1);
+  }
+
+  // Default to most recent (#1), which is the first record (newest-first)
+  const n = index ?? 1;
+  if (n < 1 || n > records.length) {
+    p.log.error(`Invalid spawn number: ${pc.bold(String(n))}`);
+    p.log.info(`Valid range: 1 to ${records.length}. Run ${pc.cyan("spawn list")} to see all spawns.`);
+    process.exit(1);
+  }
+
+  const record = records[n - 1];
+  const agentName = record.agent;
+  const cloudName = record.cloud;
+  const suffix = record.prompt ? " with prompt" : "";
+  p.log.step(`Rerunning #${n}: ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
+
+  await execScript(cloudName, agentName, record.prompt);
 }
 
 // ── Agents ─────────────────────────────────────────────────────────────────────
@@ -1074,6 +1135,8 @@ ${pc.bold("USAGE")}
   spawn list                         Show previously launched spawns (alias: ls)
   spawn list -a <agent>              Filter spawn history by agent
   spawn list -c <cloud>              Filter spawn history by cloud
+  spawn rerun                        Rerun the most recent spawn
+  spawn rerun <#>                    Rerun spawn #N from history
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
@@ -1094,6 +1157,8 @@ ${pc.bold("EXAMPLES")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Show your previously launched spawns")}
+  spawn rerun                        ${pc.dim("# Rerun the most recent spawn")}
+  spawn rerun 3                      ${pc.dim("# Rerun spawn #3 from history")}
   spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}
 
 ${pc.bold("AUTHENTICATION")}

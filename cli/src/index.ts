@@ -3,6 +3,7 @@ import {
   cmdInteractive,
   cmdRun,
   cmdList,
+  cmdRerun,
   cmdMatrix,
   cmdAgents,
   cmdClouds,
@@ -289,6 +290,9 @@ const SUBCOMMANDS: Record<string, () => Promise<void>> = {
 // list/ls handled separately for -a/-c flag parsing
 const LIST_COMMANDS = new Set(["list", "ls"]);
 
+// rerun handled separately for optional numeric argument
+const RERUN_COMMANDS = new Set(["rerun"]);
+
 /** Warn when extra positional arguments are silently ignored */
 function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
   const extra = filteredArgs.slice(maxExpected);
@@ -330,6 +334,23 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
     } else {
       const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
       await cmdList(agentFilter, cloudFilter);
+    }
+    return;
+  }
+
+  if (RERUN_COMMANDS.has(cmd)) {
+    const hasHelpFlag = filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
+    if (hasHelpFlag) {
+      cmdHelp();
+    } else {
+      const indexArg = filteredArgs[1];
+      const index = indexArg ? parseInt(indexArg, 10) : undefined;
+      if (indexArg && (isNaN(index!) || index! < 1)) {
+        console.error(pc.red(`Invalid spawn number: ${pc.bold(indexArg)}`));
+        console.error(`\nUsage: ${pc.cyan("spawn rerun [#]")}  (e.g. ${pc.cyan("spawn rerun 3")})`);
+        process.exit(1);
+      }
+      await cmdRerun(index);
     }
     return;
   }
