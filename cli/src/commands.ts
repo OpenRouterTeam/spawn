@@ -235,8 +235,10 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
   const manifest = await loadManifestWithSpinner();
   if (!manifest.agents[agent] && manifest.clouds[agent] && manifest.agents[cloud]) {
     p.log.warn(`It looks like you swapped the agent and cloud arguments.`);
-    p.log.info(`Try: ${pc.cyan(`spawn ${cloud} ${agent}`)}`);
-    process.exit(1);
+    p.log.info(`Running: ${pc.cyan(`spawn ${cloud} ${agent}`)}`);
+    const tmp = agent;
+    agent = cloud;
+    cloud = tmp;
   }
 
   validateAgent(manifest, agent);
@@ -648,7 +650,7 @@ ${pc.bold("USAGE")}
                                      Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
   spawn <cloud>                      Show available agents for cloud
-  spawn list                         Full matrix table
+  spawn list (or ls)                   Full matrix table
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
   spawn update                       Check for CLI updates
@@ -686,6 +688,7 @@ ${pc.bold("TROUBLESHOOTING")}
   ${pc.dim("*")} Missing credentials: Check cloud-specific READMEs in the repo
   ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
   ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output
+  ${pc.dim("*")} Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update
 
 ${pc.bold("MORE INFO")}
   Repository:  https://github.com/${REPO}
