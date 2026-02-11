@@ -396,6 +396,43 @@ describe("Commands Error Paths", () => {
     });
   });
 
+  // ── cmdRun: batch validation (both errors at once) ──────────────────
+
+  describe("cmdRun - batch validation shows all errors at once", () => {
+    it("should show both unknown agent AND unknown cloud errors together", async () => {
+      await expect(cmdRun("badagent", "badcloud")).rejects.toThrow("process.exit");
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const hasAgentError = errorCalls.some((msg: string) => msg.includes("Unknown agent"));
+      const hasCloudError = errorCalls.some((msg: string) => msg.includes("Unknown cloud"));
+      // Both errors should be reported, not just the first one
+      expect(hasAgentError).toBe(true);
+      expect(hasCloudError).toBe(true);
+    });
+
+    it("should show agent error and cloud-is-actually-agent error together", async () => {
+      // "spawn badagent aider" - badagent is unknown, aider is an agent not a cloud
+      await expect(cmdRun("badagent", "aider")).rejects.toThrow("process.exit");
+
+      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const hasAgentError = errorCalls.some((msg: string) => msg.includes("Unknown agent"));
+      const hasCloudError = errorCalls.some((msg: string) => msg.includes("Unknown cloud"));
+      expect(hasAgentError).toBe(true);
+      expect(hasCloudError).toBe(true);
+    });
+
+    it("should only call process.exit once even with multiple errors", async () => {
+      try {
+        await cmdRun("badagent", "badcloud");
+      } catch {
+        // Expected
+      }
+      // process.exit should be called exactly once (not twice, once per error)
+      expect(processExitSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // ── cmdRun: two agents or two clouds ────────────────────────────────
 
   describe("cmdRun - mismatched argument types", () => {
