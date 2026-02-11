@@ -774,11 +774,17 @@ get_openrouter_api_key_oauth() {
 # Generate environment variable config content
 # Usage: generate_env_config KEY1=val1 KEY2=val2 ...
 # Outputs the env config to stdout
+# SECURITY: Values are single-quoted to prevent shell injection when sourced.
+# Single quotes prevent all interpretation of special characters ($, `, \, etc.)
 generate_env_config() {
     echo ""
     echo "# [spawn:env]"
     for env_pair in "$@"; do
-        echo "export ${env_pair}"
+        local key="${env_pair%%=*}"
+        local value="${env_pair#*=}"
+        # Escape any single quotes in the value: replace ' with '\''
+        local escaped_value="${value//\'/\'\\\'\'}"
+        echo "export ${key}='${escaped_value}'"
     done
 }
 
