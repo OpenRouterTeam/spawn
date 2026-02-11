@@ -1112,7 +1112,7 @@
     "contabo/gptme": "missing",
     "contabo/opencode": "missing",
     "contabo/plandex": "missing",
-    "contabo/kilocode": "missing",
+    "contabo/kilocode": "implemented",
     "contabo/continue": "missing",
     "hostinger/claude": "implemented",
     "hostinger/openclaw": "implemented",
