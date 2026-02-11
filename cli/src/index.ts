@@ -61,6 +61,7 @@ const KNOWN_FLAGS = new Set([
   "--help", "-h",
   "--version", "-v", "-V",
   "--prompt", "-p", "--prompt-file", "-f",
+  "--dry-run", "-n",
 ]);
 
 /** Check for unknown flags and show an actionable error */
@@ -72,6 +73,7 @@ function checkUnknownFlags(args: string[]): void {
       console.error(`  Supported flags:`);
       console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
       console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
+      console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
       console.error();
@@ -127,14 +129,19 @@ async function showInfoOrError(name: string): Promise<void> {
   process.exit(1);
 }
 
-async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {
+async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean): Promise<void> {
   if (cloud && HELP_FLAGS.includes(cloud)) {
     await showInfoOrError(agent);
     return;
   }
   if (cloud) {
-    await cmdRun(agent, cloud, prompt);
+    await cmdRun(agent, cloud, prompt, dryRun);
     return;
+  }
+  if (dryRun) {
+    console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
+    console.error(`\nUsage: ${pc.cyan(`spawn <agent> <cloud> --dry-run`)}`);
+    process.exit(1);
   }
   if (prompt) {
     await suggestCloudsForPrompt(agent);
@@ -283,7 +290,7 @@ function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
 }
 
 /** Dispatch a named command or fall through to agent/cloud handling */
-async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined): Promise<void> {
+async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
     warnExtraArgs(filteredArgs, 1);
     IMMEDIATE_COMMANDS[cmd]();
@@ -302,7 +309,7 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
   }
 
   warnExtraArgs(filteredArgs, 2);
-  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt);
+  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt, dryRun);
 }
 
 async function main(): Promise<void> {
@@ -311,6 +318,12 @@ async function main(): Promise<void> {
   await checkForUpdates();
 
   const [prompt, filteredArgs] = await resolvePrompt(args);
+
+  // Extract --dry-run / -n boolean flag
+  const dryRunIdx = filteredArgs.findIndex(a => a === "--dry-run" || a === "-n");
+  const dryRun = dryRunIdx !== -1;
+  if (dryRun) filteredArgs.splice(dryRunIdx, 1);
+
   checkUnknownFlags(filteredArgs);
 
   const cmd = filteredArgs[0];
@@ -319,7 +332,7 @@ async function main(): Promise<void> {
     if (!cmd) {
       await handleNoCommand(prompt);
     } else {
-      await dispatchCommand(cmd, filteredArgs, prompt);
+      await dispatchCommand(cmd, filteredArgs, prompt, dryRun);
     }
   } catch (err) {
     handleError(err);
