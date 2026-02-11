@@ -62,5 +62,5 @@ echo ""
 # 7. Start gptme interactively
 log_step "Starting gptme..."
 sleep 1
-clear
+clear 2>/dev/null || true
 interactive_session "${NETCUP_SERVER_IP}" "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"
