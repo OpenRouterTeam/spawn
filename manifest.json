@@ -1173,7 +1173,7 @@
     "hostinger/continue": "implemented",
     "netcup/claude": "implemented",
     "netcup/openclaw": "implemented",
-    "netcup/nanoclaw": "missing",
+    "netcup/nanoclaw": "implemented",
     "netcup/aider": "implemented",
     "netcup/goose": "implemented",
     "netcup/codex": "missing",
