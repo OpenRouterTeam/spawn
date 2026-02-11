@@ -134,36 +134,39 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   }
   if (cloud) {
     await cmdRun(agent, cloud, prompt);
-  } else {
-    if (prompt) {
-      console.error(pc.red("Error: --prompt requires both <agent> and <cloud>"));
-      console.error(`\nUsage: ${pc.cyan(`spawn ${agent} <cloud> --prompt "your prompt here"`)}`);
+    return;
+  }
+  if (prompt) {
+    await suggestCloudsForPrompt(agent);
+    process.exit(1);
+  }
+  await showInfoOrError(agent);
+}
 
-      // Try to suggest available clouds for the agent
-      try {
-        const manifest = await loadManifest();
-        const resolvedAgent = resolveAgentKey(manifest, agent);
-        if (resolvedAgent) {
-          const clouds = cloudKeys(manifest).filter(
-            (c: string) => manifest.matrix[`${c}/${resolvedAgent}`] === "implemented"
-          );
-          if (clouds.length > 0) {
-            console.error(`\nAvailable clouds for ${pc.bold(resolvedAgent)}:`);
-            for (const c of clouds.slice(0, 5)) {
-              console.error(`  ${pc.cyan(`spawn ${resolvedAgent} ${c} --prompt "..."`)}`);
-            }
-            if (clouds.length > 5) {
-              console.error(`  Run ${pc.cyan(`spawn ${resolvedAgent}`)} to see all ${clouds.length} clouds.`);
-            }
-          }
-        }
-      } catch {
-        // Manifest unavailable — skip cloud suggestions
-      }
+/** Show "prompt requires cloud" error and suggest available clouds for the agent */
+async function suggestCloudsForPrompt(agent: string): Promise<void> {
+  console.error(pc.red("Error: --prompt requires both <agent> and <cloud>"));
+  console.error(`\nUsage: ${pc.cyan(`spawn ${agent} <cloud> --prompt "your prompt here"`)}`);
 
-      process.exit(1);
+  try {
+    const manifest = await loadManifest();
+    const resolvedAgent = resolveAgentKey(manifest, agent);
+    if (!resolvedAgent) return;
+
+    const clouds = cloudKeys(manifest).filter(
+      (c: string) => manifest.matrix[`${c}/${resolvedAgent}`] === "implemented"
+    );
+    if (clouds.length === 0) return;
+
+    console.error(`\nAvailable clouds for ${pc.bold(resolvedAgent)}:`);
+    for (const c of clouds.slice(0, 5)) {
+      console.error(`  ${pc.cyan(`spawn ${resolvedAgent} ${c} --prompt "..."`)}`);
     }
-    await showInfoOrError(agent);
+    if (clouds.length > 5) {
+      console.error(`  Run ${pc.cyan(`spawn ${resolvedAgent}`)} to see all ${clouds.length} clouds.`);
+    }
+  } catch {
+    // Manifest unavailable — skip cloud suggestions
   }
 }
 
