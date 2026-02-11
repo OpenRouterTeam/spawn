@@ -101,6 +101,56 @@ print(projects[0]['id'])
     echo "$project_id"
 }
 
+# Extract first error detail from Latitude.sh JSON:API error response
+_latitude_extract_error() {
+    python3 -c "
+import json,sys
+try:
+    d=json.loads(sys.stdin.read())
+    errors = d.get('errors', [])
+    if isinstance(errors, list) and errors:
+        print(errors[0].get('detail', errors[0].get('title', 'Unknown error')))
+    else:
+        print('Unknown error')
+except: print(sys.stdin.read())
+" 2>/dev/null || cat
+}
+
+# Get all SSH key IDs from Latitude.sh account
+_latitude_get_ssh_key_ids() {
+    local ssh_keys_response
+    ssh_keys_response=$(latitude_api GET "/ssh_keys")
+    echo "$ssh_keys_response" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+ids = [k['id'] for k in data.get('data', [])]
+print(json.dumps(ids))
+" 2>/dev/null || echo "[]"
+}
+
+# Build JSON:API request body for Latitude.sh server creation
+# $1=hostname $2=plan $3=site $4=os $5=project_id $6=ssh_key_ids_json
+_latitude_build_server_body() {
+    local hostname="$1" plan="$2" site="$3" os="$4" project_id="$5" ssh_key_ids="$6"
+    python3 -c "
+import json
+body = {
+    'data': {
+        'type': 'servers',
+        'attributes': {
+            'hostname': '$hostname',
+            'plan': '$plan',
+            'site': '$site',
+            'operating_system': '$os',
+            'project': '$project_id',
+            'ssh_keys': $ssh_key_ids
+        }
+    }
+}
+print(json.dumps(body))
+"
+}
+
 # Check if SSH key is registered with Latitude.sh
 latitude_check_ssh_key() {
     local fingerprint="$1"
@@ -140,17 +190,7 @@ print(json.dumps(body))
     fi
 
     local error_msg
-    error_msg=$(echo "$response" | python3 -c "
-import json,sys
-try:
-    d=json.loads(sys.stdin.read())
-    errors = d.get('errors', [])
-    if isinstance(errors, list) and errors:
-        print(errors[0].get('detail', errors[0].get('title', 'Unknown error')))
-    else:
-        print('Unknown error')
-except: print(sys.stdin.read())
-" 2>/dev/null || echo "$response")
+    error_msg=$(echo "$response" | _latitude_extract_error)
     log_error "API Error: $error_msg"
     log_error ""
     log_error "Common causes:"
@@ -196,34 +236,11 @@ create_server() {
     project_id=$(get_latitude_project_id) || return 1
 
     # Get all SSH key IDs
-    local ssh_keys_response
-    ssh_keys_response=$(latitude_api GET "/ssh_keys")
     local ssh_key_ids
-    ssh_key_ids=$(echo "$ssh_keys_response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-ids = [k['id'] for k in data.get('data', [])]
-print(json.dumps(ids))
-" 2>/dev/null || echo "[]")
+    ssh_key_ids=$(_latitude_get_ssh_key_ids)
 
     local body
-    body=$(python3 -c "
-import json
-body = {
-    'data': {
-        'type': 'servers',
-        'attributes': {
-            'hostname': '$hostname',
-            'plan': '$plan',
-            'site': '$site',
-            'operating_system': '$os',
-            'project': '$project_id',
-            'ssh_keys': $ssh_key_ids
-        }
-    }
-}
-print(json.dumps(body))
-")
+    body=$(_latitude_build_server_body "$hostname" "$plan" "$site" "$os" "$project_id" "$ssh_key_ids")
 
     local response
     response=$(latitude_api POST "/servers" "$body")
@@ -232,17 +249,7 @@ print(json.dumps(body))
     if ! echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); sys.exit(0 if 'data' in d else 1)" 2>/dev/null; then
         log_error "Failed to create Latitude.sh server"
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "
-import json,sys
-try:
-    d=json.loads(sys.stdin.read())
-    errors = d.get('errors', [])
-    if isinstance(errors, list) and errors:
-        print(errors[0].get('detail', errors[0].get('title', 'Unknown error')))
-    else:
-        print('Unknown error')
-except: print(sys.stdin.read())
-" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | _latitude_extract_error)
         log_error "API Error: $error_msg"
         log_error ""
         log_error "Common issues:"
