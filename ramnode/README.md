@@ -144,6 +144,7 @@ Uses OpenStack Compute API:
 - ✅ Claude Code
 - ✅ Aider
 - ✅ Goose
+- ✅ Open Interpreter
 
 ## Documentation
 
