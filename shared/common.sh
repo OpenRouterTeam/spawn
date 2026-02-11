@@ -1165,36 +1165,34 @@ _cloud_api_retry_loop() {
     local max_interval=30
 
     while [[ "${attempt}" -le "${max_retries}" ]]; do
+        local retry_reason=""
+
         if ! "${request_func}" "$@"; then
-            # Network/curl failure
-            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API network error"; then
-                log_error "Cloud API network error after ${max_retries} attempts"
+            retry_reason="Cloud API network error"
+        elif [[ "${API_HTTP_CODE}" == "429" ]]; then
+            retry_reason="Cloud API returned rate limit (HTTP 429)"
+        elif [[ "${API_HTTP_CODE}" == "503" ]]; then
+            retry_reason="Cloud API returned service unavailable (HTTP 503)"
+        fi
+
+        # Success — no retryable error
+        if [[ -z "${retry_reason}" ]]; then
+            echo "${API_RESPONSE_BODY}"
+            return 0
+        fi
+
+        # Retry or fail
+        if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "${retry_reason}"; then
+            log_error "${retry_reason} after ${max_retries} attempts"
+            if [[ "${retry_reason}" == "Cloud API network error" ]]; then
                 log_warn "Check your internet connection and verify the provider's API is reachable."
-                return 1
-            fi
-            _update_retry_interval interval max_interval
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        # Check for transient HTTP errors (429 or 503)
-        if [[ "${API_HTTP_CODE}" == "429" ]] || [[ "${API_HTTP_CODE}" == "503" ]]; then
-            local error_msg="rate limit"
-            if [[ "${API_HTTP_CODE}" == "503" ]]; then
-                error_msg="service unavailable"
-            fi
-            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API returned ${error_msg} (HTTP ${API_HTTP_CODE})"; then
-                log_error "Cloud API returned HTTP ${API_HTTP_CODE} after ${max_retries} attempts"
+            else
                 echo "${API_RESPONSE_BODY}"
-                return 1
             fi
-            _update_retry_interval interval max_interval
-            attempt=$((attempt + 1))
-            continue
+            return 1
         fi
-
-        echo "${API_RESPONSE_BODY}"
-        return 0
+        _update_retry_interval interval max_interval
+        attempt=$((attempt + 1))
     done
 
     log_error "Cloud API request failed after ${max_retries} attempts (${api_description})"
@@ -1387,10 +1385,7 @@ generic_ssh_wait() {
         sleep "${jitter}"
 
         elapsed_time=$((elapsed_time + jitter))
-        interval=$((interval * 2))
-        if [[ "${interval}" -gt "${max_interval}" ]]; then
-            interval="${max_interval}"
-        fi
+        _update_retry_interval interval max_interval
         attempt=$((attempt + 1))
     done
 
@@ -2033,6 +2028,41 @@ setup_continue_config() {
 # LIST_CALLBACK must output pipe-delimited lines where the first field is the selectable ID.
 # Example output: "fsn1|Falkenstein|DE" or "cpx11|2 vCPU|4 GB RAM|40 GB disk"
 #
+# Display a numbered list and read user selection
+# Pipe-delimited items: "id|label". Returns selected id via stdout.
+# Usage: _display_and_select PROMPT_TEXT DEFAULT_VALUE DEFAULT_ID <<< "$items"
+_display_and_select() {
+    local prompt_text="${1}"
+    local default_value="${2}"
+    local default_id="${3:-}"
+
+    log_info "Available ${prompt_text}:"
+    local i=1
+    local ids=()
+    local default_idx=1
+    while IFS= read -r line; do
+        local id="${line%%|*}"
+        printf "  %2d) %s\n" "${i}" "$(echo "${line}" | tr '|' '\t')" >&2
+        ids+=("${id}")
+        if [[ -n "${default_id}" && "${id}" == "${default_id}" ]]; then
+            default_idx=${i}
+        fi
+        i=$((i + 1))
+    done
+
+    local choice
+    printf "\n" >&2
+    choice=$(safe_read "Select ${prompt_text%s} [${default_idx}]: ") || choice=""
+    choice="${choice:-${default_idx}}"
+
+    if [[ "${choice}" -ge 1 && "${choice}" -le "${#ids[@]}" ]] 2>/dev/null; then
+        echo "${ids[$((choice - 1))]}"
+    else
+        log_warn "Invalid selection '${choice}' (enter a number between 1 and ${#ids[@]}). Using default: ${default_value}"
+        echo "${default_value}"
+    fi
+}
+
 # Returns: selected ID via stdout
 interactive_pick() {
     local env_var_name="${1}"
@@ -2058,31 +2088,7 @@ interactive_pick() {
         return
     fi
 
-    log_info "Available ${prompt_text}:"
-    local i=1
-    local ids=()
-    local default_idx=1
-    while IFS= read -r line; do
-        local id="${line%%|*}"
-        printf "  %2d) %s\n" "${i}" "$(echo "${line}" | tr '|' '\t')" >&2
-        ids+=("${id}")
-        if [[ -n "${default_id}" && "${id}" == "${default_id}" ]]; then
-            default_idx=${i}
-        fi
-        i=$((i + 1))
-    done <<< "${items}"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select ${prompt_text%s} [${default_idx}]: ") || choice=""
-    choice="${choice:-${default_idx}}"
-
-    if [[ "${choice}" -ge 1 && "${choice}" -le "${#ids[@]}" ]] 2>/dev/null; then
-        echo "${ids[$((choice - 1))]}"
-    else
-        log_warn "Invalid selection '${choice}' (enter a number between 1 and ${#ids[@]}). Using default: ${default_value}"
-        echo "${default_value}"
-    fi
+    _display_and_select "${prompt_text}" "${default_value}" "${default_id}" <<< "${items}"
 }
 
 # ============================================================
