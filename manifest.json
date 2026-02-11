@@ -1129,7 +1129,7 @@
     "hostinger/openclaw": "implemented",
     "hostinger/nanoclaw": "implemented",
     "hostinger/aider": "implemented",
-    "hostinger/goose": "missing",
+    "hostinger/goose": "implemented",
     "hostinger/codex": "missing",
     "hostinger/interpreter": "missing",
     "hostinger/gemini": "missing",
