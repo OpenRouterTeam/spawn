@@ -26,7 +26,7 @@ export function getErrorMessage(err: unknown): string {
 }
 
 function handleCancel(): never {
-  console.error(pc.red("Operation cancelled."));
+  p.outro(pc.dim("Cancelled."));
   process.exit(0);
 }
 
@@ -393,19 +393,17 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
 
 function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryStatus: number, fallbackStatus: number): void {
   p.log.error("Script download failed");
-  console.error(`\nPrimary source (${primaryUrl}): ${getStatusDescription(primaryStatus)}`);
-  console.error(`Fallback source (${fallbackUrl}): ${getStatusDescription(fallbackStatus)}`);
 
   if (primaryStatus === 404 && fallbackStatus === 404) {
-    console.error("\nThe script file could not be found on either source.");
-    console.error("This usually means the script hasn't been published yet,");
+    console.error("\nThe script file could not be found.");
+    console.error("This usually means the combination hasn't been published yet,");
     console.error("even though it may appear in the matrix.");
     console.error(`\nWhat to do:`);
     console.error(`  1. Verify the combination is implemented: ${pc.cyan("spawn list")}`);
     console.error(`  2. Try again later (the script may be deploying)`);
     console.error(`  3. Report the issue: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
   } else {
-    console.error(`\nNetwork or server error - try again in a few moments.`);
+    console.error(`\nNetwork or server error (HTTP ${primaryStatus}) - try again in a few moments.`);
     if (primaryStatus >= 500 || fallbackStatus >= 500) {
       console.error("The server may be experiencing temporary issues.");
     }
@@ -425,7 +423,11 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string): string[] {
   switch (exitCode) {
     case 130:
-      return ["Script was interrupted (Ctrl+C). No server was left running."];
+      return [
+        "Script was interrupted (Ctrl+C).",
+        "Note: If a server was already created, it may still be running.",
+        `  Check your cloud provider dashboard or run ${pc.cyan(`spawn ${cloud}`)} for details.`,
+      ];
     case 137:
       return ["Script was killed (likely by the system due to timeout or out of memory)."];
     case 255:
@@ -647,7 +649,7 @@ export async function cmdList(): Promise<void> {
   const total = agents.length * clouds.length;
   console.log();
   if (isCompact) {
-    console.log(`Color: ${pc.green("green")} = all clouds  ${pc.yellow("yellow")} = some missing`);
+    console.log(`${pc.green("green")} = all clouds supported  ${pc.yellow("yellow")} = some clouds not yet available`);
   } else {
     console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   }
@@ -913,7 +915,7 @@ export async function cmdUpdate(): Promise<void> {
       });
       console.log();
       p.log.success(`Updated to v${remoteVersion}`);
-      p.log.info("Restart your command to use the new version.");
+      p.log.info("Run your spawn command again to use the new version.");
     } catch {
       p.log.error("Auto-update failed. Update manually:");
       console.log();

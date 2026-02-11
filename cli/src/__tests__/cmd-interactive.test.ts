@@ -118,7 +118,7 @@ describe("cmdInteractive", () => {
       expect(processExitSpy).toHaveBeenCalledWith(0);
     });
 
-    it("should print 'Operation cancelled' when user cancels agent selection", async () => {
+    it("should show cancelled message when user cancels agent selection", async () => {
       selectReturnValues = [CANCEL_SYMBOL, "sprite"];
       isCancelValues = new Set([CANCEL_SYMBOL]);
 
@@ -128,8 +128,8 @@ describe("cmdInteractive", () => {
         // Expected
       }
 
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("cancelled");
+      const outroOutput = mockOutro.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(outroOutput.toLowerCase()).toContain("cancelled");
     });
 
     it("should exit with code 0 when user cancels cloud selection", async () => {
@@ -140,7 +140,7 @@ describe("cmdInteractive", () => {
       expect(processExitSpy).toHaveBeenCalledWith(0);
     });
 
-    it("should print 'Operation cancelled' when user cancels cloud selection", async () => {
+    it("should show cancelled message when user cancels cloud selection", async () => {
       selectReturnValues = ["claude", CANCEL_SYMBOL];
       isCancelValues = new Set([CANCEL_SYMBOL]);
 
@@ -150,8 +150,8 @@ describe("cmdInteractive", () => {
         // Expected
       }
 
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("cancelled");
+      const outroOutput = mockOutro.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(outroOutput.toLowerCase()).toContain("cancelled");
     });
 
     it("should not show launch message when user cancels", async () => {

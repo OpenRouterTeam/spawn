@@ -278,7 +278,7 @@ describe("validate_api_token", () => {
       it(`should reject token with ${desc}`, () => {
         const result = runValidator("validate_api_token", input);
         expect(result.exitCode).not.toBe(0);
-        expect(result.stderr).toContain("metacharacters");
+        expect(result.stderr).toContain("special characters");
       });
     }
   });

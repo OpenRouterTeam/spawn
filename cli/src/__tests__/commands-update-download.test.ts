@@ -258,7 +258,7 @@ describe("Script download and execution", () => {
 
     // Should show 404-specific error messaging
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(errorOutput).toContain("not found");
+    expect(errorOutput).toContain("could not be found");
   });
 
   it("should exit when both primary and fallback URLs return server errors", async () => {

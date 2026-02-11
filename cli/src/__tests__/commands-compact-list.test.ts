@@ -400,8 +400,8 @@ describe("Compact List View", () => {
       const output = getOutput();
       const allCloudsMatches = output.match(/all clouds supported/g);
       expect(allCloudsMatches).not.toBeNull();
-      // Both agents fully implemented -> 2 "all clouds supported"
-      expect(allCloudsMatches!.length).toBe(2);
+      // Both agents fully implemented -> 2 "all clouds supported" + 1 in legend
+      expect(allCloudsMatches!.length).toBe(3);
     });
   });
 
@@ -440,7 +440,7 @@ describe("Compact List View", () => {
       const output = getOutput();
       expect(output).toContain("implemented");
       // The +/- legend is grid-only, not shown in compact view
-      expect(output).not.toContain("not yet available");
+      expect(output).not.toContain("+ implemented");
     });
 
     it("should show usage hints", async () => {
