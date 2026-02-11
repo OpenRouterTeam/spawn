@@ -1138,7 +1138,7 @@
     "hostinger/gptme": "missing",
     "hostinger/opencode": "implemented",
     "hostinger/plandex": "missing",
-    "hostinger/kilocode": "missing",
+    "hostinger/kilocode": "implemented",
     "hostinger/continue": "missing",
     "local/claude": "implemented",
     "local/openclaw": "implemented",
