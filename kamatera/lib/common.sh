@@ -316,33 +316,17 @@ print(json.dumps(body))
 " <<< "{\"ssh_key\": $json_ssh_key, \"script\": $json_script}"
 }
 
-create_server() {
-    local name="$1"
-    local datacenter="${KAMATERA_DATACENTER:-EU}"
-    local cpu="${KAMATERA_CPU:-2B}"
-    local ram="${KAMATERA_RAM:-2048}"
-    local disk="${KAMATERA_DISK:-size=20}"
-    local image="${KAMATERA_IMAGE:-ubuntu_server_24.04_64-bit}"
-    local billing="${KAMATERA_BILLING:-hourly}"
-
-    validate_kamatera_params "$datacenter" "$cpu" "$ram" "$disk" "$image" "$billing" || return 1
-
-    log_warn "Creating Kamatera server '$name' (datacenter: $datacenter, cpu: $cpu, ram: ${ram}MB)..."
-
-    # Generate password for the server
-    local password
-    password=$(generate_server_password)
-
-    # Read SSH public key if available
-    local ssh_key=""
+# Read SSH public key if available, prints to stdout
+_read_ssh_public_key() {
     local pub_path="${HOME}/.ssh/id_ed25519.pub"
     if [[ -f "$pub_path" ]]; then
-        ssh_key=$(cat "$pub_path")
+        cat "$pub_path"
     fi
+}
 
-    # Build init script
-    local script_content
-    script_content=$(cat << 'INIT_EOF'
+# Build the standard cloud-init script for Kamatera servers
+_build_kamatera_init_script() {
+    cat << 'INIT_EOF'
 #!/bin/bash
 set -e
 apt-get update -qq
@@ -357,11 +341,12 @@ echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root
 # Signal completion
 touch /root/.cloud-init-complete
 INIT_EOF
-)
+}
 
-    # Build request body and submit server creation
-    local body
-    body=$(build_kamatera_server_body "$name" "$password" "$datacenter" "$image" "$cpu" "$ram" "$disk" "$billing" "$ssh_key" "$script_content")
+# Submit server creation API call, parse command IDs, and wait for completion
+# Sets: KAMATERA_SERVER_NAME_ACTUAL, KAMATERA_SERVER_IP (via get_kamatera_server_ip)
+_submit_and_wait_kamatera_server() {
+    local name="$1" body="$2"
 
     local response
     response=$(kamatera_api POST "/service/server" "$body")
@@ -389,6 +374,28 @@ INIT_EOF
     export KAMATERA_SERVER_NAME_ACTUAL
 
     get_kamatera_server_ip "$name"
+}
+
+create_server() {
+    local name="$1"
+    local datacenter="${KAMATERA_DATACENTER:-EU}"
+    local cpu="${KAMATERA_CPU:-2B}"
+    local ram="${KAMATERA_RAM:-2048}"
+    local disk="${KAMATERA_DISK:-size=20}"
+    local image="${KAMATERA_IMAGE:-ubuntu_server_24.04_64-bit}"
+    local billing="${KAMATERA_BILLING:-hourly}"
+
+    validate_kamatera_params "$datacenter" "$cpu" "$ram" "$disk" "$image" "$billing" || return 1
+
+    log_warn "Creating Kamatera server '$name' (datacenter: $datacenter, cpu: $cpu, ram: ${ram}MB)..."
+
+    local password ssh_key script_content body
+    password=$(generate_server_password)
+    ssh_key=$(_read_ssh_public_key)
+    script_content=$(_build_kamatera_init_script)
+    body=$(build_kamatera_server_body "$name" "$password" "$datacenter" "$image" "$cpu" "$ram" "$disk" "$billing" "$ssh_key" "$script_content")
+
+    _submit_and_wait_kamatera_server "$name" "$body"
 }
 
 verify_server_connectivity() {
