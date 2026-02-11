@@ -57,9 +57,10 @@ get_server_name() {
     get_resource_name "MODAL_SANDBOX_NAME" "Enter sandbox name: "
 }
 
-create_server() {
-    local name="${1}"
-    local image="${MODAL_IMAGE:-debian_slim}"
+# Validate Modal sandbox creation parameters
+# Usage: _validate_modal_params NAME IMAGE
+_validate_modal_params() {
+    local name="${1}" image="${2}"
 
     # Validate image name - used as Python attribute name (e.g. modal.Image.debian_slim())
     if [[ ! "${image}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
@@ -72,14 +73,13 @@ create_server() {
         log_error "Invalid sandbox name: must be alphanumeric with dashes/underscores"
         return 1
     fi
+}
 
-    log_warn "Creating Modal sandbox '${name}'..."
-
-    # Capture both stdout and stderr from Python SDK
-    # SECURITY: Pass name via environment variable to prevent Python injection
-    local create_output
-    local create_exitcode
-    create_output=$(_MODAL_NAME="${name}" _MODAL_IMAGE="${image}" python3 -c "
+# Invoke Modal Python SDK to create a sandbox, prints sandbox object_id to stdout
+# SECURITY: Pass name via environment variable to prevent Python injection
+# Usage: _invoke_modal_create NAME IMAGE
+_invoke_modal_create() {
+    _MODAL_NAME="${1}" _MODAL_IMAGE="${2}" python3 -c "
 import modal, sys, os
 try:
     name = os.environ['_MODAL_NAME']
@@ -96,26 +96,44 @@ try:
 except Exception as e:
     print(f'ERROR: {e}', file=sys.stderr)
     sys.exit(1)
-" 2>&1)
+" 2>&1
+}
+
+# Report Modal sandbox creation failure with troubleshooting guidance
+_report_modal_create_error() {
+    local name="${1}" output="${2}"
+    log_error "Failed to create Modal sandbox '${name}'"
+    log_error ""
+    if [[ -n "${output}" ]]; then
+        log_error "Error details: ${output}"
+    fi
+    log_error ""
+    log_error "Possible causes:"
+    log_error "  - Modal authentication expired (run: modal setup)"
+    log_error "  - Insufficient quota or credits (check: https://modal.com/settings)"
+    log_error "  - Network connectivity issues"
+    log_error "  - Invalid sandbox name (must be alphanumeric with dashes)"
+    log_error ""
+    log_error "Troubleshooting:"
+    log_error "  1. Re-authenticate: modal setup"
+    log_error "  2. Verify account status: https://modal.com/settings"
+    log_error "  3. Check Modal status: https://status.modal.com"
+}
+
+create_server() {
+    local name="${1}"
+    local image="${MODAL_IMAGE:-debian_slim}"
+
+    _validate_modal_params "${name}" "${image}" || return 1
+
+    log_warn "Creating Modal sandbox '${name}'..."
+
+    local create_output create_exitcode
+    create_output=$(_invoke_modal_create "${name}" "${image}")
     create_exitcode=$?
 
     if [[ ${create_exitcode} -ne 0 ]] || [[ -z "${create_output}" ]] || [[ "${create_output}" =~ ERROR ]]; then
-        log_error "Failed to create Modal sandbox '${name}'"
-        log_error ""
-        if [[ -n "${create_output}" ]]; then
-            log_error "Error details: ${create_output}"
-        fi
-        log_error ""
-        log_error "Possible causes:"
-        log_error "  - Modal authentication expired (run: modal setup)"
-        log_error "  - Insufficient quota or credits (check: https://modal.com/settings)"
-        log_error "  - Network connectivity issues"
-        log_error "  - Invalid sandbox name (must be alphanumeric with dashes)"
-        log_error ""
-        log_error "Troubleshooting:"
-        log_error "  1. Re-authenticate: modal setup"
-        log_error "  2. Verify account status: https://modal.com/settings"
-        log_error "  3. Check Modal status: https://status.modal.com"
+        _report_modal_create_error "${name}" "${create_output}"
         return 1
     fi
 
