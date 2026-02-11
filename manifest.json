@@ -215,6 +215,30 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'."
+    },
+    "continue": {
+      "name": "Continue",
+      "description": "Open-source AI coding assistant with CLI TUI and headless modes",
+      "url": "https://github.com/continuedev/continue",
+      "install": "npm install -g @continuedev/cli",
+      "launch": "cn",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "config_files": {
+        "~/.continue/config.json": {
+          "models": [
+            {
+              "title": "OpenRouter",
+              "provider": "openrouter",
+              "model": "openrouter/auto",
+              "apiBase": "https://openrouter.ai/api/v1",
+              "apiKey": "${OPENROUTER_API_KEY}"
+            }
+          ]
+        }
+      },
+      "notes": "Natively supports OpenRouter via config.json. CLI supports TUI mode (interactive) and headless mode (-p flag). 31K+ GitHub stars."
     }
   },
   "clouds": {
@@ -954,6 +978,31 @@
     "cherry/gptme": "implemented",
     "cherry/opencode": "implemented",
     "cherry/plandex": "implemented",
-    "cherry/kilocode": "implemented"
+    "cherry/kilocode": "implemented",
+    "sprite/continue": "implemented",
+    "hetzner/continue": "implemented",
+    "digitalocean/continue": "missing",
+    "vultr/continue": "missing",
+    "linode/continue": "missing",
+    "aws-lightsail/continue": "missing",
+    "gcp/continue": "missing",
+    "github-codespaces/continue": "missing",
+    "e2b/continue": "missing",
+    "modal/continue": "missing",
+    "fly/continue": "missing",
+    "civo/continue": "missing",
+    "scaleway/continue": "missing",
+    "daytona/continue": "missing",
+    "upcloud/continue": "missing",
+    "binarylane/continue": "missing",
+    "latitude/continue": "missing",
+    "ovh/continue": "missing",
+    "kamatera/continue": "missing",
+    "cherry/continue": "missing",
+    "oracle/continue": "missing",
+    "koyeb/continue": "missing",
+    "northflank/continue": "missing",
+    "railway/continue": "missing",
+    "render/continue": "missing"
   }
 }
