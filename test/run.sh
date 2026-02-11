@@ -50,8 +50,18 @@ echo "sprite $*" >> "${MOCK_LOG}"
 
 case "$1" in
     org)    exit 0 ;;                          # auth check passes
-    list)   echo "existing-sprite"; exit 0 ;;  # list returns no match for test sprite
-    create) exit 0 ;;
+    list)
+        echo "existing-sprite"
+        # After create, also return the test sprite name so provisioning poll succeeds
+        if [[ -f "/tmp/sprite_mock_created_$$" ]] || [[ -f "/tmp/sprite_mock_created" ]]; then
+            echo "${SPRITE_NAME:-}"
+        fi
+        exit 0
+        ;;
+    create)
+        touch "/tmp/sprite_mock_created_$$" "/tmp/sprite_mock_created"
+        exit 0
+        ;;
     exec)
         # If there's a -file flag, just pretend to upload
         if [[ "$*" == *"-file"* ]]; then
@@ -135,8 +145,9 @@ run_script_test() {
     echo ""
     printf '%b\n' "${YELLOW}━━━ Testing ${script_name}.sh ━━━${NC}"
 
-    # Reset mock log
+    # Reset mock state
     : > "${MOCK_LOG}"
+    rm -f /tmp/sprite_mock_created_* /tmp/sprite_mock_created 2>/dev/null || true
 
     # Run the script with mocked PATH and env vars (timeout 30s)
     local exit_code=0

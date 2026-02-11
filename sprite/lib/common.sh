@@ -101,16 +101,29 @@ get_sprite_name() {
 # Check if sprite exists, create if not
 ensure_sprite_exists() {
     local sprite_name=${1}
-    local sleep_time=${2:-3}
+    local max_wait=${2:-30}
 
     if sprite list 2>/dev/null | grep -qE "^${sprite_name}( |$)"; then
         log_info "Sprite '${sprite_name}' already exists"
-    else
-        log_warn "Creating sprite '${sprite_name}'..."
-        sprite create -skip-console "${sprite_name}" || true
-        log_warn "Waiting for sprite to be ready..."
-        sleep "${sleep_time}"
+        return 0
     fi
+
+    log_warn "Creating sprite '${sprite_name}'..."
+    sprite create -skip-console "${sprite_name}" || true
+
+    log_warn "Waiting for sprite to be provisioned..."
+    local elapsed=0
+    while [[ "${elapsed}" -lt "${max_wait}" ]]; do
+        if sprite list 2>/dev/null | grep -qE "^${sprite_name}( |$)"; then
+            log_info "Sprite '${sprite_name}' provisioned"
+            return 0
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+    done
+
+    log_error "Sprite '${sprite_name}' not found after ${max_wait}s"
+    return 1
 }
 
 # Verify sprite is accessible (retry up to max_attempts)

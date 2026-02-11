@@ -17,7 +17,7 @@ ensure_sprite_installed
 ensure_sprite_authenticated
 
 SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "$SPRITE_NAME" 5
+ensure_sprite_exists "${SPRITE_NAME}"
 verify_sprite_connectivity "$SPRITE_NAME"
 
 log_warn "Setting up sprite environment..."
