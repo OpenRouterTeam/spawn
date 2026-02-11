@@ -1180,7 +1180,7 @@
     "netcup/interpreter": "implemented",
     "netcup/gemini": "implemented",
     "netcup/amazonq": "implemented",
-    "netcup/cline": "missing",
+    "netcup/cline": "implemented",
     "netcup/gptme": "missing",
     "netcup/opencode": "missing",
     "netcup/plandex": "missing",
