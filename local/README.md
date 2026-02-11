@@ -4,23 +4,21 @@ Run agents directly on your local machine without any cloud provisioning.
 
 > No server creation or destruction. Installs agents and injects OpenRouter credentials locally. Useful for local development and testing.
 
-## Agents
+## Quick Start
 
-#### Claude Code
+If you have the [spawn CLI](https://github.com/OpenRouterTeam/spawn) installed:
+
+```bash
+spawn claude local
+spawn openclaw local
+spawn nanoclaw local
+```
+
+Or run directly without the CLI:
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/claude.sh)
-```
-
-#### OpenClaw
-
-```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/openclaw.sh)
-```
-
-#### NanoClaw
-
-```bash
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/nanoclaw.sh)
 ```
 
@@ -30,6 +28,16 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/nanoclaw.sh)
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
   bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/claude.sh)
 ```
+
+## What It Does
+
+Local scripts will:
+- Install the agent if not already present
+- Obtain an OpenRouter API key (via OAuth or environment variable)
+- Append environment variables to `~/.zshrc` for the agent to use
+- Launch the agent
+
+No cloud servers are created or destroyed.
 
 ## Environment Variables
 

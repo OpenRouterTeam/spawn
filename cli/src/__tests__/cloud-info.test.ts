@@ -47,11 +47,34 @@ const extendedManifest: Manifest = {
       exec_method: "ssh",
       interactive_method: "ssh",
     },
+    local: {
+      name: "Local Machine",
+      description: "Run agents locally",
+      url: "https://github.com/OpenRouterTeam/spawn",
+      type: "local",
+      auth: "none",
+      provision_method: "none",
+      exec_method: "bash -c",
+      interactive_method: "bash -c",
+    },
+    authcloud: {
+      name: "Auth Cloud",
+      description: "Cloud with env var auth",
+      url: "https://auth.example.com",
+      type: "cloud",
+      auth: "AUTH_TOKEN",
+      provision_method: "api",
+      exec_method: "ssh",
+      interactive_method: "ssh",
+    },
   },
   matrix: {
     ...mockManifest.matrix,
     "railway/claude": "implemented",
     "railway/aider": "missing",
+    "local/claude": "implemented",
+    "local/aider": "implemented",
+    "authcloud/claude": "implemented",
     // emptycloud has no matrix entries at all
   },
 };
@@ -215,6 +238,34 @@ describe("cmdCloudInfo", () => {
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).not.toContain("spawn claude emptycloud");
       expect(output).not.toContain("spawn aider emptycloud");
+    });
+  });
+
+  // ── Quick-start auth display ────────────────────────────────────────────
+
+  describe("quick-start auth display", () => {
+    it("should show OPENROUTER_API_KEY for cloud with 'none' auth", async () => {
+      await cmdCloudInfo("local");
+      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(output).toContain("OPENROUTER_API_KEY");
+    });
+
+    it("should not show 'none' as a command for cloud with 'none' auth", async () => {
+      await cmdCloudInfo("local");
+      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      // "none" should not appear as an auth instruction in quick-start
+      const quickStartLines = output.split("\n");
+      const noneAsCommand = quickStartLines.some(
+        (line: string) => line.includes("Quick start") === false && line.trim() === "none"
+      );
+      expect(noneAsCommand).toBe(false);
+    });
+
+    it("should show cloud-specific auth env var for cloud with env var auth", async () => {
+      await cmdCloudInfo("authcloud");
+      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(output).toContain("AUTH_TOKEN");
+      expect(output).toContain("OPENROUTER_API_KEY");
     });
   });
 
