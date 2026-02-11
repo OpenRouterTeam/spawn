@@ -1256,9 +1256,10 @@ ${pc.bold("USAGE")}
                                      Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
   spawn <cloud>                      Show available agents for cloud
-  spawn list                         Browse and rerun previous spawns (alias: ls)
+  spawn list                         Browse and rerun previous spawns
   spawn list -a <agent>              Filter spawn history by agent
   spawn list -c <cloud>              Filter spawn history by cloud
+                                     Aliases: ls, history
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers

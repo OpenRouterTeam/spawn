@@ -276,8 +276,8 @@ const SUBCOMMANDS: Record<string, () => Promise<void>> = {
   "update": cmdUpdate,
 };
 
-// list/ls handled separately for -a/-c flag parsing
-const LIST_COMMANDS = new Set(["list", "ls"]);
+// list/ls/history handled separately for -a/-c flag parsing
+const LIST_COMMANDS = new Set(["list", "ls", "history"]);
 
 // Common verb prefixes that users naturally try (e.g. "spawn run claude sprite")
 // These are not real subcommands -- we strip them and forward to the default handler
