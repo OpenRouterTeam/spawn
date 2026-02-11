@@ -175,6 +175,117 @@ describe("getScriptFailureGuidance", () => {
     });
   });
 
+  // ── Exit code 130: user interrupt (Ctrl+C) ────────────────────────────────
+
+  describe("exit code 130 (user interrupt)", () => {
+    it("should mention Ctrl+C", () => {
+      const lines = getScriptFailureGuidance(130, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("Ctrl+C");
+    });
+
+    it("should mention script was interrupted", () => {
+      const lines = getScriptFailureGuidance(130, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("interrupted");
+    });
+
+    it("should reassure no server was left running", () => {
+      const lines = getScriptFailureGuidance(130, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("No server was left running");
+    });
+
+    it("should return exactly 1 guidance line", () => {
+      const lines = getScriptFailureGuidance(130, "sprite");
+      expect(lines).toHaveLength(1);
+    });
+  });
+
+  // ── Exit code 137: killed (OOM / timeout) ─────────────────────────────────
+
+  describe("exit code 137 (killed)", () => {
+    it("should mention script was killed", () => {
+      const lines = getScriptFailureGuidance(137, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("killed");
+    });
+
+    it("should mention timeout or out of memory", () => {
+      const lines = getScriptFailureGuidance(137, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("timeout");
+      expect(joined).toContain("out of memory");
+    });
+
+    it("should return exactly 1 guidance line", () => {
+      const lines = getScriptFailureGuidance(137, "sprite");
+      expect(lines).toHaveLength(1);
+    });
+  });
+
+  // ── Exit code 255: SSH connection failed ───────────────────────────────────
+
+  describe("exit code 255 (SSH failure)", () => {
+    it("should mention SSH connection failed", () => {
+      const lines = getScriptFailureGuidance(255, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("SSH connection failed");
+    });
+
+    it("should mention server still booting", () => {
+      const lines = getScriptFailureGuidance(255, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("still booting");
+    });
+
+    it("should mention firewall blocking SSH", () => {
+      const lines = getScriptFailureGuidance(255, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("Firewall");
+      expect(joined).toContain("SSH");
+    });
+
+    it("should mention server termination", () => {
+      const lines = getScriptFailureGuidance(255, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("terminated");
+    });
+
+    it("should return exactly 4 guidance lines", () => {
+      const lines = getScriptFailureGuidance(255, "sprite");
+      expect(lines).toHaveLength(4);
+    });
+  });
+
+  // ── Exit code 2: shell syntax error ────────────────────────────────────────
+
+  describe("exit code 2 (shell syntax error)", () => {
+    it("should mention shell syntax or argument error", () => {
+      const lines = getScriptFailureGuidance(2, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("Shell syntax or argument error");
+    });
+
+    it("should suggest this is likely a bug in the script", () => {
+      const lines = getScriptFailureGuidance(2, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("bug in the script");
+    });
+
+    it("should include a link to report the issue", () => {
+      const lines = getScriptFailureGuidance(2, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("github.com");
+      expect(joined).toContain("issues");
+    });
+
+    it("should return exactly 2 guidance lines", () => {
+      const lines = getScriptFailureGuidance(2, "sprite");
+      expect(lines).toHaveLength(2);
+    });
+  });
+
   // ── Edge cases ────────────────────────────────────────────────────────────
 
   describe("edge cases", () => {
@@ -183,29 +294,8 @@ describe("getScriptFailureGuidance", () => {
       expect(lines[0]).toBe("Common causes:");
     });
 
-    it("should handle very large exit code", () => {
-      const lines = getScriptFailureGuidance(255, "hetzner");
-      expect(lines[0]).toBe("Common causes:");
-      expect(lines.length).toBeGreaterThan(0);
-    });
-
-    it("should handle negative exit code", () => {
+    it("should handle negative exit code as default case", () => {
       const lines = getScriptFailureGuidance(-1, "hetzner");
-      expect(lines[0]).toBe("Common causes:");
-    });
-
-    it("should handle exit code 130 (SIGINT) as default case", () => {
-      const lines = getScriptFailureGuidance(130, "sprite");
-      expect(lines[0]).toBe("Common causes:");
-    });
-
-    it("should handle exit code 137 (SIGKILL/OOM) as default case", () => {
-      const lines = getScriptFailureGuidance(137, "sprite");
-      expect(lines[0]).toBe("Common causes:");
-    });
-
-    it("should handle exit code 2 as default case", () => {
-      const lines = getScriptFailureGuidance(2, "sprite");
       expect(lines[0]).toBe("Common causes:");
     });
 
@@ -245,19 +335,22 @@ describe("getScriptFailureGuidance", () => {
     });
 
     it("should produce different output for each handled exit code", () => {
+      const result130 = getScriptFailureGuidance(130, "sprite");
+      const result137 = getScriptFailureGuidance(137, "sprite");
+      const result255 = getScriptFailureGuidance(255, "sprite");
       const result127 = getScriptFailureGuidance(127, "sprite");
       const result126 = getScriptFailureGuidance(126, "sprite");
+      const result2 = getScriptFailureGuidance(2, "sprite");
       const result1 = getScriptFailureGuidance(1, "sprite");
       const resultDefault = getScriptFailureGuidance(42, "sprite");
 
-      // 127 and 126 should be distinct from each other
-      expect(result127.join("\n")).not.toBe(result126.join("\n"));
-      // 127 and 1 should be distinct
-      expect(result127.join("\n")).not.toBe(result1.join("\n"));
-      // 126 and 1 should be distinct
-      expect(result126.join("\n")).not.toBe(result1.join("\n"));
-      // 1 and default should be distinct (different wording)
-      expect(result1.join("\n")).not.toBe(resultDefault.join("\n"));
+      const all = [result130, result137, result255, result127, result126, result2, result1, resultDefault];
+      // Every handled exit code should produce unique output
+      for (let i = 0; i < all.length; i++) {
+        for (let j = i + 1; j < all.length; j++) {
+          expect(all[i].join("\n")).not.toBe(all[j].join("\n"));
+        }
+      }
     });
   });
 });
