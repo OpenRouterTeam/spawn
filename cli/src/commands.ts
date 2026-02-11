@@ -748,6 +748,40 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
       if (agentFilter) parts.push(`agent=${pc.bold(agentFilter)}`);
       if (cloudFilter) parts.push(`cloud=${pc.bold(cloudFilter)}`);
       p.log.info(`No spawns found matching ${parts.join(", ")}.`);
+
+      // Suggest corrections for filter values using manifest data
+      try {
+        const manifest = await loadManifest();
+        if (agentFilter) {
+          const resolved = resolveAgentKey(manifest, agentFilter);
+          if (resolved && resolved !== agentFilter) {
+            p.log.info(`Did you mean ${pc.cyan(`spawn list -a ${resolved}`)}?`);
+          } else if (!resolved) {
+            const match = findClosestKeyByNameOrKey(agentFilter, agentKeys(manifest), (k) => manifest.agents[k].name);
+            if (match) {
+              p.log.info(`Did you mean ${pc.cyan(`spawn list -a ${match}`)}?`);
+            }
+          }
+        }
+        if (cloudFilter) {
+          const resolved = resolveCloudKey(manifest, cloudFilter);
+          if (resolved && resolved !== cloudFilter) {
+            p.log.info(`Did you mean ${pc.cyan(`spawn list -c ${resolved}`)}?`);
+          } else if (!resolved) {
+            const match = findClosestKeyByNameOrKey(cloudFilter, cloudKeys(manifest), (k) => manifest.clouds[k].name);
+            if (match) {
+              p.log.info(`Did you mean ${pc.cyan(`spawn list -c ${match}`)}?`);
+            }
+          }
+        }
+      } catch {
+        // Manifest unavailable -- skip suggestions
+      }
+
+      const totalRecords = filterHistory();
+      if (totalRecords.length > 0) {
+        p.log.info(`Run ${pc.cyan("spawn list")} to see all ${totalRecords.length} recorded spawn${totalRecords.length !== 1 ? "s" : ""}.`);
+      }
     } else {
       p.log.info("No spawns recorded yet.");
       p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to launch your first agent.`);
@@ -783,8 +817,14 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud}`)}`);
   }
 
-  console.log(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
-  console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}`));
+  if (agentFilter || cloudFilter) {
+    const totalRecords = filterHistory();
+    console.log(pc.dim(`Showing ${records.length} of ${totalRecords.length} spawn${totalRecords.length !== 1 ? "s" : ""}`));
+    console.log(pc.dim(`Clear filter: ${pc.cyan("spawn list")}`));
+  } else {
+    console.log(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
+    console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}`));
+  }
   console.log();
 }
 

@@ -403,7 +403,7 @@ describe("cmdList output", () => {
     await cmdList("claude");
     const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
     expect(allOutput).toContain("claude");
-    expect(allOutput).toContain("1 spawn recorded");
+    expect(allOutput).toContain("Showing 1 of 2 spawns");
   });
 
   it("should filter by cloud when cloudFilter is provided", async () => {
@@ -418,7 +418,7 @@ describe("cmdList output", () => {
     await cmdList(undefined, "hetzner");
     const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
     expect(allOutput).toContain("hetzner");
-    expect(allOutput).toContain("1 spawn recorded");
+    expect(allOutput).toContain("Showing 1 of 2 spawns");
   });
 
   it("should show records in newest-first order", async () => {
@@ -452,5 +452,66 @@ describe("cmdList output", () => {
     // Should not crash, should show empty state
     const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
     expect(allOutput).not.toContain("AGENT");
+  });
+
+  it("should not show table when filtered results are empty", async () => {
+    writeFileSync(
+      join(testDir, "history.json"),
+      JSON.stringify([
+        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
+        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
+      ])
+    );
+    const { cmdList } = await import("../commands.js");
+    await cmdList("nonexistent");
+    const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+    // Should not show table header when nothing matches
+    expect(allOutput).not.toContain("AGENT");
+    expect(allOutput).not.toContain("CLOUD");
+  });
+
+  it("should show 'Showing X of Y' when filter matches some results", async () => {
+    writeFileSync(
+      join(testDir, "history.json"),
+      JSON.stringify([
+        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
+        { agent: "claude", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
+        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T12:00:00Z" },
+      ])
+    );
+    const { cmdList } = await import("../commands.js");
+    await cmdList("claude");
+    const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+    expect(allOutput).toContain("Showing 2 of 3 spawns");
+  });
+
+  it("should show 'Clear filter' hint when filtering", async () => {
+    writeFileSync(
+      join(testDir, "history.json"),
+      JSON.stringify([
+        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
+        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
+      ])
+    );
+    const { cmdList } = await import("../commands.js");
+    await cmdList("claude");
+    const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+    expect(allOutput).toContain("Clear filter");
+    expect(allOutput).toContain("spawn list");
+  });
+
+  it("should not show 'Clear filter' hint when not filtering", async () => {
+    writeFileSync(
+      join(testDir, "history.json"),
+      JSON.stringify([
+        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
+      ])
+    );
+    const { cmdList } = await import("../commands.js");
+    await cmdList();
+    const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+    expect(allOutput).not.toContain("Clear filter");
+    // Should show normal filter hint instead
+    expect(allOutput).toContain("spawn list -a");
   });
 });
