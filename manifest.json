@@ -1064,7 +1064,7 @@
     "exoscale/cline": "implemented",
     "exoscale/gptme": "missing",
     "exoscale/opencode": "missing",
-    "exoscale/plandex": "missing",
+    "exoscale/plandex": "implemented",
     "exoscale/kilocode": "missing",
     "exoscale/continue": "missing"
   }
