@@ -12,6 +12,7 @@ import {
   findClosestMatch,
   resolveAgentKey,
   resolveCloudKey,
+  loadManifestWithSpinner,
 } from "./commands.js";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
@@ -85,7 +86,7 @@ function checkUnknownFlags(args: string[]): void {
 
 /** Show info for a name that could be an agent or cloud, or show an error with suggestions */
 async function showInfoOrError(name: string): Promise<void> {
-  const manifest = await loadManifest();
+  const manifest = await loadManifestWithSpinner();
   if (manifest.agents[name]) {
     await cmdAgentInfo(name);
     return;

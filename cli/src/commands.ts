@@ -43,7 +43,7 @@ async function withSpinner<T>(msg: string, fn: () => Promise<T>, doneMsg?: strin
   }
 }
 
-async function loadManifestWithSpinner(): Promise<Manifest> {
+export async function loadManifestWithSpinner(): Promise<Manifest> {
   return withSpinner("Loading manifest...", loadManifest);
 }
 
