@@ -281,8 +281,8 @@ describe("Script download and execution", () => {
     await expect(cmdRun("claude", "sprite")).rejects.toThrow("process.exit");
 
     expect(processExitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(errorOutput).toContain("HTTP 500");
+    const logErrorOutput = mockLogError.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    expect(logErrorOutput).toContain("HTTP 500");
   });
 
   it("should show troubleshooting info when download throws network error", async () => {
@@ -307,7 +307,7 @@ describe("Script download and execution", () => {
     }
 
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(errorOutput).toContain("Troubleshooting");
+    expect(errorOutput).toContain("How to fix");
   });
 
   it("should use fallback URL when primary returns non-OK status", async () => {
