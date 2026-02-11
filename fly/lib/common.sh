@@ -269,7 +269,7 @@ _fly_wait_for_machine_start() {
             return 0
         fi
 
-        log_warn "Machine state: $state ($attempt/$max_attempts)"
+        log_step "Machine state: $state ($attempt/$max_attempts)"
         sleep 3
         attempt=$((attempt + 1))
     done

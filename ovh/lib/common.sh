@@ -432,7 +432,7 @@ wait_for_ovh_instance() {
 
         local jitter
         jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
-        log_warn "Instance status: ${status:-unknown} (attempt ${attempt}/${max_attempts}, retry in ${jitter}s)"
+        log_step "Instance status: ${status:-unknown} (attempt ${attempt}/${max_attempts}, retry in ${jitter}s)"
         sleep "${jitter}"
 
         interval=$((interval * 2))

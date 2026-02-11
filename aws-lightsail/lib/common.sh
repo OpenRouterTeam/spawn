@@ -108,7 +108,7 @@ _wait_for_lightsail_instance() {
             log_info "Instance running: IP=${LIGHTSAIL_SERVER_IP}"
             return 0
         fi
-        log_warn "Instance state: ${state} (${attempt}/${max_attempts})"
+        log_step "Instance state: ${state} (${attempt}/${max_attempts})"
         sleep "${INSTANCE_STATUS_POLL_DELAY}"
         attempt=$((attempt + 1))
     done

@@ -327,9 +327,9 @@ print(attrs.get('status', 'unknown'))
                 log_info "Server active: IP=$LATITUDE_SERVER_IP"
                 return 0
             fi
-            log_warn "Server active but IP not yet assigned... (attempt $attempt/$max_attempts)"
+            log_step "Server active but IP not yet assigned... (attempt $attempt/$max_attempts)"
         else
-            log_warn "Server status: $status (attempt $attempt/$max_attempts)"
+            log_step "Server status: $status (attempt $attempt/$max_attempts)"
         fi
 
         sleep 10

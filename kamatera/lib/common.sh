@@ -158,7 +158,7 @@ wait_for_command() {
             return 1
         fi
 
-        log_warn "Command status: ${status:-pending} (elapsed: ${elapsed}s)"
+        log_step "Command status: ${status:-pending} (elapsed: ${elapsed}s)"
         sleep "$INSTANCE_STATUS_POLL_DELAY"
         elapsed=$((elapsed + INSTANCE_STATUS_POLL_DELAY))
     done
