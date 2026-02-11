@@ -1117,7 +1117,7 @@
     "contabo/goose": "missing",
     "contabo/codex": "missing",
     "contabo/interpreter": "missing",
-    "contabo/gemini": "missing",
+    "contabo/gemini": "implemented",
     "contabo/amazonq": "implemented",
     "contabo/cline": "missing",
     "contabo/gptme": "missing",
