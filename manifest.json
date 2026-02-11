@@ -1196,7 +1196,7 @@
     "local/gemini": "missing",
     "local/amazonq": "missing",
     "local/cline": "missing",
-    "local/gptme": "missing",
+    "local/gptme": "implemented",
     "local/opencode": "missing",
     "local/plandex": "missing",
     "local/kilocode": "missing",
