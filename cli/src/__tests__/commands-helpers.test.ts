@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { levenshtein, findClosestMatch } from "../commands";
+import { levenshtein, findClosestMatch, resolveAgentKey, resolveCloudKey } from "../commands";
+import type { Manifest } from "../manifest";
 
 /**
  * Tests for helper functions in commands.ts
@@ -310,6 +311,89 @@ describe("Command Helpers", () => {
       const status = 403;
       const desc = status === 404 ? "not found" : `HTTP ${status}`;
       expect(desc).toBe("HTTP 403");
+    });
+  });
+
+  describe("resolveAgentKey", () => {
+    const manifest = {
+      agents: {
+        claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
+        aider: { name: "Aider", description: "AI pair programmer", url: "", install: "", launch: "", env: {} },
+        "open-interpreter": { name: "Open Interpreter", description: "Code interpreter", url: "", install: "", launch: "", env: {} },
+      },
+      clouds: {},
+      matrix: {},
+    } as unknown as Manifest;
+
+    it("should return exact key match", () => {
+      expect(resolveAgentKey(manifest, "claude")).toBe("claude");
+    });
+
+    it("should resolve case-insensitive key", () => {
+      expect(resolveAgentKey(manifest, "Claude")).toBe("claude");
+      expect(resolveAgentKey(manifest, "AIDER")).toBe("aider");
+    });
+
+    it("should resolve display name to key", () => {
+      expect(resolveAgentKey(manifest, "Claude Code")).toBe("claude");
+      expect(resolveAgentKey(manifest, "Aider")).toBe("aider");
+    });
+
+    it("should resolve display name case-insensitively", () => {
+      expect(resolveAgentKey(manifest, "claude code")).toBe("claude");
+      expect(resolveAgentKey(manifest, "CLAUDE CODE")).toBe("claude");
+    });
+
+    it("should resolve hyphenated key case-insensitively", () => {
+      expect(resolveAgentKey(manifest, "Open-Interpreter")).toBe("open-interpreter");
+    });
+
+    it("should return null for unknown input", () => {
+      expect(resolveAgentKey(manifest, "nonexistent")).toBeNull();
+      expect(resolveAgentKey(manifest, "kubernetes")).toBeNull();
+    });
+
+    it("should return null for empty input", () => {
+      expect(resolveAgentKey(manifest, "")).toBeNull();
+    });
+  });
+
+  describe("resolveCloudKey", () => {
+    const manifest = {
+      agents: {},
+      clouds: {
+        sprite: { name: "Sprite", description: "Fast VM", url: "", type: "vm", auth: "", provision_method: "", exec_method: "", interactive_method: "" },
+        hetzner: { name: "Hetzner Cloud", description: "EU cloud", url: "", type: "vm", auth: "", provision_method: "", exec_method: "", interactive_method: "" },
+        "digital-ocean": { name: "DigitalOcean", description: "Cloud VPS", url: "", type: "vm", auth: "", provision_method: "", exec_method: "", interactive_method: "" },
+      },
+      matrix: {},
+    } as unknown as Manifest;
+
+    it("should return exact key match", () => {
+      expect(resolveCloudKey(manifest, "sprite")).toBe("sprite");
+    });
+
+    it("should resolve case-insensitive key", () => {
+      expect(resolveCloudKey(manifest, "Sprite")).toBe("sprite");
+      expect(resolveCloudKey(manifest, "HETZNER")).toBe("hetzner");
+    });
+
+    it("should resolve display name to key", () => {
+      expect(resolveCloudKey(manifest, "Hetzner Cloud")).toBe("hetzner");
+      expect(resolveCloudKey(manifest, "DigitalOcean")).toBe("digital-ocean");
+    });
+
+    it("should resolve display name case-insensitively", () => {
+      expect(resolveCloudKey(manifest, "hetzner cloud")).toBe("hetzner");
+      expect(resolveCloudKey(manifest, "digitalocean")).toBe("digital-ocean");
+    });
+
+    it("should return null for unknown input", () => {
+      expect(resolveCloudKey(manifest, "aws")).toBeNull();
+    });
+
+    it("should return null for empty input", () => {
+      expect(resolveCloudKey(manifest, "")).toBeNull();
     });
   });
 });

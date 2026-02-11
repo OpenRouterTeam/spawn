@@ -10,6 +10,8 @@ import {
   cmdUpdate,
   cmdHelp,
   findClosestMatch,
+  resolveAgentKey,
+  resolveCloudKey,
 } from "./commands.js";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
@@ -86,27 +88,43 @@ async function showInfoOrError(name: string): Promise<void> {
   const manifest = await loadManifest();
   if (manifest.agents[name]) {
     await cmdAgentInfo(name);
-  } else if (manifest.clouds[name]) {
-    await cmdCloudInfo(name);
-  } else {
-    const agentMatch = findClosestMatch(name, agentKeys(manifest));
-    const cloudMatch = findClosestMatch(name, cloudKeys(manifest));
-
-    console.error(pc.red(`Unknown command: ${pc.bold(name)}`));
-    console.error();
-    if (agentMatch && cloudMatch) {
-      console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent) or ${pc.cyan(cloudMatch)} (cloud)?`);
-    } else if (agentMatch) {
-      console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent)?`);
-    } else if (cloudMatch) {
-      console.error(`  Did you mean ${pc.cyan(cloudMatch)} (cloud)?`);
-    }
-    console.error();
-    console.error(`  Run ${pc.cyan("spawn agents")} to see available agents.`);
-    console.error(`  Run ${pc.cyan("spawn clouds")} to see available clouds.`);
-    console.error(`  Run ${pc.cyan("spawn help")} for usage information.`);
-    process.exit(1);
+    return;
   }
+  if (manifest.clouds[name]) {
+    await cmdCloudInfo(name);
+    return;
+  }
+
+  // Try resolving display names and case-insensitive matches
+  const resolvedAgent = resolveAgentKey(manifest, name);
+  if (resolvedAgent) {
+    await cmdAgentInfo(resolvedAgent);
+    return;
+  }
+  const resolvedCloud = resolveCloudKey(manifest, name);
+  if (resolvedCloud) {
+    await cmdCloudInfo(resolvedCloud);
+    return;
+  }
+
+  // Fall back to fuzzy matching suggestions
+  const agentMatch = findClosestMatch(name, agentKeys(manifest));
+  const cloudMatch = findClosestMatch(name, cloudKeys(manifest));
+
+  console.error(pc.red(`Unknown command: ${pc.bold(name)}`));
+  console.error();
+  if (agentMatch && cloudMatch) {
+    console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent) or ${pc.cyan(cloudMatch)} (cloud)?`);
+  } else if (agentMatch) {
+    console.error(`  Did you mean ${pc.cyan(agentMatch)} (agent)?`);
+  } else if (cloudMatch) {
+    console.error(`  Did you mean ${pc.cyan(cloudMatch)} (cloud)?`);
+  }
+  console.error();
+  console.error(`  Run ${pc.cyan("spawn agents")} to see available agents.`);
+  console.error(`  Run ${pc.cyan("spawn clouds")} to see available clouds.`);
+  console.error(`  Run ${pc.cyan("spawn help")} for usage information.`);
+  process.exit(1);
 }
 
 async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string): Promise<void> {

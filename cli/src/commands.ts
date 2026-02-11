@@ -108,6 +108,40 @@ export function findClosestMatch(input: string, candidates: string[]): string | 
   return bestDist <= 3 ? best : null;
 }
 
+/**
+ * Resolve user input to a valid agent key.
+ * Tries: exact key -> case-insensitive key -> display name match (case-insensitive).
+ * Returns the key if found, or null.
+ */
+export function resolveAgentKey(manifest: Manifest, input: string): string | null {
+  if (manifest.agents[input]) return input;
+  const lower = input.toLowerCase();
+  for (const key of agentKeys(manifest)) {
+    if (key.toLowerCase() === lower) return key;
+  }
+  for (const key of agentKeys(manifest)) {
+    if (manifest.agents[key].name.toLowerCase() === lower) return key;
+  }
+  return null;
+}
+
+/**
+ * Resolve user input to a valid cloud key.
+ * Tries: exact key -> case-insensitive key -> display name match (case-insensitive).
+ * Returns the key if found, or null.
+ */
+export function resolveCloudKey(manifest: Manifest, input: string): string | null {
+  if (manifest.clouds[input]) return input;
+  const lower = input.toLowerCase();
+  for (const key of cloudKeys(manifest)) {
+    if (key.toLowerCase() === lower) return key;
+  }
+  for (const key of cloudKeys(manifest)) {
+    if (manifest.clouds[key].name.toLowerCase() === lower) return key;
+  }
+  return null;
+}
+
 function validateAgent(manifest: Manifest, agent: string): asserts agent is keyof typeof manifest.agents {
   if (!manifest.agents[agent]) {
     p.log.error(`Unknown agent: ${pc.bold(agent)}`);
@@ -216,6 +250,19 @@ export async function cmdInteractive(): Promise<void> {
 // ── Run ────────────────────────────────────────────────────────────────────────
 
 export async function cmdRun(agent: string, cloud: string, prompt?: string): Promise<void> {
+  // Try to resolve display names / casing before strict validation
+  const manifest = await loadManifestWithSpinner();
+  const resolvedAgent = resolveAgentKey(manifest, agent);
+  const resolvedCloud = resolveCloudKey(manifest, cloud);
+  if (resolvedAgent && resolvedAgent !== agent) {
+    p.log.info(`Resolved "${agent}" to ${pc.cyan(resolvedAgent)}`);
+    agent = resolvedAgent;
+  }
+  if (resolvedCloud && resolvedCloud !== cloud) {
+    p.log.info(`Resolved "${cloud}" to ${pc.cyan(resolvedCloud)}`);
+    cloud = resolvedCloud;
+  }
+
   // SECURITY: Validate input arguments for injection attacks
   try {
     validateIdentifier(agent, "Agent name");
@@ -232,7 +279,6 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
 
   // Detect swapped arguments: user typed "spawn <cloud> <agent>" instead of "spawn <agent> <cloud>"
-  const manifest = await loadManifestWithSpinner();
   if (!manifest.agents[agent] && manifest.clouds[agent] && manifest.agents[cloud]) {
     p.log.warn(`It looks like you swapped the agent and cloud arguments.`);
     p.log.info(`Running: ${pc.cyan(`spawn ${cloud} ${agent}`)}`);
