@@ -101,14 +101,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    local server_name
-    server_name=$(get_resource_name "GENESIS_SERVER_NAME" "Enter instance name: ") || return 1
-
-    if ! validate_server_name "$server_name"; then
-        return 1
-    fi
-
-    echo "$server_name"
+    get_validated_server_name "GENESIS_SERVER_NAME" "Enter instance name: "
 }
 
 # Get all SSH key IDs from Genesis Cloud

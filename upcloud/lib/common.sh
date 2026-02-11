@@ -63,14 +63,7 @@ ensure_upcloud_credentials() {
 
 # Get server name from env var or prompt
 get_server_name() {
-    local server_name
-    server_name=$(get_resource_name "UPCLOUD_SERVER_NAME" "Enter server name: ") || return 1
-
-    if ! validate_server_name "$server_name"; then
-        return 1
-    fi
-
-    echo "$server_name"
+    get_validated_server_name "UPCLOUD_SERVER_NAME" "Enter server name: "
 }
 
 # Find Ubuntu 24.04 template UUID
