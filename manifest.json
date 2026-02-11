@@ -1013,7 +1013,7 @@
     "upcloud/continue": "implemented",
     "binarylane/continue": "implemented",
     "latitude/continue": "implemented",
-    "ovh/continue": "missing",
+    "ovh/continue": "implemented",
     "kamatera/continue": "implemented",
     "cherry/continue": "implemented",
     "oracle/continue": "implemented",
