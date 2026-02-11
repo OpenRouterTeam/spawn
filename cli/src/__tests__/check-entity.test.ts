@@ -412,6 +412,45 @@ describe("checkEntity", () => {
     });
   });
 
+  // ── Cross-kind fuzzy match: detect swapped args with typos ──────────
+
+  describe("cross-kind fuzzy match for swapped args with typos", () => {
+    it("should return false for 'htzner' as agent (close to cloud 'hetzner')", () => {
+      expect(checkEntity(manifest, "htzner", "agent")).toBe(false);
+    });
+
+    it("should return false for 'sprit' as agent (close to cloud 'sprite')", () => {
+      expect(checkEntity(manifest, "sprit", "agent")).toBe(false);
+    });
+
+    it("should return false for 'vulr' as agent (close to cloud 'vultr')", () => {
+      expect(checkEntity(manifest, "vulr", "agent")).toBe(false);
+    });
+
+    it("should return false for 'claud' as cloud (close to agent 'claude')", () => {
+      expect(checkEntity(manifest, "claud", "cloud")).toBe(false);
+    });
+
+    it("should return false for 'aidr' as cloud (close to agent 'aider')", () => {
+      expect(checkEntity(manifest, "aidr", "cloud")).toBe(false);
+    });
+
+    it("should return false for 'goos' as cloud (close to agent 'goose')", () => {
+      expect(checkEntity(manifest, "goos", "cloud")).toBe(false);
+    });
+
+    it("should prefer same-kind match over cross-kind match", () => {
+      // "goose" checked as agent should match exactly (same-kind), not cross-kind
+      expect(checkEntity(manifest, "goose", "agent")).toBe(true);
+    });
+
+    it("should not suggest cross-kind match for values far from any candidate", () => {
+      // "zzzzzzz" is far from all agent and cloud names
+      expect(checkEntity(manifest, "zzzzzzz", "agent")).toBe(false);
+      expect(checkEntity(manifest, "zzzzzzz", "cloud")).toBe(false);
+    });
+  });
+
   // ── Manifest with overlapping key names ────────────────────────────────
 
   describe("manifest with overlapping patterns", () => {
