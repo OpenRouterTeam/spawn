@@ -170,64 +170,60 @@ export function resolveCloudKey(manifest: Manifest, input: string): string | nul
   return null;
 }
 
-function validateAgent(manifest: Manifest, agent: string): asserts agent is keyof typeof manifest.agents {
-  if (!manifest.agents[agent]) {
-    p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+interface EntityDef { label: string; labelPlural: string; listCmd: string; opposite: string }
+const ENTITY_DEFS: Record<"agent" | "cloud", EntityDef> = {
+  agent: { label: "agent", labelPlural: "agents", listCmd: "spawn agents", opposite: "cloud provider" },
+  cloud: { label: "cloud", labelPlural: "clouds", listCmd: "spawn clouds", opposite: "agent" },
+};
 
-    // Check if the user passed a cloud as the first argument (e.g., "spawn hetzner sprite")
-    if (manifest.clouds[agent]) {
-      p.log.info(`"${agent}" is a cloud provider, not an agent.`);
-      p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
-      p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
-      process.exit(1);
-    }
-
-    const keys = agentKeys(manifest);
-    const match = findClosestKeyByNameOrKey(agent, keys, (k) => manifest.agents[k].name);
-    if (match) {
-      p.log.info(`Did you mean ${pc.cyan(match)} (${manifest.agents[match].name})?`);
-    }
-    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
-    process.exit(1);
-  }
+function getEntityCollection(manifest: Manifest, kind: "agent" | "cloud") {
+  return kind === "agent" ? manifest.agents : manifest.clouds;
 }
 
-// Validate and load agent - consolidates the pattern used by cmdRun and cmdAgentInfo
-async function validateAndGetAgent(agent: string): Promise<[manifest: Manifest, agentKey: string]> {
+function getEntityKeys(manifest: Manifest, kind: "agent" | "cloud") {
+  return kind === "agent" ? agentKeys(manifest) : cloudKeys(manifest);
+}
+
+function validateEntity(manifest: Manifest, value: string, kind: "agent" | "cloud"): void {
+  const def = ENTITY_DEFS[kind];
+  const collection = getEntityCollection(manifest, kind);
+  if (collection[value]) return;
+
+  p.log.error(`Unknown ${def.label}: ${pc.bold(value)}`);
+
+  const oppositeKind = kind === "agent" ? "cloud" : "agent";
+  const oppositeCollection = getEntityCollection(manifest, oppositeKind);
+  if (oppositeCollection[value]) {
+    p.log.info(`"${value}" is ${kind === "agent" ? "a cloud provider" : "an agent"}, not ${kind === "agent" ? "an agent" : "a cloud provider"}.`);
+    p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
+    p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
+    process.exit(1);
+  }
+
+  const keys = getEntityKeys(manifest, kind);
+  const match = findClosestKeyByNameOrKey(value, keys, (k) => collection[k].name);
+  if (match) {
+    p.log.info(`Did you mean ${pc.cyan(match)} (${collection[match].name})?`);
+  }
+  p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
+  process.exit(1);
+}
+
+async function validateAndGetEntity(value: string, kind: "agent" | "cloud"): Promise<[manifest: Manifest, key: string]> {
+  const def = ENTITY_DEFS[kind];
+  const capitalLabel = def.label.charAt(0).toUpperCase() + def.label.slice(1);
   try {
-    validateIdentifier(agent, "Agent name");
+    validateIdentifier(value, `${capitalLabel} name`);
   } catch (err) {
     p.log.error(getErrorMessage(err));
     process.exit(1);
   }
 
-  validateNonEmptyString(agent, "Agent name", "spawn agents");
+  validateNonEmptyString(value, `${capitalLabel} name`, def.listCmd);
   const manifest = await loadManifestWithSpinner();
-  validateAgent(manifest, agent);
+  validateEntity(manifest, value, kind);
 
-  return [manifest, agent];
-}
-
-function validateCloud(manifest: Manifest, cloud: string): asserts cloud is keyof typeof manifest.clouds {
-  if (!manifest.clouds[cloud]) {
-    p.log.error(`Unknown cloud: ${pc.bold(cloud)}`);
-
-    // Check if the user passed two agents instead of agent + cloud
-    if (manifest.agents[cloud]) {
-      p.log.info(`"${cloud}" is an agent, not a cloud provider.`);
-      p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
-      p.log.info(`Run ${pc.cyan("spawn clouds")} to see available cloud providers.`);
-      process.exit(1);
-    }
-
-    const keys = cloudKeys(manifest);
-    const match = findClosestKeyByNameOrKey(cloud, keys, (k) => manifest.clouds[k].name);
-    if (match) {
-      p.log.info(`Did you mean ${pc.cyan(match)} (${manifest.clouds[match].name})?`);
-    }
-    p.log.info(`Run ${pc.cyan("spawn clouds")} to see available clouds.`);
-    process.exit(1);
-  }
+  return [manifest, value];
 }
 
 function validateImplementation(manifest: Manifest, cloud: string, agent: string): void {
@@ -348,8 +344,8 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string): Pro
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
   ({ agent, cloud } = detectAndFixSwappedArgs(manifest, agent, cloud));
 
-  validateAgent(manifest, agent);
-  validateCloud(manifest, cloud);
+  validateEntity(manifest, agent, "agent");
+  validateEntity(manifest, cloud, "cloud");
   validateImplementation(manifest, cloud, agent);
 
   const agentName = manifest.agents[agent].name;
@@ -760,7 +756,7 @@ function printGroupedList(
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
 export async function cmdAgentInfo(agent: string): Promise<void> {
-  const [manifest, agentKey] = await validateAndGetAgent(agent);
+  const [manifest, agentKey] = await validateAndGetEntity(agent, "agent");
 
   printInfoHeader(manifest.agents[agentKey]);
 
@@ -802,22 +798,6 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
 }
 
 // ── Cloud Info ─────────────────────────────────────────────────────────────────
-
-// Validate and load cloud - consolidates the pattern used by cmdCloudInfo
-async function validateAndGetCloud(cloud: string): Promise<[manifest: Manifest, cloudKey: string]> {
-  try {
-    validateIdentifier(cloud, "Cloud name");
-  } catch (err) {
-    p.log.error(getErrorMessage(err));
-    process.exit(1);
-  }
-
-  validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
-  const manifest = await loadManifestWithSpinner();
-  validateCloud(manifest, cloud);
-
-  return [manifest, cloud];
-}
 
 /** Print quick-start auth instructions for a cloud provider */
 function printCloudQuickStart(
@@ -866,7 +846,7 @@ function printAgentList(
 }
 
 export async function cmdCloudInfo(cloud: string): Promise<void> {
-  const [manifest, cloudKey] = await validateAndGetCloud(cloud);
+  const [manifest, cloudKey] = await validateAndGetEntity(cloud, "cloud");
 
   const c = manifest.clouds[cloudKey];
   printInfoHeader(c);
