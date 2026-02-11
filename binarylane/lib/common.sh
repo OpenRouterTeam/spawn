@@ -35,55 +35,30 @@ binarylane_api() {
     generic_cloud_api "$BINARYLANE_API_BASE" "$BINARYLANE_API_TOKEN" "$method" "$endpoint" "$body"
 }
 
-ensure_binarylane_token() {
-    # Check Python 3 is available (required for JSON parsing)
-    check_python_available || return 1
-
-    if [[ -n "${BINARYLANE_API_TOKEN:-}" ]]; then
-        log_info "Using BinaryLane API token from environment"
-        return 0
-    fi
-    local config_dir="$HOME/.config/spawn"
-    local config_file="$config_dir/binarylane.json"
-    if [[ -f "$config_file" ]]; then
-        local saved_key
-        saved_key=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('api_token',''))" "$config_file" 2>/dev/null)
-        if [[ -n "$saved_key" ]]; then
-            export BINARYLANE_API_TOKEN="$saved_key"
-            log_info "Using BinaryLane API token from $config_file"
-            return 0
-        fi
-    fi
-    echo ""
-    log_warn "BinaryLane API Token Required"
-    log_warn "Get your API token from: https://home.binarylane.com.au/api-info"
-    echo ""
-    local api_token
-    api_token=$(validated_read "Enter your BinaryLane API token: " validate_api_token) || return 1
-    export BINARYLANE_API_TOKEN="$api_token"
+test_binarylane_token() {
     local response
     response=$(binarylane_api GET "/account")
     if echo "$response" | grep -q '"account"'; then
-        log_info "API token validated"
-    else
-        log_error "Authentication failed: Invalid BinaryLane API token"
-
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
-
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify API token at: https://home.binarylane.com.au/api-info"
-        log_warn "  2. Ensure the token has read/write permissions"
-        log_warn "  3. Check token hasn't been revoked"
-        unset BINARYLANE_API_TOKEN
-        return 1
+        return 0
     fi
-    mkdir -p "$config_dir"
-    printf '{\n  "api_token": %s\n}\n' "$(json_escape "$api_token")" > "$config_file"
-    chmod 600 "$config_file"
-    log_info "API token saved to $config_file"
+    local error_msg
+    error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+    log_error "API Error: $error_msg"
+    log_error ""
+    log_error "How to fix:"
+    log_error "  1. Verify API token at: https://home.binarylane.com.au/api-info"
+    log_error "  2. Ensure the token has read/write permissions"
+    log_error "  3. Check token hasn't been revoked"
+    return 1
+}
+
+ensure_binarylane_token() {
+    ensure_api_token_with_provider \
+        "BinaryLane" \
+        "BINARYLANE_API_TOKEN" \
+        "$HOME/.config/spawn/binarylane.json" \
+        "https://home.binarylane.com.au/api-info" \
+        "test_binarylane_token"
 }
 
 # Check if SSH key is registered with BinaryLane

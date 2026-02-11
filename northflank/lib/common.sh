@@ -37,108 +37,26 @@ ensure_northflank_cli() {
 }
 
 test_northflank_token() {
-    local test_response
-    # Test token by listing projects (lightweight API call)
-    test_response=$(northflank list projects 2>&1)
-    local exit_code=$?
-
-    if [[ ${exit_code} -ne 0 ]]; then
-        if echo "${test_response}" | grep -qi "unauthorized\|invalid.*token\|authentication"; then
-            log_error "Invalid API token"
-            log_warn "Remediation steps:"
-            log_warn "  1. Verify API token at: https://northflank.com/account/settings/api/tokens"
-            log_warn "  2. Ensure the token has appropriate permissions"
-            log_warn "  3. Check token hasn't expired (90 day limit)"
-            return 1
-        fi
-    fi
-    return 0
-}
-
-# Authenticate with Northflank CLI using a token
-# Returns 0 on success, 1 on invalid token
-_northflank_login() {
-    local token="$1"
-    if ! northflank login -t "${token}" &>/dev/null; then
+    # Login with the token and validate by listing projects
+    if ! northflank login -t "${NORTHFLANK_TOKEN}" &>/dev/null; then
+        log_error "Failed to authenticate with Northflank CLI"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Verify API token at: https://northflank.com/account/settings/api/tokens"
+        log_error "  2. Ensure the token has appropriate permissions"
+        log_error "  3. Check token hasn't expired (90 day limit)"
         return 1
     fi
     return 0
-}
-
-# Try to load Northflank token from config file and authenticate
-# Returns 0 if loaded and valid, 1 otherwise
-_load_northflank_config() {
-    local config_file="$1"
-    [[ -f "${config_file}" ]] || return 1
-
-    local saved_token
-    saved_token=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('token',''))" "${config_file}" 2>/dev/null)
-    if [[ -n "${saved_token}" ]]; then
-        export NORTHFLANK_TOKEN="${saved_token}"
-        log_info "Using Northflank token from ${config_file}"
-        if _northflank_login "${saved_token}"; then
-            return 0
-        fi
-        log_warn "Saved Northflank token is invalid, prompting for new one"
-        unset NORTHFLANK_TOKEN
-    fi
-    return 1
-}
-
-# Save Northflank token to config file
-_save_northflank_token() {
-    local token="$1"
-    local config_file="$2"
-    local config_dir
-    config_dir=$(dirname "${config_file}")
-    mkdir -p "${config_dir}"
-    printf '{\n  "token": "%s"\n}\n' "$(json_escape "${token}")" > "${config_file}"
-    chmod 600 "${config_file}"
-    log_info "Northflank token saved to ${config_file}"
 }
 
 ensure_northflank_token() {
-    check_python_available || return 1
-
-    # 1. Check environment variable
-    if [[ -n "${NORTHFLANK_TOKEN:-}" ]]; then
-        log_info "Using Northflank token from environment"
-        if ! _northflank_login "${NORTHFLANK_TOKEN}"; then
-            log_error "Northflank token in environment is invalid"
-            return 1
-        fi
-        return 0
-    fi
-
-    local config_file="${HOME}/.config/spawn/northflank.json"
-
-    # 2. Check config file
-    if _load_northflank_config "${config_file}"; then
-        return 0
-    fi
-
-    # 3. Prompt and validate
-    echo ""
-    log_warn "Northflank API Token Required"
-    printf '%b\n' "${YELLOW}Get your token at: https://northflank.com/account/settings/api/tokens${NC}"
-    echo ""
-
-    local token
-    token=$(safe_read "Enter your Northflank token: ") || return 1
-    if [[ -z "${token}" ]]; then
-        log_error "Northflank token cannot be empty"
-        log_warn "For non-interactive usage, set: NORTHFLANK_TOKEN=your-token"
-        return 1
-    fi
-
-    export NORTHFLANK_TOKEN="${token}"
-    if ! _northflank_login "${token}"; then
-        log_error "Invalid Northflank token"
-        unset NORTHFLANK_TOKEN
-        return 1
-    fi
-
-    _save_northflank_token "${token}" "${config_file}"
+    ensure_api_token_with_provider \
+        "Northflank" \
+        "NORTHFLANK_TOKEN" \
+        "$HOME/.config/spawn/northflank.json" \
+        "https://northflank.com/account/settings/api/tokens" \
+        "test_northflank_token"
 }
 
 get_server_name() {

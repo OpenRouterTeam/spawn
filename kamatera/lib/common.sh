@@ -44,17 +44,8 @@ kamatera_api() {
 # Returns 0 if loaded, 1 otherwise
 _load_kamatera_config() {
     local config_file="$1"
-    [[ -f "$config_file" ]] || return 1
-
     local creds
-    creds=$(python3 -c "
-import json, sys
-d = json.load(open(sys.argv[1]))
-print(d.get('api_client_id', ''))
-print(d.get('api_secret', ''))
-" "$config_file" 2>/dev/null) || return 1
-
-    [[ -n "${creds}" ]] || return 1
+    creds=$(_load_json_config_fields "$config_file" api_client_id api_secret) || return 1
 
     local saved_client_id saved_secret
     { read -r saved_client_id; read -r saved_secret; } <<< "${creds}"
@@ -115,12 +106,7 @@ ensure_kamatera_token() {
     _validate_kamatera_credentials || return 1
     log_info "API credentials validated"
 
-    local config_dir
-    config_dir=$(dirname "$config_file")
-    mkdir -p "$config_dir"
-    printf '{\n  "api_client_id": %s,\n  "api_secret": %s\n}\n' "$(json_escape "$client_id")" "$(json_escape "$secret")" > "$config_file"
-    chmod 600 "$config_file"
-    log_info "API credentials saved to $config_file"
+    _save_json_config "$config_file" api_client_id "$client_id" api_secret "$secret"
 }
 
 get_server_name() {
