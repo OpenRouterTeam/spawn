@@ -183,6 +183,7 @@ create_server() {
 }
 
 # Run a command on the Render service via SSH
+# SECURITY: Uses printf %q to properly escape commands to prevent injection
 run_server() {
     local cmd="$1"
 
@@ -191,7 +192,9 @@ run_server() {
         return 1
     fi
 
-    render ssh --service "$RENDER_SERVICE_ID" -- bash -c "$cmd"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$cmd")
+    render ssh --service "$RENDER_SERVICE_ID" -- bash -c "$escaped_cmd"
 }
 
 # Upload a file to the Render service via base64 encoding over SSH
@@ -253,7 +256,10 @@ interactive_session() {
     fi
 
     log_info "Starting interactive session..."
-    render ssh --service "$RENDER_SERVICE_ID" -- bash -c "$launch_cmd"
+    # SECURITY: Properly escape command to prevent injection
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$launch_cmd")
+    render ssh --service "$RENDER_SERVICE_ID" -- bash -c "$escaped_cmd"
 }
 
 # Cleanup: delete the service

@@ -164,8 +164,16 @@ _fly_create_app() {
     local org
     org=$(get_fly_org)
 
+    # SECURITY: Validate org slug to prevent JSON injection via FLY_ORG env var
+    if [[ ! "$org" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        log_error "Invalid FLY_ORG: must be alphanumeric with hyphens/underscores only"
+        return 1
+    fi
+
     log_warn "Creating Fly.io app '$name'..."
-    local app_body="{\"app_name\":\"$name\",\"org_slug\":\"$org\"}"
+    # SECURITY: Use json_escape to prevent JSON injection
+    local app_body
+    app_body=$(printf '{"app_name":%s,"org_slug":%s}' "$(json_escape "$name")" "$(json_escape "$org")")
     local app_response
     app_response=$(fly_api POST "/apps" "$app_body")
 
@@ -197,18 +205,19 @@ _fly_create_machine() {
 
     log_warn "Creating Fly.io machine (region: $region, memory: ${vm_memory}MB)..."
 
+    # SECURITY: Pass values via environment variables to prevent Python injection
     local machine_body
-    machine_body=$(python3 -c "
-import json
+    machine_body=$(_FLY_NAME="$name" _FLY_REGION="$region" _FLY_MEM="$vm_memory" python3 -c "
+import json, os
 body = {
-    'name': '$name',
-    'region': '$region',
+    'name': os.environ['_FLY_NAME'],
+    'region': os.environ['_FLY_REGION'],
     'config': {
         'image': 'ubuntu:24.04',
         'guest': {
             'cpu_kind': 'shared',
             'cpus': 1,
-            'memory_mb': $vm_memory
+            'memory_mb': int(os.environ['_FLY_MEM'])
         },
         'init': {
             'exec': ['/bin/sleep', 'inf']

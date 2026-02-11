@@ -195,6 +195,7 @@ upload_file() {
 }
 
 # Run a command on the codespace (wrapper matching other providers' interface)
+# SECURITY: Uses printf %q to properly escape commands to prevent injection
 run_server() {
     local cmd="$1"
 
@@ -203,7 +204,9 @@ run_server() {
         return 1
     fi
 
-    gh codespace ssh --codespace "$CODESPACE_NAME" -- bash -c "$cmd"
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$cmd")
+    gh codespace ssh --codespace "$CODESPACE_NAME" -- bash -c "$escaped_cmd"
 }
 
 # Inject environment variables into shell config
