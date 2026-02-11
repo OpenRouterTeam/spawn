@@ -166,7 +166,7 @@ create_server() {
     validate_resource_name "$size" || { log_error "Invalid DO_DROPLET_SIZE"; return 1; }
     validate_region_name "$region" || { log_error "Invalid DO_REGION"; return 1; }
 
-    log_warn "Creating DigitalOcean droplet '$name' (size: $size, region: $region)..."
+    log_step "Creating DigitalOcean droplet '$name' (size: $size, region: $region)..."
 
     # Get all SSH key IDs
     local ssh_keys_response
@@ -219,7 +219,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 destroy_server() {
     local droplet_id="$1"
 
-    log_warn "Destroying droplet $droplet_id..."
+    log_step "Destroying droplet $droplet_id..."
     local response
     response=$(do_api DELETE "/droplets/$droplet_id")
 
