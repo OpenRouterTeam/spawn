@@ -1433,12 +1433,9 @@ _save_token_to_config() {
     config_dir=$(dirname "${config_file}")
     mkdir -p "${config_dir}"
 
-    cat > "${config_file}" << EOF
-{
-  "api_key": "${token}",
-  "token": "${token}"
-}
-EOF
+    local escaped_token
+    escaped_token=$(json_escape "${token}")
+    printf '{\n  "api_key": %s,\n  "token": %s\n}\n' "${escaped_token}" "${escaped_token}" > "${config_file}"
     chmod 600 "${config_file}"
     log_info "API token saved to ${config_file}"
 }
@@ -1608,6 +1605,44 @@ setup_openclaw_config() {
     local openclaw_json
     openclaw_json=$(printf '{\n  "env": {\n    "OPENROUTER_API_KEY": %s\n  },\n  "gateway": {\n    "mode": "local",\n    "auth": {\n      "token": %s\n    }\n  },\n  "agents": {\n    "defaults": {\n      "model": {\n        "primary": "openrouter/%s"\n      }\n    }\n  }\n}\n' "$(json_escape "${openrouter_key}")" "$(json_escape "${gateway_token}")" "${model_id}")
     upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "~/.openclaw/openclaw.json"
+}
+
+# ============================================================
+# Continue configuration setup
+# ============================================================
+
+# Setup Continue configuration files (config.json)
+# This consolidates the config setup pattern used by all continue.sh scripts
+# Usage: setup_continue_config OPENROUTER_KEY UPLOAD_CALLBACK RUN_CALLBACK
+#
+# Arguments:
+#   OPENROUTER_KEY    - OpenRouter API key to inject into config
+#   UPLOAD_CALLBACK   - Function to upload files: func(local_path, remote_path)
+#   RUN_CALLBACK      - Function to run commands: func(command)
+#
+# Example (SSH-based clouds):
+#   setup_continue_config "$OPENROUTER_API_KEY" \
+#     "upload_file $SERVER_IP" \
+#     "run_server $SERVER_IP"
+#
+# Example (container clouds):
+#   setup_continue_config "$OPENROUTER_API_KEY" \
+#     "upload_file" \
+#     "run_server"
+setup_continue_config() {
+    local openrouter_key="${1}"
+    local upload_callback="${2}"
+    local run_callback="${3}"
+
+    log_warn "Configuring Continue..."
+
+    # Create ~/.continue directory
+    ${run_callback} "mkdir -p ~/.continue"
+
+    # Create config.json with json_escape to prevent injection
+    local continue_json
+    continue_json=$(printf '{\n  "models": [\n    {\n      "title": "OpenRouter",\n      "provider": "openrouter",\n      "model": "openrouter/auto",\n      "apiBase": "https://openrouter.ai/api/v1",\n      "apiKey": %s\n    }\n  ]\n}\n' "$(json_escape "${openrouter_key}")")
+    upload_config_file "${upload_callback}" "${run_callback}" "${continue_json}" "~/.continue/config.json"
 }
 
 # ============================================================

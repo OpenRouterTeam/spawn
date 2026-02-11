@@ -40,21 +40,9 @@ export PATH=\"\$HOME/.bun/bin:\$PATH\"
 export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
 ENV_EOF"
 
-log_warn "Creating Continue config file..."
-run_server "${CIVO_SERVER_IP}" "mkdir -p ~/.continue"
-run_server "${CIVO_SERVER_IP}" "cat > ~/.continue/config.json << 'EOF'
-{
-  \"models\": [
-    {
-      \"title\": \"OpenRouter\",
-      \"provider\": \"openrouter\",
-      \"model\": \"openrouter/auto\",
-      \"apiBase\": \"https://openrouter.ai/api/v1\",
-      \"apiKey\": \"${OPENROUTER_API_KEY}\"
-    }
-  ]
-}
-EOF"
+setup_continue_config "${OPENROUTER_API_KEY}" \
+    "upload_file ${CIVO_SERVER_IP}" \
+    "run_server ${CIVO_SERVER_IP}"
 
 echo ""
 log_info "Server setup completed successfully!"

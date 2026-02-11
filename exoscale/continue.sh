@@ -38,21 +38,9 @@ log_warn "Setting up environment variables..."
 inject_env_vars_ssh "${EXOSCALE_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
-log_warn "Creating Continue config file..."
-run_server "${EXOSCALE_SERVER_IP}" "mkdir -p ~/.continue"
-run_server "${EXOSCALE_SERVER_IP}" "cat > ~/.continue/config.json << 'EOF'
-{
-  \"models\": [
-    {
-      \"title\": \"OpenRouter\",
-      \"provider\": \"openrouter\",
-      \"model\": \"openrouter/auto\",
-      \"apiBase\": \"https://openrouter.ai/api/v1\",
-      \"apiKey\": \"${OPENROUTER_API_KEY}\"
-    }
-  ]
-}
-EOF"
+setup_continue_config "${OPENROUTER_API_KEY}" \
+    "upload_file ${EXOSCALE_SERVER_IP}" \
+    "run_server ${EXOSCALE_SERVER_IP}"
 
 echo ""
 log_info "Exoscale server setup completed successfully!"
