@@ -1066,28 +1066,6 @@ _api_should_retry_on_error() {
     return 0  # Do retry
 }
 
-# Helper to handle transient HTTP error (429 or 503) with retry decision
-# Usage: _api_handle_transient_error HTTP_CODE ATTEMPT MAX_RETRIES INTERVAL MAX_INTERVAL
-# Returns: 0 to retry, 1 to fail
-_api_handle_transient_http_error() {
-    local http_code="${1}"
-    local attempt="${2}"
-    local max_retries="${3}"
-    local interval="${4}"
-    local max_interval="${5}"
-
-    local error_msg="rate limit"
-    if [[ "${http_code}" == "503" ]]; then
-        error_msg="service unavailable"
-    fi
-
-    if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API returned ${error_msg} (HTTP ${http_code})"; then
-        log_error "Cloud API returned HTTP ${http_code} after ${max_retries} attempts"
-        return 1
-    fi
-    return 0
-}
-
 # Helper to update retry interval with backoff
 # Usage: _update_retry_interval INTERVAL_VAR MAX_INTERVAL_VAR
 # This eliminates repeated interval update logic across API wrappers
@@ -1151,34 +1129,6 @@ _make_api_request() {
     return ${curl_exit_code}
 }
 
-# Helper to handle transient API error and decide whether to retry
-# Returns: 0 to continue, 1 to fail (response already echoed)
-_handle_api_transient_error() {
-    local error_type="${1}"  # "network" or HTTP_CODE like "429"
-    local attempt="${2}"
-    local max_retries="${3}"
-    local interval_var="${4}"
-    local max_interval_var="${5}"
-    local response_body="${6}"
-
-    if [[ "${error_type}" == "network" ]]; then
-        if ! _api_should_retry_on_error "network" "${attempt}" "${max_retries}" "${!interval_var}" "${!max_interval_var}" "Cloud API network error"; then
-            log_error "Cloud API network error after ${max_retries} attempts"
-            log_warn "Check your internet connection and verify the provider's API is reachable."
-            return 1
-        fi
-    else
-        # HTTP error code (429 or 503)
-        if ! _api_handle_transient_http_error "${error_type}" "${attempt}" "${max_retries}" "${!interval_var}" "${!max_interval_var}"; then
-            echo "${response_body}"
-            return 1
-        fi
-    fi
-
-    _update_retry_interval "${interval_var}" "${max_interval_var}"
-    return 0
-}
-
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
 # Includes automatic retry logic with exponential backoff for transient failures
 # Usage: generic_cloud_api BASE_URL AUTH_TOKEN METHOD ENDPOINT [BODY] [MAX_RETRIES]
@@ -1200,18 +1150,29 @@ _cloud_api_retry_loop() {
 
     while [[ "${attempt}" -le "${max_retries}" ]]; do
         if ! "${request_func}" "$@"; then
-            if ! _handle_api_transient_error "network" "${attempt}" "${max_retries}" "interval" "max_interval" ""; then
+            # Network/curl failure
+            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API network error"; then
+                log_error "Cloud API network error after ${max_retries} attempts"
+                log_warn "Check your internet connection and verify the provider's API is reachable."
                 return 1
             fi
+            _update_retry_interval interval max_interval
             attempt=$((attempt + 1))
             continue
         fi
 
         # Check for transient HTTP errors (429 or 503)
         if [[ "${API_HTTP_CODE}" == "429" ]] || [[ "${API_HTTP_CODE}" == "503" ]]; then
-            if ! _handle_api_transient_error "${API_HTTP_CODE}" "${attempt}" "${max_retries}" "interval" "max_interval" "${API_RESPONSE_BODY}"; then
+            local error_msg="rate limit"
+            if [[ "${API_HTTP_CODE}" == "503" ]]; then
+                error_msg="service unavailable"
+            fi
+            if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "Cloud API returned ${error_msg} (HTTP ${API_HTTP_CODE})"; then
+                log_error "Cloud API returned HTTP ${API_HTTP_CODE} after ${max_retries} attempts"
+                echo "${API_RESPONSE_BODY}"
                 return 1
             fi
+            _update_retry_interval interval max_interval
             attempt=$((attempt + 1))
             continue
         fi
