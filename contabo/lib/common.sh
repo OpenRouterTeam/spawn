@@ -56,6 +56,7 @@ get_contabo_access_token() {
 }
 
 # Centralized curl wrapper for Contabo API
+# Delegates to generic_cloud_api for retry logic and error handling
 contabo_api() {
     local method="$1"
     local endpoint="$2"
@@ -67,41 +68,7 @@ contabo_api() {
         export CONTABO_ACCESS_TOKEN
     fi
 
-    local url="${CONTABO_API_BASE}${endpoint}"
-    local response
-
-    if [[ "$method" == "GET" ]]; then
-        response=$(curl -fsSL -X GET \
-            -H "Authorization: Bearer ${CONTABO_ACCESS_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "$url" 2>&1) || {
-            log_error "GET request failed: $response"
-            return 1
-        }
-    elif [[ "$method" == "POST" ]]; then
-        response=$(curl -fsSL -X POST \
-            -H "Authorization: Bearer ${CONTABO_ACCESS_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -H "x-request-id: spawn-$(date +%s)" \
-            -d "$body" \
-            "$url" 2>&1) || {
-            log_error "POST request failed: $response"
-            return 1
-        }
-    elif [[ "$method" == "DELETE" ]]; then
-        response=$(curl -fsSL -X DELETE \
-            -H "Authorization: Bearer ${CONTABO_ACCESS_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "$url" 2>&1) || {
-            log_error "DELETE request failed: $response"
-            return 1
-        }
-    else
-        log_error "Unsupported HTTP method: $method"
-        return 1
-    fi
-
-    echo "$response"
+    generic_cloud_api "$CONTABO_API_BASE" "$CONTABO_ACCESS_TOKEN" "$method" "$endpoint" "$body"
 }
 
 # Test Contabo credentials
@@ -125,44 +92,92 @@ test_contabo_credentials() {
     return 0
 }
 
+# Try to load Contabo credentials from config file
+# Returns 0 if all 4 credentials loaded, 1 otherwise
+_load_contabo_config() {
+    local config_file="$1"
+    [[ -f "$config_file" ]] || return 1
+
+    local creds
+    creds=$(python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(d.get('client_id', ''))
+print(d.get('client_secret', ''))
+print(d.get('api_user', ''))
+print(d.get('api_password', ''))
+" "$config_file" 2>/dev/null) || return 1
+
+    local saved_client_id saved_secret saved_user saved_password
+    { read -r saved_client_id; read -r saved_secret; read -r saved_user; read -r saved_password; } <<< "${creds}"
+
+    if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]] && [[ -n "$saved_user" ]] && [[ -n "$saved_password" ]]; then
+        export CONTABO_CLIENT_ID="$saved_client_id"
+        export CONTABO_CLIENT_SECRET="$saved_secret"
+        export CONTABO_API_USER="$saved_user"
+        export CONTABO_API_PASSWORD="$saved_password"
+        log_info "Using Contabo credentials from $config_file"
+        return 0
+    fi
+    return 1
+}
+
+# Prompt for a single Contabo credential if not already set
+# Usage: _prompt_contabo_cred VAR_NAME "prompt text"
+_prompt_contabo_cred() {
+    local var_name="$1"
+    local prompt_text="$2"
+
+    if [[ -n "${!var_name:-}" ]]; then
+        return 0
+    fi
+
+    local value
+    value=$(safe_read "$prompt_text") || return 1
+    export "${var_name}=${value}"
+}
+
+# Save Contabo credentials to config file using json_escape
+_save_contabo_config() {
+    local config_file="$1"
+    mkdir -p "$(dirname "$config_file")"
+    printf '{\n  "client_id": %s,\n  "client_secret": %s,\n  "api_user": %s,\n  "api_password": %s\n}\n' \
+        "$(json_escape "$CONTABO_CLIENT_ID")" \
+        "$(json_escape "$CONTABO_CLIENT_SECRET")" \
+        "$(json_escape "$CONTABO_API_USER")" \
+        "$(json_escape "$CONTABO_API_PASSWORD")" > "$config_file"
+    chmod 600 "$config_file"
+    log_info "Credentials saved to $config_file"
+}
+
 # Ensure Contabo credentials are available
 ensure_contabo_credentials() {
+    check_python_available || return 1
+
     local config_file="$HOME/.config/spawn/contabo.json"
 
-    # Try to load from config file first
-    if [[ -f "$config_file" ]]; then
-        CONTABO_CLIENT_ID=$(python3 -c "import json; print(json.load(open('$config_file')).get('client_id',''))" 2>/dev/null)
-        CONTABO_CLIENT_SECRET=$(python3 -c "import json; print(json.load(open('$config_file')).get('client_secret',''))" 2>/dev/null)
-        CONTABO_API_USER=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_user',''))" 2>/dev/null)
-        CONTABO_API_PASSWORD=$(python3 -c "import json; print(json.load(open('$config_file')).get('api_password',''))" 2>/dev/null)
-        export CONTABO_CLIENT_ID CONTABO_CLIENT_SECRET CONTABO_API_USER CONTABO_API_PASSWORD
+    # Try environment variables first (all 4 must be set)
+    if [[ -n "${CONTABO_CLIENT_ID:-}" ]] && [[ -n "${CONTABO_CLIENT_SECRET:-}" ]] && \
+       [[ -n "${CONTABO_API_USER:-}" ]] && [[ -n "${CONTABO_API_PASSWORD:-}" ]]; then
+        log_info "Using Contabo credentials from environment"
+        return 0
+    fi
+
+    # Try config file
+    if _load_contabo_config "$config_file"; then
+        return 0
     fi
 
     # Prompt for missing credentials
-    if [[ -z "${CONTABO_CLIENT_ID:-}" ]]; then
-        log_info "Get your Contabo API credentials from: https://my.contabo.com/api/details"
-        printf "Enter Contabo Client ID: "
-        CONTABO_CLIENT_ID=$(safe_read) || return 1
-        export CONTABO_CLIENT_ID
-    fi
+    echo ""
+    log_warn "Contabo API Credentials Required"
+    log_warn "Get your credentials from: https://my.contabo.com/api/details"
+    echo ""
 
-    if [[ -z "${CONTABO_CLIENT_SECRET:-}" ]]; then
-        printf "Enter Contabo Client Secret: "
-        CONTABO_CLIENT_SECRET=$(safe_read) || return 1
-        export CONTABO_CLIENT_SECRET
-    fi
-
-    if [[ -z "${CONTABO_API_USER:-}" ]]; then
-        printf "Enter Contabo API User (username/email): "
-        CONTABO_API_USER=$(safe_read) || return 1
-        export CONTABO_API_USER
-    fi
-
-    if [[ -z "${CONTABO_API_PASSWORD:-}" ]]; then
-        printf "Enter Contabo API Password: "
-        CONTABO_API_PASSWORD=$(safe_read) || return 1
-        export CONTABO_API_PASSWORD
-    fi
+    _prompt_contabo_cred "CONTABO_CLIENT_ID" "Enter Contabo Client ID: " || return 1
+    _prompt_contabo_cred "CONTABO_CLIENT_SECRET" "Enter Contabo Client Secret: " || return 1
+    _prompt_contabo_cred "CONTABO_API_USER" "Enter Contabo API User (username/email): " || return 1
+    _prompt_contabo_cred "CONTABO_API_PASSWORD" "Enter Contabo API Password: " || return 1
 
     # Test credentials
     log_info "Testing Contabo credentials..."
@@ -170,21 +185,7 @@ ensure_contabo_credentials() {
         return 1
     fi
 
-    # Save to config file
-    mkdir -p "$(dirname "$config_file")"
-    python3 -c "
-import json
-config = {
-    'client_id': '$CONTABO_CLIENT_ID',
-    'client_secret': '$CONTABO_CLIENT_SECRET',
-    'api_user': '$CONTABO_API_USER',
-    'api_password': '$CONTABO_API_PASSWORD'
-}
-with open('$config_file', 'w') as f:
-    json.dump(config, f, indent=2)
-" && chmod 600 "$config_file"
-
-    log_info "Credentials verified and saved to $config_file"
+    _save_contabo_config "$config_file"
 }
 
 # Check if SSH key is registered with Contabo

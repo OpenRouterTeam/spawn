@@ -3,7 +3,7 @@
 
 # Source shared provider-agnostic functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -f "$SCRIPT_DIR/../../shared/common.sh" ]]; then
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../shared/common.sh" ]]; then
     source "$SCRIPT_DIR/../../shared/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
@@ -36,23 +36,6 @@ except:
 " "$field" 2>&1
 }
 
-# Find an SSH key ID by fingerprint from a JSON array of keys
-# Usage: echo '[{"fingerprint":"...","id":1}]' | _cherry_find_key_by_fingerprint "aa:bb:..."
-_cherry_find_key_by_fingerprint() {
-    local fingerprint="$1"
-    python3 -c "
-import sys, json
-try:
-    keys = json.load(sys.stdin)
-    for key in keys:
-        if key.get('fingerprint', '') == sys.argv[1]:
-            print(key.get('id', ''))
-            break
-except:
-    pass
-" "$fingerprint" 2>&1
-}
-
 # Extract the primary IP address from a Cherry server info response
 # Usage: echo '{"ip_addresses":[...]}' | _cherry_extract_primary_ip
 _cherry_extract_primary_ip() {
@@ -70,92 +53,74 @@ except:
 }
 
 # ============================================================
+# API Wrapper
+# ============================================================
+
+# Cherry Servers API wrapper - delegates to generic_cloud_api for retry logic
+cherry_api() {
+    local method="$1"
+    local endpoint="$2"
+    local body="${3:-}"
+    generic_cloud_api "$CHERRY_API_BASE" "$CHERRY_AUTH_TOKEN" "$method" "$endpoint" "$body"
+}
+
+# ============================================================
 # Authentication
 # ============================================================
 
+# Test Cherry Servers API token
+test_cherry_token() {
+    local response
+    response=$(cherry_api GET "/projects")
+    printf '%s' "$response" | grep -q '"id"'
+}
+
 # Get Cherry Servers API token
 ensure_cherry_token() {
-    local token="${CHERRY_AUTH_TOKEN:-}"
-
-    if [[ -z "$token" ]]; then
-        log_warn "CHERRY_AUTH_TOKEN not found in environment"
-        log_info "Get your API token from: https://portal.cherryservers.com/"
-        printf "Enter your Cherry Servers API token: "
-        read -r token
-    fi
-
-    if [[ -z "$token" ]]; then
-        log_error "API token is required"
-        exit 1
-    fi
-
-    CHERRY_AUTH_TOKEN="$token"
-    export CHERRY_AUTH_TOKEN
+    ensure_api_token_with_provider \
+        "Cherry Servers" \
+        "CHERRY_AUTH_TOKEN" \
+        "$HOME/.config/spawn/cherry.json" \
+        "https://portal.cherryservers.com/" \
+        test_cherry_token
 }
 
 # ============================================================
 # SSH Key Management
 # ============================================================
 
+# Check if SSH key is registered with Cherry Servers
+cherry_check_ssh_key() {
+    local fingerprint="$1"
+    local existing_keys
+    existing_keys=$(cherry_api GET "/ssh-keys")
+    printf '%s' "$existing_keys" | grep -q "$fingerprint"
+}
+
+# Register SSH key with Cherry Servers
+cherry_register_ssh_key() {
+    local key_name="$1"
+    local pub_path="$2"
+    local pub_key
+    pub_key=$(cat "$pub_path")
+    local json_pub_key
+    json_pub_key=$(json_escape "$pub_key")
+    local register_body="{\"label\":\"$key_name\",\"key\":$json_pub_key}"
+    local register_response
+    register_response=$(cherry_api POST "/ssh-keys" "$register_body")
+
+    if printf '%s' "$register_response" | grep -q '"id"'; then
+        return 0
+    else
+        log_error "Failed to register SSH key"
+        log_error "Response: $register_response"
+        return 1
+    fi
+}
+
 # Ensure SSH key exists and is registered with Cherry Servers
 ensure_ssh_key() {
-    check_python_available
-    generate_ssh_key_if_missing
-
-    local ssh_pub_key
-    ssh_pub_key=$(cat ~/.ssh/id_rsa.pub)
-
-    # Check if key already exists
-    log_info "Checking for existing SSH key in Cherry Servers..."
-
-    local existing_keys
-    existing_keys=$(curl -s -X GET \
-        -H "Authorization: Bearer ${CHERRY_AUTH_TOKEN}" \
-        -H "Content-Type: application/json" \
-        "${CHERRY_API_BASE}/ssh-keys" 2>&1)
-
-    local key_fingerprint
-    key_fingerprint=$(get_ssh_fingerprint)
-
-    # Check if our key is already registered
-    local key_id
-    key_id=$(printf '%s' "$existing_keys" | _cherry_find_key_by_fingerprint "$key_fingerprint")
-
-    if [[ -n "$key_id" ]]; then
-        log_info "SSH key already registered (ID: $key_id)"
-        CHERRY_SSH_KEY_ID="$key_id"
-        export CHERRY_SSH_KEY_ID
-        return 0
-    fi
-
-    # Register new SSH key
-    log_info "Registering new SSH key with Cherry Servers..."
-
-    local label="spawn-$(date +%s)"
-    local ssh_key_payload
-    ssh_key_payload=$(python3 -c "
-import json, sys
-print(json.dumps({'label': sys.argv[1], 'key': sys.argv[2]}))
-" "$label" "$ssh_pub_key")
-
-    local response
-    response=$(curl -s -X POST \
-        -H "Authorization: Bearer ${CHERRY_AUTH_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d "$ssh_key_payload" \
-        "${CHERRY_API_BASE}/ssh-keys" 2>&1)
-
-    key_id=$(printf '%s' "$response" | _cherry_json_field "id")
-
-    if [[ -z "$key_id" ]]; then
-        log_error "Failed to register SSH key"
-        log_error "Response: $response"
-        exit 1
-    fi
-
-    log_info "SSH key registered successfully (ID: $key_id)"
-    CHERRY_SSH_KEY_ID="$key_id"
-    export CHERRY_SSH_KEY_ID
+    ensure_ssh_key_with_provider cherry_check_ssh_key cherry_register_ssh_key "Cherry Servers"
 }
 
 # ============================================================
@@ -167,10 +132,7 @@ get_cherry_project_id() {
     check_python_available
 
     local projects
-    projects=$(curl -s -X GET \
-        -H "Authorization: Bearer ${CHERRY_AUTH_TOKEN}" \
-        -H "Content-Type: application/json" \
-        "${CHERRY_API_BASE}/projects" 2>&1)
+    projects=$(cherry_api GET "/projects")
 
     local project_id
     project_id=$(printf '%s' "$projects" | python3 -c "
@@ -185,7 +147,7 @@ except: pass
     if [[ -z "$project_id" ]]; then
         log_error "No project found in Cherry Servers account"
         log_error "Create a project at https://portal.cherryservers.com/"
-        exit 1
+        return 1
     fi
 
     printf '%s' "$project_id"
@@ -218,7 +180,7 @@ create_server() {
     validate_resource_name "$region" || { log_error "Invalid CHERRY_DEFAULT_REGION"; return 1; }
 
     local project_id
-    project_id=$(get_cherry_project_id)
+    project_id=$(get_cherry_project_id) || return 1
 
     log_info "Creating Cherry Servers server..."
     log_info "Plan: $plan, Region: $region, Image: $image"
@@ -237,11 +199,7 @@ print(json.dumps(data))
 " "$plan" "$region" "$image" "$hostname" "${CHERRY_SSH_KEY_ID}")
 
     local response
-    response=$(curl -s -X POST \
-        -H "Authorization: Bearer ${CHERRY_AUTH_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d "$payload" \
-        "${CHERRY_API_BASE}/projects/${project_id}/servers" 2>&1)
+    response=$(cherry_api POST "/projects/${project_id}/servers" "$payload")
 
     local server_id
     server_id=$(printf '%s' "$response" | _cherry_json_field "id")
@@ -249,7 +207,7 @@ print(json.dumps(data))
     if [[ -z "$server_id" ]]; then
         log_error "Failed to create server"
         log_error "Response: $response"
-        exit 1
+        return 1
     fi
 
     log_info "Server created with ID: $server_id"
@@ -266,10 +224,7 @@ print(json.dumps(data))
         sleep "${POLL_INTERVAL}"
 
         local server_info
-        server_info=$(curl -s -X GET \
-            -H "Authorization: Bearer ${CHERRY_AUTH_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "${CHERRY_API_BASE}/servers/${server_id}" 2>&1)
+        server_info=$(cherry_api GET "/servers/${server_id}")
 
         ip_address=$(printf '%s' "$server_info" | _cherry_extract_primary_ip)
 
@@ -278,7 +233,7 @@ print(json.dumps(data))
 
     if [[ -z "$ip_address" ]]; then
         log_error "Failed to get server IP address"
-        exit 1
+        return 1
     fi
 
     log_info "Server IP: $ip_address"
@@ -293,11 +248,9 @@ print(json.dumps(data))
 # Run command on server via SSH
 run_server() {
     local ip="$1"
-    local command="$2"
-
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR -o ConnectTimeout=10 \
-        "root@${ip}" "$command"
+    local cmd="$2"
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "root@${ip}" "$cmd"
 }
 
 # Upload file to server via SCP
@@ -305,26 +258,16 @@ upload_file() {
     local ip="$1"
     local local_path="$2"
     local remote_path="$3"
-
-    scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o LogLevel=ERROR -o ConnectTimeout=10 \
-        "$local_path" "root@${ip}:${remote_path}"
+    # shellcheck disable=SC2086
+    scp $SSH_OPTS "$local_path" "root@${ip}:${remote_path}"
 }
 
 # Start interactive SSH session
 interactive_session() {
     local ip="$1"
-    local command="${2:-}"
-
-    if [[ -n "$command" ]]; then
-        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR -t \
-            "root@${ip}" "$command"
-    else
-        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR -t \
-            "root@${ip}"
-    fi
+    local cmd="${2:-}"
+    # shellcheck disable=SC2086
+    ssh -t $SSH_OPTS "root@${ip}" $cmd
 }
 
 # ============================================================
@@ -334,25 +277,8 @@ interactive_session() {
 # Verify server is accessible via SSH
 verify_server_connectivity() {
     local ip="$1"
-    local max_attempts=60
-    local attempt=0
-
-    log_info "Waiting for SSH connectivity..."
-
-    while [[ $attempt -lt $max_attempts ]]; do
-        if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-               -o LogLevel=ERROR -o ConnectTimeout=5 \
-               "root@${ip}" "echo 'SSH ready'" &> /dev/null; then
-            log_info "SSH connection established"
-            return 0
-        fi
-
-        attempt=$((attempt + 1))
-        sleep "${POLL_INTERVAL}"
-    done
-
-    log_error "Failed to connect to server via SSH"
-    exit 1
+    local max_attempts=${2:-60}
+    generic_ssh_wait "root" "$ip" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "$max_attempts" 5
 }
 
 # Wait for cloud-init to complete
