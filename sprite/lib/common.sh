@@ -13,18 +13,24 @@ fi
 # Configurable timeout/delay constants
 SPRITE_CONNECTIVITY_POLL_DELAY=${SPRITE_CONNECTIVITY_POLL_DELAY:-5}  # Delay between sprite connectivity checks
 
+# Log that sprite was found, with version if available
+# $1=optional location context (e.g. "at /path/to/sprite")
+_log_sprite_found() {
+    local context="${1:+ $1}"
+    local ver
+    ver=$(sprite version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || true)
+    if [[ -n "${ver}" ]]; then
+        log_info "sprite ${ver} already installed${context}, skipping installation"
+    else
+        log_info "sprite already installed${context}, skipping installation"
+    fi
+}
+
 # Check if sprite CLI is installed, install if not
 ensure_sprite_installed() {
     # Check if sprite is already in PATH
     if command -v sprite &> /dev/null; then
-        # sprite is already installed, check version
-        local installed_version
-        installed_version=$(sprite version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || true)
-        if [[ -n "${installed_version}" ]]; then
-            log_info "sprite ${installed_version} already installed, skipping installation"
-        else
-            log_info "sprite already installed, skipping installation"
-        fi
+        _log_sprite_found
         return 0
     fi
 
@@ -38,17 +44,10 @@ ensure_sprite_installed() {
 
     for sprite_path in "${common_paths[@]}"; do
         if [[ -x "${sprite_path}" ]]; then
-            # Found sprite binary, add its directory to PATH
             local sprite_dir
             sprite_dir=$(dirname "${sprite_path}")
             export PATH="${sprite_dir}:${PATH}"
-            local installed_version
-            installed_version=$(sprite version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?' || true)
-            if [[ -n "${installed_version}" ]]; then
-                log_info "sprite ${installed_version} already installed at ${sprite_path}, skipping installation"
-            else
-                log_info "sprite already installed at ${sprite_path}, skipping installation"
-            fi
+            _log_sprite_found "at ${sprite_path}"
             return 0
         fi
     done
