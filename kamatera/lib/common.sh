@@ -110,14 +110,7 @@ ensure_kamatera_token() {
 }
 
 get_server_name() {
-    local server_name
-    server_name=$(get_resource_name "KAMATERA_SERVER_NAME" "Enter server name: ") || return 1
-
-    if ! validate_server_name "$server_name"; then
-        return 1
-    fi
-
-    echo "$server_name"
+    get_validated_server_name "KAMATERA_SERVER_NAME" "Enter server name: "
 }
 
 # Extract a field from a Kamatera queue response (handles both list and dict responses)

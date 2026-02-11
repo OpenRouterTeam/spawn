@@ -162,14 +162,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    local server_name
-    server_name=$(get_resource_name "EXOSCALE_SERVER_NAME" "Enter server name: ") || return 1
-
-    if ! validate_server_name "$server_name"; then
-        return 1
-    fi
-
-    echo "$server_name"
+    get_validated_server_name "EXOSCALE_SERVER_NAME" "Enter server name: "
 }
 
 # Wait for Exoscale instance to become running and get its IP

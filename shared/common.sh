@@ -314,6 +314,22 @@ get_resource_name() {
     fi
     echo "${name}"
 }
+
+# Get server name from environment or prompt, with validation
+# Usage: get_validated_server_name ENV_VAR_NAME PROMPT_TEXT
+# Returns: Validated server name via stdout
+# Example: get_validated_server_name "HETZNER_SERVER_NAME" "Enter server name: "
+get_validated_server_name() {
+    local server_name
+    server_name=$(get_resource_name "$1" "$2") || return 1
+
+    if ! validate_server_name "$server_name"; then
+        return 1
+    fi
+
+    echo "$server_name"
+}
+
 # Interactively prompt for model ID with validation
 # Usage: get_model_id_interactive [default_model] [agent_name]
 # Returns: Model ID via stdout
