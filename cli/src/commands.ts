@@ -894,6 +894,27 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
   console.log();
 }
 
+function isInteractiveTTY(): boolean {
+  return !!(process.stdin.isTTY && process.stdout.isTTY);
+}
+
+/** Build a display label for a spawn record in the interactive picker */
+function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): string {
+  const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
+  const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
+  return `${agentDisplay} on ${cloudDisplay}`;
+}
+
+/** Build a hint string (timestamp + optional prompt preview) for the interactive picker */
+function buildRecordHint(r: SpawnRecord): string {
+  const when = formatTimestamp(r.timestamp);
+  if (r.prompt) {
+    const preview = r.prompt.length > 30 ? r.prompt.slice(0, 30) + "..." : r.prompt;
+    return `${when}  --prompt "${preview}"`;
+  }
+  return when;
+}
+
 export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
   const records = filterHistory(agentFilter, cloudFilter);
 
@@ -910,6 +931,29 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     // Manifest unavailable -- show raw keys
   }
 
+  // Interactive mode: show a select picker so user can choose a spawn to rerun
+  if (isInteractiveTTY()) {
+    const options = records.map((r, i) => ({
+      value: i,
+      label: buildRecordLabel(r, manifest),
+      hint: buildRecordHint(r),
+    }));
+
+    const choice = await p.select({
+      message: `Select a spawn to rerun (${records.length} recorded)`,
+      options,
+    });
+    if (p.isCancel(choice)) {
+      handleCancel();
+    }
+
+    const selected = records[choice];
+    p.log.step(`Rerunning ${pc.bold(buildRecordLabel(selected, manifest))}`);
+    await cmdRun(selected.agent, selected.cloud, selected.prompt);
+    return;
+  }
+
+  // Non-interactive: show static table
   renderListTable(records, manifest);
   showListFooter(records, agentFilter, cloudFilter);
 }
@@ -1200,7 +1244,7 @@ ${pc.bold("USAGE")}
                                      Execute agent with prompt from file
   spawn <agent>                      Show available clouds for agent
   spawn <cloud>                      Show available agents for cloud
-  spawn list                         Show previously launched spawns (alias: ls)
+  spawn list                         Browse and rerun previous spawns (alias: ls)
   spawn list -a <agent>              Filter spawn history by agent
   spawn list -c <cloud>              Filter spawn history by cloud
   spawn matrix                       Full availability matrix (alias: m)
@@ -1222,7 +1266,7 @@ ${pc.bold("EXAMPLES")}
   spawn claude sprite --dry-run      ${pc.dim("# Preview without provisioning")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
-  spawn list                         ${pc.dim("# Show your previously launched spawns")}
+  spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
   spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}
 
 ${pc.bold("AUTHENTICATION")}
