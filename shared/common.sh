@@ -302,11 +302,11 @@ get_model_id_interactive() {
     fi
 
     echo ""
-    log_warn "Browse models at: https://openrouter.ai/models"
+    log_info "Browse models at: https://openrouter.ai/models"
     if [[ -n "${agent_name}" ]]; then
-        log_warn "Which model would you like to use with ${agent_name}?"
+        log_info "Which model would you like to use with ${agent_name}?"
     else
-        log_warn "Which model would you like to use?"
+        log_info "Which model would you like to use?"
     fi
 
     local model_id=""
@@ -328,8 +328,8 @@ get_model_id_interactive() {
 # Manually prompt for API key
 get_openrouter_api_key_manual() {
     echo ""
-    log_warn "Manual API Key Entry"
-    printf '%b\n' "${YELLOW}Get your API key from: https://openrouter.ai/settings/keys${NC}"
+    log_info "Manual API Key Entry"
+    printf '%b\n' "${GREEN}Get your API key from: https://openrouter.ai/settings/keys${NC}"
     echo ""
 
     local api_key=""
@@ -487,7 +487,7 @@ wait_for_oauth_code() {
     local timeout="${2:-120}"
     local elapsed=0
 
-    log_warn "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
+    log_info "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
         elapsed=$((elapsed + POLL_INTERVAL))
@@ -624,7 +624,7 @@ _setup_oauth_server() {
     local port_file="${3}"
     local state_file="${4}"
 
-    log_warn "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
+    log_info "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
     local server_pid
     server_pid=$(start_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}")
 
@@ -667,7 +667,7 @@ _generate_csrf_state() {
 try_oauth_flow() {
     local callback_port=${1:-5180}
 
-    log_warn "Attempting OAuth authentication..."
+    log_info "Attempting OAuth authentication..."
 
     # Check prerequisites
     if ! _check_oauth_prerequisites; then
@@ -700,7 +700,7 @@ try_oauth_flow() {
     # Open browser with CSRF state parameter
     local callback_url="http://localhost:${actual_port}/callback"
     local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}&state=${csrf_state}"
-    log_warn "Opening browser to authenticate with OpenRouter..."
+    log_info "Opening browser to authenticate with OpenRouter..."
     open_browser "${auth_url}"
 
     # Wait for code
@@ -718,7 +718,7 @@ try_oauth_flow() {
     cleanup_oauth_session "${server_pid}" "${oauth_dir}"
 
     # Exchange code for API key
-    log_warn "Exchanging OAuth code for API key..."
+    log_info "Exchanging OAuth code for API key..."
     local api_key
     api_key=$(exchange_oauth_code "${oauth_code}") || return 1
 
@@ -741,9 +741,9 @@ get_openrouter_api_key_oauth() {
 
     # OAuth failed, offer manual entry
     echo ""
-    log_warn "OAuth authentication was not completed"
-    log_warn "You can enter your API key manually instead"
-    log_warn "Get a free key at: https://openrouter.ai/settings/keys"
+    log_warn "OAuth authentication was not completed."
+    log_info "You can enter your API key manually instead."
+    log_info "Get a free key at: https://openrouter.ai/settings/keys"
     echo ""
     local manual_choice
     manual_choice=$(safe_read "Would you like to enter your API key manually? (Y/n): ") || {

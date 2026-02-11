@@ -1,3 +1,4 @@
+import "./unicode-detect.js"; // Ensure TERM is set before using symbols
 import { execSync as nodeExecSync } from "child_process";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
@@ -13,6 +14,11 @@ export const executor = {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const FETCH_TIMEOUT = 5000; // 5 seconds
+
+// Use ASCII-safe symbols when unicode is disabled (SSH, dumb terminals)
+const isAscii = process.env.TERM === "linux";
+const CHECK_MARK = isAscii ? "*" : "\u2713";
+const CROSS_MARK = isAscii ? "x" : "\u2717";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -78,7 +84,7 @@ function performAutoUpdate(latestVersion: string): void {
     });
 
     console.error();
-    console.error(pc.green(pc.bold("✓ Updated successfully!")));
+    console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
     console.error(pc.dim("  Restart your command to use the new version."));
     console.error();
 
@@ -86,7 +92,7 @@ function performAutoUpdate(latestVersion: string): void {
     process.exit(0);
   } catch (err) {
     console.error();
-    console.error(pc.red(pc.bold("✗ Auto-update failed")));
+    console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
     console.error(pc.dim("  Please update manually:"));
     console.error();
     console.error(pc.cyan(`  curl -fsSL ${RAW_BASE}/cli/install.sh | bash`));
