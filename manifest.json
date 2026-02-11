@@ -1135,7 +1135,7 @@
     "hostinger/gemini": "implemented",
     "hostinger/amazonq": "missing",
     "hostinger/cline": "implemented",
-    "hostinger/gptme": "missing",
+    "hostinger/gptme": "implemented",
     "hostinger/opencode": "implemented",
     "hostinger/plandex": "implemented",
     "hostinger/kilocode": "implemented",
