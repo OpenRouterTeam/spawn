@@ -1,11 +1,12 @@
 #!/bin/bash
 set -eo pipefail
 
-# Security Review Team Service — Single Cycle (Dual-Mode)
+# Security Review Team Service — Single Cycle (Tri-Mode)
 # Triggered by trigger-server.ts via GitHub Actions
 #
 # RUN_MODE=pr       — 2-agent security review for a specific PR (10 min)
-# RUN_MODE=schedule — proactive scan of recent commits on main (15 min)
+# RUN_MODE=hygiene  — stale PR cleanup + triage (reason=hygiene, 15 min)
+# RUN_MODE=scan     — full repo security scan + issue filing (reason=schedule, 20 min)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -28,11 +29,16 @@ if [[ -n "${SPAWN_ISSUE}" ]]; then
     WORKTREE_BASE="/tmp/spawn-worktrees/security-pr-${PR_NUM}"
     TEAM_NAME="spawn-security-pr-${PR_NUM}"
     CYCLE_TIMEOUT=600   # 10 min for PR reviews
+elif [[ "${SPAWN_REASON}" == "hygiene" ]]; then
+    RUN_MODE="hygiene"
+    WORKTREE_BASE="/tmp/spawn-worktrees/security-hygiene"
+    TEAM_NAME="spawn-security-hygiene"
+    CYCLE_TIMEOUT=900   # 15 min for PR hygiene
 else
-    RUN_MODE="schedule"
+    RUN_MODE="scan"
     WORKTREE_BASE="/tmp/spawn-worktrees/security-scan"
     TEAM_NAME="spawn-security-scan"
-    CYCLE_TIMEOUT=900   # 15 min for scheduled scans
+    CYCLE_TIMEOUT=1200  # 20 min for full repo scan
 fi
 
 LOG_FILE="/home/sprite/spawn/.docs/${TEAM_NAME}.log"
@@ -160,12 +166,29 @@ After both agents report back, make the final decision:
    \`\`\`
    (The SLACK_WEBHOOK env var is: ${SLACK_WEBHOOK:-NOT_SET})
 
-### If only MEDIUM/LOW issues or no issues:
+### If only MEDIUM/LOW issues:
 1. Post an **approving** review on the PR:
    \`\`\`bash
    gh pr review ${PR_NUM} --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY"
    \`\`\`
-   Include any MEDIUM/LOW findings as informational notes.
+   Include MEDIUM/LOW findings as informational notes. Do NOT merge — leave for human review.
+
+### If NO issues at all (clean review):
+1. Post an **approving** review on the PR:
+   \`\`\`bash
+   gh pr review ${PR_NUM} --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY"
+   \`\`\`
+2. **Merge the PR** (squash merge, delete branch):
+   \`\`\`bash
+   gh pr merge ${PR_NUM} --repo OpenRouterTeam/spawn --squash --delete-branch
+   \`\`\`
+   Only merge if ALL of these are true:
+   - Zero CRITICAL, HIGH, or MEDIUM findings from code-reviewer
+   - All bash -n checks pass
+   - All bun tests pass (or N/A)
+   - curl|bash patterns are correct
+   - macOS compat is clean
+   If ANY of these fail, do NOT merge — just approve with notes.
 
 ### Review body format:
 \`\`\`
@@ -188,33 +211,43 @@ After both agents report back, make the final decision:
 
 ## Workflow
 
-1. Create the team with TeamCreate
-2. Fetch PR details and diff
-3. Spawn code-reviewer and test-verifier in parallel
-4. Monitor teammates (poll TaskList, sleep 15 between checks)
-5. Collect results from both agents
-6. Post the review (approve or request-changes)
-7. If concerns found and SLACK_WEBHOOK is set, send Slack notification
-8. Shutdown all teammates
-9. Exit
+1. Create the team with TeamCreate (team_name="${TEAM_NAME}")
+2. Create tasks with TaskCreate for each teammate's work
+3. Fetch PR details and diff
+4. Spawn teammates in parallel using Task tool (subagent_type='general-purpose', team_name="${TEAM_NAME}"):
+   - code-reviewer (model=sonnet): security review of the diff
+   - test-verifier (model=haiku): syntax/test verification
+5. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
+6. Monitor teammates (poll TaskList, sleep 15 between checks)
+7. Collect results from both agents via messages
+8. Make the review decision:
+   - If CRITICAL/HIGH → request changes + Slack notification
+   - If MEDIUM/LOW only → approve, do NOT merge
+   - If ZERO findings → approve AND merge (squash + delete branch)
+9. Shutdown all teammates via SendMessage (type=shutdown_request)
+10. Clean up with TeamDelete
+11. Exit
 
 ## CRITICAL: Monitoring Loop
 
 **Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response.
 
 Required pattern:
-1. Spawn teammates via Task tool
+1. Spawn teammates via Task tool (with team_name and name params)
 2. Poll loop:
    a. Run TaskList to check status
    b. If messages received, process them
    c. If no messages yet, run Bash("sleep 15") then loop back
 3. Once both agents report, make review decision
-4. Post review and optional Slack notification
-5. Shutdown teammates and exit
+4. Post review (and merge if clean)
+5. Send Slack notification if concerns found
+6. Shutdown teammates and exit
 
 ## Safety Rules
 
 - NEVER approve a PR with CRITICAL findings
+- NEVER merge a PR with ANY findings (CRITICAL, HIGH, MEDIUM, or LOW)
+- Only merge when the review is 100% clean — zero findings, all tests pass
 - If unsure about a finding, flag it as MEDIUM and note the uncertainty
 - Always include file paths and line numbers in findings
 - Do not modify any code — this is review only
@@ -222,53 +255,291 @@ Required pattern:
 Begin now. Review PR #${PR_NUM}.
 PR_PROMPT_EOF
 
-else
-    # --- Schedule mode: proactive scan of recent commits ---
-    cat > "${PROMPT_FILE}" << 'SCHEDULE_PROMPT_EOF'
-You are the Team Lead for a proactive security scan of the spawn codebase.
+elif [[ "${RUN_MODE}" == "hygiene" ]]; then
+    # --- Hygiene mode: stale PR cleanup + triage ---
+    cat > "${PROMPT_FILE}" << 'HYGIENE_PROMPT_EOF'
+You are the Team Lead for a PR hygiene cycle on the spawn codebase.
 
 ## Mission
 
-Scan recent commits on main for security issues. This is NOT a PR review — just an audit.
+Go through ALL open PRs. For each one: review it, decide whether to close or keep, and take action. Also file issues for anything that needs follow-up.
 
 ## Time Budget
 
-This cycle MUST complete within 10 minutes. This is a HARD deadline.
+This cycle MUST complete within 12 minutes. This is a HARD deadline.
 
-## Steps
+- At the 9-minute mark, stop new work and wrap up
+- At the 11-minute mark, send shutdown_request to all agents
+- At 12 minutes, force shutdown
 
-1. Get recent commits: `git log --oneline -20 origin/main`
-2. For each commit in the last 24 hours, review the diff: `git show COMMIT_SHA`
-3. Scan all .sh files for:
-   - Command injection (unquoted variables, unsafe eval)
-   - Credential handling (hardcoded keys, logged secrets)
-   - curl|bash safety (source/eval patterns)
-   - macOS bash 3.x compatibility
-4. Scan all .ts files for:
-   - XSS, prototype pollution
-   - Unsafe eval, unsanitized input
-5. Run `bun test` to verify test suite passes
-6. Run `bash -n` on all .sh files
+## Team Structure
 
-## Output
+Create these teammates:
 
-Print a summary report of findings. If CRITICAL issues are found, create a GitHub issue:
+1. **pr-triager** (Sonnet)
+   - List ALL open PRs: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,updatedAt,author,mergeable,headRefName,labels`
+   - For EACH open PR, evaluate:
+     * **Staleness**: last updated > 48 hours ago? (use `updatedAt` field)
+     * **Mergeable**: does it have merge conflicts? (`mergeable` field)
+     * **CI status**: `gh pr checks NUMBER --repo OpenRouterTeam/spawn` — are checks passing?
+     * **Review status**: does it have reviews? `gh pr view NUMBER --repo OpenRouterTeam/spawn --json reviews --jq '.reviews[].state'`
+     * **Relevance**: read the diff (`gh pr diff NUMBER --repo OpenRouterTeam/spawn`) — is the change still relevant to the current codebase?
+   - For each PR, take ONE of these actions:
+     * **Close** (stale + conflicts + no activity):
+       `gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Auto-closing: this PR has been stale for >48h with merge conflicts. The changes may no longer be relevant. Please reopen or create a fresh PR if still needed."`
+       Then delete the branch: `gh pr view NUMBER --repo OpenRouterTeam/spawn --json headRefName --jq '.headRefName'` → `git push origin --delete BRANCH`
+     * **Close with issue** (stale but has good ideas):
+       Close the PR with a comment, then file a new issue capturing the intent:
+       `gh issue create --repo OpenRouterTeam/spawn --title "Follow-up: [original PR intent]" --body "Original PR #NUMBER was auto-closed due to staleness. The approach had merit: [summary]. Needs a fresh implementation." --label "enhancement"`
+     * **Request review** (looks good but needs eyes):
+       `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Automated triage: This PR looks viable but needs human review. [summary of what it does and any concerns]"`
+       Add label: `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
+     * **Leave alone** (fresh, actively worked on): skip it
+   - Report all actions taken to the team lead
+
+2. **branch-cleaner** (Haiku)
+   - List all remote branches: `git branch -r --format='%(refname:short) %(committerdate:unix)'`
+   - For each branch (excluding main):
+     * Check if there's an open PR: `gh pr list --head BRANCH --state open --json number`
+     * If NO open PR and branch is stale (>48 hours): delete it `git push origin --delete BRANCH`
+     * If open PR exists: leave it (pr-triager handles PRs)
+   - Report summary: how many branches deleted, how many left
+
+## Actions Summary
+
+After both agents report, compile a summary:
+
+### If any PRs were closed or issues filed, send a Slack notification:
 ```bash
-gh issue create --repo OpenRouterTeam/spawn --title "Security: [description]" --body "BODY" --label "security"
+SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
+if [ -n "$SLACK_WEBHOOK" ]; then
+  curl -s -X POST "$SLACK_WEBHOOK" -H 'Content-Type: application/json' \
+    -d '{"text":":broom: PR Hygiene cycle complete: [N PRs closed, M issues filed, K branches deleted]. See details in the workflow run."}'
+fi
 ```
 
-No PR reviews in schedule mode — just scan and report.
+## Workflow
 
-Begin now.
-SCHEDULE_PROMPT_EOF
-fi
+1. Create the team with TeamCreate (team_name="spawn-security-hygiene")
+2. Create tasks with TaskCreate for each teammate's work
+3. Spawn teammates in parallel using Task tool (subagent_type='general-purpose', team_name="spawn-security-hygiene"):
+   - pr-triager (model=sonnet): review and triage all open PRs
+   - branch-cleaner (model=haiku): clean up stale orphan branches
+4. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
+5. Monitor teammates (poll TaskList, sleep 15 between checks)
+6. Collect results from both agents via messages
+7. Compile summary and send Slack notification
+8. Shutdown all teammates via SendMessage (type=shutdown_request)
+9. Clean up with TeamDelete
+10. Exit
 
-# Add grace period: pr=5min, schedule=5min beyond the prompt timeout
-if [[ "${RUN_MODE}" == "pr" ]]; then
-    HARD_TIMEOUT=$((CYCLE_TIMEOUT + 300))   # 10 + 5 = 15 min
+## CRITICAL: Monitoring Loop
+
+**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response.
+
+Required pattern:
+1. Spawn teammates via Task tool (with team_name and name params)
+2. Poll loop:
+   a. Run TaskList to check status
+   b. If messages received, process them
+   c. If no messages yet, run Bash("sleep 15") then loop back
+3. Once both agents report, compile summary
+4. Send Slack notification if actions were taken
+5. Shutdown teammates and exit
+
+## Safety Rules
+
+- NEVER close a PR without posting a comment explaining why
+- If a PR has recent activity (<24h), leave it alone regardless of other factors
+- When filing follow-up issues, include the original PR number and a clear description
+- Do not modify any code — this is triage only
+
+Begin now. Start the PR hygiene cycle.
+HYGIENE_PROMPT_EOF
+
+    # Substitute SLACK_WEBHOOK in the hygiene prompt (it uses double-quote heredoc workaround)
+    sed -i "s|\${SLACK_WEBHOOK:-}|${SLACK_WEBHOOK:-}|g" "${PROMPT_FILE}"
+
 else
-    HARD_TIMEOUT=$((CYCLE_TIMEOUT + 300))   # 15 + 5 = 20 min
+    # --- Scan mode: full repo security audit + issue filing ---
+    cat > "${PROMPT_FILE}" << SCAN_PROMPT_EOF
+You are the Team Lead for a full security scan of the spawn codebase.
+
+## Mission
+
+Perform a comprehensive security audit of the entire repository. File GitHub issues for anything you find. This is a proactive scan — not triggered by a PR.
+
+## Time Budget
+
+This cycle MUST complete within 15 minutes. This is a HARD deadline.
+
+- At the 12-minute mark, stop new work and wrap up
+- At the 14-minute mark, send shutdown_request to all agents
+- At 15 minutes, force shutdown
+
+## Team Structure
+
+Create these teammates:
+
+1. **shell-auditor** (Sonnet)
+   - Scan ALL .sh files in the repo for security issues:
+     * **Command injection**: unquoted variables in shell commands, unsafe eval/heredoc, unsanitized user input
+     * **Credential leaks**: hardcoded API keys/tokens/passwords, secrets logged to stdout, credentials in committed files
+     * **Path traversal**: unsanitized file paths, directory escape via ../
+     * **Unsafe patterns**: use of \`eval\` with user input, \`source <()\`, unvalidated redirects, TOCTOU races
+     * **curl|bash safety**: broken source/eval fallback patterns, missing error handling on remote fetches
+     * **macOS bash 3.x compat**: echo -e, source <(), ((var++)) with set -e, local in subshells, set -u
+     * **Permission issues**: world-readable credential files, insecure temp file creation
+   - Run \`bash -n\` on every .sh file to catch syntax errors
+   - Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
+   - Report all findings with file paths and line numbers to the team lead
+
+2. **code-auditor** (Sonnet)
+   - Scan ALL .ts files for security issues:
+     * **XSS/injection**: unsafe HTML rendering, unsanitized output, template injection
+     * **Prototype pollution**: unsafe object merging, __proto__ access
+     * **Unsafe eval**: eval(), Function(), vm.runInNewContext() with user input
+     * **Dependency issues**: known vulnerable patterns, unsafe require/import
+     * **Auth bypass**: missing auth checks, insecure token validation
+     * **Information disclosure**: verbose error messages leaking internals, stack traces exposed
+   - Run \`bun test\` to verify test suite passes
+   - Check for any weird/unexpected changes by comparing key files against what they should contain:
+     * \`shared/common.sh\` — should only contain shared utilities
+     * \`manifest.json\` — should match expected agent/cloud matrix structure
+     * \`.github/workflows/\` — should only contain expected workflow files
+     * \`cli/src/\` — should only contain expected CLI source files
+   - Report all findings with file paths and line numbers to the team lead
+
+3. **drift-detector** (Haiku)
+   - Check for unexpected changes or anomalies in the repo:
+     * Files that shouldn't be committed: .env, credentials, private keys, .DS_Store
+     * Unexpected binary files
+     * Files with unusual permissions
+     * Recent commits that look suspicious (unusual author, mass changes, obfuscated code)
+     * Check \`git log --oneline -50 origin/main\` for any weird commit patterns
+   - Verify \`.gitignore\` covers sensitive patterns
+   - Check that gitignored files (start-*.sh, .docs/) are not accidentally tracked
+   - Report any anomalies to the team lead
+
+## Issue Filing
+
+After all agents report, file GitHub issues for findings:
+
+### CRITICAL/HIGH findings — file individual issues:
+\`\`\`bash
+gh issue create --repo OpenRouterTeam/spawn \\
+  --title "Security: [brief description]" \\
+  --body "## Security Finding
+
+**Severity**: [CRITICAL/HIGH]
+**File**: \`path/to/file:line\`
+**Category**: [injection/credential-leak/path-traversal/etc.]
+
+### Description
+[Detailed description of the vulnerability]
+
+### Remediation
+[Specific steps to fix]
+
+### Found by
+Automated security scan (spawn security team)
+" \\
+  --label "security"
+\`\`\`
+
+### MEDIUM/LOW findings — file a single batch issue:
+\`\`\`bash
+gh issue create --repo OpenRouterTeam/spawn \\
+  --title "Security: batch of medium/low findings from scan" \\
+  --body "## Security Scan Results
+
+[List all MEDIUM/LOW findings in a table]
+
+| Severity | File | Description |
+|----------|------|-------------|
+| MEDIUM | path:line | description |
+| LOW | path:line | description |
+
+### Found by
+Automated security scan (spawn security team)
+" \\
+  --label "security"
+\`\`\`
+
+### DEDUP: Before filing any issue, check if a similar issue already exists:
+\`\`\`bash
+gh issue list --repo OpenRouterTeam/spawn --state open --label "security" --json number,title --jq '.[].title'
+\`\`\`
+Do NOT file duplicate issues. If a similar issue exists, add a comment with updated findings instead.
+
+### Drift/anomaly findings — file as issues:
+\`\`\`bash
+gh issue create --repo OpenRouterTeam/spawn \\
+  --title "Repo hygiene: [description]" \\
+  --body "[details]" \\
+  --label "maintenance"
+\`\`\`
+
+## Slack Notification
+
+After filing issues, send a summary to Slack:
+\`\`\`bash
+SLACK_WEBHOOK="${SLACK_WEBHOOK:-NOT_SET}"
+if [ -n "\${SLACK_WEBHOOK}" ] && [ "\${SLACK_WEBHOOK}" != "NOT_SET" ]; then
+  curl -s -X POST "\${SLACK_WEBHOOK}" -H 'Content-Type: application/json' \\
+    -d '{"text":":shield: Security scan complete: [N critical, M high, K medium, L low] findings. [X issues filed]. See https://github.com/OpenRouterTeam/spawn/issues?q=label:security"}'
 fi
+\`\`\`
+
+## Workflow
+
+1. Create the team with TeamCreate (team_name="spawn-security-scan")
+2. Create tasks with TaskCreate for each teammate's work
+3. Spawn teammates in parallel using Task tool (subagent_type='general-purpose', team_name="spawn-security-scan"):
+   - shell-auditor (model=sonnet): audit all .sh files
+   - code-auditor (model=sonnet): audit all .ts files
+   - drift-detector (model=haiku): check for anomalies and unexpected files
+4. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
+5. Monitor teammates (poll TaskList, sleep 15 between checks)
+6. Collect results from all agents via messages
+7. Dedup check against existing issues
+8. File new issues for novel findings
+9. Send Slack summary
+10. Shutdown all teammates via SendMessage (type=shutdown_request)
+11. Clean up with TeamDelete
+12. Exit
+
+## CRITICAL: Monitoring Loop
+
+**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response.
+
+Required pattern:
+1. Spawn teammates via Task tool (with team_name and name params)
+2. Poll loop:
+   a. Run TaskList to check status
+   b. If messages received, process them
+   c. If no messages yet, run Bash("sleep 15") then loop back
+3. Once all agents report, compile findings
+4. Dedup check against existing issues
+5. File new issues for novel findings
+6. Send Slack summary
+7. Shutdown teammates and exit
+
+## Safety Rules
+
+- Do not modify any code — this is audit only
+- Always dedup against existing issues before filing
+- Classify findings conservatively — if unsure, rate it one level higher
+- Include specific file paths and line numbers in all findings
+- For CRITICAL findings, always include a concrete remediation suggestion
+
+Begin now. Start the full security scan.
+SCAN_PROMPT_EOF
+
+fi
+
+# Add grace period: pr=5min, hygiene=5min, scan=5min beyond the prompt timeout
+HARD_TIMEOUT=$((CYCLE_TIMEOUT + 300))
 
 log "Hard timeout: ${HARD_TIMEOUT}s"
 

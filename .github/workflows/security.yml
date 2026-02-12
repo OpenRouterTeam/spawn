@@ -3,10 +3,28 @@ name: Security Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  schedule:
+    # Full repo security scan — daily at 06:00 UTC
+    - cron: '0 6 * * *'
+    # PR hygiene (stale PR cleanup) — every 6 hours
+    - cron: '0 */6 * * *'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode: pr (needs PR number), hygiene, or scan'
+        required: false
+        default: 'scan'
+        type: choice
+        options:
+          - scan
+          - hygiene
+      pr_number:
+        description: 'PR number (only for pr mode via workflow_dispatch)'
+        required: false
+        type: string
 
 concurrency:
-  group: security-review-pr-${{ github.event.pull_request.number || 'manual' }}
+  group: security-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'schedule' && github.event.schedule || 'manual' }}
   cancel-in-progress: true
 
 jobs:
@@ -24,11 +42,36 @@ jobs:
             exit 0
           fi
 
-          PR_NUM="${{ github.event.pull_request.number || '' }}"
-          REASON="pull_request"
-          if [ -z "$PR_NUM" ]; then
+          # Determine reason and issue/PR number based on trigger type
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            REASON="pull_request"
+            PR_NUM="${{ github.event.pull_request.number }}"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            # Distinguish between cron schedules:
+            # '0 6 * * *' = daily scan, '0 */6 * * *' = hygiene every 6h
+            CRON="${{ github.event.schedule }}"
+            if [ "$CRON" = "0 6 * * *" ]; then
+              REASON="schedule"
+            else
+              REASON="hygiene"
+            fi
+            PR_NUM=""
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ github.event.inputs.mode || 'scan' }}"
+            PR_NUM="${{ github.event.inputs.pr_number || '' }}"
+            if [ -n "$PR_NUM" ]; then
+              REASON="pull_request"
+            elif [ "$MODE" = "hygiene" ]; then
+              REASON="hygiene"
+            else
+              REASON="schedule"
+            fi
+          else
             REASON="schedule"
+            PR_NUM=""
           fi
+
+          echo "Mode: reason=$REASON, pr=$PR_NUM"
 
           set +e
           # --fail-with-body: exit 22 on HTTP errors but still print the body
