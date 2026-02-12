@@ -1213,7 +1213,7 @@
     "ramnode/cline": "implemented",
     "ramnode/gptme": "implemented",
     "ramnode/opencode": "missing",
-    "ramnode/plandex": "missing",
+    "ramnode/plandex": "implemented",
     "ramnode/kilocode": "missing",
     "ramnode/continue": "implemented"
   }
