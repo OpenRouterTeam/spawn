@@ -15,7 +15,11 @@
 #   bash test/run.sh claude       # test one script
 #   bash test/run.sh --remote     # test remote source (from GitHub)
 
-set -uo pipefail
+set -o pipefail
+
+if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+    printf 'WARNING: bash %s detected. Some features may need bash 4+.\n' "${BASH_VERSION}" >&2
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIR=$(mktemp -d)
@@ -105,12 +109,12 @@ assert_contains() {
     local file="$1" pattern="$2" msg="$3"
     if grep -qE "${pattern}" "${file}" 2>/dev/null; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg}"
         printf '%b\n' "    expected pattern: ${pattern}"
         printf '%b\n' "    in: ${file}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -118,10 +122,10 @@ assert_not_contains() {
     local file="$1" pattern="$2" msg="$3"
     if ! grep -qE "${pattern}" "${file}" 2>/dev/null; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -129,10 +133,10 @@ assert_exit_code() {
     local actual="$1" expected="$2" msg="$3"
     if [[ "${actual}" -eq "${expected}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg} (got exit code ${actual}, expected ${expected})"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -143,10 +147,10 @@ assert_common_succeeds() {
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && '"${cmd}" 2>/dev/null)
     if [[ "${result}" == "valid" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -157,10 +161,10 @@ assert_common_fails() {
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && '"${cmd}" </dev/null >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -224,7 +228,7 @@ run_script_test() {
     leaked_temps=$(find /tmp -maxdepth 1 -name "tmp.*" -newer "${MOCK_LOG}" 2>/dev/null | wc -l)
     if [[ "${leaked_temps}" -eq 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} No temp files leaked"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     fi
 }
 
@@ -248,19 +252,19 @@ _test_sprite_functions_and_syntax() {
     missing=$(echo "${output}" | grep "^MISSING:" || true)
     if [[ -z "${missing}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} All functions defined"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} Missing functions: ${missing}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # Syntax check
     if bash -n "${REPO_ROOT}/sprite/lib/common.sh" 2>/dev/null; then
         printf '%b\n' "  ${GREEN}✓${NC} Syntax valid"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} Syntax errors"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -271,10 +275,10 @@ _test_sprite_log_and_name() {
     stderr=$(timeout 5 bash -c 'source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && log_info "test"' </dev/null 2>&1 >/dev/null)
     if [[ -z "${stdout}" && -n "${stderr}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} Log functions write to stderr"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} Log functions should write to stderr only"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # get_sprite_name uses SPRITE_NAME env var
@@ -282,10 +286,10 @@ _test_sprite_log_and_name() {
     name=$(timeout 5 bash -c 'SPRITE_NAME=from-env; source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && get_sprite_name' 2>/dev/null)
     if [[ "${name}" == "from-env" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_sprite_name reads SPRITE_NAME env var"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} get_sprite_name should return 'from-env', got '${name}'"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # get_sprite_name fails gracefully without TTY or env var
@@ -293,10 +297,10 @@ _test_sprite_log_and_name() {
     timeout 5 bash -c 'SPRITE_NAME=""; source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && get_sprite_name' </dev/null >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_sprite_name fails without TTY or env var"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} get_sprite_name should fail without input"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -306,15 +310,15 @@ _test_sprite_remote_source() {
     fi
     local remote_fns
     remote_fns=$(bash -c '
-        source <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)
+        eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)"
         type log_info &>/dev/null && echo "OK" || echo "FAIL"
     ' 2>/dev/null)
     if [[ "${remote_fns}" == "OK" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} Remote source from GitHub works"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} Remote source from GitHub failed"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -352,14 +356,14 @@ _test_model_validation() {
         local test_str
         test_str=$(printf 'bad%smodel' "${char}")
         bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id '"$(printf '%q' "${test_str}")" </dev/null >/dev/null 2>&1 || rc=$?
-        [[ "${rc}" -ne 0 ]] && ((rejected_count++))
+        [[ "${rc}" -ne 0 ]] && rejected_count=$((rejected_count + 1))
     done
     if [[ "${rejected_count}" -eq "${#dangerous_chars[@]}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} validate_model_id rejects shell metacharacters"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} validate_model_id should reject all shell metacharacters (${rejected_count}/${#dangerous_chars[@]})"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -368,10 +372,10 @@ _test_json_escape() {
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && json_escape "test\"quote"' 2>/dev/null)
     if [[ "${result}" == *'\\"'* ]] || [[ "${result}" == *'\"'* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} json_escape handles special characters"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} json_escape should escape quotes"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -381,10 +385,10 @@ _test_ssh_key_utils() {
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && generate_ssh_key_if_missing "'"${test_key}"'"' >/dev/null 2>&1
     if [[ -f "${test_key}" && -f "${test_key}.pub" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} generate_ssh_key_if_missing creates key"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} generate_ssh_key_if_missing should create key at ${test_key}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # generate_ssh_key_if_missing - skips existing
@@ -396,10 +400,10 @@ _test_ssh_key_utils() {
     mtime_after=$(stat -c %Y "${test_key}" 2>/dev/null || stat -f %m "${test_key}" 2>/dev/null)
     if [[ "${mtime_before}" == "${mtime_after}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} generate_ssh_key_if_missing skips existing key"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} generate_ssh_key_if_missing should not recreate existing key"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # get_ssh_fingerprint
@@ -407,10 +411,10 @@ _test_ssh_key_utils() {
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && get_ssh_fingerprint "'"${test_key}.pub"'"' 2>/dev/null)
     if [[ -n "${result}" && "${result}" =~ ^[a-f0-9:]+$ ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_ssh_fingerprint returns valid fingerprint"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} get_ssh_fingerprint should return hex fingerprint, got '${result}'"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # extract_ssh_key_ids
@@ -418,20 +422,20 @@ _test_ssh_key_utils() {
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && echo '"'${mock_json}'"' | extract_ssh_key_ids "$(cat)" "ssh_keys"' 2>/dev/null)
     if [[ "${result}" == "[123, 456]" ]] || [[ "${result}" == "[123,456]" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} extract_ssh_key_ids parses JSON correctly"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} extract_ssh_key_ids should return [123, 456], got '${result}'"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
 _test_syntax_and_logging() {
     if bash -n "${REPO_ROOT}/shared/common.sh" 2>/dev/null; then
         printf '%b\n' "  ${GREEN}✓${NC} shared/common.sh syntax valid"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} shared/common.sh has syntax errors"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     local output missing
@@ -444,10 +448,10 @@ _test_syntax_and_logging() {
     missing=$(echo "${output}" | grep "^MISSING:" || true)
     if [[ -z "${missing}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} All logging functions exist in shared/common.sh"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} Missing logging functions: ${missing}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -462,10 +466,10 @@ _test_open_browser() {
     ' 2>/dev/null)
     if [[ "${result}" == "termux: https://example.com" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} open_browser detects termux-open-url"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} open_browser should use termux-open-url, got '${result}'"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # open_browser: macOS open
@@ -477,10 +481,10 @@ _test_open_browser() {
     ' 2>/dev/null)
     if [[ "${result}" == "macOS: https://example.com" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} open_browser detects macOS open"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} open_browser should use macOS open, got '${result}'"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # open_browser: fallback message
@@ -499,10 +503,10 @@ _test_open_browser() {
     ' 2>&1 >/dev/null)
     if [[ "${stderr_output}" == *"Please open: https://example.com"* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} open_browser shows fallback message when browsers unavailable"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} open_browser should show fallback message, got '${stderr_output}'"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -512,26 +516,26 @@ _test_cloud_init() {
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && get_cloud_init_userdata' 2>/dev/null)
     if [[ "${result}" == *"#cloud-config"* ]] && [[ "${result}" == *"package_update"* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_cloud_init_userdata returns valid YAML"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} get_cloud_init_userdata should return cloud-init YAML"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     if [[ "${result}" == *"curl"* ]] && [[ "${result}" == *"git"* ]] && [[ "${result}" == *"zsh"* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_cloud_init_userdata includes required packages"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} get_cloud_init_userdata should include curl, git, zsh"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     if [[ "${result}" == *"bun.sh/install"* ]] && [[ "${result}" == *"claude.ai/install"* ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} get_cloud_init_userdata includes Bun and Claude installation"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} get_cloud_init_userdata should include Bun and Claude install"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # check_openrouter_connectivity
@@ -539,10 +543,10 @@ _test_cloud_init() {
         result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && check_openrouter_connectivity && echo "reachable"' 2>/dev/null)
         if [[ "${result}" == "reachable" ]] || [[ -z "${result}" ]]; then
             printf '%b\n' "  ${GREEN}✓${NC} check_openrouter_connectivity handles connectivity check"
-            ((PASSED++))
+            PASSED=$((PASSED + 1))
         else
             printf '%b\n' "  ${RED}✗${NC} check_openrouter_connectivity should return success or failure gracefully"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     else
         printf '%b\n' "  ${YELLOW}⚠${NC} check_openrouter_connectivity test skipped (curl not available)"
@@ -559,10 +563,10 @@ _test_oauth_functions() {
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && wait_for_oauth_code "'"${code_test_file}"'" 1' >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -eq 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} wait_for_oauth_code returns success when file exists"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} wait_for_oauth_code should return 0 when file exists"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # wait_for_oauth_code - timeout
@@ -571,10 +575,10 @@ _test_oauth_functions() {
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && wait_for_oauth_code "'"${missing_file}"'" 1' >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} wait_for_oauth_code returns failure on timeout"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} wait_for_oauth_code should return non-zero on timeout"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # cleanup_oauth_session
@@ -583,10 +587,10 @@ _test_oauth_functions() {
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && cleanup_oauth_session "" "'"${cleanup_test_dir}"'"' >/dev/null 2>&1
     if [[ ! -d "${cleanup_test_dir}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} cleanup_oauth_session removes directory"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} cleanup_oauth_session should remove directory"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -602,10 +606,10 @@ _test_ssh_wait() {
     ' 2>/dev/null | tail -1)
     if [[ "${result}" == "0" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} generic_ssh_wait succeeds when command passes"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} generic_ssh_wait should return 0 on success, got '${result}'"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # generic_ssh_wait - failure
@@ -618,10 +622,10 @@ _test_ssh_wait() {
     ' 2>/dev/null | tail -1)
     if [[ "${result}" == "1" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} generic_ssh_wait fails after max attempts"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} generic_ssh_wait should return 1 after max attempts, got '${result}'"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -631,10 +635,10 @@ _test_input_and_server_validation() {
     timeout 5 bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && safe_read "test: "' </dev/null >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} safe_read fails when no TTY available"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} safe_read should fail without TTY"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # validate_server_name
@@ -684,19 +688,19 @@ test_source_detection() {
         # Verify the source block checks for local file existence
         if grep -q 'if \[\[ -f "${SCRIPT_DIR}/lib/common.sh" \]\]' "${script_path}"; then
             printf '%b\n' "  ${GREEN}✓${NC} ${script}.sh uses file-existence check for sourcing"
-            ((PASSED++))
+            PASSED=$((PASSED + 1))
         else
             printf '%b\n' "  ${RED}✗${NC} ${script}.sh missing file-existence source check"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
 
         # Verify syntax
         if bash -n "${script_path}" 2>/dev/null; then
             printf '%b\n' "  ${GREEN}✓${NC} ${script}.sh syntax valid"
-            ((PASSED++))
+            PASSED=$((PASSED + 1))
         else
             printf '%b\n' "  ${RED}✗${NC} ${script}.sh syntax error"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     done
 }
@@ -734,7 +738,7 @@ run_shellcheck() {
 
     for script in "${all_scripts[@]}"; do
         [[ -f "${script}" ]] || continue
-        ((checked_count++))
+        checked_count=$((checked_count + 1))
 
         # Run shellcheck with warning severity, exclude some noisy checks
         # SC1090: Can't follow non-constant source
@@ -743,7 +747,7 @@ run_shellcheck() {
         output=$(shellcheck --severity=warning --exclude=SC1090,SC2312 "${script}" 2>&1)
 
         if [[ -n "${output}" ]]; then
-            ((issue_count++))
+            issue_count=$((issue_count + 1))
             printf '%b\n' "  ${YELLOW}⚠${NC} $(basename "${script}"): found issues"
             echo "${output}" | sed 's/^/    /'
         fi
@@ -751,7 +755,7 @@ run_shellcheck() {
 
     if [[ "${issue_count}" -eq 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} No issues found in ${checked_count} scripts"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${YELLOW}⚠${NC} Found issues in ${issue_count}/${checked_count} scripts (advisory only)"
         # Don't fail the build, just warn

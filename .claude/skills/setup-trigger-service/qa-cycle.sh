@@ -42,6 +42,27 @@ cleanup() {
 
 trap cleanup EXIT SIGTERM SIGINT
 
+# macOS-compatible timeout: run command with a time limit
+# Usage: run_with_timeout SECONDS COMMAND [ARGS...]
+run_with_timeout() {
+    local secs="$1"; shift
+    "$@" &
+    local pid=$!
+    local elapsed=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if [[ "$elapsed" -ge "$secs" ]]; then
+            kill "$pid" 2>/dev/null
+            sleep 1
+            kill -9 "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            return 124
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    wait "$pid" 2>/dev/null
+}
+
 log "=== Starting QA cycle (reason=${SPAWN_REASON}) ==="
 log "Repo root: ${REPO_ROOT}"
 log "Timeout: ${CYCLE_TIMEOUT}s"
@@ -58,6 +79,63 @@ check_timeout() {
         return 1
     fi
     return 0
+}
+
+# Robust push → PR → merge with retry on stale main
+# Usage: push_and_merge_pr BRANCH_NAME PR_TITLE PR_BODY
+push_and_merge_pr() {
+    local branch_name="$1"
+    local pr_title="$2"
+    local pr_body="$3"
+    local max_retries=3
+    local attempt=0
+
+    if [[ -z "$(git log origin/main..HEAD --oneline 2>/dev/null)" ]]; then
+        log "push_and_merge_pr: No commits to push on ${branch_name}"
+        return 0
+    fi
+
+    git push -u origin "${branch_name}" 2>&1 | tee -a "${LOG_FILE}" || {
+        log "push_and_merge_pr: Push failed for ${branch_name}"
+        return 1
+    }
+
+    local pr_url=""
+    pr_url=$(gh pr create \
+        --title "${pr_title}" \
+        --body "${pr_body}" \
+        --base main --head "${branch_name}" 2>/dev/null) || true
+
+    if [[ -z "${pr_url:-}" ]]; then
+        log "push_and_merge_pr: PR creation failed for ${branch_name}"
+        return 1
+    fi
+
+    log "push_and_merge_pr: PR created: ${pr_url}"
+
+    while [[ "$attempt" -lt "$max_retries" ]]; do
+        attempt=$((attempt + 1))
+
+        if gh pr merge "${branch_name}" --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}"; then
+            log "push_and_merge_pr: Merged ${branch_name} (attempt ${attempt})"
+            return 0
+        fi
+
+        log "push_and_merge_pr: Merge failed (attempt ${attempt}/${max_retries}), rebasing onto latest main..."
+
+        git fetch origin main 2>/dev/null || true
+        if git rebase origin/main 2>&1 | tee -a "${LOG_FILE}"; then
+            git push --force-with-lease origin "${branch_name}" 2>&1 | tee -a "${LOG_FILE}" || true
+            sleep 3
+        else
+            git rebase --abort 2>/dev/null || true
+            log "push_and_merge_pr: Rebase failed for ${branch_name}, giving up"
+            break
+        fi
+    done
+
+    log "push_and_merge_pr: Could not merge ${branch_name} after ${max_retries} attempts, leaving PR open"
+    return 1
 }
 
 # ============================================================
@@ -113,6 +191,32 @@ git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
 log "Pre-cycle cleanup complete"
+
+# ============================================================
+# Phase 0: Key Preflight
+# ============================================================
+log "=== Phase 0: Key Preflight ==="
+
+if [[ -f "${REPO_ROOT}/shared/key-request.sh" ]]; then
+    source "${REPO_ROOT}/shared/key-request.sh"
+    load_cloud_keys_from_config
+    if [[ -n "${MISSING_KEY_PROVIDERS:-}" ]]; then
+        log "Phase 0: Missing keys for: ${MISSING_KEY_PROVIDERS}"
+        if [[ -n "${KEY_SERVER_URL:-}" ]]; then
+            log "Phase 0: Requesting keys via key-server (will trigger email notification)"
+            request_missing_cloud_keys
+        else
+            log "Phase 0: KEY_SERVER_URL not set — skipping email notification"
+            log "Phase 0: Set KEY_SERVER_URL and KEY_SERVER_SECRET to enable email flow"
+        fi
+    else
+        log "Phase 0: All cloud keys available"
+    fi
+else
+    log "Phase 0: shared/key-request.sh not found, skipping key preflight"
+fi
+
+check_timeout || exit 0
 
 # ============================================================
 # Phase 1: Record fixtures
@@ -175,7 +279,7 @@ else
 
             (
                 cd "${worktree}"
-                timeout --signal=TERM --kill-after=60 600 \
+                run_with_timeout 600 \
                     claude -p "The API fixture recording for cloud '${cloud}' is failing in test/record.sh.
 
 Error output:
@@ -199,14 +303,9 @@ Only modify ${cloud}/lib/common.sh — do not change test/record.sh." \
                 if bash -n "${cloud}/lib/common.sh" 2>/dev/null && [[ -n "$(git status --porcelain)" ]]; then
                     git add "${cloud}/lib/common.sh"
                     git commit -m "$(printf 'fix: Update %s API integration for recording\n\nAgent: qa-record-fixer\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>' "${cloud}")" || true
-                    git push -u origin "${branch_name}" || true
-                    PR_URL=$(gh pr create \
-                        --title "fix: Update ${cloud} API for fixture recording" \
-                        --body "Automated fix from QA cycle. API recording was failing for ${cloud}." \
-                        --base main --head "${branch_name}" 2>/dev/null) || true
-                    if [[ -n "${PR_URL:-}" ]]; then
-                        gh pr merge --squash --delete-branch 2>/dev/null || true
-                    fi
+                    push_and_merge_pr "${branch_name}" \
+                        "fix: Update ${cloud} API for fixture recording" \
+                        "Automated fix from QA cycle. API recording was failing for ${cloud}." || true
                 fi
             ) &
             RECORD_FIX_PIDS="${RECORD_FIX_PIDS} $!"
@@ -232,6 +331,14 @@ Only modify ${cloud}/lib/common.sh — do not change test/record.sh." \
         bash test/record.sh allsaved 2>&1 | tee -a "${LOG_FILE}" || {
             log "Phase 1: Re-record still has failures — continuing with existing fixtures"
         }
+    fi
+
+    # Request fresh keys for stale providers (auth failures detected earlier)
+    if [[ -n "${STALE_KEY_PROVIDERS:-}" ]] && type request_missing_cloud_keys &>/dev/null; then
+        MISSING_KEY_PROVIDERS="${STALE_KEY_PROVIDERS}"
+        log "Phase 1: Requesting fresh keys for stale providers: ${STALE_KEY_PROVIDERS}"
+        request_missing_cloud_keys
+        log "Phase 1: Key request sent (email notification will be sent if KEY_SERVER_URL is configured)"
     fi
 fi
 
@@ -317,7 +424,7 @@ ${ctx}
         (
             cd "${worktree}"
             FIX_EXIT=0
-            timeout --signal=TERM --kill-after=60 900 \
+            run_with_timeout 900 \
                 claude -p "Fix the failing mock tests for cloud '${cloud}' in the spawn codebase.
 
 Failing scripts: ${failing_scripts}
@@ -354,14 +461,9 @@ Agent: qa-fixer
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 FIXEOF
                     )" || true
-                    git push -u origin "${branch_name}" || true
-                    PR_URL=$(gh pr create \
-                        --title "fix: Fix ${cloud} mock test failures" \
-                        --body "Automated fix from QA cycle. ${fail_count} mock test(s) were failing for ${cloud}: ${failing_scripts}" \
-                        --base main --head "${branch_name}" 2>/dev/null) || true
-                    if [[ -n "${PR_URL:-}" ]]; then
-                        gh pr merge --squash --delete-branch 2>/dev/null || true
-                    fi
+                    push_and_merge_pr "${branch_name}" \
+                        "fix: Fix ${cloud} mock test failures" \
+                        "Automated fix from QA cycle. ${fail_count} mock test(s) were failing for ${cloud}: ${failing_scripts}" || true
                 fi
             fi
         ) &
@@ -404,8 +506,11 @@ if [[ -f "${RESULTS_PHASE4}" ]]; then
 
     python3 test/update-readme.py "${RESULTS_PHASE4}" 2>&1 | tee -a "${LOG_FILE}"
 
-    # Commit + push if README changed
+    # Commit + push if README changed (using PR workflow for safety)
     if [[ -n "$(git diff --name-only README.md 2>/dev/null)" ]]; then
+        README_BRANCH="qa/readme-update-$(date +%s)"
+        git checkout -b "${README_BRANCH}" 2>&1 | tee -a "${LOG_FILE}"
+
         git add README.md
         git commit -m "$(cat <<'EOF'
 test: Update README matrix after QA cycle
@@ -413,8 +518,19 @@ test: Update README matrix after QA cycle
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
         )" 2>&1 | tee -a "${LOG_FILE}" || true
-        git push origin main 2>&1 | tee -a "${LOG_FILE}" || true
-        log "Phase 4: README updated, committed, and pushed"
+
+        push_and_merge_pr "${README_BRANCH}" \
+            "test: Update README matrix after QA cycle" \
+            "Automated README update from QA cycle Phase 4. Test results updated in the matrix." || {
+            log "Phase 4: PR merge failed, leaving PR open for manual review"
+        }
+
+        # Switch back to main and sync
+        git checkout main 2>&1 | tee -a "${LOG_FILE}" || true
+        git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
+        git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
+
+        log "Phase 4: README updated via PR"
     else
         log "Phase 4: No README changes needed"
     fi
