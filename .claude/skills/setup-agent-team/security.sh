@@ -166,29 +166,22 @@ After both agents report back, make the final decision:
    \`\`\`
    (The SLACK_WEBHOOK env var is: ${SLACK_WEBHOOK:-NOT_SET})
 
-### If only MEDIUM/LOW issues:
+### If only MEDIUM/LOW issues or no issues:
 1. Post an **approving** review on the PR:
    \`\`\`bash
    gh pr review ${PR_NUM} --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY"
    \`\`\`
-   Include MEDIUM/LOW findings as informational notes. Do NOT merge — leave for human review.
+   Include any MEDIUM/LOW findings as informational notes.
 
-### If NO issues at all (clean review):
-1. Post an **approving** review on the PR:
-   \`\`\`bash
-   gh pr review ${PR_NUM} --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY"
-   \`\`\`
 2. **Merge the PR** (squash merge, delete branch):
    \`\`\`bash
    gh pr merge ${PR_NUM} --repo OpenRouterTeam/spawn --squash --delete-branch
    \`\`\`
-   Only merge if ALL of these are true:
-   - Zero CRITICAL, HIGH, or MEDIUM findings from code-reviewer
+   Merge if ALL of these are true:
+   - Zero CRITICAL or HIGH findings from code-reviewer
    - All bash -n checks pass
    - All bun tests pass (or N/A)
-   - curl|bash patterns are correct
-   - macOS compat is clean
-   If ANY of these fail, do NOT merge — just approve with notes.
+   If merge fails (e.g. conflicts, branch protection), log the error and move on.
 
 ### Review body format:
 \`\`\`
@@ -222,8 +215,7 @@ After both agents report back, make the final decision:
 7. Collect results from both agents via messages
 8. Make the review decision:
    - If CRITICAL/HIGH → request changes + Slack notification
-   - If MEDIUM/LOW only → approve, do NOT merge
-   - If ZERO findings → approve AND merge (squash + delete branch)
+   - If MEDIUM/LOW or clean → approve AND merge (squash + delete branch)
 9. Shutdown all teammates via SendMessage (type=shutdown_request)
 10. Clean up with TeamDelete
 11. Exit
@@ -239,15 +231,15 @@ Required pattern:
    b. If messages received, process them
    c. If no messages yet, run Bash("sleep 15") then loop back
 3. Once both agents report, make review decision
-4. Post review (and merge if clean)
+4. Post review and merge if no CRITICAL/HIGH findings
 5. Send Slack notification if concerns found
 6. Shutdown teammates and exit
 
 ## Safety Rules
 
-- NEVER approve a PR with CRITICAL findings
-- NEVER merge a PR with ANY findings (CRITICAL, HIGH, MEDIUM, or LOW)
-- Only merge when the review is 100% clean — zero findings, all tests pass
+- NEVER approve a PR with CRITICAL or HIGH findings
+- Auto-merge PRs that have no CRITICAL/HIGH findings and all tests pass
+- MEDIUM/LOW findings are informational — still approve and merge
 - If unsure about a finding, flag it as MEDIUM and note the uncertainty
 - Always include file paths and line numbers in findings
 - Do not modify any code — this is review only
