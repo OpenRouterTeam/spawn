@@ -1,0 +1,55 @@
+name: Team Improvement / Suggestion
+description: Suggest an improvement to how the automated refactoring team operates
+title: "[Team]: "
+labels: ["team-improvement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us improve the automated team! Suggestions about agent roles,
+        workflows, review processes, or coordination are all welcome.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the team does this affect?
+      options:
+        - Agent roles (add, remove, or change a team member)
+        - PR workflow (review, merge, labeling)
+        - Issue handling (triage, labels, coordination)
+        - Safety / security (review gates, approval flow)
+        - Performance (timeouts, parallelism, resource usage)
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What should change?
+      description: Describe the improvement or new behavior you'd like to see.
+      placeholder: |
+        Agents should not merge their own PRs. Instead, a different agent
+        should review and approve each PR before it gets merged.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why?
+      description: What problem does this solve or what benefit does it provide?
+      placeholder: |
+        Cross-review catches duplicate work and ensures a second pair of eyes
+        on every change before it lands on main.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other details, examples from past cycles, or references
+    validations:
+      required: false

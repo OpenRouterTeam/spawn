@@ -154,13 +154,16 @@ Create these teammates:
    - Implement the fix in an isolated worktree
    - Run tests to verify the fix
    - Create a PR with \`Fixes #${SPAWN_ISSUE}\` in the body
-   - Merge the PR immediately
+   - Label the PR with \`needs-team-review\` — do NOT self-merge
+   - Message issue-tester to review the PR
 
 2. **issue-tester** (Haiku)
-   - Review the fix for correctness and edge cases
+   - Review the issue-fixer's PR for correctness and edge cases
+   - Read the PR diff: \`gh pr diff NUMBER --repo OpenRouterTeam/spawn\`
    - Run \`bun test\` to verify no regressions
    - Run \`bash -n\` on any modified .sh files
-   - Report test results to the team lead
+   - If the PR looks good: approve and merge it
+   - If issues are found: request changes and message issue-fixer
 
 ## Label Management (MANDATORY)
 
@@ -190,13 +193,15 @@ Track issue lifecycle with labels: "Pending Review" → "Under Review" → "In P
 9. When fix is ready:
    - Push: \`git push -u origin fix/issue-${SPAWN_ISSUE}\`
    - PR: \`gh pr create --title "fix: Description" --body "Fixes #${SPAWN_ISSUE}"\`
-   - Merge: \`gh pr merge --squash --delete-branch\`
-10. Post resolution comment on the issue with PR link
-11. Remove status labels and close the issue:
+   - Label: \`gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"\`
+   - Message issue-tester to review and merge (do NOT self-merge)
+10. Issue-tester reviews, approves, and merges the PR
+11. Post resolution comment on the issue with PR link
+12. Remove status labels and close the issue:
     \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "In Progress"\`
     \`gh issue close ${SPAWN_ISSUE}\`
-12. Clean up worktree: \`git worktree remove ${WORKTREE_BASE}\`
-13. Shutdown all teammates and exit
+13. Clean up worktree: \`git worktree remove ${WORKTREE_BASE}\`
+14. Shutdown all teammates and exit
 
 ## Commit Markers (MANDATORY)
 
@@ -235,6 +240,60 @@ Agents should aim for ONE high-impact PR each, not many small ones.
 Complexity-hunter: pick the top 1-2 worst functions, fix them, PR, done. Do NOT exhaustively refactor everything.
 Test-engineer: add ONE focused test file, PR, done. Do NOT aim for 100% coverage.
 Security-auditor: scan for HIGH/CRITICAL only. Document medium/low, don't fix them.
+
+## Cross-Review Rule (MANDATORY — NO SELF-MERGING)
+
+Agents must NEVER merge their own PRs. Every PR requires review by a DIFFERENT agent.
+
+### How it works:
+
+1. **When an agent finishes a PR**, they must:
+   - Add the label `needs-team-review` to the PR:
+     `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
+   - Add a comment tagging which agent should review (see assignment table below)
+   - Message the reviewing agent via SendMessage to notify them
+   - Do NOT run `gh pr merge` — that is the reviewer's job
+
+2. **Review assignment** (each agent has a designated reviewer):
+   - security-auditor PRs → reviewed by **ux-engineer**
+   - ux-engineer PRs → reviewed by **security-auditor**
+   - complexity-hunter PRs → reviewed by **test-engineer**
+   - test-engineer PRs → reviewed by **complexity-hunter**
+   - community-coordinator PRs → reviewed by **security-auditor**
+   - branch-cleaner PRs → reviewed by **team-lead** (merge directly — cleanup is low-risk)
+
+3. **When reviewing another agent's PR**, the reviewer must:
+   - Read the PR diff: `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
+   - Check for duplicate work (see Duplicate Work Detection below)
+   - Run tests in the PR's worktree: `cd WORKTREE_BASE_PLACEHOLDER/BRANCH && bun test`
+   - Run `bash -n` on any modified .sh files
+   - If the PR looks good: approve and merge it:
+     `gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "Reviewed by REVIEWER-AGENT. LGTM."`
+     `gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch`
+     Remove the review label: `gh pr edit NUMBER --repo OpenRouterTeam/spawn --remove-label "needs-team-review"`
+   - If the PR has issues: request changes with a comment explaining what's wrong:
+     `gh pr review NUMBER --repo OpenRouterTeam/spawn --request-changes --body "ISSUE DESCRIPTION"`
+     Message the author agent to fix the issues
+
+4. **Team lead responsibility**: During the monitoring loop, check for stale `needs-team-review` PRs.
+   If a PR has had the label for >5 minutes with no review, message the assigned reviewer.
+   If the assigned reviewer is unresponsive, the team lead may review and merge it directly.
+
+## Duplicate Work Detection (MANDATORY before every PR)
+
+Before creating a PR, EVERY agent MUST check for overlapping work:
+
+1. List all open PRs from this cycle:
+   `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,files`
+2. List recently merged PRs (last 2 hours):
+   `gh pr list --repo OpenRouterTeam/spawn --state merged --json number,title,mergedAt,files --jq '[.[] | select(.mergedAt > (now - 7200 | todate))]'`
+3. Check if ANY of those PRs touch the SAME files your change touches
+4. If overlap is found:
+   - If the other PR is open: coordinate with that agent — either combine the work or ensure your changes are compatible
+   - If the other PR was already merged: rebase on latest main (`git pull origin main`) and verify your changes still apply cleanly
+   - If your work is genuinely redundant (another agent already fixed the same thing): abandon your branch and skip the PR
+5. Add a "Checked for duplicates" note in the PR body:
+   `No overlapping PRs found` or `Rebased on #NUMBER which touched similar files`
 
 ## Team Structure
 
@@ -342,10 +401,13 @@ When fixing a bug reported in a GitHub issue:
 8. Implement the fix and commit (include Agent: marker)
 9. Community-coordinator posts interim update on the issue with root cause summary (only if no similar update exists)
 10. Push the branch: git push -u origin fix/issue-NUMBER
-11. Create a PR that references the issue:
-    gh pr create --title "Fix: description" --body "Fixes #NUMBER"
-12. Merge the PR immediately: gh pr merge --squash --delete-branch
-13. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
+11. Create a PR that references the issue (include duplicate check note):
+    gh pr create --title "Fix: description" --body "Fixes #NUMBER
+
+    Checked for duplicates: No overlapping PRs found."
+12. Label for cross-review: gh pr edit NUMBER --add-label "needs-team-review"
+13. Assigned reviewer reviews, approves, and merges the PR (see Cross-Review Rule)
+14. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
 14. Community-coordinator posts final resolution comment with PR link and explanation (only if no resolution exists)
 15. Remove status labels and close the issue:
     gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "In Progress"
@@ -412,11 +474,16 @@ Agent: agent-name
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 git push -u origin BRANCH-NAME
 
-# 4. Create PR (can be done from anywhere)
-gh pr create --title "title" --body "body"
+# 4. Create PR (can be done from anywhere) — include duplicate check note
+gh pr create --title "title" --body "body
 
-# 5. Merge and clean up
-gh pr merge NUMBER --squash --delete-branch
+Checked for duplicates: No overlapping PRs found."
+
+# 5. Label for cross-review (DO NOT self-merge)
+gh pr edit NUMBER --add-label "needs-team-review"
+# Message the assigned reviewer via SendMessage — they will merge it
+
+# 6. After the REVIEWER merges, clean up the worktree
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 ```
 
@@ -471,12 +538,14 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 2. Immediately start a polling loop — do NOT just output text saying "I'll wait":
    while teammates are still active:
      a. Run TaskList to check task status
-     b. Run `gh pr list --repo OpenRouterTeam/spawn --state open` to check for PRs to merge
-     c. When you receive a teammate message, acknowledge it and update task tracking
-     d. If a teammate reports completion, mark their task done and merge their PR
-     e. If a teammate reports an error, coordinate resolution
-     f. If the time budget is almost up, send wrap-up messages to all teammates
-     g. If no messages received yet, run `Bash("sleep 30")` then loop back to (a)
+     b. Run `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` to find PRs awaiting review
+     c. For each PR with `needs-team-review`: check which agent created it, message the assigned reviewer if not already notified
+     d. If a `needs-team-review` PR has been waiting >5 minutes with no review, message the reviewer again or review it yourself
+     e. When you receive a teammate message, acknowledge it and update task tracking
+     f. If a teammate reports completion, mark their task done — their PR goes through cross-review
+     g. If a teammate reports an error, coordinate resolution
+     h. If the time budget is almost up, send wrap-up messages to all teammates. For any remaining `needs-team-review` PRs, the team lead reviews and merges directly
+     i. If no messages received yet, run `Bash("sleep 30")` then loop back to (a)
 3. Only after ALL teammates have finished, proceed to shutdown
 ```
 
@@ -491,7 +560,7 @@ GOOD: Spawn teammates → TaskList → sleep 30 → TaskList → receive message
 You MUST remain active until ALL of the following are true:
 
 1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
-2. **All PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm zero open PRs from this cycle. Every PR must be either merged or closed with a comment.
+2. **All PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm zero open PRs from this cycle. Every PR must be either merged or closed with a comment. If any PRs still have `needs-team-review`, the team lead must review and merge them before shutdown.
 3. **All issues are engaged and labeled**: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,labels`
    and for EACH open issue, verify it has at least one comment AND has a status label
    ("Pending Review", "Under Review", or "In Progress"). If any issue is missing a status
