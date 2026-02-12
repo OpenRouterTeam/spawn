@@ -31,8 +31,8 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server "$UPCLOUD_SERVER_IP" "printf '%s\n' 'export OPENROUTER_API_KEY=\"${OPENROUTER_API_KEY}\"' >> /root/.bashrc"
-run_server "$UPCLOUD_SERVER_IP" "printf '%s\n' 'export OPENROUTER_API_KEY=\"${OPENROUTER_API_KEY}\"' >> /root/.zshrc"
+inject_env_vars_ssh "$UPCLOUD_SERVER_IP" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 setup_continue_config "${OPENROUTER_API_KEY}" \
     "upload_file ${UPCLOUD_SERVER_IP}" \
