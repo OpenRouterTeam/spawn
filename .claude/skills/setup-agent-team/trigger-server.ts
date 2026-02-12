@@ -21,6 +21,8 @@
  * continues to drain to the server console.
  */
 
+import { timingSafeEqual } from "crypto";
+
 const PORT = 8080;
 const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const TARGET_SCRIPT = process.env.TARGET_SCRIPT ?? "";
@@ -50,6 +52,25 @@ interface RunEntry {
 let shuttingDown = false;
 const runs = new Map<number, RunEntry>();
 let nextRunId = 1;
+
+/** Timing-safe auth check — prevents timing side-channel attacks on TRIGGER_SECRET */
+function isAuthed(req: Request): boolean {
+  const given = req.headers.get("Authorization") ?? "";
+  const expected = `Bearer ${TRIGGER_SECRET}`;
+  if (given.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+}
+
+/** Allowed values for the reason query parameter */
+const VALID_REASONS = new Set([
+  "manual",
+  "schedule",
+  "issues",
+  "team_building",
+  "triage",
+  "review_all",
+  "hygiene",
+]);
 
 /** Check if a process is still alive via kill(0) */
 function isAlive(pid: number): boolean {
@@ -309,8 +330,7 @@ const server = Bun.serve({
         );
       }
 
-      const auth = req.headers.get("Authorization") ?? "";
-      if (auth !== `Bearer ${TRIGGER_SECRET}`) {
+      if (!isAuthed(req)) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
 
@@ -336,6 +356,12 @@ const server = Bun.serve({
       }
 
       const reason = url.searchParams.get("reason") ?? "manual";
+      if (!VALID_REASONS.has(reason)) {
+        return Response.json(
+          { error: "invalid reason", allowed: Array.from(VALID_REASONS) },
+          { status: 400 }
+        );
+      }
       const issue = url.searchParams.get("issue") ?? "";
 
       // Validate issue is a positive integer (prevents injection into shell commands)
