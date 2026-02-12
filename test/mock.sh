@@ -442,60 +442,44 @@ MOCKCURL
     chmod +x "${TEST_DIR}/curl"
 }
 
-setup_mock_ssh() {
-    # Mock ssh — log and succeed
-    cat > "${TEST_DIR}/ssh" << 'MOCKSSH'
+# Create a mock that logs "<name> $*" to MOCK_LOG and exits 0
+_create_logging_mock() {
+    local name="$1"
+    cat > "${TEST_DIR}/${name}" << MOCK
 #!/bin/bash
-echo "ssh $*" >> "${MOCK_LOG}"
+echo "${name} \$*" >> "\${MOCK_LOG}"
 exit 0
-MOCKSSH
-    chmod +x "${TEST_DIR}/ssh"
+MOCK
+    chmod +x "${TEST_DIR}/${name}"
+}
 
-    # Mock scp — log and succeed
-    cat > "${TEST_DIR}/scp" << 'MOCKSCP'
-#!/bin/bash
-echo "scp $*" >> "${MOCK_LOG}"
-exit 0
-MOCKSCP
-    chmod +x "${TEST_DIR}/scp"
+# Create a mock that silently exits 0 (no logging)
+_create_silent_mock() {
+    local name="$1"
+    printf '#!/bin/bash\nexit 0\n' > "${TEST_DIR}/${name}"
+    chmod +x "${TEST_DIR}/${name}"
+}
+
+setup_mock_ssh() {
+    _create_logging_mock ssh
+    _create_logging_mock scp
 }
 
 setup_mock_agents() {
     # Agent binaries
-    local agents="claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q"
-    for agent in $agents; do
-        cat > "${TEST_DIR}/${agent}" << MOCK
-#!/bin/bash
-echo "${agent} \$*" >> "\${MOCK_LOG}"
-exit 0
-MOCK
-        chmod +x "${TEST_DIR}/${agent}"
+    local cmd
+    for cmd in claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q; do
+        _create_logging_mock "$cmd"
     done
 
     # Tools used during agent install
-    local tools="pip pip3 npm npx bun node openssl shred cargo go"
-    for tool in $tools; do
-        cat > "${TEST_DIR}/${tool}" << MOCK
-#!/bin/bash
-echo "${tool} \$*" >> "\${MOCK_LOG}"
-exit 0
-MOCK
-        chmod +x "${TEST_DIR}/${tool}"
+    for cmd in pip pip3 npm npx bun node openssl shred cargo go git; do
+        _create_logging_mock "$cmd"
     done
 
-    # Mock 'clear' to prevent terminal clearing
-    cat > "${TEST_DIR}/clear" << 'MOCK'
-#!/bin/bash
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/clear"
-
-    # Mock 'sleep' to speed up tests
-    cat > "${TEST_DIR}/sleep" << 'MOCK'
-#!/bin/bash
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/sleep"
+    # Silent mocks (no logging needed)
+    _create_silent_mock clear
+    _create_silent_mock sleep
 
     # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
     cat > "${TEST_DIR}/ssh-keygen" << 'MOCK'
@@ -524,14 +508,6 @@ fi
 exit 0
 MOCK
     chmod +x "${TEST_DIR}/ssh-keygen"
-
-    # Mock 'git' for agents that clone repos
-    cat > "${TEST_DIR}/git" << 'MOCK'
-#!/bin/bash
-echo "git $*" >> "${MOCK_LOG}"
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/git"
 }
 
 setup_fake_home() {
@@ -551,6 +527,14 @@ setup_fake_home() {
 # Cloud-specific env var setup
 # ============================================================
 
+# Export key=value pairs: _export_vars KEY1=val1 KEY2=val2 ...
+_export_vars() {
+    local pair
+    for pair in "$@"; do
+        export "${pair?}"
+    done
+}
+
 setup_env_for_cloud() {
     local cloud="$1"
 
@@ -559,81 +543,20 @@ setup_env_for_cloud() {
     export INSTANCE_STATUS_POLL_DELAY=0
 
     case "$cloud" in
-        hetzner)
-            export HCLOUD_TOKEN="test-token-hetzner"
-            export HETZNER_SERVER_NAME="test-srv"
-            export HETZNER_SERVER_TYPE="cpx11"
-            export HETZNER_LOCATION="fsn1"
-            ;;
-        digitalocean)
-            export DO_API_TOKEN="test-token-do"
-            export DO_DROPLET_NAME="test-srv"
-            export DO_DROPLET_SIZE="s-2vcpu-2gb"
-            export DO_REGION="nyc3"
-            ;;
-        vultr)
-            export VULTR_API_KEY="test-token-vultr"
-            export VULTR_SERVER_NAME="test-srv"
-            export VULTR_PLAN="vc2-1c-2gb"
-            export VULTR_REGION="ewr"
-            ;;
-        linode)
-            export LINODE_API_TOKEN="test-token-linode"
-            export LINODE_SERVER_NAME="test-srv"
-            export LINODE_TYPE="g6-standard-1"
-            export LINODE_REGION="us-east"
-            ;;
-        lambda)
-            export LAMBDA_API_KEY="test-token-lambda"
-            export LAMBDA_SERVER_NAME="test-srv"
-            ;;
-        civo)
-            export CIVO_API_TOKEN="test-token-civo"
-            export CIVO_SERVER_NAME="test-srv"
-            export CIVO_REGION="lon1"
-            ;;
-        upcloud)
-            export UPCLOUD_USERNAME="test-user"
-            export UPCLOUD_PASSWORD="test-pass"
-            export UPCLOUD_SERVER_NAME="test-srv"
-            export UPCLOUD_PLAN="1xCPU-1GB"
-            export UPCLOUD_ZONE="us-chi1"
-            ;;
-        binarylane)
-            export BINARYLANE_API_TOKEN="test-token-bl"
-            export BINARYLANE_SERVER_NAME="test-srv"
-            export BINARYLANE_SIZE="std-min"
-            export BINARYLANE_REGION="syd"
-            ;;
-        ovh)
-            export OVH_APPLICATION_KEY="test-app-key"
-            export OVH_APPLICATION_SECRET="test-app-secret"
-            export OVH_CONSUMER_KEY="test-consumer-key"
-            export OVH_PROJECT_ID="test-project-id"
-            export OVH_SERVER_NAME="test-srv"
-            ;;
-        scaleway)
-            export SCW_SECRET_KEY="test-token-scw"
-            export SCALEWAY_SERVER_NAME="test-srv"
-            export SCALEWAY_ZONE="fr-par-1"
-            ;;
-        genesiscloud)
-            export GENESIS_API_KEY="test-token-genesis"
-            export GENESIS_SERVER_NAME="test-srv"
-            ;;
-        kamatera)
-            export KAMATERA_API_CLIENT_ID="test-client-id"
-            export KAMATERA_API_SECRET="test-secret"
-            export KAMATERA_SERVER_NAME="test-srv"
-            ;;
-        latitude)
-            export LATITUDE_API_KEY="test-token-lat"
-            export LATITUDE_SERVER_NAME="test-srv"
-            ;;
-        hyperstack)
-            export HYPERSTACK_API_KEY="test-token-hyper"
-            export HYPERSTACK_SERVER_NAME="test-srv"
-            ;;
+        hetzner)      _export_vars HCLOUD_TOKEN=test-token-hetzner HETZNER_SERVER_NAME=test-srv HETZNER_SERVER_TYPE=cpx11 HETZNER_LOCATION=fsn1 ;;
+        digitalocean) _export_vars DO_API_TOKEN=test-token-do DO_DROPLET_NAME=test-srv DO_DROPLET_SIZE=s-2vcpu-2gb DO_REGION=nyc3 ;;
+        vultr)        _export_vars VULTR_API_KEY=test-token-vultr VULTR_SERVER_NAME=test-srv VULTR_PLAN=vc2-1c-2gb VULTR_REGION=ewr ;;
+        linode)       _export_vars LINODE_API_TOKEN=test-token-linode LINODE_SERVER_NAME=test-srv LINODE_TYPE=g6-standard-1 LINODE_REGION=us-east ;;
+        lambda)       _export_vars LAMBDA_API_KEY=test-token-lambda LAMBDA_SERVER_NAME=test-srv ;;
+        civo)         _export_vars CIVO_API_TOKEN=test-token-civo CIVO_SERVER_NAME=test-srv CIVO_REGION=lon1 ;;
+        upcloud)      _export_vars UPCLOUD_USERNAME=test-user UPCLOUD_PASSWORD=test-pass UPCLOUD_SERVER_NAME=test-srv UPCLOUD_PLAN=1xCPU-1GB UPCLOUD_ZONE=us-chi1 ;;
+        binarylane)   _export_vars BINARYLANE_API_TOKEN=test-token-bl BINARYLANE_SERVER_NAME=test-srv BINARYLANE_SIZE=std-min BINARYLANE_REGION=syd ;;
+        ovh)          _export_vars OVH_APPLICATION_KEY=test-app-key OVH_APPLICATION_SECRET=test-app-secret OVH_CONSUMER_KEY=test-consumer-key OVH_PROJECT_ID=test-project-id OVH_SERVER_NAME=test-srv ;;
+        scaleway)     _export_vars SCW_SECRET_KEY=test-token-scw SCALEWAY_SERVER_NAME=test-srv SCALEWAY_ZONE=fr-par-1 ;;
+        genesiscloud) _export_vars GENESIS_API_KEY=test-token-genesis GENESIS_SERVER_NAME=test-srv ;;
+        kamatera)     _export_vars KAMATERA_API_CLIENT_ID=test-client-id KAMATERA_API_SECRET=test-secret KAMATERA_SERVER_NAME=test-srv ;;
+        latitude)     _export_vars LATITUDE_API_KEY=test-token-lat LATITUDE_SERVER_NAME=test-srv ;;
+        hyperstack)   _export_vars HYPERSTACK_API_KEY=test-token-hyper HYPERSTACK_SERVER_NAME=test-srv ;;
     esac
 }
 
