@@ -40,73 +40,21 @@ kamatera_api() {
         -H "AuthSecret: ${KAMATERA_API_SECRET}"
 }
 
-# Try to load Kamatera credentials from config file
-# Returns 0 if loaded, 1 otherwise
-_load_kamatera_config() {
-    local config_file="$1"
-    local creds
-    creds=$(_load_json_config_fields "$config_file" api_client_id api_secret) || return 1
-
-    local saved_client_id saved_secret
-    { read -r saved_client_id; read -r saved_secret; } <<< "${creds}"
-    if [[ -n "$saved_client_id" ]] && [[ -n "$saved_secret" ]]; then
-        export KAMATERA_API_CLIENT_ID="$saved_client_id"
-        export KAMATERA_API_SECRET="$saved_secret"
-        log_info "Using Kamatera API credentials from $config_file"
-        return 0
-    fi
-    return 1
-}
-
 # Validate Kamatera credentials with a test API call
-# Returns 0 if valid, 1 otherwise (unsets credentials on failure)
-_validate_kamatera_credentials() {
+_test_kamatera_credentials() {
     local response
     response=$(kamatera_api POST "/service/server/info" '{"name":"__test__"}')
     if printf '%s' "$response" | grep -qi "authentication failed\|unauthorized\|invalid.*auth"; then
-        log_error "Authentication failed: Invalid Kamatera API credentials"
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify credentials at: https://console.kamatera.com/keys"
-        log_warn "  2. Ensure the API key has appropriate permissions"
-        unset KAMATERA_API_CLIENT_ID
-        unset KAMATERA_API_SECRET
         return 1
     fi
     return 0
 }
 
 ensure_kamatera_token() {
-    check_python_available || return 1
-
-    if [[ -n "${KAMATERA_API_CLIENT_ID:-}" ]] && [[ -n "${KAMATERA_API_SECRET:-}" ]]; then
-        log_info "Using Kamatera API credentials from environment"
-        return 0
-    fi
-
-    local config_file="$HOME/.config/spawn/kamatera.json"
-
-    if _load_kamatera_config "$config_file"; then
-        return 0
-    fi
-
-    echo ""
-    log_warn "Kamatera API Credentials Required"
-    log_warn "Get your API keys from: https://console.kamatera.com/keys"
-    echo ""
-
-    local client_id
-    client_id=$(validated_read "Enter your Kamatera API Client ID: " validate_api_token) || return 1
-
-    local secret
-    secret=$(validated_read "Enter your Kamatera API Secret: " validate_api_token) || return 1
-
-    export KAMATERA_API_CLIENT_ID="$client_id"
-    export KAMATERA_API_SECRET="$secret"
-
-    _validate_kamatera_credentials || return 1
-    log_info "API credentials validated"
-
-    _save_json_config "$config_file" api_client_id "$client_id" api_secret "$secret"
+    ensure_multi_credentials "Kamatera" "$HOME/.config/spawn/kamatera.json" \
+        "https://console.kamatera.com/keys" _test_kamatera_credentials \
+        "KAMATERA_API_CLIENT_ID:api_client_id:API Client ID" \
+        "KAMATERA_API_SECRET:api_secret:API Secret"
 }
 
 get_server_name() {
