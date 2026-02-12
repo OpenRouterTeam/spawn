@@ -43,10 +43,10 @@ test_genesis_token() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message', d.get('message','No details available')))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify API key at: https://developers.genesiscloud.com/"
-        log_warn "  2. Ensure the key has read/write permissions"
-        log_warn "  3. Check key hasn't been revoked"
+        log_error "Remediation steps:"
+        log_error "  1. Verify API key at: https://developers.genesiscloud.com/"
+        log_error "  2. Ensure the key has read/write permissions"
+        log_error "  3. Check key hasn't been revoked"
         return 1
     fi
     return 0
@@ -85,10 +85,10 @@ genesis_register_ssh_key() {
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message', d.get('message','Unknown error')))" 2>/dev/null || echo "$register_response")
         log_error "API Error: $error_msg"
 
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered with this name"
-        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
-        log_warn "  - API key lacks write permissions"
+        log_error "Common causes:"
+        log_error "  - SSH key already registered with this name"
+        log_error "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_error "  - API key lacks write permissions"
         return 1
     fi
 }
@@ -178,11 +178,11 @@ create_server() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message', d.get('message','Unknown error')))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Instance type unavailable in region (try different GENESIS_INSTANCE_TYPE or GENESIS_REGION)"
-        log_warn "  - Instance limit reached"
-        log_warn "Remediation: Check https://console.genesiscloud.com/"
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance"
+        log_error "  - Instance type unavailable in region (try different GENESIS_INSTANCE_TYPE or GENESIS_REGION)"
+        log_error "  - Instance limit reached"
+        log_error "Remediation: Check https://console.genesiscloud.com/"
         return 1
     fi
 

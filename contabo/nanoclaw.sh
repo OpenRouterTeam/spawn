@@ -68,6 +68,6 @@ echo ""
 
 # 9. Start nanoclaw
 log_step "Starting nanoclaw..."
-log_warn "You will need to scan a WhatsApp QR code to authenticate."
+log_info "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 interactive_session "${CONTABO_SERVER_IP}" "cd ~/nanoclaw && source ~/.bashrc && npm run dev"

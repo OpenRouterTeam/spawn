@@ -77,10 +77,10 @@ civo_register_ssh_key() {
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('reason','Unknown error'))" 2>/dev/null || echo "$register_response")
         log_error "API Error: $error_msg"
 
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered with this name"
-        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
-        log_warn "  - API key lacks write permissions"
+        log_error "Common causes:"
+        log_error "  - SSH key already registered with this name"
+        log_error "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_error "  - API key lacks write permissions"
         return 1
     fi
 }
@@ -243,11 +243,11 @@ _handle_civo_create_error() {
     error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('reason', d.get('message', 'Unknown error')))" 2>/dev/null || echo "$response")
     log_error "API Error: $error_msg"
 
-    log_warn "Common issues:"
-    log_warn "  - Insufficient account balance"
-    log_warn "  - Size unavailable in region (try different CIVO_SIZE or CIVO_REGION)"
-    log_warn "  - Instance limit reached"
-    log_warn "Remediation: Check https://dashboard.civo.com/"
+    log_error "Common issues:"
+    log_error "  - Insufficient account balance"
+    log_error "  - Size unavailable in region (try different CIVO_SIZE or CIVO_REGION)"
+    log_error "  - Instance limit reached"
+    log_error "Remediation: Check https://dashboard.civo.com/"
 }
 
 create_server() {

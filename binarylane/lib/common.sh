@@ -86,10 +86,10 @@ binarylane_register_ssh_key() {
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
         log_error "API Error: $error_msg"
 
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered with this name"
-        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
-        log_warn "  - API token lacks write permissions"
+        log_error "Common causes:"
+        log_error "  - SSH key already registered with this name"
+        log_error "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_error "  - API token lacks write permissions"
         return 1
     fi
 }
@@ -155,12 +155,12 @@ _binarylane_handle_create_response() {
     local error_msg
     error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
     log_error "API Error: $error_msg"
-    log_warn "Common issues:"
-    log_warn "  - Insufficient account balance"
-    log_warn "  - Size/region/image unavailable (try different BINARYLANE_SIZE, BINARYLANE_REGION, or BINARYLANE_IMAGE)"
-    log_warn "  - Server limit reached"
-    log_warn "  - Invalid cloud-init userdata"
-    log_warn "Remediation: Check https://home.binarylane.com.au/"
+    log_error "Common issues:"
+    log_error "  - Insufficient account balance"
+    log_error "  - Size/region/image unavailable (try different BINARYLANE_SIZE, BINARYLANE_REGION, or BINARYLANE_IMAGE)"
+    log_error "  - Server limit reached"
+    log_error "  - Invalid cloud-init userdata"
+    log_error "Remediation: Check https://home.binarylane.com.au/"
     return 1
 }
 

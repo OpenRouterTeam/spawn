@@ -53,10 +53,10 @@ test_daytona_token() {
     if [[ ${exit_code} -ne 0 ]]; then
         if printf '%s' "${test_response}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"; then
             log_error "Invalid API key"
-            log_warn "Remediation steps:"
-            log_warn "  1. Verify API key at: https://app.daytona.io"
-            log_warn "  2. Ensure the key has sandbox permissions"
-            log_warn "  3. Check key hasn't expired or been revoked"
+            log_error "Remediation steps:"
+            log_error "  1. Verify API key at: https://app.daytona.io"
+            log_error "  2. Ensure the key has sandbox permissions"
+            log_error "  3. Check key hasn't expired or been revoked"
             return 1
         fi
         # Non-auth error during login — could be network, still fail
@@ -71,10 +71,10 @@ test_daytona_token() {
     if [[ ${exit_code} -ne 0 ]]; then
         if printf '%s' "${test_response}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"; then
             log_error "Invalid API key"
-            log_warn "Remediation steps:"
-            log_warn "  1. Verify API key at: https://app.daytona.io"
-            log_warn "  2. Ensure the key has sandbox permissions"
-            log_warn "  3. Check key hasn't expired or been revoked"
+            log_error "Remediation steps:"
+            log_error "  1. Verify API key at: https://app.daytona.io"
+            log_error "  2. Ensure the key has sandbox permissions"
+            log_error "  3. Check key hasn't expired or been revoked"
             return 1
         fi
     fi

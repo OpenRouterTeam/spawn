@@ -43,10 +43,10 @@ test_upcloud_credentials() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('error_message','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify credentials at: https://hub.upcloud.com/people/account"
-        log_warn "  2. Ensure your sub-account has API access enabled"
-        log_warn "  3. Check username and password are correct"
+        log_error "Remediation steps:"
+        log_error "  1. Verify credentials at: https://hub.upcloud.com/people/account"
+        log_error "  2. Ensure your sub-account has API access enabled"
+        log_error "  3. Check username and password are correct"
         return 1
     fi
 }
@@ -158,11 +158,11 @@ _upcloud_handle_create_response() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('error_message','Unknown error'))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Plan not available in zone (try different UPCLOUD_PLAN or UPCLOUD_ZONE)"
-        log_warn "  - Server limit reached"
-        log_warn "Remediation: Check https://hub.upcloud.com/"
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance"
+        log_error "  - Plan not available in zone (try different UPCLOUD_PLAN or UPCLOUD_ZONE)"
+        log_error "  - Server limit reached"
+        log_error "Remediation: Check https://hub.upcloud.com/"
         return 1
     fi
 

@@ -284,11 +284,11 @@ _submit_and_wait_kamatera_server() {
     if [[ -z "$command_ids" ]]; then
         log_error "Failed to create Kamatera server"
         log_error "API Response: $response"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Datacenter unavailable (try different KAMATERA_DATACENTER)"
-        log_warn "  - Invalid image name"
-        log_warn "Remediation: Check https://console.kamatera.com/"
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance"
+        log_error "  - Datacenter unavailable (try different KAMATERA_DATACENTER)"
+        log_error "  - Invalid image name"
+        log_error "Remediation: Check https://console.kamatera.com/"
         return 1
     fi
 

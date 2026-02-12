@@ -57,10 +57,10 @@ test_scaleway_token() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify secret key at: https://console.scaleway.com/iam/api-keys"
-        log_warn "  2. Ensure the key has appropriate permissions"
-        log_warn "  3. Check key hasn't been revoked"
+        log_error "Remediation steps:"
+        log_error "  1. Verify secret key at: https://console.scaleway.com/iam/api-keys"
+        log_error "  2. Ensure the key has appropriate permissions"
+        log_error "  3. Check key hasn't been revoked"
         return 1
     fi
     return 0
@@ -90,7 +90,7 @@ get_scaleway_project_id() {
 
     if [[ -z "$project_id" ]]; then
         log_error "Failed to get Scaleway project ID"
-        log_warn "Set SCW_DEFAULT_PROJECT_ID environment variable or check API permissions"
+        log_error "Set SCW_DEFAULT_PROJECT_ID environment variable or check API permissions"
         return 1
     fi
 
@@ -176,10 +176,10 @@ print(json.dumps(body))
         local error_msg
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
         log_error "API Error: $error_msg"
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered with this name"
-        log_warn "  - Invalid SSH key format"
-        log_warn "  - API key lacks write permissions"
+        log_error "Common causes:"
+        log_error "  - SSH key already registered with this name"
+        log_error "  - Invalid SSH key format"
+        log_error "  - API key lacks write permissions"
         return 1
     fi
 }
@@ -215,14 +215,14 @@ else:
 _scaleway_power_on_and_wait() {
     local server_id="$1"
 
-    log_warn "Powering on instance..."
+    log_step "Powering on instance..."
     local action_response
     action_response=$(scaleway_instance_api POST "/servers/${server_id}/action" '{"action":"poweron"}')
 
     if echo "$action_response" | grep -q '"task"'; then
         log_info "Power on initiated"
     else
-        log_warn "Power on may have failed, checking status..."
+        log_step "Power on may have failed, checking status..."
     fi
 
     log_step "Waiting for instance to become active..."
@@ -295,11 +295,11 @@ print(json.dumps(body))
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Commercial type unavailable in zone (try different SCALEWAY_TYPE or SCALEWAY_ZONE)"
-        log_warn "  - Instance limit reached"
-        log_warn "Remediation: Check https://console.scaleway.com/"
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance"
+        log_error "  - Commercial type unavailable in zone (try different SCALEWAY_TYPE or SCALEWAY_ZONE)"
+        log_error "  - Instance limit reached"
+        log_error "Remediation: Check https://console.scaleway.com/"
         return 1
     fi
 

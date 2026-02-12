@@ -48,10 +48,10 @@ test_do_token() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
-        log_warn "  2. Ensure the token has read/write permissions"
-        log_warn "  3. Check token hasn't expired or been revoked"
+        log_error "Remediation steps:"
+        log_error "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
+        log_error "  2. Ensure the token has read/write permissions"
+        log_error "  3. Check token hasn't expired or been revoked"
         return 1
     fi
 }
@@ -91,10 +91,10 @@ do_register_ssh_key() {
         error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
         log_error "API Error: $error_msg"
 
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered (check: doctl compute ssh-key list)"
-        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
-        log_warn "  - API token lacks write permissions"
+        log_error "Common causes:"
+        log_error "  - SSH key already registered (check: doctl compute ssh-key list)"
+        log_error "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_error "  - API token lacks write permissions"
         return 1
     fi
 }
@@ -187,12 +187,12 @@ create_server() {
         error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown error'))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
 
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance or payment method required"
-        log_warn "  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)"
-        log_warn "  - Droplet limit reached (check account limits)"
-        log_warn "  - Invalid cloud-init userdata"
-        log_warn "Remediation: Check https://cloud.digitalocean.com/droplets"
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance or payment method required"
+        log_error "  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)"
+        log_error "  - Droplet limit reached (check account limits)"
+        log_error "  - Invalid cloud-init userdata"
+        log_error "Remediation: Check https://cloud.digitalocean.com/droplets"
         return 1
     fi
 

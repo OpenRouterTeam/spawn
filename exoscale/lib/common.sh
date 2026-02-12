@@ -108,7 +108,7 @@ ensure_exoscale_creds() {
 
     # Prompt for credentials
     log_warn "Exoscale credentials not found"
-    log_warn "Get your API credentials at: https://portal.exoscale.com/iam/api-keys"
+    log_info "Get your API credentials at: https://portal.exoscale.com/iam/api-keys"
     echo ""
 
     local api_key api_secret zone
@@ -149,10 +149,10 @@ exoscale_register_ssh_key() {
         return 0
     else
         log_error "Failed to register SSH key"
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered with this name"
-        log_warn "  - Invalid SSH key format"
-        log_warn "  - API key lacks write permissions"
+        log_error "Common causes:"
+        log_error "  - SSH key already registered with this name"
+        log_error "  - Invalid SSH key format"
+        log_error "  - API key lacks write permissions"
         return 1
     fi
 }
@@ -215,12 +215,12 @@ _handle_exoscale_create_error() {
 
     log_error "Failed to create Exoscale instance"
     log_error "Output: $create_output"
-    log_warn "Common issues:"
-    log_warn "  - Insufficient account balance"
-    log_warn "  - Instance type/zone unavailable"
-    log_warn "  - Template not found"
-    log_warn "  - SSH key not registered"
-    log_warn "Remediation: Check https://portal.exoscale.com/"
+    log_error "Common issues:"
+    log_error "  - Insufficient account balance"
+    log_error "  - Instance type/zone unavailable"
+    log_error "  - Template not found"
+    log_error "  - SSH key not registered"
+    log_error "Remediation: Check https://portal.exoscale.com/"
 }
 
 create_server() {

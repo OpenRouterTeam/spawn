@@ -98,10 +98,10 @@ _validate_fly_token() {
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "Authentication failed: Invalid Fly.io API token"
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
-        log_warn "  1. Run: fly tokens deploy"
-        log_warn "  2. Or generate a token at: https://fly.io/dashboard"
-        log_warn "  3. Ensure the token has appropriate permissions"
+        log_error "Remediation steps:"
+        log_error "  1. Run: fly tokens deploy"
+        log_error "  2. Or generate a token at: https://fly.io/dashboard"
+        log_error "  3. Ensure the token has appropriate permissions"
         return 1
     fi
     return 0
@@ -146,8 +146,8 @@ get_server_name() {
     local server_name=$(safe_read "Enter app name: ")
     if [[ -z "$server_name" ]]; then
         log_error "App name is required"
-        log_warn "Set FLY_APP_NAME environment variable for non-interactive usage:"
-        log_warn "  FLY_APP_NAME=dev-mk1 curl ... | bash"
+        log_info "Set FLY_APP_NAME environment variable for non-interactive usage:"
+        log_info "  FLY_APP_NAME=dev-mk1 curl ... | bash"
         return 1
     fi
 
@@ -186,10 +186,10 @@ _fly_create_app() {
         fi
         log_error "Failed to create Fly.io app"
         log_error "API Error: $error_msg"
-        log_warn "Common issues:"
-        log_warn "  - App name already taken by another user"
-        log_warn "  - Invalid organization slug"
-        log_warn "  - API token lacks permissions"
+        log_error "Common issues:"
+        log_error "  - App name already taken by another user"
+        log_error "  - Invalid organization slug"
+        log_error "  - API token lacks permissions"
         return 1
     fi
 
@@ -236,11 +236,11 @@ print(json.dumps(body))
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance or payment method required"
-        log_warn "  - Region unavailable (try different FLY_REGION)"
-        log_warn "  - Machine limit reached"
-        log_warn "Remediation: Check https://fly.io/dashboard"
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance or payment method required"
+        log_error "  - Region unavailable (try different FLY_REGION)"
+        log_error "  - Machine limit reached"
+        log_error "Remediation: Check https://fly.io/dashboard"
         return 1
     fi
 
