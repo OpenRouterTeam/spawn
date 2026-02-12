@@ -296,34 +296,13 @@ function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
 /** Parse -a/--agent <agent> and -c/--cloud <cloud> filter flags from args.
  *  Also accepts a bare positional arg as a filter (e.g. "spawn list claude"). */
 function parseListFilters(args: string[]): { agentFilter?: string; cloudFilter?: string } {
-  let agentFilter: string | undefined;
-  let cloudFilter: string | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "-a" || args[i] === "--agent") {
-      if (!args[i + 1] || args[i + 1].startsWith("-")) {
-        console.error(pc.red(`Error: ${pc.bold(args[i])} requires an agent name`));
-        console.error(`\nUsage: ${pc.cyan("spawn list -a <agent>")}`);
-        process.exit(1);
-      }
-      agentFilter = args[i + 1];
-      i++;
-    } else if (args[i] === "-c" || args[i] === "--cloud") {
-      if (!args[i + 1] || args[i + 1].startsWith("-")) {
-        console.error(pc.red(`Error: ${pc.bold(args[i])} requires a cloud name`));
-        console.error(`\nUsage: ${pc.cyan("spawn list -c <cloud>")}`);
-        process.exit(1);
-      }
-      cloudFilter = args[i + 1];
-      i++;
-    } else if (!args[i].startsWith("-")) {
-      positional.push(args[i]);
-    }
-  }
+  const [agentFilter, afterAgent] = extractFlagValue(args, ["-a", "--agent"], "agent name", "spawn list -a <agent>");
+  const [cloudFilter, remaining] = extractFlagValue(afterAgent, ["-c", "--cloud"], "cloud name", "spawn list -c <cloud>");
 
   // Support bare positional filter: "spawn list claude" or "spawn list hetzner"
-  if (!agentFilter && !cloudFilter && positional.length > 0) {
-    agentFilter = positional[0];
+  if (!agentFilter && !cloudFilter) {
+    const positional = remaining.find(a => !a.startsWith("-"));
+    if (positional) return { agentFilter: positional };
   }
 
   return { agentFilter, cloudFilter };
