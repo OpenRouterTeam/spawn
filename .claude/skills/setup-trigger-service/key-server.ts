@@ -354,6 +354,16 @@ const server = Bun.serve({
           { status: 400 }
         );
 
+      // Validate all provider names before processing (prevents path traversal in saveKeys)
+      const invalid = (body.providers as string[]).filter(
+        (p: string) => typeof p !== "string" || !SAFE_PROVIDER_RE.test(p)
+      );
+      if (invalid.length)
+        return Response.json(
+          { error: "invalid provider name(s)", invalid },
+          { status: 400 }
+        );
+
       const clouds = getClouds();
       const d = load();
       cleanup(d);
