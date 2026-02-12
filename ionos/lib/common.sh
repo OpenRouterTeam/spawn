@@ -165,7 +165,7 @@ _ionos_find_existing_datacenter() {
 # Sets IONOS_DATACENTER_ID on success
 _ionos_create_datacenter() {
     local location="$1"
-    log_warn "No datacenter found, creating new datacenter..."
+    log_step "No datacenter found, creating new datacenter..."
 
     local dc_body
     dc_body=$(python3 -c "
@@ -388,7 +388,7 @@ _ionos_launch_and_attach() {
     export IONOS_SERVER_ID
 
     # Attach volume to server
-    log_warn "Attaching volume to server..."
+    log_step "Attaching volume to server..."
     local attach_response
     attach_response=$(ionos_api POST "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}/volumes" "{\"id\": \"${volume_id}\"}")
 

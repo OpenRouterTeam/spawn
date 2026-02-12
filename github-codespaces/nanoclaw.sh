@@ -81,7 +81,7 @@ echo ""
 # 8. Start nanoclaw
 log_step "Starting nanoclaw..."
 log_warn "You will need to scan a WhatsApp QR code to authenticate."
-log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
+log_info "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1
 
