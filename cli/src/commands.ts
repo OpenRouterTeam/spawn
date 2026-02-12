@@ -591,7 +591,14 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
   }
 }
 
-function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string): never {
+export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
+  if (!prompt) return `spawn ${agent} ${cloud}`;
+  const short = prompt.length > 60 ? prompt.slice(0, 60) + "..." : prompt;
+  const safe = short.replace(/"/g, '\\"');
+  return `spawn ${agent} ${cloud} --prompt "${safe}"`;
+}
+
+function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, prompt?: string): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
 
@@ -602,7 +609,7 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
-  console.error(`Retry: ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
+  console.error(`Retry: ${pc.cyan(buildRetryCommand(agent, cloud, prompt))}`);
   process.exit(1);
 }
 
@@ -669,7 +676,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     }
   }
 
-  reportScriptFailure(lastErr!, cloud, agent, authHint);
+  reportScriptFailure(lastErr!, cloud, agent, authHint, prompt);
 }
 
 function runBash(script: string, prompt?: string): Promise<void> {

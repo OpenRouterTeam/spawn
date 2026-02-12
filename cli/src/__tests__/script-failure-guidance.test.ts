@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { getScriptFailureGuidance, getStatusDescription } from "../commands";
+import { getScriptFailureGuidance, getStatusDescription, buildRetryCommand } from "../commands";
 
 /**
  * Tests for getScriptFailureGuidance() in commands.ts.
@@ -454,5 +454,44 @@ describe("getScriptFailureGuidance", () => {
         }
       }
     });
+  });
+});
+
+describe("buildRetryCommand", () => {
+  it("should return simple command without prompt", () => {
+    expect(buildRetryCommand("claude", "sprite")).toBe("spawn claude sprite");
+  });
+
+  it("should include --prompt when prompt is provided", () => {
+    expect(buildRetryCommand("claude", "sprite", "Fix all bugs")).toBe(
+      'spawn claude sprite --prompt "Fix all bugs"'
+    );
+  });
+
+  it("should truncate long prompts to 60 characters", () => {
+    const longPrompt = "A".repeat(100);
+    const result = buildRetryCommand("claude", "sprite", longPrompt);
+    expect(result).toContain("A".repeat(60) + "...");
+    expect(result).not.toContain("A".repeat(61));
+  });
+
+  it("should not truncate prompts at exactly 60 characters", () => {
+    const exactPrompt = "B".repeat(60);
+    const result = buildRetryCommand("aider", "hetzner", exactPrompt);
+    expect(result).toBe(`spawn aider hetzner --prompt "${exactPrompt}"`);
+    expect(result).not.toContain("...");
+  });
+
+  it("should escape double quotes in prompt", () => {
+    const result = buildRetryCommand("claude", "sprite", 'Fix "all" bugs');
+    expect(result).toBe('spawn claude sprite --prompt "Fix \\"all\\" bugs"');
+  });
+
+  it("should return simple command when prompt is undefined", () => {
+    expect(buildRetryCommand("aider", "vultr", undefined)).toBe("spawn aider vultr");
+  });
+
+  it("should return simple command when prompt is empty string", () => {
+    expect(buildRetryCommand("aider", "vultr", "")).toBe("spawn aider vultr");
   });
 });
