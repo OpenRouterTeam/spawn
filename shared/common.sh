@@ -158,6 +158,7 @@ validate_model_id() {
 # Helper to show server name validation requirements
 show_server_name_requirements() {
     log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+    log_error "Example: spawn-my-server"
 }
 
 # Validate server/sprite name to prevent injection and ensure cloud provider compatibility
@@ -315,19 +316,55 @@ get_resource_name() {
     echo "${name}"
 }
 
+# Generate a random short suffix for default server names (4 hex chars)
+_generate_name_suffix() {
+    if command -v openssl &>/dev/null; then
+        openssl rand -hex 2
+    elif [[ -r /dev/urandom ]]; then
+        od -An -N2 -tx1 /dev/urandom | tr -d ' \n'
+    else
+        printf '%04x' $RANDOM
+    fi
+}
+
 # Get server name from environment or prompt, with validation
+# Generates a default name like "spawn-a1b2" so users can just press Enter
 # Usage: get_validated_server_name ENV_VAR_NAME PROMPT_TEXT
 # Returns: Validated server name via stdout
 # Example: get_validated_server_name "HETZNER_SERVER_NAME" "Enter server name: "
 get_validated_server_name() {
-    local server_name
-    server_name=$(get_resource_name "$1" "$2") || return 1
+    local env_var_name="${1}"
+    local prompt_text="${2}"
+    local env_value="${!env_var_name:-}"
 
-    if ! validate_server_name "$server_name"; then
+    # If env var is set, use it directly (via get_resource_name)
+    if [[ -n "${env_value}" ]]; then
+        local server_name
+        server_name=$(get_resource_name "${env_var_name}" "${prompt_text}") || return 1
+        if ! validate_server_name "$server_name"; then
+            return 1
+        fi
+        echo "$server_name"
+        return 0
+    fi
+
+    # Generate a default name for the prompt
+    local default_name="spawn-$(_generate_name_suffix)"
+    # Strip trailing ": " from prompt to insert default value
+    local base_prompt="${prompt_text%%:*}"
+    local name
+    name=$(safe_read "${base_prompt} [${default_name}]: ") || {
+        log_error "For non-interactive usage, set the environment variable:"
+        log_error "  ${env_var_name}=${default_name} spawn ..."
+        return 1
+    }
+    name="${name:-${default_name}}"
+
+    if ! validate_server_name "$name"; then
         return 1
     fi
 
-    echo "$server_name"
+    echo "$name"
 }
 
 # Interactively prompt for model ID with validation
@@ -394,7 +431,7 @@ get_openrouter_api_key_manual() {
         if [[ -z "${api_key}" ]]; then
             log_error "API key cannot be empty"
         elif [[ ! "${api_key}" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
-            log_warn "Warning: API key format doesn't match expected pattern (sk-or-v1-...)"
+            log_warn "API key format doesn't match expected pattern (sk-or-v1-...)"
             local confirm
             confirm=$(safe_read "Use this key anyway? (y/N): ") || return 1
             if [[ "${confirm}" =~ ^[Yy]$ ]]; then
