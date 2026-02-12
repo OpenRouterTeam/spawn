@@ -57,6 +57,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/ra
 bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/ramnode/goose.sh)
 ```
 
+### Run NanoClaw
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/ramnode/nanoclaw.sh)
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -145,6 +151,11 @@ Uses OpenStack Compute API:
 - ✅ Aider
 - ✅ Goose
 - ✅ Open Interpreter
+- ✅ NanoClaw
+- ✅ OpenClaw
+- ✅ Cline
+- ✅ gptme
+- ✅ Continue
 
 ## Documentation
 

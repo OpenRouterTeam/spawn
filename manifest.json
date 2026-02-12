@@ -1203,7 +1203,7 @@
     "local/continue": "implemented",
     "ramnode/claude": "implemented",
     "ramnode/openclaw": "implemented",
-    "ramnode/nanoclaw": "missing",
+    "ramnode/nanoclaw": "implemented",
     "ramnode/aider": "implemented",
     "ramnode/goose": "implemented",
     "ramnode/codex": "missing",
