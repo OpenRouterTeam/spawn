@@ -3,6 +3,8 @@ name: Security Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  issues:
+    types: [opened, reopened]
   schedule:
     # Full repo security scan — daily at 06:00 UTC
     - cron: '0 6 * * *'
@@ -24,13 +26,17 @@ on:
         type: string
 
 concurrency:
-  group: security-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'schedule' && github.event.schedule || 'manual' }}
+  group: security-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'issues' && format('issue-{0}', github.event.issue.number) || github.event_name == 'schedule' && github.event.schedule || 'manual' }}
   cancel-in-progress: true
 
 jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Only trigger on team-building issues (or PR/schedule/manual)
+    if: >-
+      github.event_name != 'issues' ||
+      contains(github.event.issue.labels.*.name, 'team-building')
     steps:
       - name: Trigger security review
         env:
@@ -45,7 +51,10 @@ jobs:
           # Determine reason and issue/PR number based on trigger type
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             REASON="pull_request"
-            PR_NUM="${{ github.event.pull_request.number }}"
+            ISSUE_NUM="${{ github.event.pull_request.number }}"
+          elif [ "${{ github.event_name }}" = "issues" ]; then
+            REASON="team_building"
+            ISSUE_NUM="${{ github.event.issue.number }}"
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             # Distinguish between cron schedules:
             # '0 6 * * *' = daily scan, '0 */6 * * *' = hygiene every 6h
@@ -55,11 +64,11 @@ jobs:
             else
               REASON="hygiene"
             fi
-            PR_NUM=""
+            ISSUE_NUM=""
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MODE="${{ github.event.inputs.mode || 'scan' }}"
-            PR_NUM="${{ github.event.inputs.pr_number || '' }}"
-            if [ -n "$PR_NUM" ]; then
+            ISSUE_NUM="${{ github.event.inputs.pr_number || '' }}"
+            if [ -n "$ISSUE_NUM" ]; then
               REASON="pull_request"
             elif [ "$MODE" = "hygiene" ]; then
               REASON="hygiene"
@@ -68,17 +77,17 @@ jobs:
             fi
           else
             REASON="schedule"
-            PR_NUM=""
+            ISSUE_NUM=""
           fi
 
-          echo "Mode: reason=$REASON, pr=$PR_NUM"
+          echo "Mode: reason=$REASON, issue=$ISSUE_NUM"
 
           set +e
           # --fail-with-body: exit 22 on HTTP errors but still print the body
           # -N: no output buffering (stream chunks in real-time)
           # --max-time: hard cap matching the Sprite's cycle timeout + grace
           curl -sSN --http1.1 --fail-with-body --max-time 2700 -X POST \
-            "${SPRITE_URL}/trigger?reason=${REASON}&issue=${PR_NUM}" \
+            "${SPRITE_URL}/trigger?reason=${REASON}&issue=${ISSUE_NUM}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
           CURL_EXIT=$?
           set -e

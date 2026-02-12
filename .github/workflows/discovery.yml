@@ -15,6 +15,11 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # Only trigger on cloud-request or agent-request issues (or schedule/manual)
+    if: >-
+      github.event_name != 'issues' ||
+      contains(github.event.issue.labels.*.name, 'cloud-request') ||
+      contains(github.event.issue.labels.*.name, 'agent-request')
     steps:
       - name: Trigger and stream discovery cycle
         env:
@@ -26,7 +31,7 @@ jobs:
           # -N: no output buffering (stream chunks in real-time)
           # --max-time: hard cap matching the Sprite's cycle timeout + grace
           curl -sSN --http1.1 --fail-with-body --max-time 5400 -X POST \
-            "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            "${SPRITE_URL}/trigger?reason=${{ github.event_name }}&issue=${{ github.event.issue.number || '' }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
           CURL_EXIT=$?
           set -e

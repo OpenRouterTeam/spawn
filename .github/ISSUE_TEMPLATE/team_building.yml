@@ -1,0 +1,33 @@
+name: Team Building
+description: Request a change or new capability for an agent team
+title: "[Team]: "
+labels: ["team-building"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Request an improvement to one of the agent teams (discovery, refactor, security, QA).
+
+  - type: dropdown
+    id: team
+    attributes:
+      label: Agent Team
+      description: Which team should be improved?
+      options:
+        - Security Team (security.sh)
+        - Refactor Team (refactor.sh)
+        - Discovery Team (discovery.sh)
+        - QA Team (qa.sh)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What to Change
+      description: Describe the new capability, behavior change, or improvement.
+      placeholder: |
+        The security team should also check for...
+        The refactor team should add a new agent that...
+    validations:
+      required: true
