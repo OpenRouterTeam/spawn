@@ -32,8 +32,8 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server "printf 'export OPENROUTER_API_KEY=\"%s\"\n' '${OPENROUTER_API_KEY}' >> ~/.bashrc"
-run_server "printf 'export OPENROUTER_API_KEY=\"%s\"\n' '${OPENROUTER_API_KEY}' >> ~/.zshrc"
+inject_env_vars_local upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 setup_continue_config "${OPENROUTER_API_KEY}" "upload_file" "run_server"
 
