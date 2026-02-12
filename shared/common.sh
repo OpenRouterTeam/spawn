@@ -1118,7 +1118,38 @@ _parse_api_response() {
     API_RESPONSE_BODY="${response_body}"
 }
 
-# Helper to handle a single API request attempt - builds curl args and executes it
+# Core curl wrapper for API requests - builds args, executes, parses response
+# Usage: _curl_api URL METHOD BODY AUTH_ARGS...
+# Returns: 0 on curl success, 1 on curl failure
+# Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
+_curl_api() {
+    local url="${1}"
+    local method="${2}"
+    local body="${3:-}"
+    shift 3
+
+    local args=(
+        -s
+        -w "\n%{http_code}"
+        -X "${method}"
+        -H "Content-Type: application/json"
+        "$@"
+    )
+
+    if [[ -n "${body}" ]]; then
+        args+=(-d "${body}")
+    fi
+
+    local response
+    response=$(curl "${args[@]}" "${url}" 2>&1)
+    local curl_exit_code=$?
+
+    _parse_api_response "${response}"
+
+    return ${curl_exit_code}
+}
+
+# Helper to handle a single API request attempt with Bearer auth
 # Returns: 0 on curl success, 1 on curl failure
 # Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
 _make_api_request() {
@@ -1128,25 +1159,7 @@ _make_api_request() {
     local endpoint="${4}"
     local body="${5:-}"
 
-    local args=(
-        -s
-        -w "\n%{http_code}"
-        -X "${method}"
-        -H "Authorization: Bearer ${auth_token}"
-        -H "Content-Type: application/json"
-    )
-
-    if [[ -n "${body}" ]]; then
-        args+=(-d "${body}")
-    fi
-
-    local response
-    response=$(curl "${args[@]}" "${base_url}${endpoint}" 2>&1)
-    local curl_exit_code=$?
-
-    _parse_api_response "${response}"
-
-    return ${curl_exit_code}
+    _curl_api "${base_url}${endpoint}" "${method}" "${body}" -H "Authorization: Bearer ${auth_token}"
 }
 
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
@@ -1224,27 +1237,8 @@ _make_api_request_custom_auth() {
     local method="${2}"
     local body="${3:-}"
     shift 3
-    # Remaining args are custom curl auth flags (e.g., -u "user:pass" or -H "X-Auth-Token: ...")
 
-    local args=(
-        -s
-        -w "\n%{http_code}"
-        -X "${method}"
-        -H "Content-Type: application/json"
-        "$@"
-    )
-
-    if [[ -n "${body}" ]]; then
-        args+=(-d "${body}")
-    fi
-
-    local response
-    response=$(curl "${args[@]}" "${url}" 2>&1)
-    local curl_exit_code=$?
-
-    _parse_api_response "${response}"
-
-    return ${curl_exit_code}
+    _curl_api "${url}" "${method}" "${body}" "$@"
 }
 
 # Generic cloud API wrapper with custom curl auth args
@@ -1458,6 +1452,18 @@ ssh_verify_connectivity() {
     generic_ssh_wait "${SSH_USER:-root}" "${ip}" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "${max_attempts}" "${initial_interval}"
 }
 
+# Extract a value from a JSON response using a Python expression
+# Usage: _extract_json_field JSON_STRING PYTHON_EXPR [DEFAULT]
+# The Python expression receives 'd' as the parsed JSON dict.
+# Returns DEFAULT (or empty string) on parse failure.
+_extract_json_field() {
+    local json="${1}"
+    local py_expr="${2}"
+    local default="${3:-}"
+
+    printf '%s' "${json}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${py_expr})" 2>/dev/null || echo "${default}"
+}
+
 # Generic instance status polling loop
 # Polls an API endpoint until the instance reaches the target status, then extracts the IP.
 # Usage: generic_wait_for_instance API_FUNC ENDPOINT TARGET_STATUS STATUS_PY IP_PY IP_VAR DESCRIPTION [MAX_ATTEMPTS]
@@ -1495,7 +1501,7 @@ generic_wait_for_instance() {
         response=$("${api_func}" GET "${endpoint}" 2>/dev/null) || true
 
         local status
-        status=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${status_py})" 2>/dev/null || echo "unknown")
+        status=$(_extract_json_field "${response}" "${status_py}" "unknown")
 
         if [[ "${status}" != "${target_status}" ]]; then
             log_step "${description} status: ${status} (${attempt}/${max_attempts})"
@@ -1505,7 +1511,7 @@ generic_wait_for_instance() {
         fi
 
         local ip
-        ip=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${ip_py})" 2>/dev/null || echo "")
+        ip=$(_extract_json_field "${response}" "${ip_py}")
 
         if [[ -n "${ip}" ]]; then
             export "${ip_var}=${ip}"
