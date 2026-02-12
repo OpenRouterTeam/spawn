@@ -67,6 +67,20 @@ function mapToSelectOptions<T extends { name: string; description: string }>(
   }));
 }
 
+export function mapCloudsToSelectOptions(
+  keys: string[],
+  clouds: Record<string, { name: string; description: string; type: string }>
+): Array<{ value: string; label: string; hint: string }> {
+  return keys.map((key) => {
+    const c = clouds[key];
+    return {
+      value: key,
+      label: c.name,
+      hint: `[${c.type}] ${c.description}`,
+    };
+  });
+}
+
 export function getImplementedClouds(manifest: Manifest, agent: string): string[] {
   return cloudKeys(manifest).filter(
     (c: string): boolean => matrixStatus(manifest, c, agent) === "implemented"
@@ -299,7 +313,7 @@ export async function cmdInteractive(): Promise<void> {
 
   const cloudChoice = await p.select({
     message: "Select a cloud provider",
-    options: mapToSelectOptions(clouds, manifest.clouds),
+    options: mapCloudsToSelectOptions(clouds, manifest.clouds),
   });
   if (p.isCancel(cloudChoice)) handleCancel();
 
@@ -1030,10 +1044,16 @@ export async function cmdAgents(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   const allAgents = agentKeys(manifest);
+  // Sort agents by implementation count (most clouds first) for discoverability
+  const sortedAgents = [...allAgents].sort((a, b) => {
+    const countA = getImplementedClouds(manifest, a).length;
+    const countB = getImplementedClouds(manifest, b).length;
+    return countB - countA;
+  });
   console.log();
-  console.log(pc.bold("Agents") + pc.dim(` (${allAgents.length} total)`));
+  console.log(pc.bold("Agents") + pc.dim(` (${sortedAgents.length} total, sorted by cloud support)`));
   console.log();
-  for (const key of allAgents) {
+  for (const key of sortedAgents) {
     const a = manifest.agents[key];
     const implCount = getImplementedClouds(manifest, key).length;
     console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} cloud${implCount !== 1 ? "s" : ""}  ${a.description}`)}`);
@@ -1054,12 +1074,16 @@ export async function cmdClouds(): Promise<void> {
   const byType = groupByType(allClouds, (key) => manifest.clouds[key].type);
 
   console.log();
-  console.log(pc.bold("Cloud Providers") + pc.dim(` (${allClouds.length} total)`));
+  console.log(pc.bold("Cloud Providers") + pc.dim(` (${allClouds.length} total, sorted by agent support)`));
 
   for (const [type, keys] of Object.entries(byType)) {
+    // Sort clouds within each type by implementation count (most agents first)
+    const sortedKeys = [...keys].sort((a, b) => {
+      return getImplementedAgents(manifest, b).length - getImplementedAgents(manifest, a).length;
+    });
     console.log();
     console.log(`  ${pc.dim(type)}`);
-    for (const key of keys) {
+    for (const key of sortedKeys) {
       const c = manifest.clouds[key];
       const implCount = getImplementedAgents(manifest, key).length;
       const countStr = `${implCount}/${allAgents.length}`;
