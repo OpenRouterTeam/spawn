@@ -167,7 +167,7 @@ get_server_name() {
 # Sets CHERRY_SERVER_IP on success
 _cherry_wait_for_ip() {
     local server_id="$1"
-    log_info "Waiting for IP address assignment..."
+    log_step "Waiting for IP address assignment..."
     local ip_address=""
     local attempts=0
     local max_attempts=60
@@ -181,10 +181,13 @@ _cherry_wait_for_ip() {
         ip_address=$(printf '%s' "$server_info" | _cherry_extract_primary_ip)
 
         attempts=$((attempts + 1))
+        if [[ -z "$ip_address" ]] && [[ $((attempts % 5)) -eq 0 ]]; then
+            log_step "Still waiting for IP address... (attempt ${attempts}/${max_attempts})"
+        fi
     done
 
     if [[ -z "$ip_address" ]]; then
-        log_error "Failed to get server IP address"
+        log_error "Failed to get server IP address after ${max_attempts} attempts"
         return 1
     fi
 
@@ -209,7 +212,7 @@ create_server() {
     local project_id
     project_id=$(get_cherry_project_id) || return 1
 
-    log_info "Creating Cherry Servers server..."
+    log_step "Creating Cherry Servers server..."
     log_info "Plan: $plan, Region: $region, Image: $image"
 
     local payload
@@ -260,7 +263,7 @@ wait_for_cloud_init() {
     local ip="$1"
     local timeout="${2:-300}"
 
-    log_info "Waiting for system initialization..."
+    log_step "Waiting for system initialization..."
 
     if ! run_server "$ip" "cloud-init status --wait --long" 2>/dev/null; then
         log_warn "cloud-init wait timed out or not available, proceeding anyway"

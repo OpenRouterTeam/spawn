@@ -89,7 +89,7 @@ create_codespace() {
     local machine="${2:-basicLinux32gb}"
     local idle_timeout="${3:-30m}"
 
-    log_info "Creating GitHub Codespace..."
+    log_step "Creating GitHub Codespace..."
     log_info "Repo: $repo"
     log_info "Machine: $machine"
     log_info "Idle timeout: $idle_timeout"
@@ -117,7 +117,7 @@ wait_for_codespace() {
     local max_attempts=60
     local attempt=0
 
-    log_info "Waiting for codespace to be ready..."
+    log_step "Waiting for codespace to be ready..."
 
     while [[ $attempt -lt $max_attempts ]]; do
         local state

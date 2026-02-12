@@ -221,7 +221,7 @@ _pick_flavor() {
         return
     fi
 
-    log_info "Fetching available instance types..."
+    log_step "Fetching available instance types..."
     local flavors
     flavors=$(_list_flavors)
 
@@ -231,7 +231,7 @@ _pick_flavor() {
         return
     fi
 
-    log_info "Available instance types:"
+    log_step "Available instance types:"
     local i=1
     local names=()
     while IFS='|' read -r name cores ram disk; do
@@ -314,7 +314,7 @@ print(json.dumps(body))
 # Poll the RamNode API until the server has an IPv4 address
 # Sets RAMNODE_SERVER_IP on success
 _ramnode_wait_for_ip() {
-    log_info "Waiting for IP address..."
+    log_step "Waiting for IP address..."
     local max_attempts=30
     local attempt=0
     while [[ $attempt -lt $max_attempts ]]; do
@@ -340,9 +340,12 @@ for net_name, addrs in addresses.items():
         fi
 
         attempt=$((attempt + 1))
+        if [[ $((attempt % 5)) -eq 0 ]]; then
+            log_step "Still waiting for IP address... (attempt ${attempt}/${max_attempts})"
+        fi
     done
 
-    log_error "Timeout waiting for IP address"
+    log_error "Timeout waiting for IP address after ${max_attempts} attempts"
     return 1
 }
 
@@ -378,7 +381,7 @@ create_server() {
     flavor=$(_pick_flavor)
 
     # Get image ID
-    log_info "Fetching Ubuntu 24.04 image..."
+    log_step "Fetching Ubuntu 24.04 image..."
     local image_id
     image_id=$(_list_images)
     if [[ -z "$image_id" ]]; then

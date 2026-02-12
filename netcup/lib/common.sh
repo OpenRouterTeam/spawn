@@ -216,7 +216,7 @@ print(json.dumps(param))
 # Poll the Netcup API until the VPS has an IPv4 address
 # Sets NETCUP_SERVER_IP on success
 _netcup_wait_for_ip() {
-    log_info "Waiting for IP assignment..."
+    log_step "Waiting for IP assignment..."
     local ip=""
     local attempts=0
     while [[ -z "$ip" ]] && [[ $attempts -lt 60 ]]; do
@@ -233,10 +233,13 @@ except:
     pass
 " 2>/dev/null || echo "")
         attempts=$((attempts + 1))
+        if [[ -z "$ip" ]] && [[ $((attempts % 5)) -eq 0 ]]; then
+            log_step "Still waiting for IP assignment... (attempt ${attempts}/60)"
+        fi
     done
 
     if [[ -z "$ip" ]]; then
-        log_error "Timeout waiting for IP assignment"
+        log_error "Timeout waiting for IP assignment after 60 attempts"
         return 1
     fi
 
