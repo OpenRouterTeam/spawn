@@ -184,8 +184,15 @@ function suggestTypoCorrection(
   return findClosestKeyByNameOrKey(value, keys, (k) => collection[k].name);
 }
 
-/** Report validation error for an entity and return false, or return true if valid */
-export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "cloud"): boolean {
+/** Build a suggested spawn command. When pairArg is given, show full "spawn <agent> <cloud>". */
+export function buildSuggestionCmd(match: string, kind: "agent" | "cloud", pairArg?: string): string {
+  if (!pairArg) return `spawn ${match}`;
+  return kind === "agent" ? `spawn ${match} ${pairArg}` : `spawn ${pairArg} ${match}`;
+}
+
+/** Report validation error for an entity and return false, or return true if valid.
+ *  pairArg is the other argument in a "spawn <agent> <cloud>" command, used to build complete suggestions. */
+export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "cloud", pairArg?: string): boolean {
   const def = ENTITY_DEFS[kind];
   const collection = getEntityCollection(manifest, kind);
   if (collection[value]) return true;
@@ -207,8 +214,9 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
   // Check for typo matches in the same kind
   const match = suggestTypoCorrection(value, manifest, kind);
   if (match) {
+    const cmd = buildSuggestionCmd(match, kind, pairArg);
     p.log.info(`Did you mean ${pc.cyan(match)} (${collection[match].name})?`);
-    p.log.info(`  ${pc.cyan(`spawn ${match}`)}`);
+    p.log.info(`  ${pc.cyan(cmd)}`);
     p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
     return false;
   }
@@ -420,8 +428,8 @@ function validateRunSecurity(agent: string, cloud: string, prompt?: string): voi
 
 /** Validate agent and cloud exist in manifest, showing all errors before exiting */
 function validateEntities(manifest: Manifest, agent: string, cloud: string): void {
-  const agentValid = checkEntity(manifest, agent, "agent");
-  const cloudValid = checkEntity(manifest, cloud, "cloud");
+  const agentValid = checkEntity(manifest, agent, "agent", cloud);
+  const cloudValid = checkEntity(manifest, cloud, "cloud", agent);
   if (!agentValid || !cloudValid) {
     process.exit(1);
   }

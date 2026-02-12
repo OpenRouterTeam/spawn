@@ -324,4 +324,45 @@ describe("checkEntity message output", () => {
       expect(mockLogInfo.mock.calls.length).toBe(0);
     });
   });
+
+  // ── pairArg: complete command suggestions ──────────────────────────────
+
+  describe("pairArg builds complete spawn commands in suggestions", () => {
+    it("should suggest 'spawn claude sprite' for agent typo with cloud pairArg", () => {
+      checkEntity(manifest, "claud", "agent", "sprite");
+
+      const info = infoCalls();
+      expect(info.some(m => m.includes("spawn claude sprite"))).toBe(true);
+    });
+
+    it("should suggest 'spawn claude hetzner' for cloud typo with agent pairArg", () => {
+      checkEntity(manifest, "hetzne", "cloud", "claude");
+
+      const info = infoCalls();
+      expect(info.some(m => m.includes("spawn claude hetzner"))).toBe(true);
+    });
+
+    it("should show 'spawn aider sprite' for cloud typo 'sprit' with agent pairArg", () => {
+      checkEntity(manifest, "sprit", "cloud", "aider");
+
+      const info = infoCalls();
+      expect(info.some(m => m.includes("spawn aider sprite"))).toBe(true);
+    });
+
+    it("should show bare 'spawn claude' when no pairArg given", () => {
+      checkEntity(manifest, "claud", "agent");
+
+      const info = infoCalls();
+      expect(info.some(m => m.includes("spawn claude") && !m.includes("spawn claude "))).toBe(true);
+    });
+
+    it("should still return true for valid entity with pairArg", () => {
+      expect(checkEntity(manifest, "claude", "agent", "sprite")).toBe(true);
+      expect(mockLogError.mock.calls.length).toBe(0);
+    });
+
+    it("should still return false for unknown entity with pairArg", () => {
+      expect(checkEntity(manifest, "kubernetes", "agent", "sprite")).toBe(false);
+    });
+  });
 });
