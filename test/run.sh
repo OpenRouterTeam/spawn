@@ -15,7 +15,7 @@
 #   bash test/run.sh claude       # test one script
 #   bash test/run.sh --remote     # test remote source (from GitHub)
 
-set -uo pipefail
+set -eo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIR=$(mktemp -d)
@@ -310,7 +310,7 @@ _test_sprite_remote_source() {
     fi
     local remote_fns
     remote_fns=$(bash -c '
-        source <(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)
+        eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)"
         type log_info &>/dev/null && echo "OK" || echo "FAIL"
     ' 2>/dev/null)
     assert_equals "${remote_fns}" "OK" "Remote source from GitHub works"

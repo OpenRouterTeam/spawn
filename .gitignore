@@ -3,3 +3,15 @@ node_modules/
 __pycache__/
 .claude/skills/*/start-*.sh
 cli/cli.js
+
+# Sensitive files — never commit secrets or private keys
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+credentials.json
+service-account.json
