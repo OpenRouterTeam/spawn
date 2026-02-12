@@ -541,7 +541,7 @@ wait_for_oauth_code() {
     local timeout="${2:-120}"
     local elapsed=0
 
-    log_info "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
+    log_step "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
         elapsed=$((elapsed + POLL_INTERVAL))
@@ -1793,7 +1793,7 @@ _multi_creds_validate() {
         return 0
     fi
 
-    log_info "Testing ${provider_name} credentials..."
+    log_step "Testing ${provider_name} credentials..."
     if ! "${test_func}"; then
         log_error "Invalid ${provider_name} credentials"
         log_error "The credentials may be expired, revoked, or incorrectly copied."
@@ -2108,7 +2108,7 @@ _display_and_select() {
     local default_value="${2}"
     local default_id="${3:-}"
 
-    log_info "Available ${prompt_text}:"
+    log_step "Available ${prompt_text}:"
     local i=1
     local ids=()
     local default_idx=1
@@ -2150,7 +2150,7 @@ interactive_pick() {
         return
     fi
 
-    log_info "Fetching available ${prompt_text}..."
+    log_step "Fetching available ${prompt_text}..."
     local items
     items=$("${list_callback}")
 

@@ -21,7 +21,7 @@ REPO="${GITHUB_REPO:-OpenRouterTeam/spawn}"
 MACHINE="${CODESPACE_MACHINE:-basicLinux32gb}"
 IDLE_TIMEOUT="${CODESPACE_IDLE_TIMEOUT:-30m}"
 
-log_info "Creating codespace for repo: $REPO"
+log_step "Creating codespace for repo: $REPO"
 CODESPACE=$(create_codespace "$REPO" "$MACHINE" "$IDLE_TIMEOUT")
 
 if [[ -z "$CODESPACE" ]]; then

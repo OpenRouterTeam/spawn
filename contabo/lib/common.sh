@@ -239,7 +239,7 @@ create_server() {
     export CONTABO_INSTANCE_ID
 
     log_info "Instance created: ID=$CONTABO_INSTANCE_ID"
-    log_info "Waiting for instance to be provisioned..."
+    log_step "Waiting for instance to be provisioned..."
 
     _contabo_wait_for_instance "$CONTABO_INSTANCE_ID"
 }
