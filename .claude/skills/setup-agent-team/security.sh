@@ -397,16 +397,25 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
 
 6. Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
 
-7. Make the review decision:
+7. Make the review decision and label the PR:
 
-   **If CRITICAL or HIGH issues found** — request changes:
+   **If CRITICAL or HIGH issues found** — request changes + label:
    \`\`\`bash
    gh pr review NUMBER --repo OpenRouterTeam/spawn --request-changes --body "REVIEW_BODY"
+   gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "security-review-required"
    \`\`\`
 
-   **If only MEDIUM/LOW or no issues** — approve AND merge:
+   **If only MEDIUM/LOW issues** — approve, label, and merge:
    \`\`\`bash
    gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY"
+   gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "security-approved" --remove-label "security-review-required"
+   gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch
+   \`\`\`
+
+   **If no issues at all** — approve, label, and merge:
+   \`\`\`bash
+   gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY"
+   gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "security-approved" --remove-label "security-review-required"
    gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch
    \`\`\`
    If merge fails (conflicts, branch protection), log the error and move on.
@@ -443,15 +452,40 @@ Spawn a **branch-cleaner** agent (model=haiku, team_name="${TEAM_NAME}", name="b
   * If open PR exists: leave it (pr-reviewers handle PRs)
 - Report summary: how many branches deleted, how many left
 
-## Step 4 — Monitor and Collect Results
+## Step 4 — Stale Issue Re-triage
+
+Spawn an **issue-checker** agent (model=haiku, team_name="${TEAM_NAME}", name="issue-checker"):
+
+- List all open issues with security-related labels:
+  \`\`\`bash
+  gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels,updatedAt,comments
+  \`\`\`
+- For each open issue, check if it is **stale** (no activity in the last 1 hour — use \`updatedAt\` field):
+  * If stale AND has one of these labels: \`safe-to-work\`, \`needs-human-review\`, \`security\`, \`security-review-required\`:
+    - The issue may have been triaged but never acted on. Re-evaluate:
+    - Read the issue body and comments to understand current state
+    - If labeled \`safe-to-work\` but no one has started work: post a comment nudging action
+      \`gh issue comment NUMBER --repo OpenRouterTeam/spawn --body "This issue was triaged as safe but has had no activity for over an hour. Re-flagging for attention."\`
+    - If labeled \`needs-human-review\` and still unresolved: re-notify via Slack (if webhook set)
+    - If labeled \`security\` or \`security-review-required\`: ensure it has an assignee or a linked PR. If not, add \`Pending Review\` label
+  * If stale AND has NO security labels: check if it should have been triaged
+    - If the issue has zero comments from automated accounts, it was never triaged — add \`Pending Review\` label:
+      \`gh issue edit NUMBER --repo OpenRouterTeam/spawn --add-label "Pending Review"\`
+- Also verify label consistency on ALL open issues:
+  * Every issue should have exactly ONE status label (\`Pending Review\`, \`Under Review\`, \`In Progress\`, \`safe-to-work\`, or \`needs-human-review\`)
+  * If an issue has no status label at all, add \`Pending Review\`
+- Report summary: how many issues re-flagged, how many already active
+
+## Step 5 — Monitor and Collect Results
 
 Poll TaskList every 15 seconds. As each agent reports back, record:
 - PR number
 - Verdict (approved+merged / changes-requested / closed-stale)
 - Number of findings by severity
 - Branches deleted (from branch-cleaner)
+- Issues re-flagged (from issue-checker)
 
-## Step 5 — Summary and Slack Notification
+## Step 6 — Summary and Slack Notification
 
 After all agents finish (or time runs out), compile the summary.
 
@@ -460,7 +494,7 @@ If SLACK_WEBHOOK is set, send a Slack notification:
 SLACK_WEBHOOK="${SLACK_WEBHOOK:-NOT_SET}"
 if [ -n "\${SLACK_WEBHOOK}" ] && [ "\${SLACK_WEBHOOK}" != "NOT_SET" ]; then
   curl -s -X POST "\${SLACK_WEBHOOK}" -H 'Content-Type: application/json' \\
-    -d '{"text":":shield: PR review+hygiene complete: N PRs reviewed (X merged, Y flagged, Z closed-stale), K branches cleaned. See https://github.com/OpenRouterTeam/spawn/pulls"}'
+    -d '{"text":":shield: PR review+hygiene complete: N PRs reviewed (X merged, Y flagged, Z closed-stale), K branches cleaned, J issues re-flagged. See https://github.com/OpenRouterTeam/spawn/pulls"}'
 fi
 \`\`\`
 (The SLACK_WEBHOOK env var is: ${SLACK_WEBHOOK:-NOT_SET})
@@ -470,17 +504,18 @@ fi
 1. List open PRs: \`gh pr list --state open --json number,title,headRefName,updatedAt,mergeable\`
 2. Create the team with TeamCreate (team_name="${TEAM_NAME}")
 3. Spawn branch-cleaner agent (model=haiku)
-4. For each PR:
+4. Spawn issue-checker agent (model=haiku) — monitors stale issues
+5. For each PR:
    a. Create a task with TaskCreate
    b. Spawn a pr-reviewer agent (model=opus, team_name="${TEAM_NAME}", name="pr-reviewer-NUMBER")
-5. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
-6. Monitor teammates (poll TaskList, sleep 15 between checks)
-7. Collect results from all agents via messages
-8. Compile summary (N reviewed, X merged, Y flagged, Z closed-stale, K branches cleaned)
-9. Send Slack notification
-10. Shutdown all teammates via SendMessage (type=shutdown_request)
-11. Clean up with TeamDelete
-12. Exit
+6. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
+7. Monitor teammates (poll TaskList, sleep 15 between checks)
+8. Collect results from all agents via messages
+9. Compile summary (N reviewed, X merged, Y flagged, Z closed-stale, K branches cleaned, J issues re-flagged)
+10. Send Slack notification
+11. Shutdown all teammates via SendMessage (type=shutdown_request)
+12. Clean up with TeamDelete
+13. Exit
 
 ## CRITICAL: Monitoring Loop
 
