@@ -15,6 +15,11 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # Only trigger on bug or cli issues (or schedule/manual)
+    if: >-
+      github.event_name != 'issues' ||
+      contains(github.event.issue.labels.*.name, 'bug') ||
+      contains(github.event.issue.labels.*.name, 'cli')
     steps:
       - name: Trigger and stream refactor cycle
         env:

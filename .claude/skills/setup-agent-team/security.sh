@@ -1,12 +1,13 @@
 #!/bin/bash
 set -eo pipefail
 
-# Security Review Team Service — Single Cycle (Tri-Mode)
+# Security Review Team Service — Single Cycle (Quad-Mode)
 # Triggered by trigger-server.ts via GitHub Actions
 #
-# RUN_MODE=pr       — 2-agent security review for a specific PR (10 min)
-# RUN_MODE=hygiene  — stale PR cleanup + triage (reason=hygiene, 15 min)
-# RUN_MODE=scan     — full repo security scan + issue filing (reason=schedule, 20 min)
+# RUN_MODE=team_building — implement team changes from issue (reason=team_building, 15 min)
+# RUN_MODE=pr            — 2-agent security review for a specific PR (10 min)
+# RUN_MODE=hygiene       — stale PR cleanup + triage (reason=hygiene, 15 min)
+# RUN_MODE=scan          — full repo security scan + issue filing (reason=schedule, 20 min)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -23,7 +24,13 @@ if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-if [[ -n "${SPAWN_ISSUE}" ]]; then
+if [[ "${SPAWN_REASON}" == "team_building" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
+    RUN_MODE="team_building"
+    ISSUE_NUM="${SPAWN_ISSUE}"
+    WORKTREE_BASE="/tmp/spawn-worktrees/team-building-${ISSUE_NUM}"
+    TEAM_NAME="spawn-team-building-${ISSUE_NUM}"
+    CYCLE_TIMEOUT=900   # 15 min for team building
+elif [[ -n "${SPAWN_ISSUE}" ]]; then
     RUN_MODE="pr"
     PR_NUM="${SPAWN_ISSUE}"
     WORKTREE_BASE="/tmp/spawn-worktrees/security-pr-${PR_NUM}"
@@ -83,6 +90,8 @@ log "Worktree base: ${WORKTREE_BASE}"
 log "Timeout: ${CYCLE_TIMEOUT}s"
 if [[ "${RUN_MODE}" == "pr" ]]; then
     log "PR: #${PR_NUM}"
+elif [[ "${RUN_MODE}" == "team_building" ]]; then
+    log "Issue: #${ISSUE_NUM}"
 fi
 
 # Fetch latest refs (read-only, safe for concurrent runs)
@@ -94,7 +103,104 @@ log "Launching ${RUN_MODE} cycle..."
 
 PROMPT_FILE=$(mktemp /tmp/security-prompt-XXXXXX.md)
 
-if [[ "${RUN_MODE}" == "pr" ]]; then
+if [[ "${RUN_MODE}" == "team_building" ]]; then
+    # --- Team Building mode: implement changes to agent team scripts ---
+    cat > "${PROMPT_FILE}" << TEAM_PROMPT_EOF
+You are the Team Lead for a team-building cycle on the spawn codebase.
+
+## Target Issue
+
+Implement the changes requested in GitHub issue #${ISSUE_NUM}.
+
+First, fetch the issue details:
+\`\`\`bash
+gh issue view ${ISSUE_NUM} --repo OpenRouterTeam/spawn
+\`\`\`
+
+The issue uses the "Team Building" template with two fields:
+- **Agent Team**: which team to improve (Security, Refactor, Discovery, or QA)
+- **What to Change**: description of the new capability or behavior change
+
+## Time Budget
+
+This cycle MUST complete within 12 minutes. This is a HARD deadline.
+
+- At the 9-minute mark, stop new work and wrap up
+- At the 11-minute mark, send shutdown_request to all agents
+- At 12 minutes, force shutdown
+
+## Team Structure
+
+Create these teammates:
+
+1. **implementer** (Opus)
+   - Read the issue to understand what team and what change is requested
+   - Identify the target script file:
+     * Security Team → \`.claude/skills/setup-agent-team/security.sh\`
+     * Refactor Team → \`.claude/skills/setup-agent-team/refactor.sh\`
+     * Discovery Team → \`.claude/skills/setup-agent-team/discovery.sh\`
+     * QA Team → \`.claude/skills/setup-agent-team/qa.sh\`
+   - Read the current script to understand its structure
+   - Implement the requested change in a worktree branch
+   - If the change also needs workflow updates (\`.github/workflows/\`), make those too
+   - Run \`bash -n\` on all modified .sh files
+   - Commit with a descriptive message referencing the issue
+   - Create a PR: \`gh pr create --title "feat: [description]" --body "Implements #${ISSUE_NUM}"\`
+
+2. **reviewer** (Opus)
+   - Wait for the implementer to create the PR
+   - Review the PR diff for:
+     * Security: no credential leaks, no injection, no unsafe patterns
+     * Correctness: does the change match what was requested?
+     * Compatibility: macOS bash 3.x, curl|bash sourcing patterns
+     * Consistency: follows existing patterns in the target script
+   - Post a review on the PR (approve or request-changes)
+   - If approved and all checks pass, merge the PR:
+     \`gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch\`
+   - Report results to the team lead
+
+## Workflow
+
+1. Create the team with TeamCreate (team_name="${TEAM_NAME}")
+2. Create tasks with TaskCreate for implementer and reviewer work
+3. Fetch issue details: \`gh issue view ${ISSUE_NUM} --repo OpenRouterTeam/spawn\`
+4. Set up worktree: \`git worktree add ${WORKTREE_BASE} -b team-building/issue-${ISSUE_NUM} origin/main\`
+5. Spawn implementer (model=opus) to work in \`${WORKTREE_BASE}\`
+6. Spawn reviewer (model=opus) to review once PR is created
+7. Monitor teammates (poll TaskList, sleep 15 between checks)
+8. Once both report:
+   - If PR was merged, close the issue:
+     \`gh issue close ${ISSUE_NUM} --repo OpenRouterTeam/spawn --comment "Implemented and merged. See PR #NUMBER."\`
+   - If PR had issues, comment on the issue with findings
+9. Shutdown all teammates via SendMessage (type=shutdown_request)
+10. Clean up worktree and TeamDelete
+11. Exit
+
+## CRITICAL: Monitoring Loop
+
+**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response.
+
+Required pattern:
+1. Spawn teammates via Task tool (with team_name and name params)
+2. Poll loop:
+   a. Run TaskList to check status
+   b. If messages received, process them
+   c. If no messages yet, run Bash("sleep 15") then loop back
+3. Once both agents report, close the issue or comment
+4. Shutdown teammates and exit
+
+## Safety Rules
+
+- Only modify the specific team script(s) mentioned in the issue
+- Run \`bash -n\` on every modified .sh file before committing
+- Never break existing functionality — the change must be additive
+- Always reference the issue number in commits and PR
+- If the request is unclear or too broad, comment on the issue asking for clarification and exit
+
+Begin now. Implement the team building request from issue #${ISSUE_NUM}.
+TEAM_PROMPT_EOF
+
+elif [[ "${RUN_MODE}" == "pr" ]]; then
     # --- PR mode: 2-agent security review ---
     cat > "${PROMPT_FILE}" << PR_PROMPT_EOF
 You are the Team Lead for a security review of PR #${PR_NUM} on the spawn codebase.
