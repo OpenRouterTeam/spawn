@@ -424,11 +424,13 @@ describe("cmdCloudInfo - Not yet available agents", () => {
   });
 
   describe("many missing agents (6 missing, > 5 threshold)", () => {
-    it("should NOT show 'Not yet available' section", async () => {
+    it("should show count instead of listing individual agent names", async () => {
       await setupManifest(manyAgentManifest);
       await cmdCloudInfo("testcloud");
       const output = getOutput();
-      expect(output).not.toContain("Not yet available");
+      // Shows count summary instead of individual names
+      expect(output).toContain("other agents not yet available");
+      expect(output).not.toContain("Not yet available:");
     });
 
     it("should still show the implemented agent", async () => {

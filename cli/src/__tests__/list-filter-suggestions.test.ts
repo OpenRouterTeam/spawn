@@ -626,10 +626,10 @@ describe("cmdMatrix - compact vs grid view", () => {
       await cmdMatrix();
 
       const output = getOutput();
-      // Compact view shows "all clouds supported" or "Not yet available" column
+      // Compact view shows "all clouds supported" or available/missing clouds column
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Not yet available");
+      expect(output).toContain("Details");
     });
 
     it("should show green for fully-supported agents in compact view", async () => {
@@ -643,15 +643,16 @@ describe("cmdMatrix - compact vs grid view", () => {
       expect(output).toContain("all clouds supported");
     });
 
-    it("should list missing cloud names in compact view for partial agents", async () => {
+    it("should list available cloud names in compact view when fewer implemented than missing", async () => {
       process.stdout.columns = 40;
       await setManifest(wideManifest);
 
       await cmdMatrix();
 
       const output = getOutput();
-      // aider is missing on several clouds
-      expect(output).toContain("Hetzner Cloud");
+      // aider has 1 implemented (Sprite) out of 8 clouds
+      // Since 1 <= 7, shows available clouds instead of missing ones
+      expect(output).toContain("Sprite");
     });
 
     it("should show ratio X/Y for each agent in compact view", async () => {

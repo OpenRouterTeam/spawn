@@ -339,12 +339,13 @@ describe("cmdCloudInfo - missing agents display", () => {
       expect(output).toContain("Codex CLI");
     });
 
-    it("should NOT show 'Not yet available' when missing agents > 5", async () => {
+    it("should show count instead of listing names when missing agents > 5", async () => {
       await setManifest(manyAgentsManifest);
       await cmdCloudInfo("sprite");
       const output = getOutput();
-      // 6 missing agents exceeds the <= 5 threshold
-      expect(output).not.toContain("Not yet available");
+      // 6 missing agents exceeds the <= 5 threshold: shows count instead of individual names
+      expect(output).toContain("other agents not yet available");
+      expect(output).not.toContain("OpenClaw");
     });
 
     it("should NOT show 'Not yet available' when all agents are implemented", async () => {

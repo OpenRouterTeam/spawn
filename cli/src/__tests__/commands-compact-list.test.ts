@@ -224,10 +224,10 @@ describe("Compact List View", () => {
 
       await cmdMatrix();
       const output = getOutput();
-      // Compact view has "Agent", "Clouds", "Not yet available" header columns
+      // Compact view has "Agent", "Clouds", "Details" header columns
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Not yet available");
+      expect(output).toContain("Details");
     });
 
     it("should use grid view when terminal is wide enough for small manifest", async () => {
@@ -255,14 +255,14 @@ describe("Compact List View", () => {
       // With 7 clouds at ~10+ chars each, the grid would be ~100+ chars
       // which exceeds the 80-column default, so compact view should trigger
       expect(output).toContain("Agent");
-      expect(output).toContain("Not yet available");
+      expect(output).toContain("Details");
     });
   });
 
   // ── Compact view header and structure ─────────────────────────────
 
   describe("compact view header", () => {
-    it("should show three column headers: Agent, Clouds, Not yet available", async () => {
+    it("should show three column headers: Agent, Clouds, Details", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
@@ -270,7 +270,7 @@ describe("Compact List View", () => {
       const output = getOutput();
       expect(output).toContain("Agent");
       expect(output).toContain("Clouds");
-      expect(output).toContain("Not yet available");
+      expect(output).toContain("Details");
     });
 
     it("should include a separator line with dashes", async () => {
@@ -343,53 +343,46 @@ describe("Compact List View", () => {
       expect(output).toContain("all clouds supported");
     });
 
-    it("should list missing cloud names when agent is partially implemented", async () => {
+    it("should show available clouds when fewer implemented than missing", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
       await cmdMatrix();
       const output = getOutput();
-      // aider is missing: hetzner, vultr, digitalocean, aws, gcp
-      expect(output).toContain("Hetzner Cloud");
-      expect(output).toContain("Vultr");
-      expect(output).toContain("DigitalOcean");
-      expect(output).toContain("AWS EC2");
-      expect(output).toContain("Google Cloud");
+      // aider has 2 implemented (sprite, linode) out of 7
+      // Since 2 <= 5 (missing), it shows the available clouds instead
+      expect(output).toContain("Sprite");
+      expect(output).toContain("Linode");
     });
 
-    it("should not list implemented clouds as missing", async () => {
+    it("should show available clouds on the aider line when implemented <= missing", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
       await cmdMatrix();
-      const output = getOutput();
-      // Find the line containing "Aider" to isolate the aider row
       const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
       const aiderLine = lines.find(
         (line: string) => line.includes("Aider") && line.includes("/7")
       );
       expect(aiderLine).toBeDefined();
-      // Sprite and Linode are implemented for aider, so they should NOT appear
-      // as missing on the aider line
-      // (But "Sprite" might appear in other lines, so check just the aider line)
-      expect(aiderLine!).not.toContain("Sprite");
-      expect(aiderLine!).not.toContain("Linode");
+      // Sprite and Linode are the 2 implemented clouds for aider
+      expect(aiderLine!).toContain("Sprite");
+      expect(aiderLine!).toContain("Linode");
+      // Missing clouds should NOT appear on the aider line
+      expect(aiderLine!).not.toContain("Hetzner");
+      expect(aiderLine!).not.toContain("Vultr");
     });
 
-    it("should list all clouds as missing when agent has no implementations", async () => {
+    it("should show empty details when agent has no implementations", async () => {
       await setManifest(allMissingManifest);
       process.stdout.columns = 60;
 
       await cmdMatrix();
       const output = getOutput();
-      // All cloud names should appear in the missing column
-      expect(output).toContain("Sprite");
-      expect(output).toContain("Hetzner Cloud");
-      expect(output).toContain("Vultr");
-      expect(output).toContain("Linode");
-      expect(output).toContain("DigitalOcean");
-      expect(output).toContain("AWS EC2");
-      expect(output).toContain("Google Cloud");
+      // 0 implemented, 7 missing - since 0 <= 7, shows available (none)
+      expect(output).toContain("0/7");
+      // No cloud names should appear since none are implemented
+      expect(output).not.toContain("all clouds supported");
     });
 
     it("should show 'all clouds supported' for every agent when everything is implemented", async () => {
@@ -400,8 +393,8 @@ describe("Compact List View", () => {
       const output = getOutput();
       const allCloudsMatches = output.match(/all clouds supported/g);
       expect(allCloudsMatches).not.toBeNull();
-      // Both agents fully implemented -> 2 "all clouds supported" + 1 in legend
-      expect(allCloudsMatches!.length).toBe(3);
+      // Both agents fully implemented -> 2 "all clouds supported"
+      expect(allCloudsMatches!.length).toBe(2);
     });
   });
 
@@ -478,15 +471,17 @@ describe("Compact List View", () => {
       const output = getOutput();
       expect(output).toContain("Claude Code");
       expect(output).toContain("2/7");
-      expect(output).toContain("Vultr");
+      // 2 implemented <= 5 missing, so shows available clouds
+      expect(output).toContain("Sprite");
+      expect(output).toContain("Hetzner Cloud");
       expect(output).toContain("2/7 combinations implemented");
     });
   });
 
   // ── Missing clouds separator format ───────────────────────────────
 
-  describe("compact view missing clouds formatting", () => {
-    it("should separate missing cloud names with commas", async () => {
+  describe("compact view details formatting", () => {
+    it("should separate cloud names with commas", async () => {
       await setManifest(wideManifest);
       process.stdout.columns = 60;
 
@@ -496,8 +491,45 @@ describe("Compact List View", () => {
         (line: string) => line.includes("Aider") && line.includes("/7")
       );
       expect(aiderLine).toBeDefined();
-      // Missing clouds should be comma-separated
+      // Available clouds should be comma-separated
       expect(aiderLine!).toContain(", ");
+    });
+
+    it("should show 'missing:' prefix when more implemented than missing", async () => {
+      // Create a manifest where aider has 5/7 implemented (more than 2 missing)
+      const mostlyImplemented = {
+        agents: wideManifest.agents,
+        clouds: wideManifest.clouds,
+        matrix: {
+          "sprite/claude": "implemented",
+          "hetzner/claude": "implemented",
+          "vultr/claude": "implemented",
+          "linode/claude": "implemented",
+          "digitalocean/claude": "implemented",
+          "aws/claude": "implemented",
+          "gcp/claude": "implemented",
+          "sprite/aider": "implemented",
+          "hetzner/aider": "implemented",
+          "vultr/aider": "implemented",
+          "linode/aider": "implemented",
+          "digitalocean/aider": "implemented",
+          "aws/aider": "missing",
+          "gcp/aider": "missing",
+        },
+      };
+      await setManifest(mostlyImplemented);
+      process.stdout.columns = 60;
+
+      await cmdMatrix();
+      const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
+      const aiderLine = lines.find(
+        (line: string) => line.includes("Aider") && line.includes("/7")
+      );
+      expect(aiderLine).toBeDefined();
+      // 5 implemented > 2 missing, so shows "missing: ..." with the missing cloud names
+      expect(aiderLine!).toContain("missing:");
+      expect(aiderLine!).toContain("AWS EC2");
+      expect(aiderLine!).toContain("Google Cloud");
     });
   });
 });

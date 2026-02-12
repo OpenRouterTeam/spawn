@@ -722,22 +722,26 @@ function renderCompactList(manifest: Manifest, agents: string[], clouds: string[
   const totalClouds = clouds.length;
 
   console.log();
-  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Not yet available"));
+  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Details"));
   console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + 30)));
 
   for (const a of agents) {
-    const implCount = getImplementedClouds(manifest, a).length;
+    const implemented = getImplementedClouds(manifest, a);
     const missing = getMissingClouds(manifest, a, clouds);
-    const countStr = `${implCount}/${totalClouds}`;
-    const colorFn = implCount === totalClouds ? pc.green : pc.yellow;
+    const countStr = `${implemented.length}/${totalClouds}`;
+    const colorFn = implemented.length === totalClouds ? pc.green : pc.yellow;
 
     let line = pc.bold(manifest.agents[a].name.padEnd(COMPACT_NAME_WIDTH));
     line += colorFn(countStr.padEnd(COMPACT_COUNT_WIDTH));
 
     if (missing.length === 0) {
-      line += pc.green("-- all clouds supported");
+      line += pc.green("all clouds supported");
+    } else if (implemented.length <= missing.length) {
+      // Fewer implemented than missing: show what's available
+      line += pc.green(implemented.map((c) => manifest.clouds[c].name).join(", "));
     } else {
-      line += pc.dim(missing.map((c) => manifest.clouds[c].name).join(", "));
+      // More implemented than missing: show what's NOT available
+      line += pc.dim("missing: " + missing.map((c) => manifest.clouds[c].name).join(", "));
     }
 
     console.log(line);
@@ -749,7 +753,7 @@ function renderMatrixFooter(manifest: Manifest, agents: string[], clouds: string
   const total = agents.length * clouds.length;
   console.log();
   if (isCompact) {
-    console.log(`${pc.green("green")} = all clouds supported  ${pc.yellow("yellow")} = some clouds not yet available`);
+    console.log(`${pc.green("green")} = available  ${pc.dim("dim")} = missing  ${pc.yellow("yellow")} = partial coverage`);
   } else {
     console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   }
@@ -1036,7 +1040,10 @@ export async function cmdAgents(): Promise<void> {
   for (const key of allAgents) {
     const a = manifest.agents[key];
     const implCount = getImplementedClouds(manifest, key).length;
-    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} cloud${implCount !== 1 ? "s" : ""}  ${a.description}`)}`);
+    const countLabel = `${implCount} cloud${implCount !== 1 ? "s" : ""}`;
+    const keyColor = implCount > 0 ? pc.green : pc.dim;
+    const countColor = implCount > 0 ? pc.dim : pc.yellow;
+    console.log(`  ${keyColor(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${countColor(countLabel)}  ${pc.dim(a.description)}`);
   }
   console.log();
   console.log(pc.dim(`  Run ${pc.cyan("spawn <agent>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
@@ -1064,7 +1071,9 @@ export async function cmdClouds(): Promise<void> {
       const implCount = getImplementedAgents(manifest, key).length;
       const countStr = `${implCount}/${allAgents.length}`;
       const authHint = c.auth.toLowerCase() === "none" ? "" : `  auth: ${c.auth}`;
-      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${authHint ? pc.dim(authHint) : ""}`);
+      const keyColor = implCount > 0 ? pc.green : pc.dim;
+      const countColor = implCount > 0 ? pc.dim : pc.yellow;
+      console.log(`    ${keyColor(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${countColor(countStr.padEnd(6))} ${pc.dim(c.description)}${authHint ? pc.dim(authHint) : ""}`);
     }
   }
   console.log();
@@ -1198,9 +1207,13 @@ function printAgentList(
     }
   }
 
-  if (missingAgents.length > 0 && missingAgents.length <= 5) {
+  if (missingAgents.length > 0) {
     console.log();
-    console.log(pc.dim(`  Not yet available: ${missingAgents.map((a) => manifest.agents[a].name).join(", ")}`));
+    if (missingAgents.length <= 5) {
+      console.log(pc.dim(`  Not yet available: ${missingAgents.map((a) => manifest.agents[a].name).join(", ")}`));
+    } else {
+      console.log(pc.dim(`  ${missingAgents.length} other agents not yet available on this cloud`));
+    }
   }
 }
 
