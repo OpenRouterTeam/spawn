@@ -378,12 +378,33 @@ function buildCloudLines(cloudInfo: { name: string; description: string; default
   return lines;
 }
 
+function buildAuthLines(cloudDef: { auth: string; url?: string }): string[] {
+  const lines: string[] = [];
+  const authVars = parseAuthEnvVars(cloudDef.auth);
+
+  // Always need OPENROUTER_API_KEY
+  const orSet = !!process.env.OPENROUTER_API_KEY;
+  lines.push(`  ${orSet ? pc.green("OPENROUTER_API_KEY") : pc.red("OPENROUTER_API_KEY")}  ${orSet ? pc.green("(set)") : pc.red("(not set)")}`);
+
+  for (const v of authVars) {
+    const isSet = !!process.env[v];
+    lines.push(`  ${isSet ? pc.green(v) : pc.red(v)}  ${isSet ? pc.green("(set)") : pc.red("(not set)")}`);
+  }
+
+  if (cloudDef.url) {
+    lines.push(`  ${pc.dim(`Get credentials: ${cloudDef.url}`)}`);
+  }
+  return lines;
+}
+
 function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, prompt?: string): void {
   p.log.info(pc.bold("Dry run -- no resources will be provisioned\n"));
 
   printDryRunSection("Agent", buildAgentLines(manifest.agents[agent]));
   printDryRunSection("Cloud", buildCloudLines(manifest.clouds[cloud]));
   printDryRunSection("Script", [`  URL: ${RAW_BASE}/${cloud}/${agent}.sh`]);
+
+  printDryRunSection("Authentication", buildAuthLines(manifest.clouds[cloud]));
 
   const env = manifest.agents[agent].env;
   if (env) {

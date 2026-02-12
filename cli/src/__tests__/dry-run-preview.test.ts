@@ -456,6 +456,84 @@ describe("Dry-run preview (showDryRunPreview via cmdRun)", () => {
     });
   });
 
+  // ── Authentication section ──────────────────────────────────────────
+
+  describe("authentication information", () => {
+    it("should show Authentication section header", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      expect(getStepCalls().some(c => c.includes("Authentication"))).toBe(true);
+    });
+
+    it("should display OPENROUTER_API_KEY status", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      expect(getLogText()).toContain("OPENROUTER_API_KEY");
+    });
+
+    it("should display cloud auth env var", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      expect(getLogText()).toContain("SPRITE_TOKEN");
+    });
+
+    it("should display HCLOUD_TOKEN for hetzner", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "hetzner", undefined, true);
+
+      expect(getLogText()).toContain("HCLOUD_TOKEN");
+    });
+
+    it("should show credential URL when cloud has url", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      expect(getLogText()).toContain("https://sprite.sh");
+    });
+
+    it("should show (set) when env var is present", async () => {
+      const origVal = process.env.OPENROUTER_API_KEY;
+      process.env.OPENROUTER_API_KEY = "test-key";
+      try {
+        setupManifest(standardManifest);
+        await loadManifest(true);
+        await cmdRun("claude", "sprite", undefined, true);
+
+        expect(getLogText()).toContain("(set)");
+      } finally {
+        if (origVal !== undefined) {
+          process.env.OPENROUTER_API_KEY = origVal;
+        } else {
+          delete process.env.OPENROUTER_API_KEY;
+        }
+      }
+    });
+
+    it("should show (not set) when env var is missing", async () => {
+      const origVal = process.env.SPRITE_TOKEN;
+      delete process.env.SPRITE_TOKEN;
+      try {
+        setupManifest(standardManifest);
+        await loadManifest(true);
+        await cmdRun("claude", "sprite", undefined, true);
+
+        expect(getLogText()).toContain("(not set)");
+      } finally {
+        if (origVal !== undefined) {
+          process.env.SPRITE_TOKEN = origVal;
+        }
+      }
+    });
+  });
+
   // ── Prompt display ──────────────────────────────────────────────────
 
   describe("prompt display", () => {
@@ -595,15 +673,26 @@ describe("Dry-run preview (showDryRunPreview via cmdRun)", () => {
       expect(cloudIdx).toBeLessThan(scriptIdx);
     });
 
-    it("should show Script before Environment section", async () => {
+    it("should show Script before Authentication section", async () => {
       setupManifest(standardManifest);
       await loadManifest(true);
       await cmdRun("claude", "sprite", undefined, true);
 
       const steps = getStepCalls();
       const scriptIdx = steps.findIndex(c => c.includes("Script"));
+      const authIdx = steps.findIndex(c => c.includes("Authentication"));
+      expect(scriptIdx).toBeLessThan(authIdx);
+    });
+
+    it("should show Authentication before Environment section", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      const steps = getStepCalls();
+      const authIdx = steps.findIndex(c => c.includes("Authentication"));
       const envIdx = steps.findIndex(c => c.includes("Environment"));
-      expect(scriptIdx).toBeLessThan(envIdx);
+      expect(authIdx).toBeLessThan(envIdx);
     });
 
     it("should show Environment before Prompt section", async () => {
