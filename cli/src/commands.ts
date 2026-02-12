@@ -1129,10 +1129,12 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     const authVars = parseAuthEnvVars(cloudDef.auth);
     console.log();
     console.log(pc.bold("Quick start:"));
-    console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
+    const orStatus = credentialStatus("OPENROUTER_API_KEY");
+    console.log(`  ${orStatus} ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
     if (authVars.length > 0) {
+      const status = credentialStatus(authVars[0]);
       const hint = cloudDef.url ? `  ${pc.dim(`# ${cloudDef.url}`)}` : `  ${pc.dim(`# ${cloudDef.name} credential`)}`;
-      console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}${hint}`);
+      console.log(`  ${status} ${pc.cyan(`export ${authVars[0]}=...`)}${hint}`);
     }
     console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
   }
@@ -1158,6 +1160,16 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
 
 // ── Cloud Info ─────────────────────────────────────────────────────────────────
 
+/** Format a credential status indicator: green checkmark if set, red X if missing */
+export function credentialStatus(envVar: string): string {
+  const isAscii = process.env.TERM === "linux";
+  const isSet = !!process.env[envVar];
+  if (isSet) {
+    return pc.green(isAscii ? "[ok]" : "\u2713");
+  }
+  return pc.red(isAscii ? "[missing]" : "\u2717");
+}
+
 /** Print quick-start auth instructions for a cloud provider */
 function printCloudQuickStart(
   cloud: { auth: string; url?: string },
@@ -1167,18 +1179,33 @@ function printCloudQuickStart(
 ): void {
   console.log();
   console.log(pc.bold("Quick start:"));
-  console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
+  const orStatus = credentialStatus("OPENROUTER_API_KEY");
+  console.log(`  ${orStatus} ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
   if (authVars.length > 0) {
     const hint = cloud.url ? `  ${pc.dim(`# ${cloud.url}`)}` : "";
     for (let i = 0; i < authVars.length; i++) {
+      const status = credentialStatus(authVars[i]);
       // Only show the URL hint on the first auth var to avoid repetition
-      console.log(`  ${pc.cyan(`export ${authVars[i]}=...`)}${i === 0 ? hint : ""}`);
+      console.log(`  ${status} ${pc.cyan(`export ${authVars[i]}=...`)}${i === 0 ? hint : ""}`);
     }
   } else if (cloud.auth.toLowerCase() !== "none") {
     console.log(`  ${pc.dim(`Auth: ${cloud.auth}`)}`);
   }
   if (exampleAgent) {
     console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
+  }
+
+  // Show summary status
+  const allVars = ["OPENROUTER_API_KEY", ...authVars];
+  const allSet = allVars.every((v) => !!process.env[v]);
+  const noneSet = allVars.every((v) => !process.env[v]);
+  if (allSet) {
+    console.log();
+    console.log(`  ${pc.green("All credentials configured. Ready to launch!")}`);
+  } else if (!noneSet) {
+    const missing = allVars.filter((v) => !process.env[v]);
+    console.log();
+    console.log(`  ${pc.yellow(`Missing: ${missing.join(", ")}`)}`);
   }
 }
 
