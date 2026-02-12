@@ -73,7 +73,7 @@ setup_claude_code_config "$OPENROUTER_API_KEY" "upload_file" "run_server"
 echo ""
 log_info "Setup complete. Opening interactive session..."
 echo ""
-log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
+log_step "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 
 # 8. Source env vars and launch Claude

@@ -215,7 +215,7 @@ else:
 _scaleway_power_on_and_wait() {
     local server_id="$1"
 
-    log_warn "Powering on instance..."
+    log_step "Powering on instance..."
     local action_response
     action_response=$(scaleway_instance_api POST "/servers/${server_id}/action" '{"action":"poweron"}')
 

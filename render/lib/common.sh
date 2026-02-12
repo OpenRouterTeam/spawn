@@ -230,7 +230,7 @@ wait_for_cloud_init() {
 # Inject environment variables into shell config
 # Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    log_warn "Injecting environment variables..."
+    log_step "Injecting environment variables..."
 
     local env_temp
     env_temp=$(mktemp)
@@ -265,7 +265,7 @@ interactive_session() {
 # Cleanup: delete the service
 cleanup_server() {
     if [[ -n "${RENDER_SERVICE_ID:-}" ]]; then
-        log_warn "Deleting Render service: $RENDER_SERVICE_NAME"
+        log_step "Deleting Render service: $RENDER_SERVICE_NAME"
         curl -s -X DELETE "https://api.render.com/v1/services/${RENDER_SERVICE_ID}" \
             -H "Authorization: Bearer ${RENDER_API_KEY}" >/dev/null 2>&1 || true
     fi

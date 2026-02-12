@@ -263,7 +263,7 @@ wait_for_cloud_init() {
     log_info "Waiting for system initialization..."
 
     if ! run_server "$ip" "cloud-init status --wait --long" 2>/dev/null; then
-        log_warn "cloud-init wait timed out or not available, proceeding anyway"
+        log_step "cloud-init wait timed out or not available, proceeding anyway"
     else
         log_info "System initialization complete"
     fi

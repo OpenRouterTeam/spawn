@@ -63,7 +63,7 @@ echo ""
 
 # 7. Start codex interactively
 log_step "Starting codex..."
-log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
+log_step "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1
 

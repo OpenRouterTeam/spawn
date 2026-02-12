@@ -63,7 +63,7 @@ echo ""
 
 # 7. Start amazon q interactively
 log_step "Starting Amazon Q CLI..."
-log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
+log_step "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1
 

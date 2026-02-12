@@ -47,7 +47,7 @@ ensure_modal_cli() {
     fi
     # Check if authenticated
     if ! modal profile current &>/dev/null; then
-        log_warn "Modal not authenticated. Running setup..."
+        log_step "Modal not authenticated. Running setup..."
         modal setup
     fi
     log_info "Modal CLI ready"
@@ -214,7 +214,7 @@ p.wait()
 destroy_server() {
     local sandbox_id="${1:-${MODAL_SANDBOX_ID}}"
     validate_sandbox_id "${sandbox_id}" || return 1
-    log_warn "Terminating sandbox..."
+    log_step "Terminating sandbox..."
     # SECURITY: Pass sandbox ID via environment variable to prevent Python injection
     _MODAL_SB_ID="${sandbox_id}" python3 -c "
 import modal, os

@@ -146,8 +146,8 @@ get_server_name() {
     local server_name=$(safe_read "Enter app name: ")
     if [[ -z "$server_name" ]]; then
         log_error "App name is required"
-        log_warn "Set FLY_APP_NAME environment variable for non-interactive usage:"
-        log_warn "  FLY_APP_NAME=dev-mk1 curl ... | bash"
+        log_error "Set FLY_APP_NAME environment variable for non-interactive usage:"
+        log_error "  FLY_APP_NAME=dev-mk1 curl ... | bash"
         return 1
     fi
 
@@ -181,7 +181,7 @@ _fly_create_app() {
         local error_msg
         error_msg=$(echo "$app_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$app_response")
         if echo "$error_msg" | grep -qi "already exists"; then
-            log_warn "App '$name' already exists, reusing it"
+            log_info "App '$name' already exists, reusing it"
             return 0
         fi
         log_error "Failed to create Fly.io app"

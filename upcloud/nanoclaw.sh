@@ -55,6 +55,6 @@ log_info "Server: ${SERVER_NAME} (UUID: ${UPCLOUD_SERVER_UUID}, IP: ${UPCLOUD_SE
 echo ""
 
 log_step "Starting nanoclaw..."
-log_warn "You will need to scan a WhatsApp QR code to authenticate."
+log_step "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 interactive_session "${UPCLOUD_SERVER_IP}" "cd ~/nanoclaw && source ~/.zshrc && npm run dev"

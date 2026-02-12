@@ -68,7 +68,7 @@ ensure_gh_cli() {
 # Ensure user is authenticated with gh CLI
 ensure_gh_auth() {
     if ! gh auth status &>/dev/null; then
-        log_warn "Not authenticated with GitHub CLI"
+        log_step "Not authenticated with GitHub CLI"
         log_info "Initiating GitHub CLI authentication..."
         gh auth login || {
             log_error "Failed to authenticate with GitHub CLI"
@@ -212,7 +212,7 @@ run_server() {
 # Inject environment variables into shell config
 # Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    log_warn "Injecting environment variables..."
+    log_step "Injecting environment variables..."
 
     local env_temp
     env_temp=$(mktemp)

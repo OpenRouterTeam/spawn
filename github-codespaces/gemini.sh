@@ -64,7 +64,7 @@ echo ""
 
 # 7. Start gemini interactively
 log_step "Starting gemini..."
-log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
+log_step "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1
 

@@ -62,7 +62,7 @@ echo ""
 
 # 9. Start NanoClaw interactively
 log_step "Starting NanoClaw..."
-log_warn "You will need to scan a WhatsApp QR code to authenticate."
+log_step "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 sleep 1
 clear

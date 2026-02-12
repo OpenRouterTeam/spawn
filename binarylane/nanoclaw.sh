@@ -56,6 +56,6 @@ log_info "Server: ${SERVER_NAME} (ID: ${BINARYLANE_SERVER_ID}, IP: ${BINARYLANE_
 echo ""
 
 log_step "Starting nanoclaw..."
-log_warn "You will need to scan a WhatsApp QR code to authenticate."
+log_step "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 interactive_session "${BINARYLANE_SERVER_IP}" "cd ~/nanoclaw && source ~/.zshrc && npm run dev"

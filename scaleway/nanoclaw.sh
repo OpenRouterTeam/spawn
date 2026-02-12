@@ -54,6 +54,6 @@ log_info "Server: ${SERVER_NAME} (ID: ${SCALEWAY_SERVER_ID}, IP: ${SCALEWAY_SERV
 echo ""
 
 log_step "Starting nanoclaw..."
-log_warn "You will need to scan a WhatsApp QR code to authenticate."
+log_step "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 interactive_session "${SCALEWAY_SERVER_IP}" "cd ~/nanoclaw && source ~/.zshrc && npm run dev"

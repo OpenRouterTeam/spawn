@@ -64,7 +64,7 @@ echo ""
 
 # 8. Start gptme interactively
 log_step "Starting gptme..."
-log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
+log_step "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1
 
