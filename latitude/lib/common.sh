@@ -259,45 +259,28 @@ create_server() {
     log_step "Waiting for server provisioning (this may take a few minutes for bare metal)..."
 }
 
-# Extract the IPv4 address from a Latitude.sh server API response
-# Checks network.ip, ip_addresses[], and primary_ipv4 fields
-# Usage: extract_latitude_server_ip JSON_RESPONSE
-extract_latitude_server_ip() {
-    local response="$1"
-    echo "$response" | python3 -c "
+# Extract status and IPv4 from a Latitude.sh server API response
+# Outputs two lines: status, then IP (or empty)
+_latitude_parse_server_response() {
+    python3 -c "
 import json, sys
-data = json.loads(sys.stdin.read())
-server = data.get('data', {})
-attrs = server.get('attributes', {})
-# Check for IP in network attributes
-network = attrs.get('network', {})
-if isinstance(network, dict):
-    ip = network.get('ip', '')
-    if ip:
-        print(ip)
-        sys.exit(0)
-# Check for IP in relationships or included data
-ips = attrs.get('ip_addresses', [])
-if isinstance(ips, list):
-    for ip_obj in ips:
-        if isinstance(ip_obj, dict):
-            addr = ip_obj.get('address', '')
-            if addr and ':' not in addr:  # Skip IPv6
-                print(addr)
-                sys.exit(0)
-        elif isinstance(ip_obj, str) and ':' not in ip_obj:
-            print(ip_obj)
-            sys.exit(0)
-# Fallback: try primary_ipv4
-primary = attrs.get('primary_ipv4', '')
-if primary:
-    print(primary)
-    sys.exit(0)
-sys.exit(1)
+d = json.loads(sys.stdin.read())
+attrs = d.get('data',{}).get('attributes',{})
+print(attrs.get('status','unknown'))
+ip = attrs.get('network',{}).get('ip','')
+if not ip:
+    for x in attrs.get('ip_addresses',[]):
+        addr = x.get('address','') if isinstance(x,dict) else (x if isinstance(x,str) else '')
+        if addr and ':' not in addr:
+            ip = addr; break
+if not ip:
+    ip = attrs.get('primary_ipv4','')
+print(ip)
 " 2>/dev/null
 }
 
 # Wait for server to become active and get its IP address
+# Sets LATITUDE_SERVER_IP on success
 wait_for_server_ready() {
     local server_id="$1"
     local max_attempts=${2:-60}
@@ -308,27 +291,19 @@ wait_for_server_ready() {
         local response
         response=$(latitude_api GET "/servers/$server_id")
 
-        local status
-        status=$(echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-server = data.get('data', {})
-attrs = server.get('attributes', {})
-print(attrs.get('status', 'unknown'))
-" 2>/dev/null || echo "unknown")
+        local parsed status ip
+        parsed=$(echo "$response" | _latitude_parse_server_response)
+        status=$(echo "$parsed" | head -1)
+        ip=$(echo "$parsed" | tail -1)
 
-        if [[ "$status" == "on" ]] || [[ "$status" == "active" ]]; then
-            LATITUDE_SERVER_IP=$(extract_latitude_server_ip "$response")
-            if [[ -n "$LATITUDE_SERVER_IP" ]]; then
-                export LATITUDE_SERVER_IP
-                log_info "Server active: IP=$LATITUDE_SERVER_IP"
-                return 0
-            fi
-            log_step "Server active but IP not yet assigned... (attempt $attempt/$max_attempts)"
-        else
-            log_step "Server status: $status (attempt $attempt/$max_attempts)"
+        if [[ "$status" == "on" || "$status" == "active" ]] && [[ -n "$ip" ]]; then
+            LATITUDE_SERVER_IP="$ip"
+            export LATITUDE_SERVER_IP
+            log_info "Server active: IP=$LATITUDE_SERVER_IP"
+            return 0
         fi
 
+        log_step "Server status: $status (attempt $attempt/$max_attempts)"
         sleep 10
         attempt=$((attempt + 1))
     done

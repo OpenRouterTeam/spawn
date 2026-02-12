@@ -192,27 +192,8 @@ get_server_name() {
     get_validated_server_name "SCALEWAY_SERVER_NAME" "Enter server name: "
 }
 
-# Parse Scaleway server response to extract public IP address
-_scaleway_extract_ip() {
-    python3 -c "
-import json, sys
-server = json.loads(sys.stdin.read())['server']
-ip = server.get('public_ip', {})
-if ip:
-    print(ip.get('address', ''))
-else:
-    ips = server.get('public_ips', [])
-    for pip in ips:
-        if pip.get('address'):
-            print(pip['address'])
-            sys.exit(0)
-    print('')
-"
-}
-
-# Power on and wait for Scaleway instance to become running with a public IP
-# Sets SCALEWAY_SERVER_IP on success
-_scaleway_power_on_and_wait() {
+# Power on a Scaleway instance and issue the poweron action
+_scaleway_power_on() {
     local server_id="$1"
 
     log_warn "Powering on instance..."
@@ -224,32 +205,19 @@ _scaleway_power_on_and_wait() {
     else
         log_warn "Power on may have failed, checking status..."
     fi
+}
 
-    log_step "Waiting for instance to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(scaleway_instance_api GET "/servers/$server_id")
-        local state
-        state=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['state'])")
+# Power on and wait for Scaleway instance to become running with a public IP
+# Sets SCALEWAY_SERVER_IP on success
+_scaleway_power_on_and_wait() {
+    local server_id="$1"
 
-        if [[ "$state" == "running" ]]; then
-            SCALEWAY_SERVER_IP=$(echo "$status_response" | _scaleway_extract_ip)
-            if [[ -n "$SCALEWAY_SERVER_IP" ]]; then
-                export SCALEWAY_SERVER_IP
-                log_info "Instance active: IP=$SCALEWAY_SERVER_IP"
-                return 0
-            fi
-        fi
+    _scaleway_power_on "$server_id"
 
-        log_step "Instance state: $state ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
+    generic_wait_for_instance scaleway_instance_api "/servers/${server_id}" \
+        "running" "d['server']['state']" \
+        "(d['server'].get('public_ip') or {}).get('address','') or next((p['address'] for p in d['server'].get('public_ips',[]) if p.get('address')),'') " \
+        SCALEWAY_SERVER_IP "Instance" 60
 }
 
 create_server() {
