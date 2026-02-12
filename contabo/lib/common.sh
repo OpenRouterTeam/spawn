@@ -104,10 +104,7 @@ ensure_contabo_credentials() {
 
 # Check if SSH key is registered with Contabo
 contabo_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(contabo_api GET "/compute/secrets")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint contabo_api "/compute/secrets" "$1"
 }
 
 # Register SSH key with Contabo as a secret

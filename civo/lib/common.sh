@@ -55,10 +55,7 @@ test_civo_token() {
 
 # Check if SSH key is registered with Civo
 civo_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(civo_api GET "/sshkeys")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint civo_api "/sshkeys" "$1"
 }
 
 # Register SSH key with Civo

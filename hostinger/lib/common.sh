@@ -65,10 +65,7 @@ ensure_hostinger_token() {
 
 # Check if SSH key is registered with Hostinger
 hostinger_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(hostinger_api GET "/ssh-keys")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint hostinger_api "/ssh-keys" "$1"
 }
 
 # Register SSH key with Hostinger

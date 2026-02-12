@@ -173,10 +173,7 @@ ensure_ovh_authenticated() {
 
 # Check if SSH key is registered with OVH
 ovh_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(ovh_api_call GET "/cloud/project/${OVH_PROJECT_ID}/sshkey")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint ovh_api_call "/cloud/project/${OVH_PROJECT_ID}/sshkey" "$1"
 }
 
 # Register SSH key with OVH

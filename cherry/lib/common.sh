@@ -91,10 +91,7 @@ ensure_cherry_token() {
 
 # Check if SSH key is registered with Cherry Servers
 cherry_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(cherry_api GET "/ssh-keys")
-    printf '%s' "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint cherry_api "/ssh-keys" "$1"
 }
 
 # Register SSH key with Cherry Servers

@@ -153,10 +153,7 @@ print(json.dumps(body))
 
 # Check if SSH key is registered with Latitude.sh
 latitude_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(latitude_api GET "/ssh_keys")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint latitude_api "/ssh_keys" "$1"
 }
 
 # Register SSH key with Latitude.sh

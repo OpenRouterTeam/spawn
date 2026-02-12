@@ -139,10 +139,7 @@ get_ubuntu_image_id() {
 
 # Check if SSH key is registered with Scaleway
 scaleway_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(scaleway_api GET "${SCALEWAY_ACCOUNT_API}/ssh-keys?per_page=50")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint scaleway_api "${SCALEWAY_ACCOUNT_API}/ssh-keys?per_page=50" "$1"
 }
 
 # Register SSH key with Scaleway
