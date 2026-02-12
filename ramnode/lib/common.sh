@@ -75,27 +75,19 @@ print(json.dumps(body))
 }
 
 # Centralized curl wrapper for RamNode Compute API
+# Delegates to generic_cloud_api_custom_auth for retry logic and error handling
 ramnode_compute_api() {
     local method="$1"
     local endpoint="$2"
     local body="${3:-}"
-
-    local url="${RAMNODE_COMPUTE_API}${endpoint}"
 
     if [[ -z "${RAMNODE_AUTH_TOKEN:-}" ]]; then
         log_error "RAMNODE_AUTH_TOKEN not set"
         return 1
     fi
 
-    local curl_opts=(-fsSL -X "$method" "$url")
-    curl_opts+=(-H "X-Auth-Token: ${RAMNODE_AUTH_TOKEN}")
-    curl_opts+=(-H "Content-Type: application/json")
-
-    if [[ -n "$body" ]]; then
-        curl_opts+=(-d "$body")
-    fi
-
-    curl "${curl_opts[@]}" 2>/dev/null || echo '{"error": "API call failed"}'
+    generic_cloud_api_custom_auth "$RAMNODE_COMPUTE_API" "$method" "$endpoint" "$body" 3 \
+        -H "X-Auth-Token: ${RAMNODE_AUTH_TOKEN}"
 }
 
 # Test RamNode credentials
@@ -214,43 +206,9 @@ for f in flavors:
 "
 }
 
-# Interactive flavor picker
+# Interactive flavor picker (delegates to shared interactive_pick)
 _pick_flavor() {
-    if [[ -n "${RAMNODE_FLAVOR:-}" ]]; then
-        echo "$RAMNODE_FLAVOR"
-        return
-    fi
-
-    log_info "Fetching available instance types..."
-    local flavors
-    flavors=$(_list_flavors)
-
-    if [[ -z "$flavors" ]]; then
-        log_warn "Could not fetch flavors, using default: 1GB"
-        echo "1GB"
-        return
-    fi
-
-    log_info "Available instance types:"
-    local i=1
-    local names=()
-    while IFS='|' read -r name cores ram disk; do
-        printf "  %2d) %-12s  %-8s  %-12s  %s\n" "$i" "$name" "$cores" "$ram" "$disk" >&2
-        names+=("$name")
-        i=$((i + 1))
-    done <<< "$flavors"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select instance type [1]: ") || choice=""
-    choice="${choice:-1}"
-
-    if [[ "$choice" -ge 1 && "$choice" -le "${#names[@]}" ]] 2>/dev/null; then
-        echo "${names[$((choice - 1))]}"
-    else
-        log_warn "Invalid choice, using default: 1GB"
-        echo "1GB"
-    fi
+    interactive_pick "RAMNODE_FLAVOR" "1GB" "instance types" _list_flavors
 }
 
 # List available images
@@ -276,10 +234,8 @@ elif images:
 # Get default network ID
 _get_network_id() {
     local response
-    response=$(curl -fsSL -X GET \
-        "$RAMNODE_NETWORK_API/networks" \
-        -H "X-Auth-Token: ${RAMNODE_AUTH_TOKEN}" \
-        -H "Content-Type: application/json" 2>/dev/null || echo '{"networks":[]}')
+    response=$(generic_cloud_api_custom_auth "$RAMNODE_NETWORK_API" "GET" "/networks" "" 3 \
+        -H "X-Auth-Token: ${RAMNODE_AUTH_TOKEN}")
 
     echo "$response" | python3 -c "
 import json, sys
