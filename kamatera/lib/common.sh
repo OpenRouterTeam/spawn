@@ -173,7 +173,7 @@ get_kamatera_server_ip() {
     local max_attempts=${2:-30}
     local attempt=1
 
-    log_warn "Retrieving server IP address..."
+    log_step "Retrieving server IP address..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
         local info_response
         info_response=$(kamatera_api POST "/service/server/info" "{\"name\":\"$name\"}")
@@ -333,7 +333,7 @@ interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local server_name="$1"
-    log_warn "Terminating server $server_name..."
+    log_step "Terminating server $server_name..."
     local response
     response=$(kamatera_api POST "/service/server/terminate" "{\"name\":\"$server_name\",\"force\":true}")
 

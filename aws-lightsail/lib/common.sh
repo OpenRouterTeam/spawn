@@ -58,7 +58,7 @@ ensure_ssh_key() {
         return 0
     fi
 
-    log_warn "Importing SSH key to Lightsail..."
+    log_step "Importing SSH key to Lightsail..."
     aws lightsail import-key-pair \
         --key-pair-name "${key_name}" \
         --public-key-base64 "$(base64 -w0 "${pub_path}" 2>/dev/null || base64 "${pub_path}")" \

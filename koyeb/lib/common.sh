@@ -255,7 +255,7 @@ wait_for_cloud_init() {
 # Inject environment variables into shell config
 # Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    log_warn "Injecting environment variables..."
+    log_step "Injecting environment variables..."
 
     local env_temp
     env_temp=$(mktemp)
@@ -290,12 +290,12 @@ interactive_session() {
 # Cleanup: delete the service and app
 cleanup_server() {
     if [[ -n "${KOYEB_SERVICE_NAME:-}" ]]; then
-        log_warn "Deleting service: $KOYEB_SERVICE_NAME"
+        log_step "Deleting service: $KOYEB_SERVICE_NAME"
         koyeb service delete "$KOYEB_SERVICE_NAME" --force >/dev/null 2>&1 || true
     fi
 
     if [[ -n "${KOYEB_APP_NAME:-}" ]]; then
-        log_warn "Deleting app: $KOYEB_APP_NAME"
+        log_step "Deleting app: $KOYEB_APP_NAME"
         koyeb app delete "$KOYEB_APP_NAME" >/dev/null 2>&1 || true
     fi
 }
