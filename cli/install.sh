@@ -164,37 +164,19 @@ build_and_install() {
     cd "${tmpdir}/cli"
     bun install
 
-    local build_ok=0
-    if bun run build 2>/dev/null; then
-        build_ok=1
-    else
-        log_warn "Build failed, retrying with forced reinstall..."
-        bun install --force
-        if bun run build 2>/dev/null; then
-            build_ok=1
+    if ! bun run build 2>/dev/null; then
+        log_warn "Local build failed, downloading pre-built binary..."
+        curl -fsSL "https://github.com/${SPAWN_REPO}/releases/download/cli-latest/cli.js" -o cli.js
+        if [ ! -s cli.js ]; then
+            log_error "Failed to download pre-built binary"
+            exit 1
         fi
     fi
 
     INSTALL_DIR="$(find_install_dir)"
     mkdir -p "${INSTALL_DIR}"
-
-    if [ "$build_ok" = "1" ]; then
-        cp cli.js "${INSTALL_DIR}/spawn"
-        chmod +x "${INSTALL_DIR}/spawn"
-    else
-        # Bundled build failed — fall back to source mode.
-        # Install source + node_modules to ~/.spawn/ and create a wrapper.
-        log_warn "Bundled build unavailable, installing from source..."
-        local spawn_lib="${HOME}/.spawn"
-        rm -rf "${spawn_lib}"
-        mkdir -p "${spawn_lib}"
-        cp -r node_modules src package.json "${spawn_lib}/"
-        cat > "${INSTALL_DIR}/spawn" <<'WRAPPER'
-#!/usr/bin/env bash
-cd "$HOME/.spawn" && exec bun src/index.ts "$@"
-WRAPPER
-        chmod +x "${INSTALL_DIR}/spawn"
-    fi
+    cp cli.js "${INSTALL_DIR}/spawn"
+    chmod +x "${INSTALL_DIR}/spawn"
 
     log_info "Installed spawn to ${INSTALL_DIR}/spawn"
     ensure_in_path "${INSTALL_DIR}"

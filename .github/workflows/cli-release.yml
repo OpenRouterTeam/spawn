@@ -1,0 +1,55 @@
+name: CLI Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cli/src/**'
+      - 'cli/package.json'
+      - 'cli/bun.lock'
+
+jobs:
+  build:
+    name: Build and release CLI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies and build
+        working-directory: cli
+        run: |
+          bun install
+          bun run build
+
+      - name: Get version
+        id: version
+        working-directory: cli
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Update cli-latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete existing release if present
+          gh release delete cli-latest --yes 2>/dev/null || true
+          git tag -d cli-latest 2>/dev/null || true
+          git push origin :refs/tags/cli-latest 2>/dev/null || true
+
+          # Create new release with built cli.js
+          gh release create cli-latest \
+            --title "CLI v${{ steps.version.outputs.version }}" \
+            --notes "Pre-built CLI binary (auto-updated on every push to main).
+
+          This release is used as a fallback by \`install.sh\` when the local build fails (e.g. Termux proot).
+
+          **Version:** ${{ steps.version.outputs.version }}
+          **Built:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --prerelease \
+            cli/cli.js
