@@ -1183,7 +1183,7 @@
     "netcup/cline": "implemented",
     "netcup/gptme": "implemented",
     "netcup/opencode": "implemented",
-    "netcup/plandex": "missing",
+    "netcup/plandex": "implemented",
     "netcup/kilocode": "missing",
     "netcup/continue": "implemented",
     "local/claude": "implemented",
