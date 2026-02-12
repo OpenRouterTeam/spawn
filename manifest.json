@@ -1193,7 +1193,7 @@
     "local/goose": "implemented",
     "local/codex": "implemented",
     "local/interpreter": "implemented",
-    "local/gemini": "missing",
+    "local/gemini": "implemented",
     "local/amazonq": "missing",
     "local/cline": "missing",
     "local/gptme": "implemented",
