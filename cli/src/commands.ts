@@ -1135,6 +1135,9 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
       console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}${hint}`);
     }
     console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
+    console.log();
+    console.log(pc.dim(`  Non-interactive: ${pc.cyan(`spawn ${agentKey} ${exampleCloud} --prompt "Fix all linter errors"`)}`));
+    console.log(pc.dim(`  Preview first:   ${pc.cyan(`spawn ${agentKey} ${exampleCloud} --dry-run`)}`));
   }
 
   console.log();

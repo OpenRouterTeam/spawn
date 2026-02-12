@@ -76,6 +76,8 @@ function checkUnknownFlags(args: string[]): void {
       console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
       console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
       console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
+      console.error(`    ${pc.cyan("--agent, -a")}         Filter by agent (with ${pc.cyan("spawn list")})`);
+      console.error(`    ${pc.cyan("--cloud, -c")}         Filter by cloud (with ${pc.cyan("spawn list")})`);
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
       console.error();
@@ -334,6 +336,9 @@ function hasTrailingHelpFlag(args: string[]): boolean {
   return args.slice(1).some(a => HELP_FLAGS.includes(a));
 }
 
+// Filter flags that only work with "spawn list" — detect misuse at top level
+const LIST_FILTER_FLAGS = new Set(["-a", "--agent", "-c", "--cloud"]);
+
 /** Dispatch a named command or fall through to agent/cloud handling */
 async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
@@ -347,6 +352,15 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
     const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
     await cmdList(agentFilter, cloudFilter);
     return;
+  }
+
+  // Detect filter flags used outside "spawn list" (e.g. "spawn -a claude")
+  if (LIST_FILTER_FLAGS.has(cmd)) {
+    const value = filteredArgs[1] || "<name>";
+    console.error(pc.red(`Error: ${pc.bold(cmd)} is a filter flag for ${pc.cyan("spawn list")}`));
+    console.error(`\nUsage: ${pc.cyan(`spawn list ${cmd} ${value}`)}`);
+    console.error(pc.dim(`  Browse and rerun previous spawns filtered by agent or cloud.`));
+    process.exit(1);
   }
 
   if (SUBCOMMANDS[cmd]) {
