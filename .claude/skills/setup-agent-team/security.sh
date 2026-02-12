@@ -335,16 +335,45 @@ Each pr-reviewer agent must:
 
 2. **Staleness check first** — Before doing security review, check:
    * Is \`updatedAt\` > 48 hours ago AND \`mergeable\` is \`CONFLICTING\`?
-     - YES → **Close the PR** (stale + conflicts):
+     - YES → Read the PR title, body, and diff to understand the intent.
+     - **If the PR contains a valid fix or improvement** (security fix, bug fix, feature, etc.), file a follow-up issue BEFORE closing:
        \`\`\`bash
-       gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Auto-closing: this PR has been stale for >48h with merge conflicts. Please reopen or create a fresh PR if still needed."
+       PR_TITLE=\$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json title --jq '.title')
+       PR_BODY=\$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json body --jq '.body')
+       gh issue create --repo OpenRouterTeam/spawn \\
+         --title "Follow-up: \${PR_TITLE} (from closed PR #NUMBER)" \\
+         --body "## Context
+
+PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it proposed is still valid and needed.
+
+**Original PR**: https://github.com/OpenRouterTeam/spawn/pull/NUMBER
+
+## What needs to be done
+
+[Summarize the PR's intent and what needs to be re-implemented at the correct file paths]
+
+## Original PR description
+
+\${PR_BODY}
+
+---
+*Filed automatically by the security review team to preserve knowledge from closed PRs.*" \\
+         --label "enhancement"
        \`\`\`
-       Then delete the branch:
+     - Then close the PR with a comment referencing the new issue:
+       \`\`\`bash
+       gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Auto-closing: this PR has been stale for >48h with merge conflicts. The change is still valid — filed ISSUE_URL to track re-implementation."
+       \`\`\`
+     - **If the PR is trivial, outdated, or no longer relevant**, close without filing an issue:
+       \`\`\`bash
+       gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Auto-closing: this PR has been stale for >48h with merge conflicts and the changes are no longer relevant. Please reopen or create a fresh PR if still needed."
+       \`\`\`
+     - Then delete the branch:
        \`\`\`bash
        BRANCH=\$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json headRefName --jq '.headRefName')
        git push origin --delete "\${BRANCH}" 2>/dev/null || true
        \`\`\`
-       Report to team lead: "PR #NUMBER closed (stale+conflicts)" and STOP — skip security review.
+     - Report to team lead: "PR #NUMBER closed (stale+conflicts), follow-up issue filed: ISSUE_URL" (or "no follow-up needed") and STOP — skip security review.
    * Is \`updatedAt\` > 48 hours ago but NO conflicts?
      - The PR is stale but mergeable — still do the security review below (it may be fine to merge).
    * Is the PR fresh (<48h)? → Proceed to security review normally.

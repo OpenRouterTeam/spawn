@@ -101,7 +101,7 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
         fi
     done
 
-    log "Pre-cycle cleanup: stale open PRs..."
+    log "Pre-cycle cleanup: stale open PRs (merge if possible, never close)..."
     STALE_PRS=$(gh pr list --repo OpenRouterTeam/spawn --state open --json number,updatedAt --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | .number' 2>/dev/null) || true
     for pr_num in $STALE_PRS; do
         if [[ -n "$pr_num" ]]; then
@@ -111,8 +111,7 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
                 log "Merging stale PR #${pr_num}..."
                 gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
             else
-                log "Closing unmergeable stale PR #${pr_num}..."
-                gh pr close "$pr_num" --repo OpenRouterTeam/spawn --comment "Auto-closing: stale PR from a previous interrupted cycle. Please reopen if still needed." 2>&1 | tee -a "${LOG_FILE}" || true
+                log "Stale PR #${pr_num} has conflicts — will be handled by pr-maintainer agent"
             fi
         fi
     done
@@ -292,18 +291,36 @@ Create these teammates:
    - Run 'bun test' and fix failures
    - Add integration tests for critical paths
 
-5. **branch-cleaner** (Haiku)
-   - FIRST TASK: List all remote branches: git branch -r --format='%(refname:short) %(committerdate:unix)'
-   - For each remote branch (excluding main):
-     * Check if there's an open PR: gh pr list --head BRANCH --state open --json number,title
-     * If open PR exists and branch is stale (last commit >4 hours ago):
-       - If PR has conflicts or failing checks: close it with gh pr close NUMBER --comment "Auto-closing: stale branch with unresolvable conflicts. Please reopen if still needed."
-       - If PR is mergeable: add a comment noting it's stale and ready for review, ensure it has `needs-team-review` label (do NOT merge — merging is external)
-     * If no open PR and branch is stale (>4 hours old): delete it with git push origin --delete BRANCH
-     * If branch is fresh (<4 hours): leave it alone (may be actively worked on)
-   - After cleanup, report summary: how many branches labeled, closed, deleted, left alone
-   - Run this check AGAIN at the end of the cycle to catch branches created during the cycle
-   - GOAL: Zero stale unlabeled branches left on the remote after each cycle.
+5. **pr-maintainer** (Sonnet)
+   - FIRST TASK: List ALL open PRs: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision`
+   - For EACH open PR, evaluate and take the appropriate action:
+     * **Mergeable + approved (or no reviews required)**: approve and merge it
+       `gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "Approved by pr-maintainer: looks good, tests pass."`
+       `gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch`
+     * **Mergeable + needs review**: review the diff for correctness, then approve and merge if safe
+       `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
+       - Check for: command injection, credential leaks, broken curl|bash patterns, macOS compat issues
+       - If safe: approve + merge (squash + delete branch)
+       - If concerns: post a review comment describing the issue (request changes, do NOT close)
+     * **Has merge conflicts**: rebase the PR branch onto main to resolve
+       ```
+       git fetch origin
+       git worktree add /tmp/spawn-worktrees/pr-rebase-NUMBER -b pr-rebase-NUMBER origin/BRANCH
+       cd /tmp/spawn-worktrees/pr-rebase-NUMBER
+       git rebase origin/main
+       # If rebase succeeds: force-push the branch
+       git push --force-with-lease origin BRANCH
+       # Then re-evaluate: if clean, approve and merge
+       git worktree remove /tmp/spawn-worktrees/pr-rebase-NUMBER
+       ```
+       If rebase has unresolvable conflicts, post a comment asking the author to resolve:
+       `gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "This PR has merge conflicts that couldn't be auto-resolved. Could you rebase on main and push? Happy to re-review once updated."`
+     * **Failing checks**: investigate the failure, fix if trivial, otherwise comment with failure details
+   - ALSO clean up orphan branches (no open PR, stale >4 hours): `git push origin --delete BRANCH`
+   - **NEVER close a PR** — always try to rebase, fix, or request changes instead
+   - After processing all PRs, report summary: how many merged, rebased, commented, branches cleaned
+   - Run this check AGAIN at the end of the cycle to catch PRs created during the cycle
+   - GOAL: Zero stale unreviewed PRs left on the remote after each cycle.
 
 6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
@@ -403,7 +420,7 @@ Agent marker values:
 - `Agent: ux-engineer`
 - `Agent: complexity-hunter`
 - `Agent: test-engineer`
-- `Agent: branch-cleaner`
+- `Agent: pr-maintainer`
 - `Agent: community-coordinator`
 - `Agent: team-lead`
 
@@ -472,7 +489,7 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 1. Create the team with TeamCreate
 2. Set up worktree directory: mkdir -p WORKTREE_BASE_PLACEHOLDER
 3. Create tasks using TaskCreate for each area:
-   - Branch cleanup: scan and clean stale remote branches
+   - PR maintenance: review, rebase, and merge all open PRs; clean orphan branches
    - Community coordination: scan all open issues, post acknowledgments, categorize, and delegate
    - Security scan of all scripts
    - UX test of main user flows
@@ -480,7 +497,7 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
    - Test coverage for recent changes
 4. Spawn teammates with Task tool using subagent_type='general-purpose'
 5. Assign tasks to teammates using TaskUpdate
-6. Branch-cleaner runs first pass on stale branches
+6. PR-maintainer reviews all open PRs: merge clean ones, rebase conflicting ones, comment on issues
 7. Community-coordinator engages issues FIRST — posts acknowledgments before other agents start investigating
 8. Community-coordinator delegates issue investigations to relevant teammates
 9. All agents use worktrees for their branch work (never git checkout in the main repo)
@@ -488,7 +505,7 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 11. Community-coordinator posts interim updates on issues as teammates report findings
 12. Create Sprite checkpoint after successful changes: sprite-env checkpoint create --comment 'Description'
 13. Community-coordinator posts final resolutions on all issues, closes them
-14. Branch-cleaner runs final pass to catch any branches created during the cycle
+14. PR-maintainer runs final pass to catch any new PRs created during the cycle
 15. Team lead runs: git worktree prune to clean stale worktree entries
 16. When all work is done, execute the Lifecycle Management shutdown sequence (below) — send shutdown_request to every teammate, wait for confirmations, clean up worktrees, then exit
 
@@ -550,6 +567,7 @@ You MUST remain active until ALL of the following are true:
 
 ## Safety Rules
 
+- NEVER close a PR — always rebase, fix, request changes, or comment instead. PRs represent work; closing them loses that work.
 - ALWAYS create Sprite checkpoint BEFORE risky changes
 - One logical change per commit
 - Run tests after every change
