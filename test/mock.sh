@@ -270,7 +270,7 @@ case "$URL" in
     https://api.civo.com/v2*)           ENDPOINT="${URL#https://api.civo.com/v2}" ;;
     https://api.upcloud.com/1.3*)       ENDPOINT="${URL#https://api.upcloud.com/1.3}" ;;
     https://api.binarylane.com.au/v2*)  ENDPOINT="${URL#https://api.binarylane.com.au/v2}" ;;
-    https://api.scaleway.com/*)         ENDPOINT=$(echo "$URL" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||') ;;
+    https://api.scaleway.com/*)         ENDPOINT=$(echo "$URL" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||; s|https://api.scaleway.com/account/v3/||') ;;
     https://api.genesiscloud.com/compute/v1*) ENDPOINT="${URL#https://api.genesiscloud.com/compute/v1}" ;;
     https://console.kamatera.com/svc*)  ENDPOINT="${URL#https://console.kamatera.com/svc}" ;;
     https://api.latitude.sh*)           ENDPOINT="${URL#https://api.latitude.sh}" ;;
@@ -367,6 +367,9 @@ case "$METHOD" in
                 lambda)
                     printf '{"data":{"id":"test-uuid-1234","name":"test-srv","status":"active","ip":"10.0.0.1"}}'
                     ;;
+                scaleway)
+                    printf '{"server":{"id":"00000000-0000-0000-0000-000000000001","name":"test-srv","state":"running","public_ip":{"address":"10.0.0.1","dynamic":true},"public_ips":[{"address":"10.0.0.1","dynamic":true}]}}'
+                    ;;
                 *) printf '{}' ;;
             esac
         fi
@@ -376,6 +379,10 @@ case "$METHOD" in
             /ssh_keys|/ssh-keys|/account/keys|/profile/sshkeys|/sshkeys|*/sshkey)
                 # SSH key registration — return success
                 printf '{"ssh_key":{"id":99999,"name":"test-key","fingerprint":"af:0d:c5:57:a8:fd:b2:82:5e:d4:c1:65:f0:0c:8a:9d"}}'
+                ;;
+            */action)
+                # Scaleway instance actions (poweron, poweroff, terminate, etc.)
+                printf '{"task":{"id":"00000000-0000-0000-0000-000000000004","status":"pending","href_from":"/servers/00000000-0000-0000-0000-000000000001/action","description":"server_poweron"}}'
                 ;;
             *)
                 # Server/instance creation

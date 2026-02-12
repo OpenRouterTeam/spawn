@@ -1,0 +1,50 @@
+{
+  "server": {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "name": "test-srv",
+    "organization": "00000000-0000-0000-0000-000000000000",
+    "project": "00000000-0000-0000-0000-000000000000",
+    "allowed_actions": ["poweron", "backup", "stop", "reboot", "terminate"],
+    "arch": "x86_64",
+    "boot_type": "local",
+    "bootscript": null,
+    "commercial_type": "DEV1-S",
+    "creation_date": "2026-02-12T00:00:00.000000+00:00",
+    "dynamic_ip_required": true,
+    "enable_ipv6": false,
+    "hostname": "test-srv",
+    "image": {
+      "id": "ca5e7780-a7c3-451f-a528-0eabc745343c",
+      "name": "Ubuntu 24.04 Noble Jellyfish",
+      "arch": "x86_64"
+    },
+    "ipv6": null,
+    "location": null,
+    "modification_date": "2026-02-12T00:00:00.000000+00:00",
+    "name": "test-srv",
+    "placement_group": null,
+    "private_ip": "10.0.0.1",
+    "protected": false,
+    "public_ip": {
+      "address": "10.0.0.1",
+      "dynamic": true,
+      "id": "00000000-0000-0000-0000-000000000002"
+    },
+    "public_ips": [
+      {
+        "address": "10.0.0.1",
+        "dynamic": true,
+        "id": "00000000-0000-0000-0000-000000000002"
+      }
+    ],
+    "security_group": {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "name": "Default security group"
+    },
+    "state": "stopped",
+    "state_detail": "",
+    "tags": [],
+    "volumes": {},
+    "zone": "fr-par-1"
+  }
+}
