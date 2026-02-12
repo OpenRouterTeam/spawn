@@ -251,22 +251,26 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
   }
 }
 
-function showVersion(): void {
+async function showVersion(): Promise<void> {
   console.log(`spawn v${VERSION}`);
   const binPath = process.argv[1];
   if (binPath) {
     console.log(pc.dim(`  ${binPath}`));
   }
   console.log(pc.dim(`  ${process.versions.bun ? "bun" : "node"} ${process.versions.bun ?? process.versions.node}  ${process.platform} ${process.arch}`));
+  try {
+    const manifest = await loadManifest();
+    const agents = agentKeys(manifest).length;
+    const clouds = cloudKeys(manifest).length;
+    console.log(pc.dim(`  ${agents} agents, ${clouds} clouds`));
+  } catch {
+    // Manifest unavailable - skip stats
+  }
   console.log(pc.dim(`  Run ${pc.cyan("spawn update")} to check for updates.`));
 }
 
 const IMMEDIATE_COMMANDS: Record<string, () => void> = {
   "help": cmdHelp, "--help": cmdHelp, "-h": cmdHelp,
-  "version": showVersion,
-  "--version": showVersion,
-  "-v": showVersion,
-  "-V": showVersion,
 };
 
 const SUBCOMMANDS: Record<string, () => Promise<void>> = {
@@ -274,6 +278,10 @@ const SUBCOMMANDS: Record<string, () => Promise<void>> = {
   "agents": cmdAgents,
   "clouds": cmdClouds,
   "update": cmdUpdate,
+  "version": showVersion,
+  "--version": showVersion,
+  "-v": showVersion,
+  "-V": showVersion,
 };
 
 // list/ls/history handled separately for -a/-c flag parsing

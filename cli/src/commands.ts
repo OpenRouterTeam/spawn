@@ -523,9 +523,10 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
 }
 
 function credentialHint(cloud: string, authHint?: string, verb = "Missing or invalid"): string {
-  return authHint
-    ? `  - ${verb} credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`
-    : `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`;
+  if (authHint) {
+    return `  - ${verb} credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`;
+  }
+  return `  - ${verb} credentials (need ${pc.cyan("OPENROUTER_API_KEY")}; run ${pc.cyan(`spawn ${cloud}`)} for setup)`;
 }
 
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
@@ -542,6 +543,12 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         "  - The server may not have enough RAM for this agent",
         "  - Try a larger instance size or a different cloud provider",
         "  - Check your cloud provider dashboard to stop or delete any unused servers",
+      ];
+    case 143:
+      return [
+        "Script was terminated by a signal (SIGTERM).",
+        "Note: If a server was already created, it may still be running.",
+        "  Check your cloud provider dashboard to stop or delete any unused servers.",
       ];
     case 255:
       return [
@@ -1210,6 +1217,14 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   const c = manifest.clouds[cloudKey];
   printInfoHeader(c);
   console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}`));
+
+  if (c.defaults && Object.keys(c.defaults).length > 0) {
+    console.log();
+    console.log(pc.bold("Defaults:"));
+    for (const [k, v] of Object.entries(c.defaults)) {
+      console.log(`  ${pc.dim(k + ":")} ${v}`);
+    }
+  }
 
   const authVars = parseAuthEnvVars(c.auth);
   const implAgents = getImplementedAgents(manifest, cloudKey);

@@ -27,10 +27,15 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 
   // Allowlist validation: only safe characters
   if (!IDENTIFIER_PATTERN.test(identifier)) {
+    const hasUppercase = /[A-Z]/.test(identifier);
+    const lower = identifier.toLowerCase();
+    const hint = hasUppercase && IDENTIFIER_PATTERN.test(lower)
+      ? `Try: ${lower}`
+      : `Run 'spawn agents' or 'spawn clouds' to see valid names.`;
     throw new Error(
       `${fieldName} "${identifier}" contains invalid characters.\n` +
       `Only lowercase letters, numbers, hyphens, and underscores are allowed.\n` +
-      `Run 'spawn agents' or 'spawn clouds' to see valid names.`
+      hint
     );
   }
 

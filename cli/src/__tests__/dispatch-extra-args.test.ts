@@ -34,11 +34,11 @@ const HELP_FLAGS = ["--help", "-h", "help"];
 
 const IMMEDIATE_COMMAND_KEYS = new Set([
   "help", "--help", "-h",
-  "version", "--version", "-v", "-V",
 ]);
 
 const SUBCOMMAND_KEYS = new Set([
   "list", "ls", "matrix", "m", "agents", "clouds", "update",
+  "version", "--version", "-v", "-V",
 ]);
 
 type DispatchResult =
@@ -170,26 +170,6 @@ describe("dispatchCommand routing", () => {
       expect(result.type).toBe("immediate");
     });
 
-    it("should route 'version' as immediate", () => {
-      const result = dispatchCommand("version", ["version"], undefined);
-      expect(result.type).toBe("immediate");
-    });
-
-    it("should route '--version' as immediate", () => {
-      const result = dispatchCommand("--version", ["--version"], undefined);
-      expect(result.type).toBe("immediate");
-    });
-
-    it("should route '-v' as immediate", () => {
-      const result = dispatchCommand("-v", ["-v"], undefined);
-      expect(result.type).toBe("immediate");
-    });
-
-    it("should route '-V' as immediate", () => {
-      const result = dispatchCommand("-V", ["-V"], undefined);
-      expect(result.type).toBe("immediate");
-    });
-
     it("should warn on extra args after immediate command", () => {
       const result = dispatchCommand("help", ["help", "extra"], undefined);
       expect(result.type).toBe("immediate");
@@ -200,10 +180,32 @@ describe("dispatchCommand routing", () => {
     });
 
     it("should not warn when no extra args on immediate command", () => {
-      const result = dispatchCommand("version", ["version"], undefined);
+      const result = dispatchCommand("help", ["help"], undefined);
       if (result.type === "immediate") {
         expect(result.extraWarning.warned).toBe(false);
       }
+    });
+  });
+
+  describe("version commands (routed as subcommands)", () => {
+    it("should route 'version' as subcommand", () => {
+      const result = dispatchCommand("version", ["version"], undefined);
+      expect(result.type).toBe("subcommand");
+    });
+
+    it("should route '--version' as subcommand", () => {
+      const result = dispatchCommand("--version", ["--version"], undefined);
+      expect(result.type).toBe("subcommand");
+    });
+
+    it("should route '-v' as subcommand", () => {
+      const result = dispatchCommand("-v", ["-v"], undefined);
+      expect(result.type).toBe("subcommand");
+    });
+
+    it("should route '-V' as subcommand", () => {
+      const result = dispatchCommand("-V", ["-V"], undefined);
+      expect(result.type).toBe("subcommand");
     });
   });
 
@@ -440,8 +442,8 @@ describe("dispatch end-to-end scenarios", () => {
 
   it("'spawn version --json' warns about extra arg '--json'", () => {
     const result = dispatchCommand("version", ["version", "--json"], undefined);
-    expect(result.type).toBe("immediate");
-    if (result.type === "immediate") {
+    expect(result.type).toBe("subcommand");
+    if (result.type === "subcommand") {
       expect(result.extraWarning.warned).toBe(true);
       expect(result.extraWarning.message).toContain("--json");
     }

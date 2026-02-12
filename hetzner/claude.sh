@@ -74,3 +74,5 @@ log_step "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"
+
+show_post_session_reminder "Hetzner" "${SERVER_NAME}" "hcloud server delete ${SERVER_NAME}"

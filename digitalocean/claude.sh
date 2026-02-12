@@ -78,3 +78,5 @@ log_step "Starting Claude Code..."
 sleep 1
 clear
 interactive_session "${DO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"
+
+show_post_session_reminder "DigitalOcean" "${DROPLET_NAME}" "doctl compute droplet delete ${DROPLET_NAME}"

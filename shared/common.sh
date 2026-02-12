@@ -71,20 +71,30 @@ POLL_INTERVAL="${SPAWN_POLL_INTERVAL:-1}"
 
 # Check if Python 3 is available (required for JSON parsing throughout Spawn)
 check_python_available() {
-    if ! command -v python3 &> /dev/null; then
-        log_error "Python 3 is required but not installed"
-        log_error ""
-        log_error "Spawn uses Python 3 for JSON parsing and API interactions."
-        log_error ""
-        log_error "Install Python 3:"
-        log_error "  Ubuntu/Debian:  sudo apt-get update && sudo apt-get install -y python3"
-        log_error "  Fedora/RHEL:    sudo dnf install -y python3"
-        log_error "  macOS:          brew install python3"
-        log_error "  Arch Linux:     sudo pacman -S python"
-        log_error ""
-        return 1
+    if command -v python3 &> /dev/null; then
+        return 0
     fi
-    return 0
+
+    # Some systems only have 'python' pointing to Python 3
+    if command -v python &> /dev/null; then
+        local py_version
+        py_version=$(python -c "import sys; print(sys.version_info[0])" 2>/dev/null || echo "")
+        if [[ "${py_version}" == "3" ]]; then
+            return 0
+        fi
+    fi
+
+    log_error "Python 3 is required but not installed"
+    log_error ""
+    log_error "Spawn uses Python 3 for JSON parsing and API interactions."
+    log_error ""
+    log_error "Install Python 3:"
+    log_error "  Ubuntu/Debian:  sudo apt-get update && sudo apt-get install -y python3"
+    log_error "  Fedora/RHEL:    sudo dnf install -y python3"
+    log_error "  macOS:          brew install python3"
+    log_error "  Arch Linux:     sudo pacman -S python"
+    log_error ""
+    return 1
 }
 
 # ============================================================
@@ -2193,6 +2203,29 @@ ensure_ssh_key_with_provider() {
 # environments.
 opencode_install_cmd() {
     printf '%s' 'OC_ARCH=$(uname -m); if [ "$OC_ARCH" = "aarch64" ]; then OC_ARCH=arm64; fi; OC_OS=$(uname -s | tr A-Z a-z); if [ "$OC_OS" = "darwin" ]; then OC_OS=mac; fi; mkdir -p /tmp/opencode-install "$HOME/.opencode/bin" && curl -fsSL -o /tmp/opencode-install/oc.tar.gz "https://github.com/opencode-ai/opencode/releases/latest/download/opencode-${OC_OS}-${OC_ARCH}.tar.gz" && tar xzf /tmp/opencode-install/oc.tar.gz -C /tmp/opencode-install && mv /tmp/opencode-install/opencode "$HOME/.opencode/bin/" && rm -rf /tmp/opencode-install && grep -q ".opencode/bin" "$HOME/.bashrc" 2>/dev/null || echo '"'"'export PATH="$HOME/.opencode/bin:$PATH"'"'"' >> "$HOME/.bashrc"; grep -q ".opencode/bin" "$HOME/.zshrc" 2>/dev/null || echo '"'"'export PATH="$HOME/.opencode/bin:$PATH"'"'"' >> "$HOME/.zshrc" 2>/dev/null; export PATH="$HOME/.opencode/bin:$PATH"'
+}
+
+# ============================================================
+# Post-session reminder
+# ============================================================
+
+# Print a reminder that the server is still running after the interactive session ends.
+# Call this after the interactive_session / ssh_interactive_session call in agent scripts.
+# Usage: show_post_session_reminder PROVIDER_NAME SERVER_ID_OR_NAME [DESTROY_HINT]
+# Example: show_post_session_reminder "Hetzner" "$SERVER_NAME" "hcloud server delete $SERVER_NAME"
+show_post_session_reminder() {
+    local provider_name="${1}"
+    local server_label="${2}"
+    local destroy_hint="${3:-}"
+
+    echo ""
+    log_warn "Session ended. Your ${provider_name} server '${server_label}' is still running."
+    log_warn "It will continue to incur charges until you delete it."
+    if [[ -n "${destroy_hint}" ]]; then
+        log_warn "To delete it:  ${destroy_hint}"
+    fi
+    log_warn "Or check your ${provider_name} dashboard to manage running servers."
+    echo ""
 }
 
 # ============================================================

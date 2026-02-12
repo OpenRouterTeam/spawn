@@ -129,12 +129,11 @@ function handleDefaultCommand(
 
 const IMMEDIATE_COMMANDS = new Set([
   "help", "--help", "-h",
-  "version", "--version", "-v", "-V",
 ]);
 
 const LIST_COMMANDS = new Set(["list", "ls", "history"]);
 
-const SUBCOMMANDS = new Set(["matrix", "m", "agents", "clouds", "update"]);
+const SUBCOMMANDS = new Set(["matrix", "m", "agents", "clouds", "update", "version", "--version", "-v", "-V"]);
 
 const VERB_ALIASES = new Set(["run", "launch", "start", "deploy", "exec"]);
 
@@ -757,11 +756,23 @@ describe("handleDefaultCommand routing", () => {
 
 describe("dispatchCommand routing", () => {
   describe("immediate commands", () => {
-    for (const cmd of ["help", "--help", "-h", "version", "--version", "-v", "-V"]) {
+    for (const cmd of ["help", "--help", "-h"]) {
       it(`should route "${cmd}" as immediate`, () => {
         const result = dispatchCommand(cmd, [cmd]);
         expect(result.type).toBe("immediate");
         if (result.type === "immediate") {
+          expect(result.cmd).toBe(cmd);
+        }
+      });
+    }
+  });
+
+  describe("version commands (subcommands)", () => {
+    for (const cmd of ["version", "--version", "-v", "-V"]) {
+      it(`should route "${cmd}" as subcommand`, () => {
+        const result = dispatchCommand(cmd, [cmd]);
+        expect(result.type).toBe("subcommand");
+        if (result.type === "subcommand") {
           expect(result.cmd).toBe(cmd);
         }
       });
