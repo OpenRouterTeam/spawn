@@ -162,26 +162,41 @@ Create these teammates:
    - Run \`bash -n\` on any modified .sh files
    - Report test results to the team lead
 
+## Label Management (MANDATORY)
+
+Track issue lifecycle with labels: "Pending Review" → "Under Review" → "In Progress"
+
+- At cycle start, transition the issue to "In Progress":
+  \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --add-label "In Progress"\`
+- When the fix is merged and the issue is closed, remove all status labels:
+  \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "In Progress"\`
+- Always check current labels first to avoid errors:
+  \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name'\`
+
 ## Workflow
 
 1. Create the team with TeamCreate
 2. Fetch issue details: \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn\`
-3. DEDUP CHECK: Check if issue already has comments from automated accounts:
+3. Transition label to "In Progress":
+   \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --add-label "In Progress"\`
+4. DEDUP CHECK: Check if issue already has comments from automated accounts:
    \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'\`
    Only post acknowledgment if no automated comments exist.
-4. Post acknowledgment comment on the issue (if not already acknowledged):
+5. Post acknowledgment comment on the issue (if not already acknowledged):
    \`gh issue comment ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now."\`
-5. Create worktree: \`git worktree add ${WORKTREE_BASE} -b fix/issue-${SPAWN_ISSUE} origin/main\`
-6. Spawn issue-fixer to work in \`${WORKTREE_BASE}\`
-7. Spawn issue-tester to review and test
-8. When fix is ready:
+6. Create worktree: \`git worktree add ${WORKTREE_BASE} -b fix/issue-${SPAWN_ISSUE} origin/main\`
+7. Spawn issue-fixer to work in \`${WORKTREE_BASE}\`
+8. Spawn issue-tester to review and test
+9. When fix is ready:
    - Push: \`git push -u origin fix/issue-${SPAWN_ISSUE}\`
    - PR: \`gh pr create --title "fix: Description" --body "Fixes #${SPAWN_ISSUE}"\`
    - Merge: \`gh pr merge --squash --delete-branch\`
-9. Post resolution comment on the issue with PR link
-10. Close the issue: \`gh issue close ${SPAWN_ISSUE}\`
-11. Clean up worktree: \`git worktree remove ${WORKTREE_BASE}\`
-12. Shutdown all teammates and exit
+10. Post resolution comment on the issue with PR link
+11. Remove status labels and close the issue:
+    \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "In Progress"\`
+    \`gh issue close ${SPAWN_ISSUE}\`
+12. Clean up worktree: \`git worktree remove ${WORKTREE_BASE}\`
+13. Shutdown all teammates and exit
 
 ## Commit Markers (MANDATORY)
 
@@ -267,6 +282,18 @@ Create these teammates:
 
 6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
+   - LABEL MANAGEMENT (MANDATORY for every issue interaction):
+     Labels track issue lifecycle: "Pending Review" → "Under Review" → "In Progress"
+     * When you FIRST discover an issue that has NO status label (none of the three above):
+       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --add-label "Pending Review"`
+     * When you acknowledge/engage an issue (post first comment):
+       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Pending Review" --add-label "Under Review"`
+     * When you delegate an issue to a teammate for a fix:
+       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --add-label "In Progress"`
+     * When the fix is merged and the issue is closed, remove all status labels:
+       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --remove-label "In Progress"`
+     Always check existing labels before adding/removing to avoid errors:
+       `gh issue view NUMBER --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name'`
    - DEDUP CHECK (MANDATORY before ANY comment): For each issue, FIRST check existing comments:
      `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'`
      If the issue already has a comment from your bot account (check for "la14-1" or any automated commenter), SKIP posting an acknowledgment — the issue has already been engaged.
@@ -303,20 +330,26 @@ Create these teammates:
 When fixing a bug reported in a GitHub issue:
 
 1. Community-coordinator checks for existing comments (dedup) before posting acknowledgment
-2. Community-coordinator posts acknowledgment comment on the issue (only if not already acknowledged)
-3. Community-coordinator messages the relevant teammate to investigate
-4. Create a worktree for the fix:
+2. Community-coordinator transitions label to "Under Review":
+   `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Pending Review" --add-label "Under Review"`
+3. Community-coordinator posts acknowledgment comment on the issue (only if not already acknowledged)
+4. Community-coordinator messages the relevant teammate to investigate
+5. Community-coordinator transitions label to "In Progress" when delegating:
+   `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Under Review" --add-label "In Progress"`
+6. Create a worktree for the fix:
    git worktree add WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER -b fix/issue-NUMBER origin/main
-5. Work inside the worktree: cd WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
-6. Implement the fix and commit (include Agent: marker)
-7. Community-coordinator posts interim update on the issue with root cause summary (only if no similar update exists)
-8. Push the branch: git push -u origin fix/issue-NUMBER
-9. Create a PR that references the issue:
-   gh pr create --title "Fix: description" --body "Fixes #NUMBER"
-10. Merge the PR immediately: gh pr merge --squash --delete-branch
-11. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
-12. Community-coordinator posts final resolution comment with PR link and explanation (only if no resolution exists)
-13. Close the issue: gh issue close NUMBER
+7. Work inside the worktree: cd WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
+8. Implement the fix and commit (include Agent: marker)
+9. Community-coordinator posts interim update on the issue with root cause summary (only if no similar update exists)
+10. Push the branch: git push -u origin fix/issue-NUMBER
+11. Create a PR that references the issue:
+    gh pr create --title "Fix: description" --body "Fixes #NUMBER"
+12. Merge the PR immediately: gh pr merge --squash --delete-branch
+13. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
+14. Community-coordinator posts final resolution comment with PR link and explanation (only if no resolution exists)
+15. Remove status labels and close the issue:
+    gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "In Progress"
+    gh issue close NUMBER
 
 NEVER leave an issue open after the fix is merged. NEVER leave a PR unmerged.
 If a PR cannot be merged (conflicts, superseded, etc.), close it WITH a comment explaining why.
@@ -459,9 +492,11 @@ You MUST remain active until ALL of the following are true:
 
 1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
 2. **All PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm zero open PRs from this cycle. Every PR must be either merged or closed with a comment.
-3. **All issues are engaged**: Run `gh issue list --repo OpenRouterTeam/spawn --state open`
-   and for EACH open issue, verify it has at least one comment. If any issue has zero comments,
-   the community-coordinator MUST post an acknowledgment before shutdown proceeds.
+3. **All issues are engaged and labeled**: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,labels`
+   and for EACH open issue, verify it has at least one comment AND has a status label
+   ("Pending Review", "Under Review", or "In Progress"). If any issue is missing a status
+   label, add "Pending Review". If any issue has zero comments, the community-coordinator
+   MUST post an acknowledgment before shutdown proceeds.
 4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
 5. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
 
