@@ -288,6 +288,11 @@ function formPage(
 
 // --- Config file operations ---
 function saveKeys(provider: string, vars: Record<string, string>) {
+  // SECURITY: Defense-in-depth validation to prevent path traversal
+  if (!SAFE_PROVIDER_RE.test(provider)) {
+    console.error(`[key-server] Rejected invalid provider name in saveKeys: ${provider}`);
+    return;
+  }
   const cfgPath = join(CONFIG_DIR, `${provider}.json`);
   const data: Record<string, string> = { ...vars };
   // Backward compat: single-var clouds also get api_key/token fields
@@ -364,6 +369,13 @@ const server = Bun.serve({
       const skipped: string[] = [];
 
       for (const pk of body.providers as string[]) {
+        // SECURITY: Validate provider names to prevent path traversal in saveKeys
+        if (typeof pk !== "string" || !SAFE_PROVIDER_RE.test(pk)) {
+          return Response.json(
+            { error: `invalid provider name: ${pk}` },
+            { status: 400 }
+          );
+        }
         if (
           d.batches.some(
             (b) =>
