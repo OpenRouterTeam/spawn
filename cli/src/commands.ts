@@ -531,7 +531,12 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         "  Check your cloud provider dashboard to stop or delete any unused servers.",
       ];
     case 137:
-      return ["Script was killed (likely by the system due to timeout or out of memory)."];
+      return [
+        "Script was killed (likely by the system due to timeout or out of memory).",
+        "  - The server may not have enough RAM for this agent",
+        "  - Try a larger instance size or a different cloud provider",
+        "  - Check your cloud provider dashboard to stop or delete any unused servers",
+      ];
     case 255:
       return [
         "SSH connection failed. Common causes:",
@@ -546,7 +551,12 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         `  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`,
       ];
     case 126:
-      return ["A command was found but could not be executed (permission denied)."];
+      return [
+        "A command was found but could not be executed (permission denied).",
+        "  - A downloaded binary may lack execute permissions",
+        "  - The script may require root/sudo access",
+        `  - Report it if this persists: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
+      ];
     case 2:
       return [
         "Shell syntax or argument error. This is likely a bug in the script.",
