@@ -1925,8 +1925,25 @@ setup_claude_code_config() {
     ${run_callback} "mkdir -p ~/.claude"
 
     # Create settings.json
+    local escaped_key
+    escaped_key=$(json_escape "${openrouter_key}")
     local settings_json
-    settings_json=$(printf '{\n  "theme": "dark",\n  "editor": "vim",\n  "env": {\n    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",\n    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",\n    "ANTHROPIC_AUTH_TOKEN": %s\n  },\n  "permissions": {\n    "defaultMode": "bypassPermissions",\n    "dangerouslySkipPermissions": true\n  }\n}\n' "$(json_escape "${openrouter_key}")")
+    settings_json=$(cat << EOF
+{
+  "theme": "dark",
+  "editor": "vim",
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "ANTHROPIC_AUTH_TOKEN": ${escaped_key}
+  },
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "dangerouslySkipPermissions": true
+  }
+}
+EOF
+)
     upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "~/.claude/settings.json"
 
     # Create .claude.json global state
@@ -1983,8 +2000,31 @@ setup_openclaw_config() {
     gateway_token=$(openssl rand -hex 16)
 
     # Create openclaw.json config
+    local escaped_key escaped_token
+    escaped_key=$(json_escape "${openrouter_key}")
+    escaped_token=$(json_escape "${gateway_token}")
     local openclaw_json
-    openclaw_json=$(printf '{\n  "env": {\n    "OPENROUTER_API_KEY": %s\n  },\n  "gateway": {\n    "mode": "local",\n    "auth": {\n      "token": %s\n    }\n  },\n  "agents": {\n    "defaults": {\n      "model": {\n        "primary": "openrouter/%s"\n      }\n    }\n  }\n}\n' "$(json_escape "${openrouter_key}")" "$(json_escape "${gateway_token}")" "${model_id}")
+    openclaw_json=$(cat << EOF
+{
+  "env": {
+    "OPENROUTER_API_KEY": ${escaped_key}
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "token": ${escaped_token}
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/${model_id}"
+      }
+    }
+  }
+}
+EOF
+)
     upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "~/.openclaw/openclaw.json"
 }
 
@@ -2021,8 +2061,23 @@ setup_continue_config() {
     ${run_callback} "mkdir -p ~/.continue"
 
     # Create config.json with json_escape to prevent injection
+    local escaped_key
+    escaped_key=$(json_escape "${openrouter_key}")
     local continue_json
-    continue_json=$(printf '{\n  "models": [\n    {\n      "title": "OpenRouter",\n      "provider": "openrouter",\n      "model": "openrouter/auto",\n      "apiBase": "https://openrouter.ai/api/v1",\n      "apiKey": %s\n    }\n  ]\n}\n' "$(json_escape "${openrouter_key}")")
+    continue_json=$(cat << EOF
+{
+  "models": [
+    {
+      "title": "OpenRouter",
+      "provider": "openrouter",
+      "model": "openrouter/auto",
+      "apiBase": "https://openrouter.ai/api/v1",
+      "apiKey": ${escaped_key}
+    }
+  ]
+}
+EOF
+)
     upload_config_file "${upload_callback}" "${run_callback}" "${continue_json}" "~/.continue/config.json"
 }
 

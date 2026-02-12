@@ -587,21 +587,24 @@ run_shellcheck() {
         return 0
     fi
 
-    # Find all shell scripts
-    local all_scripts=(
-        "${REPO_ROOT}"/sprite/*.sh
-        "${REPO_ROOT}"/sprite/lib/common.sh
-        "${REPO_ROOT}"/shared/common.sh
-        "${REPO_ROOT}"/digitalocean/*.sh
-        "${REPO_ROOT}"/digitalocean/lib/common.sh
-        "${REPO_ROOT}"/hetzner/*.sh
-        "${REPO_ROOT}"/hetzner/lib/common.sh
-        "${REPO_ROOT}"/linode/*.sh
-        "${REPO_ROOT}"/linode/lib/common.sh
-        "${REPO_ROOT}"/vultr/*.sh
-        "${REPO_ROOT}"/vultr/lib/common.sh
-        "${REPO_ROOT}"/test/run.sh
-    )
+    # Dynamically discover all shell scripts (agent scripts + lib files + test harness)
+    local all_scripts=()
+    local dir
+    for dir in "${REPO_ROOT}"/*/; do
+        local cloud
+        cloud=$(basename "${dir}")
+        # Skip non-cloud directories
+        case "${cloud}" in
+            cli|shared|test|node_modules|.git|.github|.claude|.docs) continue ;;
+        esac
+        # Add agent scripts and lib/common.sh if they exist
+        local f
+        for f in "${dir}"*.sh; do
+            [[ -f "${f}" ]] && all_scripts+=("${f}")
+        done
+        [[ -f "${dir}lib/common.sh" ]] && all_scripts+=("${dir}lib/common.sh")
+    done
+    all_scripts+=("${REPO_ROOT}/shared/common.sh" "${REPO_ROOT}/test/run.sh")
 
     local issue_count=0
     local checked_count=0
