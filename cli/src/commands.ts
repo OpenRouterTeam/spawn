@@ -473,7 +473,7 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
     }
 
     // Fallback to GitHub raw
-    s.message("Trying fallback source...");
+    s.message("Primary source unavailable, trying GitHub fallback...");
     const ghRes = await fetch(fallbackUrl, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
@@ -534,7 +534,8 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
       return [
         "Script was interrupted (Ctrl+C).",
         "Note: If a server was already created, it may still be running.",
-        "  Check your cloud provider dashboard to stop or delete any unused servers.",
+        `  Check your cloud provider dashboard to stop or delete any unused servers.`,
+        `  To rerun: ${pc.cyan(`spawn ${cloud}`)} for cloud dashboard info.`,
       ];
     case 137:
       return [
@@ -571,9 +572,9 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
     case 1:
       return [
         "Common causes:",
-        credentialHint(cloud, authHint),
         "  - Cloud provider API error (quota, rate limit, or region issue)",
         "  - Server provisioning failed (try again or pick a different region)",
+        credentialHint(cloud, authHint),
       ];
     default:
       return [
@@ -1135,6 +1136,8 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
       console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}${hint}`);
     }
     console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
+    console.log();
+    console.log(pc.dim(`  Tip: If you skip OPENROUTER_API_KEY, the script will open a browser for OAuth login.`));
   }
 
   console.log();
@@ -1180,6 +1183,8 @@ function printCloudQuickStart(
   if (exampleAgent) {
     console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
   }
+  console.log();
+  console.log(pc.dim(`  Tip: If you skip OPENROUTER_API_KEY, the script will open a browser for OAuth login.`));
 }
 
 /** Print the list of implemented agents and any missing ones */
@@ -1340,6 +1345,7 @@ ${pc.bold("INSTALL")}
 ${pc.bold("TROUBLESHOOTING")}
   ${pc.dim("*")} Script not found: Run ${pc.cyan("spawn matrix")} to verify the combination exists
   ${pc.dim("*")} Missing credentials: Run ${pc.cyan("spawn <cloud>")} to see setup instructions
+  ${pc.dim("*")} SSH failures: Server may still be booting -- wait a moment and retry
   ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
   ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output
   ${pc.dim("*")} Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update

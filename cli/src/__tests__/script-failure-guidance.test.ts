@@ -216,9 +216,15 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("cloud provider dashboard");
     });
 
-    it("should return exactly 3 guidance lines", () => {
+    it("should return exactly 4 guidance lines", () => {
       const lines = getScriptFailureGuidance(130, "sprite");
-      expect(lines).toHaveLength(3);
+      expect(lines).toHaveLength(4);
+    });
+
+    it("should suggest checking cloud info for rerun", () => {
+      const lines = getScriptFailureGuidance(130, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("spawn sprite");
     });
   });
 
