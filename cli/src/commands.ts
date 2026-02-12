@@ -585,7 +585,15 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
   }
 }
 
-function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string): never {
+export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
+  if (!prompt) return `spawn ${agent} ${cloud}`;
+  // Escape double quotes so the suggested command is valid shell
+  const safePrompt = prompt.replace(/"/g, '\\"');
+  if (safePrompt.length <= 60) return `spawn ${agent} ${cloud} --prompt "${safePrompt}"`;
+  return `spawn ${agent} ${cloud} --prompt "${safePrompt.slice(0, 57)}..."`;
+}
+
+function reportScriptFailure(errMsg: string, cloud: string, agent: string, prompt?: string, authHint?: string): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
 
@@ -596,7 +604,7 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
-  console.error(`Retry: ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
+  console.error(`Retry: ${pc.cyan(buildRetryCommand(agent, cloud, prompt))}`);
   process.exit(1);
 }
 
@@ -630,7 +638,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     if (errMsg.includes("interrupted by user")) {
       process.exit(130);
     }
-    reportScriptFailure(errMsg, cloud, agent, authHint);
+    reportScriptFailure(errMsg, cloud, agent, prompt, authHint);
   }
 }
 
@@ -800,16 +808,41 @@ export async function cmdMatrix(): Promise<void> {
 
 // ── List (History) ──────────────────────────────────────────────────────────────
 
-function formatTimestamp(iso: string): string {
+/** Format a timestamp as relative time ("2 min ago") or absolute date for older entries */
+export function formatRelativeTime(iso: string, now?: Date): string {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
-    const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-    return `${date} ${time}`;
+    const ref = now ?? new Date();
+    const diffMs = ref.getTime() - d.getTime();
+    if (diffMs < 0) return formatAbsoluteTime(d); // future dates: show absolute
+
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 60) return "just now";
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} min ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+
+    return formatAbsoluteTime(d);
   } catch {
     return iso;
   }
+}
+
+function formatAbsoluteTime(d: Date): string {
+  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${date} ${time}`;
+}
+
+function formatTimestamp(iso: string): string {
+  return formatRelativeTime(iso);
 }
 
 async function suggestFilterCorrection(

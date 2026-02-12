@@ -475,16 +475,16 @@ describe("cmdList table rendering", () => {
   describe("timestamp display", () => {
     it("should show formatted date for valid ISO timestamp", async () => {
       await setManifest(mockManifest);
+      // Use an old timestamp (>7 days ago) to get absolute format
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T14:30:00.000Z" },
+        { agent: "claude", cloud: "sprite", timestamp: "2025-01-15T14:30:00.000Z" },
       ]);
 
       await cmdList();
       const output = getOutput();
-      // Should contain a formatted date, not the raw ISO string
-      expect(output).toContain("2026");
-      // The exact format depends on locale, but should contain month/day
-      expect(output).toContain("Feb");
+      // Old timestamps show absolute format with year and month
+      expect(output).toContain("2025");
+      expect(output).toContain("Jan");
     });
 
     it("should handle invalid timestamp gracefully", async () => {
