@@ -812,6 +812,41 @@ function formatTimestamp(iso: string): string {
   }
 }
 
+/** Format a timestamp as relative time ("2 minutes ago", "yesterday", etc.) */
+export function formatRelativeTime(iso: string, now?: Date): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const ref = now ?? new Date();
+    const diffMs = ref.getTime() - d.getTime();
+    if (diffMs < 0) return formatTimestamp(iso); // future dates fall back to absolute
+
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 60) return "just now";
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes === 1) return "1 minute ago";
+    if (minutes < 60) return `${minutes} minutes ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours === 1) return "1 hour ago";
+    if (hours < 24) return `${hours} hours ago`;
+
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "yesterday";
+    if (days < 7) return `${days} days ago`;
+
+    const weeks = Math.floor(days / 7);
+    if (weeks === 1) return "1 week ago";
+    if (weeks < 5) return `${weeks} weeks ago`;
+
+    // Beyond a month, fall back to absolute date
+    return formatTimestamp(iso);
+  } catch {
+    return iso;
+  }
+}
+
 async function suggestFilterCorrection(
   filter: string,
   flag: string,
@@ -896,7 +931,7 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
   console.log(pc.dim("-".repeat(60)));
 
   for (const r of records) {
-    const when = formatTimestamp(r.timestamp);
+    const when = formatRelativeTime(r.timestamp);
     const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
     const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
     let line =
@@ -923,9 +958,9 @@ function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): string {
   return `${agentDisplay} on ${cloudDisplay}`;
 }
 
-/** Build a hint string (timestamp + optional prompt preview) for the interactive picker */
+/** Build a hint string (relative time + optional prompt preview) for the interactive picker */
 function buildRecordHint(r: SpawnRecord): string {
-  const when = formatTimestamp(r.timestamp);
+  const when = formatRelativeTime(r.timestamp);
   if (r.prompt) {
     const preview = r.prompt.length > 30 ? r.prompt.slice(0, 30) + "..." : r.prompt;
     return `${when}  --prompt "${preview}"`;

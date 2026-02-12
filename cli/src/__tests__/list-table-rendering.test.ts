@@ -473,18 +473,31 @@ describe("cmdList table rendering", () => {
   // ── Timestamp formatting in rows ───────────────────────────────────────
 
   describe("timestamp display", () => {
-    it("should show formatted date for valid ISO timestamp", async () => {
+    it("should show relative time for recent timestamps", async () => {
       await setManifest(mockManifest);
+      // Use a timestamp from 5 minutes ago to ensure a stable relative time
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T14:30:00.000Z" },
+        { agent: "claude", cloud: "sprite", timestamp: fiveMinAgo },
       ]);
 
       await cmdList();
       const output = getOutput();
-      // Should contain a formatted date, not the raw ISO string
-      expect(output).toContain("2026");
-      // The exact format depends on locale, but should contain month/day
-      expect(output).toContain("Feb");
+      // Should contain a relative time like "5 minutes ago"
+      expect(output).toContain("minutes ago");
+    });
+
+    it("should show absolute date for very old timestamps", async () => {
+      await setManifest(mockManifest);
+      writeHistory([
+        { agent: "claude", cloud: "sprite", timestamp: "2024-06-15T14:30:00.000Z" },
+      ]);
+
+      await cmdList();
+      const output = getOutput();
+      // Old timestamps (> 5 weeks) should fall back to absolute format
+      expect(output).toContain("2024");
+      expect(output).toContain("Jun");
     });
 
     it("should handle invalid timestamp gracefully", async () => {
@@ -495,7 +508,7 @@ describe("cmdList table rendering", () => {
 
       await cmdList();
       const output = getOutput();
-      // formatTimestamp returns the raw string for invalid dates
+      // formatRelativeTime returns the raw string for invalid dates
       expect(output).toContain("not-a-date");
     });
   });
