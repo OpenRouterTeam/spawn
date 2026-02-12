@@ -351,6 +351,17 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
 
   if (SUBCOMMANDS[cmd]) {
     if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+
+    // "spawn agents <name>" or "spawn clouds <name>" -> show info for that name
+    if ((cmd === "agents" || cmd === "clouds") && filteredArgs.length > 1 && !filteredArgs[1].startsWith("-")) {
+      const name = filteredArgs[1];
+      warnExtraArgs(filteredArgs, 2);
+      console.error(pc.dim(`Tip: next time you can just run ${pc.cyan(`spawn ${name}`)}`));
+      console.error();
+      await showInfoOrError(name);
+      return;
+    }
+
     warnExtraArgs(filteredArgs, 1);
     await SUBCOMMANDS[cmd]();
     return;

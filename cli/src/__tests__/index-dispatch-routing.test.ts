@@ -144,6 +144,7 @@ type DispatchResult =
   | { type: "list_help" }
   | { type: "subcommand"; cmd: string }
   | { type: "subcommand_help" }
+  | { type: "subcommand_info"; name: string }
   | { type: "verb_alias"; agent: string; cloud?: string }
   | { type: "verb_alias_bare"; verb: string }
   | { type: "default"; agent: string; cloud?: string };
@@ -163,6 +164,12 @@ function dispatchCommand(
 
   if (SUBCOMMANDS.has(cmd)) {
     if (hasTrailingHelpFlag(filteredArgs)) return { type: "subcommand_help" };
+
+    // "spawn agents <name>" or "spawn clouds <name>" -> show info for that name
+    if ((cmd === "agents" || cmd === "clouds") && filteredArgs.length > 1 && !filteredArgs[1].startsWith("-")) {
+      return { type: "subcommand_info", name: filteredArgs[1] };
+    }
+
     return { type: "subcommand", cmd };
   }
 
@@ -818,6 +825,60 @@ describe("dispatchCommand routing", () => {
         expect(result.type).toBe("subcommand_help");
       });
     }
+  });
+
+  describe("subcommand info redirect (agents/clouds <name>)", () => {
+    it('should redirect "agents claude" to info for claude', () => {
+      const result = dispatchCommand("agents", ["agents", "claude"]);
+      expect(result.type).toBe("subcommand_info");
+      if (result.type === "subcommand_info") {
+        expect(result.name).toBe("claude");
+      }
+    });
+
+    it('should redirect "clouds hetzner" to info for hetzner', () => {
+      const result = dispatchCommand("clouds", ["clouds", "hetzner"]);
+      expect(result.type).toBe("subcommand_info");
+      if (result.type === "subcommand_info") {
+        expect(result.name).toBe("hetzner");
+      }
+    });
+
+    it('should NOT redirect "agents --help" (flag, not name)', () => {
+      const result = dispatchCommand("agents", ["agents", "--help"]);
+      expect(result.type).toBe("subcommand_help");
+    });
+
+    it('should NOT redirect "matrix something" (not agents/clouds)', () => {
+      const result = dispatchCommand("matrix", ["matrix", "something"]);
+      expect(result.type).toBe("subcommand");
+    });
+
+    it('should NOT redirect "update something" (not agents/clouds)', () => {
+      const result = dispatchCommand("update", ["update", "something"]);
+      expect(result.type).toBe("subcommand");
+    });
+
+    it('should NOT redirect "agents -h" (flag starts with dash)', () => {
+      const result = dispatchCommand("agents", ["agents", "-h"]);
+      expect(result.type).toBe("subcommand_help");
+    });
+
+    it('should redirect "clouds sprite" to info for sprite', () => {
+      const result = dispatchCommand("clouds", ["clouds", "sprite"]);
+      expect(result.type).toBe("subcommand_info");
+      if (result.type === "subcommand_info") {
+        expect(result.name).toBe("sprite");
+      }
+    });
+
+    it('should redirect "agents aider" to info for aider', () => {
+      const result = dispatchCommand("agents", ["agents", "aider"]);
+      expect(result.type).toBe("subcommand_info");
+      if (result.type === "subcommand_info") {
+        expect(result.name).toBe("aider");
+      }
+    });
   });
 
   describe("verb aliases", () => {
