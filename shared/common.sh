@@ -1118,22 +1118,23 @@ _parse_api_response() {
     API_RESPONSE_BODY="${response_body}"
 }
 
-# Helper to handle a single API request attempt - builds curl args and executes it
+# Single curl helper for all API requests.
+# Usage: _curl_api URL METHOD BODY AUTH_ARGS...
 # Returns: 0 on curl success, 1 on curl failure
 # Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
-_make_api_request() {
-    local base_url="${1}"
-    local auth_token="${2}"
-    local method="${3}"
-    local endpoint="${4}"
-    local body="${5:-}"
+_curl_api() {
+    local url="${1}"
+    local method="${2}"
+    local body="${3:-}"
+    shift 3
+    # Remaining args are auth-related curl flags
 
     local args=(
         -s
         -w "\n%{http_code}"
         -X "${method}"
-        -H "Authorization: Bearer ${auth_token}"
         -H "Content-Type: application/json"
+        "$@"
     )
 
     if [[ -n "${body}" ]]; then
@@ -1141,7 +1142,7 @@ _make_api_request() {
     fi
 
     local response
-    response=$(curl "${args[@]}" "${base_url}${endpoint}" 2>&1)
+    response=$(curl "${args[@]}" "${url}" 2>&1)
     local curl_exit_code=$?
 
     _parse_api_response "${response}"
@@ -1213,38 +1214,7 @@ generic_cloud_api() {
     local body="${5:-}"
     local max_retries="${6:-3}"
 
-    _cloud_api_retry_loop _make_api_request "${max_retries}" "${method} ${endpoint}" "${base_url}" "${auth_token}" "${method}" "${endpoint}" "${body}"
-}
-
-# Helper to make API request with custom curl auth args (e.g., Basic Auth, custom headers)
-# Returns: 0 on curl success, 1 on curl failure
-# Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
-_make_api_request_custom_auth() {
-    local url="${1}"
-    local method="${2}"
-    local body="${3:-}"
-    shift 3
-    # Remaining args are custom curl auth flags (e.g., -u "user:pass" or -H "X-Auth-Token: ...")
-
-    local args=(
-        -s
-        -w "\n%{http_code}"
-        -X "${method}"
-        -H "Content-Type: application/json"
-        "$@"
-    )
-
-    if [[ -n "${body}" ]]; then
-        args+=(-d "${body}")
-    fi
-
-    local response
-    response=$(curl "${args[@]}" "${url}" 2>&1)
-    local curl_exit_code=$?
-
-    _parse_api_response "${response}"
-
-    return ${curl_exit_code}
+    _cloud_api_retry_loop _curl_api "${max_retries}" "${method} ${endpoint}" "${base_url}${endpoint}" "${method}" "${body}" -H "Authorization: Bearer ${auth_token}"
 }
 
 # Generic cloud API wrapper with custom curl auth args
@@ -1261,7 +1231,7 @@ generic_cloud_api_custom_auth() {
     shift 5
     # Remaining args are custom curl auth flags
 
-    _cloud_api_retry_loop _make_api_request_custom_auth "${max_retries}" "${method} ${endpoint}" "${base_url}${endpoint}" "${method}" "${body}" "$@"
+    _cloud_api_retry_loop _curl_api "${max_retries}" "${method} ${endpoint}" "${base_url}${endpoint}" "${method}" "${body}" "$@"
 }
 
 # ============================================================
