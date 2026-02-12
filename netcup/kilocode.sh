@@ -1,7 +1,9 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+# shellcheck source=netcup/lib/common.sh
 if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/lib/common.sh" ]]; then
     source "$SCRIPT_DIR/lib/common.sh"
 else
@@ -17,6 +19,7 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${NETCUP_SERVER_IP}"
+wait_for_cloud_init "${NETCUP_SERVER_IP}" 60
 
 log_step "Setting up server environment..."
 setup_shell_environment "${NETCUP_SERVER_IP}"
@@ -32,13 +35,14 @@ else
 fi
 
 log_step "Setting up environment variables..."
-inject_env_vars_ssh "${NETCUP_SERVER_IP}" \
+inject_env_vars_ssh "${NETCUP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "KILO_PROVIDER_TYPE=openrouter" \
     "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
-log_info "Netcup setup completed successfully!"
+log_info "Netcup server setup completed successfully!"
+log_info "Server: ${SERVER_NAME} (ID: ${NETCUP_SERVER_ID}, IP: ${NETCUP_SERVER_IP})"
 echo ""
 
 log_step "Starting Kilo Code..."
