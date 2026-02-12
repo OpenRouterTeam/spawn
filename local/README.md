@@ -14,7 +14,10 @@ spawn openclaw local
 spawn nanoclaw local
 spawn aider local
 spawn goose local
-spawn cline local
+spawn codex local
+spawn interpreter local
+spawn gptme local
+spawn continue local
 ```
 
 Or run directly without the CLI:
@@ -25,7 +28,10 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/nanoclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/goose.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/continue.sh)
 ```
 
 ## Non-Interactive Mode

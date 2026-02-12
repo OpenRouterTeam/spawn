@@ -1192,7 +1192,7 @@
     "local/aider": "implemented",
     "local/goose": "implemented",
     "local/codex": "implemented",
-    "local/interpreter": "missing",
+    "local/interpreter": "implemented",
     "local/gemini": "missing",
     "local/amazonq": "missing",
     "local/cline": "missing",
