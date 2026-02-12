@@ -63,9 +63,23 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("could not be executed");
     });
 
-    it("should return exactly 1 guidance line", () => {
+    it("should suggest possible causes", () => {
       const lines = getScriptFailureGuidance(126, "sprite");
-      expect(lines).toHaveLength(1);
+      const joined = lines.join("\n");
+      expect(joined).toContain("execute permissions");
+      expect(joined).toContain("root/sudo");
+    });
+
+    it("should include a link to report the issue", () => {
+      const lines = getScriptFailureGuidance(126, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("github.com");
+      expect(joined).toContain("issues");
+    });
+
+    it("should return exactly 4 guidance lines", () => {
+      const lines = getScriptFailureGuidance(126, "sprite");
+      expect(lines).toHaveLength(4);
     });
   });
 
@@ -224,9 +238,21 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("out of memory");
     });
 
-    it("should return exactly 1 guidance line", () => {
+    it("should suggest trying a larger instance", () => {
       const lines = getScriptFailureGuidance(137, "sprite");
-      expect(lines).toHaveLength(1);
+      const joined = lines.join("\n");
+      expect(joined).toContain("larger instance size");
+    });
+
+    it("should suggest checking cloud provider dashboard", () => {
+      const lines = getScriptFailureGuidance(137, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+    });
+
+    it("should return exactly 4 guidance lines", () => {
+      const lines = getScriptFailureGuidance(137, "sprite");
+      expect(lines).toHaveLength(4);
     });
   });
 
