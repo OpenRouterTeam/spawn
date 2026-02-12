@@ -95,8 +95,8 @@ export function validatePrompt(prompt: string): void {
   const MAX_PROMPT_LENGTH = 10 * 1024;
   if (prompt.length > MAX_PROMPT_LENGTH) {
     throw new Error(
-      `Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters (${prompt.length} given).\n` +
-      `For longer prompts, use --prompt-file to read from a file instead.`
+      `Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH.toLocaleString()} characters (${prompt.length.toLocaleString()} given).\n` +
+      `Try shortening your prompt or breaking the task into smaller steps.`
     );
   }
 

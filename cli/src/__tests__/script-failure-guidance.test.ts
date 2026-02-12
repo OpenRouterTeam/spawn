@@ -210,10 +210,11 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("may still be running");
     });
 
-    it("should suggest checking cloud provider dashboard", () => {
+    it("should suggest running spawn <cloud> for cleanup instructions", () => {
       const lines = getScriptFailureGuidance(130, "sprite");
       const joined = lines.join("\n");
-      expect(joined).toContain("cloud provider dashboard");
+      expect(joined).toContain("spawn sprite");
+      expect(joined).toContain("cleanup instructions");
     });
 
     it("should return exactly 3 guidance lines", () => {
@@ -244,10 +245,11 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("larger instance size");
     });
 
-    it("should suggest checking cloud provider dashboard", () => {
+    it("should suggest running spawn <cloud> for cleanup instructions", () => {
       const lines = getScriptFailureGuidance(137, "sprite");
       const joined = lines.join("\n");
-      expect(joined).toContain("cloud provider dashboard");
+      expect(joined).toContain("spawn sprite");
+      expect(joined).toContain("cleanup instructions");
     });
 
     it("should return exactly 4 guidance lines", () => {

@@ -307,6 +307,7 @@ export async function cmdInteractive(): Promise<void> {
   const cloudName = manifest.clouds[cloudChoice].name;
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
+  p.log.info(`Or with a prompt:        ${pc.cyan(`spawn ${agentChoice} ${cloudChoice} -p "your task"`)}`);
   p.outro("Handing off to spawn script...");
 
   await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice));
@@ -534,14 +535,14 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
       return [
         "Script was interrupted (Ctrl+C).",
         "Note: If a server was already created, it may still be running.",
-        "  Check your cloud provider dashboard to stop or delete any unused servers.",
+        `  Run ${pc.cyan(`spawn ${cloud}`)} for dashboard and cleanup instructions.`,
       ];
     case 137:
       return [
         "Script was killed (likely by the system due to timeout or out of memory).",
         "  - The server may not have enough RAM for this agent",
         "  - Try a larger instance size or a different cloud provider",
-        "  - Check your cloud provider dashboard to stop or delete any unused servers",
+        `  - Run ${pc.cyan(`spawn ${cloud}`)} for dashboard and cleanup instructions`,
       ];
     case 255:
       return [
@@ -1135,6 +1136,9 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
       console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}${hint}`);
     }
     console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
+    console.log();
+    console.log(pc.bold("Non-interactive:"));
+    console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud} --prompt "Fix the failing tests"`)}`);
   }
 
   console.log();
@@ -1179,6 +1183,9 @@ function printCloudQuickStart(
   }
   if (exampleAgent) {
     console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
+    console.log();
+    console.log(pc.bold("Non-interactive:"));
+    console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey} --prompt "Fix the failing tests"`)}`);
   }
 }
 
