@@ -305,6 +305,9 @@ export async function cmdInteractive(): Promise<void> {
 
   const agentName = manifest.agents[agentChoice].name;
   const cloudName = manifest.clouds[cloudChoice].name;
+
+  showPreflightCredentialCheck(manifest, cloudChoice);
+
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
@@ -434,6 +437,49 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
   return authVars.length > 0 ? authVars.join(" + ") : undefined;
 }
 
+/** Check which required credentials are missing and show a helpful summary before launching */
+export function showPreflightCredentialCheck(manifest: Manifest, cloud: string): void {
+  const cloudDef = manifest.clouds[cloud];
+  const authVars = parseAuthEnvVars(cloudDef.auth);
+
+  // Check OPENROUTER_API_KEY
+  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
+
+  // Check cloud-specific auth env vars
+  const missingCloudVars = authVars.filter((v) => !process.env[v]);
+
+  // Nothing missing -- no need to show anything
+  if (hasOpenRouterKey && missingCloudVars.length === 0) {
+    return;
+  }
+
+  const lines: string[] = [];
+
+  if (!hasOpenRouterKey) {
+    lines.push(`  ${pc.yellow("!")} ${pc.cyan("OPENROUTER_API_KEY")} not set ${pc.dim("-- you'll be prompted to authenticate via browser")}`);
+  }
+
+  if (missingCloudVars.length > 0) {
+    for (const v of missingCloudVars) {
+      lines.push(`  ${pc.yellow("!")} ${pc.cyan(v)} not set`);
+    }
+  } else if (authVars.length === 0 && cloudDef.auth.toLowerCase() !== "none") {
+    // Non-env-var auth (e.g., "aws configure", "modal setup")
+    lines.push(`  ${pc.dim("i")} Auth: ${cloudDef.auth}`);
+  }
+
+  if (lines.length > 0) {
+    p.log.warn("Credentials needed:");
+    for (const line of lines) {
+      console.log(line);
+    }
+    if (missingCloudVars.length > 0) {
+      console.log(`  ${pc.dim(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`)}`);
+    }
+    console.log();
+  }
+}
+
 export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean): Promise<void> {
   const manifest = await loadManifestWithSpinner();
   ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
@@ -446,6 +492,8 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
     showDryRunPreview(manifest, agent, cloud, prompt);
     return;
   }
+
+  showPreflightCredentialCheck(manifest, cloud);
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
