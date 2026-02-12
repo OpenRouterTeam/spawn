@@ -1154,6 +1154,20 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     (c) => `spawn ${agentKey} ${c}`
   );
   console.log();
+
+  // In interactive terminals, offer to launch directly
+  if (isInteractiveTTY()) {
+    const cloudChoice = await p.select({
+      message: `Launch ${agentDef.name} on`,
+      options: [
+        ...mapToSelectOptions(implClouds, manifest.clouds),
+        { value: "__exit__", label: "Exit", hint: "just show info" },
+      ],
+    });
+    if (p.isCancel(cloudChoice) || cloudChoice === "__exit__") return;
+
+    await execScript(cloudChoice, agentKey, undefined, getAuthHint(manifest, cloudChoice));
+  }
 }
 
 // ── Cloud Info ─────────────────────────────────────────────────────────────────
@@ -1226,6 +1240,20 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
   console.log();
   console.log(pc.dim(`  Full setup guide: ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloudKey}`)}`));
   console.log();
+
+  // In interactive terminals, offer to launch directly
+  if (isInteractiveTTY() && implAgents.length > 0) {
+    const agentChoice = await p.select({
+      message: `Launch on ${c.name}`,
+      options: [
+        ...mapToSelectOptions(implAgents, manifest.agents),
+        { value: "__exit__", label: "Exit", hint: "just show info" },
+      ],
+    });
+    if (p.isCancel(agentChoice) || agentChoice === "__exit__") return;
+
+    await execScript(cloudKey, agentChoice, undefined, getAuthHint(manifest, cloudKey));
+  }
 }
 
 // ── Update ─────────────────────────────────────────────────────────────────────
