@@ -122,7 +122,7 @@ This cycle MUST complete within 8 minutes. This is a HARD deadline.
 
 Create these teammates:
 
-1. **code-reviewer** (Sonnet)
+1. **code-reviewer** (Opus)
    - Fetch the full PR diff: \`gh pr diff ${PR_NUM} --repo OpenRouterTeam/spawn\`
    - Review every changed file for security issues:
      * **Command injection**: unquoted variables in shell commands, unsafe eval/heredoc, unsanitized input in bash
@@ -215,7 +215,7 @@ After both agents report back, make the final decision:
 2. Create tasks with TaskCreate for each teammate's work
 3. Fetch PR details and diff
 4. Spawn teammates in parallel using Task tool (subagent_type='general-purpose', team_name="${TEAM_NAME}"):
-   - code-reviewer (model=sonnet): security review of the diff
+   - code-reviewer (model=opus): security review of the diff
    - test-verifier (model=haiku): syntax/test verification
 5. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
 6. Monitor teammates (poll TaskList, sleep 15 between checks)
@@ -276,7 +276,7 @@ This cycle MUST complete within 12 minutes. This is a HARD deadline.
 
 Create these teammates:
 
-1. **pr-triager** (Sonnet)
+1. **pr-triager** (Opus)
    - List ALL open PRs: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,updatedAt,author,mergeable,headRefName,labels`
    - For EACH open PR, evaluate:
      * **Staleness**: last updated > 48 hours ago? (use `updatedAt` field)
@@ -323,7 +323,7 @@ fi
 1. Create the team with TeamCreate (team_name="spawn-security-hygiene")
 2. Create tasks with TaskCreate for each teammate's work
 3. Spawn teammates in parallel using Task tool (subagent_type='general-purpose', team_name="spawn-security-hygiene"):
-   - pr-triager (model=sonnet): review and triage all open PRs
+   - pr-triager (model=opus): review and triage all open PRs
    - branch-cleaner (model=haiku): clean up stale orphan branches
 4. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
 5. Monitor teammates (poll TaskList, sleep 15 between checks)
@@ -381,7 +381,7 @@ This cycle MUST complete within 15 minutes. This is a HARD deadline.
 
 Create these teammates:
 
-1. **shell-auditor** (Sonnet)
+1. **shell-auditor** (Opus)
    - Scan ALL .sh files in the repo for security issues:
      * **Command injection**: unquoted variables in shell commands, unsafe eval/heredoc, unsanitized user input
      * **Credential leaks**: hardcoded API keys/tokens/passwords, secrets logged to stdout, credentials in committed files
@@ -394,7 +394,7 @@ Create these teammates:
    - Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
    - Report all findings with file paths and line numbers to the team lead
 
-2. **code-auditor** (Sonnet)
+2. **code-auditor** (Opus)
    - Scan ALL .ts files for security issues:
      * **XSS/injection**: unsafe HTML rendering, unsanitized output, template injection
      * **Prototype pollution**: unsafe object merging, __proto__ access
@@ -496,8 +496,8 @@ fi
 1. Create the team with TeamCreate (team_name="spawn-security-scan")
 2. Create tasks with TaskCreate for each teammate's work
 3. Spawn teammates in parallel using Task tool (subagent_type='general-purpose', team_name="spawn-security-scan"):
-   - shell-auditor (model=sonnet): audit all .sh files
-   - code-auditor (model=sonnet): audit all .ts files
+   - shell-auditor (model=opus): audit all .sh files
+   - code-auditor (model=opus): audit all .ts files
    - drift-detector (model=haiku): check for anomalies and unexpected files
 4. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
 5. Monitor teammates (poll TaskList, sleep 15 between checks)
