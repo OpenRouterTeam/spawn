@@ -157,6 +157,20 @@ Each cycle MUST complete within 45 minutes. This is a HARD deadline.
 
 Agents should aim for focused, high-impact work. Do NOT exhaustively expand everything.
 
+## No Self-Merge Rule (MANDATORY)
+
+Agents must NEVER merge their own PRs. This applies to ALL agents including the team lead.
+
+After creating a PR, every agent MUST:
+1. **Self-review**: Read the diff and add a review comment summarizing changes, tests run, and any concerns:
+   `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
+   `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of changes, what was tested, any concerns]"`
+2. **Label**: Add `needs-team-review` so external reviewers can find it:
+   `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
+3. **Leave the PR open** — do NOT run `gh pr merge`
+
+Merging is handled externally (by maintainers or a separate review cycle).
+
 ## Priority Order
 
 1. **Fill gaps first** — if manifest.json has "missing" entries, fill them before discovering
@@ -213,7 +227,7 @@ Research new AI agents, BUT only add one if there's REAL community demand:
 Check the repo's GitHub issues for user requests:
 - Run: `gh issue list --repo OpenRouterTeam/spawn --state open --limit 20`
 - Look for issues requesting specific agents or cloud providers
-- If a request is actionable, implement it
+- If a request is actionable, implement it and create a PR (self-review + label, do NOT merge)
 - Comment on the issue with the PR link when done
 - If a request is already implemented, close the issue with a comment
 
@@ -223,8 +237,8 @@ Clean up stale remote branches before and after the cycle:
 - For each branch (excluding main):
   * Check if there's an open PR: `gh pr list --head BRANCH --state open --json number,title`
   * If open PR and branch is stale (last commit >4 hours ago):
-    - Mergeable → merge with `gh pr merge NUMBER --squash --delete-branch`
-    - Conflicts/failing → close with `gh pr close NUMBER --comment "Auto-closing: stale branch. Please reopen if still needed."`
+    - If PR has conflicts/failing checks → close with `gh pr close NUMBER --comment "Auto-closing: stale branch. Please reopen if still needed."`
+    - If PR is mergeable → ensure it has `needs-team-review` label, add a comment noting it's stale (do NOT merge — merging is external)
   * If no open PR and stale >4 hours → delete with `git push origin --delete BRANCH`
   * If fresh (<4 hours) → leave alone
 - Run again at end of cycle to catch branches created during the cycle
@@ -311,11 +325,15 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 # 5. Push
 git push -u origin BRANCH-NAME
 
-# 6. Create and merge PR (can be done from anywhere)
+# 6. Create PR (can be done from anywhere)
 gh pr create --title "title" --body "body"
-gh pr merge NUMBER --squash --delete-branch
 
-# 7. Clean up worktree
+# 7. Self-review and label (DO NOT merge — see No Self-Merge Rule)
+gh pr diff NUMBER --repo OpenRouterTeam/spawn
+gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]"
+gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"
+
+# 8. Clean up worktree (PR stays open for external review)
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 ```
 
@@ -342,25 +360,28 @@ Every teammate MUST follow this workflow using worktrees. NO exceptions.
 4. Do the work, commit (with Agent: marker)
 5. Push: `git push -u origin {branch-name}`
 6. Create PR: `gh pr create --title "..." --body "..."`
-7. Try to merge: `gh pr merge --squash --delete-branch`
-8. **If merge fails** (conflicts, CI, etc.):
-   - Comment on the PR explaining WHY it cannot be merged
+7. Self-review and label (DO NOT merge):
+   `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
+   `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]"`
+   `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
+8. **If PR cannot be created** (conflicts, etc.):
+   - Comment on the PR explaining WHY
    - Close with: `gh pr close {number} --comment "Closing: {reason}"`
-   - Acceptable reasons: merge conflict with a concurrent PR, superseded by another PR, implementation found to be incorrect after review
    - NEVER close a PR silently — every closed PR MUST have a comment
 9. Clean up worktree: `git worktree remove WORKTREE_BASE_PLACEHOLDER/{branch-name}`
 
 ### PR Policy (MANDATORY):
 Every PR must reach one of these terminal states:
-- **MERGED** — the happy path, always preferred
-- **CLOSED with comment** — only when merge is impossible, with a clear explanation
+- **OPEN with self-review + `needs-team-review` label** — the standard path, always preferred
+- **CLOSED with comment** — only when PR is impossible (conflicts, duplicate work), with a clear explanation
 
 ### NEVER:
+- Run `gh pr merge` — merging is handled externally
 - Push directly to main
 - Use `git checkout -b` when other agents are active — use worktrees
 - Close a PR without a comment explaining why
-- Leave PRs open/abandoned — resolve them in the same cycle
-- Leave branches or worktrees hanging after merge
+- Leave PRs without a self-review comment and `needs-team-review` label
+- Leave branches or worktrees hanging after work is done
 - Work on a stale base — always `git fetch origin main` before creating a worktree
 
 ## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
@@ -368,23 +389,22 @@ Every PR must reach one of these terminal states:
 You MUST remain active until ALL of the following are true:
 
 1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
-2. **All PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm zero open PRs from this cycle. Every PR must be either merged or closed with a comment.
-3. **All provider PRs are resolved**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName` and check for ANY open PRs related to cloud providers (branches like `add/*`, `feat/*-cloud`, provider names in titles). For each:
-   - Check mergeability: `gh pr view NUMBER --json mergeable --jq '.mergeable'`
-   - If MERGEABLE → merge: `gh pr merge NUMBER --squash --delete-branch`
-   - If not mergeable → close with comment: `gh pr close NUMBER --comment "Auto-closing: provider PR from interrupted cycle (unmergeable). Please reopen if still needed."`
-   - **No provider PR should survive across cycles** — resolve every one before exiting
+2. **All PRs are self-reviewed and labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm every PR from this cycle has a self-review comment and the `needs-team-review` label. Do NOT merge — PRs stay open for external review.
+3. **All provider PRs are labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName` and check for ANY open PRs related to cloud providers. For each:
+   - Ensure it has a self-review comment and `needs-team-review` label
+   - If not mergeable (conflicts) → close with comment: `gh pr close NUMBER --comment "Auto-closing: provider PR from interrupted cycle (unmergeable). Please reopen if still needed."`
+   - If mergeable → leave open with label for external review (do NOT merge)
 4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
 5. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
 
 ### Shutdown Sequence (execute in this exact order):
 
 1. Check TaskList — if any tasks are still in_progress or pending, wait and check again (poll every 30 seconds, up to 5 minutes)
-2. Verify all PRs merged or closed: `gh pr list --repo OpenRouterTeam/spawn --state open`
+2. Verify all PRs are self-reviewed and labeled: `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` (PRs stay open — do NOT merge)
 3. **Sweep for leftover provider PRs**: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,mergeable`
-   - For each PR whose title or branch references a cloud/provider (e.g. `hetzner`, `vultr`, `runpod`, `add/`, `feat/`):
-     - MERGEABLE → merge with `gh pr merge NUMBER --squash --delete-branch`
-     - Not mergeable → close with `gh pr close NUMBER --comment "Auto-closing: stale provider PR. Please reopen if still needed."`
+   - For each PR whose title or branch references a cloud/provider:
+     - If mergeable → ensure it has `needs-team-review` label and a self-review comment (do NOT merge)
+     - If not mergeable → close with `gh pr close NUMBER --comment "Auto-closing: stale provider PR (unmergeable). Please reopen if still needed."`
    - Log every action taken
 4. For each teammate, send a `shutdown_request` via SendMessage
 5. Wait for all `shutdown_response` confirmations
@@ -408,8 +428,9 @@ The cycle is NOT complete until this final README update is committed and pushed
 - ALWAYS use worktrees — never `git checkout -b` in the main repo
 - ALWAYS `git fetch origin main` before creating a worktree
 - Each teammate works on DIFFERENT files
-- Each unit of work gets its own worktree → branch → PR → merge → cleanup worktree
-- **Every PR must be merged OR closed with a comment** — no silent closes, no abandoned PRs
+- Each unit of work gets its own worktree → branch → PR → self-review → label → cleanup worktree
+- **Every PR must have a self-review comment + `needs-team-review` label, OR be closed with a comment** — no silent closes, no unlabeled PRs
+- **NEVER run `gh pr merge`** — merging is handled externally
 - Update manifest.json, the cloud's README.md, AND the root README.md matrix
 - Clean up worktrees after every PR: `git worktree remove PATH`
 - NEVER revert prior macOS/curl-bash compatibility fixes

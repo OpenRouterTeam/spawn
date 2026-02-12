@@ -81,23 +81,21 @@ check_timeout() {
     return 0
 }
 
-# Robust push → PR → merge with retry on stale main
-# Usage: push_and_merge_pr BRANCH_NAME PR_TITLE PR_BODY
-push_and_merge_pr() {
+# Push → PR → self-review (NO merging — merging is handled externally)
+# Usage: push_and_create_pr BRANCH_NAME PR_TITLE PR_BODY
+push_and_create_pr() {
     local branch_name="$1"
     local pr_title="$2"
     local pr_body="$3"
-    local max_retries=3
-    local attempt=0
 
     # Check there are actual commits to push
     if [[ -z "$(git log origin/main..HEAD --oneline 2>/dev/null)" ]]; then
-        log "push_and_merge_pr: No commits to push on ${branch_name}"
+        log "push_and_create_pr: No commits to push on ${branch_name}"
         return 0
     fi
 
     git push -u origin "${branch_name}" 2>&1 | tee -a "${LOG_FILE}" || {
-        log "push_and_merge_pr: Push failed for ${branch_name}"
+        log "push_and_create_pr: Push failed for ${branch_name}"
         return 1
     }
 
@@ -108,36 +106,30 @@ push_and_merge_pr() {
         --base main --head "${branch_name}" 2>/dev/null) || true
 
     if [[ -z "${pr_url:-}" ]]; then
-        log "push_and_merge_pr: PR creation failed for ${branch_name}"
+        log "push_and_create_pr: PR creation failed for ${branch_name}"
         return 1
     fi
 
-    log "push_and_merge_pr: PR created: ${pr_url}"
+    log "push_and_create_pr: PR created: ${pr_url}"
 
-    while [[ "$attempt" -lt "$max_retries" ]]; do
-        attempt=$((attempt + 1))
+    # Extract PR number from URL
+    local pr_number=""
+    pr_number=$(printf '%s' "${pr_url}" | grep -oE '[0-9]+$') || true
 
-        if gh pr merge "${branch_name}" --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}"; then
-            log "push_and_merge_pr: Merged ${branch_name} (attempt ${attempt})"
-            return 0
-        fi
+    if [[ -n "${pr_number}" ]]; then
+        # Self-review: add a comment summarizing the changes
+        gh pr review "${pr_number}" --repo OpenRouterTeam/spawn --comment \
+            --body "Self-review by QA cycle: ${pr_title}. Automated change — tests were run before submission." \
+            2>&1 | tee -a "${LOG_FILE}" || true
 
-        log "push_and_merge_pr: Merge failed (attempt ${attempt}/${max_retries}), rebasing onto latest main..."
+        # Label for external review
+        gh pr edit "${pr_number}" --repo OpenRouterTeam/spawn --add-label "needs-team-review" \
+            2>&1 | tee -a "${LOG_FILE}" || true
 
-        # Fetch latest main and rebase
-        git fetch origin main 2>/dev/null || true
-        if git rebase origin/main 2>&1 | tee -a "${LOG_FILE}"; then
-            git push --force-with-lease origin "${branch_name}" 2>&1 | tee -a "${LOG_FILE}" || true
-            sleep 3  # Give GitHub a moment to process
-        else
-            git rebase --abort 2>/dev/null || true
-            log "push_and_merge_pr: Rebase failed for ${branch_name}, giving up"
-            break
-        fi
-    done
+        log "push_and_create_pr: Self-reviewed and labeled PR #${pr_number} (not merging — awaiting external review)"
+    fi
 
-    log "push_and_merge_pr: Could not merge ${branch_name} after ${max_retries} attempts, leaving PR open"
-    return 1
+    return 0
 }
 
 # ============================================================
@@ -376,7 +368,7 @@ Only modify ${cloud}/lib/common.sh and test/record.sh if the recording infrastru
                 fi
 
                 # Push, PR, and merge with retry on stale main
-                push_and_merge_pr "${branch_name}" \
+                push_and_create_pr "${branch_name}" \
                     "fix: Update ${cloud} API for fixture recording" \
                     "Automated fix from QA cycle. API recording was failing for ${cloud}." || true
             ) &
@@ -569,7 +561,7 @@ FIXEOF
             fi
 
             # Push, PR, and merge with retry on stale main
-            push_and_merge_pr "${branch_name}" \
+            push_and_create_pr "${branch_name}" \
                 "fix: Fix ${cloud} mock test failures" \
                 "Automated fix from QA cycle. ${fail_count} mock test(s) were failing for ${cloud}: ${failing_scripts}" || true
         ) &
@@ -627,10 +619,10 @@ EOF
         )" 2>&1 | tee -a "${LOG_FILE}" || true
 
         # Push, PR, and merge with retry on stale main
-        push_and_merge_pr "${README_BRANCH}" \
+        push_and_create_pr "${README_BRANCH}" \
             "test: Update README matrix after QA cycle" \
             "Automated README update from QA cycle Phase 4. Test results updated in the matrix." || {
-            log "Phase 4: PR merge failed, leaving PR open for manual review"
+            log "Phase 4: PR creation failed, check for errors"
         }
 
         # Switch back to main and sync
