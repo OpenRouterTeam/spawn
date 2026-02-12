@@ -164,19 +164,20 @@ try_load_config() {
     # Map cloud name to config file
     local config_file="$HOME/.config/spawn/${cloud}.json"
 
-    # OVH uses separate config with multiple fields
+    # OVH uses separate config with multiple fields — read each safely via stdout
     if [[ "$cloud" == "ovh" ]]; then
         if [[ -f "$config_file" ]]; then
-            eval "$(python3 -c "
-import json, sys
-try:
-    d = json.load(open(sys.argv[1]))
-    for k, e in [('application_key','OVH_APPLICATION_KEY'), ('application_secret','OVH_APPLICATION_SECRET'),
-                 ('consumer_key','OVH_CONSUMER_KEY'), ('project_id','OVH_PROJECT_ID')]:
-        v = d.get(k, '')
-        if v: print(f'export {e}=\"{v}\"')
-except: pass
-" "$config_file" 2>/dev/null)" || true
+            local ovh_val
+            for ovh_pair in "application_key:OVH_APPLICATION_KEY" "application_secret:OVH_APPLICATION_SECRET" \
+                            "consumer_key:OVH_CONSUMER_KEY" "project_id:OVH_PROJECT_ID"; do
+                local json_key="${ovh_pair%%:*}"
+                local env_name="${ovh_pair##*:}"
+                ovh_val=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get(sys.argv[2],''))" \
+                    "$config_file" "$json_key" 2>/dev/null) || true
+                if [[ -n "${ovh_val:-}" ]]; then
+                    export "${env_name}=${ovh_val}"
+                fi
+            done
         fi
         return 0
     fi
@@ -223,32 +224,41 @@ save_config() {
     local config_file="${config_dir}/${cloud}.json"
     mkdir -p "$config_dir"
 
+    # Use stdin to pass credential values to Python safely (avoids shell/Python injection)
     case "$cloud" in
         ovh)
-            python3 -c "
-import json
-d = {'application_key': '${OVH_APPLICATION_KEY:-}', 'application_secret': '${OVH_APPLICATION_SECRET:-}',
-     'consumer_key': '${OVH_CONSUMER_KEY:-}', 'project_id': '${OVH_PROJECT_ID:-}'}
+            printf '%s\n%s\n%s\n%s\n' "${OVH_APPLICATION_KEY:-}" "${OVH_APPLICATION_SECRET:-}" \
+                "${OVH_CONSUMER_KEY:-}" "${OVH_PROJECT_ID:-}" | python3 -c "
+import json, sys
+lines = [l.rstrip('\n') for l in sys.stdin.readlines()]
+d = {'application_key': lines[0], 'application_secret': lines[1],
+     'consumer_key': lines[2], 'project_id': lines[3]}
 print(json.dumps(d, indent=2))
 " > "$config_file"
             ;;
         upcloud)
-            python3 -c "
-import json
-print(json.dumps({'username': '${UPCLOUD_USERNAME:-}', 'password': '${UPCLOUD_PASSWORD:-}'}, indent=2))
+            printf '%s\n%s\n' "${UPCLOUD_USERNAME:-}" "${UPCLOUD_PASSWORD:-}" | python3 -c "
+import json, sys
+lines = [l.rstrip('\n') for l in sys.stdin.readlines()]
+print(json.dumps({'username': lines[0], 'password': lines[1]}, indent=2))
 " > "$config_file"
             ;;
         kamatera)
-            python3 -c "
-import json
-print(json.dumps({'client_id': '${KAMATERA_API_CLIENT_ID:-}', 'secret': '${KAMATERA_API_SECRET:-}'}, indent=2))
+            printf '%s\n%s\n' "${KAMATERA_API_CLIENT_ID:-}" "${KAMATERA_API_SECRET:-}" | python3 -c "
+import json, sys
+lines = [l.rstrip('\n') for l in sys.stdin.readlines()]
+print(json.dumps({'client_id': lines[0], 'secret': lines[1]}, indent=2))
 " > "$config_file"
             ;;
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
             eval "local val=\"\${${env_var}:-}\""
-            python3 -c "import json; print(json.dumps({'api_key': '${val}'}, indent=2))" > "$config_file"
+            printf '%s\n' "${val}" | python3 -c "
+import json, sys
+val = sys.stdin.readline().rstrip('\n')
+print(json.dumps({'api_key': val}, indent=2))
+" > "$config_file"
             ;;
     esac
     printf '%b\n' "  ${GREEN}saved${NC} → ${config_file}"
