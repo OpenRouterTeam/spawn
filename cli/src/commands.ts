@@ -459,6 +459,8 @@ export function getStatusDescription(status: number): string {
   return status === 404 ? "not found" : `HTTP ${status}`;
 }
 
+const ISSUE_URL = `https://github.com/${REPO}/issues`;
+
 async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: string): Promise<string> {
   const s = p.spinner();
   s.start("Downloading spawn script...");
@@ -499,7 +501,7 @@ function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryS
     console.error(`\nHow to fix:`);
     console.error(`  1. Verify the combination is implemented: ${pc.cyan("spawn matrix")}`);
     console.error(`  2. Try again later (the script may be deploying)`);
-    console.error(`  3. Report the issue: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
+    console.error(`  3. Report the issue: ${pc.cyan(ISSUE_URL)}`);
   } else {
     p.log.error(`Script download failed (HTTP ${primaryStatus}/${fallbackStatus})`);
     console.error(`\nBoth download sources returned errors.`);
@@ -528,28 +530,33 @@ function credentialHint(cloud: string, authHint?: string, verb = "Missing or inv
     : `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`;
 }
 
+/** Static exit code guidance (codes that don't need dynamic cloud/auth interpolation) */
+const STATIC_EXIT_GUIDANCE: Record<number, string[]> = {
+  130: [
+    "Script was interrupted (Ctrl+C).",
+    "Note: If a server was already created, it may still be running.",
+    "  Check your cloud provider dashboard to stop or delete any unused servers.",
+  ],
+  137: [
+    "Script was killed (likely by the system due to timeout or out of memory).",
+    "  - The server may not have enough RAM for this agent",
+    "  - Try a larger instance size or a different cloud provider",
+    "  - Check your cloud provider dashboard to stop or delete any unused servers",
+  ],
+  255: [
+    "SSH connection failed. Common causes:",
+    "  - Server is still booting (wait a moment and retry)",
+    "  - Firewall blocking SSH port 22",
+    "  - Server was terminated before the session started",
+  ],
+};
+
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
+  if (exitCode !== null && STATIC_EXIT_GUIDANCE[exitCode]) {
+    return STATIC_EXIT_GUIDANCE[exitCode];
+  }
+
   switch (exitCode) {
-    case 130:
-      return [
-        "Script was interrupted (Ctrl+C).",
-        "Note: If a server was already created, it may still be running.",
-        "  Check your cloud provider dashboard to stop or delete any unused servers.",
-      ];
-    case 137:
-      return [
-        "Script was killed (likely by the system due to timeout or out of memory).",
-        "  - The server may not have enough RAM for this agent",
-        "  - Try a larger instance size or a different cloud provider",
-        "  - Check your cloud provider dashboard to stop or delete any unused servers",
-      ];
-    case 255:
-      return [
-        "SSH connection failed. Common causes:",
-        "  - Server is still booting (wait a moment and retry)",
-        "  - Firewall blocking SSH port 22",
-        "  - Server was terminated before the session started",
-      ];
     case 127:
       return [
         "A required command was not found. Check that these are installed:",
@@ -561,12 +568,12 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         "A command was found but could not be executed (permission denied).",
         "  - A downloaded binary may lack execute permissions",
         "  - The script may require root/sudo access",
-        `  - Report it if this persists: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
+        `  - Report it if this persists: ${pc.cyan(ISSUE_URL)}`,
       ];
     case 2:
       return [
         "Shell syntax or argument error. This is likely a bug in the script.",
-        `  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
+        `  Report it at: ${pc.cyan(ISSUE_URL)}`,
       ];
     case 1:
       return [

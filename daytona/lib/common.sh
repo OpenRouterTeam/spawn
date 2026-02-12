@@ -44,6 +44,19 @@ ensure_daytona_cli() {
     log_info "Daytona CLI available"
 }
 
+# Check if a Daytona CLI response indicates an auth failure
+_daytona_is_auth_error() {
+    printf '%s' "${1}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"
+}
+
+_daytona_report_auth_error() {
+    log_error "Invalid API key"
+    log_warn "Remediation steps:"
+    log_warn "  1. Verify API key at: https://app.daytona.io"
+    log_warn "  2. Ensure the key has sandbox permissions"
+    log_warn "  3. Check key hasn't expired or been revoked"
+}
+
 test_daytona_token() {
     local test_response
     # Authenticate CLI with the API key first
@@ -51,15 +64,10 @@ test_daytona_token() {
     local exit_code=$?
 
     if [[ ${exit_code} -ne 0 ]]; then
-        if printf '%s' "${test_response}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"; then
-            log_error "Invalid API key"
-            log_warn "Remediation steps:"
-            log_warn "  1. Verify API key at: https://app.daytona.io"
-            log_warn "  2. Ensure the key has sandbox permissions"
-            log_warn "  3. Check key hasn't expired or been revoked"
+        if _daytona_is_auth_error "${test_response}"; then
+            _daytona_report_auth_error
             return 1
         fi
-        # Non-auth error during login — could be network, still fail
         log_error "Daytona login failed: ${test_response}"
         return 1
     fi
@@ -68,15 +76,9 @@ test_daytona_token() {
     test_response=$(daytona list --limit 1 2>&1)
     exit_code=$?
 
-    if [[ ${exit_code} -ne 0 ]]; then
-        if printf '%s' "${test_response}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"; then
-            log_error "Invalid API key"
-            log_warn "Remediation steps:"
-            log_warn "  1. Verify API key at: https://app.daytona.io"
-            log_warn "  2. Ensure the key has sandbox permissions"
-            log_warn "  3. Check key hasn't expired or been revoked"
-            return 1
-        fi
+    if [[ ${exit_code} -ne 0 ]] && _daytona_is_auth_error "${test_response}"; then
+        _daytona_report_auth_error
+        return 1
     fi
     return 0
 }
