@@ -284,7 +284,7 @@ validated_read() {
             return 0
         fi
 
-        log_warn "Please try again."
+        log_info "Please try again."
     done
 }
 
@@ -444,7 +444,7 @@ _validate_oauth_server_args() {
     local starting_port="${1}"
     local state_file="${2}"
 
-    OAUTH_RUNTIME=$(find_node_runtime) || { log_warn "No Node.js runtime found"; return 1; }
+    OAUTH_RUNTIME=$(find_node_runtime) || { log_error "No Node.js runtime found"; return 1; }
 
     # SECURITY: Validate port number to prevent injection
     if ! validate_oauth_port "${starting_port}"; then
@@ -568,9 +568,9 @@ exchange_oauth_code() {
 
     if [[ -z "${api_key}" ]]; then
         log_error "Failed to exchange OAuth code for API key"
-        log_warn "Server response: ${key_response}"
-        log_warn "This may indicate the OAuth code expired or was already used"
-        log_warn "Please try again, or set OPENROUTER_API_KEY manually"
+        log_error "Server response: ${key_response}"
+        log_info "This may indicate the OAuth code expired or was already used"
+        log_info "Please try again, or set OPENROUTER_API_KEY manually"
         return 1
     fi
 
@@ -632,8 +632,8 @@ start_and_verify_oauth_server() {
 
     sleep "${POLL_INTERVAL}"
     if ! kill -0 "${server_pid}" 2>/dev/null; then
-        log_warn "Failed to start OAuth server - ports ${callback_port}-$((callback_port + 10)) may be in use"
-        log_warn "Try closing other dev servers or set OPENROUTER_API_KEY to skip OAuth"
+        log_error "Failed to start OAuth server - ports ${callback_port}-$((callback_port + 10)) may be in use"
+        log_info "Try closing other dev servers or set OPENROUTER_API_KEY to skip OAuth"
         return 1
     fi
 
@@ -645,8 +645,8 @@ start_and_verify_oauth_server() {
     done
 
     if [[ ! -f "${port_file}" ]]; then
-        log_warn "OAuth server failed to allocate a port after 2 seconds"
-        log_warn "Another process may be using ports ${callback_port}-$((callback_port + 10))"
+        log_error "OAuth server failed to allocate a port after 2 seconds"
+        log_info "Another process may be using ports ${callback_port}-$((callback_port + 10))"
         return 1
     fi
 
@@ -657,17 +657,17 @@ start_and_verify_oauth_server() {
 # Returns 0 if all checks pass, 1 otherwise
 _check_oauth_prerequisites() {
     if ! check_openrouter_connectivity; then
-        log_warn "Cannot reach openrouter.ai - network may be unavailable"
-        log_warn "Please check your internet connection and try again"
-        log_warn "Alternatively, set OPENROUTER_API_KEY in your environment to skip OAuth"
+        log_error "Cannot reach openrouter.ai - network may be unavailable"
+        log_info "Please check your internet connection and try again"
+        log_info "Alternatively, set OPENROUTER_API_KEY in your environment to skip OAuth"
         return 1
     fi
 
     local runtime
     runtime=$(find_node_runtime)
     if [[ -z "${runtime}" ]]; then
-        log_warn "No Node.js runtime (bun/node) found - required for the OAuth callback server"
-        log_warn "Install one with: brew install node  OR  curl -fsSL https://bun.sh/install | bash"
+        log_error "No Node.js runtime (bun/node) found - required for the OAuth callback server"
+        log_info "Install one with: brew install node  OR  curl -fsSL https://bun.sh/install | bash"
         return 1
     fi
 
@@ -703,7 +703,7 @@ _wait_for_oauth() {
     local code_file="${1}"
 
     if ! wait_for_oauth_code "${code_file}" 120; then
-        log_warn "OAuth timeout - no response received"
+        log_error "OAuth timeout - no response received"
         return 1
     fi
     return 0
@@ -752,15 +752,15 @@ _await_oauth_callback() {
 
     if ! _wait_for_oauth "${code_file}"; then
         cleanup_oauth_session "${server_pid}" "${oauth_dir}"
-        log_warn "OAuth timed out after 120 seconds. Possible causes:"
-        log_warn "  - Browser did not open (try visiting the URL manually)"
-        log_warn "  - Authentication was not completed in the browser"
-        log_warn "  - Firewall or proxy blocked the local callback on port ${actual_port}"
-        log_warn ""
-        log_warn "How to fix:"
-        log_warn "  1. Re-run the command to try again"
-        log_warn "  2. Set the key manually: export OPENROUTER_API_KEY=sk-or-..."
-        log_warn "     (get a key at https://openrouter.ai/settings/keys)"
+        log_error "OAuth timed out after 120 seconds. Possible causes:"
+        log_error "  - Browser did not open (try visiting the URL manually)"
+        log_error "  - Authentication was not completed in the browser"
+        log_error "  - Firewall or proxy blocked the local callback on port ${actual_port}"
+        log_error ""
+        log_info "How to fix:"
+        log_info "  1. Re-run the command to try again"
+        log_info "  2. Set the key manually: export OPENROUTER_API_KEY=sk-or-..."
+        log_info "     (get a key at https://openrouter.ai/settings/keys)"
         return 1
     fi
 
@@ -821,23 +821,23 @@ get_openrouter_api_key_oauth() {
 
     # OAuth failed, offer manual entry
     echo ""
-    log_warn "Browser-based OAuth login was not completed."
-    log_warn "This is normal on remote servers, SSH sessions, or headless environments."
+    log_info "Browser-based OAuth login was not completed."
+    log_info "This is normal on remote servers, SSH sessions, or headless environments."
     log_info "You can paste an API key instead. Create one at: https://openrouter.ai/settings/keys"
     echo ""
     local manual_choice
     manual_choice=$(safe_read "Paste your API key manually? (Y/n): ") || {
         log_error "Cannot prompt for manual entry in non-interactive mode"
-        log_warn "Set OPENROUTER_API_KEY environment variable before running spawn"
+        log_info "Set OPENROUTER_API_KEY environment variable before running spawn"
         return 1
     }
 
     if [[ "${manual_choice}" =~ ^[Nn]$ ]]; then
         log_error "Authentication cancelled. An OpenRouter API key is required to use spawn."
-        log_warn "To authenticate, either:"
-        log_warn "  - Re-run this command and complete the OAuth flow in your browser"
-        log_warn "  - Set OPENROUTER_API_KEY=sk-or-v1-... before running spawn"
-        log_warn "  - Create a key at: https://openrouter.ai/settings/keys"
+        log_info "To authenticate, either:"
+        log_info "  - Re-run this command and complete the OAuth flow in your browser"
+        log_info "  - Set OPENROUTER_API_KEY=sk-or-v1-... before running spawn"
+        log_info "  - Create a key at: https://openrouter.ai/settings/keys"
         return 1
     fi
 
@@ -1080,7 +1080,7 @@ _api_should_retry_on_error() {
 
     local jitter
     jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
-    log_warn "${message} (attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
+    log_step "${message} (attempt ${attempt}/${max_retries}), retrying in ${jitter}s..."
     sleep "${jitter}"
 
     return 0  # Do retry
@@ -1189,7 +1189,7 @@ _cloud_api_retry_loop() {
         if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "${retry_reason}"; then
             log_error "${retry_reason} after ${max_retries} attempts"
             if [[ "${retry_reason}" == "Cloud API network error" ]]; then
-                log_warn "Check your internet connection and verify the provider's API is reachable."
+                log_info "Check your internet connection and verify the provider's API is reachable."
             else
                 echo "${API_RESPONSE_BODY}"
             fi
@@ -1200,8 +1200,8 @@ _cloud_api_retry_loop() {
     done
 
     log_error "Cloud API request failed after ${max_retries} attempts (${api_description})"
-    log_warn "This is usually caused by rate limiting or temporary provider issues."
-    log_warn "Wait a minute and try again, or check the provider's status page."
+    log_info "This is usually caused by rate limiting or temporary provider issues."
+    log_info "Wait a minute and try again, or check the provider's status page."
     return 1
 }
 
@@ -1394,7 +1394,7 @@ generic_ssh_wait() {
     done
 
     log_error "${description} failed after ${max_attempts} attempts (${elapsed_time}s elapsed)"
-    log_warn "The server at ${ip} may still be booting. You can try again or check its status in your cloud provider dashboard."
+    log_info "The server at ${ip} may still be booting. You can try again or check its status in your cloud provider dashboard."
     return 1
 }
 
@@ -1519,10 +1519,10 @@ generic_wait_for_instance() {
     done
 
     log_error "${description} did not become ${target_status} after ${max_attempts} attempts"
-    log_warn "The instance may still be provisioning. You can:"
-    log_warn "  1. Re-run the command to try again"
-    log_warn "  2. Check the instance status in your cloud provider dashboard"
-    log_warn "  3. Try a different region (some regions provision faster)"
+    log_info "The instance may still be provisioning. You can:"
+    log_info "  1. Re-run the command to try again"
+    log_info "  2. Check the instance status in your cloud provider dashboard"
+    log_info "  3. Try a different region (some regions provision faster)"
     return 1
 }
 
