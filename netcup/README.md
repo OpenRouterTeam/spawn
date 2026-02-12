@@ -28,6 +28,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/goose.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/amazonq.sh)
 ```
 
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/plandex.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
