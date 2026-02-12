@@ -33,6 +33,72 @@ for var in re.split(r'\s*\+\s*', auth):
 " "${REPO_ROOT}/manifest.json" "${cloud}" 2>/dev/null
 }
 
+# Try to ensure a single env var is set, loading from config file if needed.
+# Returns 0 if the var is set (already or from config), 1 if missing.
+# Usage: _try_load_env_var VAR_NAME CONFIG_FILE
+_try_load_env_var() {
+    local var_name="$1"
+    local config_file="$2"
+
+    # Already set in environment?
+    local current_val="${!var_name:-}"
+    if [[ -n "${current_val}" ]]; then
+        return 0
+    fi
+
+    # Try loading from config file
+    if [[ -f "${config_file}" ]]; then
+        local val
+        val=$(python3 -c "
+import json, sys
+data = json.load(open(sys.argv[1]))
+v = data.get(sys.argv[2], '') or data.get('api_key', '') or data.get('token', '')
+print(v)
+" "${config_file}" "${var_name}" 2>/dev/null)
+        if [[ -n "${val}" ]]; then
+            export "${var_name}=${val}"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+# Load all env vars for a single cloud provider from env or config file.
+# Returns 0 if all vars are available, 1 if any are missing.
+# Usage: _load_cloud_credentials CLOUD_KEY AUTH_STRING
+_load_cloud_credentials() {
+    local cloud_key="$1"
+    local auth_string="$2"
+    local config_file="${HOME}/.config/spawn/${cloud_key}.json"
+
+    local env_vars
+    env_vars=$(printf '%s' "${auth_string}" | tr '+' '\n' | sed 's/^ *//;s/ *$//')
+
+    while IFS= read -r var_name; do
+        [[ -z "${var_name}" ]] && continue
+        _try_load_env_var "${var_name}" "${config_file}" || return 1
+    done <<< "${env_vars}"
+
+    return 0
+}
+
+# Parse manifest.json to list cloud_key|auth_string pairs for API-token clouds.
+# Skips CLI-based auth (login/configure/setup) and empty auth strings.
+_list_api_token_clouds() {
+    python3 -c "
+import json, re, sys
+manifest = json.load(open(sys.argv[1]))
+for key, cloud in manifest.get('clouds', {}).items():
+    auth = cloud.get('auth', '')
+    if re.search(r'\b(login|configure|setup)\b', auth, re.I):
+        continue
+    if not auth.strip():
+        continue
+    print(key + '|' + auth)
+" "$1" 2>/dev/null
+}
+
 # Load cloud API keys from ~/.config/spawn/{cloud}.json into environment
 # Reads manifest.json to determine which clouds need API-token auth
 # Skips CLI-based auth (sprite login, aws configure, etc.)
@@ -53,60 +119,14 @@ load_cloud_keys_from_config() {
     local loaded=0
     local missing_providers=""
 
-    # Parse manifest.json → cloud_key|auth_string for each API-token cloud
     local cloud_auths
-    cloud_auths=$(python3 -c "
-import json, re, sys
-manifest = json.load(open(sys.argv[1]))
-for key, cloud in manifest.get('clouds', {}).items():
-    auth = cloud.get('auth', '')
-    if re.search(r'\b(login|configure|setup)\b', auth, re.I):
-        continue
-    if not auth.strip():
-        continue
-    print(key + '|' + auth)
-" "${manifest_path}" 2>/dev/null) || return 1
+    cloud_auths=$(_list_api_token_clouds "${manifest_path}") || return 1
 
     while IFS='|' read -r cloud_key auth_string; do
         [[ -z "${cloud_key}" ]] && continue
         total=$((total + 1))
 
-        # Parse env var names from auth string (split on " + ")
-        local env_vars
-        env_vars=$(printf '%s' "${auth_string}" | tr '+' '\n' | sed 's/^ *//;s/ *$//')
-
-        local cloud_complete=true
-        local config_file="${HOME}/.config/spawn/${cloud_key}.json"
-
-        while IFS= read -r var_name; do
-            [[ -z "${var_name}" ]] && continue
-
-            # Already set in environment? Skip
-            local current_val="${!var_name:-}"
-            if [[ -n "${current_val}" ]]; then
-                continue
-            fi
-
-            # Try loading from config file
-            if [[ -f "${config_file}" ]]; then
-                local val
-                val=$(python3 -c "
-import json, sys
-data = json.load(open(sys.argv[1]))
-v = data.get(sys.argv[2], '') or data.get('api_key', '') or data.get('token', '')
-print(v)
-" "${config_file}" "${var_name}" 2>/dev/null)
-                if [[ -n "${val}" ]]; then
-                    export "${var_name}=${val}"
-                    continue
-                fi
-            fi
-
-            # This env var is missing
-            cloud_complete=false
-        done <<< "${env_vars}"
-
-        if [[ "${cloud_complete}" == "true" ]]; then
+        if _load_cloud_credentials "${cloud_key}" "${auth_string}"; then
             loaded=$((loaded + 1))
         else
             missing_providers="${missing_providers} ${cloud_key}"
