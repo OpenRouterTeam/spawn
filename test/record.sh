@@ -167,14 +167,15 @@ try_load_config() {
     # OVH uses separate config with multiple fields
     if [[ "$cloud" == "ovh" ]]; then
         if [[ -f "$config_file" ]]; then
+            # SECURITY: Use shlex.quote to prevent shell injection via JSON values
             eval "$(python3 -c "
-import json, sys
+import json, sys, shlex
 try:
     d = json.load(open(sys.argv[1]))
     for k, e in [('application_key','OVH_APPLICATION_KEY'), ('application_secret','OVH_APPLICATION_SECRET'),
                  ('consumer_key','OVH_CONSUMER_KEY'), ('project_id','OVH_PROJECT_ID')]:
         v = d.get(k, '')
-        if v: print(f'export {e}=\"{v}\"')
+        if v: print(f'export {e}={shlex.quote(str(v))}')
 except: pass
 " "$config_file" 2>/dev/null)" || true
         fi
@@ -223,32 +224,34 @@ save_config() {
     local config_file="${config_dir}/${cloud}.json"
     mkdir -p "$config_dir"
 
+    # SECURITY: Pass credential values via sys.argv to prevent Python injection.
+    # Never interpolate env var values directly into Python string literals.
     case "$cloud" in
         ovh)
             python3 -c "
-import json
-d = {'application_key': '${OVH_APPLICATION_KEY:-}', 'application_secret': '${OVH_APPLICATION_SECRET:-}',
-     'consumer_key': '${OVH_CONSUMER_KEY:-}', 'project_id': '${OVH_PROJECT_ID:-}'}
+import json, sys
+d = {'application_key': sys.argv[1], 'application_secret': sys.argv[2],
+     'consumer_key': sys.argv[3], 'project_id': sys.argv[4]}
 print(json.dumps(d, indent=2))
-" > "$config_file"
+" "${OVH_APPLICATION_KEY:-}" "${OVH_APPLICATION_SECRET:-}" "${OVH_CONSUMER_KEY:-}" "${OVH_PROJECT_ID:-}" > "$config_file"
             ;;
         upcloud)
             python3 -c "
-import json
-print(json.dumps({'username': '${UPCLOUD_USERNAME:-}', 'password': '${UPCLOUD_PASSWORD:-}'}, indent=2))
-" > "$config_file"
+import json, sys
+print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}, indent=2))
+" "${UPCLOUD_USERNAME:-}" "${UPCLOUD_PASSWORD:-}" > "$config_file"
             ;;
         kamatera)
             python3 -c "
-import json
-print(json.dumps({'client_id': '${KAMATERA_API_CLIENT_ID:-}', 'secret': '${KAMATERA_API_SECRET:-}'}, indent=2))
-" > "$config_file"
+import json, sys
+print(json.dumps({'client_id': sys.argv[1], 'secret': sys.argv[2]}, indent=2))
+" "${KAMATERA_API_CLIENT_ID:-}" "${KAMATERA_API_SECRET:-}" > "$config_file"
             ;;
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
             eval "local val=\"\${${env_var}:-}\""
-            python3 -c "import json; print(json.dumps({'api_key': '${val}'}, indent=2))" > "$config_file"
+            python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "${val}" > "$config_file"
             ;;
     esac
     printf '%b\n' "  ${GREEN}saved${NC} → ${config_file}"
