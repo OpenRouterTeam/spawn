@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '*/30 * * * *'
   issues:
-    types: [opened, reopened]
+    types: [opened, reopened, labeled]
   workflow_dispatch:
 
 concurrency:
@@ -15,11 +15,12 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # Only trigger on cloud-request or agent-request issues (or schedule/manual)
+    # Only trigger on issues with safe-to-work AND (cloud-request or agent-request) labels, or schedule/manual
     if: >-
       github.event_name != 'issues' ||
-      contains(github.event.issue.labels.*.name, 'cloud-request') ||
-      contains(github.event.issue.labels.*.name, 'agent-request')
+      (contains(github.event.issue.labels.*.name, 'safe-to-work') &&
+       (contains(github.event.issue.labels.*.name, 'cloud-request') ||
+        contains(github.event.issue.labels.*.name, 'agent-request')))
     steps:
       - name: Trigger and stream discovery cycle
         env:

@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   issues:
-    types: [opened, reopened]
+    types: [opened, reopened, labeled]
   workflow_dispatch:
 
 concurrency:
@@ -15,11 +15,12 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # Only trigger on bug or cli issues (or schedule/manual)
+    # Only trigger on issues with safe-to-work AND (bug or cli) labels, or schedule/manual
     if: >-
       github.event_name != 'issues' ||
-      contains(github.event.issue.labels.*.name, 'bug') ||
-      contains(github.event.issue.labels.*.name, 'cli')
+      (contains(github.event.issue.labels.*.name, 'safe-to-work') &&
+       (contains(github.event.issue.labels.*.name, 'bug') ||
+        contains(github.event.issue.labels.*.name, 'cli')))
     steps:
       - name: Trigger and stream refactor cycle
         env:

@@ -33,10 +33,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Only trigger on team-building issues (or PR/schedule/manual)
-    if: >-
-      github.event_name != 'issues' ||
-      contains(github.event.issue.labels.*.name, 'team-building')
+    # Trigger on ALL issues (triage or team-building) plus PR/schedule/manual
     steps:
       - name: Trigger security review
         env:
@@ -53,8 +50,12 @@ jobs:
             REASON="pull_request"
             ISSUE_NUM="${{ github.event.pull_request.number }}"
           elif [ "${{ github.event_name }}" = "issues" ]; then
-            REASON="team_building"
             ISSUE_NUM="${{ github.event.issue.number }}"
+            if [ "${{ contains(github.event.issue.labels.*.name, 'team-building') }}" = "true" ]; then
+              REASON="team_building"
+            else
+              REASON="triage"
+            fi
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             # Distinguish between cron schedules:
             # '0 6 * * *' = daily scan, '0 */6 * * *' = hygiene every 6h
