@@ -585,7 +585,17 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
   }
 }
 
-function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string): never {
+export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
+  if (!prompt) return `spawn ${agent} ${cloud}`;
+  // Escape double quotes so the suggested command is valid shell
+  const safePrompt = prompt.replace(/"/g, '\\"');
+  if (prompt.length <= 80) {
+    return `spawn ${agent} ${cloud} --prompt "${safePrompt}"`;
+  }
+  return `spawn ${agent} ${cloud} --prompt "..."`;
+}
+
+function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, prompt?: string): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
 
@@ -596,7 +606,10 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
-  console.error(`Retry: ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
+  console.error(`Retry: ${pc.cyan(buildRetryCommand(agent, cloud, prompt))}`);
+  if (prompt && prompt.length > 80) {
+    console.error(pc.dim(`  (prompt truncated -- use Up arrow to recall your original command)`));
+  }
   process.exit(1);
 }
 
@@ -630,7 +643,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     if (errMsg.includes("interrupted by user")) {
       process.exit(130);
     }
-    reportScriptFailure(errMsg, cloud, agent, authHint);
+    reportScriptFailure(errMsg, cloud, agent, authHint, prompt);
   }
 }
 
