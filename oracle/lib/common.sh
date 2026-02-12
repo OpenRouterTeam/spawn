@@ -26,18 +26,7 @@ fi
 # Configurable timeout/delay constants
 INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}
 
-ensure_oci_cli() {
-    if ! command -v oci &>/dev/null; then
-        log_error "OCI CLI is required but not installed."
-        log_error ""
-        log_error "Install with: pip install oci-cli"
-        log_error "Or: bash -c \"\$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)\""
-        log_error ""
-        log_error "After installing, run: oci setup config"
-        return 1
-    fi
-
-    # Verify config exists
+_check_oci_config() {
     if [[ ! -f "${HOME}/.oci/config" ]]; then
         log_error "OCI CLI not configured. Run: oci setup config"
         log_error ""
@@ -49,11 +38,11 @@ ensure_oci_cli() {
         log_error "  - API signing key pair (generated during setup)"
         return 1
     fi
+}
 
-    # Get compartment ID
+_resolve_compartment_id() {
     local compartment="${OCI_COMPARTMENT_ID:-}"
     if [[ -z "${compartment}" ]]; then
-        # Try to get tenancy OCID as default compartment (root compartment)
         compartment=$(oci iam compartment list --compartment-id-in-subtree true --all \
             --query 'data[0]."compartment-id"' --raw-output 2>/dev/null || true)
         if [[ -z "${compartment}" ]]; then
@@ -66,6 +55,21 @@ ensure_oci_cli() {
     fi
     export OCI_COMPARTMENT_ID="${compartment}"
     log_info "Using OCI compartment: ${compartment}"
+}
+
+ensure_oci_cli() {
+    if ! command -v oci &>/dev/null; then
+        log_error "OCI CLI is required but not installed."
+        log_error ""
+        log_error "Install with: pip install oci-cli"
+        log_error "Or: bash -c \"\$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)\""
+        log_error ""
+        log_error "After installing, run: oci setup config"
+        return 1
+    fi
+
+    _check_oci_config || return 1
+    _resolve_compartment_id || return 1
 }
 
 ensure_ssh_key() {
@@ -179,22 +183,21 @@ _create_vcn() {
     echo "${vcn_id}"
 }
 
-_setup_vcn_networking() {
-    local compartment="${1}"
-    local vcn_id="${2}"
-
-    # Create internet gateway
-    local igw_id
-    igw_id=$(oci network internet-gateway create \
+_create_internet_gateway() {
+    local compartment="${1}" vcn_id="${2}"
+    oci network internet-gateway create \
         --compartment-id "${compartment}" \
         --vcn-id "${vcn_id}" \
         --display-name "spawn-igw" \
         --is-enabled true \
         --wait-for-state AVAILABLE \
         --query 'data.id' \
-        --raw-output 2>/dev/null)
+        --raw-output 2>/dev/null
+}
 
-    # Add default route to internet gateway
+_add_default_route() {
+    local compartment="${1}" vcn_id="${2}" igw_id="${3}"
+
     local rt_id
     rt_id=$(oci network route-table list \
         --compartment-id "${compartment}" \
@@ -202,15 +205,18 @@ _setup_vcn_networking() {
         --query 'data[0].id' \
         --raw-output 2>/dev/null)
 
-    if [[ -n "${rt_id}" && "${rt_id}" != "null" && -n "${igw_id}" && "${igw_id}" != "null" ]]; then
+    if [[ -n "${rt_id}" && "${rt_id}" != "null" ]]; then
         oci network route-table update \
             --rt-id "${rt_id}" \
             --route-rules "[{\"destination\":\"0.0.0.0/0\",\"networkEntityId\":\"${igw_id}\",\"destinationType\":\"CIDR_BLOCK\"}]" \
             --force \
             --wait-for-state AVAILABLE >/dev/null 2>&1 || true
     fi
+}
 
-    # Add SSH ingress rule to default security list
+_add_ssh_security_rules() {
+    local compartment="${1}" vcn_id="${2}"
+
     local sl_id
     sl_id=$(oci network security-list list \
         --compartment-id "${compartment}" \
@@ -226,6 +232,20 @@ _setup_vcn_networking() {
             --force \
             --wait-for-state AVAILABLE >/dev/null 2>&1 || true
     fi
+}
+
+_setup_vcn_networking() {
+    local compartment="${1}"
+    local vcn_id="${2}"
+
+    local igw_id
+    igw_id=$(_create_internet_gateway "${compartment}" "${vcn_id}")
+
+    if [[ -n "${igw_id}" && "${igw_id}" != "null" ]]; then
+        _add_default_route "${compartment}" "${vcn_id}" "${igw_id}"
+    fi
+
+    _add_ssh_security_rules "${compartment}" "${vcn_id}"
 }
 
 _create_subnet() {

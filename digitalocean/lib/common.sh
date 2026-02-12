@@ -145,6 +145,34 @@ _wait_for_droplet_active() {
         DO_SERVER_IP "Droplet" "${max_attempts}"
 }
 
+# Extract droplet ID from API response or report error and return 1
+# Usage: _handle_droplet_create_response RESPONSE
+# Sets: DO_DROPLET_ID (exported)
+_handle_droplet_create_response() {
+    local response="$1"
+
+    if echo "$response" | grep -q '"id"' && echo "$response" | grep -q '"droplet"'; then
+        DO_DROPLET_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['id'])")
+        export DO_DROPLET_ID
+        log_info "Droplet created: ID=$DO_DROPLET_ID"
+        return 0
+    fi
+
+    log_error "Failed to create DigitalOcean droplet"
+
+    local error_msg
+    error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown error'))" 2>/dev/null || echo "$response")
+    log_error "API Error: $error_msg"
+
+    log_warn "Common issues:"
+    log_warn "  - Insufficient account balance or payment method required"
+    log_warn "  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)"
+    log_warn "  - Droplet limit reached (check account limits)"
+    log_warn "  - Invalid cloud-init userdata"
+    log_warn "Remediation: Check https://cloud.digitalocean.com/droplets"
+    return 1
+}
+
 # Create a DigitalOcean droplet with cloud-init
 create_server() {
     local name="$1"
@@ -174,27 +202,7 @@ create_server() {
     local response
     response=$(do_api POST "/droplets" "$body")
 
-    # Check for errors
-    if echo "$response" | grep -q '"id"' && echo "$response" | grep -q '"droplet"'; then
-        DO_DROPLET_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['id'])")
-        export DO_DROPLET_ID
-        log_info "Droplet created: ID=$DO_DROPLET_ID"
-    else
-        log_error "Failed to create DigitalOcean droplet"
-
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance or payment method required"
-        log_warn "  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)"
-        log_warn "  - Droplet limit reached (check account limits)"
-        log_warn "  - Invalid cloud-init userdata"
-        log_warn "Remediation: Check https://cloud.digitalocean.com/droplets"
-        return 1
-    fi
+    _handle_droplet_create_response "$response" || return 1
 
     _wait_for_droplet_active "$DO_DROPLET_ID"
 }
