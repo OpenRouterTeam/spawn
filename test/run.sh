@@ -451,39 +451,37 @@ _test_syntax_and_logging() {
     fi
 }
 
-_test_open_browser() {
-    # open_browser: termux
+# Assert open_browser dispatches to expected command
+# Usage: _assert_browser_dispatch LABEL MOCK_SETUP EXPECTED_OUTPUT
+_assert_browser_dispatch() {
+    local label="$1" mock_setup="$2" expected="$3"
     local result
     result=$(bash -c '
         source "'"${REPO_ROOT}"'/shared/common.sh"
-        termux-open-url() { echo "termux: $*"; }
-        export -f termux-open-url
+        '"${mock_setup}"'
         open_browser "https://example.com"
     ' 2>/dev/null)
-    if [[ "${result}" == "termux: https://example.com" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} open_browser detects termux-open-url"
+    if [[ "${result}" == "${expected}" ]]; then
+        printf '%b\n' "  ${GREEN}✓${NC} ${label}"
         ((PASSED++))
     else
-        printf '%b\n' "  ${RED}✗${NC} open_browser should use termux-open-url, got '${result}'"
+        printf '%b\n' "  ${RED}✗${NC} ${label}, got '${result}'"
         ((FAILED++))
     fi
+}
 
-    # open_browser: macOS open
-    result=$(bash -c '
-        source "'"${REPO_ROOT}"'/shared/common.sh"
-        open() { echo "macOS: $*"; }
-        export -f open
-        open_browser "https://example.com"
-    ' 2>/dev/null)
-    if [[ "${result}" == "macOS: https://example.com" ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} open_browser detects macOS open"
-        ((PASSED++))
-    else
-        printf '%b\n' "  ${RED}✗${NC} open_browser should use macOS open, got '${result}'"
-        ((FAILED++))
-    fi
+_test_open_browser() {
+    _assert_browser_dispatch \
+        "open_browser detects termux-open-url" \
+        'termux-open-url() { echo "termux: $*"; }; export -f termux-open-url' \
+        "termux: https://example.com"
 
-    # open_browser: fallback message
+    _assert_browser_dispatch \
+        "open_browser detects macOS open" \
+        'open() { echo "macOS: $*"; }; export -f open' \
+        "macOS: https://example.com"
+
+    # Fallback: no browser available — checks stderr
     local stderr_output
     stderr_output=$(bash -c '
         PATH="/usr/bin:/bin"
@@ -702,59 +700,70 @@ test_source_detection() {
 }
 
 # --- Static analysis with shellcheck ---
+
+# Dynamically discover all shell scripts across the repo
+# Covers shared/, all cloud dirs (agent scripts + lib/common.sh), and test/
+_discover_shell_scripts() {
+    local scripts=("${REPO_ROOT}"/shared/common.sh)
+
+    # Discover cloud directories (any dir with lib/common.sh)
+    local cloud_lib
+    for cloud_lib in "${REPO_ROOT}"/*/lib/common.sh; do
+        [[ -f "${cloud_lib}" ]] || continue
+        local cloud_dir
+        cloud_dir=$(dirname "$(dirname "${cloud_lib}")")
+        scripts+=("${cloud_lib}")
+        # Add agent scripts in the cloud directory
+        local agent_script
+        for agent_script in "${cloud_dir}"/*.sh; do
+            [[ -f "${agent_script}" ]] && scripts+=("${agent_script}")
+        done
+    done
+
+    scripts+=("${REPO_ROOT}"/test/run.sh)
+    printf '%s\n' "${scripts[@]}"
+}
+
+# Run shellcheck on a single script, printing issues if found
+# Returns 0 if clean, 1 if issues found
+_shellcheck_one() {
+    local script="$1"
+    local output
+    # SC1090: Can't follow non-constant source
+    # SC2312: Consider invoking this command separately to avoid masking its return value
+    output=$(shellcheck --severity=warning --exclude=SC1090,SC2312 "${script}" 2>&1)
+    if [[ -n "${output}" ]]; then
+        printf '%b\n' "  ${YELLOW}⚠${NC} $(basename "${script}"): found issues"
+        echo "${output}" | sed 's/^/    /'
+        return 1
+    fi
+    return 0
+}
+
 run_shellcheck() {
     echo ""
     printf '%b\n' "${YELLOW}━━━ Running shellcheck (static analysis) ━━━${NC}"
 
-    # Check if shellcheck is available
     if ! command -v shellcheck &> /dev/null; then
         printf '%b\n' "  ${YELLOW}⚠${NC} shellcheck not found (install with: apt install shellcheck / brew install shellcheck)"
         printf '%b\n' "  ${YELLOW}⚠${NC} Skipping static analysis"
         return 0
     fi
 
-    # Find all shell scripts
-    local all_scripts=(
-        "${REPO_ROOT}"/sprite/*.sh
-        "${REPO_ROOT}"/sprite/lib/common.sh
-        "${REPO_ROOT}"/shared/common.sh
-        "${REPO_ROOT}"/digitalocean/*.sh
-        "${REPO_ROOT}"/digitalocean/lib/common.sh
-        "${REPO_ROOT}"/hetzner/*.sh
-        "${REPO_ROOT}"/hetzner/lib/common.sh
-        "${REPO_ROOT}"/linode/*.sh
-        "${REPO_ROOT}"/linode/lib/common.sh
-        "${REPO_ROOT}"/vultr/*.sh
-        "${REPO_ROOT}"/vultr/lib/common.sh
-        "${REPO_ROOT}"/test/run.sh
-    )
-
     local issue_count=0
     local checked_count=0
 
-    for script in "${all_scripts[@]}"; do
+    while IFS= read -r script; do
         [[ -f "${script}" ]] || continue
         ((checked_count++))
-
-        # Run shellcheck with warning severity, exclude some noisy checks
-        # SC1090: Can't follow non-constant source
-        # SC2312: Consider invoking this command separately to avoid masking its return value
-        local output
-        output=$(shellcheck --severity=warning --exclude=SC1090,SC2312 "${script}" 2>&1)
-
-        if [[ -n "${output}" ]]; then
-            ((issue_count++))
-            printf '%b\n' "  ${YELLOW}⚠${NC} $(basename "${script}"): found issues"
-            echo "${output}" | sed 's/^/    /'
-        fi
-    done
+        _shellcheck_one "${script}" || ((issue_count++))
+    done < <(_discover_shell_scripts)
 
     if [[ "${issue_count}" -eq 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} No issues found in ${checked_count} scripts"
         ((PASSED++))
     else
         printf '%b\n' "  ${YELLOW}⚠${NC} Found issues in ${issue_count}/${checked_count} scripts (advisory only)"
-        # Don't fail the build, just warn
     fi
 }
 
