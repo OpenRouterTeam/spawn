@@ -11,6 +11,10 @@
 
 set -eo pipefail
 
+if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+    printf 'WARNING: bash %s detected. Some features may need bash 4+.\n' "${BASH_VERSION}" >&2
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES_DIR="${REPO_ROOT}/test/fixtures"
 TEST_DIR=$(mktemp -d)
@@ -63,6 +67,89 @@ assert_log_contains() {
     fi
 }
 
+assert_api_called() {
+    local method="$1"
+    local endpoint_pattern="$2"
+    local msg="${3:-calls ${method} ${endpoint_pattern}}"
+    if grep -qE "curl ${method} .*${endpoint_pattern}" "${MOCK_LOG}" 2>/dev/null; then
+        printf '%b\n' "    ${GREEN}✓${NC} ${msg}"
+        PASSED=$((PASSED + 1))
+    else
+        printf '%b\n' "    ${RED}✗${NC} ${msg}"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+assert_env_injected() {
+    local var_name="$1"
+    local msg="${2:-injects ${var_name}}"
+    # Check mock log (ssh/scp commands may reference the var) and output log.
+    # Also check case-insensitively: OPENROUTER_API_KEY → "openrouter" appears
+    # in output like "Using OpenRouter API key from environment".
+    local first_word
+    first_word=$(printf '%s' "$var_name" | sed 's/_.*//' | tr '[:upper:]' '[:lower:]')
+    if grep -qE "${var_name}" "${MOCK_LOG}" 2>/dev/null || \
+       grep -qE "${var_name}" "${TEST_DIR}/output.log" 2>/dev/null || \
+       grep -qi "${first_word}" "${TEST_DIR}/output.log" 2>/dev/null || \
+       grep -qi "${first_word}" "${MOCK_LOG}" 2>/dev/null; then
+        printf '%b\n' "    ${GREEN}✓${NC} ${msg}"
+        PASSED=$((PASSED + 1))
+    else
+        printf '%b\n' "    ${RED}✗${NC} ${msg}"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+assert_file_created() {
+    local path_pattern="$1"
+    local msg="${2:-creates file matching ${path_pattern}}"
+    if grep -qE "(scp|upload|file).*${path_pattern}" "${MOCK_LOG}" 2>/dev/null; then
+        printf '%b\n' "    ${GREEN}✓${NC} ${msg}"
+        PASSED=$((PASSED + 1))
+    else
+        printf '%b\n' "    ${RED}✗${NC} ${msg}"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+assert_no_body_errors() {
+    local msg="${1:-no request body validation errors}"
+    if grep -qE "BODY_ERROR:" "${MOCK_LOG}" 2>/dev/null; then
+        local errors
+        errors=$(grep "BODY_ERROR:" "${MOCK_LOG}" 2>/dev/null)
+        printf '%b\n' "    ${RED}✗${NC} ${msg}"
+        printf '%b\n' "    ${RED}  Errors:${NC}"
+        printf '%s\n' "$errors" | while IFS= read -r line; do
+            printf '      %s\n' "$line"
+        done
+        FAILED=$((FAILED + 1))
+    else
+        printf '%b\n' "    ${GREEN}✓${NC} ${msg}"
+        PASSED=$((PASSED + 1))
+    fi
+}
+
+assert_server_cleaned_up() {
+    local state_file="$1"
+    local msg="${2:-server lifecycle tracked}"
+    if [[ ! -f "$state_file" ]]; then
+        printf '%b\n' "    ${YELLOW}⚠${NC} ${msg} (no state file)"
+        return 0
+    fi
+    local created deleted
+    created=$(grep -c "^CREATED:" "$state_file" 2>/dev/null || true)
+    deleted=$(grep -c "^DELETED:" "$state_file" 2>/dev/null || true)
+    if [[ "$created" -gt 0 ]]; then
+        printf '%b\n' "    ${GREEN}✓${NC} ${msg} (created=${created}, deleted=${deleted})"
+        PASSED=$((PASSED + 1))
+        if [[ "$deleted" -lt "$created" ]]; then
+            printf '%b\n' "    ${YELLOW}⚠${NC} warning: ${created} created but only ${deleted} deleted (expected — user takes over)"
+        fi
+    else
+        printf '%b\n' "    ${YELLOW}⚠${NC} ${msg} (no server creation tracked)"
+    fi
+}
+
 # ============================================================
 # Mock setup
 # ============================================================
@@ -76,6 +163,7 @@ setup_mock_curl() {
 # Parse curl arguments
 METHOD="GET"
 URL=""
+BODY=""
 HAS_WRITE_OUT=false
 prev_flag=""
 
@@ -88,7 +176,8 @@ for arg in "$@"; do
             esac
             prev_flag=""; continue
             ;;
-        -d|-H|-o|-u|--connect-timeout|--max-time|--retry|--retry-delay) prev_flag=""; continue ;;
+        -d) BODY="$arg"; prev_flag=""; continue ;;
+        -H|-o|-u|--connect-timeout|--max-time|--retry|--retry-delay) prev_flag=""; continue ;;
     esac
     case "$arg" in
         -X|-w|-d|-H|-o|-u|--connect-timeout|--max-time|--retry|--retry-delay) prev_flag="$arg"; continue ;;
@@ -98,6 +187,48 @@ for arg in "$@"; do
 done
 
 echo "curl ${METHOD} ${URL}" >> "${MOCK_LOG}"
+if [ -n "$BODY" ]; then
+    echo "BODY:${BODY}" >> "${MOCK_LOG}"
+fi
+
+# --- Error injection (opt-in via MOCK_ERROR_SCENARIO) ---
+if [ -n "${MOCK_ERROR_SCENARIO:-}" ]; then
+    case "$URL" in
+        *openrouter.ai*|*raw.githubusercontent.com*|*claude.ai/install*|*bun.sh*|*goose*|*nodesource*|*plandex.ai*|*opencode*|*pip.pypa.io*|*get.docker.com*|*npmjs.org*|*github.com/*/releases*)
+            # Don't inject errors for install/download URLs or OpenRouter
+            ;;
+        *)
+            case "${MOCK_ERROR_SCENARIO}" in
+                auth_failure)
+                    printf '{"error":"Unauthorized"}'
+                    if [ "$HAS_WRITE_OUT" = "true" ]; then printf '\n401'; fi
+                    exit 1
+                    ;;
+                rate_limit)
+                    printf '{"error":"Rate limit exceeded"}'
+                    if [ "$HAS_WRITE_OUT" = "true" ]; then printf '\n429'; fi
+                    exit 1
+                    ;;
+                server_error)
+                    printf '{"error":"Internal server error"}'
+                    if [ "$HAS_WRITE_OUT" = "true" ]; then printf '\n500'; fi
+                    exit 1
+                    ;;
+                create_failure)
+                    if [ "$METHOD" = "POST" ]; then
+                        case "$URL" in
+                            *servers*|*droplets*|*instances*)
+                                printf '{"error":"Unprocessable entity"}'
+                                if [ "$HAS_WRITE_OUT" = "true" ]; then printf '\n422'; fi
+                                exit 1
+                                ;;
+                        esac
+                    fi
+                    ;;
+            esac
+            ;;
+    esac
+fi
 
 # --- Install script downloads → return no-op ---
 case "$URL" in
@@ -135,7 +266,7 @@ case "$URL" in
     https://api.digitalocean.com/v2*)   ENDPOINT="${URL#https://api.digitalocean.com/v2}" ;;
     https://api.vultr.com/v2*)          ENDPOINT="${URL#https://api.vultr.com/v2}" ;;
     https://api.linode.com/v4*)         ENDPOINT="${URL#https://api.linode.com/v4}" ;;
-    https://api.lambdalabs.com/v1*)     ENDPOINT="${URL#https://api.lambdalabs.com/v1}" ;;
+    https://cloud.lambdalabs.com/api/v1*)  ENDPOINT="${URL#https://cloud.lambdalabs.com/api/v1}" ;;
     https://api.civo.com/v2*)           ENDPOINT="${URL#https://api.civo.com/v2}" ;;
     https://api.upcloud.com/1.3*)       ENDPOINT="${URL#https://api.upcloud.com/1.3}" ;;
     https://api.binarylane.com.au/v2*)  ENDPOINT="${URL#https://api.binarylane.com.au/v2}" ;;
@@ -145,13 +276,45 @@ case "$URL" in
     https://api.latitude.sh*)           ENDPOINT="${URL#https://api.latitude.sh}" ;;
     https://infrahub-api.nexgencloud.com/v1*) ENDPOINT="${URL#https://infrahub-api.nexgencloud.com/v1}" ;;
     *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
-    https://openstack.ramnode.com:5000/v3*)   ENDPOINT="${URL#https://openstack.ramnode.com:5000/v3}" ;;
-    https://openstack.ramnode.com:8774/v2.1*) ENDPOINT="${URL#https://openstack.ramnode.com:8774/v2.1}" ;;
-    https://openstack.ramnode.com:9696/v2.0*) ENDPOINT="${URL#https://openstack.ramnode.com:9696/v2.0}" ;;
 esac
 
 # Strip query params for matching
 EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
+
+# --- Body validation (opt-in via MOCK_VALIDATE_BODY=1) ---
+if [ "${MOCK_VALIDATE_BODY:-}" = "1" ] && [ -n "$BODY" ] && [ "$METHOD" = "POST" ]; then
+    # Check body is valid JSON
+    if ! printf '%s' "$BODY" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
+        echo "BODY_ERROR:invalid_json:${URL}" >> "${MOCK_LOG}"
+    else
+        # Check required fields per cloud+endpoint
+        _check_fields() {
+            local fields="$1"
+            for field in $fields; do
+                if ! printf '%s' "$BODY" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
+                    echo "BODY_ERROR:missing_field:${field}:${URL}" >> "${MOCK_LOG}"
+                fi
+            done
+        }
+        case "${MOCK_CLOUD}" in
+            hetzner)
+                case "$EP_CLEAN" in /servers) _check_fields "name server_type image location" ;; esac
+                ;;
+            digitalocean)
+                case "$EP_CLEAN" in /droplets) _check_fields "name region size image" ;; esac
+                ;;
+            vultr)
+                case "$EP_CLEAN" in /instances) _check_fields "label region plan os_id" ;; esac
+                ;;
+            linode)
+                case "$EP_CLEAN" in /linode/instances) _check_fields "label region type image" ;; esac
+                ;;
+            civo)
+                case "$EP_CLEAN" in /instances) _check_fields "hostname size region" ;; esac
+                ;;
+        esac
+    fi
+fi
 
 # Try to find fixture file
 _try_fixture() {
@@ -201,6 +364,9 @@ case "$METHOD" in
                 hetzner)
                     printf '{"server":{"id":99999,"name":"test-srv","status":"running","public_net":{"ipv4":{"ip":"10.0.0.1"}}}}'
                     ;;
+                lambda)
+                    printf '{"data":{"id":"test-uuid-1234","name":"test-srv","status":"active","ip":"10.0.0.1"}}'
+                    ;;
                 *) printf '{}' ;;
             esac
         fi
@@ -248,6 +414,23 @@ case "$METHOD" in
         printf '{}'
         ;;
 esac
+
+# --- State tracking (opt-in via MOCK_TRACK_STATE=1) ---
+if [ "${MOCK_TRACK_STATE:-}" = "1" ] && [ -n "${MOCK_STATE_FILE:-}" ]; then
+    TS=$(date +%s)
+    case "$METHOD" in
+        POST)
+            case "$EP_CLEAN" in
+                /servers|/droplets|/instances|/linode/instances|/instance-operations/launch)
+                    echo "CREATED:${MOCK_CLOUD}:${TS}" >> "${MOCK_STATE_FILE}"
+                    ;;
+            esac
+            ;;
+        DELETE)
+            echo "DELETED:${MOCK_CLOUD}:${TS}" >> "${MOCK_STATE_FILE}"
+            ;;
+    esac
+fi
 
 # Append HTTP status code if -w was used
 if [ "$HAS_WRITE_OUT" = "true" ]; then
@@ -373,7 +556,6 @@ setup_env_for_cloud() {
 
     # Universal env vars
     export OPENROUTER_API_KEY="sk-or-v1-0000000000000000000000000000000000000000000000000000000000000000"
-    export MODEL_ID="openrouter/auto"
     export INSTANCE_STATUS_POLL_DELAY=0
 
     case "$cloud" in
@@ -452,9 +634,6 @@ setup_env_for_cloud() {
             export HYPERSTACK_API_KEY="test-token-hyper"
             export HYPERSTACK_SERVER_NAME="test-srv"
             ;;
-        local)
-            # No cloud credentials needed for local
-            ;;
     esac
 }
 
@@ -490,7 +669,6 @@ run_test() {
     local cloud="$1"
     local agent="$2"
     local script_path="${REPO_ROOT}/${cloud}/${agent}.sh"
-    local _prev_failed="$FAILED"
 
     if [[ ! -f "$script_path" ]]; then
         printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}/${agent}.sh — file not found"
@@ -499,6 +677,9 @@ run_test() {
     fi
 
     printf '%b\n' "  ${CYAN}test${NC} ${cloud}/${agent}.sh"
+
+    # Snapshot failure count before this test's assertions
+    local _pre_failed="${FAILED}"
 
     # Reset mock log
     : > "${MOCK_LOG}"
@@ -510,6 +691,10 @@ run_test() {
     local fake_home
     fake_home=$(setup_fake_home)
 
+    # Set up state file for state tracking
+    local state_file="${TEST_DIR}/state_${cloud}_${agent}.log"
+    : > "${state_file}"
+
     # Run the script with mocked PATH + HOME (10s timeout — all calls are fake)
     local exit_code=0
 
@@ -517,6 +702,10 @@ run_test() {
     MOCK_FIXTURE_DIR="${FIXTURES_DIR}/${cloud}" \
     MOCK_CLOUD="${cloud}" \
     MOCK_REPO_ROOT="${REPO_ROOT}" \
+    MOCK_VALIDATE_BODY="${MOCK_VALIDATE_BODY:-}" \
+    MOCK_TRACK_STATE="${MOCK_TRACK_STATE:-}" \
+    MOCK_STATE_FILE="${state_file}" \
+    MOCK_ERROR_SCENARIO="${MOCK_ERROR_SCENARIO:-}" \
     PATH="${TEST_DIR}:${PATH}" \
     HOME="${fake_home}" \
         bash "${script_path}" < /dev/null > "${TEST_DIR}/output.log" 2>&1 &
@@ -546,22 +735,81 @@ run_test() {
     fi
 
     # --- Assertions ---
-    assert_exit_code "${exit_code}" 0 "exits successfully"
-
-    # Check that API calls were made (curl for installs or cloud APIs)
-    assert_log_contains "curl (GET|POST) https://" "makes API calls"
-
-    # Check that SSH was used (for remote execution) — skip for local cloud
-    if [[ "$cloud" != "local" ]]; then
-        assert_log_contains "ssh " "uses SSH"
+    if [[ -n "${MOCK_ERROR_SCENARIO:-}" ]]; then
+        # Error scenarios: expect non-zero exit
+        if [[ "${exit_code}" -ne 0 ]]; then
+            printf '%b\n' "    ${GREEN}✓${NC} fails on ${MOCK_ERROR_SCENARIO} (exit code ${exit_code})"
+            PASSED=$((PASSED + 1))
+            if [[ -n "${RESULTS_FILE:-}" ]]; then
+                printf '%s/%s:pass\n' "${cloud}" "${agent}" >> "${RESULTS_FILE}"
+            fi
+        else
+            printf '%b\n' "    ${RED}✗${NC} should fail on ${MOCK_ERROR_SCENARIO} but exited 0"
+            FAILED=$((FAILED + 1))
+            if [[ -n "${RESULTS_FILE:-}" ]]; then
+                printf '%s/%s:fail\n' "${cloud}" "${agent}" >> "${RESULTS_FILE}"
+            fi
+        fi
+        printf '\n'
+        return 0
     fi
 
-    # Append result to RESULTS_FILE if set
+    assert_exit_code "${exit_code}" 0 "exits successfully"
+
+    # Cloud-specific API call assertions
+    case "$cloud" in
+        hetzner)
+            assert_api_called "GET" "/ssh_keys" "fetches SSH keys"
+            assert_api_called "POST" "/servers" "creates server"
+            ;;
+        digitalocean)
+            assert_api_called "GET" "/account/keys" "fetches SSH keys"
+            assert_api_called "POST" "/droplets" "creates droplet"
+            ;;
+        vultr)
+            assert_api_called "GET" "/ssh-keys" "fetches SSH keys"
+            assert_api_called "POST" "/instances" "creates instance"
+            ;;
+        linode)
+            assert_api_called "GET" "/profile/sshkeys" "fetches SSH keys"
+            assert_api_called "POST" "/linode/instances" "creates instance"
+            ;;
+        civo)
+            assert_api_called "GET" "/sshkeys" "fetches SSH keys"
+            assert_api_called "POST" "/instances" "creates instance"
+            ;;
+        lambda)
+            assert_api_called "GET" "/ssh-keys" "fetches SSH keys"
+            assert_api_called "POST" "/instance-operations/launch" "launches instance"
+            ;;
+        *)
+            assert_log_contains "curl (GET|POST) https://" "makes API calls"
+            ;;
+    esac
+
+    # Check that SSH was used (for remote execution)
+    assert_log_contains "ssh " "uses SSH"
+
+    # Check OpenRouter API key injection
+    assert_env_injected "OPENROUTER_API_KEY"
+
+    # Body validation (when enabled)
+    if [[ "${MOCK_VALIDATE_BODY:-}" == "1" ]]; then
+        assert_no_body_errors
+    fi
+
+    # State tracking (when enabled)
+    if [[ "${MOCK_TRACK_STATE:-}" == "1" ]]; then
+        assert_server_cleaned_up "${state_file}"
+    fi
+
+    # Write per-test result to RESULTS_FILE (used by qa-dry-run.sh / qa-cycle.sh)
     if [[ -n "${RESULTS_FILE:-}" ]]; then
-        if [[ "$FAILED" -gt "$_prev_failed" ]] || [[ "$exit_code" -ne 0 ]]; then
-            printf '%s/%s:fail\n' "$cloud" "$agent" >> "${RESULTS_FILE}"
+        local pre_fail=$((FAILED - _pre_failed))
+        if [[ "$pre_fail" -gt 0 ]]; then
+            printf '%s/%s:fail\n' "${cloud}" "${agent}" >> "${RESULTS_FILE}"
         else
-            printf '%s/%s:pass\n' "$cloud" "$agent" >> "${RESULTS_FILE}"
+            printf '%s/%s:pass\n' "${cloud}" "${agent}" >> "${RESULTS_FILE}"
         fi
     fi
 

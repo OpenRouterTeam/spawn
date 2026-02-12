@@ -1,0 +1,9 @@
+{
+  "name": "spawn-trigger-service",
+  "private": true,
+  "scripts": {
+    "key-server": "bun run key-server.ts",
+    "trigger-server": "bun run trigger-server.ts",
+    "prod": "bun run key-server.ts & bun run trigger-server.ts"
+  }
+}
