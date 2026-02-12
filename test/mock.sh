@@ -460,44 +460,28 @@ MOCKSCP
     chmod +x "${TEST_DIR}/scp"
 }
 
-setup_mock_agents() {
-    # Agent binaries
-    local agents="claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q"
-    for agent in $agents; do
-        cat > "${TEST_DIR}/${agent}" << MOCK
+# Create a mock binary that logs its invocation to MOCK_LOG and exits 0
+# Usage: _create_logging_mock <name>
+_create_logging_mock() {
+    local name="$1"
+    cat > "${TEST_DIR}/${name}" << MOCK
 #!/bin/bash
-echo "${agent} \$*" >> "\${MOCK_LOG}"
+echo "${name} \$*" >> "\${MOCK_LOG}"
 exit 0
 MOCK
-        chmod +x "${TEST_DIR}/${agent}"
-    done
+    chmod +x "${TEST_DIR}/${name}"
+}
 
-    # Tools used during agent install
-    local tools="pip pip3 npm npx bun node openssl shred cargo go"
-    for tool in $tools; do
-        cat > "${TEST_DIR}/${tool}" << MOCK
-#!/bin/bash
-echo "${tool} \$*" >> "\${MOCK_LOG}"
-exit 0
-MOCK
-        chmod +x "${TEST_DIR}/${tool}"
-    done
+# Create a mock binary that silently exits 0 (no logging)
+# Usage: _create_silent_mock <name>
+_create_silent_mock() {
+    local name="$1"
+    printf '#!/bin/bash\nexit 0\n' > "${TEST_DIR}/${name}"
+    chmod +x "${TEST_DIR}/${name}"
+}
 
-    # Mock 'clear' to prevent terminal clearing
-    cat > "${TEST_DIR}/clear" << 'MOCK'
-#!/bin/bash
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/clear"
-
-    # Mock 'sleep' to speed up tests
-    cat > "${TEST_DIR}/sleep" << 'MOCK'
-#!/bin/bash
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/sleep"
-
-    # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
+# Create the ssh-keygen mock with fingerprint and key creation support
+_create_ssh_keygen_mock() {
     cat > "${TEST_DIR}/ssh-keygen" << 'MOCK'
 #!/bin/bash
 echo "ssh-keygen $*" >> "${MOCK_LOG}"
@@ -524,14 +508,26 @@ fi
 exit 0
 MOCK
     chmod +x "${TEST_DIR}/ssh-keygen"
+}
 
-    # Mock 'git' for agents that clone repos
-    cat > "${TEST_DIR}/git" << 'MOCK'
-#!/bin/bash
-echo "git $*" >> "${MOCK_LOG}"
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/git"
+setup_mock_agents() {
+    # Agent binaries (log invocations for assertion)
+    local cmd
+    for cmd in claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q; do
+        _create_logging_mock "$cmd"
+    done
+
+    # Tools used during agent install (log invocations for assertion)
+    for cmd in pip pip3 npm npx bun node openssl shred cargo go git; do
+        _create_logging_mock "$cmd"
+    done
+
+    # Silent mocks (no logging needed)
+    _create_silent_mock "clear"
+    _create_silent_mock "sleep"
+
+    # ssh-keygen needs special behavior (fingerprint + key creation)
+    _create_ssh_keygen_mock
 }
 
 setup_fake_home() {

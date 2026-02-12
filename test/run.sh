@@ -165,6 +165,37 @@ assert_common_fails() {
 }
 
 # --- Test runner for a single script ---
+# Assert the standard sprite lifecycle: auth -> list -> create -> exec -> env -> interactive
+_assert_sprite_lifecycle() {
+    local script_name="$1"
+    assert_contains "${MOCK_LOG}" "sprite org list" "Checks sprite authentication"
+    assert_contains "${MOCK_LOG}" "sprite list" "Checks if sprite exists"
+    assert_contains "${MOCK_LOG}" "sprite create.*test-sprite-${script_name}" "Creates sprite with correct name"
+    assert_contains "${MOCK_LOG}" "sprite exec.*test-sprite-${script_name}" "Runs commands on sprite"
+    assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/env_config" "Uploads env config to sprite"
+    assert_contains "${MOCK_LOG}" "sprite exec.*-tty.*" "Launches interactive session"
+}
+
+# Assert agent-specific install/config steps
+_assert_agent_specifics() {
+    local script_name="$1"
+    case "${script_name}" in
+        claude)
+            assert_contains "${MOCK_LOG}" "sprite exec.*claude.*install" "Installs Claude Code"
+            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*settings.json" "Uploads Claude settings"
+            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*\.claude\.json" "Uploads Claude global state"
+            ;;
+        openclaw)
+            assert_contains "${MOCK_LOG}" "sprite exec.*\.sprite.*bun.*openclaw" "Installs openclaw via bun"
+            assert_contains "${MOCK_LOG}" "sprite exec.*openclaw gateway" "Starts openclaw gateway"
+            ;;
+        nanoclaw)
+            assert_contains "${MOCK_LOG}" "sprite exec.*git.*nanoclaw" "Clones nanoclaw repo"
+            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/nanoclaw_env" "Uploads nanoclaw .env"
+            ;;
+    esac
+}
+
 run_script_test() {
     local script_name="$1"
     local script_path="${REPO_ROOT}/sprite/${script_name}.sh"
@@ -186,38 +217,8 @@ run_script_test() {
         timeout 30 bash "${script_path}" > "${output_file}" 2>&1 || exit_code=$?
 
     assert_exit_code "${exit_code}" 0 "Script exits successfully"
-
-    # Common assertions for all scripts
-    assert_contains "${MOCK_LOG}" "sprite org list" "Checks sprite authentication"
-    assert_contains "${MOCK_LOG}" "sprite list" "Checks if sprite exists"
-    assert_contains "${MOCK_LOG}" "sprite create.*test-sprite-${script_name}" "Creates sprite with correct name"
-    assert_contains "${MOCK_LOG}" "sprite exec.*test-sprite-${script_name}" "Runs commands on sprite"
-
-    # Check env var injection (temp file upload)
-    assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/env_config" "Uploads env config to sprite"
-
-    # Check final interactive launch (flag order varies: -s NAME -tty or -tty -s NAME)
-    assert_contains "${MOCK_LOG}" "sprite exec.*-tty.*" "Launches interactive session"
-
-    # Script-specific assertions
-    case "${script_name}" in
-        claude)
-            assert_contains "${MOCK_LOG}" "sprite exec.*claude.*install" "Installs Claude Code"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*settings.json" "Uploads Claude settings"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*\.claude\.json" "Uploads Claude global state"
-            ;;
-        openclaw)
-            assert_contains "${MOCK_LOG}" "sprite exec.*\.sprite.*bun.*openclaw" "Installs openclaw via bun"
-            assert_contains "${MOCK_LOG}" "sprite exec.*openclaw gateway" "Starts openclaw gateway"
-            ;;
-        nanoclaw)
-            assert_contains "${MOCK_LOG}" "sprite exec.*git.*nanoclaw" "Clones nanoclaw repo"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/nanoclaw_env" "Uploads nanoclaw .env"
-            ;;
-        *)
-            # No agent-specific assertions for other agents
-            ;;
-    esac
+    _assert_sprite_lifecycle "${script_name}"
+    _assert_agent_specifics "${script_name}"
 
     # Check no temp files leaked
     local leaked_temps
