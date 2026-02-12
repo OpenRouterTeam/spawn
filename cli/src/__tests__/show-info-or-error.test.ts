@@ -224,6 +224,75 @@ describe("showInfoOrError - single argument routing", () => {
     });
   });
 
+  // ── Subcommand typo correction ─────────────────────────────────────────
+
+  describe("subcommand typo correction", () => {
+    it("should suggest 'matrix' for 'matrixx'", () => {
+      const result = runCli(["matrixx"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("spawn matrix");
+    });
+
+    it("should suggest 'clouds' for 'clousd'", () => {
+      const result = runCli(["clousd"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("spawn clouds");
+    });
+
+    it("should suggest 'agents' for 'agens'", () => {
+      const result = runCli(["agens"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("spawn agents");
+    });
+
+    it("should suggest 'update' for 'updte'", () => {
+      const result = runCli(["updte"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("spawn update");
+    });
+
+    it("should suggest 'list' for 'listt'", () => {
+      const result = runCli(["listt"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("spawn list");
+    });
+
+    it("should suggest 'history' for 'histry'", () => {
+      const result = runCli(["histry"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("spawn history");
+    });
+
+    it("should suggest 'version' for 'vrsion'", () => {
+      const result = runCli(["vrsion"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("spawn version");
+    });
+
+    it("should suggest 'help' for 'hlp'", () => {
+      const result = runCli(["hlp"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("spawn help");
+    });
+
+    it("should not suggest subcommands for completely unrelated input", () => {
+      const result = runCli(["xyzzyplugh"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Unknown command");
+      expect(output).not.toContain("spawn matrix");
+      expect(output).not.toContain("spawn update");
+      expect(output).not.toContain("spawn list");
+    });
+  });
+
   // ── Edge cases ─────────────────────────────────────────────────────────
 
   describe("edge cases", () => {

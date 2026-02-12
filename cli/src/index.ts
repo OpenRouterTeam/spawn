@@ -10,6 +10,7 @@ import {
   cmdCloudInfo,
   cmdUpdate,
   cmdHelp,
+  findClosestMatch,
   findClosestKeyByNameOrKey,
   resolveAgentKey,
   resolveCloudKey,
@@ -89,9 +90,13 @@ function checkUnknownFlags(args: string[]): void {
 function showUnknownCommandError(name: string, manifest: { agents: Record<string, { name: string }>; clouds: Record<string, { name: string }> }): never {
   const agentMatch = findClosestKeyByNameOrKey(name, agentKeys(manifest), (k) => manifest.agents[k].name);
   const cloudMatch = findClosestKeyByNameOrKey(name, cloudKeys(manifest), (k) => manifest.clouds[k].name);
+  const subcommandMatch = findClosestMatch(name, ALL_SUBCOMMANDS);
 
   console.error(pc.red(`Unknown command: ${pc.bold(name)}`));
   console.error();
+  if (subcommandMatch) {
+    console.error(`  Did you mean ${pc.cyan(`spawn ${subcommandMatch}`)}?`);
+  }
   if (agentMatch || cloudMatch) {
     const suggestions: string[] = [];
     if (agentMatch) suggestions.push(`${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})`);
@@ -282,6 +287,9 @@ const LIST_COMMANDS = new Set(["list", "ls", "history"]);
 // Common verb prefixes that users naturally try (e.g. "spawn run claude sprite")
 // These are not real subcommands -- we strip them and forward to the default handler
 const VERB_ALIASES = new Set(["run", "launch", "start", "deploy", "exec"]);
+
+// All user-facing subcommands for typo correction (excludes flag variants like --help, -v)
+const ALL_SUBCOMMANDS = ["help", "version", "matrix", "agents", "clouds", "update", "list", "history"];
 
 /** Warn when extra positional arguments are silently ignored */
 function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
