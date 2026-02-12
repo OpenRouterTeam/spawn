@@ -713,21 +713,18 @@ run_shellcheck() {
         return 0
     fi
 
-    # Find all shell scripts
-    local all_scripts=(
-        "${REPO_ROOT}"/sprite/*.sh
-        "${REPO_ROOT}"/sprite/lib/common.sh
-        "${REPO_ROOT}"/shared/common.sh
-        "${REPO_ROOT}"/digitalocean/*.sh
-        "${REPO_ROOT}"/digitalocean/lib/common.sh
-        "${REPO_ROOT}"/hetzner/*.sh
-        "${REPO_ROOT}"/hetzner/lib/common.sh
-        "${REPO_ROOT}"/linode/*.sh
-        "${REPO_ROOT}"/linode/lib/common.sh
-        "${REPO_ROOT}"/vultr/*.sh
-        "${REPO_ROOT}"/vultr/lib/common.sh
-        "${REPO_ROOT}"/test/run.sh
-    )
+    # Auto-discover all shell scripts across clouds, shared/, and test/
+    local all_scripts=("${REPO_ROOT}"/shared/common.sh "${REPO_ROOT}"/test/run.sh)
+    local cloud_dir
+    for cloud_dir in "${REPO_ROOT}"/*/lib/common.sh; do
+        [[ -f "${cloud_dir}" ]] || continue
+        local cloud_root="${cloud_dir%/lib/common.sh}"
+        all_scripts+=("${cloud_dir}")
+        local agent_sh
+        for agent_sh in "${cloud_root}"/*.sh; do
+            [[ -f "${agent_sh}" ]] && all_scripts+=("${agent_sh}")
+        done
+    done
 
     local issue_count=0
     local checked_count=0
