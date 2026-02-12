@@ -1,39 +1,32 @@
 name: Security Review
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   issues:
     types: [opened, reopened]
   schedule:
-    # Full repo security scan — daily at 06:00 UTC
-    - cron: '0 6 * * *'
-    # PR hygiene (stale PR cleanup) — every 6 hours
-    - cron: '0 */6 * * *'
+    # Batch PR security review + hygiene — every 15 min
+    - cron: '*/15 * * * *'
+    # Full repo security scan — every 30 min (offset +5)
+    - cron: '5,35 * * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Run mode: pr (needs PR number), hygiene, or scan'
+        description: 'Run mode: review_all (PR review + hygiene) or scan (repo audit)'
         required: false
-        default: 'scan'
+        default: 'review_all'
         type: choice
         options:
+          - review_all
           - scan
-          - hygiene
-      pr_number:
-        description: 'PR number (only for pr mode via workflow_dispatch)'
-        required: false
-        type: string
 
 concurrency:
-  group: security-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'issues' && format('issue-{0}', github.event.issue.number) || github.event_name == 'schedule' && github.event.schedule || 'manual' }}
+  group: security-${{ github.event_name == 'issues' && format('issue-{0}', github.event.issue.number) || github.event_name == 'schedule' && github.event.schedule || 'manual' }}
   cancel-in-progress: true
 
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # Trigger on ALL issues (triage or team-building) plus PR/schedule/manual
+    timeout-minutes: 40
     steps:
       - name: Trigger security review
         env:
@@ -45,11 +38,8 @@ jobs:
             exit 0
           fi
 
-          # Determine reason and issue/PR number based on trigger type
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            REASON="pull_request"
-            ISSUE_NUM="${{ github.event.pull_request.number }}"
-          elif [ "${{ github.event_name }}" = "issues" ]; then
+          # Determine reason and issue number based on trigger type
+          if [ "${{ github.event_name }}" = "issues" ]; then
             ISSUE_NUM="${{ github.event.issue.number }}"
             if [ "${{ contains(github.event.issue.labels.*.name, 'team-building') }}" = "true" ]; then
               REASON="team_building"
@@ -57,25 +47,24 @@ jobs:
               REASON="triage"
             fi
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            # Distinguish between cron schedules:
-            # '0 6 * * *' = daily scan, '0 */6 * * *' = hygiene every 6h
+            # Distinguish between cron schedules by their cron string
             CRON="${{ github.event.schedule }}"
-            if [ "$CRON" = "0 6 * * *" ]; then
+            if [ "$CRON" = "*/15 * * * *" ]; then
+              REASON="review_all"
+            elif [ "$CRON" = "5,35 * * * *" ]; then
               REASON="schedule"
             else
-              REASON="hygiene"
+              REASON="schedule"
             fi
             ISSUE_NUM=""
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MODE="${{ github.event.inputs.mode || 'scan' }}"
-            ISSUE_NUM="${{ github.event.inputs.pr_number || '' }}"
-            if [ -n "$ISSUE_NUM" ]; then
-              REASON="pull_request"
-            elif [ "$MODE" = "hygiene" ]; then
-              REASON="hygiene"
+            MODE="${{ github.event.inputs.mode || 'review_all' }}"
+            if [ "$MODE" = "review_all" ]; then
+              REASON="review_all"
             else
               REASON="schedule"
             fi
+            ISSUE_NUM=""
           else
             REASON="schedule"
             ISSUE_NUM=""
