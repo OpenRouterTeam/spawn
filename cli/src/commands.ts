@@ -574,6 +574,8 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         credentialHint(cloud, authHint),
         "  - Cloud provider API error (quota, rate limit, or region issue)",
         "  - Server provisioning failed (try again or pick a different region)",
+        "",
+        `Tip: You can skip OPENROUTER_API_KEY and authenticate via browser instead.`,
       ];
     default:
       return [
@@ -581,6 +583,8 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         credentialHint(cloud, authHint, "Missing"),
         "  - Cloud provider API rate limit or quota exceeded",
         "  - Missing local dependencies (SSH, curl, jq)",
+        "",
+        `Tip: You can skip OPENROUTER_API_KEY and authenticate via browser instead.`,
       ];
   }
 }

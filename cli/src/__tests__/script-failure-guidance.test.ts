@@ -116,9 +116,16 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("provisioning failed");
     });
 
-    it("should return exactly 4 guidance lines", () => {
+    it("should return exactly 6 guidance lines", () => {
       const lines = getScriptFailureGuidance(1, "sprite");
-      expect(lines).toHaveLength(4);
+      expect(lines).toHaveLength(6);
+    });
+
+    it("should include OAuth browser auth tip", () => {
+      const lines = getScriptFailureGuidance(1, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("browser");
+      expect(joined).toContain("OPENROUTER_API_KEY");
     });
   });
 
@@ -157,9 +164,16 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("spawn linode");
     });
 
-    it("should return exactly 4 guidance lines", () => {
+    it("should return exactly 6 guidance lines", () => {
       const lines = getScriptFailureGuidance(42, "linode");
-      expect(lines).toHaveLength(4);
+      expect(lines).toHaveLength(6);
+    });
+
+    it("should include OAuth browser auth tip", () => {
+      const lines = getScriptFailureGuidance(42, "linode");
+      const joined = lines.join("\n");
+      expect(joined).toContain("browser");
+      expect(joined).toContain("OPENROUTER_API_KEY");
     });
   });
 
@@ -183,9 +197,9 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("spawn sprite");
     });
 
-    it("should return exactly 4 guidance lines", () => {
+    it("should return exactly 6 guidance lines", () => {
       const lines = getScriptFailureGuidance(null, "sprite");
-      expect(lines).toHaveLength(4);
+      expect(lines).toHaveLength(6);
     });
   });
 
@@ -369,12 +383,12 @@ describe("getScriptFailureGuidance", () => {
 
     it("should preserve line count for exit code 1 with authHint", () => {
       const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(4);
+      expect(lines).toHaveLength(6);
     });
 
     it("should preserve line count for default case with authHint", () => {
       const lines = getScriptFailureGuidance(42, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(4);
+      expect(lines).toHaveLength(6);
     });
   });
 
