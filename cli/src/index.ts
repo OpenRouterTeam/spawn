@@ -283,6 +283,9 @@ const LIST_COMMANDS = new Set(["list", "ls", "history"]);
 // These are not real subcommands -- we strip them and forward to the default handler
 const VERB_ALIASES = new Set(["run", "launch", "start", "deploy", "exec"]);
 
+// Info verb aliases: "spawn info claude" -> "spawn claude" (show info page)
+const INFO_ALIASES = new Set(["info", "show", "describe"]);
+
 /** Warn when extra positional arguments are silently ignored */
 function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
   const extra = filteredArgs.slice(maxExpected);
@@ -367,6 +370,22 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
     console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent and cloud`));
     console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud>")}`);
     console.error(pc.dim(`  The "${cmd}" keyword is optional -- just use ${pc.cyan("spawn <agent> <cloud>")} directly.`));
+    process.exit(1);
+  }
+
+  // Handle info aliases: "spawn info claude" -> "spawn claude" (show info page)
+  if (INFO_ALIASES.has(cmd)) {
+    if (filteredArgs.length > 1) {
+      warnExtraArgs(filteredArgs, 2);
+      await showInfoOrError(filteredArgs[1]);
+      return;
+    }
+    console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent or cloud name`));
+    console.error(`\nUsage: ${pc.cyan("spawn <name>")}`);
+    console.error(pc.dim(`  The "${cmd}" keyword is optional -- just use ${pc.cyan("spawn <name>")} directly.`));
+    console.error();
+    console.error(`  Run ${pc.cyan("spawn agents")} to see available agents.`);
+    console.error(`  Run ${pc.cyan("spawn clouds")} to see available clouds.`);
     process.exit(1);
   }
 
