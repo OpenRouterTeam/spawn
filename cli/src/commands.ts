@@ -555,6 +555,9 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         "  - Server is still booting (wait a moment and retry)",
         "  - Firewall blocking SSH port 22",
         "  - Server was terminated before the session started",
+        "",
+        "Note: The server may still be running.",
+        `  Check your cloud provider dashboard or run ${pc.cyan(`spawn ${cloud}`)} for details.`,
       ];
     case 127:
       return [
@@ -568,11 +571,17 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         "  - A downloaded binary may lack execute permissions",
         "  - The script may require root/sudo access",
         `  - Report it if this persists: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
+        "",
+        "Note: If a server was already created, it may still be running.",
+        `  Check your cloud provider dashboard or run ${pc.cyan(`spawn ${cloud}`)} for details.`,
       ];
     case 2:
       return [
         "Shell syntax or argument error. This is likely a bug in the script.",
         `  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
+        "",
+        "Note: If a server was already created, it may still be running.",
+        `  Check your cloud provider dashboard or run ${pc.cyan(`spawn ${cloud}`)} for details.`,
       ];
     case 1:
       return [
@@ -580,6 +589,9 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         ...credentialHints(cloud, authHint),
         "  - Cloud provider API error (quota, rate limit, or region issue)",
         "  - Server provisioning failed (try again or pick a different region)",
+        "",
+        "Note: If a server was already created, it may still be running.",
+        `  Check your cloud provider dashboard or run ${pc.cyan(`spawn ${cloud}`)} for details.`,
       ];
     default:
       return [
@@ -587,6 +599,9 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         ...credentialHints(cloud, authHint, "Missing"),
         "  - Cloud provider API rate limit or quota exceeded",
         "  - Missing local dependencies (SSH, curl, jq)",
+        "",
+        "Note: If a server was already created, it may still be running.",
+        `  Check your cloud provider dashboard or run ${pc.cyan(`spawn ${cloud}`)} for details.`,
       ];
   }
 }

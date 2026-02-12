@@ -77,9 +77,11 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("issues");
     });
 
-    it("should return exactly 4 guidance lines", () => {
+    it("should include server cleanup note", () => {
       const lines = getScriptFailureGuidance(126, "sprite");
-      expect(lines).toHaveLength(4);
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("cloud provider dashboard");
     });
   });
 
@@ -284,9 +286,11 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("terminated");
     });
 
-    it("should return exactly 4 guidance lines", () => {
+    it("should include server cleanup note", () => {
       const lines = getScriptFailureGuidance(255, "sprite");
-      expect(lines).toHaveLength(4);
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("cloud provider dashboard");
     });
   });
 
@@ -312,9 +316,11 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("issues");
     });
 
-    it("should return exactly 2 guidance lines", () => {
+    it("should include server cleanup note", () => {
       const lines = getScriptFailureGuidance(2, "sprite");
-      expect(lines).toHaveLength(2);
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("cloud provider dashboard");
     });
   });
 
@@ -373,18 +379,83 @@ describe("getScriptFailureGuidance", () => {
 
     it("should include setup instruction line for exit code 1 with authHint", () => {
       const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(5);
       const joined = lines.join("\n");
       expect(joined).toContain("spawn hetzner");
       expect(joined).toContain("setup");
+      expect(joined).toContain("may still be running");
     });
 
     it("should include setup instruction line for default case with authHint", () => {
       const lines = getScriptFailureGuidance(42, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(5);
       const joined = lines.join("\n");
       expect(joined).toContain("spawn hetzner");
       expect(joined).toContain("setup");
+      expect(joined).toContain("may still be running");
+    });
+  });
+
+  // ── Server cleanup note ─────────────────────────────────────────────────
+
+  describe("server cleanup note", () => {
+    it("should include cleanup note for exit code 1", () => {
+      const lines = getScriptFailureGuidance(1, "hetzner");
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("cloud provider dashboard");
+      expect(joined).toContain("spawn hetzner");
+    });
+
+    it("should include cleanup note for exit code 255", () => {
+      const lines = getScriptFailureGuidance(255, "vultr");
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("spawn vultr");
+    });
+
+    it("should include cleanup note for exit code 126", () => {
+      const lines = getScriptFailureGuidance(126, "linode");
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("spawn linode");
+    });
+
+    it("should include cleanup note for exit code 2", () => {
+      const lines = getScriptFailureGuidance(2, "digitalocean");
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("spawn digitalocean");
+    });
+
+    it("should include cleanup note for unknown exit codes", () => {
+      const lines = getScriptFailureGuidance(42, "civo");
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("spawn civo");
+    });
+
+    it("should include cleanup note for null exit code", () => {
+      const lines = getScriptFailureGuidance(null, "scaleway");
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+      expect(joined).toContain("spawn scaleway");
+    });
+
+    it("should not include cleanup note for exit code 127 (command not found)", () => {
+      const lines = getScriptFailureGuidance(127, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).not.toContain("may still be running");
+    });
+
+    it("should include cleanup note in exit 130 (already had it)", () => {
+      const lines = getScriptFailureGuidance(130, "hetzner");
+      const joined = lines.join("\n");
+      expect(joined).toContain("may still be running");
+    });
+
+    it("should include cleanup note in exit 137 (already had it)", () => {
+      const lines = getScriptFailureGuidance(137, "hetzner");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
     });
   });
 
