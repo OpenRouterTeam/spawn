@@ -140,7 +140,7 @@ mock.module("@clack/prompts", () => ({
   isCancel: () => false,
 }));
 
-const { cmdRun } = await import("../commands.js");
+const { cmdRun, buildCredentialLines } = await import("../commands.js");
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
@@ -606,15 +606,238 @@ describe("Dry-run preview (showDryRunPreview via cmdRun)", () => {
       expect(scriptIdx).toBeLessThan(envIdx);
     });
 
-    it("should show Environment before Prompt section", async () => {
+    it("should show Environment before Required credentials section", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      const steps = getStepCalls();
+      const envIdx = steps.findIndex(c => c.includes("Environment"));
+      const credIdx = steps.findIndex(c => c.includes("Required credentials"));
+      expect(envIdx).toBeLessThan(credIdx);
+    });
+
+    it("should show Required credentials before Prompt section", async () => {
       setupManifest(standardManifest);
       await loadManifest(true);
       await cmdRun("claude", "sprite", "test prompt", true);
 
       const steps = getStepCalls();
-      const envIdx = steps.findIndex(c => c.includes("Environment"));
+      const credIdx = steps.findIndex(c => c.includes("Required credentials"));
       const promptIdx = steps.findIndex(c => c.includes("Prompt"));
-      expect(envIdx).toBeLessThan(promptIdx);
+      expect(credIdx).toBeLessThan(promptIdx);
     });
+  });
+
+  // ── Required credentials section ────────────────────────────────────
+
+  describe("required credentials", () => {
+    let savedEnv: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      savedEnv = {
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+        SPRITE_TOKEN: process.env.SPRITE_TOKEN,
+        HCLOUD_TOKEN: process.env.HCLOUD_TOKEN,
+        TEST_TOKEN: process.env.TEST_TOKEN,
+      };
+    });
+
+    afterEach(() => {
+      for (const [k, v] of Object.entries(savedEnv)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+
+    it("should show Required credentials section header", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      expect(getStepCalls().some(c => c.includes("Required credentials"))).toBe(true);
+    });
+
+    it("should show OPENROUTER_API_KEY in credentials", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      expect(getLogText()).toContain("OPENROUTER_API_KEY");
+    });
+
+    it("should show cloud auth var in credentials", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      expect(getLogText()).toContain("SPRITE_TOKEN");
+    });
+
+    it("should show 'set' when OPENROUTER_API_KEY is present", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      const text = getLogText();
+      // The OPENROUTER_API_KEY line should contain "set" (green)
+      expect(text).toContain("OPENROUTER_API_KEY");
+    });
+
+    it("should show 'not set' when OPENROUTER_API_KEY is missing", async () => {
+      delete process.env.OPENROUTER_API_KEY;
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      const text = getLogText();
+      expect(text).toContain("OPENROUTER_API_KEY");
+      expect(text).toContain("openrouter.ai/settings/keys");
+    });
+
+    it("should show setup hint for missing cloud auth var", async () => {
+      delete process.env.SPRITE_TOKEN;
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      await cmdRun("claude", "sprite", undefined, true);
+
+      const text = getLogText();
+      expect(text).toContain("spawn sprite");
+    });
+  });
+});
+
+// ── Unit tests for buildCredentialLines ──────────────────────────────────────
+
+describe("buildCredentialLines", () => {
+  let savedEnv: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    savedEnv = {
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+      HCLOUD_TOKEN: process.env.HCLOUD_TOKEN,
+      SPRITE_TOKEN: process.env.SPRITE_TOKEN,
+      TEST_TOKEN: process.env.TEST_TOKEN,
+      CONTABO_CLIENT_ID: process.env.CONTABO_CLIENT_ID,
+      CONTABO_CLIENT_SECRET: process.env.CONTABO_CLIENT_SECRET,
+    };
+  });
+
+  afterEach(() => {
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+
+  it("always includes OPENROUTER_API_KEY", () => {
+    delete process.env.OPENROUTER_API_KEY;
+    const lines = buildCredentialLines(standardManifest, "sprite");
+    const joined = lines.join("\n");
+    expect(joined).toContain("OPENROUTER_API_KEY");
+  });
+
+  it("includes cloud auth env var", () => {
+    const lines = buildCredentialLines(standardManifest, "hetzner");
+    const joined = lines.join("\n");
+    expect(joined).toContain("HCLOUD_TOKEN");
+  });
+
+  it("shows 'set' status for present env vars", () => {
+    process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+    process.env.HCLOUD_TOKEN = "test-token";
+    const lines = buildCredentialLines(standardManifest, "hetzner");
+    // Both lines should indicate "set" (via picocolors green)
+    expect(lines.length).toBe(2);
+  });
+
+  it("shows help URL for missing OPENROUTER_API_KEY", () => {
+    delete process.env.OPENROUTER_API_KEY;
+    const lines = buildCredentialLines(standardManifest, "hetzner");
+    const joined = lines.join("\n");
+    expect(joined).toContain("openrouter.ai/settings/keys");
+  });
+
+  it("shows setup hint for missing cloud auth var", () => {
+    delete process.env.HCLOUD_TOKEN;
+    const lines = buildCredentialLines(standardManifest, "hetzner");
+    const joined = lines.join("\n");
+    expect(joined).toContain("spawn hetzner");
+  });
+
+  it("handles multiple cloud auth vars", () => {
+    delete process.env.CONTABO_CLIENT_ID;
+    delete process.env.CONTABO_CLIENT_SECRET;
+    const manifest: Manifest = {
+      ...standardManifest,
+      clouds: {
+        ...standardManifest.clouds,
+        contabo: {
+          name: "Contabo",
+          description: "Budget cloud",
+          url: "https://contabo.com",
+          type: "cloud",
+          auth: "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET",
+          provision_method: "api",
+          exec_method: "ssh",
+          interactive_method: "ssh",
+        },
+      },
+    };
+    const lines = buildCredentialLines(manifest, "contabo");
+    const joined = lines.join("\n");
+    expect(joined).toContain("CONTABO_CLIENT_ID");
+    expect(joined).toContain("CONTABO_CLIENT_SECRET");
+    // OPENROUTER_API_KEY + 2 contabo vars = 3 lines
+    expect(lines.length).toBe(3);
+  });
+
+  it("handles auth 'none' (no cloud auth vars)", () => {
+    const manifest: Manifest = {
+      ...standardManifest,
+      clouds: {
+        ...standardManifest.clouds,
+        noauth: {
+          name: "NoAuth Cloud",
+          description: "No auth needed",
+          url: "https://example.com",
+          type: "container",
+          auth: "none",
+          provision_method: "cli",
+          exec_method: "exec",
+          interactive_method: "exec",
+        },
+      },
+    };
+    const lines = buildCredentialLines(manifest, "noauth");
+    // Should only have OPENROUTER_API_KEY line (no cloud auth)
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toContain("OPENROUTER_API_KEY");
+  });
+
+  it("handles non-env-var auth strings as descriptive text", () => {
+    const manifest: Manifest = {
+      ...standardManifest,
+      clouds: {
+        ...standardManifest.clouds,
+        awscloud: {
+          name: "AWS",
+          description: "Amazon Web Services",
+          url: "https://aws.amazon.com",
+          type: "cloud",
+          auth: "aws configure (AWS credentials)",
+          provision_method: "cli",
+          exec_method: "ssh",
+          interactive_method: "ssh",
+        },
+      },
+    };
+    const lines = buildCredentialLines(manifest, "awscloud");
+    const joined = lines.join("\n");
+    // Should show the descriptive auth text
+    expect(joined).toContain("aws configure");
+    // OPENROUTER_API_KEY + descriptive auth = 2 lines
+    expect(lines.length).toBe(2);
   });
 });

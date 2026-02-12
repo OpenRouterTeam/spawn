@@ -378,6 +378,31 @@ function buildCloudLines(cloudInfo: { name: string; description: string; default
   return lines;
 }
 
+/** Build credential status lines for dry-run preview */
+export function buildCredentialLines(manifest: Manifest, cloud: string): string[] {
+  const lines: string[] = [];
+  const cloudDef = manifest.clouds[cloud];
+
+  // OpenRouter API key (required for all agents)
+  const orSet = !!process.env.OPENROUTER_API_KEY;
+  const orStatus = orSet ? pc.green("set") : pc.red("not set");
+  lines.push(`  ${pc.cyan("OPENROUTER_API_KEY")}  ${orStatus}${orSet ? "" : pc.dim("  https://openrouter.ai/settings/keys")}`);
+
+  // Cloud-specific auth env vars
+  const authVars = parseAuthEnvVars(cloudDef.auth);
+  if (authVars.length > 0) {
+    for (const v of authVars) {
+      const isSet = !!process.env[v];
+      const status = isSet ? pc.green("set") : pc.red("not set");
+      lines.push(`  ${pc.cyan(v)}  ${status}${isSet ? "" : pc.dim(`  run ${pc.cyan(`spawn ${cloud}`)} for setup`)}`);
+    }
+  } else if (cloudDef.auth.toLowerCase() !== "none") {
+    lines.push(`  ${pc.dim(`Auth: ${cloudDef.auth}`)}`);
+  }
+
+  return lines;
+}
+
 function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, prompt?: string): void {
   p.log.info(pc.bold("Dry run -- no resources will be provisioned\n"));
 
@@ -393,6 +418,8 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
     });
     printDryRunSection("Environment variables", envLines);
   }
+
+  printDryRunSection("Required credentials", buildCredentialLines(manifest, cloud));
 
   if (prompt) {
     printDryRunSection("Prompt", [`  ${prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt}`]);
