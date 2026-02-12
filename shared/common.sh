@@ -1185,9 +1185,9 @@ _cloud_api_retry_loop() {
             return 0
         fi
 
-        # Retry or fail
+        # Last attempt — report failure details and exit
         if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "${retry_reason}"; then
-            log_error "${retry_reason} after ${max_retries} attempts"
+            log_error "${retry_reason} after ${max_retries} attempts (${api_description})"
             if [[ "${retry_reason}" == "Cloud API network error" ]]; then
                 log_warn "Check your internet connection and verify the provider's API is reachable."
             else
@@ -1198,11 +1198,6 @@ _cloud_api_retry_loop() {
         _update_retry_interval interval max_interval
         attempt=$((attempt + 1))
     done
-
-    log_error "Cloud API request failed after ${max_retries} attempts (${api_description})"
-    log_warn "This is usually caused by rate limiting or temporary provider issues."
-    log_warn "Wait a minute and try again, or check the provider's status page."
-    return 1
 }
 
 generic_cloud_api() {
@@ -1494,20 +1489,22 @@ generic_wait_for_instance() {
         local response
         response=$("${api_func}" GET "${endpoint}" 2>/dev/null) || true
 
-        local status
-        status=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${status_py})" 2>/dev/null || echo "unknown")
+        # Parse status and IP in a single python3 call (two lines: status, then IP)
+        local parsed status ip
+        parsed=$(printf '%s' "${response}" | python3 -c "
+import json,sys
+d=json.loads(sys.stdin.read())
+print(${status_py})
+try:
+    ip=${ip_py}
+    print(ip if ip else '')
+except Exception:
+    print('')
+" 2>/dev/null || echo "unknown")
+        status=$(printf '%s' "${parsed}" | head -1)
+        ip=$(printf '%s' "${parsed}" | sed -n '2p')
 
-        if [[ "${status}" != "${target_status}" ]]; then
-            log_step "${description} status: ${status} (${attempt}/${max_attempts})"
-            sleep "${poll_delay}"
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        local ip
-        ip=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${ip_py})" 2>/dev/null || echo "")
-
-        if [[ -n "${ip}" ]]; then
+        if [[ "${status}" == "${target_status}" && -n "${ip}" ]]; then
             export "${ip_var}=${ip}"
             log_info "${description} ${target_status}: IP=${ip}"
             return 0
