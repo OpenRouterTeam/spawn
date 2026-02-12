@@ -21,9 +21,9 @@ YELLOW='\033[1;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-log_info()  { echo -e "${GREEN}[spawn]${NC} $1"; }
-log_warn()  { echo -e "${YELLOW}[spawn]${NC} $1"; }
-log_error() { echo -e "${RED}[spawn]${NC} $1"; }
+log_info()  { printf "${GREEN}[spawn]${NC} %s\n" "$1"; }
+log_warn()  { printf "${YELLOW}[spawn]${NC} %s\n" "$1"; }
+log_error() { printf "${RED}[spawn]${NC} %s\n" "$1"; }
 
 # --- Helper: compare semver strings ---
 # Returns 0 (true) if $1 >= $2
