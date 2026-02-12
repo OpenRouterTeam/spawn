@@ -128,27 +128,32 @@ if [ -z "$URL" ]; then
     exit 0
 fi
 
-# Strip API base to get endpoint
+# Strip API base to get endpoint — loop over known prefixes
 ENDPOINT="$URL"
-case "$URL" in
-    https://api.hetzner.cloud/v1*)     ENDPOINT="${URL#https://api.hetzner.cloud/v1}" ;;
-    https://api.digitalocean.com/v2*)   ENDPOINT="${URL#https://api.digitalocean.com/v2}" ;;
-    https://api.vultr.com/v2*)          ENDPOINT="${URL#https://api.vultr.com/v2}" ;;
-    https://api.linode.com/v4*)         ENDPOINT="${URL#https://api.linode.com/v4}" ;;
-    https://api.lambdalabs.com/v1*)     ENDPOINT="${URL#https://api.lambdalabs.com/v1}" ;;
-    https://api.civo.com/v2*)           ENDPOINT="${URL#https://api.civo.com/v2}" ;;
-    https://api.upcloud.com/1.3*)       ENDPOINT="${URL#https://api.upcloud.com/1.3}" ;;
-    https://api.binarylane.com.au/v2*)  ENDPOINT="${URL#https://api.binarylane.com.au/v2}" ;;
-    https://api.scaleway.com/*)         ENDPOINT=$(echo "$URL" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||') ;;
-    https://api.genesiscloud.com/compute/v1*) ENDPOINT="${URL#https://api.genesiscloud.com/compute/v1}" ;;
-    https://console.kamatera.com/svc*)  ENDPOINT="${URL#https://console.kamatera.com/svc}" ;;
-    https://api.latitude.sh*)           ENDPOINT="${URL#https://api.latitude.sh}" ;;
-    https://infrahub-api.nexgencloud.com/v1*) ENDPOINT="${URL#https://infrahub-api.nexgencloud.com/v1}" ;;
-    *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
-    https://openstack.ramnode.com:5000/v3*)   ENDPOINT="${URL#https://openstack.ramnode.com:5000/v3}" ;;
-    https://openstack.ramnode.com:8774/v2.1*) ENDPOINT="${URL#https://openstack.ramnode.com:8774/v2.1}" ;;
-    https://openstack.ramnode.com:9696/v2.0*) ENDPOINT="${URL#https://openstack.ramnode.com:9696/v2.0}" ;;
-esac
+for _prefix in \
+    https://api.hetzner.cloud/v1 \
+    https://api.digitalocean.com/v2 \
+    https://api.vultr.com/v2 \
+    https://api.linode.com/v4 \
+    https://api.lambdalabs.com/v1 \
+    https://api.civo.com/v2 \
+    https://api.upcloud.com/1.3 \
+    https://api.binarylane.com.au/v2 \
+    https://api.genesiscloud.com/compute/v1 \
+    https://console.kamatera.com/svc \
+    https://api.latitude.sh \
+    https://infrahub-api.nexgencloud.com/v1 \
+    https://eu.api.ovh.com/1.0 \
+    https://openstack.ramnode.com:5000/v3 \
+    https://openstack.ramnode.com:8774/v2.1 \
+    https://openstack.ramnode.com:9696/v2.0 \
+; do
+    case "$URL" in "${_prefix}"*) ENDPOINT="${URL#"${_prefix}"}"; break ;; esac
+done
+# Scaleway has a zone segment in the path that must be stripped via regex
+case "$URL" in https://api.scaleway.com/*)
+    ENDPOINT=$(echo "$URL" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||')
+;; esac
 
 # Strip query params for matching
 EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
