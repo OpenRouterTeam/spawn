@@ -191,7 +191,7 @@ build_and_install() {
         cp -r node_modules src package.json "${spawn_lib}/"
         cat > "${INSTALL_DIR}/spawn" <<'WRAPPER'
 #!/usr/bin/env bash
-exec bun "$HOME/.spawn/src/index.ts" "$@"
+cd "$HOME/.spawn" && exec bun src/index.ts "$@"
 WRAPPER
         chmod +x "${INSTALL_DIR}/spawn"
     fi
