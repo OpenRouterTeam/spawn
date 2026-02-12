@@ -1151,7 +1151,11 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   printGroupedList(
     byType,
     (c) => manifest.clouds[c].name,
-    (c) => `spawn ${agentKey} ${c}`
+    (c) => {
+      const auth = manifest.clouds[c].auth;
+      const authHint = auth.toLowerCase() === "none" ? "" : `  auth: ${auth}`;
+      return `spawn ${agentKey} ${c}${authHint}`;
+    }
   );
   console.log();
 }
