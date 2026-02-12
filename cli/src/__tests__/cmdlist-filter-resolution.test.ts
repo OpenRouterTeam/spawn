@@ -308,6 +308,66 @@ describe("cmdList filter resolution via display names", () => {
     });
   });
 
+  // ── Bare positional arg: auto-detect cloud vs agent ───────────────────────
+
+  describe("bare positional arg reclassified as cloud filter when appropriate", () => {
+    it("should reclassify 'hetzner' from agentFilter to cloudFilter", async () => {
+      await setManifest(mockManifest);
+      writeHistory(sampleRecords);
+
+      // "hetzner" passed as agentFilter (bare positional), should be reclassified
+      await cmdList("hetzner");
+
+      const output = consoleOutput();
+      // Should find 2 records on hetzner (aider + claude), not 0
+      expect(output).toContain("2 of 4");
+    });
+
+    it("should reclassify 'sprite' from agentFilter to cloudFilter", async () => {
+      await setManifest(mockManifest);
+      writeHistory(sampleRecords);
+
+      await cmdList("sprite");
+
+      const output = consoleOutput();
+      // Should find 2 records on sprite
+      expect(output).toContain("2 of 4");
+    });
+
+    it("should reclassify cloud display name 'Hetzner Cloud' to cloudFilter", async () => {
+      await setManifest(mockManifest);
+      writeHistory(sampleRecords);
+
+      await cmdList("Hetzner Cloud");
+
+      const output = consoleOutput();
+      expect(output).toContain("2 of 4");
+    });
+
+    it("should NOT reclassify when agentFilter resolves to an agent", async () => {
+      await setManifest(mockManifest);
+      writeHistory(sampleRecords);
+
+      await cmdList("claude");
+
+      const output = consoleOutput();
+      // "claude" is a valid agent, should filter by agent
+      expect(output).toContain("2 of 4");
+    });
+
+    it("should NOT reclassify when explicit cloudFilter is already set", async () => {
+      await setManifest(mockManifest);
+      writeHistory(sampleRecords);
+
+      // When both are set, don't reclassify
+      await cmdList("unknown-thing", "hetzner");
+
+      const info = logInfoOutput();
+      // Should show "no spawns" since agent=unknown-thing finds nothing
+      expect(info).toContain("No spawns found matching");
+    });
+  });
+
   // ── Key that matches directly vs display name ──────────────────────────────
 
   describe("direct key match takes precedence over display name", () => {
