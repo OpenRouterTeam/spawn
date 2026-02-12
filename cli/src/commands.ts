@@ -648,6 +648,10 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     } catch (err) {
       const errMsg = getErrorMessage(err);
       if (errMsg.includes("interrupted by user")) {
+        console.error();
+        p.log.warn("Script interrupted (Ctrl+C).");
+        p.log.warn("If a server was already created, it may still be running.");
+        p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
         process.exit(130);
       }
       lastErr = errMsg;
