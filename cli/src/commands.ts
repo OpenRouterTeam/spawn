@@ -309,7 +309,7 @@ export async function cmdInteractive(): Promise<void> {
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice));
+  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url);
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────
@@ -452,7 +452,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
   const suffix = prompt ? " with prompt..." : "...";
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
-  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud));
+  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), manifest.clouds[cloud].url);
 }
 
 export function getStatusDescription(status: number): string {
@@ -528,20 +528,26 @@ function credentialHint(cloud: string, authHint?: string, verb = "Missing or inv
     : `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`;
 }
 
-export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
+function dashboardHint(cloudUrl?: string): string {
+  return cloudUrl
+    ? `  Check your provider dashboard: ${pc.cyan(cloudUrl)}`
+    : "  Check your cloud provider dashboard to stop or delete any unused servers.";
+}
+
+export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string, cloudUrl?: string): string[] {
   switch (exitCode) {
     case 130:
       return [
         "Script was interrupted (Ctrl+C).",
         "Note: If a server was already created, it may still be running.",
-        "  Check your cloud provider dashboard to stop or delete any unused servers.",
+        dashboardHint(cloudUrl),
       ];
     case 137:
       return [
         "Script was killed (likely by the system due to timeout or out of memory).",
         "  - The server may not have enough RAM for this agent",
         "  - Try a larger instance size or a different cloud provider",
-        "  - Check your cloud provider dashboard to stop or delete any unused servers",
+        dashboardHint(cloudUrl),
       ];
     case 255:
       return [
@@ -585,14 +591,14 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
   }
 }
 
-function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string): never {
+function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, cloudUrl?: string): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
 
   const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
   const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : null;
 
-  const lines = getScriptFailureGuidance(exitCode, cloud, authHint);
+  const lines = getScriptFailureGuidance(exitCode, cloud, authHint, cloudUrl);
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
@@ -600,7 +606,7 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   process.exit(1);
 }
 
-async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
+async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, cloudUrl?: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
@@ -630,7 +636,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     if (errMsg.includes("interrupted by user")) {
       process.exit(130);
     }
-    reportScriptFailure(errMsg, cloud, agent, authHint);
+    reportScriptFailure(errMsg, cloud, agent, authHint, cloudUrl);
   }
 }
 

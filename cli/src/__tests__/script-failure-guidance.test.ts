@@ -378,6 +378,60 @@ describe("getScriptFailureGuidance", () => {
     });
   });
 
+  // ── Cloud URL parameter ──────────────────────────────────────────────────
+
+  describe("cloud URL parameter", () => {
+    it("should show dashboard URL for exit code 130 when cloudUrl is provided", () => {
+      const lines = getScriptFailureGuidance(130, "hetzner", undefined, "https://www.hetzner.com/cloud/");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://www.hetzner.com/cloud/");
+      expect(joined).toContain("dashboard");
+    });
+
+    it("should show generic dashboard hint for exit code 130 when cloudUrl is not provided", () => {
+      const lines = getScriptFailureGuidance(130, "hetzner");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+    });
+
+    it("should show dashboard URL for exit code 137 when cloudUrl is provided", () => {
+      const lines = getScriptFailureGuidance(137, "vultr", undefined, "https://www.vultr.com/");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://www.vultr.com/");
+      expect(joined).toContain("dashboard");
+    });
+
+    it("should show generic dashboard hint for exit code 137 when cloudUrl is not provided", () => {
+      const lines = getScriptFailureGuidance(137, "vultr");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+    });
+
+    it("should not affect exit codes that don't mention dashboards", () => {
+      const lines255 = getScriptFailureGuidance(255, "hetzner", undefined, "https://www.hetzner.com/cloud/");
+      const joined255 = lines255.join("\n");
+      expect(joined255).not.toContain("https://www.hetzner.com/cloud/");
+
+      const lines127 = getScriptFailureGuidance(127, "hetzner", undefined, "https://www.hetzner.com/cloud/");
+      const joined127 = lines127.join("\n");
+      expect(joined127).not.toContain("https://www.hetzner.com/cloud/");
+
+      const lines1 = getScriptFailureGuidance(1, "hetzner", undefined, "https://www.hetzner.com/cloud/");
+      const joined1 = lines1.join("\n");
+      expect(joined1).not.toContain("https://www.hetzner.com/cloud/");
+    });
+
+    it("should preserve line count for exit code 130 with cloudUrl", () => {
+      const lines = getScriptFailureGuidance(130, "sprite", undefined, "https://sprites.dev");
+      expect(lines).toHaveLength(3);
+    });
+
+    it("should preserve line count for exit code 137 with cloudUrl", () => {
+      const lines = getScriptFailureGuidance(137, "sprite", undefined, "https://sprites.dev");
+      expect(lines).toHaveLength(4);
+    });
+  });
+
   // ── Edge cases ────────────────────────────────────────────────────────────
 
   describe("edge cases", () => {
