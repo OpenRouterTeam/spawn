@@ -21,6 +21,8 @@
  * continues to drain to the server console.
  */
 
+import { timingSafeEqual } from "crypto";
+
 const PORT = 8080;
 const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const TARGET_SCRIPT = process.env.TARGET_SCRIPT ?? "";
@@ -309,8 +311,13 @@ const server = Bun.serve({
         );
       }
 
+      // SECURITY: Use constant-time comparison to prevent timing attacks
       const auth = req.headers.get("Authorization") ?? "";
-      if (auth !== `Bearer ${TRIGGER_SECRET}`) {
+      const expected = `Bearer ${TRIGGER_SECRET}`;
+      if (
+        auth.length !== expected.length ||
+        !timingSafeEqual(Buffer.from(auth), Buffer.from(expected))
+      ) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
 
@@ -336,6 +343,15 @@ const server = Bun.serve({
       }
 
       const reason = url.searchParams.get("reason") ?? "manual";
+
+      // Validate reason to prevent arbitrary values in env vars and logs
+      if (!/^[a-z_-]{1,32}$/.test(reason)) {
+        return Response.json(
+          { error: "reason must be 1-32 lowercase letters, hyphens, or underscores" },
+          { status: 400 }
+        );
+      }
+
       const issue = url.searchParams.get("issue") ?? "";
 
       // Validate issue is a positive integer (prevents injection into shell commands)
