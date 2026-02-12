@@ -14,7 +14,7 @@ import type { Manifest } from "../manifest";
  * - groupByType: groups keys by a classifier function (commands.ts:1046-1054)
  * - buildAgentLines: formats agent info for dry-run preview (commands.ts:360-368)
  * - buildCloudLines: formats cloud info for dry-run preview (commands.ts:370-382)
- * - credentialHint: builds auth credential hint string (commands.ts:519-523)
+ * - credentialHints: builds auth credential hint strings (commands.ts:525-534)
  * - mapToSelectOptions: transforms manifest entries to select picker options (commands.ts:59-68)
  * - validateNonEmptyString: validates required non-empty input (commands.ts:51-57)
  * - renderMatrixRow: builds a single matrix row with status icons (commands.ts:690-699)
@@ -77,15 +77,21 @@ function buildCloudLines(cloudInfo: {
   return lines;
 }
 
-// commands.ts:519-523
-function credentialHint(
+// commands.ts:525-534
+function credentialHints(
   cloud: string,
   authHint?: string,
   verb = "Missing or invalid"
-): string {
-  return authHint
-    ? `  - ${verb} credentials (need ${authHint} + OPENROUTER_API_KEY)`
-    : `  - ${verb} credentials (run spawn ${cloud} for setup)`;
+): string[] {
+  if (authHint) {
+    return [
+      `  - ${verb} credentials (need ${authHint} + OPENROUTER_API_KEY)`,
+      `    Run spawn ${cloud} for setup instructions`,
+    ];
+  }
+  return [
+    `  - ${verb} credentials (run spawn ${cloud} for setup)`,
+  ];
 }
 
 // commands.ts:59-68
@@ -378,52 +384,71 @@ describe("buildCloudLines", () => {
   });
 });
 
-// ── credentialHint tests ────────────────────────────────────────────────────
+// ── credentialHints tests ────────────────────────────────────────────────────
 
-describe("credentialHint", () => {
-  it("shows auth hint with named env vars when authHint is provided", () => {
-    const hint = credentialHint("hetzner", "HCLOUD_TOKEN");
-    expect(hint).toContain("HCLOUD_TOKEN");
-    expect(hint).toContain("OPENROUTER_API_KEY");
-    expect(hint).toContain("Missing or invalid");
+describe("credentialHints", () => {
+  it("shows auth hint with named env vars and setup instruction when authHint is provided", () => {
+    const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
+    const joined = hints.join("\n");
+    expect(joined).toContain("HCLOUD_TOKEN");
+    expect(joined).toContain("OPENROUTER_API_KEY");
+    expect(joined).toContain("Missing or invalid");
+    expect(joined).toContain("spawn hetzner");
+    expect(joined).toContain("setup instructions");
+  });
+
+  it("returns two lines when authHint is provided", () => {
+    const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
+    expect(hints).toHaveLength(2);
   });
 
   it("shows cloud setup command when authHint is not provided", () => {
-    const hint = credentialHint("hetzner");
-    expect(hint).toContain("spawn hetzner");
-    expect(hint).toContain("setup");
-    expect(hint).not.toContain("OPENROUTER_API_KEY");
+    const hints = credentialHints("hetzner");
+    const joined = hints.join("\n");
+    expect(joined).toContain("spawn hetzner");
+    expect(joined).toContain("setup");
+    expect(joined).not.toContain("OPENROUTER_API_KEY");
+  });
+
+  it("returns one line when authHint is not provided", () => {
+    const hints = credentialHints("hetzner");
+    expect(hints).toHaveLength(1);
   });
 
   it("uses custom verb when provided", () => {
-    const hint = credentialHint("sprite", "SPRITE_TOKEN", "Missing");
-    expect(hint).toContain("Missing");
-    expect(hint).not.toContain("Missing or invalid");
+    const hints = credentialHints("sprite", "SPRITE_TOKEN", "Missing");
+    const joined = hints.join("\n");
+    expect(joined).toContain("Missing");
+    expect(joined).not.toContain("Missing or invalid");
   });
 
   it("uses default verb when not provided", () => {
-    const hint = credentialHint("sprite", "SPRITE_TOKEN");
-    expect(hint).toContain("Missing or invalid");
+    const hints = credentialHints("sprite", "SPRITE_TOKEN");
+    const joined = hints.join("\n");
+    expect(joined).toContain("Missing or invalid");
   });
 
   it("shows cloud name in setup fallback", () => {
-    const hint = credentialHint("digitalocean");
-    expect(hint).toContain("spawn digitalocean");
+    const hints = credentialHints("digitalocean");
+    const joined = hints.join("\n");
+    expect(joined).toContain("spawn digitalocean");
   });
 
   it("works with multi-token authHint", () => {
-    const hint = credentialHint(
+    const hints = credentialHints(
       "upcloud",
       "UPCLOUD_USERNAME + UPCLOUD_PASSWORD"
     );
-    expect(hint).toContain("UPCLOUD_USERNAME + UPCLOUD_PASSWORD");
-    expect(hint).toContain("OPENROUTER_API_KEY");
+    const joined = hints.join("\n");
+    expect(joined).toContain("UPCLOUD_USERNAME + UPCLOUD_PASSWORD");
+    expect(joined).toContain("OPENROUTER_API_KEY");
   });
 
   it("uses custom verb without authHint", () => {
-    const hint = credentialHint("vultr", undefined, "Missing");
-    expect(hint).toContain("Missing");
-    expect(hint).toContain("spawn vultr");
+    const hints = credentialHints("vultr", undefined, "Missing");
+    const joined = hints.join("\n");
+    expect(joined).toContain("Missing");
+    expect(joined).toContain("spawn vultr");
   });
 });
 
@@ -713,21 +738,22 @@ describe("groupByType with manifest clouds", () => {
   });
 });
 
-// ── Integration: credentialHint in error message context ────────────────────
+// ── Integration: credentialHints in error message context ────────────────────
 
-describe("credentialHint in error context", () => {
-  it("produces valid hint for exit code 1 with auth", () => {
-    const hint = credentialHint("hetzner", "HCLOUD_TOKEN");
-    // Used in getScriptFailureGuidance for exit code 1
-    expect(hint).toMatch(/^\s+-/);
-    expect(hint).toContain("credentials");
+describe("credentialHints in error context", () => {
+  it("produces valid hints for exit code 1 with auth", () => {
+    const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
+    // First line is the credential hint, second is the setup instruction
+    expect(hints[0]).toMatch(/^\s+-/);
+    expect(hints[0]).toContain("credentials");
+    expect(hints[1]).toContain("spawn hetzner");
   });
 
   it("produces valid hint for default exit code without auth", () => {
-    const hint = credentialHint("sprite", undefined, "Missing");
-    expect(hint).toMatch(/^\s+-/);
-    expect(hint).toContain("credentials");
-    expect(hint).toContain("spawn sprite");
+    const hints = credentialHints("sprite", undefined, "Missing");
+    expect(hints[0]).toMatch(/^\s+-/);
+    expect(hints[0]).toContain("credentials");
+    expect(hints[0]).toContain("spawn sprite");
   });
 });
 

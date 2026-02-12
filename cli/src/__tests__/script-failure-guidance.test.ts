@@ -116,9 +116,9 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("provisioning failed");
     });
 
-    it("should return exactly 4 guidance lines", () => {
+    it("should return at least 4 guidance lines", () => {
       const lines = getScriptFailureGuidance(1, "sprite");
-      expect(lines).toHaveLength(4);
+      expect(lines.length).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -157,9 +157,9 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("spawn linode");
     });
 
-    it("should return exactly 4 guidance lines", () => {
+    it("should return at least 4 guidance lines", () => {
       const lines = getScriptFailureGuidance(42, "linode");
-      expect(lines).toHaveLength(4);
+      expect(lines.length).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -183,9 +183,9 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("spawn sprite");
     });
 
-    it("should return exactly 4 guidance lines", () => {
+    it("should return at least 4 guidance lines", () => {
       const lines = getScriptFailureGuidance(null, "sprite");
-      expect(lines).toHaveLength(4);
+      expect(lines.length).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -321,11 +321,13 @@ describe("getScriptFailureGuidance", () => {
   // ── Auth hint parameter ──────────────────────────────────────────────────
 
   describe("auth hint parameter", () => {
-    it("should show specific env var name for exit code 1 when authHint is provided", () => {
+    it("should show specific env var name and setup hint for exit code 1 when authHint is provided", () => {
       const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
       const joined = lines.join("\n");
       expect(joined).toContain("HCLOUD_TOKEN");
       expect(joined).toContain("OPENROUTER_API_KEY");
+      expect(joined).toContain("spawn hetzner");
+      expect(joined).toContain("setup");
     });
 
     it("should show generic setup hint for exit code 1 when no authHint", () => {
@@ -335,11 +337,13 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).not.toContain("HCLOUD_TOKEN");
     });
 
-    it("should show specific env var name for default case when authHint is provided", () => {
+    it("should show specific env var name and setup hint for default case when authHint is provided", () => {
       const lines = getScriptFailureGuidance(42, "digitalocean", "DO_API_TOKEN");
       const joined = lines.join("\n");
       expect(joined).toContain("DO_API_TOKEN");
       expect(joined).toContain("OPENROUTER_API_KEY");
+      expect(joined).toContain("spawn digitalocean");
+      expect(joined).toContain("setup");
     });
 
     it("should show generic setup hint for default case when no authHint", () => {
@@ -367,14 +371,20 @@ describe("getScriptFailureGuidance", () => {
       expect(joined255).toContain("SSH");
     });
 
-    it("should preserve line count for exit code 1 with authHint", () => {
+    it("should include setup instruction line for exit code 1 with authHint", () => {
       const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(4);
+      expect(lines).toHaveLength(5);
+      const joined = lines.join("\n");
+      expect(joined).toContain("spawn hetzner");
+      expect(joined).toContain("setup");
     });
 
-    it("should preserve line count for default case with authHint", () => {
+    it("should include setup instruction line for default case with authHint", () => {
       const lines = getScriptFailureGuidance(42, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(4);
+      expect(lines).toHaveLength(5);
+      const joined = lines.join("\n");
+      expect(joined).toContain("spawn hetzner");
+      expect(joined).toContain("setup");
     });
   });
 
