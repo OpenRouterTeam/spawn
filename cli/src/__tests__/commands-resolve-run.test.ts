@@ -306,7 +306,7 @@ describe("cmdRun - display name resolution", () => {
       expect(stepCalls.some((msg: string) => msg.includes("Claude Code") && msg.includes("Hetzner Cloud"))).toBe(true);
     });
 
-    it("should show 'with prompt' in launch message when prompt is provided", async () => {
+    it("should show prompt preview in info message when prompt is provided", async () => {
       await setManifestAndScript(mockManifest);
 
       try {
@@ -315,11 +315,11 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution
       }
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
-      expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Prompt:") && msg.includes("Fix all bugs"))).toBe(true);
     });
 
-    it("should not show 'with prompt' when no prompt given", async () => {
+    it("should not show prompt preview when no prompt given", async () => {
       await setManifestAndScript(mockManifest);
 
       try {
@@ -328,8 +328,8 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution
       }
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
-      expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(false);
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Prompt:"))).toBe(false);
     });
   });
 

@@ -323,19 +323,17 @@ describe("execScript bash execution error handling", () => {
       expect(launchMsg).toBeDefined();
       expect(launchMsg).toContain("Claude Code");
       expect(launchMsg).toContain("Sprite");
-      expect(launchMsg).not.toContain("with prompt");
+      expect(launchMsg).not.toContain("Prompt:");
     });
 
-    it("should show launch step message with prompt suffix when prompt provided", async () => {
+    it("should show prompt preview in info message when prompt provided", async () => {
       mockFetchWithScript("exit 0");
       await loadManifest(true);
 
       await cmdRun("claude", "sprite", "Fix all bugs");
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
-      const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
-      expect(launchMsg).toBeDefined();
-      expect(launchMsg).toContain("with prompt");
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Prompt:") && msg.includes("Fix all bugs"))).toBe(true);
     });
   });
 

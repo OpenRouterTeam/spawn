@@ -323,7 +323,7 @@ describe("Commands Error Paths", () => {
       expect(stepCalls.some((msg: string) => msg.includes("Claude Code") && msg.includes("Sprite"))).toBe(true);
     });
 
-    it("should show prompt indicator when prompt is provided", async () => {
+    it("should show prompt preview when prompt is provided", async () => {
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
           return {
@@ -346,8 +346,8 @@ describe("Commands Error Paths", () => {
         // Expected
       }
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
-      expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Prompt:") && msg.includes("Fix all bugs"))).toBe(true);
     });
   });
 

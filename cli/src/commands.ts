@@ -449,8 +449,11 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
-  const suffix = prompt ? " with prompt..." : "...";
-  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
+  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
+  if (prompt) {
+    const preview = prompt.length > 80 ? prompt.slice(0, 77) + "..." : prompt;
+    p.log.info(pc.dim(`Prompt: "${preview}"`));
+  }
 
   await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud));
 }

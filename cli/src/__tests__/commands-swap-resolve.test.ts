@@ -539,7 +539,7 @@ describe("prompt handling with swapped args", () => {
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
 
-  it("should swap args and show 'with prompt' when prompt provided", async () => {
+  it("should swap args and show prompt preview when prompt provided", async () => {
     await setManifestAndScript(mockManifest);
 
     try {
@@ -553,9 +553,8 @@ describe("prompt handling with swapped args", () => {
     const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
     expect(infoCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
 
-    // Should show launch message with prompt
-    const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
-    expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
+    // Should show prompt preview in info message
+    expect(infoCalls.some((msg: string) => msg.includes("Prompt:") && msg.includes("Fix all bugs"))).toBe(true);
   });
 
   it("should validate prompt even when args are swapped", async () => {

@@ -524,26 +524,24 @@ describe("cmdRun happy-path pipeline", () => {
       expect(launchMsg).toContain("Sprite");
     });
 
-    it("should append 'with prompt...' when prompt is provided", async () => {
+    it("should show prompt preview in info message when prompt is provided", async () => {
       global.fetch = mockFetchForDownload({ primaryOk: true });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite", "Fix bugs");
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
-      const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
-      expect(launchMsg).toContain("with prompt");
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Prompt:") && msg.includes("Fix bugs"))).toBe(true);
     });
 
-    it("should append '...' without prompt when no prompt provided", async () => {
+    it("should not show prompt preview when no prompt provided", async () => {
       global.fetch = mockFetchForDownload({ primaryOk: true });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
-      const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
-      expect(launchMsg).not.toContain("with prompt");
+      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      expect(infoCalls.some((msg: string) => msg.includes("Prompt:"))).toBe(false);
     });
   });
 

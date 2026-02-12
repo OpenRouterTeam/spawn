@@ -506,9 +506,7 @@ describe("Script download and execution", () => {
     expect(allOutput).toContain("try again");
   });
 
-  it("should pass SPAWN_PROMPT and SPAWN_MODE env vars with prompt", async () => {
-    // We can verify the launch step message includes "with prompt"
-    // when a valid prompt is provided
+  it("should show prompt preview in info message when prompt is provided", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
         return {
@@ -531,7 +529,7 @@ describe("Script download and execution", () => {
       // Expected - bash execution in test env
     }
 
-    const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
-    expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
+    const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+    expect(infoCalls.some((msg: string) => msg.includes("Prompt:") && msg.includes("Write tests"))).toBe(true);
   });
 });
