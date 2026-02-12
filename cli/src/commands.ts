@@ -314,7 +314,9 @@ export async function cmdInteractive(): Promise<void> {
 
 // ── Run ────────────────────────────────────────────────────────────────────────
 
-/** Resolve display names / casing and log if resolved to a different key */
+/** Resolve display names / casing and log if resolved to a different key.
+ *  Unresolved names are lowercased so they pass identifier validation and
+ *  reach the more helpful "Unknown agent/cloud" error with suggestions. */
 function resolveAndLog(
   manifest: Manifest,
   agent: string,
@@ -322,13 +324,21 @@ function resolveAndLog(
 ): { agent: string; cloud: string } {
   const resolvedAgent = resolveAgentKey(manifest, agent);
   const resolvedCloud = resolveCloudKey(manifest, cloud);
-  if (resolvedAgent && resolvedAgent !== agent) {
-    p.log.info(`Resolved "${agent}" to ${pc.cyan(resolvedAgent)}`);
+  if (resolvedAgent) {
+    if (resolvedAgent !== agent) {
+      p.log.info(`Resolved "${agent}" to ${pc.cyan(resolvedAgent)}`);
+    }
     agent = resolvedAgent;
+  } else {
+    agent = agent.toLowerCase();
   }
-  if (resolvedCloud && resolvedCloud !== cloud) {
-    p.log.info(`Resolved "${cloud}" to ${pc.cyan(resolvedCloud)}`);
+  if (resolvedCloud) {
+    if (resolvedCloud !== cloud) {
+      p.log.info(`Resolved "${cloud}" to ${pc.cyan(resolvedCloud)}`);
+    }
     cloud = resolvedCloud;
+  } else {
+    cloud = cloud.toLowerCase();
   }
   return { agent, cloud };
 }

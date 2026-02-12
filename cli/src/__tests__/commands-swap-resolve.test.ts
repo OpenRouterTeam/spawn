@@ -364,6 +364,38 @@ describe("resolveAndLog via cmdRun", () => {
       expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("sprite"))).toBe(true);
     });
   });
+
+  describe("unresolvable uppercase names", () => {
+    it("should lowercase unresolvable agent name and show 'Unknown agent' instead of 'invalid characters'", async () => {
+      await setManifestAndScript(mockManifest);
+
+      try {
+        await cmdRun("FooBar", "sprite");
+      } catch {
+        // Expected: process.exit from validateEntities
+      }
+
+      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      // Should get "Unknown agent" error, NOT "invalid characters"
+      expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
+      expect(errorCalls.some((msg: string) => msg.includes("invalid characters"))).toBe(false);
+    });
+
+    it("should lowercase unresolvable cloud name and show 'Unknown cloud' instead of 'invalid characters'", async () => {
+      await setManifestAndScript(mockManifest);
+
+      try {
+        await cmdRun("claude", "BazCloud");
+      } catch {
+        // Expected: process.exit from validateEntities
+      }
+
+      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      // Should get "Unknown cloud" error, NOT "invalid characters"
+      expect(errorCalls.some((msg: string) => msg.includes("Unknown cloud"))).toBe(true);
+      expect(errorCalls.some((msg: string) => msg.includes("invalid characters"))).toBe(false);
+    });
+  });
 });
 
 // ── isValidManifest tests (via loadManifest) ──────────────────────────────────
