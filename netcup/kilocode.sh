@@ -1,0 +1,56 @@
+#!/bin/bash
+set -eo pipefail
+
+# Source common functions - try local file first, fall back to remote
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+# shellcheck source=netcup/lib/common.sh
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
+else
+    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/netcup/lib/common.sh)"
+fi
+
+log_info "Kilo Code on Netcup Cloud"
+echo ""
+
+# 1. Resolve Netcup credentials
+ensure_netcup_credentials
+
+# 2. Generate + register SSH key
+ensure_ssh_key
+
+# 3. Get server name and create server
+SERVER_NAME=$(get_server_name)
+create_server "${SERVER_NAME}"
+
+# 4. Wait for SSH and cloud-init
+verify_server_connectivity "${NETCUP_SERVER_IP}"
+wait_for_cloud_init "${NETCUP_SERVER_IP}" 60
+
+# 5. Install Kilo Code CLI
+log_step "Installing Kilo Code CLI..."
+run_server "${NETCUP_SERVER_IP}" "npm install -g @kilocode/cli"
+
+# 6. Get OpenRouter API key
+echo ""
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+    log_info "Using OpenRouter API key from environment"
+else
+    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
+fi
+
+log_step "Setting up environment variables..."
+inject_env_vars_ssh "${NETCUP_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "KILO_PROVIDER_TYPE=openrouter" \
+    "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
+
+echo ""
+log_info "Netcup server setup completed successfully!"
+log_info "Server: ${SERVER_NAME} (ID: ${NETCUP_SERVER_ID}, IP: ${NETCUP_SERVER_IP})"
+echo ""
+
+# 7. Start Kilo Code
+log_step "Starting Kilo Code..."
+sleep 1
+interactive_session "${NETCUP_SERVER_IP}" "cd ~ && source ~/.zshrc && kilocode"

@@ -22,6 +22,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/goose.sh)
 ```
 
+#### Kilo Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/kilocode.sh)
+```
+
 #### Amazon Q
 
 ```bash
