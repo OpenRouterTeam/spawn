@@ -171,7 +171,7 @@ print(json.dumps(body))
 
     if echo "$response" | grep -q '"error"'; then
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | _extract_json_field "error.message" "Unknown error")
         log_error "API Error: $error_msg"
         log_error ""
         log_error "Common causes:"
@@ -354,7 +354,7 @@ _ramnode_handle_create_response() {
     if echo "$response" | grep -q '"error"'; then
         log_error "Failed to create RamNode server"
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | _extract_json_field "error.message" "Unknown error")
         log_error "API Error: $error_msg"
         log_error ""
         log_error "Common issues:"

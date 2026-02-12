@@ -77,7 +77,7 @@ test_contabo_credentials() {
     response=$(contabo_api GET "/compute/instances?page=1&size=1")
     if echo "$response" | grep -q '"error"'; then
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | _extract_json_field "message" "No details available")
         log_error "API Error: $error_msg"
         log_error ""
         log_error "How to fix:"
@@ -121,7 +121,7 @@ contabo_register_ssh_key() {
 
     if echo "$register_response" | grep -q '"error"'; then
         local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | _extract_json_field "message" "Unknown error")
         log_error "API Error: $error_msg"
         log_error ""
         log_error "Common causes:"
@@ -224,7 +224,7 @@ create_server() {
     if echo "$response" | grep -q '"error"' || ! echo "$response" | grep -q '"instanceId"'; then
         log_error "Failed to create Contabo instance"
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | _extract_json_field "message" "Unknown error")
         log_error "API Error: $error_msg"
         log_error ""
         log_error "Common issues:"

@@ -41,7 +41,7 @@ test_upcloud_credentials() {
         return 0
     else
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('error_message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | _extract_json_field "error.error_message" "No details available")
         log_error "API Error: $error_msg"
         log_warn "Remediation steps:"
         log_warn "  1. Verify credentials at: https://hub.upcloud.com/people/account"
@@ -156,7 +156,7 @@ _upcloud_handle_create_response() {
     if echo "$response" | grep -q '"error"'; then
         log_error "Failed to create UpCloud server"
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('error_message','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | _extract_json_field "error.error_message" "Unknown error")
         log_error "API Error: $error_msg"
         log_warn "Common issues:"
         log_warn "  - Insufficient account balance"

@@ -997,6 +997,32 @@ json_escape() {
     }
 }
 
+# Extract a field from a JSON response, with an optional fallback value.
+# Replaces the repeated `python3 -c "import json,sys; d=json.loads(...); print(d.get(...))"` pattern.
+# Reads JSON from stdin and navigates dot-separated keys (e.g., "error.message").
+# Usage: echo "$json" | _extract_json_field FIELD_PATH [FALLBACK]
+# Examples:
+#   echo "$response" | _extract_json_field "message" "Unknown error"
+#   echo "$response" | _extract_json_field "error.message" "No details"
+_extract_json_field() {
+    local field_path="${1}"
+    local fallback="${2:-}"
+    python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+keys = '${field_path}'.split('.')
+v = d
+for k in keys:
+    if isinstance(v, dict):
+        v = v.get(k)
+    else:
+        v = None
+    if v is None:
+        break
+print(v if v is not None else '${fallback}')
+" 2>/dev/null || echo "${fallback}"
+}
+
 # Extract SSH key IDs from cloud provider API response
 # Usage: extract_ssh_key_ids API_RESPONSE KEY_FIELD
 # KEY_FIELD: "ssh_keys" (DigitalOcean/Vultr) or "data" (Linode)
@@ -1494,20 +1520,20 @@ generic_wait_for_instance() {
         local response
         response=$("${api_func}" GET "${endpoint}" 2>/dev/null) || true
 
-        local status
-        status=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${status_py})" 2>/dev/null || echo "unknown")
+        # Extract both status and IP in a single python3 call (separated by newline)
+        local status_and_ip
+        status_and_ip=$(printf '%s' "${response}" | python3 -c "
+import json,sys
+d=json.loads(sys.stdin.read())
+print(${status_py})
+print(${ip_py})
+" 2>/dev/null || printf 'unknown\n')
 
-        if [[ "${status}" != "${target_status}" ]]; then
-            log_step "${description} status: ${status} (${attempt}/${max_attempts})"
-            sleep "${poll_delay}"
-            attempt=$((attempt + 1))
-            continue
-        fi
+        local status ip
+        { read -r status; read -r ip; } <<< "${status_and_ip}"
+        status="${status:-unknown}"
 
-        local ip
-        ip=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${ip_py})" 2>/dev/null || echo "")
-
-        if [[ -n "${ip}" ]]; then
+        if [[ "${status}" == "${target_status}" && -n "${ip}" ]]; then
             export "${ip_var}=${ip}"
             log_info "${description} ${target_status}: IP=${ip}"
             return 0

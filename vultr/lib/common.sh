@@ -43,7 +43,7 @@ test_vultr_token() {
         return 0
     else
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | _extract_json_field "error" "No details available")
         log_error "API Error: $error_msg"
         log_warn "Remediation steps:"
         log_warn "  1. Verify API key at: https://my.vultr.com/settings/#settingsapi"
@@ -84,7 +84,7 @@ vultr_register_ssh_key() {
     else
         # Parse error details
         local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | _extract_json_field "error" "Unknown error")
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -176,7 +176,7 @@ create_server() {
     else
         log_error "Failed to create Vultr instance"
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | _extract_json_field "error" "Unknown error")
         log_error "API Error: $error_msg"
         log_warn "Common issues:"
         log_warn "  - Insufficient account balance"

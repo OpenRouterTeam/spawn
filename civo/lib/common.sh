@@ -74,7 +74,7 @@ civo_register_ssh_key() {
         return 0
     else
         local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('reason','Unknown error'))" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | _extract_json_field "reason" "Unknown error")
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"

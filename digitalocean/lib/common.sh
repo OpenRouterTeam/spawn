@@ -46,7 +46,7 @@ test_do_token() {
     else
         # Parse error details if available
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | _extract_json_field "message" "No details available")
         log_error "API Error: $error_msg"
         log_warn "Remediation steps:"
         log_warn "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
@@ -88,7 +88,7 @@ do_register_ssh_key() {
     else
         # Parse error details
         local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | _extract_json_field "message" "Unknown error")
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -184,7 +184,7 @@ create_server() {
 
         # Parse error details
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | _extract_json_field "message" "Unknown error")
         log_error "API Error: $error_msg"
 
         log_warn "Common issues:"

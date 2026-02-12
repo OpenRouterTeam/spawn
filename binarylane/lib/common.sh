@@ -42,7 +42,7 @@ test_binarylane_token() {
         return 0
     fi
     local error_msg
-    error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
+    error_msg=$(echo "$response" | _extract_json_field "message" "No details available")
     log_error "API Error: $error_msg"
     log_error ""
     log_error "How to fix:"
@@ -83,7 +83,7 @@ binarylane_register_ssh_key() {
     else
         # Parse error details
         local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
+        error_msg=$(echo "$register_response" | _extract_json_field "message" "Unknown error")
         log_error "API Error: $error_msg"
 
         log_warn "Common causes:"
@@ -153,7 +153,7 @@ _binarylane_handle_create_response() {
 
     log_error "Failed to create BinaryLane server"
     local error_msg
-    error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
+    error_msg=$(echo "$response" | _extract_json_field "message" "Unknown error")
     log_error "API Error: $error_msg"
     log_warn "Common issues:"
     log_warn "  - Insufficient account balance"

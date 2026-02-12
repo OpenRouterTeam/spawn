@@ -95,7 +95,7 @@ _validate_fly_token() {
     response=$(fly_api GET "/apps?org_slug=personal")
     if echo "$response" | grep -q '"error"'; then
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
+        error_msg=$(echo "$response" | _extract_json_field "error" "No details available")
         log_error "Authentication failed: Invalid Fly.io API token"
         log_error "API Error: $error_msg"
         log_warn "Remediation steps:"
@@ -179,7 +179,7 @@ _fly_create_app() {
 
     if echo "$app_response" | grep -q '"error"'; then
         local error_msg
-        error_msg=$(echo "$app_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$app_response")
+        error_msg=$(echo "$app_response" | _extract_json_field "error" "Unknown error")
         if echo "$error_msg" | grep -qi "already exists"; then
             log_warn "App '$name' already exists, reusing it"
             return 0
@@ -234,7 +234,7 @@ print(json.dumps(body))
     if echo "$response" | grep -q '"error"'; then
         log_error "Failed to create Fly.io machine"
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(echo "$response" | _extract_json_field "error" "Unknown error")
         log_error "API Error: $error_msg"
         log_warn "Common issues:"
         log_warn "  - Insufficient account balance or payment method required"
