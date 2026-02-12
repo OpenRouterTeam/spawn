@@ -55,47 +55,9 @@ inject_env_vars \
     "PATH=\$HOME/.claude/local/bin:\$HOME/.bun/bin:\$PATH"
 
 # 7. Configure Claude Code settings
-log_step "Configuring Claude Code..."
-
-run_server "mkdir -p /root/.claude"
-
-# Upload settings.json
-SETTINGS_TEMP=$(mktemp)
-chmod 600 "$SETTINGS_TEMP"
-cat > "$SETTINGS_TEMP" << EOF
-{
-  "theme": "dark",
-  "editor": "vim",
-  "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
-    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-    "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}"
-  },
-  "permissions": {
-    "defaultMode": "bypassPermissions",
-    "dangerouslySkipPermissions": true
-  }
-}
-EOF
-
-upload_file "$SETTINGS_TEMP" "/root/.claude/settings.json"
-rm "$SETTINGS_TEMP"
-
-# Upload ~/.claude.json global state
-GLOBAL_STATE_TEMP=$(mktemp)
-chmod 600 "$GLOBAL_STATE_TEMP"
-cat > "$GLOBAL_STATE_TEMP" << EOF
-{
-  "hasCompletedOnboarding": true,
-  "bypassPermissionsModeAccepted": true
-}
-EOF
-
-upload_file "$GLOBAL_STATE_TEMP" "/root/.claude.json"
-rm "$GLOBAL_STATE_TEMP"
-
-# Create empty CLAUDE.md
-run_server "touch /root/.claude/CLAUDE.md"
+setup_claude_code_config "${OPENROUTER_API_KEY}" \
+    "upload_file" \
+    "run_server"
 
 echo ""
 log_info "Railway service setup completed successfully!"
