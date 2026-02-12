@@ -522,10 +522,16 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   process.exit(1);
 }
 
-function credentialHint(cloud: string, authHint?: string, verb = "Missing or invalid"): string {
-  return authHint
-    ? `  - ${verb} credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`
-    : `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`;
+function credentialHints(cloud: string, authHint?: string, verb = "Missing or invalid"): string[] {
+  if (authHint) {
+    return [
+      `  - ${verb} credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`,
+      `    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`,
+    ];
+  }
+  return [
+    `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`,
+  ];
 }
 
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
@@ -571,14 +577,14 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
     case 1:
       return [
         "Common causes:",
-        credentialHint(cloud, authHint),
+        ...credentialHints(cloud, authHint),
         "  - Cloud provider API error (quota, rate limit, or region issue)",
         "  - Server provisioning failed (try again or pick a different region)",
       ];
     default:
       return [
         "Common causes:",
-        credentialHint(cloud, authHint, "Missing"),
+        ...credentialHints(cloud, authHint, "Missing"),
         "  - Cloud provider API rate limit or quota exceeded",
         "  - Missing local dependencies (SSH, curl, jq)",
       ];
