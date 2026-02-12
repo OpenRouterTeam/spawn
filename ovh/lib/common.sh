@@ -79,96 +79,23 @@ ovh_api_call() {
 }
 
 # Test OVH API credentials
-test_ovh_token() {
+_test_ovh_credentials() {
     local response
     response=$(ovh_api_call GET "/me")
     if echo "$response" | grep -q '"message"'; then
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
-        log_error ""
-        log_error "How to fix:"
-        log_error "  1. Verify your credentials at: https://api.ovh.com/createToken/"
-        log_error "  2. Ensure Application Key, Application Secret, and Consumer Key are correct"
-        log_error "  3. Check the Consumer Key has the required permissions"
         return 1
     fi
     return 0
 }
 
-# Interactively prompt for OVH credentials, validate, and save to config
-_ovh_prompt_credentials() {
-    local config_file="$1"
-
-    echo ""
-    log_warn "OVHcloud API Credentials Required"
-    log_warn "Create credentials at: https://api.ovh.com/createToken/"
-    log_warn ""
-    log_warn "Required permissions:"
-    log_warn "  GET    /cloud/project/*"
-    log_warn "  POST   /cloud/project/*"
-    log_warn "  DELETE /cloud/project/*"
-    log_warn "  GET    /me"
-    echo ""
-
-    local app_key app_secret consumer_key project_id
-
-    app_key=$(validated_read "Enter OVH Application Key: " validate_api_token) || return 1
-    app_secret=$(validated_read "Enter OVH Application Secret: " validate_api_token) || return 1
-    consumer_key=$(validated_read "Enter OVH Consumer Key: " validate_api_token) || return 1
-
-    echo ""
-    log_warn "Your OVH Public Cloud Project ID is required."
-    log_warn "Find it at: https://www.ovh.com/manager/public-cloud/ (select project -> Project ID)"
-    echo ""
-    project_id=$(validated_read "Enter OVH Project ID: " validate_api_token) || return 1
-
-    export OVH_APPLICATION_KEY="${app_key}"
-    export OVH_APPLICATION_SECRET="${app_secret}"
-    export OVH_CONSUMER_KEY="${consumer_key}"
-    export OVH_PROJECT_ID="${project_id}"
-
-    if ! test_ovh_token; then
-        unset OVH_APPLICATION_KEY OVH_APPLICATION_SECRET OVH_CONSUMER_KEY OVH_PROJECT_ID
-        return 1
-    fi
-
-    _save_json_config "${config_file}" \
-        application_key "${app_key}" \
-        application_secret "${app_secret}" \
-        consumer_key "${consumer_key}" \
-        project_id "${project_id}"
-}
-
 # Ensure OVH credentials are available (env vars -> config file -> prompt+save)
 ensure_ovh_authenticated() {
-    check_python_available || return 1
-
-    local config_file="$HOME/.config/spawn/ovh.json"
-
-    # Try environment variables first
-    if [[ -n "${OVH_APPLICATION_KEY:-}" && -n "${OVH_APPLICATION_SECRET:-}" && -n "${OVH_CONSUMER_KEY:-}" && -n "${OVH_PROJECT_ID:-}" ]]; then
-        log_info "Using OVHcloud credentials from environment"
-        return 0
-    fi
-
-    # Try config file
-    local creds
-    if creds=$(_load_json_config_fields "$config_file" application_key application_secret consumer_key project_id); then
-        local saved_ak saved_as saved_ck saved_pid
-        { read -r saved_ak; read -r saved_as; read -r saved_ck; read -r saved_pid; } <<< "${creds}"
-        if [[ -n "${saved_ak}" && -n "${saved_as}" && -n "${saved_ck}" && -n "${saved_pid}" ]]; then
-            export OVH_APPLICATION_KEY="${saved_ak}"
-            export OVH_APPLICATION_SECRET="${saved_as}"
-            export OVH_CONSUMER_KEY="${saved_ck}"
-            export OVH_PROJECT_ID="${saved_pid}"
-            log_info "Using OVHcloud credentials from ${config_file}"
-            return 0
-        fi
-    fi
-
-    # Prompt, validate, and save credentials
-    _ovh_prompt_credentials "${config_file}"
+    ensure_multi_credentials "OVHcloud" "$HOME/.config/spawn/ovh.json" \
+        "https://api.ovh.com/createToken/" _test_ovh_credentials \
+        "OVH_APPLICATION_KEY:application_key:Application Key" \
+        "OVH_APPLICATION_SECRET:application_secret:Application Secret" \
+        "OVH_CONSUMER_KEY:consumer_key:Consumer Key" \
+        "OVH_PROJECT_ID:project_id:Project ID"
 }
 
 # Check if SSH key is registered with OVH
@@ -379,68 +306,18 @@ create_ovh_instance() {
     log_info "Instance created: ID=$OVH_INSTANCE_ID"
 }
 
-# Extract public IPv4 address from OVH instance JSON response
-# Prefers public type; falls back to first IPv4
-_ovh_extract_public_ipv4() {
-    python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for addr in data.get('ipAddresses', []):
-    if addr.get('version', 0) == 4 and addr.get('type', '') == 'public':
-        print(addr['ip'])
-        sys.exit(0)
-for addr in data.get('ipAddresses', []):
-    if addr.get('version', 0) == 4:
-        print(addr['ip'])
-        sys.exit(0)
-print('')
-"
-}
-
-# Extract instance status from OVH API response
-_ovh_extract_status() {
-    python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('status',''))" 2>/dev/null || echo ""
-}
-
 # Wait for OVH instance to be ACTIVE and get IP
+# OVH IP extraction: prefer public IPv4, fallback to first IPv4
 wait_for_ovh_instance() {
     local instance_id="$1"
     local max_attempts="${2:-60}"
-    local attempt=1
-    local interval=5
-    local max_interval=15
 
-    log_step "Waiting for OVHcloud instance to become active..."
-    while [[ "${attempt}" -le "${max_attempts}" ]]; do
-        local response
-        response=$(ovh_api_call GET "/cloud/project/${OVH_PROJECT_ID}/instance/${instance_id}")
-
-        local status
-        status=$(echo "$response" | _ovh_extract_status)
-
-        if [[ "${status}" == "ACTIVE" ]]; then
-            OVH_SERVER_IP=$(echo "$response" | _ovh_extract_public_ipv4)
-            export OVH_SERVER_IP
-            if [[ -n "${OVH_SERVER_IP}" ]]; then
-                log_info "Instance active: IP=$OVH_SERVER_IP"
-                return 0
-            fi
-        fi
-
-        local jitter
-        jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
-        log_step "Instance status: ${status:-unknown} (attempt ${attempt}/${max_attempts}, retry in ${jitter}s)"
-        sleep "${jitter}"
-
-        interval=$((interval * 2))
-        if [[ "${interval}" -gt "${max_interval}" ]]; then
-            interval="${max_interval}"
-        fi
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active after ${max_attempts} attempts"
-    return 1
+    generic_wait_for_instance ovh_api_call \
+        "/cloud/project/${OVH_PROJECT_ID}/instance/${instance_id}" \
+        "ACTIVE" \
+        "d.get('status','')" \
+        "next((a['ip'] for a in d.get('ipAddresses',[]) if a.get('version',0)==4 and a.get('type','')=='public'), next((a['ip'] for a in d.get('ipAddresses',[]) if a.get('version',0)==4), ''))" \
+        OVH_SERVER_IP "OVHcloud instance" "${max_attempts}"
 }
 
 # Destroy an OVH instance
