@@ -282,9 +282,30 @@ export async function cmdInteractive(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   const agents = agentKeys(manifest);
+  // Sort agents: those with more clouds first, then alphabetical
+  const sortedAgents = [...agents].sort((a, b) => {
+    const aCount = getImplementedClouds(manifest, a).length;
+    const bCount = getImplementedClouds(manifest, b).length;
+    if (bCount !== aCount) return bCount - aCount;
+    return manifest.agents[a].name.localeCompare(manifest.agents[b].name);
+  });
+
+  const agentOptions = sortedAgents.map((key) => {
+    const a = manifest.agents[key];
+    const cloudCount = getImplementedClouds(manifest, key).length;
+    const countLabel = cloudCount === 0
+      ? "no clouds yet"
+      : `${cloudCount} cloud${cloudCount !== 1 ? "s" : ""}`;
+    return {
+      value: key,
+      label: cloudCount === 0 ? pc.dim(a.name) : a.name,
+      hint: `${countLabel} -- ${a.description}`,
+    };
+  });
+
   const agentChoice = await p.select({
     message: "Select an agent",
-    options: mapToSelectOptions(agents, manifest.agents),
+    options: agentOptions,
   });
   if (p.isCancel(agentChoice)) handleCancel();
 
