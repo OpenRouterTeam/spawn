@@ -309,10 +309,7 @@ export async function cmdInteractive(): Promise<void> {
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  const authVars = parseAuthEnvVars(manifest.clouds[cloudChoice].auth);
-  const authHint = authVars.length > 0 ? authVars.join(" + ") : undefined;
-
-  await execScript(cloudChoice, agentChoice, undefined, authHint);
+  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice));
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────
@@ -404,11 +401,8 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   p.log.success("Dry run complete -- no resources were provisioned");
 }
 
-export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean): Promise<void> {
-  const manifest = await loadManifestWithSpinner();
-  ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
-
-  // SECURITY: Validate input arguments for injection attacks
+/** Validate inputs for injection attacks (SECURITY) and check they're non-empty */
+function validateRunSecurity(agent: string, cloud: string, prompt?: string): void {
   try {
     validateIdentifier(agent, "Agent name");
     validateIdentifier(cloud, "Cloud name");
@@ -422,15 +416,31 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
 
   validateNonEmptyString(agent, "Agent name", "spawn agents");
   validateNonEmptyString(cloud, "Cloud name", "spawn clouds");
-  ({ agent, cloud } = detectAndFixSwappedArgs(manifest, agent, cloud));
+}
 
-  // Validate both agent and cloud before exiting, so users see all errors at once
+/** Validate agent and cloud exist in manifest, showing all errors before exiting */
+function validateEntities(manifest: Manifest, agent: string, cloud: string): void {
   const agentValid = checkEntity(manifest, agent, "agent");
   const cloudValid = checkEntity(manifest, cloud, "cloud");
   if (!agentValid || !cloudValid) {
     process.exit(1);
   }
   validateImplementation(manifest, cloud, agent);
+}
+
+/** Build auth hint string from cloud auth field for error messages */
+function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
+  const authVars = parseAuthEnvVars(manifest.clouds[cloud].auth);
+  return authVars.length > 0 ? authVars.join(" + ") : undefined;
+}
+
+export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean): Promise<void> {
+  const manifest = await loadManifestWithSpinner();
+  ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
+
+  validateRunSecurity(agent, cloud, prompt);
+  ({ agent, cloud } = detectAndFixSwappedArgs(manifest, agent, cloud));
+  validateEntities(manifest, agent, cloud);
 
   if (dryRun) {
     showDryRunPreview(manifest, agent, cloud, prompt);
@@ -442,11 +452,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
   const suffix = prompt ? " with prompt..." : "...";
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
-  // Extract auth env var names so error messages can show what credentials are needed
-  const authVars = parseAuthEnvVars(manifest.clouds[cloud].auth);
-  const authHint = authVars.length > 0 ? authVars.join(" + ") : undefined;
-
-  await execScript(cloud, agent, prompt, authHint);
+  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud));
 }
 
 export function getStatusDescription(status: number): string {
@@ -917,8 +923,11 @@ function buildRecordHint(r: SpawnRecord): string {
   return when;
 }
 
-export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
-  // Try to load manifest early so we can resolve display names in filters
+/** Try to load manifest and resolve filter display names to keys */
+async function resolveListFilters(
+  agentFilter?: string,
+  cloudFilter?: string
+): Promise<{ manifest: Manifest | null; agentFilter?: string; cloudFilter?: string }> {
   let manifest: Manifest | null = null;
   try {
     manifest = await loadManifest();
@@ -926,7 +935,6 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     // Manifest unavailable -- show raw keys
   }
 
-  // Resolve display names to keys (e.g., "Claude Code" -> "claude")
   if (manifest && agentFilter) {
     const resolved = resolveAgentKey(manifest, agentFilter);
     if (resolved) agentFilter = resolved;
@@ -936,6 +944,36 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     if (resolved) cloudFilter = resolved;
   }
 
+  return { manifest, agentFilter, cloudFilter };
+}
+
+/** Show interactive picker to select and rerun a previous spawn */
+async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
+  const options = records.map((r, i) => ({
+    value: i,
+    label: buildRecordLabel(r, manifest),
+    hint: buildRecordHint(r),
+  }));
+
+  const choice = await p.select({
+    message: `Select a spawn to rerun (${records.length} recorded)`,
+    options,
+  });
+  if (p.isCancel(choice)) {
+    handleCancel();
+  }
+
+  const selected = records[choice];
+  p.log.step(`Rerunning ${pc.bold(buildRecordLabel(selected, manifest))}`);
+  await cmdRun(selected.agent, selected.cloud, selected.prompt);
+}
+
+export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
+  const resolved = await resolveListFilters(agentFilter, cloudFilter);
+  const manifest = resolved.manifest;
+  agentFilter = resolved.agentFilter;
+  cloudFilter = resolved.cloudFilter;
+
   const records = filterHistory(agentFilter, cloudFilter);
 
   if (records.length === 0) {
@@ -943,29 +981,11 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     return;
   }
 
-  // Interactive mode: show a select picker so user can choose a spawn to rerun
   if (isInteractiveTTY()) {
-    const options = records.map((r, i) => ({
-      value: i,
-      label: buildRecordLabel(r, manifest),
-      hint: buildRecordHint(r),
-    }));
-
-    const choice = await p.select({
-      message: `Select a spawn to rerun (${records.length} recorded)`,
-      options,
-    });
-    if (p.isCancel(choice)) {
-      handleCancel();
-    }
-
-    const selected = records[choice];
-    p.log.step(`Rerunning ${pc.bold(buildRecordLabel(selected, manifest))}`);
-    await cmdRun(selected.agent, selected.cloud, selected.prompt);
+    await interactiveListPicker(records, manifest);
     return;
   }
 
-  // Non-interactive: show static table
   renderListTable(records, manifest);
   showListFooter(records, agentFilter, cloudFilter);
 }
