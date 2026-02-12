@@ -59,6 +59,6 @@ log_info "Server: ${SERVER_NAME} (ID: ${CIVO_SERVER_ID}, IP: ${CIVO_SERVER_IP})"
 echo ""
 
 log_step "Starting nanoclaw..."
-log_warn "You will need to scan a WhatsApp QR code to authenticate."
+log_info "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 interactive_session "${CIVO_SERVER_IP}" "cd ~/nanoclaw && source ~/.zshrc && npm run dev"

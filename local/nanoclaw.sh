@@ -52,7 +52,7 @@ else
 fi
 
 # 6. Inject environment variables
-log_warn "Appending environment variables to ~/.zshrc..."
+log_step "Appending environment variables to ~/.zshrc..."
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
@@ -72,7 +72,7 @@ echo ""
 
 # 8. Start nanoclaw
 log_step "Starting nanoclaw..."
-log_warn "You will need to scan a WhatsApp QR code to authenticate."
+log_info "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 source ~/.zshrc 2>/dev/null || true
 cd "${HOME}/nanoclaw" && exec npm run dev

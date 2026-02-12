@@ -82,7 +82,7 @@ echo ""
 
 # 9. Start openclaw gateway in background, then TUI
 log_step "Starting openclaw..."
-log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
+log_info "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1
 
