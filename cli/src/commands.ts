@@ -933,7 +933,8 @@ function buildRecordHint(r: SpawnRecord): string {
   return when;
 }
 
-/** Try to load manifest and resolve filter display names to keys */
+/** Try to load manifest and resolve filter display names to keys.
+ *  When a bare positional filter doesn't match an agent, try it as a cloud. */
 async function resolveListFilters(
   agentFilter?: string,
   cloudFilter?: string
@@ -947,7 +948,16 @@ async function resolveListFilters(
 
   if (manifest && agentFilter) {
     const resolved = resolveAgentKey(manifest, agentFilter);
-    if (resolved) agentFilter = resolved;
+    if (resolved) {
+      agentFilter = resolved;
+    } else if (!cloudFilter) {
+      // Bare positional arg didn't match an agent -- try as a cloud filter
+      const resolvedCloud = resolveCloudKey(manifest, agentFilter);
+      if (resolvedCloud) {
+        cloudFilter = resolvedCloud;
+        agentFilter = undefined;
+      }
+    }
   }
   if (manifest && cloudFilter) {
     const resolved = resolveCloudKey(manifest, cloudFilter);
