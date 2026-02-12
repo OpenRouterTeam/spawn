@@ -175,6 +175,13 @@ print(json.dumps(providers))
 # Usage: invalidate_cloud_key CLOUD_KEY
 invalidate_cloud_key() {
     local provider="${1}"
+
+    # SECURITY: Validate provider name to prevent path traversal
+    if [[ ! "${provider}" =~ ^[a-z0-9][a-z0-9._-]{0,63}$ ]]; then
+        log "invalidate_cloud_key: invalid provider name: ${provider}"
+        return 1
+    fi
+
     local config_file="${HOME}/.config/spawn/${provider}.json"
 
     if [[ -f "${config_file}" ]]; then

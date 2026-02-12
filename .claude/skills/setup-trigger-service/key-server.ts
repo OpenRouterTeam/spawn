@@ -364,6 +364,11 @@ const server = Bun.serve({
       const skipped: string[] = [];
 
       for (const pk of body.providers as string[]) {
+        // SECURITY: Validate provider names to prevent path traversal in saveKeys
+        if (typeof pk !== "string" || !SAFE_PROVIDER_RE.test(pk)) {
+          skipped.push(pk);
+          continue;
+        }
         if (
           d.batches.some(
             (b) =>
