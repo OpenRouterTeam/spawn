@@ -1184,7 +1184,7 @@
     "netcup/gptme": "implemented",
     "netcup/opencode": "implemented",
     "netcup/plandex": "implemented",
-    "netcup/kilocode": "missing",
+    "netcup/kilocode": "implemented",
     "netcup/continue": "implemented",
     "local/claude": "implemented",
     "local/openclaw": "implemented",

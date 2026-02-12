@@ -34,6 +34,12 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/amazonq.sh)
 bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/plandex.sh)
 ```
 
+#### Kilo Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/kilocode.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
