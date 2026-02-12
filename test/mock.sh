@@ -665,38 +665,14 @@ discover_agents() {
 # Test runner
 # ============================================================
 
-run_test() {
-    local cloud="$1"
-    local agent="$2"
-    local script_path="${REPO_ROOT}/${cloud}/${agent}.sh"
-
-    if [[ ! -f "$script_path" ]]; then
-        printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}/${agent}.sh — file not found"
-        SKIPPED=$((SKIPPED + 1))
-        return 0
-    fi
-
-    printf '%b\n' "  ${CYAN}test${NC} ${cloud}/${agent}.sh"
-
-    # Snapshot failure count before this test's assertions
-    local _pre_failed="${FAILED}"
-
-    # Reset mock log
-    : > "${MOCK_LOG}"
-
-    # Set up environment
-    setup_env_for_cloud "$cloud"
-
-    # Fake HOME to avoid polluting real home
-    local fake_home
-    fake_home=$(setup_fake_home)
-
-    # Set up state file for state tracking
-    local state_file="${TEST_DIR}/state_${cloud}_${agent}.log"
-    : > "${state_file}"
-
-    # Run the script with mocked PATH + HOME (10s timeout — all calls are fake)
-    local exit_code=0
+# Run a script in the background with a timeout (4 seconds).
+# Sets the variable named by $2 to the exit code.
+# Usage: _run_script_with_timeout SCRIPT_PATH EXIT_CODE_VAR CLOUD STATE_FILE FAKE_HOME
+_run_script_with_timeout() {
+    local script_path="$1"
+    local cloud="$2"
+    local state_file="$3"
+    local fake_home="$4"
 
     MOCK_LOG="${MOCK_LOG}" \
     MOCK_FIXTURE_DIR="${FIXTURES_DIR}/${cloud}" \
@@ -715,48 +691,27 @@ run_test() {
         if [[ "$i" -ge 4 ]]; then
             kill -9 "$pid" 2>/dev/null
             wait "$pid" 2>/dev/null || true
-            exit_code=124
-            break
+            echo 124
+            return 0
         fi
         sleep 1
         i=$((i + 1))
     done
-    if [[ "$exit_code" -ne 124 ]]; then
-        wait "$pid" 2>/dev/null || exit_code=$?
-    fi
+    wait "$pid" 2>/dev/null && echo 0 || echo $?
+}
 
-    # Show last lines of output on failure
-    if [[ "${exit_code}" -ne 0 ]]; then
-        printf '%b\n' "    ${RED}--- output (last 20 lines) ---${NC}"
-        tail -20 "${TEST_DIR}/output.log" 2>/dev/null | while IFS= read -r line; do
-            printf '    %s\n' "$line"
-        done
-        printf '%b\n' "    ${RED}--- end output ---${NC}"
-    fi
+# Print the last 20 lines of output.log on test failure
+_show_failure_output() {
+    printf '%b\n' "    ${RED}--- output (last 20 lines) ---${NC}"
+    tail -20 "${TEST_DIR}/output.log" 2>/dev/null | while IFS= read -r line; do
+        printf '    %s\n' "$line"
+    done
+    printf '%b\n' "    ${RED}--- end output ---${NC}"
+}
 
-    # --- Assertions ---
-    if [[ -n "${MOCK_ERROR_SCENARIO:-}" ]]; then
-        # Error scenarios: expect non-zero exit
-        if [[ "${exit_code}" -ne 0 ]]; then
-            printf '%b\n' "    ${GREEN}✓${NC} fails on ${MOCK_ERROR_SCENARIO} (exit code ${exit_code})"
-            PASSED=$((PASSED + 1))
-            if [[ -n "${RESULTS_FILE:-}" ]]; then
-                printf '%s/%s:pass\n' "${cloud}" "${agent}" >> "${RESULTS_FILE}"
-            fi
-        else
-            printf '%b\n' "    ${RED}✗${NC} should fail on ${MOCK_ERROR_SCENARIO} but exited 0"
-            FAILED=$((FAILED + 1))
-            if [[ -n "${RESULTS_FILE:-}" ]]; then
-                printf '%s/%s:fail\n' "${cloud}" "${agent}" >> "${RESULTS_FILE}"
-            fi
-        fi
-        printf '\n'
-        return 0
-    fi
-
-    assert_exit_code "${exit_code}" 0 "exits successfully"
-
-    # Cloud-specific API call assertions
+# Assert cloud-specific API calls were made
+_assert_cloud_api_calls() {
+    local cloud="$1"
     case "$cloud" in
         hetzner)
             assert_api_called "GET" "/ssh_keys" "fetches SSH keys"
@@ -786,31 +741,87 @@ run_test() {
             assert_log_contains "curl (GET|POST) https://" "makes API calls"
             ;;
     esac
+}
 
-    # Check that SSH was used (for remote execution)
+# Write pass/fail result to RESULTS_FILE if set
+_record_test_result() {
+    local cloud="$1"
+    local agent="$2"
+    local result="$3"
+    if [[ -n "${RESULTS_FILE:-}" ]]; then
+        printf '%s/%s:%s\n' "${cloud}" "${agent}" "${result}" >> "${RESULTS_FILE}"
+    fi
+}
+
+run_test() {
+    local cloud="$1"
+    local agent="$2"
+    local script_path="${REPO_ROOT}/${cloud}/${agent}.sh"
+
+    if [[ ! -f "$script_path" ]]; then
+        printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}/${agent}.sh — file not found"
+        SKIPPED=$((SKIPPED + 1))
+        return 0
+    fi
+
+    printf '%b\n' "  ${CYAN}test${NC} ${cloud}/${agent}.sh"
+
+    # Snapshot failure count before this test's assertions
+    local _pre_failed="${FAILED}"
+
+    # Reset mock log
+    : > "${MOCK_LOG}"
+
+    # Set up environment
+    setup_env_for_cloud "$cloud"
+
+    local fake_home
+    fake_home=$(setup_fake_home)
+
+    local state_file="${TEST_DIR}/state_${cloud}_${agent}.log"
+    : > "${state_file}"
+
+    # Run script with mocked PATH + HOME (4s timeout — all calls are fake)
+    local exit_code
+    exit_code=$(_run_script_with_timeout "${script_path}" "${cloud}" "${state_file}" "${fake_home}")
+
+    if [[ "${exit_code}" -ne 0 ]]; then
+        _show_failure_output
+    fi
+
+    # Error scenario mode: expect non-zero exit
+    if [[ -n "${MOCK_ERROR_SCENARIO:-}" ]]; then
+        if [[ "${exit_code}" -ne 0 ]]; then
+            printf '%b\n' "    ${GREEN}✓${NC} fails on ${MOCK_ERROR_SCENARIO} (exit code ${exit_code})"
+            PASSED=$((PASSED + 1))
+            _record_test_result "${cloud}" "${agent}" "pass"
+        else
+            printf '%b\n' "    ${RED}✗${NC} should fail on ${MOCK_ERROR_SCENARIO} but exited 0"
+            FAILED=$((FAILED + 1))
+            _record_test_result "${cloud}" "${agent}" "fail"
+        fi
+        printf '\n'
+        return 0
+    fi
+
+    assert_exit_code "${exit_code}" 0 "exits successfully"
+    _assert_cloud_api_calls "$cloud"
     assert_log_contains "ssh " "uses SSH"
-
-    # Check OpenRouter API key injection
     assert_env_injected "OPENROUTER_API_KEY"
 
-    # Body validation (when enabled)
     if [[ "${MOCK_VALIDATE_BODY:-}" == "1" ]]; then
         assert_no_body_errors
     fi
-
-    # State tracking (when enabled)
     if [[ "${MOCK_TRACK_STATE:-}" == "1" ]]; then
         assert_server_cleaned_up "${state_file}"
     fi
 
     # Write per-test result to RESULTS_FILE (used by qa-dry-run.sh / qa-cycle.sh)
-    if [[ -n "${RESULTS_FILE:-}" ]]; then
-        local pre_fail=$((FAILED - _pre_failed))
-        if [[ "$pre_fail" -gt 0 ]]; then
-            printf '%s/%s:fail\n' "${cloud}" "${agent}" >> "${RESULTS_FILE}"
-        else
-            printf '%s/%s:pass\n' "${cloud}" "${agent}" >> "${RESULTS_FILE}"
-        fi
+    local pre_fail=$((FAILED - _pre_failed))
+    if [[ "$pre_fail" -gt 0 ]]; then
+        _record_test_result "${cloud}" "${agent}" "fail"
+    else
+        _record_test_result "${cloud}" "${agent}" "pass"
     fi
 
     printf '\n'
