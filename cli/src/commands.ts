@@ -67,6 +67,26 @@ function mapToSelectOptions<T extends { name: string; description: string }>(
   }));
 }
 
+function mapCloudSelectOptions(
+  keys: string[],
+  clouds: Record<string, { name: string; description: string; auth: string }>
+): Array<{ value: string; label: string; hint: string }> {
+  return keys.map((key) => {
+    const cloud = clouds[key];
+    const authVars = parseAuthEnvVars(cloud.auth);
+    const authSuffix = authVars.length > 0
+      ? ` (auth: ${authVars.join(", ")})`
+      : cloud.auth.toLowerCase() !== "none"
+        ? ` (auth: ${cloud.auth})`
+        : "";
+    return {
+      value: key,
+      label: cloud.name,
+      hint: cloud.description + authSuffix,
+    };
+  });
+}
+
 export function getImplementedClouds(manifest: Manifest, agent: string): string[] {
   return cloudKeys(manifest).filter(
     (c: string): boolean => matrixStatus(manifest, c, agent) === "implemented"
@@ -299,7 +319,7 @@ export async function cmdInteractive(): Promise<void> {
 
   const cloudChoice = await p.select({
     message: "Select a cloud provider",
-    options: mapToSelectOptions(clouds, manifest.clouds),
+    options: mapCloudSelectOptions(clouds, manifest.clouds),
   });
   if (p.isCancel(cloudChoice)) handleCancel();
 
