@@ -1,5 +1,5 @@
 node_modules/
 .docs/
 __pycache__/
-.claude/skills/setup-trigger-service/start-*.sh
+.claude/skills/setup-agent-team/start-*.sh
 cli/cli.js

@@ -1,5 +1,5 @@
 ---
-name: setup-trigger-service
+name: setup-agent-team
 description: Set up the Bun trigger server on a Sprite and configure GitHub Actions to wake it on a schedule, on events, or manually.
 disable-model-invocation: true
 argument-hint: "[service-name] [target-script-path]"
@@ -45,7 +45,7 @@ GitHub Actions (cron / events / manual)
 ## Step 1: Verify trigger-server.ts
 
 The trigger server lives at:
-`/home/sprite/spawn/.claude/skills/setup-trigger-service/trigger-server.ts`
+`/home/sprite/spawn/.claude/skills/setup-agent-team/trigger-server.ts`
 
 It reads env vars:
 - `TRIGGER_SECRET` (required) — Bearer token for authenticating requests
@@ -95,21 +95,21 @@ Create `start-<service-name>.sh` in the skill directory:
 ```bash
 #!/bin/bash
 export TRIGGER_SECRET="<secret-from-step-2>"
-export TARGET_SCRIPT="/home/sprite/spawn/.claude/skills/setup-trigger-service/<target-script>.sh"
+export TARGET_SCRIPT="/home/sprite/spawn/.claude/skills/setup-agent-team/<target-script>.sh"
 export REPO_ROOT="/home/sprite/spawn"
-exec bun run /home/sprite/spawn/.claude/skills/setup-trigger-service/trigger-server.ts
+exec bun run /home/sprite/spawn/.claude/skills/setup-agent-team/trigger-server.ts
 ```
 
 Make it executable:
 
 ```bash
-chmod +x /home/sprite/spawn/.claude/skills/setup-trigger-service/start-<service-name>.sh
+chmod +x /home/sprite/spawn/.claude/skills/setup-agent-team/start-<service-name>.sh
 ```
 
 **IMPORTANT:** Verify that `.gitignore` includes wrapper scripts:
 
 ```
-.claude/skills/setup-trigger-service/start-*.sh
+.claude/skills/setup-agent-team/start-*.sh
 ```
 
 Wrapper scripts contain secrets and MUST NOT be committed.
@@ -120,8 +120,8 @@ Register the trigger server as a Sprite service with HTTP port forwarding:
 
 ```bash
 sprite-env services create <service-name> \
-  --cmd bash --args /home/sprite/spawn/.claude/skills/setup-trigger-service/start-<service-name>.sh \
-  --http-port 8080 --dir /home/sprite/spawn/.claude/skills/setup-trigger-service
+  --cmd bash --args /home/sprite/spawn/.claude/skills/setup-agent-team/start-<service-name>.sh \
+  --http-port 8080 --dir /home/sprite/spawn/.claude/skills/setup-agent-team
 ```
 
 **Key flags:**
@@ -419,7 +419,7 @@ The `trigger-server.ts` file is **shared** — same code runs on every Sprite, c
 
 To add a new automation script (beyond discovery.sh and refactor.sh):
 
-1. Create the script in `/home/sprite/spawn/.claude/skills/setup-trigger-service/<script-name>.sh`
+1. Create the script in `/home/sprite/spawn/.claude/skills/setup-agent-team/<script-name>.sh`
 2. Make it executable: `chmod +x <script-name>.sh`
 3. Ensure it follows the single-cycle pattern (sync with origin, run once, exit)
 4. Create a corresponding `start-<script-name>.sh` wrapper with the appropriate env vars

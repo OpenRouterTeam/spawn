@@ -114,7 +114,7 @@ spawn/
   {cloud}/
     lib/common.sh                # Cloud-specific functions (sources shared/common.sh)
     {agent}.sh                   # Agent deployment scripts
-  .claude/skills/setup-trigger-service/
+  .claude/skills/setup-agent-team/
     trigger-server.ts            # HTTP trigger server (concurrent runs, dedup)
     discovery.sh                 # Discovery cycle script (fill gaps, scout new clouds/agents)
     refactor.sh                  # Dual-mode cycle script (issue fix or full refactor)
@@ -269,7 +269,7 @@ When running autonomous discovery/refactoring loops (`./discovery.sh --loop`):
 
 ## Refactoring Service
 
-The automated refactoring service runs via `.claude/skills/setup-trigger-service/`. It is triggered by GitHub Actions (on schedule, on issue open, or manual dispatch).
+The automated refactoring service runs via `.claude/skills/setup-agent-team/`. It is triggered by GitHub Actions (on schedule, on issue open, or manual dispatch).
 
 ### Architecture
 
