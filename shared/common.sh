@@ -1443,8 +1443,17 @@ ssh_upload_file() {
 ssh_interactive_session() {
     local ip="${1}"
     local cmd="${2}"
+    local ssh_exit=0
     # shellcheck disable=SC2086
-    ssh -t $SSH_OPTS "${SSH_USER:-root}@${ip}" "${cmd}"
+    ssh -t $SSH_OPTS "${SSH_USER:-root}@${ip}" "${cmd}" || ssh_exit=$?
+
+    # After the SSH session ends, remind the user their server is still running
+    echo "" >&2
+    log_warn "Session ended. Your server is still running and may incur charges."
+    log_step "  Reconnect: ssh ${SSH_USER:-root}@${ip}"
+    log_step "  Stop billing: delete the server from your cloud provider's dashboard"
+    echo "" >&2
+    return ${ssh_exit}
 }
 
 # Wait for SSH connectivity to a server
