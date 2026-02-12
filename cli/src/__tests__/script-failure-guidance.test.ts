@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { getScriptFailureGuidance, getStatusDescription } from "../commands";
+import { getScriptFailureGuidance, getStatusDescription, serverRunningWarning } from "../commands";
 
 /**
  * Tests for getScriptFailureGuidance() in commands.ts.
@@ -443,6 +443,128 @@ describe("getScriptFailureGuidance", () => {
           expect(all[i].join("\n")).not.toBe(all[j].join("\n"));
         }
       }
+    });
+  });
+
+  // ── Dashboard URL parameter ───────────────────────────────────────────────
+
+  describe("dashboard URL parameter", () => {
+    const hetznerUrl = "https://www.hetzner.com/cloud/";
+    const vultrUrl = "https://www.vultr.com/";
+
+    it("should include dashboard URL in exit code 130 guidance", () => {
+      const lines = getScriptFailureGuidance(130, "hetzner", undefined, hetznerUrl);
+      const joined = lines.join("\n");
+      expect(joined).toContain(hetznerUrl);
+      expect(joined).not.toContain("cloud provider dashboard");
+    });
+
+    it("should fall back to generic message for exit code 130 without URL", () => {
+      const lines = getScriptFailureGuidance(130, "hetzner");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+      expect(joined).not.toContain("hetzner.com");
+    });
+
+    it("should include dashboard URL in exit code 137 guidance", () => {
+      const lines = getScriptFailureGuidance(137, "vultr", undefined, vultrUrl);
+      const joined = lines.join("\n");
+      expect(joined).toContain(vultrUrl);
+      expect(joined).not.toContain("cloud provider dashboard");
+    });
+
+    it("should fall back to generic message for exit code 137 without URL", () => {
+      const lines = getScriptFailureGuidance(137, "vultr");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+      expect(joined).not.toContain("vultr.com");
+    });
+
+    it("should preserve line count for exit code 130 with and without URL", () => {
+      const withUrl = getScriptFailureGuidance(130, "hetzner", undefined, hetznerUrl);
+      const withoutUrl = getScriptFailureGuidance(130, "hetzner");
+      expect(withUrl).toHaveLength(withoutUrl.length);
+    });
+
+    it("should preserve line count for exit code 137 with and without URL", () => {
+      const withUrl = getScriptFailureGuidance(137, "hetzner", undefined, hetznerUrl);
+      const withoutUrl = getScriptFailureGuidance(137, "hetzner");
+      expect(withUrl).toHaveLength(withoutUrl.length);
+    });
+
+    it("should not add dashboard URL to exit code 255 (SSH failure)", () => {
+      const lines = getScriptFailureGuidance(255, "hetzner", undefined, hetznerUrl);
+      const joined = lines.join("\n");
+      expect(joined).not.toContain(hetznerUrl);
+    });
+
+    it("should not add dashboard URL to exit code 127 (command not found)", () => {
+      const lines = getScriptFailureGuidance(127, "hetzner", undefined, hetznerUrl);
+      const joined = lines.join("\n");
+      expect(joined).not.toContain(hetznerUrl);
+    });
+
+    it("should not add dashboard URL to exit code 126 (permission denied)", () => {
+      const lines = getScriptFailureGuidance(126, "hetzner", undefined, hetznerUrl);
+      const joined = lines.join("\n");
+      expect(joined).not.toContain(hetznerUrl);
+    });
+
+    it("should not add dashboard URL to exit code 2 (syntax error)", () => {
+      const lines = getScriptFailureGuidance(2, "hetzner", undefined, hetznerUrl);
+      const joined = lines.join("\n");
+      expect(joined).not.toContain(hetznerUrl);
+    });
+
+    it("should not add dashboard URL to exit code 1 (generic failure)", () => {
+      const lines = getScriptFailureGuidance(1, "hetzner", undefined, hetznerUrl);
+      const joined = lines.join("\n");
+      expect(joined).not.toContain(hetznerUrl);
+    });
+
+    it("should not add dashboard URL to default case", () => {
+      const lines = getScriptFailureGuidance(42, "hetzner", undefined, hetznerUrl);
+      const joined = lines.join("\n");
+      expect(joined).not.toContain(hetznerUrl);
+    });
+
+    it("should work with both authHint and dashboardUrl", () => {
+      const lines = getScriptFailureGuidance(130, "hetzner", "HCLOUD_TOKEN", hetznerUrl);
+      const joined = lines.join("\n");
+      expect(joined).toContain(hetznerUrl);
+      expect(joined).not.toContain("HCLOUD_TOKEN"); // 130 doesn't use authHint
+    });
+  });
+
+  // ── serverRunningWarning helper ─────────────────────────────────────────────
+
+  describe("serverRunningWarning", () => {
+    it("should return generic message when no URL provided", () => {
+      const msg = serverRunningWarning();
+      expect(msg).toContain("cloud provider dashboard");
+    });
+
+    it("should return generic message for undefined URL", () => {
+      const msg = serverRunningWarning(undefined);
+      expect(msg).toContain("cloud provider dashboard");
+    });
+
+    it("should include the dashboard URL when provided", () => {
+      const msg = serverRunningWarning("https://www.hetzner.com/cloud/");
+      expect(msg).toContain("https://www.hetzner.com/cloud/");
+      expect(msg).not.toContain("cloud provider dashboard");
+    });
+
+    it("should always mention checking/stopping/deleting servers", () => {
+      const withUrl = serverRunningWarning("https://example.com");
+      const withoutUrl = serverRunningWarning();
+      expect(withUrl).toContain("stop or delete");
+      expect(withoutUrl).toContain("stop or delete");
+    });
+
+    it("should return a string (not an array)", () => {
+      expect(typeof serverRunningWarning()).toBe("string");
+      expect(typeof serverRunningWarning("https://example.com")).toBe("string");
     });
   });
 });
