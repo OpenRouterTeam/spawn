@@ -40,7 +40,12 @@ inject_env_vars_ssh "${KAMATERA_SERVER_IP}" upload_file run_server \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
 
 # Write .env file for NanoClaw
-run_server "${KAMATERA_SERVER_IP}" "printf 'ANTHROPIC_API_KEY=%s\n' '${OPENROUTER_API_KEY}' > ~/nanoclaw/.env"
+DOTENV_TEMP=$(mktemp)
+track_temp_file "${DOTENV_TEMP}"
+chmod 600 "${DOTENV_TEMP}"
+printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
+upload_file "${KAMATERA_SERVER_IP}" "${DOTENV_TEMP}" "/tmp/nanoclaw_env"
+run_server "${KAMATERA_SERVER_IP}" "mv /tmp/nanoclaw_env ~/nanoclaw/.env"
 
 echo ""
 log_info "Kamatera server setup completed successfully!"
