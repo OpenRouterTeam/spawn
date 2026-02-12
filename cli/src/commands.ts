@@ -600,6 +600,17 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   process.exit(1);
 }
 
+const MAX_RETRIES = 2;
+const RETRY_DELAYS = [5, 10]; // seconds
+
+export function isRetryableExitCode(errMsg: string): boolean {
+  const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
+  if (!exitCodeMatch) return false;
+  const code = parseInt(exitCodeMatch[1], 10);
+  // Exit 255 = SSH connection failure (the standard SSH error exit code)
+  return code === 255;
+}
+
 async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
@@ -623,15 +634,32 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     // Non-fatal: don't block the spawn if history write fails
   }
 
-  try {
-    await runBash(scriptContent, prompt);
-  } catch (err) {
-    const errMsg = getErrorMessage(err);
-    if (errMsg.includes("interrupted by user")) {
-      process.exit(130);
+  let lastErr: string | undefined;
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    try {
+      await runBash(scriptContent, prompt);
+      return; // success
+    } catch (err) {
+      const errMsg = getErrorMessage(err);
+      if (errMsg.includes("interrupted by user")) {
+        process.exit(130);
+      }
+      lastErr = errMsg;
+
+      // Only retry for potentially transient failures
+      if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
+        const delay = RETRY_DELAYS[attempt - 1];
+        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+        await new Promise(r => setTimeout(r, delay * 1000));
+        continue;
+      }
+
+      // Non-retryable or out of retries
+      break;
     }
-    reportScriptFailure(errMsg, cloud, agent, authHint);
   }
+
+  reportScriptFailure(lastErr!, cloud, agent, authHint);
 }
 
 function runBash(script: string, prompt?: string): Promise<void> {
