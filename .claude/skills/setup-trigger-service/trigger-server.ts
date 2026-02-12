@@ -21,6 +21,8 @@
  * continues to drain to the server console.
  */
 
+import { timingSafeEqual } from "crypto";
+
 const PORT = 8080;
 const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const TARGET_SCRIPT = process.env.TARGET_SCRIPT ?? "";
@@ -38,6 +40,14 @@ if (!TRIGGER_SECRET) {
 if (!TARGET_SCRIPT) {
   console.error("ERROR: TARGET_SCRIPT env var is required");
   process.exit(1);
+}
+
+/** SECURITY: Timing-safe comparison to prevent token extraction via timing side-channels */
+function isAuthed(req: Request): boolean {
+  const given = req.headers.get("Authorization") ?? "";
+  const expected = `Bearer ${TRIGGER_SECRET}`;
+  if (given.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
 interface RunEntry {
@@ -309,8 +319,8 @@ const server = Bun.serve({
         );
       }
 
-      const auth = req.headers.get("Authorization") ?? "";
-      if (auth !== `Bearer ${TRIGGER_SECRET}`) {
+      // SECURITY: Use timing-safe comparison to prevent token extraction via timing attacks
+      if (!isAuthed(req)) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
 
