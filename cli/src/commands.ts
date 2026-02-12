@@ -585,6 +585,23 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
   }
 }
 
+/** Build copy-pasteable retry command with env var exports for credential-related failures */
+export function buildRetryWithEnvHint(agent: string, cloud: string, authHint?: string): string[] {
+  if (!authHint) {
+    return [`Retry: ${pc.cyan(`spawn ${agent} ${cloud}`)}`];
+  }
+
+  const lines: string[] = [];
+  lines.push("Quick fix -- set credentials and retry:");
+  lines.push(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
+  const authVars = authHint.split(" + ").map(s => s.trim()).filter(Boolean);
+  for (const v of authVars) {
+    lines.push(`  ${pc.cyan(`export ${v}=...`)}`);
+  }
+  lines.push(`  ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
+  return lines;
+}
+
 function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
@@ -596,7 +613,15 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
-  console.error(`Retry: ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
+
+  // For credential-likely failures, show copy-pasteable fix with env vars
+  const isCredentialLikely = exitCode === 1 || exitCode === null;
+  if (isCredentialLikely) {
+    const retryLines = buildRetryWithEnvHint(agent, cloud, authHint);
+    for (const line of retryLines) console.error(line);
+  } else {
+    console.error(`Retry: ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
+  }
   process.exit(1);
 }
 

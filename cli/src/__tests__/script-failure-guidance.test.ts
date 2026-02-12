@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { getScriptFailureGuidance, getStatusDescription } from "../commands";
+import { getScriptFailureGuidance, getStatusDescription, buildRetryWithEnvHint } from "../commands";
 
 /**
  * Tests for getScriptFailureGuidance() in commands.ts.
@@ -444,5 +444,45 @@ describe("getScriptFailureGuidance", () => {
         }
       }
     });
+  });
+});
+
+describe("buildRetryWithEnvHint", () => {
+  it("should return simple retry line when no authHint", () => {
+    const lines = buildRetryWithEnvHint("claude", "sprite");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("Retry:");
+    expect(lines[0]).toContain("spawn claude sprite");
+  });
+
+  it("should show export commands when authHint is provided", () => {
+    const lines = buildRetryWithEnvHint("claude", "hetzner", "HCLOUD_TOKEN");
+    const joined = lines.join("\n");
+    expect(joined).toContain("Quick fix");
+    expect(joined).toContain("export OPENROUTER_API_KEY=sk-or-v1-...");
+    expect(joined).toContain("export HCLOUD_TOKEN=...");
+    expect(joined).toContain("spawn claude hetzner");
+  });
+
+  it("should handle multi-credential auth hint", () => {
+    const lines = buildRetryWithEnvHint("claude", "upcloud", "UPCLOUD_USERNAME + UPCLOUD_PASSWORD");
+    const joined = lines.join("\n");
+    expect(joined).toContain("export UPCLOUD_USERNAME=...");
+    expect(joined).toContain("export UPCLOUD_PASSWORD=...");
+    expect(joined).toContain("export OPENROUTER_API_KEY=sk-or-v1-...");
+    expect(joined).toContain("spawn claude upcloud");
+  });
+
+  it("should include OpenRouter key URL hint", () => {
+    const lines = buildRetryWithEnvHint("aider", "vultr", "VULTR_API_KEY");
+    const joined = lines.join("\n");
+    expect(joined).toContain("openrouter.ai/settings/keys");
+  });
+
+  it("should include the correct agent and cloud in the spawn command", () => {
+    const lines = buildRetryWithEnvHint("goose", "digitalocean", "DO_API_TOKEN");
+    const joined = lines.join("\n");
+    expect(joined).toContain("spawn goose digitalocean");
+    expect(joined).not.toContain("spawn goose vultr");
   });
 });
