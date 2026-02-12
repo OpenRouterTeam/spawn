@@ -367,6 +367,9 @@ case "$METHOD" in
                 lambda)
                     printf '{"data":{"id":"test-uuid-1234","name":"test-srv","status":"active","ip":"10.0.0.1"}}'
                     ;;
+                civo)
+                    printf '{"id":"test-uuid-1234","hostname":"test-srv","status":"ACTIVE","public_ip":"10.0.0.1"}'
+                    ;;
                 *) printf '{}' ;;
             esac
         fi
@@ -394,6 +397,9 @@ case "$METHOD" in
                             ;;
                         linode)
                             printf '{"id":12345678,"label":"test-srv","status":"running","ipv4":["10.0.0.1"]}'
+                            ;;
+                        civo)
+                            printf '{"id":"test-uuid-1234","hostname":"test-srv","status":"BUILDING","public_ip":null}'
                             ;;
                         *)
                             printf '{"id":"test-id","status":"active","ip":"10.0.0.1"}'

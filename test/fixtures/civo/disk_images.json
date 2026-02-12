@@ -1,0 +1,20 @@
+[
+  {
+    "id": "a4204155-a876-43fa-b4d6-ea2af8774560",
+    "name": "ubuntu-24.04",
+    "label": "Ubuntu 24.04 LTS",
+    "version": "24.04",
+    "state": "available",
+    "distribution": "ubuntu",
+    "description": "Ubuntu 24.04 LTS (Noble Numbat)"
+  },
+  {
+    "id": "b5315266-b987-54gb-c5e7-fb3bg8885671",
+    "name": "ubuntu-22.04",
+    "label": "Ubuntu 22.04 LTS",
+    "version": "22.04",
+    "state": "available",
+    "distribution": "ubuntu",
+    "description": "Ubuntu 22.04 LTS (Jammy Jellyfish)"
+  }
+]

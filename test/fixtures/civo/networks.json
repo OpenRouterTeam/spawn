@@ -1,0 +1,11 @@
+[
+  {
+    "id": "28244e0f-a0e8-4d73-afa3-d23d3fe0d6f0",
+    "name": "default",
+    "region": "lon1",
+    "default": true,
+    "cidr": "192.168.1.0/24",
+    "label": "Default network",
+    "status": "Active"
+  }
+]
