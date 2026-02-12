@@ -11,7 +11,7 @@ import { loadManifest } from "../manifest";
  *
  * - Exit code 127: "A required command was not found" (missing bash/curl/ssh/jq)
  * - Exit code 126: "A command was found but could not be executed" (permission denied)
- * - Exit code 130: Silent exit for Ctrl+C (user interrupt)
+ * - Exit code 130: Cleanup warning + exit for Ctrl+C (user interrupt)
  * - Generic failures: "Common causes" with credential/rate-limit/dependency hints
  * - runBash: Sets SPAWN_PROMPT and SPAWN_MODE env vars when prompt is provided
  * - runBash: Resolves successfully for exit code 0
@@ -23,6 +23,7 @@ const mockManifest = createMockManifest();
 
 // Mock @clack/prompts
 const mockLogError = mock(() => {});
+const mockLogWarn = mock(() => {});
 const mockLogInfo = mock(() => {});
 const mockLogStep = mock(() => {});
 const mockSpinnerStart = mock(() => {});
@@ -38,7 +39,7 @@ mock.module("@clack/prompts", () => ({
   log: {
     step: mockLogStep,
     info: mockLogInfo,
-    warn: mock(() => {}),
+    warn: mockLogWarn,
     error: mockLogError,
   },
   intro: mock(() => {}),
@@ -59,6 +60,7 @@ describe("execScript bash execution error handling", () => {
   beforeEach(async () => {
     consoleMocks = createConsoleMocks();
     mockLogError.mockClear();
+    mockLogWarn.mockClear();
     mockLogInfo.mockClear();
     mockLogStep.mockClear();
     mockSpinnerStart.mockClear();
@@ -174,7 +176,7 @@ describe("execScript bash execution error handling", () => {
   // ── Exit code 130: Ctrl+C (user interrupt) ──────────────────────────────
 
   describe("exit code 130 - user interrupt", () => {
-    it("should exit silently with code 130 for Ctrl+C", async () => {
+    it("should exit with code 130 and show cleanup warning for Ctrl+C", async () => {
       mockFetchWithScript("exit 130");
       await loadManifest(true);
 
@@ -187,10 +189,17 @@ describe("execScript bash execution error handling", () => {
       // Should exit with 130
       expect(processExitSpy).toHaveBeenCalledWith(130);
 
-      // Should NOT show error messages for Ctrl+C
+      // Should NOT show error messages for Ctrl+C (no "Spawn script failed")
       const clackErrors = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
       const errorMessages = clackErrors.filter((e: string) => e.includes("Spawn script failed"));
       expect(errorMessages).toHaveLength(0);
+
+      // Should show warning about orphaned resources
+      const warnMessages = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      const warnText = warnMessages.join("\n");
+      expect(warnText).toContain("interrupted");
+      expect(warnText).toContain("server");
+      expect(warnText).toContain("cloud provider dashboard");
     });
   });
 
