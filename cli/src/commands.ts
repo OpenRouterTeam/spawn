@@ -304,12 +304,12 @@ export async function cmdInteractive(): Promise<void> {
   if (p.isCancel(cloudChoice)) handleCancel();
 
   const agentName = manifest.agents[agentChoice].name;
-  const cloudName = manifest.clouds[cloudChoice].name;
-  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
+  const cloudDef = manifest.clouds[cloudChoice];
+  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudDef.name)}`);
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice));
+  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice), cloudDef.type, cloudDef.name, cloudDef.url);
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────
@@ -448,11 +448,11 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
   }
 
   const agentName = manifest.agents[agent].name;
-  const cloudName = manifest.clouds[cloud].name;
+  const cloudDef = manifest.clouds[cloud];
   const suffix = prompt ? " with prompt..." : "...";
-  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
+  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudDef.name)}${suffix}`);
 
-  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud));
+  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), cloudDef.type, cloudDef.name, cloudDef.url);
 }
 
 export function getStatusDescription(status: number): string {
@@ -600,7 +600,25 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   process.exit(1);
 }
 
-async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
+/** Cloud types that provision persistent servers which accrue charges after the session */
+export const PERSISTENT_CLOUD_TYPES = new Set(["api", "cli", "api+cli"]);
+
+/** Show a post-session reminder about the server still running */
+export function showPostSessionMessage(cloud: string, cloudName: string, cloudType: string, agent: string, cloudUrl?: string): void {
+  if (!PERSISTENT_CLOUD_TYPES.has(cloudType)) return;
+
+  console.log();
+  console.log(pc.yellow("Your session has ended, but the server is still running."));
+  console.log();
+  console.log(`  Reconnect:  ${pc.cyan(`spawn ${agent} ${cloud}`)}`);
+  if (cloudUrl) {
+    console.log(`  Dashboard:  ${pc.cyan(cloudUrl)}`);
+  }
+  console.log(`  ${pc.dim("Delete the server from your cloud provider dashboard to stop billing.")}`);
+  console.log();
+}
+
+async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, cloudType?: string, cloudName?: string, cloudUrl?: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
@@ -631,6 +649,11 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
       process.exit(130);
     }
     reportScriptFailure(errMsg, cloud, agent, authHint);
+  }
+
+  // Show cleanup reminder for clouds that leave servers running
+  if (cloudType && cloudName) {
+    showPostSessionMessage(cloud, cloudName, cloudType, agent, cloudUrl);
   }
 }
 
