@@ -460,42 +460,42 @@ MOCKSCP
     chmod +x "${TEST_DIR}/scp"
 }
 
+# Create a mock that logs its invocation and exits 0
+# Usage: _create_logging_mock NAME [NAME...]
+_create_logging_mock() {
+    local name
+    for name in "$@"; do
+        cat > "${TEST_DIR}/${name}" << MOCK
+#!/bin/bash
+echo "${name} \$*" >> "\${MOCK_LOG}"
+exit 0
+MOCK
+        chmod +x "${TEST_DIR}/${name}"
+    done
+}
+
+# Create a mock that silently exits 0 (no logging)
+# Usage: _create_silent_mock NAME [NAME...]
+_create_silent_mock() {
+    local name
+    for name in "$@"; do
+        cat > "${TEST_DIR}/${name}" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+        chmod +x "${TEST_DIR}/${name}"
+    done
+}
+
 setup_mock_agents() {
     # Agent binaries
-    local agents="claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q"
-    for agent in $agents; do
-        cat > "${TEST_DIR}/${agent}" << MOCK
-#!/bin/bash
-echo "${agent} \$*" >> "\${MOCK_LOG}"
-exit 0
-MOCK
-        chmod +x "${TEST_DIR}/${agent}"
-    done
+    _create_logging_mock claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q
 
     # Tools used during agent install
-    local tools="pip pip3 npm npx bun node openssl shred cargo go"
-    for tool in $tools; do
-        cat > "${TEST_DIR}/${tool}" << MOCK
-#!/bin/bash
-echo "${tool} \$*" >> "\${MOCK_LOG}"
-exit 0
-MOCK
-        chmod +x "${TEST_DIR}/${tool}"
-    done
+    _create_logging_mock pip pip3 npm npx bun node openssl shred cargo go git
 
-    # Mock 'clear' to prevent terminal clearing
-    cat > "${TEST_DIR}/clear" << 'MOCK'
-#!/bin/bash
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/clear"
-
-    # Mock 'sleep' to speed up tests
-    cat > "${TEST_DIR}/sleep" << 'MOCK'
-#!/bin/bash
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/sleep"
+    # Silent mocks (no logging needed)
+    _create_silent_mock clear sleep
 
     # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
     cat > "${TEST_DIR}/ssh-keygen" << 'MOCK'
@@ -524,14 +524,6 @@ fi
 exit 0
 MOCK
     chmod +x "${TEST_DIR}/ssh-keygen"
-
-    # Mock 'git' for agents that clone repos
-    cat > "${TEST_DIR}/git" << 'MOCK'
-#!/bin/bash
-echo "git $*" >> "${MOCK_LOG}"
-exit 0
-MOCK
-    chmod +x "${TEST_DIR}/git"
 }
 
 setup_fake_home() {
