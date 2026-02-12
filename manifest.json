@@ -1197,7 +1197,7 @@
     "local/amazonq": "missing",
     "local/cline": "missing",
     "local/gptme": "implemented",
-    "local/opencode": "missing",
+    "local/opencode": "implemented",
     "local/plandex": "missing",
     "local/kilocode": "missing",
     "local/continue": "implemented",
