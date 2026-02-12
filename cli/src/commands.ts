@@ -297,9 +297,22 @@ export async function cmdInteractive(): Promise<void> {
     process.exit(1);
   }
 
+  // Prioritize clouds where credentials are already configured
+  const withCreds = clouds.filter((c) => hasCloudCredentials(manifest.clouds[c].auth));
+  const withoutCreds = clouds.filter((c) => !hasCloudCredentials(manifest.clouds[c].auth));
+  const sortedClouds = [...withCreds, ...withoutCreds];
+
+  const cloudOptions = sortedClouds.map((key) => ({
+    value: key,
+    label: manifest.clouds[key].name,
+    hint: withCreds.includes(key)
+      ? `credentials detected - ${manifest.clouds[key].description}`
+      : manifest.clouds[key].description,
+  }));
+
   const cloudChoice = await p.select({
     message: "Select a cloud provider",
-    options: mapToSelectOptions(clouds, manifest.clouds),
+    options: cloudOptions,
   });
   if (p.isCancel(cloudChoice)) handleCancel();
 
@@ -1026,6 +1039,13 @@ export function parseAuthEnvVars(auth: string): string[] {
     .filter((s) => /^[A-Z][A-Z0-9_]{3,}$/.test(s));
 }
 
+/** Check if a cloud's required auth env vars are all present in the environment */
+export function hasCloudCredentials(auth: string): boolean {
+  const vars = parseAuthEnvVars(auth);
+  if (vars.length === 0) return false; // CLI-based auth or "none" - can't detect
+  return vars.every((v) => !!process.env[v]);
+}
+
 export async function cmdAgents(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
@@ -1063,7 +1083,12 @@ export async function cmdClouds(): Promise<void> {
       const c = manifest.clouds[key];
       const implCount = getImplementedAgents(manifest, key).length;
       const countStr = `${implCount}/${allAgents.length}`;
-      const authHint = c.auth.toLowerCase() === "none" ? "" : `  auth: ${c.auth}`;
+      const hasCreds = hasCloudCredentials(c.auth);
+      const authHint = c.auth.toLowerCase() === "none"
+        ? ""
+        : hasCreds
+          ? `  auth: ${pc.green("configured")}`
+          : `  auth: ${c.auth}`;
       console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${authHint ? pc.dim(authHint) : ""}`);
     }
   }
