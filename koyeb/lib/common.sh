@@ -159,14 +159,24 @@ _koyeb_wait_for_service() {
 
         if [[ "$status" == "error" || "$status" == "failed" ]]; then
             log_error "Service deployment failed"
+            log_error ""
+            log_error "How to fix:"
+            log_error "  1. Check service logs: koyeb service logs $service_id"
+            log_error "  2. Verify account status at: https://app.koyeb.com"
+            log_error "  3. Re-run the command to try again"
             return 1
         fi
 
+        log_step "Service status: ${status:-pending} (${attempt}/${max_attempts})"
         attempt=$((attempt + 1))
         sleep 5
     done
 
-    log_error "Timeout waiting for service to be ready"
+    log_error "Timeout waiting for service to be ready after $((max_attempts * 5))s"
+    log_error ""
+    log_error "The service may still be deploying. You can:"
+    log_error "  1. Check service status at: https://app.koyeb.com"
+    log_error "  2. Re-run the command to try again"
     return 1
 }
 
@@ -255,7 +265,7 @@ wait_for_cloud_init() {
 # Inject environment variables into shell config
 # Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    log_warn "Injecting environment variables..."
+    log_step "Injecting environment variables..."
 
     local env_temp
     env_temp=$(mktemp)
@@ -290,12 +300,12 @@ interactive_session() {
 # Cleanup: delete the service and app
 cleanup_server() {
     if [[ -n "${KOYEB_SERVICE_NAME:-}" ]]; then
-        log_warn "Deleting service: $KOYEB_SERVICE_NAME"
+        log_step "Deleting service: $KOYEB_SERVICE_NAME"
         koyeb service delete "$KOYEB_SERVICE_NAME" --force >/dev/null 2>&1 || true
     fi
 
     if [[ -n "${KOYEB_APP_NAME:-}" ]]; then
-        log_warn "Deleting app: $KOYEB_APP_NAME"
+        log_step "Deleting app: $KOYEB_APP_NAME"
         koyeb app delete "$KOYEB_APP_NAME" >/dev/null 2>&1 || true
     fi
 }

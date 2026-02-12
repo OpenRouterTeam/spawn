@@ -128,11 +128,17 @@ wait_for_codespace() {
             return 0
         fi
 
+        log_step "Codespace status: ${state:-unknown} (${attempt}/${max_attempts})"
         attempt=$((attempt + 1))
         sleep 2
     done
 
     log_error "Codespace failed to become ready after $max_attempts attempts"
+    log_error ""
+    log_error "How to fix:"
+    log_error "  1. Check codespace status: gh codespace list"
+    log_error "  2. Try a smaller machine type (e.g., CODESPACE_MACHINE=basicLinux32gb)"
+    log_error "  3. Delete and retry: gh codespace delete --codespace $codespace --force"
     return 1
 }
 
@@ -212,7 +218,7 @@ run_server() {
 # Inject environment variables into shell config
 # Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    log_warn "Injecting environment variables..."
+    log_step "Injecting environment variables..."
 
     local env_temp
     env_temp=$(mktemp)

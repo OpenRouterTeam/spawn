@@ -124,7 +124,14 @@ print(json.dumps(body))
 
     if echo "$create_response" | grep -q "error"; then
         log_error "Failed to create Render service"
-        log_error "$create_response"
+        local error_msg
+        error_msg=$(echo "$create_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message', d.get('error', 'Unknown error')))" 2>/dev/null || echo "$create_response")
+        log_error "API Error: $error_msg"
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - Invalid or expired API key (check https://dashboard.render.com/u/settings/api-keys)"
+        log_error "  - Account limits reached (check your Render dashboard)"
+        log_error "  - Service name already in use"
         return 1
     fi
 
@@ -160,14 +167,24 @@ _render_wait_for_service() {
 
         if [[ "$status" == "failed" ]]; then
             log_error "Service deployment failed"
+            log_error ""
+            log_error "How to fix:"
+            log_error "  1. Check the deploy logs: https://dashboard.render.com"
+            log_error "  2. Verify the Docker image can build successfully"
+            log_error "  3. Re-run the command to try again"
             return 1
         fi
 
+        log_step "Service status: ${status:-pending} (${attempt}/${max_attempts})"
         attempt=$((attempt + 1))
         sleep 5
     done
 
-    log_error "Timeout waiting for service to be live"
+    log_error "Timeout waiting for service to be live after $((max_attempts * 5))s"
+    log_error ""
+    log_error "The service may still be deploying. You can:"
+    log_error "  1. Check deployment status at: https://dashboard.render.com"
+    log_error "  2. Re-run the command to try again"
     return 1
 }
 
@@ -230,7 +247,7 @@ wait_for_cloud_init() {
 # Inject environment variables into shell config
 # Writes to a temp file and uploads to avoid shell interpolation of values
 inject_env_vars() {
-    log_warn "Injecting environment variables..."
+    log_step "Injecting environment variables..."
 
     local env_temp
     env_temp=$(mktemp)
@@ -265,7 +282,7 @@ interactive_session() {
 # Cleanup: delete the service
 cleanup_server() {
     if [[ -n "${RENDER_SERVICE_ID:-}" ]]; then
-        log_warn "Deleting Render service: $RENDER_SERVICE_NAME"
+        log_step "Deleting Render service: $RENDER_SERVICE_NAME"
         curl -s -X DELETE "https://api.render.com/v1/services/${RENDER_SERVICE_ID}" \
             -H "Authorization: Bearer ${RENDER_API_KEY}" >/dev/null 2>&1 || true
     fi
