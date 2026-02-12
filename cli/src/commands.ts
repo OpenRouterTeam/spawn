@@ -58,12 +58,13 @@ function validateNonEmptyString(value: string, fieldName: string, helpCommand: s
 
 function mapToSelectOptions<T extends { name: string; description: string }>(
   keys: string[],
-  items: Record<string, T>
+  items: Record<string, T>,
+  hintOverrides?: Record<string, string>
 ): Array<{ value: string; label: string; hint: string }> {
   return keys.map((key) => ({
     value: key,
     label: items[key].name,
-    hint: items[key].description,
+    hint: hintOverrides?.[key] ?? items[key].description,
   }));
 }
 
@@ -297,9 +298,31 @@ export async function cmdInteractive(): Promise<void> {
     process.exit(1);
   }
 
+  // Prioritize clouds where the user already has credentials set
+  const withCreds: string[] = [];
+  const withoutCreds: string[] = [];
+  for (const c of clouds) {
+    if (hasCloudCredentials(manifest.clouds[c].auth)) {
+      withCreds.push(c);
+    } else {
+      withoutCreds.push(c);
+    }
+  }
+  const sortedClouds = [...withCreds, ...withoutCreds];
+
+  // Add credential hints to the select options
+  const hintOverrides: Record<string, string> = {};
+  for (const c of withCreds) {
+    hintOverrides[c] = `credentials detected -- ${manifest.clouds[c].description}`;
+  }
+
+  if (withCreds.length > 0) {
+    p.log.info(`${withCreds.length} cloud${withCreds.length > 1 ? "s" : ""} with credentials detected`);
+  }
+
   const cloudChoice = await p.select({
     message: "Select a cloud provider",
-    options: mapToSelectOptions(clouds, manifest.clouds),
+    options: mapToSelectOptions(sortedClouds, manifest.clouds, hintOverrides),
   });
   if (p.isCancel(cloudChoice)) handleCancel();
 
@@ -1069,6 +1092,13 @@ export function parseAuthEnvVars(auth: string): string[] {
     .split(/\s*\+\s*/)
     .map((s) => s.trim())
     .filter((s) => /^[A-Z][A-Z0-9_]{3,}$/.test(s));
+}
+
+/** Check if a cloud's required auth env vars are all set in the environment */
+export function hasCloudCredentials(auth: string): boolean {
+  const vars = parseAuthEnvVars(auth);
+  if (vars.length === 0) return false;
+  return vars.every((v) => !!process.env[v]);
 }
 
 export async function cmdAgents(): Promise<void> {
