@@ -99,42 +99,39 @@ chown ubuntu:ubuntu /home/ubuntu/.cloud-init-complete
 CLOUD_INIT_EOF
 }
 
-_get_ubuntu_image_id() {
-    local compartment="${OCI_COMPARTMENT_ID}"
-    local shape="${1:-VM.Standard.E2.1.Micro}"
-
-    # Determine OS for the shape - ARM shapes need aarch64
-    local os_match="Canonical Ubuntu"
-    local os_version="24.04"
-
-    local image_id
-    image_id=$(oci compute image list \
-        --compartment-id "${compartment}" \
-        --operating-system "${os_match}" \
-        --operating-system-version "${os_version}" \
-        --shape "${shape}" \
+# Query OCI for the latest Ubuntu 24.04 image, optionally filtered by shape.
+# Usage: _oci_image_list [--shape SHAPE]
+_oci_image_list() {
+    local shape_args=()
+    if [[ "${1:-}" == "--shape" && -n "${2:-}" ]]; then
+        shape_args=(--shape "${2}")
+    fi
+    oci compute image list \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --operating-system "Canonical Ubuntu" \
+        --operating-system-version "24.04" \
+        "${shape_args[@]}" \
         --sort-by TIMECREATED \
         --sort-order DESC \
         --limit 1 \
         --query 'data[0].id' \
-        --raw-output 2>/dev/null || true)
+        --raw-output 2>/dev/null || true
+}
+
+_get_ubuntu_image_id() {
+    local shape="${1:-VM.Standard.E2.1.Micro}"
+
+    # Try with shape filter first, then fall back to unfiltered
+    local image_id
+    image_id=$(_oci_image_list --shape "${shape}")
 
     if [[ -z "${image_id}" || "${image_id}" == "null" ]]; then
-        # Fallback: try without shape filter
-        image_id=$(oci compute image list \
-            --compartment-id "${compartment}" \
-            --operating-system "${os_match}" \
-            --operating-system-version "${os_version}" \
-            --sort-by TIMECREATED \
-            --sort-order DESC \
-            --limit 1 \
-            --query 'data[0].id' \
-            --raw-output 2>/dev/null || true)
+        image_id=$(_oci_image_list)
     fi
 
     if [[ -z "${image_id}" || "${image_id}" == "null" ]]; then
         log_error "Could not find Ubuntu 24.04 image for shape ${shape}"
-        log_error "Check available images: oci compute image list --compartment-id ${compartment} --all"
+        log_error "Check available images: oci compute image list --compartment-id ${OCI_COMPARTMENT_ID} --all"
         return 1
     fi
 
@@ -179,22 +176,23 @@ _create_vcn() {
     echo "${vcn_id}"
 }
 
-_setup_vcn_networking() {
-    local compartment="${1}"
-    local vcn_id="${2}"
-
-    # Create internet gateway
-    local igw_id
-    igw_id=$(oci network internet-gateway create \
+# Create an internet gateway in the VCN and return its OCID
+_create_internet_gateway() {
+    local compartment="${1}" vcn_id="${2}"
+    oci network internet-gateway create \
         --compartment-id "${compartment}" \
         --vcn-id "${vcn_id}" \
         --display-name "spawn-igw" \
         --is-enabled true \
         --wait-for-state AVAILABLE \
         --query 'data.id' \
-        --raw-output 2>/dev/null)
+        --raw-output 2>/dev/null
+}
 
-    # Add default route to internet gateway
+# Add a default route (0.0.0.0/0) pointing to the internet gateway
+_setup_default_route() {
+    local compartment="${1}" vcn_id="${2}" igw_id="${3}"
+
     local rt_id
     rt_id=$(oci network route-table list \
         --compartment-id "${compartment}" \
@@ -202,15 +200,19 @@ _setup_vcn_networking() {
         --query 'data[0].id' \
         --raw-output 2>/dev/null)
 
-    if [[ -n "${rt_id}" && "${rt_id}" != "null" && -n "${igw_id}" && "${igw_id}" != "null" ]]; then
+    if [[ -n "${rt_id}" && "${rt_id}" != "null" ]]; then
         oci network route-table update \
             --rt-id "${rt_id}" \
             --route-rules "[{\"destination\":\"0.0.0.0/0\",\"networkEntityId\":\"${igw_id}\",\"destinationType\":\"CIDR_BLOCK\"}]" \
             --force \
             --wait-for-state AVAILABLE >/dev/null 2>&1 || true
     fi
+}
 
-    # Add SSH ingress rule to default security list
+# Allow SSH ingress and all egress on the VCN's default security list
+_setup_security_list() {
+    local compartment="${1}" vcn_id="${2}"
+
     local sl_id
     sl_id=$(oci network security-list list \
         --compartment-id "${compartment}" \
@@ -226,6 +228,19 @@ _setup_vcn_networking() {
             --force \
             --wait-for-state AVAILABLE >/dev/null 2>&1 || true
     fi
+}
+
+_setup_vcn_networking() {
+    local compartment="${1}" vcn_id="${2}"
+
+    local igw_id
+    igw_id=$(_create_internet_gateway "${compartment}" "${vcn_id}")
+
+    if [[ -n "${igw_id}" && "${igw_id}" != "null" ]]; then
+        _setup_default_route "${compartment}" "${vcn_id}" "${igw_id}"
+    fi
+
+    _setup_security_list "${compartment}" "${vcn_id}"
 }
 
 _create_subnet() {
