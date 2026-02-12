@@ -13,6 +13,7 @@ set -eo pipefail
 
 SPAWN_REPO="OpenRouterTeam/spawn"
 SPAWN_RAW_BASE="https://raw.githubusercontent.com/${SPAWN_REPO}/main"
+MIN_BUN_VERSION="1.2.0"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -23,6 +24,47 @@ NC='\033[0m'
 log_info()  { echo -e "${GREEN}[spawn]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[spawn]${NC} $1"; }
 log_error() { echo -e "${RED}[spawn]${NC} $1"; }
+
+# --- Helper: compare semver strings ---
+# Returns 0 (true) if $1 >= $2
+version_gte() {
+    local IFS='.'
+    local a=($1) b=($2)
+    local i=0
+    while [ $i -lt ${#b[@]} ]; do
+        local av="${a[$i]:-0}"
+        local bv="${b[$i]:-0}"
+        if [ "$av" -lt "$bv" ]; then
+            return 1
+        elif [ "$av" -gt "$bv" ]; then
+            return 0
+        fi
+        i=$((i + 1))
+    done
+    return 0
+}
+
+# --- Helper: ensure bun meets minimum version ---
+ensure_min_bun_version() {
+    local current
+    current="$(bun --version)"
+    if ! version_gte "$current" "$MIN_BUN_VERSION"; then
+        log_warn "bun ${current} is below minimum ${MIN_BUN_VERSION}, upgrading..."
+        bun upgrade
+        current="$(bun --version)"
+        if ! version_gte "$current" "$MIN_BUN_VERSION"; then
+            log_error "Failed to upgrade bun to >= ${MIN_BUN_VERSION} (got ${current})"
+            echo ""
+            echo "Please upgrade bun manually:"
+            echo "  bun upgrade"
+            echo ""
+            echo "Then re-run:"
+            echo "  curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
+            exit 1
+        fi
+        log_info "bun upgraded to ${current}"
+    fi
+}
 
 # --- Helper: find the best install directory ---
 # Picks the first directory that exists AND is in PATH
@@ -104,6 +146,7 @@ clone_cli() {
             | grep '"name"' | grep '\.ts"' | grep -v '__tests__' \
             | sed 's/.*"name": "//;s/".*//')
         curl -fsSL "${SPAWN_RAW_BASE}/cli/package.json"  -o "${dest}/cli/package.json"
+        curl -fsSL "${SPAWN_RAW_BASE}/cli/bun.lock"       -o "${dest}/cli/bun.lock"
         curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"  -o "${dest}/cli/tsconfig.json"
         for f in $files; do
             curl -fsSL "${SPAWN_RAW_BASE}/cli/src/${f}" -o "${dest}/cli/src/${f}"
@@ -120,7 +163,11 @@ build_and_install() {
 
     cd "${tmpdir}/cli"
     bun install
-    bun run build
+    if ! bun run build; then
+        log_warn "Build failed, retrying with forced reinstall..."
+        bun install --force
+        bun run build
+    fi
 
     INSTALL_DIR="$(find_install_dir)"
     mkdir -p "${INSTALL_DIR}"
@@ -152,6 +199,8 @@ if ! command -v bun &>/dev/null; then
 
     log_info "bun installed successfully"
 fi
+
+ensure_min_bun_version
 
 log_info "Installing spawn via bun..."
 build_and_install
