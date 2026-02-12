@@ -21,6 +21,8 @@
  * continues to drain to the server console.
  */
 
+import { timingSafeEqual } from "crypto";
+
 const PORT = 8080;
 const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
 const TARGET_SCRIPT = process.env.TARGET_SCRIPT ?? "";
@@ -310,7 +312,11 @@ const server = Bun.serve({
       }
 
       const auth = req.headers.get("Authorization") ?? "";
-      if (auth !== `Bearer ${TRIGGER_SECRET}`) {
+      const expected = `Bearer ${TRIGGER_SECRET}`;
+      if (
+        auth.length !== expected.length ||
+        !timingSafeEqual(Buffer.from(auth), Buffer.from(expected))
+      ) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
 
