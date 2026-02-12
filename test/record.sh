@@ -765,99 +765,79 @@ print(json.dumps(body))
 }
 
 # --- Record one cloud ---
-record_cloud() {
+# Check credentials and prompt if needed; returns 1 to skip this cloud
+_record_ensure_credentials() {
     local cloud="$1"
-
-    if ! has_credentials "$cloud"; then
-        local env_var
-        env_var=$(get_auth_env_var "$cloud")
-        if [[ "$PROMPT_FOR_CREDS" == "true" ]]; then
-            printf '%b\n' "${CYAN}━━━ ${cloud} ━━━${NC}"
-            printf '%b\n' "  ${YELLOW}missing${NC} ${env_var}"
-            if ! prompt_credentials "$cloud"; then
-                printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}"
-                SKIPPED=$((SKIPPED + 1))
-                return 0
-            fi
-        else
-            printf '%b\n' "  ${YELLOW}skip${NC} ${cloud} — ${env_var} not set"
-            SKIPPED=$((SKIPPED + 1))
-            return 0
-        fi
+    if has_credentials "$cloud"; then
+        return 0
     fi
 
-    printf '%b\n' "${CYAN}━━━ Recording ${cloud} ━━━${NC}"
-
-    # Create fixture directory
-    local fixture_dir="${FIXTURES_DIR}/${cloud}"
-    mkdir -p "$fixture_dir"
-
-    # Source the cloud's lib in a subshell to avoid namespace collisions
-    # Capture results via temp files
-    local endpoints
-    endpoints=$(get_endpoints "$cloud")
-
-    local cloud_recorded=0
-    local cloud_errors=0
-    local metadata_entries=""
-
-    while IFS=: read -r fixture_name endpoint; do
-        [[ -z "$fixture_name" ]] && continue
-
-        local response=""
-        local record_ok=false
-
-        # Call API in a subshell that sources the cloud lib
-        local tmp_response
-        tmp_response=$(mktemp /tmp/spawn-record-XXXXXX)
-
-        (
-            # Source cloud lib (this also sources shared/common.sh)
-            source "${REPO_ROOT}/${cloud}/lib/common.sh" 2>/dev/null
-
-            # Suppress any interactive prompts by ensuring tokens are loaded
-            # The API call itself uses env vars directly
-            call_api "$cloud" "$endpoint" 2>/dev/null
-        ) > "$tmp_response" 2>/dev/null || true
-
-        response=$(cat "$tmp_response")
-        rm -f "$tmp_response"
-
-        if [[ -z "$response" ]]; then
-            printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — empty response"
-            cloud_errors=$((cloud_errors + 1))
-            continue
+    local env_var
+    env_var=$(get_auth_env_var "$cloud")
+    if [[ "$PROMPT_FOR_CREDS" == "true" ]]; then
+        printf '%b\n' "${CYAN}━━━ ${cloud} ━━━${NC}"
+        printf '%b\n' "  ${YELLOW}missing${NC} ${env_var}"
+        if prompt_credentials "$cloud"; then
+            return 0
         fi
+        printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}"
+    else
+        printf '%b\n' "  ${YELLOW}skip${NC} ${cloud} — ${env_var} not set"
+    fi
+    SKIPPED=$((SKIPPED + 1))
+    return 1
+}
 
-        if ! echo "$response" | is_valid_json; then
-            printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
-            cloud_errors=$((cloud_errors + 1))
-            continue
-        fi
+# Record a single endpoint fixture; increments cloud_recorded/cloud_errors
+# Usage: _record_endpoint CLOUD FIXTURE_DIR FIXTURE_NAME ENDPOINT
+_record_endpoint() {
+    local cloud="$1" fixture_dir="$2" fixture_name="$3" endpoint="$4"
 
-        if has_api_error "$cloud" "$response"; then
-            printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
-            cloud_errors=$((cloud_errors + 1))
-            continue
-        fi
+    # Call API in a subshell that sources the cloud lib
+    local tmp_response
+    tmp_response=$(mktemp /tmp/spawn-record-XXXXXX)
 
-        # Save pretty-printed fixture
-        echo "$response" | pretty_json > "${fixture_dir}/${fixture_name}.json"
-        printf '%b\n' "  ${GREEN}  ok${NC} ${fixture_name} → fixtures/${cloud}/${fixture_name}.json"
-        cloud_recorded=$((cloud_recorded + 1))
+    (
+        source "${REPO_ROOT}/${cloud}/lib/common.sh" 2>/dev/null
+        call_api "$cloud" "$endpoint" 2>/dev/null
+    ) > "$tmp_response" 2>/dev/null || true
 
-        # Build metadata entry
-        local timestamp
-        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        metadata_entries="${metadata_entries}    \"${fixture_name}\": {\"endpoint\": \"${endpoint}\", \"recorded_at\": \"${timestamp}\"},
+    local response
+    response=$(cat "$tmp_response")
+    rm -f "$tmp_response"
+
+    if [[ -z "$response" ]]; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — empty response"
+        cloud_errors=$((cloud_errors + 1))
+        return 0
+    fi
+
+    if ! echo "$response" | is_valid_json; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
+        cloud_errors=$((cloud_errors + 1))
+        return 0
+    fi
+
+    if has_api_error "$cloud" "$response"; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
+        cloud_errors=$((cloud_errors + 1))
+        return 0
+    fi
+
+    echo "$response" | pretty_json > "${fixture_dir}/${fixture_name}.json"
+    printf '%b\n' "  ${GREEN}  ok${NC} ${fixture_name} → fixtures/${cloud}/${fixture_name}.json"
+    cloud_recorded=$((cloud_recorded + 1))
+
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    metadata_entries="${metadata_entries}    \"${fixture_name}\": {\"endpoint\": \"${endpoint}\", \"recorded_at\": \"${timestamp}\"},
 "
-    done <<< "$endpoints"
+}
 
-    # --- Live create+delete cycle for write endpoint fixtures ---
-    # || true prevents set -e from killing the whole script if one cloud's live cycle fails
-    _record_live_cycle "$cloud" "$fixture_dir" cloud_recorded cloud_errors metadata_entries || true
+# Write the _metadata.json file for a cloud's fixtures
+_record_write_metadata() {
+    local cloud="$1" fixture_dir="$2"
 
-    # Write metadata
     local meta_timestamp
     meta_timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -873,6 +853,34 @@ ${metadata_entries}
   }
 }
 METADATA_EOF
+}
+
+record_cloud() {
+    local cloud="$1"
+
+    _record_ensure_credentials "$cloud" || return 0
+
+    printf '%b\n' "${CYAN}━━━ Recording ${cloud} ━━━${NC}"
+
+    local fixture_dir="${FIXTURES_DIR}/${cloud}"
+    mkdir -p "$fixture_dir"
+
+    local endpoints
+    endpoints=$(get_endpoints "$cloud")
+
+    local cloud_recorded=0
+    local cloud_errors=0
+    local metadata_entries=""
+
+    while IFS=: read -r fixture_name endpoint; do
+        [[ -z "$fixture_name" ]] && continue
+        _record_endpoint "$cloud" "$fixture_dir" "$fixture_name" "$endpoint"
+    done <<< "$endpoints"
+
+    # Live create+delete cycle for write endpoint fixtures
+    _record_live_cycle "$cloud" "$fixture_dir" cloud_recorded cloud_errors metadata_entries || true
+
+    _record_write_metadata "$cloud" "$fixture_dir"
 
     RECORDED=$((RECORDED + cloud_recorded))
     ERRORS=$((ERRORS + cloud_errors))
