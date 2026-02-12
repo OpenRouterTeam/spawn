@@ -107,8 +107,8 @@ ensure_exoscale_creds() {
     fi
 
     # Prompt for credentials
-    log_warn "Exoscale credentials not found"
-    log_warn "Get your API credentials at: https://portal.exoscale.com/iam/api-keys"
+    log_step "Exoscale credentials not found"
+    log_info "Get your API credentials at: https://portal.exoscale.com/iam/api-keys"
     echo ""
 
     local api_key api_secret zone

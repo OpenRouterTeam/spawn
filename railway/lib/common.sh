@@ -203,7 +203,7 @@ wait_for_cloud_init() {
 
     # Update package lists if needed
     run_server "apt-get update -qq >/dev/null 2>&1 || true" || {
-        log_warn "Package update skipped (may already be ready)"
+        log_info "Package update skipped (may already be ready)"
     }
 
     log_info "System ready"

@@ -65,6 +65,6 @@ echo ""
 
 # Start nanoclaw
 log_step "Starting nanoclaw..."
-log_warn "You will need to scan a WhatsApp QR code to authenticate."
+log_info "You will need to scan a WhatsApp QR code to authenticate."
 echo ""
 sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "cd ~/nanoclaw && source ~/.zshrc && npm run dev"

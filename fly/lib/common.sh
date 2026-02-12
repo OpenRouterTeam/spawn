@@ -181,7 +181,7 @@ _fly_create_app() {
         local error_msg
         error_msg=$(echo "$app_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$app_response")
         if echo "$error_msg" | grep -qi "already exists"; then
-            log_warn "App '$name' already exists, reusing it"
+            log_info "App '$name' already exists, reusing it"
             return 0
         fi
         log_error "Failed to create Fly.io app"

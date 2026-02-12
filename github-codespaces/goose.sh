@@ -62,7 +62,7 @@ echo ""
 
 # 7. Start goose interactively
 log_step "Starting goose..."
-log_warn "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
+log_info "To delete codespace later, run: gh codespace delete --codespace $CODESPACE --force"
 echo ""
 sleep 1
 
