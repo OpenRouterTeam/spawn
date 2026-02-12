@@ -348,7 +348,7 @@ get_model_id_interactive() {
         return 0
     fi
 
-    echo ""
+    echo "" >&2
     log_info "Browse models at: https://openrouter.ai/models"
     if [[ -n "${agent_name}" ]]; then
         log_info "Which model would you like to use with ${agent_name}?"
