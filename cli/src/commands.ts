@@ -277,6 +277,29 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
 
 // ── Interactive ────────────────────────────────────────────────────────────────
 
+/** Sort clouds by credential availability and build hint overrides for the picker */
+export function prioritizeCloudsByCredentials(
+  clouds: string[],
+  manifest: Manifest
+): { sortedClouds: string[]; hintOverrides: Record<string, string>; credCount: number } {
+  const withCreds: string[] = [];
+  const withoutCreds: string[] = [];
+  for (const c of clouds) {
+    if (hasCloudCredentials(manifest.clouds[c].auth)) {
+      withCreds.push(c);
+    } else {
+      withoutCreds.push(c);
+    }
+  }
+
+  const hintOverrides: Record<string, string> = {};
+  for (const c of withCreds) {
+    hintOverrides[c] = `credentials detected -- ${manifest.clouds[c].description}`;
+  }
+
+  return { sortedClouds: [...withCreds, ...withoutCreds], hintOverrides, credCount: withCreds.length };
+}
+
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
@@ -298,26 +321,10 @@ export async function cmdInteractive(): Promise<void> {
     process.exit(1);
   }
 
-  // Prioritize clouds where the user already has credentials set
-  const withCreds: string[] = [];
-  const withoutCreds: string[] = [];
-  for (const c of clouds) {
-    if (hasCloudCredentials(manifest.clouds[c].auth)) {
-      withCreds.push(c);
-    } else {
-      withoutCreds.push(c);
-    }
-  }
-  const sortedClouds = [...withCreds, ...withoutCreds];
+  const { sortedClouds, hintOverrides, credCount } = prioritizeCloudsByCredentials(clouds, manifest);
 
-  // Add credential hints to the select options
-  const hintOverrides: Record<string, string> = {};
-  for (const c of withCreds) {
-    hintOverrides[c] = `credentials detected -- ${manifest.clouds[c].description}`;
-  }
-
-  if (withCreds.length > 0) {
-    p.log.info(`${withCreds.length} cloud${withCreds.length > 1 ? "s" : ""} with credentials detected`);
+  if (credCount > 0) {
+    p.log.info(`${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected`);
   }
 
   const cloudChoice = await p.select({

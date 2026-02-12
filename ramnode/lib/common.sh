@@ -214,43 +214,9 @@ for f in flavors:
 "
 }
 
-# Interactive flavor picker
+# Interactive flavor picker (delegates to shared interactive_pick)
 _pick_flavor() {
-    if [[ -n "${RAMNODE_FLAVOR:-}" ]]; then
-        echo "$RAMNODE_FLAVOR"
-        return
-    fi
-
-    log_step "Fetching available instance types..."
-    local flavors
-    flavors=$(_list_flavors)
-
-    if [[ -z "$flavors" ]]; then
-        log_warn "Could not fetch flavors, using default: 1GB"
-        echo "1GB"
-        return
-    fi
-
-    log_step "Available instance types:"
-    local i=1
-    local names=()
-    while IFS='|' read -r name cores ram disk; do
-        printf "  %2d) %-12s  %-8s  %-12s  %s\n" "$i" "$name" "$cores" "$ram" "$disk" >&2
-        names+=("$name")
-        i=$((i + 1))
-    done <<< "$flavors"
-
-    local choice
-    printf "\n" >&2
-    choice=$(safe_read "Select instance type [1]: ") || choice=""
-    choice="${choice:-1}"
-
-    if [[ "$choice" -ge 1 && "$choice" -le "${#names[@]}" ]] 2>/dev/null; then
-        echo "${names[$((choice - 1))]}"
-    else
-        log_warn "Invalid choice, using default: 1GB"
-        echo "1GB"
-    fi
+    interactive_pick "RAMNODE_FLAVOR" "1GB" "instance types" _list_flavors
 }
 
 # List available images
