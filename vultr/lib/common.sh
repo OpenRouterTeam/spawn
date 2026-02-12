@@ -64,10 +64,7 @@ ensure_vultr_token() {
 
 # Check if SSH key is registered with Vultr
 vultr_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(vultr_api GET "/ssh-keys")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint vultr_api "/ssh-keys" "$1"
 }
 
 # Register SSH key with Vultr

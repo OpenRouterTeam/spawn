@@ -62,10 +62,7 @@ ensure_hcloud_token() {
 
 # Check if SSH key is registered with Hetzner
 hetzner_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(hetzner_api GET "/ssh_keys")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint hetzner_api "/ssh_keys" "$1"
 }
 
 # Register SSH key with Hetzner

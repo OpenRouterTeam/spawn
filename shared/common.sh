@@ -2099,6 +2099,21 @@ interactive_pick() {
 # SSH key registration helpers
 # ============================================================
 
+# Generic SSH key check: queries the provider's API and greps for the fingerprint.
+# Most providers follow this exact pattern. Use this to avoid duplicating 5-line
+# check functions across every cloud lib.
+# Usage: check_ssh_key_by_fingerprint API_FUNC ENDPOINT FINGERPRINT
+# Example: check_ssh_key_by_fingerprint hetzner_api "/ssh_keys" "$fingerprint"
+check_ssh_key_by_fingerprint() {
+    local api_func="${1}"
+    local endpoint="${2}"
+    local fingerprint="${3}"
+
+    local existing_keys
+    existing_keys=$("${api_func}" GET "${endpoint}")
+    echo "${existing_keys}" | grep -q "${fingerprint}"
+}
+
 # Generic SSH key registration pattern used by all cloud providers
 # Eliminates ~220 lines of duplicate code across 5 provider libraries
 #

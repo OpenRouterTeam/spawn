@@ -63,10 +63,7 @@ ensure_binarylane_token() {
 
 # Check if SSH key is registered with BinaryLane
 binarylane_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(binarylane_api GET "/account/keys")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint binarylane_api "/account/keys" "$1"
 }
 
 # Register SSH key with BinaryLane

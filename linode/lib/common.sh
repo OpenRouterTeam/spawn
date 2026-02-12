@@ -62,10 +62,7 @@ ensure_linode_token() {
 
 # Check if SSH key is registered with Linode
 linode_check_ssh_key() {
-    local fingerprint="$1"
-    local existing_keys
-    existing_keys=$(linode_api GET "/profile/sshkeys")
-    echo "$existing_keys" | grep -q "$fingerprint"
+    check_ssh_key_by_fingerprint linode_api "/profile/sshkeys" "$1"
 }
 
 # Register SSH key with Linode
