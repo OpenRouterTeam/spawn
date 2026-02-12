@@ -867,6 +867,29 @@ generate_env_config() {
 }
 
 # Inject environment variables into remote server's shell config (SSH-based clouds)
+# Internal helper: generate env config, upload via callbacks, and append to .zshrc
+# The upload_args and run_args arrays are built by the public wrappers below.
+# Usage: _inject_env_to_zshrc UPLOAD_CMD RUN_CMD KEY1=val1 KEY2=val2 ...
+#   UPLOAD_CMD = "func [prefix_args...]" — called as: $UPLOAD_CMD <local_path> <remote_path>
+#   RUN_CMD    = "func [prefix_args...]" — called as: $RUN_CMD <shell_command>
+_inject_env_to_zshrc() {
+    local upload_cmd="${1}"
+    local run_cmd="${2}"
+    shift 2
+
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    generate_env_config "$@" > "${env_temp}"
+
+    # Upload and append to .zshrc (temp file cleaned up by trap handler)
+    ${upload_cmd} "${env_temp}" "/tmp/env_config"
+    ${run_cmd} "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+}
+
+# Inject environment variables for SSH-based providers
 # Usage: inject_env_vars_ssh SERVER_IP UPLOAD_FUNC RUN_FUNC KEY1=val1 KEY2=val2 ...
 # Example: inject_env_vars_ssh "$DO_SERVER_IP" upload_file run_server \
 #            "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
@@ -877,18 +900,7 @@ inject_env_vars_ssh() {
     local run_func="${3}"
     shift 3
 
-    local env_temp
-    env_temp=$(mktemp)
-    chmod 600 "${env_temp}"
-    track_temp_file "${env_temp}"
-
-    generate_env_config "$@" > "${env_temp}"
-
-    # Upload and append to .zshrc
-    "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-
-    # Note: temp file will be cleaned up by trap handler
+    _inject_env_to_zshrc "${upload_func} ${server_ip}" "${run_func} ${server_ip}" "$@"
 }
 
 # Inject environment variables for providers without SSH (modal, e2b, sprite)
@@ -902,18 +914,7 @@ inject_env_vars_local() {
     local run_func="${2}"
     shift 2
 
-    local env_temp
-    env_temp=$(mktemp)
-    chmod 600 "${env_temp}"
-    track_temp_file "${env_temp}"
-
-    generate_env_config "$@" > "${env_temp}"
-
-    # Upload and append to .zshrc
-    "${upload_func}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-
-    # Note: temp file will be cleaned up by trap handler
+    _inject_env_to_zshrc "${upload_func}" "${run_func}" "$@"
 }
 
 # ============================================================
@@ -1118,7 +1119,39 @@ _parse_api_response() {
     API_RESPONSE_BODY="${response_body}"
 }
 
-# Helper to handle a single API request attempt - builds curl args and executes it
+# Core curl executor for all API requests
+# Builds common curl args, appends any extra flags, executes, and parses the response.
+# Returns: 0 on curl success, 1 on curl failure
+# Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
+# Usage: _execute_curl_api URL METHOD BODY [EXTRA_CURL_ARGS...]
+_execute_curl_api() {
+    local url="${1}"
+    local method="${2}"
+    local body="${3:-}"
+    shift 3
+
+    local args=(
+        -s
+        -w "\n%{http_code}"
+        -X "${method}"
+        -H "Content-Type: application/json"
+        "$@"
+    )
+
+    if [[ -n "${body}" ]]; then
+        args+=(-d "${body}")
+    fi
+
+    local response
+    response=$(curl "${args[@]}" "${url}" 2>&1)
+    local curl_exit_code=$?
+
+    _parse_api_response "${response}"
+
+    return ${curl_exit_code}
+}
+
+# Helper to handle a single API request attempt with Bearer token auth
 # Returns: 0 on curl success, 1 on curl failure
 # Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
 _make_api_request() {
@@ -1128,25 +1161,8 @@ _make_api_request() {
     local endpoint="${4}"
     local body="${5:-}"
 
-    local args=(
-        -s
-        -w "\n%{http_code}"
-        -X "${method}"
+    _execute_curl_api "${base_url}${endpoint}" "${method}" "${body}" \
         -H "Authorization: Bearer ${auth_token}"
-        -H "Content-Type: application/json"
-    )
-
-    if [[ -n "${body}" ]]; then
-        args+=(-d "${body}")
-    fi
-
-    local response
-    response=$(curl "${args[@]}" "${base_url}${endpoint}" 2>&1)
-    local curl_exit_code=$?
-
-    _parse_api_response "${response}"
-
-    return ${curl_exit_code}
 }
 
 # Generic cloud API wrapper - centralized curl wrapper for all cloud providers
@@ -1226,25 +1242,7 @@ _make_api_request_custom_auth() {
     shift 3
     # Remaining args are custom curl auth flags (e.g., -u "user:pass" or -H "X-Auth-Token: ...")
 
-    local args=(
-        -s
-        -w "\n%{http_code}"
-        -X "${method}"
-        -H "Content-Type: application/json"
-        "$@"
-    )
-
-    if [[ -n "${body}" ]]; then
-        args+=(-d "${body}")
-    fi
-
-    local response
-    response=$(curl "${args[@]}" "${url}" 2>&1)
-    local curl_exit_code=$?
-
-    _parse_api_response "${response}"
-
-    return ${curl_exit_code}
+    _execute_curl_api "${url}" "${method}" "${body}" "$@"
 }
 
 # Generic cloud API wrapper with custom curl auth args
