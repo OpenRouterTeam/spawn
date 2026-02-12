@@ -871,6 +871,15 @@ generate_env_config() {
 # Example: inject_env_vars_ssh "$DO_SERVER_IP" upload_file run_server \
 #            "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
 #            "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+_write_env_temp_file() {
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+    generate_env_config "$@" > "${env_temp}"
+    echo "${env_temp}"
+}
+
 inject_env_vars_ssh() {
     local server_ip="${1}"
     local upload_func="${2}"
@@ -878,17 +887,10 @@ inject_env_vars_ssh() {
     shift 3
 
     local env_temp
-    env_temp=$(mktemp)
-    chmod 600 "${env_temp}"
-    track_temp_file "${env_temp}"
+    env_temp=$(_write_env_temp_file "$@")
 
-    generate_env_config "$@" > "${env_temp}"
-
-    # Upload and append to .zshrc
     "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
     "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-
-    # Note: temp file will be cleaned up by trap handler
 }
 
 # Inject environment variables for providers without SSH (modal, e2b, sprite)
@@ -903,17 +905,10 @@ inject_env_vars_local() {
     shift 2
 
     local env_temp
-    env_temp=$(mktemp)
-    chmod 600 "${env_temp}"
-    track_temp_file "${env_temp}"
+    env_temp=$(_write_env_temp_file "$@")
 
-    generate_env_config "$@" > "${env_temp}"
-
-    # Upload and append to .zshrc
     "${upload_func}" "${env_temp}" "/tmp/env_config"
     "${run_func}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-
-    # Note: temp file will be cleaned up by trap handler
 }
 
 # ============================================================
@@ -1476,6 +1471,17 @@ ssh_verify_connectivity() {
 #   generic_wait_for_instance vultr_api "/instances/$id" "active" \
 #       "d['instance']['status']" "d['instance']['main_ip']" \
 #       VULTR_SERVER_IP "Instance" 60
+_extract_instance_fields() {
+    local status_py="${1}"
+    local ip_py="${2}"
+    python3 -c "
+import json,sys
+d=json.loads(sys.stdin.read())
+print(${status_py})
+print(${ip_py})
+" 2>/dev/null
+}
+
 generic_wait_for_instance() {
     local api_func="${1}"
     local endpoint="${2}"
@@ -1494,20 +1500,13 @@ generic_wait_for_instance() {
         local response
         response=$("${api_func}" GET "${endpoint}" 2>/dev/null) || true
 
-        local status
-        status=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${status_py})" 2>/dev/null || echo "unknown")
+        local status="" ip=""
+        {
+            read -r status
+            read -r ip
+        } <<< "$(printf '%s' "${response}" | _extract_instance_fields "${status_py}" "${ip_py}" || printf 'unknown\n\n')"
 
-        if [[ "${status}" != "${target_status}" ]]; then
-            log_step "${description} status: ${status} (${attempt}/${max_attempts})"
-            sleep "${poll_delay}"
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        local ip
-        ip=$(printf '%s' "${response}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${ip_py})" 2>/dev/null || echo "")
-
-        if [[ -n "${ip}" ]]; then
+        if [[ "${status}" == "${target_status}" && -n "${ip}" ]]; then
             export "${ip_var}=${ip}"
             log_info "${description} ${target_status}: IP=${ip}"
             return 0
