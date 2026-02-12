@@ -391,4 +391,38 @@ describe("execScript bash execution error handling", () => {
       });
     }
   });
+
+  // ── Retry command includes prompt ──────────────────────────────────────
+
+  describe("retry command includes prompt", () => {
+    it("should include --prompt in retry command when prompt was provided", async () => {
+      mockFetchWithScript("exit 1");
+      await loadManifest(true);
+
+      try {
+        await cmdRun("claude", "sprite", "Fix all bugs");
+      } catch {
+        // Expected - process.exit
+      }
+
+      const errors = getErrorOutput();
+      expect(errors).toContain('--prompt');
+      expect(errors).toContain('Fix all bugs');
+    });
+
+    it("should not include --prompt in retry command when no prompt was provided", async () => {
+      mockFetchWithScript("exit 1");
+      await loadManifest(true);
+
+      try {
+        await cmdRun("claude", "sprite");
+      } catch {
+        // Expected - process.exit
+      }
+
+      const errors = getErrorOutput();
+      expect(errors).toContain("spawn claude sprite");
+      expect(errors).not.toContain("--prompt");
+    });
+  });
 });

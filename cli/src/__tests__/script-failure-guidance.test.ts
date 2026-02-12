@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { getScriptFailureGuidance, getStatusDescription } from "../commands";
+import { getScriptFailureGuidance, getStatusDescription, buildRetryCommand } from "../commands";
 
 /**
  * Tests for getScriptFailureGuidance() in commands.ts.
@@ -444,5 +444,51 @@ describe("getScriptFailureGuidance", () => {
         }
       }
     });
+  });
+});
+
+describe("buildRetryCommand", () => {
+  it("should return basic command without prompt", () => {
+    expect(buildRetryCommand("claude", "sprite")).toBe("spawn claude sprite");
+  });
+
+  it("should include --prompt when prompt is provided", () => {
+    expect(buildRetryCommand("claude", "sprite", "Fix all bugs")).toBe(
+      'spawn claude sprite --prompt "Fix all bugs"'
+    );
+  });
+
+  it("should truncate long prompts at 60 characters", () => {
+    const longPrompt = "A".repeat(100);
+    const result = buildRetryCommand("claude", "sprite", longPrompt);
+    expect(result).toContain("...");
+    expect(result).toContain("A".repeat(60));
+    expect(result).not.toContain("A".repeat(61));
+  });
+
+  it("should not truncate prompts exactly 60 characters", () => {
+    const prompt = "B".repeat(60);
+    const result = buildRetryCommand("claude", "sprite", prompt);
+    expect(result).not.toContain("...");
+    expect(result).toBe(`spawn claude sprite --prompt "${prompt}"`);
+  });
+
+  it("should escape double quotes in prompt", () => {
+    const result = buildRetryCommand("claude", "sprite", 'Fix the "bug"');
+    expect(result).toBe('spawn claude sprite --prompt "Fix the \\"bug\\""');
+  });
+
+  it("should handle empty string prompt as no prompt", () => {
+    expect(buildRetryCommand("claude", "sprite", "")).toBe("spawn claude sprite");
+  });
+
+  it("should handle undefined prompt", () => {
+    expect(buildRetryCommand("claude", "sprite", undefined)).toBe("spawn claude sprite");
+  });
+
+  it("should preserve different agent and cloud names", () => {
+    expect(buildRetryCommand("aider", "hetzner", "Test")).toBe(
+      'spawn aider hetzner --prompt "Test"'
+    );
   });
 });
