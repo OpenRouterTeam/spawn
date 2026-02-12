@@ -1518,7 +1518,11 @@ generic_wait_for_instance() {
         attempt=$((attempt + 1))
     done
 
-    log_error "${description} did not become ${target_status} in time"
+    log_error "${description} did not become ${target_status} after ${max_attempts} attempts"
+    log_warn "The instance may still be provisioning. You can:"
+    log_warn "  1. Re-run the command to try again"
+    log_warn "  2. Check the instance status in your cloud provider dashboard"
+    log_warn "  3. Try a different region (some regions provision faster)"
     return 1
 }
 
@@ -1576,7 +1580,10 @@ _validate_token_with_provider() {
     if ! "${test_func}"; then
         log_error "Authentication failed: Invalid ${provider_name} API token"
         log_error "The token may be expired, revoked, or incorrectly copied."
-        log_error "Please re-run the command to enter a new token."
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Re-run the command to enter a new token"
+        log_error "  2. Or set it directly: export ${env_var_name}=your-token spawn ..."
         unset "${env_var_name}"
         return 1
     fi
