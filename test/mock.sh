@@ -257,6 +257,7 @@ _strip_api_base() {
         https://infrahub-api.nexgencloud.com/v1*) ENDPOINT="${URL#https://infrahub-api.nexgencloud.com/v1}" ;;
         *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
         https://cloudapi.atlantic.net/*)    ENDPOINT=$(echo "$URL" | sed 's|https://cloudapi.atlantic.net/\?||') ;;
+        https://invapi.hostkey.com*)        ENDPOINT="${URL#https://invapi.hostkey.com}" ;;
     esac
     EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
 }
