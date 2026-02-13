@@ -203,13 +203,12 @@ create_server() {
     # Interactive location + instance preset selection (skipped if env vars are set)
     local location
     location=$(_pick_location)
+    # Validate location before using it in API calls (preset listing)
+    validate_region_name "$location" || { log_error "Invalid HOSTKEY_LOCATION"; return 1; }
 
     local preset
     preset=$(_pick_instance_preset "$location")
-
-    # Validate inputs
     validate_resource_name "$preset" || { log_error "Invalid HOSTKEY_INSTANCE_PRESET"; return 1; }
-    validate_region_name "$location" || { log_error "Invalid HOSTKEY_LOCATION"; return 1; }
 
     log_step "Creating HOSTKEY instance '$name' (preset: $preset, location: $location)..."
 

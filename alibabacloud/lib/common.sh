@@ -329,6 +329,7 @@ create_server() {
     # Validate inputs to prevent injection
     validate_resource_name "$instance_type" || { log_error "Invalid ALIYUN_INSTANCE_TYPE"; return 1; }
     validate_region_name "$region" || { log_error "Invalid ALIYUN_REGION"; return 1; }
+    validate_resource_name "$image_id" || { log_error "Invalid ALIYUN_IMAGE_ID"; return 1; }
 
     # Get or create VPC
     log_step "Checking for VPC in region $region..."
