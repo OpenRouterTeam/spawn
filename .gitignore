@@ -2,6 +2,7 @@ node_modules/
 .docs/
 __pycache__/
 .claude/skills/*/start-*.sh
+.claude/settings.local.json
 cli/cli.js
 
 # Sensitive files — never commit secrets or private keys
@@ -15,3 +16,11 @@ id_rsa
 id_ed25519
 credentials.json
 service-account.json
+.claude/settings.json
+.claude/settings.json
+.claude/settings.json
+.claude/settings.local.json
+.DS_Store
+.claude/settings.local.json
+.DS_Store
+.claude/settings.local.json
