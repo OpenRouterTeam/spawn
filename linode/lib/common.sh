@@ -43,7 +43,7 @@ test_linode_token() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print(errs[0].get('reason','No details') if errs else 'Unable to parse')" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
+        log_error "How to fix:"
         log_warn "  1. Verify token at: https://cloud.linode.com/profile/tokens"
         log_warn "  2. Ensure the token has read/write permissions"
         log_warn "  3. Check token hasn't expired or been revoked"
@@ -196,7 +196,7 @@ print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown e
         log_warn "  - Type/region unavailable (try different LINODE_TYPE or LINODE_REGION)"
         log_warn "  - Instance limit reached"
         log_warn "  - Invalid cloud-init metadata"
-        log_warn "Remediation: Check https://cloud.linode.com/"
+        log_warn "Check your dashboard: https://cloud.linode.com/"
         return 1
     fi
 

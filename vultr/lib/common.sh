@@ -43,7 +43,7 @@ test_vultr_token() {
         return 0
     else
         log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
-        log_warn "Remediation steps:"
+        log_error "How to fix:"
         log_warn "  1. Verify API key at: https://my.vultr.com/settings/#settingsapi"
         log_warn "  2. Ensure the key has appropriate permissions"
         log_warn "  3. Check key hasn't been revoked"
@@ -177,7 +177,7 @@ create_server() {
         log_warn "  - Plan/region unavailable (try different VULTR_PLAN or VULTR_REGION)"
         log_warn "  - Instance limit reached"
         log_warn "  - Invalid cloud-init userdata"
-        log_warn "Remediation: Check https://my.vultr.com/"
+        log_warn "Check your dashboard: https://my.vultr.com/"
         return 1
     fi
 

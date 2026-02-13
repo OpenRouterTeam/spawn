@@ -45,7 +45,7 @@ test_do_token() {
         return 0
     else
         log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
-        log_warn "Remediation steps:"
+        log_error "How to fix:"
         log_warn "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
         log_warn "  2. Ensure the token has read/write permissions"
         log_warn "  3. Check token hasn't expired or been revoked"
@@ -187,7 +187,7 @@ create_server() {
         log_warn "  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)"
         log_warn "  - Droplet limit reached (check account limits)"
         log_warn "  - Invalid cloud-init userdata"
-        log_warn "Remediation: Check https://cloud.digitalocean.com/droplets"
+        log_warn "Check your dashboard: https://cloud.digitalocean.com/droplets"
         return 1
     fi
 
