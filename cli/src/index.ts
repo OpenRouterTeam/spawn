@@ -66,6 +66,20 @@ const KNOWN_FLAGS = new Set([
   "-a", "-c", "--agent", "--cloud",
 ]);
 
+/** Expand --flag=value into --flag value so all flag parsing works uniformly */
+export function expandEqualsFlags(args: string[]): string[] {
+  const result: string[] = [];
+  for (const arg of args) {
+    if (arg.startsWith("--") && arg.includes("=")) {
+      const eqIdx = arg.indexOf("=");
+      result.push(arg.slice(0, eqIdx), arg.slice(eqIdx + 1));
+    } else {
+      result.push(arg);
+    }
+  }
+  return result;
+}
+
 /** Check for unknown flags and show an actionable error */
 function checkUnknownFlags(args: string[]): void {
   for (const arg of args) {
@@ -386,7 +400,7 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  const args = expandEqualsFlags(process.argv.slice(2));
 
   await checkForUpdates();
 
