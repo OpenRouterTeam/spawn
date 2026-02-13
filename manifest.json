@@ -1199,7 +1199,7 @@
     "local/gptme": "implemented",
     "local/opencode": "implemented",
     "local/plandex": "missing",
-    "local/kilocode": "missing",
+    "local/kilocode": "implemented",
     "local/continue": "implemented",
     "ramnode/claude": "implemented",
     "ramnode/openclaw": "implemented",
