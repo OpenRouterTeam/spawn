@@ -40,6 +40,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/gemini.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/opencode.sh)
 ```
 
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/plandex.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
