@@ -32,9 +32,10 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server 'echo "export OPENROUTER_API_KEY=\"'"${OPENROUTER_API_KEY}"'\"" >> ~/.bashrc'
-run_server 'echo "export OPENAI_API_KEY=\"'"${OPENROUTER_API_KEY}"'\"" >> ~/.bashrc'
-run_server 'echo "export OPENAI_BASE_URL=\"https://openrouter.ai/api/v1\"" >> ~/.bashrc'
+inject_env_vars_local upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "CodeSandbox setup completed successfully!"
