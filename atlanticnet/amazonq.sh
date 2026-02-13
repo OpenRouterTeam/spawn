@@ -31,11 +31,10 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server "${ATLANTICNET_SERVER_IP}" "cat >> ~/.bashrc << 'EOF'
-export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-export OPENAI_API_KEY=${OPENROUTER_API_KEY}
-export OPENAI_BASE_URL=https://openrouter.ai/api/v1
-EOF"
+inject_env_vars_ssh "${ATLANTICNET_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "Server setup completed successfully!"
@@ -44,4 +43,4 @@ echo ""
 log_step "Starting Amazon Q..."
 sleep 1
 clear
-interactive_session "${ATLANTICNET_SERVER_IP}" "source ~/.bashrc && q chat"
+interactive_session "${ATLANTICNET_SERVER_IP}" "source ~/.zshrc && q chat"

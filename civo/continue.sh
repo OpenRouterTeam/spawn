@@ -30,15 +30,8 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server "${CIVO_SERVER_IP}" "cat >> ~/.bashrc << 'ENV_EOF'
-export PATH=\"\$HOME/.bun/bin:\$PATH\"
-export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-ENV_EOF"
-
-run_server "${CIVO_SERVER_IP}" "cat >> ~/.zshrc << 'ENV_EOF'
-export PATH=\"\$HOME/.bun/bin:\$PATH\"
-export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-ENV_EOF"
+inject_env_vars_ssh "${CIVO_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 setup_continue_config "${OPENROUTER_API_KEY}" \
     "upload_file ${CIVO_SERVER_IP}" \
