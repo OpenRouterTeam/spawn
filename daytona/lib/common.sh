@@ -44,6 +44,18 @@ ensure_daytona_cli() {
     log_info "Daytona CLI available"
 }
 
+_is_daytona_auth_error() {
+    printf '%s' "${1}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"
+}
+
+_daytona_auth_error() {
+    log_error "Invalid API key"
+    log_error "How to fix:"
+    log_warn "  1. Verify API key at: https://app.daytona.io"
+    log_warn "  2. Ensure the key has sandbox permissions"
+    log_warn "  3. Check key hasn't expired or been revoked"
+}
+
 test_daytona_token() {
     local test_response
     # Authenticate CLI with the API key first
@@ -51,32 +63,17 @@ test_daytona_token() {
     local exit_code=$?
 
     if [[ ${exit_code} -ne 0 ]]; then
-        if printf '%s' "${test_response}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"; then
-            log_error "Invalid API key"
-            log_error "How to fix:"
-            log_warn "  1. Verify API key at: https://app.daytona.io"
-            log_warn "  2. Ensure the key has sandbox permissions"
-            log_warn "  3. Check key hasn't expired or been revoked"
-            return 1
+        if _is_daytona_auth_error "${test_response}"; then
+            _daytona_auth_error; return 1
         fi
-        # Non-auth error during login — could be network, still fail
         log_error "Daytona login failed: ${test_response}"
         return 1
     fi
 
     # Verify by listing sandboxes (lightweight API call)
     test_response=$(daytona list --limit 1 2>&1)
-    exit_code=$?
-
-    if [[ ${exit_code} -ne 0 ]]; then
-        if printf '%s' "${test_response}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"; then
-            log_error "Invalid API key"
-            log_error "How to fix:"
-            log_warn "  1. Verify API key at: https://app.daytona.io"
-            log_warn "  2. Ensure the key has sandbox permissions"
-            log_warn "  3. Check key hasn't expired or been revoked"
-            return 1
-        fi
+    if [[ $? -ne 0 ]] && _is_daytona_auth_error "${test_response}"; then
+        _daytona_auth_error; return 1
     fi
     return 0
 }
@@ -94,82 +91,53 @@ get_server_name() {
     get_resource_name "DAYTONA_SANDBOX_NAME" "Enter sandbox name: "
 }
 
-create_server() {
+_is_snapshot_conflict() {
+    printf '%s' "${1}" | grep -qi "cannot specify.*resources.*snapshot\|cannot specify.*sandbox.*resources"
+}
+
+_daytona_create_with_resources() {
     local name="${1}"
-    local use_explicit_resources="false"
+    local cpu="${DAYTONA_CPU:-2}"
+    local memory="${DAYTONA_MEMORY:-2048}"
+    local disk="${DAYTONA_DISK:-5}"
 
-    # Check if user explicitly set resource env vars (override --class)
-    if [[ -n "${DAYTONA_CPU:-}" || -n "${DAYTONA_MEMORY:-}" || -n "${DAYTONA_DISK:-}" ]]; then
-        use_explicit_resources="true"
-    fi
+    # Validate numeric env vars to prevent command injection
+    if [[ ! "${cpu}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_CPU: must be numeric"; return 1; fi
+    if [[ ! "${memory}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_MEMORY: must be numeric"; return 1; fi
+    if [[ ! "${disk}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_DISK: must be numeric"; return 1; fi
 
-    local output
-    local exit_code
+    log_step "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
+    daytona create \
+        --name "${name}" \
+        --cpu "${cpu}" \
+        --memory "${memory}" \
+        --disk "${disk}" \
+        --auto-stop 0 \
+        --auto-archive 0 \
+        2>&1
+}
 
-    if [[ "${use_explicit_resources}" == "true" ]]; then
-        local cpu="${DAYTONA_CPU:-2}"
-        local memory="${DAYTONA_MEMORY:-2048}"
-        local disk="${DAYTONA_DISK:-5}"
+_daytona_create_with_class() {
+    local name="${1}"
+    local sandbox_class="${DAYTONA_CLASS:-small}"
 
-        # Validate numeric env vars to prevent command injection
-        if [[ ! "${cpu}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_CPU: must be numeric"; return 1; fi
-        if [[ ! "${memory}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_MEMORY: must be numeric"; return 1; fi
-        if [[ ! "${disk}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_DISK: must be numeric"; return 1; fi
-
-        log_step "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
-
-        output=$(daytona create \
-            --name "${name}" \
-            --cpu "${cpu}" \
-            --memory "${memory}" \
-            --disk "${disk}" \
-            --auto-stop 0 \
-            --auto-archive 0 \
-            2>&1)
-        exit_code=$?
-
-        # Detect snapshot/resource conflict and retry with --class
-        if [[ ${exit_code} -ne 0 ]] && printf '%s' "${output}" | grep -qi "cannot specify.*resources.*snapshot\|cannot specify.*sandbox.*resources"; then
-            log_warn "Daytona rejected explicit resource flags (snapshot in use)"
-            log_step "Retrying with --class small..."
-            use_explicit_resources="false"
-        fi
-    fi
-
-    if [[ "${use_explicit_resources}" == "false" ]]; then
-        local sandbox_class="${DAYTONA_CLASS:-small}"
-
-        # Validate class to prevent injection (alphanumeric, hyphens, underscores)
-        if [[ ! "${sandbox_class}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-            log_error "Invalid DAYTONA_CLASS: must be alphanumeric (with hyphens/underscores)"
-            return 1
-        fi
-
-        log_step "Creating Daytona sandbox '${name}' (class: ${sandbox_class})..."
-
-        output=$(daytona create \
-            --name "${name}" \
-            --class "${sandbox_class}" \
-            --auto-stop 0 \
-            --auto-archive 0 \
-            2>&1)
-        exit_code=$?
-    fi
-
-    if [[ ${exit_code} -ne 0 ]]; then
-        if printf '%s' "${output}" | grep -qi "cannot specify.*resources.*snapshot\|cannot specify.*sandbox.*resources"; then
-            log_error "Cannot specify resources when using a Daytona snapshot"
-            log_error ""
-            log_error "Use a sandbox class instead:"
-            log_error "  DAYTONA_CLASS=small spawn <agent> daytona"
-            log_error ""
-            log_error "Or unset explicit resource variables:"
-            log_error "  unset DAYTONA_CPU DAYTONA_MEMORY DAYTONA_DISK"
-        else
-            log_error "Failed to create sandbox: ${output}"
-        fi
+    # Validate class to prevent injection (alphanumeric, hyphens, underscores)
+    if [[ ! "${sandbox_class}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        log_error "Invalid DAYTONA_CLASS: must be alphanumeric (with hyphens/underscores)"
         return 1
     fi
+
+    log_step "Creating Daytona sandbox '${name}' (class: ${sandbox_class})..."
+    daytona create \
+        --name "${name}" \
+        --class "${sandbox_class}" \
+        --auto-stop 0 \
+        --auto-archive 0 \
+        2>&1
+}
+
+_resolve_sandbox_id() {
+    local name="${1}"
 
     # Try to get the sandbox ID from `daytona info`
     local info_output
@@ -186,6 +154,43 @@ create_server() {
 
     export DAYTONA_SANDBOX_ID
     export DAYTONA_SANDBOX_NAME_ACTUAL="${name}"
+}
+
+create_server() {
+    local name="${1}"
+    local output
+    local exit_code=0
+
+    # Try explicit resources first if any resource env vars are set
+    if [[ -n "${DAYTONA_CPU:-}" || -n "${DAYTONA_MEMORY:-}" || -n "${DAYTONA_DISK:-}" ]]; then
+        output=$(_daytona_create_with_resources "${name}") && exit_code=0 || exit_code=$?
+
+        # Detect snapshot/resource conflict and fall back to --class
+        if [[ ${exit_code} -ne 0 ]] && _is_snapshot_conflict "${output}"; then
+            log_warn "Daytona rejected explicit resource flags (snapshot in use)"
+            log_step "Retrying with --class small..."
+            output=$(_daytona_create_with_class "${name}") && exit_code=0 || exit_code=$?
+        fi
+    else
+        output=$(_daytona_create_with_class "${name}") && exit_code=0 || exit_code=$?
+    fi
+
+    if [[ ${exit_code} -ne 0 ]]; then
+        if _is_snapshot_conflict "${output}"; then
+            log_error "Cannot specify resources when using a Daytona snapshot"
+            log_error ""
+            log_error "Use a sandbox class instead:"
+            log_error "  DAYTONA_CLASS=small spawn <agent> daytona"
+            log_error ""
+            log_error "Or unset explicit resource variables:"
+            log_error "  unset DAYTONA_CPU DAYTONA_MEMORY DAYTONA_DISK"
+        else
+            log_error "Failed to create sandbox: ${output}"
+        fi
+        return 1
+    fi
+
+    _resolve_sandbox_id "${name}"
     log_info "Sandbox created: ${DAYTONA_SANDBOX_ID}"
 }
 
