@@ -287,7 +287,7 @@ refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
 | | Issue Mode | Refactor Mode |
 |---|---|---|
 | **Trigger** | `?reason=issues&issue=N` | `?reason=schedule` |
-| **Agents** | 2 (issue-fixer, issue-tester) | 6 (security, ux, complexity, test, branch, community) |
+| **Teammates** | 2 (issue-fixer, issue-tester) | 6 (security, ux, complexity, test, branch, community) |
 | **Prompt timeout** | 15 min | 30 min |
 | **Hard timeout** | 20 min | 40 min |
 | **Worktree** | `/tmp/spawn-worktrees/issue-N/` | `/tmp/spawn-worktrees/refactor/` |

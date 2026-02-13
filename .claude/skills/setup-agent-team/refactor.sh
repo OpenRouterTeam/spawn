@@ -282,7 +282,25 @@ Create these teammates:
 5. **pr-maintainer** (Sonnet)
    - **Role: Keep PRs healthy and mergeable. Do NOT review, approve, or merge PRs — that is the security team's responsibility.**
    - FIRST TASK: List ALL open PRs: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision`
-   - For EACH open PR, evaluate and take the appropriate action:
+   - For EACH open PR, first read the PR comments to understand context:
+     ```
+     gh pr view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[] | "\(.author.login): \(.body)"'
+     gh api repos/OpenRouterTeam/spawn/pulls/NUMBER/comments --jq '.[] | "\(.user.login): \(.body)"'
+     ```
+   - **Comment-based triage** — If comments indicate the PR should be closed, close it:
+     * A maintainer or the author says it's **superseded** by another PR (e.g., "superseded by #NNN", "replaced by #NNN")
+     * Comments indicate the work is **duplicate** of another PR or already merged
+     * The author abandoned the PR (e.g., "closing this", "will redo", "no longer needed")
+     * A previous reviewer flagged it as stale, duplicate, or no-longer-relevant
+     If any of these apply:
+     ```
+     gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Closing: [reason — e.g., superseded by #NNN / duplicate of #NNN / author abandoned].
+
+-- refactor/pr-maintainer"
+     ```
+     Delete the branch: `git push origin --delete "$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json headRefName --jq '.headRefName')" 2>/dev/null || true`
+     Report to team lead and move on to the next PR.
+   - For EACH remaining open PR, evaluate and take the appropriate action:
      * **Has merge conflicts**: rebase the PR branch onto main to resolve
        ```
        git fetch origin
@@ -321,7 +339,7 @@ Create these teammates:
        ```
      * **Mergeable + not yet reviewed**: leave it alone — the security team handles review
    - **NEVER review or approve PRs** — that is exclusively the security team's job. But if a PR is already approved, DO merge it.
-   - **NEVER close a PR** — always try to rebase, fix, or request changes instead
+   - **Only close a PR** when comments clearly indicate it's superseded, duplicate, or abandoned — otherwise try to rebase, fix, or request changes
    - After processing all PRs, report summary: how many merged, rebased, fixed, commented
    - Run this check AGAIN at the end of the cycle to catch PRs created during the cycle
    - GOAL: Approved PRs are merged, conflicting PRs are rebased, review feedback is addressed, checks are passing.
