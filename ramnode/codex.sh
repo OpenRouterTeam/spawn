@@ -2,14 +2,13 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-# shellcheck source=ramnode/lib/common.sh
-if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
-    source "${SCRIPT_DIR}/lib/common.sh"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/lib/common.sh" ]]; then
+    source "$SCRIPT_DIR/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/ramnode/lib/common.sh)"
 fi
 
-log_info "Codex CLI on RamNode Cloud"
+log_info "Codex CLI on RamNode"
 echo ""
 
 ensure_ramnode_credentials
@@ -17,12 +16,12 @@ ensure_ssh_key
 
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
+
 verify_server_connectivity "${RAMNODE_SERVER_IP}"
 wait_for_cloud_init "${RAMNODE_SERVER_IP}" 60
 
 log_step "Installing Codex CLI..."
 run_server "${RAMNODE_SERVER_IP}" "npm install -g @openai/codex"
-log_info "Codex CLI installed"
 
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
