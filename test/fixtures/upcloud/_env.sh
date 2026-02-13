@@ -1,0 +1,5 @@
+export UPCLOUD_USERNAME="test-user"
+export UPCLOUD_PASSWORD="test-pass"
+export UPCLOUD_SERVER_NAME="test-srv"
+export UPCLOUD_PLAN="1xCPU-1GB"
+export UPCLOUD_ZONE="us-chi1"

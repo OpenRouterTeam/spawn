@@ -1,0 +1,5 @@
+export OVH_APPLICATION_KEY="test-app-key"
+export OVH_APPLICATION_SECRET="test-app-secret"
+export OVH_CONSUMER_KEY="test-consumer-key"
+export OVH_PROJECT_ID="test-project-id"
+export OVH_SERVER_NAME="test-srv"

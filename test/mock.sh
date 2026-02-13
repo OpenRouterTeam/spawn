@@ -499,83 +499,12 @@ setup_env_for_cloud() {
     export OPENROUTER_API_KEY="sk-or-v1-0000000000000000000000000000000000000000000000000000000000000000"
     export INSTANCE_STATUS_POLL_DELAY=0
 
-    case "$cloud" in
-        hetzner)
-            export HCLOUD_TOKEN="test-token-hetzner"
-            export HETZNER_SERVER_NAME="test-srv"
-            export HETZNER_SERVER_TYPE="cpx11"
-            export HETZNER_LOCATION="fsn1"
-            ;;
-        digitalocean)
-            export DO_API_TOKEN="test-token-do"
-            export DO_DROPLET_NAME="test-srv"
-            export DO_DROPLET_SIZE="s-2vcpu-2gb"
-            export DO_REGION="nyc3"
-            ;;
-        vultr)
-            export VULTR_API_KEY="test-token-vultr"
-            export VULTR_SERVER_NAME="test-srv"
-            export VULTR_PLAN="vc2-1c-2gb"
-            export VULTR_REGION="ewr"
-            ;;
-        linode)
-            export LINODE_API_TOKEN="test-token-linode"
-            export LINODE_SERVER_NAME="test-srv"
-            export LINODE_TYPE="g6-standard-1"
-            export LINODE_REGION="us-east"
-            ;;
-        lambda)
-            export LAMBDA_API_KEY="test-token-lambda"
-            export LAMBDA_SERVER_NAME="test-srv"
-            ;;
-        civo)
-            export CIVO_API_TOKEN="test-token-civo"
-            export CIVO_SERVER_NAME="test-srv"
-            export CIVO_REGION="lon1"
-            ;;
-        upcloud)
-            export UPCLOUD_USERNAME="test-user"
-            export UPCLOUD_PASSWORD="test-pass"
-            export UPCLOUD_SERVER_NAME="test-srv"
-            export UPCLOUD_PLAN="1xCPU-1GB"
-            export UPCLOUD_ZONE="us-chi1"
-            ;;
-        binarylane)
-            export BINARYLANE_API_TOKEN="test-token-bl"
-            export BINARYLANE_SERVER_NAME="test-srv"
-            export BINARYLANE_SIZE="std-min"
-            export BINARYLANE_REGION="syd"
-            ;;
-        ovh)
-            export OVH_APPLICATION_KEY="test-app-key"
-            export OVH_APPLICATION_SECRET="test-app-secret"
-            export OVH_CONSUMER_KEY="test-consumer-key"
-            export OVH_PROJECT_ID="test-project-id"
-            export OVH_SERVER_NAME="test-srv"
-            ;;
-        scaleway)
-            export SCW_SECRET_KEY="test-token-scw"
-            export SCALEWAY_SERVER_NAME="test-srv"
-            export SCALEWAY_ZONE="fr-par-1"
-            ;;
-        genesiscloud)
-            export GENESIS_API_KEY="test-token-genesis"
-            export GENESIS_SERVER_NAME="test-srv"
-            ;;
-        kamatera)
-            export KAMATERA_API_CLIENT_ID="test-client-id"
-            export KAMATERA_API_SECRET="test-secret"
-            export KAMATERA_SERVER_NAME="test-srv"
-            ;;
-        latitude)
-            export LATITUDE_API_KEY="test-token-lat"
-            export LATITUDE_SERVER_NAME="test-srv"
-            ;;
-        hyperstack)
-            export HYPERSTACK_API_KEY="test-token-hyper"
-            export HYPERSTACK_SERVER_NAME="test-srv"
-            ;;
-    esac
+    # Cloud-specific env vars from fixture data
+    local env_file="${FIXTURES_DIR}/${cloud}/_env.sh"
+    if [[ -f "$env_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$env_file"
+    fi
 }
 
 # ============================================================
@@ -679,38 +608,18 @@ assert_error_scenario() {
 }
 
 # Assert that the expected cloud-specific API calls were made.
+# Reads assertions from test/fixtures/{cloud}/_api_assertions.sh if present,
+# otherwise falls back to a generic API call check.
 # Args: cloud
 assert_cloud_api_calls() {
     local cloud="$1"
-    case "$cloud" in
-        hetzner)
-            assert_api_called "GET" "/ssh_keys" "fetches SSH keys"
-            assert_api_called "POST" "/servers" "creates server"
-            ;;
-        digitalocean)
-            assert_api_called "GET" "/account/keys" "fetches SSH keys"
-            assert_api_called "POST" "/droplets" "creates droplet"
-            ;;
-        vultr)
-            assert_api_called "GET" "/ssh-keys" "fetches SSH keys"
-            assert_api_called "POST" "/instances" "creates instance"
-            ;;
-        linode)
-            assert_api_called "GET" "/profile/sshkeys" "fetches SSH keys"
-            assert_api_called "POST" "/linode/instances" "creates instance"
-            ;;
-        civo)
-            assert_api_called "GET" "/sshkeys" "fetches SSH keys"
-            assert_api_called "POST" "/instances" "creates instance"
-            ;;
-        lambda)
-            assert_api_called "GET" "/ssh-keys" "fetches SSH keys"
-            assert_api_called "POST" "/instance-operations/launch" "launches instance"
-            ;;
-        *)
-            assert_log_contains "curl (GET|POST) https://" "makes API calls"
-            ;;
-    esac
+    local assertions_file="${FIXTURES_DIR}/${cloud}/_api_assertions.sh"
+    if [[ -f "$assertions_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$assertions_file"
+    else
+        assert_log_contains "curl (GET|POST) https://" "makes API calls"
+    fi
 }
 
 # Write pass/fail result to RESULTS_FILE if set.
