@@ -48,6 +48,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/opencode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/plandex.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/gemini.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
