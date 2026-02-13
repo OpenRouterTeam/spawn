@@ -1,12 +1,38 @@
 {
   "meta": {
     "links": {
-      "next": "bmV4dF9fdmNnLWExMDAtM2MtMzBnLTIwdnJhbQ==",
+      "next": "bmV4dF9fdmNnLWE0MC02Yy0zMGctMTJ2cmFt",
       "prev": ""
     },
-    "total": 159
+    "total": 160
   },
   "plans": [
+    {
+      "bandwidth": 0,
+      "cpu_vendor": "Intel",
+      "deploy_ondemand": true,
+      "deploy_preemptible": false,
+      "disk": 10,
+      "disk_count": 1,
+      "disk_type": "SSD",
+      "hourly_cost": 0,
+      "hourly_cost_preemptible": 0,
+      "id": "vc2-1c-0.5gb-free",
+      "invoice_type": "monthly",
+      "location_cost": {},
+      "locations": [
+        "sea",
+        "fra",
+        "mia"
+      ],
+      "monthly_cost": 0,
+      "monthly_cost_preemptible": 0,
+      "ram": 512,
+      "storage_type": "local_storage",
+      "type": "vc2",
+      "vcpu_count": 1,
+      "vcpu_type": "thread"
+    },
     {
       "bandwidth": 512,
       "cpu_vendor": "Intel",
@@ -1042,7 +1068,7 @@
         "lax",
         "atl",
         "ams",
-        "fra",
+        "lhr",
         "sjc",
         "yto",
         "cdg",
@@ -1086,6 +1112,7 @@
       "invoice_type": "monthly",
       "location_cost": {},
       "locations": [
+        "ewr",
         "dfw",
         "sea",
         "lax",
@@ -1136,11 +1163,11 @@
         "ams",
         "sjc",
         "yto",
-        "cdg",
         "nrt",
         "waw",
         "mad",
         "icn",
+        "mia",
         "sgp",
         "sto",
         "mex",
@@ -3153,6 +3180,7 @@
         "dfw",
         "sea",
         "lax",
+        "atl",
         "ams",
         "lhr",
         "fra",
@@ -3268,6 +3296,7 @@
         "dfw",
         "sea",
         "lax",
+        "atl",
         "ams",
         "lhr",
         "fra",
@@ -3566,6 +3595,7 @@
       "locations": [
         "ewr",
         "ord",
+        "sea",
         "lax",
         "ams",
         "lhr",
@@ -3619,6 +3649,7 @@
         "dfw",
         "sea",
         "lax",
+        "atl",
         "ams",
         "lhr",
         "fra",
@@ -4007,6 +4038,7 @@
         "dfw",
         "sea",
         "lax",
+        "atl",
         "ams",
         "lhr",
         "fra",
@@ -4123,6 +4155,7 @@
         "ams",
         "lhr",
         "sjc",
+        "syd",
         "cdg",
         "nrt",
         "waw",
@@ -4431,6 +4464,7 @@
         "dfw",
         "sea",
         "lax",
+        "atl",
         "ams",
         "lhr",
         "fra",
@@ -4646,6 +4680,7 @@
         "dfw",
         "sea",
         "lax",
+        "atl",
         "ams",
         "lhr",
         "fra",
@@ -4699,6 +4734,7 @@
         "dfw",
         "sea",
         "lax",
+        "atl",
         "ams",
         "lhr",
         "fra",
@@ -4802,6 +4838,7 @@
         "dfw",
         "sea",
         "lax",
+        "atl",
         "ams",
         "lhr",
         "fra",
@@ -5271,6 +5308,7 @@
       "locations": [
         "ewr",
         "lhr",
+        "syd",
         "nrt",
         "blr"
       ],
@@ -5334,9 +5372,7 @@
       "locations": [
         "lhr",
         "fra",
-        "syd",
-        "nrt",
-        "sgp"
+        "syd"
       ],
       "monthly_cost": 210,
       "monthly_cost_preemptible": 210,
@@ -5362,7 +5398,7 @@
       "invoice_type": "hourly",
       "location_cost": {},
       "locations": [
-        "ewr",
+        "syd",
         "nrt"
       ],
       "monthly_cost": 315,
@@ -5371,35 +5407,6 @@
       "storage_type": "local_storage",
       "type": "vcg",
       "vcpu_count": 6,
-      "vcpu_type": "thread"
-    },
-    {
-      "bandwidth": 3072,
-      "cpu_vendor": "Intel",
-      "deploy_ondemand": true,
-      "deploy_preemptible": false,
-      "disk": 700,
-      "disk_count": 1,
-      "disk_type": "CLOUDGPU",
-      "gpu_type": "NVIDIA_A100",
-      "gpu_vram_gb": 20,
-      "hourly_cost": 0.616,
-      "hourly_cost_preemptible": 0.616,
-      "id": "vcg-a100-3c-30g-20vram",
-      "invoice_type": "hourly",
-      "location_cost": {},
-      "locations": [
-        "ewr",
-        "fra",
-        "sjc",
-        "nrt"
-      ],
-      "monthly_cost": 450,
-      "monthly_cost_preemptible": 450,
-      "ram": 30720,
-      "storage_type": "local_storage",
-      "type": "vcg",
-      "vcpu_count": 3,
       "vcpu_type": "thread"
     }
   ]

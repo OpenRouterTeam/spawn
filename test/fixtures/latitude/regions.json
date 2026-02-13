@@ -1,0 +1,285 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "country": {
+          "name": "United States",
+          "slug": "united-states"
+        },
+        "facility": "Digital Realty Silicon Valley - SJC15",
+        "name": "Silicon Valley",
+        "slug": "SJC2",
+        "type": "Core"
+      },
+      "id": "loc_kW9EKa3v5RoBV",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Japan",
+          "slug": "japan"
+        },
+        "facility": "Digital Realty Tokyo - NRT10",
+        "name": "Tokyo 4",
+        "slug": "TYO4",
+        "type": "Core"
+      },
+      "id": "loc_9vAPXaMp5epzk",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "United States",
+          "slug": "united-states"
+        },
+        "facility": "CenterSquare LAX5",
+        "name": "Los Angeles 2",
+        "slug": "LAX2",
+        "type": "Core"
+      },
+      "id": "loc_bEvjLaBg0oqyx",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Netherlands",
+          "slug": "netherlands"
+        },
+        "facility": "LeaseWeb Amsterdam AMS-01",
+        "name": "Amsterdam",
+        "slug": "AMS",
+        "type": "Core"
+      },
+      "id": "loc_E7pWRawp0rD6y",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Germany",
+          "slug": "germany"
+        },
+        "facility": "Leaseweb FRA1 ( Iron Mountain FRA-2)",
+        "name": "Frankfurt 2",
+        "slug": "FRA2",
+        "type": "Core"
+      },
+      "id": "loc_qewOM5GbNp8ER",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Australia",
+          "slug": "australia"
+        },
+        "facility": "Equinix SY5",
+        "name": "Sydney 2",
+        "slug": "SYD2",
+        "type": "Core"
+      },
+      "id": "loc_OmJyo0vL5Dkw9",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Singapore",
+          "slug": "singapore"
+        },
+        "facility": "Equinix SG2",
+        "name": "Singapore",
+        "slug": "SGP",
+        "type": "Core"
+      },
+      "id": "loc_4g3PYaR30yozM",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Japan",
+          "slug": "japan"
+        },
+        "facility": "Equinix TY10",
+        "name": "Tokyo",
+        "slug": "TYO3",
+        "type": "Core"
+      },
+      "id": "loc_nzZOo0leNKQYb",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "United Kingdom",
+          "slug": "united-kingdom"
+        },
+        "facility": "Telehouse Docklands South",
+        "name": "London 2",
+        "slug": "LON2",
+        "type": "Core"
+      },
+      "id": "loc_28mop5gvNjxvn",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "United States",
+          "slug": "united-states"
+        },
+        "facility": "Colohouse - Miami",
+        "name": "Miami",
+        "slug": "MIA2",
+        "type": "Core"
+      },
+      "id": "loc_JLqG158d5BOgv",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Chile",
+          "slug": "chile"
+        },
+        "facility": "Ascenty  Chile 2",
+        "name": "Santiago 3",
+        "slug": "SAN3",
+        "type": "Core"
+      },
+      "id": "loc_D6B9VaLRN7vrk",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Germany",
+          "slug": "germany"
+        },
+        "facility": "Leaseweb Germany GmbH",
+        "name": "Frankfurt",
+        "slug": "FRA",
+        "type": "Core"
+      },
+      "id": "loc_PogXka9d5JdBA",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Mexico",
+          "slug": "mexico"
+        },
+        "facility": "Ascenty MEX1",
+        "name": "Mexico City",
+        "slug": "MEX2",
+        "type": "Core"
+      },
+      "id": "loc_Ylnow0Ow09x1q",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Colombia",
+          "slug": "colombia"
+        },
+        "facility": "Odata",
+        "name": "Bogota",
+        "slug": "BGT",
+        "type": "Core"
+      },
+      "id": "loc_l3xMV0xKamQp7",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "United States",
+          "slug": "united-states"
+        },
+        "facility": "DEFT IAD",
+        "name": "Ashburn",
+        "slug": "ASH",
+        "type": "Core"
+      },
+      "id": "loc_zdexA0q8alQVv",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "United States",
+          "slug": "united-states"
+        },
+        "facility": "Deft CH1",
+        "name": "Chicago",
+        "slug": "CHI",
+        "type": "Core"
+      },
+      "id": "loc_wmgWeN6O5Yd7k",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Argentina",
+          "slug": "argentina"
+        },
+        "facility": "SYT",
+        "name": "Buenos Aires",
+        "slug": "BUE",
+        "type": "Core"
+      },
+      "id": "loc_rx3egaQx546Q8",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Brazil",
+          "slug": "brazil"
+        },
+        "facility": "Scala SP2",
+        "name": "S\u00e3o Paulo 2",
+        "slug": "SAO2",
+        "type": "Core"
+      },
+      "id": "loc_ZnPRbajK0koM1",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "United Kingdom",
+          "slug": "united-kingdom"
+        },
+        "facility": "LDEX1",
+        "name": "London",
+        "slug": "LON",
+        "type": "Core"
+      },
+      "id": "loc_ndYjv5rwaqp7l",
+      "type": "regions"
+    },
+    {
+      "attributes": {
+        "country": {
+          "name": "Australia",
+          "slug": "australia"
+        },
+        "facility": "Global Switch SYD",
+        "name": "Sydney",
+        "slug": "SYD",
+        "type": "Core"
+      },
+      "id": "loc_Dy9815Xx5vEkd",
+      "type": "regions"
+    }
+  ],
+  "meta": {}
+}

@@ -1,7 +1,8 @@
 {
-  "cloud": "vultr",
-  "recorded_at": "2026-02-13T05:00:32Z",
+  "cloud": "latitude",
+  "recorded_at": "2026-02-13T05:00:30Z",
   "fixtures": {
+    "ssh_keys": {"endpoint": "/ssh_keys", "recorded_at": "2026-02-13T05:00:28Z"},
     "plans": {"endpoint": "/plans", "recorded_at": "2026-02-13T05:00:30Z"},
     "regions": {"endpoint": "/regions", "recorded_at": "2026-02-13T05:00:30Z"}
   }

@@ -244,6 +244,29 @@ macOS ships bash 3.2. All scripts MUST work on it:
 - Run tests with `bun test`
 - Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
 
+### Mock Test Infrastructure (MANDATORY for new clouds)
+
+When adding a new cloud provider, you **MUST** update all of these in `test/mock.sh`:
+
+| Function | What to add |
+|---|---|
+| `_strip_api_base()` | URL pattern to strip the cloud's API base (e.g., `https://api.newcloud.com/v1*`) |
+| `_validate_body()` | Server creation endpoint + required POST fields |
+| `assert_cloud_api_calls()` | Expected API calls (SSH key fetch + server create endpoints) |
+| `setup_env_for_cloud()` | Test env vars (API token, server name, plan, region) |
+
+And in `test/record.sh`:
+
+| Function | What to add |
+|---|---|
+| `ALL_RECORDABLE_CLOUDS` | Cloud name to the list |
+| `get_endpoints()` | GET-only API endpoints for fixture recording |
+| `get_auth_env_var()` | Auth env var name mapping |
+| `call_api()` | API function dispatcher |
+| `has_api_error()` | Error response detection for the cloud's API |
+
+Without these, the cloud has **no test coverage**, body validation is missing, mock tests log `UNHANDLED_URL` warnings, and the QA cycle skips the cloud entirely. Both `test/mock.sh` and `test/record.sh` run in parallel when testing/recording multiple clouds.
+
 ## CLI Version Management
 
 **CRITICAL: Bump the version on every CLI change!**

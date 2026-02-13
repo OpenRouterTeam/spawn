@@ -228,7 +228,13 @@ check_timeout || exit 0
 log "=== Phase 1: Record fixtures ==="
 
 RECORD_OUTPUT="/tmp/spawn-qa-record-output.txt"
+RECORD_FAILURES_FILE="${REPO_ROOT}/.docs/qa-record-failures.json"
 rm -f "${RECORD_OUTPUT}"
+
+# Initialize failure tracker if missing
+if [[ ! -f "${RECORD_FAILURES_FILE}" ]]; then
+    printf '{}' > "${RECORD_FAILURES_FILE}"
+fi
 
 RECORD_EXIT=0
 bash test/record.sh allsaved 2>&1 | tee -a "${LOG_FILE}" | tee "${RECORD_OUTPUT}" || RECORD_EXIT=$?
@@ -408,6 +414,107 @@ Only modify ${cloud}/lib/common.sh and test/record.sh if the recording infrastru
     fi
 fi
 
+# --- Track consecutive Phase 1 failures per cloud ---
+# Parse the final recording output to determine which clouds failed
+FINAL_RECORD_FAILED=""
+FINAL_RECORD_SUCCEEDED=""
+if [[ -f "${RECORD_OUTPUT}" ]]; then
+    _current_cloud=""
+    _cloud_had_error=""
+    while IFS= read -r line; do
+        clean=$(printf '%s' "$line" | sed 's/\x1b\[[0-9;]*m//g')
+        case "$clean" in
+            *"Recording "*" ━━━"*)
+                # Save previous cloud result
+                if [[ -n "${_current_cloud}" ]]; then
+                    if [[ "${_cloud_had_error}" == "true" ]]; then
+                        FINAL_RECORD_FAILED="${FINAL_RECORD_FAILED} ${_current_cloud}"
+                    else
+                        FINAL_RECORD_SUCCEEDED="${FINAL_RECORD_SUCCEEDED} ${_current_cloud}"
+                    fi
+                fi
+                _current_cloud=$(printf '%s' "$clean" | sed 's/.*Recording //; s/ ━━━.*//')
+                _cloud_had_error=""
+                ;;
+            *"fail "*)
+                _cloud_had_error="true"
+                ;;
+            *"done "*)
+                # Cloud section ended
+                ;;
+        esac
+    done < "${RECORD_OUTPUT}"
+    # Handle last cloud
+    if [[ -n "${_current_cloud}" ]]; then
+        if [[ "${_cloud_had_error}" == "true" ]]; then
+            FINAL_RECORD_FAILED="${FINAL_RECORD_FAILED} ${_current_cloud}"
+        else
+            FINAL_RECORD_SUCCEEDED="${FINAL_RECORD_SUCCEEDED} ${_current_cloud}"
+        fi
+    fi
+fi
+FINAL_RECORD_FAILED=$(printf '%s' "${FINAL_RECORD_FAILED}" | sed 's/^ //')
+FINAL_RECORD_SUCCEEDED=$(printf '%s' "${FINAL_RECORD_SUCCEEDED}" | sed 's/^ //')
+
+# Update the persistent failure tracker
+if [[ -f "${RECORD_FAILURES_FILE}" ]]; then
+    python3 -c "
+import json, sys
+
+tracker_path = sys.argv[1]
+failed = sys.argv[2].split() if sys.argv[2] else []
+succeeded = sys.argv[3].split() if sys.argv[3] else []
+
+try:
+    with open(tracker_path) as f:
+        tracker = json.load(f)
+except (json.JSONDecodeError, FileNotFoundError):
+    tracker = {}
+
+# Increment consecutive failures for failed clouds
+for cloud in failed:
+    tracker[cloud] = tracker.get(cloud, 0) + 1
+
+# Reset counter for clouds that succeeded
+for cloud in succeeded:
+    tracker[cloud] = 0
+
+with open(tracker_path, 'w') as f:
+    json.dump(tracker, f, indent=2, sort_keys=True)
+
+# Output clouds that hit the threshold (3+ consecutive failures)
+escalate = [c for c, count in tracker.items() if count >= 3]
+if escalate:
+    print(' '.join(escalate))
+" "${RECORD_FAILURES_FILE}" "${FINAL_RECORD_FAILED}" "${FINAL_RECORD_SUCCEEDED}" > /tmp/spawn-qa-escalate.txt 2>/dev/null || true
+
+    ESCALATE_CLOUDS=$(cat /tmp/spawn-qa-escalate.txt 2>/dev/null || true)
+    rm -f /tmp/spawn-qa-escalate.txt
+
+    if [[ -n "${ESCALATE_CLOUDS}" ]]; then
+        for cloud in ${ESCALATE_CLOUDS}; do
+            consecutive=$(python3 -c "import json; print(json.load(open('${RECORD_FAILURES_FILE}')).get('${cloud}', 0))" 2>/dev/null || printf "3+")
+            log "Phase 1: ESCALATION — ${cloud} has failed ${consecutive} consecutive cycles"
+
+            # Check if an issue already exists for this cloud
+            existing_issue=$(gh issue list --repo OpenRouterTeam/spawn --state open \
+                --search "fixture recording failing ${cloud}" \
+                --json number --jq '.[0].number' 2>/dev/null) || existing_issue=""
+
+            if [[ -z "${existing_issue}" ]]; then
+                gh issue create --repo OpenRouterTeam/spawn \
+                    --title "QA: ${cloud} fixture recording has been failing for ${consecutive} consecutive cycles" \
+                    --body "$(printf 'The automated QA cycle has detected that fixture recording for **%s** has failed for **%s consecutive cycles**.\n\nThis likely indicates a persistent issue with the cloud provider'\''s API or our integration that requires manual investigation.\n\n## What to check\n- Has the %s API changed? (new auth requirements, endpoint changes, rate limits)\n- Are the API credentials still valid?\n- Check `%s/lib/common.sh` for outdated API calls\n- Run `bash test/record.sh %s` locally to reproduce\n\n## Auto-generated\nThis issue was created automatically by the QA cycle (`qa-cycle.sh`).\n\n-- qa/cycle' "${cloud}" "${consecutive}" "${cloud}" "${cloud}" "${cloud}")" \
+                    --label "bug" \
+                    2>&1 | tee -a "${LOG_FILE}" || true
+                log "Phase 1: Created GitHub issue for ${cloud} persistent failure"
+            else
+                log "Phase 1: Issue #${existing_issue} already open for ${cloud}, skipping duplicate"
+            fi
+        done
+    fi
+fi
+
 rm -f "${RECORD_OUTPUT}"
 check_timeout || exit 0
 
@@ -448,6 +555,15 @@ else
         FAILED_CLOUDS=$(grep ':fail$' "${RESULTS_PHASE2}" | sed 's/:fail$//' | cut -d/ -f1 | sort -u || true)
     fi
 
+    # Capture full mock test output per-cloud for richer agent context
+    MOCK_OUTPUT_DIR="/tmp/spawn-qa-mock-output"
+    rm -rf "${MOCK_OUTPUT_DIR}"
+    mkdir -p "${MOCK_OUTPUT_DIR}"
+    for cloud in $FAILED_CLOUDS; do
+        log "Phase 3: Capturing full mock test output for ${cloud}..."
+        bash test/mock.sh "$cloud" > "${MOCK_OUTPUT_DIR}/${cloud}.log" 2>&1 || true
+    done
+
     AGENT_PIDS=""
     for cloud in $FAILED_CLOUDS; do
         check_timeout || break
@@ -456,24 +572,20 @@ else
         cloud_failures=$(printf '%s\n' $FAILURES | grep "^${cloud}/" || true)
         failing_scripts=""
         failing_agents=""
-        error_context=""
         for combo in $cloud_failures; do
             agent=$(printf '%s' "$combo" | cut -d/ -f2)
             script_path="${cloud}/${agent}.sh"
             failing_scripts="${failing_scripts} ${script_path}"
             failing_agents="${failing_agents} ${agent}"
-            if [[ -f "${LOG_FILE}" ]]; then
-                ctx=$(grep -A 10 "test ${script_path}" "${LOG_FILE}" | tail -10 || true)
-                if [[ -n "$ctx" ]]; then
-                    error_context="${error_context}
---- ${script_path} ---
-${ctx}
-"
-                fi
-            fi
         done
         failing_scripts=$(printf '%s' "$failing_scripts" | sed 's/^ //')
         failing_agents=$(printf '%s' "$failing_agents" | sed 's/^ //')
+
+        # Use full mock test output as error context (not just 10 lines)
+        error_context=""
+        if [[ -f "${MOCK_OUTPUT_DIR}/${cloud}.log" ]]; then
+            error_context=$(cat "${MOCK_OUTPUT_DIR}/${cloud}.log")
+        fi
 
         fail_count=$(printf '%s\n' $cloud_failures | wc -l | tr -d ' ')
         log "Phase 3: Spawning agent to fix ${fail_count} failing script(s) in ${cloud}"
@@ -581,6 +693,9 @@ FIXEOF
         git branch -D "qa/fix-${cloud}" 2>/dev/null || true
     done
     git worktree prune 2>/dev/null || true
+
+    # Clean up per-cloud mock output
+    rm -rf "${MOCK_OUTPUT_DIR}" 2>/dev/null || true
 
     log "Phase 3: Fix agents complete"
 fi

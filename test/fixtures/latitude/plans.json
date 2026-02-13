@@ -1,0 +1,4901 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "user_data"
+        ],
+        "name": "c2.small.x86",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SAN3"
+              ],
+              "in_stock": [
+                "SAN3"
+              ]
+            },
+            "name": "Chile",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": [
+                "TYO3"
+              ]
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": []
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 0.9,
+                "month": 460.0,
+                "year": 3864.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": []
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BGT"
+              ],
+              "in_stock": []
+            },
+            "name": "Colombia",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA",
+                "FRA2"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": []
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              },
+              "USD": {
+                "hour": 0.18,
+                "month": 92.0,
+                "year": 773.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "c2-small-x86",
+        "specs": {
+          "cpu": {
+            "clock": 3.6,
+            "cores": 4,
+            "count": 1,
+            "type": "E-2234"
+          },
+          "drives": [
+            {
+              "count": 1,
+              "size": "500 GB",
+              "type": "SSD"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 32
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "1 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_2X6KG5mA5yPBM",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "c2.medium.x86",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 1.75,
+                "month": 894.0,
+                "year": 7510.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 179.0,
+                "year": 1504.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "MIA2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 1.75,
+                "month": 894.0,
+                "year": 7510.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 179.0,
+                "year": 1504.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 1.75,
+                "month": 894.0,
+                "year": 7510.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 179.0,
+                "year": 1504.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SAN3"
+              ],
+              "in_stock": [
+                "SAN3"
+              ]
+            },
+            "name": "Chile",
+            "pricing": {
+              "BRL": {
+                "hour": 1.75,
+                "month": 894.0,
+                "year": 7510.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 179.0,
+                "year": 1504.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 1.75,
+                "month": 894.0,
+                "year": 7510.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 179.0,
+                "year": 1504.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": []
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 1.75,
+                "month": 894.0,
+                "year": 7510.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 179.0,
+                "year": 1504.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 1.75,
+                "month": 894.0,
+                "year": 7510.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 179.0,
+                "year": 1504.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 1.75,
+                "month": 894.0,
+                "year": 7510.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 179.0,
+                "year": 1504.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": []
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 1.73,
+                "month": 1200.0,
+                "year": 10608.0
+              },
+              "USD": {
+                "hour": 0.35,
+                "month": 243.0,
+                "year": 2146.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "c2-medium-x86",
+        "specs": {
+          "cpu": {
+            "clock": 3.4,
+            "cores": 8,
+            "count": 1,
+            "type": "E-2278G"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "500 GB",
+              "type": "SSD"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 64
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "10 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_GdmkONWoNjL1b",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "c2.large.x86",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 1.95,
+                "month": 996.0,
+                "year": 8366.0
+              },
+              "USD": {
+                "hour": 0.39,
+                "month": 199.0,
+                "year": 1672.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "CHI"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 1.95,
+                "month": 996.0,
+                "year": 8366.0
+              },
+              "USD": {
+                "hour": 0.39,
+                "month": 199.0,
+                "year": 1672.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 1.95,
+                "month": 996.0,
+                "year": 8366.0
+              },
+              "USD": {
+                "hour": 0.39,
+                "month": 199.0,
+                "year": 1672.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAN3"
+              ],
+              "in_stock": []
+            },
+            "name": "Chile",
+            "pricing": {
+              "BRL": {
+                "hour": 1.95,
+                "month": 996.0,
+                "year": 8366.0
+              },
+              "USD": {
+                "hour": 0.39,
+                "month": 199.0,
+                "year": 1672.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 1.95,
+                "month": 996.0,
+                "year": 8366.0
+              },
+              "USD": {
+                "hour": 0.39,
+                "month": 199.0,
+                "year": 1672.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": []
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 1.95,
+                "month": 996.0,
+                "year": 8366.0
+              },
+              "USD": {
+                "hour": 0.39,
+                "month": 199.0,
+                "year": 1672.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "c2-large-x86",
+        "specs": {
+          "cpu": {
+            "clock": 2.2,
+            "cores": 20,
+            "count": 2,
+            "type": "Silver 4210"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "1 TB",
+              "type": "SSD"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 128
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "10 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_zdexA0q8alQVv",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "user_data"
+        ],
+        "name": "c1.tiny.x86",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 0.54,
+                "month": 276.0,
+                "year": 2318.0
+              },
+              "USD": {
+                "hour": 0.09,
+                "month": 46.0,
+                "year": 386.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "MIA2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 0.54,
+                "month": 276.0,
+                "year": 2318.0
+              },
+              "USD": {
+                "hour": 0.09,
+                "month": 46.0,
+                "year": 386.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 0.54,
+                "month": 276.0,
+                "year": 2318.0
+              },
+              "USD": {
+                "hour": 0.09,
+                "month": 46.0,
+                "year": 386.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAN3"
+              ],
+              "in_stock": []
+            },
+            "name": "Chile",
+            "pricing": {
+              "BRL": {
+                "hour": 0.54,
+                "month": 276.0,
+                "year": 2318.0
+              },
+              "USD": {
+                "hour": 0.09,
+                "month": 46.0,
+                "year": 386.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 0.54,
+                "month": 276.0,
+                "year": 2318.0
+              },
+              "USD": {
+                "hour": 0.09,
+                "month": 46.0,
+                "year": 386.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "c1-tiny-x86",
+        "specs": {
+          "cpu": {
+            "clock": 3.5,
+            "cores": 4,
+            "count": 1,
+            "type": "E-2134"
+          },
+          "drives": [
+            {
+              "count": 1,
+              "size": "500 GB",
+              "type": "SSD"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 16
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "1 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_D6B9VaLRN7vrk",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "s3.large.x86",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 649.0,
+                "year": 5452.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 649.0,
+                "year": 5452.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 649.0,
+                "year": 5452.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAN3"
+              ],
+              "in_stock": []
+            },
+            "name": "Chile",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 649.0,
+                "year": 5452.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 649.0,
+                "year": 5452.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": []
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 956.0,
+                "year": 8030.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 649.0,
+                "year": 5452.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": []
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 649.0,
+                "year": 5452.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": []
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 6.35,
+                "month": 3245.0,
+                "year": 27258.0
+              },
+              "USD": {
+                "hour": 1.27,
+                "month": 649.0,
+                "year": 5452.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "s3-large-x86",
+        "specs": {
+          "cpu": {
+            "clock": 2.85,
+            "cores": 24,
+            "count": 1,
+            "type": "AMD 7443P"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "3.8 TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 512
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "10Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_y3ZXaDKW5p2ml",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "user_data"
+        ],
+        "name": "c3.small.x86",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 1.15,
+                "month": 588.0,
+                "year": 4939.0
+              },
+              "USD": {
+                "hour": 0.23,
+                "month": 118.0,
+                "year": 991.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": []
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 1.15,
+                "month": 588.0,
+                "year": 4939.0
+              },
+              "USD": {
+                "hour": 0.23,
+                "month": 118.0,
+                "year": 991.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAN3"
+              ],
+              "in_stock": []
+            },
+            "name": "Chile",
+            "pricing": {
+              "BRL": {
+                "hour": 1.15,
+                "month": 588.0,
+                "year": 4939.0
+              },
+              "USD": {
+                "hour": 0.23,
+                "month": 118.0,
+                "year": 991.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 1.15,
+                "month": 588.0,
+                "year": 4939.0
+              },
+              "USD": {
+                "hour": 0.23,
+                "month": 118.0,
+                "year": 991.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": [
+                "MEX2"
+              ]
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 1.3,
+                "month": 664.0,
+                "year": 5578.0
+              },
+              "USD": {
+                "hour": 0.23,
+                "month": 118.0,
+                "year": 991.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": []
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 1.15,
+                "month": 588.0,
+                "year": 4939.0
+              },
+              "USD": {
+                "hour": 0.23,
+                "month": 118.0,
+                "year": 991.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BGT"
+              ],
+              "in_stock": []
+            },
+            "name": "Colombia",
+            "pricing": {
+              "BRL": {
+                "hour": 1.15,
+                "month": 588.0,
+                "year": 4939.0
+              },
+              "USD": {
+                "hour": 0.23,
+                "month": 118.0,
+                "year": 991.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "c3-small-x86",
+        "specs": {
+          "cpu": {
+            "clock": 3.5,
+            "cores": 6,
+            "count": 1,
+            "type": "E-2386G"
+          },
+          "drives": [
+            {
+              "count": 1,
+              "size": "800 GB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 32
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "10 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_gXQvNe93NzpbP",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "m3.large.x86",
+        "regions": [
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "NYC",
+                "ASH"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 9.2,
+                "month": 4701.0,
+                "year": 39488.0
+              },
+              "USD": {
+                "hour": 1.84,
+                "month": 940.0,
+                "year": 7896.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 11.0,
+                "month": 5621.0,
+                "year": 47216.0
+              },
+              "USD": {
+                "hour": 2.2,
+                "month": 1124.0,
+                "year": 9442.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": []
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 9.2,
+                "month": 4701.0,
+                "year": 39488.0
+              },
+              "USD": {
+                "hour": 1.84,
+                "month": 940.0,
+                "year": 7896.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": []
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 9.2,
+                "month": 4701.0,
+                "year": 39488.0
+              },
+              "USD": {
+                "hour": 1.84,
+                "month": 940.0,
+                "year": 7896.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "m3-large-x86",
+        "specs": {
+          "cpu": {
+            "clock": 2.8,
+            "cores": 32,
+            "count": 1,
+            "type": "AMD 7543P"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "3.8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 1024
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 10 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_jv6m5JADNLPeE",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "c3.large.x86",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 5.95,
+                "month": 3040.0,
+                "year": 25536.0
+              },
+              "USD": {
+                "hour": 1.19,
+                "month": 608.0,
+                "year": 5107.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "ASH",
+                "MIA2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 4.85,
+                "month": 2478.0,
+                "year": 20815.0
+              },
+              "USD": {
+                "hour": 0.97,
+                "month": 496.0,
+                "year": 4166.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": [
+                "SYD2"
+              ]
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 6.72,
+                "month": 3434.0,
+                "year": 28846.0
+              },
+              "USD": {
+                "hour": 1.19,
+                "month": 608.0,
+                "year": 5107.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 5.95,
+                "month": 3040.0,
+                "year": 25536.0
+              },
+              "USD": {
+                "hour": 1.19,
+                "month": 608.0,
+                "year": 5107.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": [
+                "MEX2"
+              ]
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 5.95,
+                "month": 3040.0,
+                "year": 25536.0
+              },
+              "USD": {
+                "hour": 1.19,
+                "month": 608.0,
+                "year": 5107.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 4.85,
+                "month": 2478.0,
+                "year": 20815.0
+              },
+              "USD": {
+                "hour": 0.97,
+                "month": 496.0,
+                "year": 4166.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": []
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 5.95,
+                "month": 3040.0,
+                "year": 25536.0
+              },
+              "USD": {
+                "hour": 1.19,
+                "month": 608.0,
+                "year": 5107.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 4.85,
+                "month": 2478.0,
+                "year": 20815.0
+              },
+              "USD": {
+                "hour": 0.97,
+                "month": 496.0,
+                "year": 4166.0
+              }
+            },
+            "stock_level": "low"
+          }
+        ],
+        "slug": "c3-large-x86",
+        "specs": {
+          "cpu": {
+            "clock": 2.85,
+            "cores": 24,
+            "count": 1,
+            "type": "AMD 7443P"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "1.9 TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 256
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 10 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_M3Beabem5LnbE",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "s2.small.x86",
+        "regions": [
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 1.64,
+                "month": 838.0,
+                "year": 7039.0
+              },
+              "USD": {
+                "hour": 0.29,
+                "month": 148.0,
+                "year": 1243.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 1.64,
+                "month": 838.0,
+                "year": 7039.0
+              },
+              "USD": {
+                "hour": 0.29,
+                "month": 148.0,
+                "year": 1243.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": [
+                "TYO3"
+              ]
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 1.64,
+                "month": 838.0,
+                "year": 7039.0
+              },
+              "USD": {
+                "hour": 0.29,
+                "month": 148.0,
+                "year": 1243.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON2"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 1.64,
+                "month": 838.0,
+                "year": 7039.0
+              },
+              "USD": {
+                "hour": 0.29,
+                "month": 148.0,
+                "year": 1243.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 1.64,
+                "month": 838.0,
+                "year": 7039.0
+              },
+              "USD": {
+                "hour": 0.29,
+                "month": 148.0,
+                "year": 1243.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": [
+                "SGP"
+              ]
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 1.64,
+                "month": 838.0,
+                "year": 7039.0
+              },
+              "USD": {
+                "hour": 0.29,
+                "month": 148.0,
+                "year": 1243.0
+              }
+            },
+            "stock_level": "low"
+          }
+        ],
+        "slug": "s2-small-x86",
+        "specs": {
+          "cpu": {
+            "clock": 3.7,
+            "cores": 6,
+            "count": 1,
+            "type": "E-2176G"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "500 GB",
+              "type": "SSD"
+            },
+            {
+              "count": 2,
+              "size": "1 TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 32
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "1 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_dexA0qn8NlQVv",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "g3.h100.medium",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": []
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 45.03,
+                "month": 23010.0,
+                "year": 193284.0
+              },
+              "USD": {
+                "hour": 7.97,
+                "month": 4073.0,
+                "year": 34213.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "g3-h100-medium",
+        "specs": {
+          "cpu": {
+            "clock": 3.25,
+            "cores": 64,
+            "count": 2,
+            "type": "AMD 9354"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "3.8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {
+            "count": 4,
+            "interconnect": "Paired-NVLink, PCIe based",
+            "type": "NVIDIA H100 80GB NVLink",
+            "vram_per_gpu": 80
+          },
+          "memory": {
+            "total": 768
+          },
+          "nics": [
+            {
+              "count": 2,
+              "type": "10 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_3xMV0xWKamQp7",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "g3.h100.small",
+        "regions": [
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu24_ml_in_a_box"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 13.62,
+                "month": 6960.0,
+                "year": 58464.0
+              },
+              "USD": {
+                "hour": 2.41,
+                "month": 1232.0,
+                "year": 10349.0
+              }
+            },
+            "stock_level": "high"
+          }
+        ],
+        "slug": "g3-h100-small",
+        "specs": {
+          "cpu": {
+            "clock": 3.0,
+            "cores": 16,
+            "count": 1,
+            "type": "AMD 9124"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "3.8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {
+            "count": 1,
+            "interconnect": "Paired-NVLink, PCIe based",
+            "type": "NVIDIA H100 80GB",
+            "vram_per_gpu": 80
+          },
+          "memory": {
+            "total": 192
+          },
+          "nics": [
+            {
+              "count": 2,
+              "type": "10 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_lnow0Ovwa9x1q",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "m4.metal.small",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              },
+              "USD": {
+                "hour": 0.51,
+                "month": 261.0,
+                "year": 2192.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "NYC",
+                "CHI",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 2.09,
+                "month": 1068.0,
+                "year": 8971.0
+              },
+              "USD": {
+                "hour": 0.37,
+                "month": 189.0,
+                "year": 1588.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": [
+                "SYD2"
+              ]
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              },
+              "USD": {
+                "hour": 0.51,
+                "month": 261.0,
+                "year": 2192.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SAN3"
+              ],
+              "in_stock": [
+                "SAN3"
+              ]
+            },
+            "name": "Chile",
+            "pricing": {
+              "BRL": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              },
+              "USD": {
+                "hour": 0.51,
+                "month": 261.0,
+                "year": 2192.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 2.49,
+                "month": 1272.0,
+                "year": 10685.0
+              },
+              "USD": {
+                "hour": 0.44,
+                "month": 225.0,
+                "year": 1890.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": [
+                "MEX2"
+              ]
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              },
+              "USD": {
+                "hour": 0.51,
+                "month": 261.0,
+                "year": 2192.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": []
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 2.09,
+                "month": 1068.0,
+                "year": 8971.0
+              },
+              "USD": {
+                "hour": 0.37,
+                "month": 189.0,
+                "year": 1588.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": []
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 2.55,
+                "month": 1303.0,
+                "year": 10945.0
+              },
+              "USD": {
+                "hour": 0.51,
+                "month": 261.0,
+                "year": 2192.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "BGT"
+              ],
+              "in_stock": [
+                "BGT"
+              ]
+            },
+            "name": "Colombia",
+            "pricing": {
+              "BRL": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              },
+              "USD": {
+                "hour": 0.51,
+                "month": 261.0,
+                "year": 2192.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": []
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 2.09,
+                "month": 1068.0,
+                "year": 8971.0
+              },
+              "USD": {
+                "hour": 0.37,
+                "month": 189.0,
+                "year": 1588.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": [
+                "SGP"
+              ]
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 2.2,
+                "month": 1124.0,
+                "year": 9442.0
+              },
+              "USD": {
+                "hour": 0.44,
+                "month": 225.0,
+                "year": 1890.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "AMS"
+              ],
+              "in_stock": [
+                "AMS"
+              ]
+            },
+            "name": "Netherlands",
+            "pricing": {
+              "BRL": {
+                "hour": 2.09,
+                "month": 1068.0,
+                "year": 8971.0
+              },
+              "USD": {
+                "hour": 0.37,
+                "month": 189.0,
+                "year": 1588.0
+              }
+            },
+            "stock_level": "high"
+          }
+        ],
+        "slug": "m4-metal-small",
+        "specs": {
+          "cpu": {
+            "clock": 3.8,
+            "cores": 6,
+            "count": 1,
+            "type": "AMD 4244P"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "960GB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 64
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 10Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_8mop5gXvajxvn",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data",
+          "sev"
+        ],
+        "name": "m4.metal.medium",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 5.65,
+                "month": 2887.0,
+                "year": 24251.0
+              },
+              "USD": {
+                "hour": 1.13,
+                "month": 577.0,
+                "year": 4847.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 4.45,
+                "month": 2274.0,
+                "year": 19102.0
+              },
+              "USD": {
+                "hour": 0.89,
+                "month": 455.0,
+                "year": 3822.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 5.65,
+                "month": 2887.0,
+                "year": 24251.0
+              },
+              "USD": {
+                "hour": 1.13,
+                "month": 577.0,
+                "year": 4847.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAN3"
+              ],
+              "in_stock": []
+            },
+            "name": "Chile",
+            "pricing": {
+              "BRL": {
+                "hour": 5.65,
+                "month": 2887.0,
+                "year": 24251.0
+              },
+              "USD": {
+                "hour": 1.13,
+                "month": 577.0,
+                "year": 4847.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 5.1,
+                "month": 2606.0,
+                "year": 21890.0
+              },
+              "USD": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": [
+                "MEX2"
+              ]
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 5.65,
+                "month": 2887.0,
+                "year": 24251.0
+              },
+              "USD": {
+                "hour": 1.13,
+                "month": 577.0,
+                "year": 4847.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON",
+                "LON2"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 4.45,
+                "month": 2274.0,
+                "year": 19102.0
+              },
+              "USD": {
+                "hour": 0.89,
+                "month": 455.0,
+                "year": 3822.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": []
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 5.65,
+                "month": 2887.0,
+                "year": 24251.0
+              },
+              "USD": {
+                "hour": 1.13,
+                "month": 577.0,
+                "year": 4847.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "BGT"
+              ],
+              "in_stock": [
+                "BGT"
+              ]
+            },
+            "name": "Colombia",
+            "pricing": {
+              "BRL": {
+                "hour": 5.65,
+                "month": 2887.0,
+                "year": 24251.0
+              },
+              "USD": {
+                "hour": 1.13,
+                "month": 577.0,
+                "year": 4847.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA",
+                "FRA2"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 4.45,
+                "month": 2274.0,
+                "year": 19102.0
+              },
+              "USD": {
+                "hour": 0.89,
+                "month": 455.0,
+                "year": 3822.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": []
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 5.1,
+                "month": 2606.0,
+                "year": 21890.0
+              },
+              "USD": {
+                "hour": 1.02,
+                "month": 521.0,
+                "year": 4376.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "m4-metal-medium",
+        "specs": {
+          "cpu": {
+            "clock": 3.0,
+            "cores": 16,
+            "count": 1,
+            "type": "AMD 9124"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "480GB",
+              "type": "NVME"
+            },
+            {
+              "count": 2,
+              "size": "1.9TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 128
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 10Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_zZOo0l3eaKQYb",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data",
+          "sev"
+        ],
+        "name": "m4.metal.large",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "SJC2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "MEX2"
+              ],
+              "in_stock": [
+                "MEX2"
+              ]
+            },
+            "name": "Mexico",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON",
+                "LON2"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": []
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA",
+                "FRA2"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": []
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "AMS"
+              ],
+              "in_stock": [
+                "AMS"
+              ]
+            },
+            "name": "Netherlands",
+            "pricing": {
+              "BRL": {
+                "hour": 7.91,
+                "month": 4042.0,
+                "year": 33953.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "low"
+          }
+        ],
+        "slug": "m4-metal-large",
+        "specs": {
+          "cpu": {
+            "clock": 2.9,
+            "cores": 24,
+            "count": 1,
+            "type": "AMD 9254"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "480GB",
+              "type": "NVME"
+            },
+            {
+              "count": 2,
+              "size": "3.8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 384
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 10Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_g3PYaRB3ayozM",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data",
+          "sev"
+        ],
+        "name": "rs4.metal.large",
+        "regions": [
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": [
+                "SAO2"
+              ]
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 15.93,
+                "month": 8140.0,
+                "year": 68376.0
+              },
+              "USD": {
+                "hour": 2.82,
+                "month": 1441.0,
+                "year": 12104.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 11.7,
+                "month": 5979.0,
+                "year": 50224.0
+              },
+              "USD": {
+                "hour": 2.07,
+                "month": 1058.0,
+                "year": 8887.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": []
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 15.93,
+                "month": 8140.0,
+                "year": 68376.0
+              },
+              "USD": {
+                "hour": 2.82,
+                "month": 1441.0,
+                "year": 12104.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": [
+                "TYO3",
+                "TYO4"
+              ]
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 12.71,
+                "month": 6495.0,
+                "year": 54558.0
+              },
+              "USD": {
+                "hour": 2.25,
+                "month": 1150.0,
+                "year": 9660.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON2"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 11.7,
+                "month": 5979.0,
+                "year": 50224.0
+              },
+              "USD": {
+                "hour": 2.07,
+                "month": 1058.0,
+                "year": 8887.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA",
+                "FRA2"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 11.7,
+                "month": 5979.0,
+                "year": 50224.0
+              },
+              "USD": {
+                "hour": 2.07,
+                "month": 1058.0,
+                "year": 8887.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": [
+                "SGP"
+              ]
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 12.71,
+                "month": 6495.0,
+                "year": 54558.0
+              },
+              "USD": {
+                "hour": 2.25,
+                "month": 1150.0,
+                "year": 9660.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "AMS"
+              ],
+              "in_stock": [
+                "AMS"
+              ]
+            },
+            "name": "Netherlands",
+            "pricing": {
+              "BRL": {
+                "hour": 11.7,
+                "month": 5979.0,
+                "year": 50224.0
+              },
+              "USD": {
+                "hour": 2.07,
+                "month": 1058.0,
+                "year": 8887.0
+              }
+            },
+            "stock_level": "high"
+          }
+        ],
+        "slug": "rs4-metal-large",
+        "specs": {
+          "cpu": {
+            "clock": 3.25,
+            "cores": 32,
+            "count": 1,
+            "type": "AMD 9354P"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "480GB",
+              "type": "NVME"
+            },
+            {
+              "count": 2,
+              "size": "8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 768
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 100Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_mJyo0vmLaDkw9",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data",
+          "sev"
+        ],
+        "name": "rs4.metal.xlarge",
+        "regions": [
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 19.89,
+                "month": 10164.0,
+                "year": 85378.0
+              },
+              "USD": {
+                "hour": 3.52,
+                "month": 1799.0,
+                "year": 15112.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": [
+                "TYO3",
+                "TYO4"
+              ]
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 21.64,
+                "month": 11058.0,
+                "year": 92887.0
+              },
+              "USD": {
+                "hour": 3.83,
+                "month": 1957.0,
+                "year": 16439.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON2"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 19.89,
+                "month": 10164.0,
+                "year": 85378.0
+              },
+              "USD": {
+                "hour": 3.52,
+                "month": 1799.0,
+                "year": 15112.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA2"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 19.89,
+                "month": 10164.0,
+                "year": 85378.0
+              },
+              "USD": {
+                "hour": 3.52,
+                "month": 1799.0,
+                "year": 15112.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": [
+                "SGP"
+              ]
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 21.64,
+                "month": 11058.0,
+                "year": 92887.0
+              },
+              "USD": {
+                "hour": 3.83,
+                "month": 1957.0,
+                "year": 16439.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "AMS"
+              ],
+              "in_stock": [
+                "AMS"
+              ]
+            },
+            "name": "Netherlands",
+            "pricing": {
+              "BRL": {
+                "hour": 19.89,
+                "month": 10164.0,
+                "year": 85378.0
+              },
+              "USD": {
+                "hour": 3.52,
+                "month": 1799.0,
+                "year": 15112.0
+              }
+            },
+            "stock_level": "low"
+          }
+        ],
+        "slug": "rs4-metal-xlarge",
+        "specs": {
+          "cpu": {
+            "clock": 3.1,
+            "cores": 64,
+            "count": 1,
+            "type": "AMD 9554P"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "480GB",
+              "type": "NVME"
+            },
+            {
+              "count": 4,
+              "size": "8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 1536
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 100Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_ewOM5GAb0p8ER",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "f4.metal.medium",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 8.81,
+                "month": 4502.0,
+                "year": 37817.0
+              },
+              "USD": {
+                "hour": 1.56,
+                "month": 797.0,
+                "year": 6695.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts",
+              "ipxe"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 5.45,
+                "month": 2785.0,
+                "year": 23394.0
+              },
+              "USD": {
+                "hour": 1.09,
+                "month": 557.0,
+                "year": 4679.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": [
+                "SYD2"
+              ]
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 8.81,
+                "month": 4502.0,
+                "year": 37817.0
+              },
+              "USD": {
+                "hour": 1.56,
+                "month": 797.0,
+                "year": 6695.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": [
+                "TYO3",
+                "TYO4"
+              ]
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 7.0,
+                "month": 3577.0,
+                "year": 30047.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON2"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 5.45,
+                "month": 2785.0,
+                "year": 23394.0
+              },
+              "USD": {
+                "hour": 1.09,
+                "month": 557.0,
+                "year": 4679.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": [
+                "BUE"
+              ]
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 7.8,
+                "month": 3986.0,
+                "year": 33482.0
+              },
+              "USD": {
+                "hour": 1.56,
+                "month": 797.0,
+                "year": 6695.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": [
+                "FRA2"
+              ]
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 5.45,
+                "month": 2785.0,
+                "year": 23394.0
+              },
+              "USD": {
+                "hour": 1.09,
+                "month": 557.0,
+                "year": 4679.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": [
+                "SGP"
+              ]
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 7.0,
+                "month": 3577.0,
+                "year": 30047.0
+              },
+              "USD": {
+                "hour": 1.4,
+                "month": 715.0,
+                "year": 6006.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "AMS"
+              ],
+              "in_stock": [
+                "AMS"
+              ]
+            },
+            "name": "Netherlands",
+            "pricing": {
+              "BRL": {
+                "hour": 6.16,
+                "month": 3148.0,
+                "year": 26443.0
+              },
+              "USD": {
+                "hour": 1.09,
+                "month": 557.0,
+                "year": 4679.0
+              }
+            },
+            "stock_level": "high"
+          }
+        ],
+        "slug": "f4-metal-medium",
+        "specs": {
+          "cpu": {
+            "clock": 4.5,
+            "cores": 16,
+            "count": 1,
+            "type": "AMD 4564P"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "480GB",
+              "type": "NVME"
+            },
+            {
+              "count": 2,
+              "size": "1.9TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 192
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 10Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_w8MVaone523gj",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data",
+          "sev"
+        ],
+        "name": "f4.metal.large",
+        "regions": [
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": [
+                "SAO2"
+              ]
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 17.52,
+                "month": 8953.0,
+                "year": 75205.0
+              },
+              "USD": {
+                "hour": 3.1,
+                "month": 1584.0,
+                "year": 13306.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "NYC",
+                "CHI",
+                "ASH",
+                "LAX2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 10.85,
+                "month": 5544.0,
+                "year": 46570.0
+              },
+              "USD": {
+                "hour": 2.17,
+                "month": 1109.0,
+                "year": 9316.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": [
+                "TYO4"
+              ]
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 12.5,
+                "month": 6388.0,
+                "year": 53659.0
+              },
+              "USD": {
+                "hour": 2.5,
+                "month": 1277.0,
+                "year": 10727.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": []
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 10.85,
+                "month": 5544.0,
+                "year": 46570.0
+              },
+              "USD": {
+                "hour": 2.17,
+                "month": 1109.0,
+                "year": 9316.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": []
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 10.85,
+                "month": 5544.0,
+                "year": 46570.0
+              },
+              "USD": {
+                "hour": 2.17,
+                "month": 1109.0,
+                "year": 9316.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": [
+                "SGP"
+              ]
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 12.5,
+                "month": 6388.0,
+                "year": 53659.0
+              },
+              "USD": {
+                "hour": 2.5,
+                "month": 1277.0,
+                "year": 10727.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "AMS"
+              ],
+              "in_stock": [
+                "AMS"
+              ]
+            },
+            "name": "Netherlands",
+            "pricing": {
+              "BRL": {
+                "hour": 12.26,
+                "month": 6265.0,
+                "year": 52626.0
+              },
+              "USD": {
+                "hour": 2.17,
+                "month": 1109.0,
+                "year": 9316.0
+              }
+            },
+            "stock_level": "low"
+          }
+        ],
+        "slug": "f4-metal-large",
+        "specs": {
+          "cpu": {
+            "clock": 4.1,
+            "cores": 24,
+            "count": 1,
+            "type": "AMD 9275F"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "480GB",
+              "type": "NVME"
+            },
+            {
+              "count": 2,
+              "size": "3.8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 768
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 100Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_7vRENk3gNdPyk",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "f4.metal.small",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SAO",
+                "SAO2"
+              ],
+              "in_stock": []
+            },
+            "name": "Brazil",
+            "pricing": {
+              "BRL": {
+                "hour": 4.41,
+                "month": 2254.0,
+                "year": 18934.0
+              },
+              "USD": {
+                "hour": 0.78,
+                "month": 399.0,
+                "year": 3352.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "DAL",
+                "NYC",
+                "CHI",
+                "SJC2"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 2.85,
+                "month": 1456.0,
+                "year": 12230.0
+              },
+              "USD": {
+                "hour": 0.57,
+                "month": 291.0,
+                "year": 2444.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SYD",
+                "SYD2"
+              ],
+              "in_stock": [
+                "SYD2"
+              ]
+            },
+            "name": "Australia",
+            "pricing": {
+              "BRL": {
+                "hour": 4.41,
+                "month": 2254.0,
+                "year": 18934.0
+              },
+              "USD": {
+                "hour": 0.78,
+                "month": 399.0,
+                "year": 3352.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": [
+                "TYO4"
+              ]
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 3.35,
+                "month": 1712.0,
+                "year": 14381.0
+              },
+              "USD": {
+                "hour": 0.67,
+                "month": 342.0,
+                "year": 2873.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_24_04_x64_lts",
+              "ubuntu_22_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": [
+                "LON2"
+              ]
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 2.85,
+                "month": 1456.0,
+                "year": 12230.0
+              },
+              "USD": {
+                "hour": 0.57,
+                "month": 291.0,
+                "year": 2444.0
+              }
+            },
+            "stock_level": "high"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "BUE"
+              ],
+              "in_stock": []
+            },
+            "name": "Argentina",
+            "pricing": {
+              "BRL": {
+                "hour": 3.9,
+                "month": 1993.0,
+                "year": 16741.0
+              },
+              "USD": {
+                "hour": 0.78,
+                "month": 399.0,
+                "year": 3352.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": []
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 2.85,
+                "month": 1456.0,
+                "year": 12230.0
+              },
+              "USD": {
+                "hour": 0.57,
+                "month": 291.0,
+                "year": 2444.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": [
+                "SGP"
+              ]
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 3.35,
+                "month": 1712.0,
+                "year": 14381.0
+              },
+              "USD": {
+                "hour": 0.67,
+                "month": 342.0,
+                "year": 2873.0
+              }
+            },
+            "stock_level": "medium"
+          },
+          {
+            "deploys_instantly": [
+              "ubuntu_22_04_x64_lts",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "AMS"
+              ],
+              "in_stock": [
+                "AMS"
+              ]
+            },
+            "name": "Netherlands",
+            "pricing": {
+              "BRL": {
+                "hour": 3.22,
+                "month": 1645.0,
+                "year": 13818.0
+              },
+              "USD": {
+                "hour": 0.57,
+                "month": 291.0,
+                "year": 2444.0
+              }
+            },
+            "stock_level": "high"
+          }
+        ],
+        "slug": "f4-metal-small",
+        "specs": {
+          "cpu": {
+            "clock": 4.4,
+            "cores": 12,
+            "count": 1,
+            "type": "AMD 4484PX"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "960GB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 96
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 10Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_PVwea4vvNB9OQ",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data"
+        ],
+        "name": "g4.rtx6kpro.large",
+        "regions": [
+          {
+            "deploys_instantly": [
+              "ubuntu24_ml_in_a_box",
+              "ubuntu_24_04_x64_lts"
+            ],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": [
+                "CHI",
+                "ASH"
+              ]
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 110.18,
+                "month": 56302.0,
+                "year": 472937.0
+              },
+              "USD": {
+                "hour": 19.5,
+                "month": 9964.0,
+                "year": 83698.0
+              }
+            },
+            "stock_level": "low"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": []
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 0.0,
+                "month": 0.0,
+                "year": 0.0
+              },
+              "USD": {
+                "hour": null,
+                "month": null,
+                "year": null
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "g4-rtx6kpro-large",
+        "specs": {
+          "cpu": {
+            "clock": 3.55,
+            "cores": 64,
+            "count": 2,
+            "type": "AMD 9355"
+          },
+          "drives": [
+            {
+              "count": 4,
+              "size": "3.8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {
+            "count": 8,
+            "interconnect": "No Interconnect",
+            "type": "NVIDIA RTX PRO 6000 Server Edition",
+            "vram_per_gpu": 96
+          },
+          "memory": {
+            "total": 1536
+          },
+          "nics": [
+            {
+              "count": 2,
+              "type": "100 Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_YGwn0Vnq063JD",
+      "type": "plans"
+    },
+    {
+      "attributes": {
+        "features": [
+          "ssh",
+          "raid",
+          "user_data",
+          "sev"
+        ],
+        "name": "m4.metal.xlarge",
+        "regions": [
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "DAL",
+                "LAX",
+                "NYC",
+                "CHI",
+                "ASH",
+                "MIA2",
+                "LAX2",
+                "SJC2"
+              ],
+              "in_stock": []
+            },
+            "name": "United States",
+            "pricing": {
+              "BRL": {
+                "hour": 16.27,
+                "month": 8314.0,
+                "year": 69838.0
+              },
+              "USD": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "TYO3",
+                "TYO4"
+              ],
+              "in_stock": []
+            },
+            "name": "Japan",
+            "pricing": {
+              "BRL": {
+                "hour": 17.01,
+                "month": 8692.0,
+                "year": 73013.0
+              },
+              "USD": {
+                "hour": 3.01,
+                "month": 1538.0,
+                "year": 12919.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "LON",
+                "LON2"
+              ],
+              "in_stock": []
+            },
+            "name": "United Kingdom",
+            "pricing": {
+              "BRL": {
+                "hour": 16.27,
+                "month": 8314.0,
+                "year": 69838.0
+              },
+              "USD": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "FRA",
+                "FRA2"
+              ],
+              "in_stock": []
+            },
+            "name": "Germany",
+            "pricing": {
+              "BRL": {
+                "hour": 16.27,
+                "month": 8314.0,
+                "year": 69838.0
+              },
+              "USD": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "SGP"
+              ],
+              "in_stock": []
+            },
+            "name": "Singapore",
+            "pricing": {
+              "BRL": {
+                "hour": 17.01,
+                "month": 8692.0,
+                "year": 73013.0
+              },
+              "USD": {
+                "hour": 3.01,
+                "month": 1538.0,
+                "year": 12919.0
+              }
+            },
+            "stock_level": "unavailable"
+          },
+          {
+            "deploys_instantly": [],
+            "locations": {
+              "available": [
+                "AMS"
+              ],
+              "in_stock": []
+            },
+            "name": "Netherlands",
+            "pricing": {
+              "BRL": {
+                "hour": 16.27,
+                "month": 8314.0,
+                "year": 69838.0
+              },
+              "USD": {
+                "hour": 2.88,
+                "month": 1472.0,
+                "year": 12365.0
+              }
+            },
+            "stock_level": "unavailable"
+          }
+        ],
+        "slug": "m4-metal-xlarge",
+        "specs": {
+          "cpu": {
+            "clock": 3.15,
+            "cores": 48,
+            "count": 1,
+            "type": "AMD 9455P"
+          },
+          "drives": [
+            {
+              "count": 2,
+              "size": "480GB",
+              "type": "NVME"
+            },
+            {
+              "count": 2,
+              "size": "3.8TB",
+              "type": "NVME"
+            }
+          ],
+          "gpu": {},
+          "memory": {
+            "total": 768
+          },
+          "nics": [
+            {
+              "count": 1,
+              "type": "2 x 10Gbps"
+            }
+          ]
+        }
+      },
+      "id": "plan_y9815Xnx0vEkd",
+      "type": "plans"
+    }
+  ],
+  "meta": {}
+}

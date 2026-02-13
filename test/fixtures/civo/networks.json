@@ -1,0 +1,17 @@
+[
+  {
+    "cidr": "192.168.1.0/24",
+    "default": true,
+    "free_ip_count": 254,
+    "gateway_ipv4": "192.168.1.1",
+    "id": "aee434ed-e2b8-4e5d-8eb2-97ef3d3062b3",
+    "ipv4_enabled": true,
+    "label": "default",
+    "name": "cust-default-d2449447-75059009d0bd",
+    "nameservers_v4": [
+      "8.8.8.8",
+      "1.1.1.1"
+    ],
+    "status": "Active"
+  }
+]

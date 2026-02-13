@@ -2,6 +2,72 @@
   "images": [
     {
       "arch": "x86_64",
+      "creation_date": "2026-02-11T15:09:32.597221+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "5c248ca4-5058-489b-8481-be7d2799fb0a",
+      "modification_date": "2026-02-11T15:09:32.597221+00:00",
+      "name": "k8s_base_node_instance",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "4159bb92-5a75-44ee-9ce5-8294de74cc2d",
+        "name": "k8s_base_node_instance",
+        "size": 10000000000,
+        "volume_type": "l_ssd"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "arm64",
+      "creation_date": "2026-02-11T15:08:54.481101+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "28ee64af-8f6e-43d3-b9ea-d3d4a123b687",
+      "modification_date": "2026-02-11T15:08:54.481101+00:00",
+      "name": "k8s_base_node_instance",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "89b1b122-8470-4c54-8919-366266f658c8",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
+      "creation_date": "2026-02-11T15:08:08.602556+00:00",
+      "default_bootscript": null,
+      "extra_volumes": {},
+      "from_server": "",
+      "id": "0a25b795-9e9b-4351-a445-8865d3d41410",
+      "modification_date": "2026-02-11T15:08:08.602556+00:00",
+      "name": "k8s_base_node_instance",
+      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
+      "public": true,
+      "root_volume": {
+        "id": "7b182ad3-7b1e-4b7a-8c74-cc88302d3036",
+        "name": "",
+        "size": 0,
+        "volume_type": "sbs_snapshot"
+      },
+      "state": "available",
+      "tags": [],
+      "zone": "fr-par-1"
+    },
+    {
+      "arch": "x86_64",
       "creation_date": "2026-02-10T16:31:15.771530+00:00",
       "default_bootscript": null,
       "extra_volumes": {},
@@ -146,72 +212,6 @@
       "public": true,
       "root_volume": {
         "id": "8f813bfe-0ad8-4ff1-aeb3-663d9e1670af",
-        "name": "",
-        "size": 0,
-        "volume_type": "sbs_snapshot"
-      },
-      "state": "available",
-      "tags": [],
-      "zone": "fr-par-1"
-    },
-    {
-      "arch": "arm64",
-      "creation_date": "2026-01-28T16:28:07.893202+00:00",
-      "default_bootscript": null,
-      "extra_volumes": {},
-      "from_server": "",
-      "id": "2dcbfb4f-1b77-4733-b734-954b09c2b17b",
-      "modification_date": "2026-01-28T16:28:07.893202+00:00",
-      "name": "debian-trixie",
-      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
-      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
-      "public": true,
-      "root_volume": {
-        "id": "a33ea2ec-9531-4ce2-b2c1-6e4979c371f6",
-        "name": "",
-        "size": 0,
-        "volume_type": "sbs_snapshot"
-      },
-      "state": "available",
-      "tags": [],
-      "zone": "fr-par-1"
-    },
-    {
-      "arch": "x86_64",
-      "creation_date": "2026-01-28T16:27:26.694891+00:00",
-      "default_bootscript": null,
-      "extra_volumes": {},
-      "from_server": "",
-      "id": "69982b79-5db1-487a-8fd4-cdb3547f4bb2",
-      "modification_date": "2026-01-28T16:27:26.694891+00:00",
-      "name": "debian-trixie",
-      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
-      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
-      "public": true,
-      "root_volume": {
-        "id": "a6ed67b9-9789-4b18-875b-4e747eda3dc9",
-        "name": "debian-trixie",
-        "size": 10000000000,
-        "volume_type": "l_ssd"
-      },
-      "state": "available",
-      "tags": [],
-      "zone": "fr-par-1"
-    },
-    {
-      "arch": "x86_64",
-      "creation_date": "2026-01-28T16:27:25.789355+00:00",
-      "default_bootscript": null,
-      "extra_volumes": {},
-      "from_server": "",
-      "id": "6d173ed8-ae70-4671-a8f1-584921c4e706",
-      "modification_date": "2026-01-28T16:27:25.789355+00:00",
-      "name": "debian-trixie",
-      "organization": "51b656e3-4865-41e8-adbc-0c45bdd780db",
-      "project": "51b656e3-4865-41e8-adbc-0c45bdd780db",
-      "public": true,
-      "root_volume": {
-        "id": "5f780810-ef25-4def-987b-b03409862d08",
         "name": "",
         "size": 0,
         "volume_type": "sbs_snapshot"

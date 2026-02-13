@@ -1,9 +1,13 @@
 {
   "cloud": "civo",
-  "recorded_at": "2026-02-11T02:07:07Z",
+  "recorded_at": "2026-02-13T05:00:40Z",
   "fixtures": {
-    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-11T02:07:02Z"},
-    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-11T02:07:03Z"},
-    "ssh_keys": {"endpoint": "/sshkeys", "recorded_at": "2026-02-11T02:07:04Z"}
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-13T05:00:28Z"},
+    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-13T05:00:29Z"},
+    "sshkeys": {"endpoint": "/sshkeys", "recorded_at": "2026-02-13T05:00:30Z"},
+    "networks": {"endpoint": "/networks", "recorded_at": "2026-02-13T05:00:30Z"},
+    "disk_images": {"endpoint": "/disk_images", "recorded_at": "2026-02-13T05:00:31Z"},
+    "create_server": {"endpoint": "POST /instances", "type": "live", "recorded_at": "2026-02-13T05:00:34Z"},
+    "delete_server": {"endpoint": "DELETE /instances/{id}", "type": "live", "recorded_at": "2026-02-13T05:00:40Z"}
   }
 }

@@ -67,7 +67,16 @@
           "vcpus": 30
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "Virginia, USA",
+          "name": "us-east-1"
+        },
+        {
+          "description": "Arizona, USA",
+          "name": "us-west-2"
+        }
+      ]
     },
     "gpu_1x_a6000": {
       "instance_type": {
@@ -97,7 +106,12 @@
           "vcpus": 26
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "Sydney, Australia",
+          "name": "australia-east-1"
+        }
+      ]
     },
     "gpu_1x_gh200": {
       "instance_type": {
@@ -112,7 +126,12 @@
           "vcpus": 64
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "Washington DC, USA",
+          "name": "us-east-3"
+        }
+      ]
     },
     "gpu_1x_h100_pcie": {
       "instance_type": {
@@ -127,7 +146,12 @@
           "vcpus": 26
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "Utah, USA",
+          "name": "us-west-3"
+        }
+      ]
     },
     "gpu_1x_h100_sxm5": {
       "instance_type": {
@@ -142,7 +166,12 @@
           "vcpus": 26
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "Central Texas, USA",
+          "name": "us-south-3"
+        }
+      ]
     },
     "gpu_1x_rtx6000": {
       "instance_type": {
@@ -217,7 +246,12 @@
           "vcpus": 52
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "Central Texas, USA",
+          "name": "us-south-3"
+        }
+      ]
     },
     "gpu_4x_a100": {
       "instance_type": {
@@ -304,10 +338,6 @@
         {
           "description": "Arizona, USA",
           "name": "us-west-2"
-        },
-        {
-          "description": "Germany",
-          "name": "europe-central-1"
         }
       ]
     },
@@ -324,7 +354,16 @@
           "vcpus": 240
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "Illinois, USA",
+          "name": "us-midwest-1"
+        },
+        {
+          "description": "Sydney, Australia",
+          "name": "australia-east-1"
+        }
+      ]
     },
     "gpu_8x_b200_sxm6": {
       "instance_type": {
@@ -354,7 +393,12 @@
           "vcpus": 208
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "North Texas, USA",
+          "name": "us-south-2"
+        }
+      ]
     },
     "gpu_8x_v100": {
       "instance_type": {

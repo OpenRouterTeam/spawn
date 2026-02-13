@@ -4,12 +4,18 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: test-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   mock-tests:
     name: Mock Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Run mock tests
         run: |
           bash test/mock.sh 2>&1 | tee /tmp/mock-output.log
