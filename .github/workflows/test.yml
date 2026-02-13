@@ -1,0 +1,28 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  mock-tests:
+    name: Mock Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run mock tests
+        run: |
+          bash test/mock.sh 2>&1 | tee /tmp/mock-output.log
+      - name: Post summary
+        if: always()
+        run: |
+          echo '## Mock Test Results' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          grep -E '(Results:|✓|✗|skip|━━━)' /tmp/mock-output.log | head -100 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
