@@ -42,6 +42,26 @@ describe("history", () => {
       const { homedir } = require("os");
       expect(getSpawnDir()).toBe(join(homedir(), ".spawn"));
     });
+
+    it("throws for relative SPAWN_HOME path", () => {
+      process.env.SPAWN_HOME = "relative/path";
+      expect(() => getSpawnDir()).toThrow("must be an absolute path");
+    });
+
+    it("throws for dot-relative SPAWN_HOME path", () => {
+      process.env.SPAWN_HOME = "./local/dir";
+      expect(() => getSpawnDir()).toThrow("must be an absolute path");
+    });
+
+    it("resolves .. segments in absolute SPAWN_HOME", () => {
+      process.env.SPAWN_HOME = "/tmp/foo/../bar";
+      expect(getSpawnDir()).toBe("/tmp/bar");
+    });
+
+    it("accepts normal absolute SPAWN_HOME", () => {
+      process.env.SPAWN_HOME = "/home/user/.spawn";
+      expect(getSpawnDir()).toBe("/home/user/.spawn");
+    });
   });
 
   // ── getHistoryPath ──────────────────────────────────────────────────────

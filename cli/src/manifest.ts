@@ -66,7 +66,8 @@ function logError(message: string, err?: unknown): void {
 
 function readCache(): Manifest | null {
   try {
-    return JSON.parse(readFileSync(CACHE_FILE, "utf-8")) as Manifest;
+    const raw = JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
+    return stripDangerousKeys(raw) as Manifest;
   } catch (err) {
     // Cache file missing, corrupted, or unreadable
     logError(`Failed to read cache from ${CACHE_FILE}`, err);
@@ -81,8 +82,22 @@ function writeCache(data: Manifest): void {
 
 // ── Fetching ───────────────────────────────────────────────────────────────────
 
+/** Recursively strip __proto__, constructor, and prototype keys from parsed JSON
+ *  to prevent prototype pollution attacks (defense in depth). */
+function stripDangerousKeys(obj: any): any {
+  if (obj === null || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(stripDangerousKeys);
+  const clean: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    clean[key] = stripDangerousKeys(obj[key]);
+  }
+  return clean;
+}
+
 function isValidManifest(data: any): data is Manifest {
-  return data && data.agents && data.clouds && data.matrix;
+  return data && typeof data === "object" && !Array.isArray(data) &&
+    data.agents && data.clouds && data.matrix;
 }
 
 async function fetchManifestFromGitHub(): Promise<Manifest | null> {
@@ -94,7 +109,8 @@ async function fetchManifestFromGitHub(): Promise<Manifest | null> {
       logError(`Failed to fetch manifest from GitHub: HTTP ${res.status} ${res.statusText}`);
       return null;
     }
-    const data = (await res.json()) as Manifest;
+    const raw = await res.json();
+    const data = stripDangerousKeys(raw) as Manifest;
     if (!isValidManifest(data)) {
       logError("Manifest structure validation failed: missing required fields (agents, clouds, or matrix)");
       return null;
@@ -132,7 +148,8 @@ function tryLoadLocalManifest(): Manifest | null {
     // Try loading manifest.json from current directory (development mode)
     const localPath = join(process.cwd(), "manifest.json");
     if (existsSync(localPath)) {
-      const data = JSON.parse(readFileSync(localPath, "utf-8"));
+      const raw = JSON.parse(readFileSync(localPath, "utf-8"));
+      const data = stripDangerousKeys(raw);
       if (isValidManifest(data)) {
         return data as Manifest;
       }
@@ -226,4 +243,4 @@ export function _resetCacheForTesting(): void {
   _staleCache = false;
 }
 
-export { RAW_BASE, REPO, CACHE_DIR };
+export { RAW_BASE, REPO, CACHE_DIR, stripDangerousKeys };
