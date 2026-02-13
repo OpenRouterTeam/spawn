@@ -126,17 +126,18 @@ _binarylane_build_server_body() {
     python3 -c "
 import json, sys
 userdata = json.loads(sys.stdin.read())
+name, region, size, image, ssh_key_ids = sys.argv[1:6]
 body = {
-    'name': '$name',
-    'region': '$region',
-    'size': '$size',
-    'image': '$image',
-    'ssh_keys': $ssh_key_ids,
+    'name': name,
+    'region': region,
+    'size': size,
+    'image': image,
+    'ssh_keys': json.loads(ssh_key_ids),
     'user_data': userdata,
     'backups': False
 }
 print(json.dumps(body))
-" <<< "$json_userdata"
+" "$name" "$region" "$size" "$image" "$ssh_key_ids" <<< "$json_userdata"
 }
 
 # Parse server ID from create response, or log error and return 1

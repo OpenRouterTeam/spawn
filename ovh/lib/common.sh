@@ -245,15 +245,16 @@ _ovh_build_instance_body() {
     local name="$1" flavor_id="$2" image_id="$3" region="$4" ssh_key_id="$5"
     python3 -c "
 import json, sys
+name, flavor_id, image_id, region, ssh_key_id = sys.argv[1:6]
 body = {
-    'name': sys.argv[1],
-    'flavorId': sys.argv[2],
-    'imageId': sys.argv[3],
-    'region': sys.argv[4],
+    'name': name,
+    'flavorId': flavor_id,
+    'imageId': image_id,
+    'region': region,
     'monthlyBilling': False
 }
-if sys.argv[5]:
-    body['sshKeyId'] = sys.argv[5]
+if ssh_key_id:
+    body['sshKeyId'] = ssh_key_id
 print(json.dumps(body))
 " "$name" "$flavor_id" "$image_id" "$region" "$ssh_key_id"
 }

@@ -244,15 +244,16 @@ _ionos_build_volume_body() {
 
     python3 -c "
 import json, sys
+name, disk_size, image_id, userdata = sys.argv[1:5]
 body = {
     'properties': {
-        'name': sys.argv[1] + '-boot',
+        'name': name + '-boot',
         'type': 'HDD',
-        'size': int(sys.argv[2]),
+        'size': int(disk_size),
         'availabilityZone': 'AUTO',
-        'image': sys.argv[3],
+        'image': image_id,
         'imagePassword': 'TempPass123!',
-        'userData': sys.argv[4]
+        'userData': userdata
     }
 }
 print(json.dumps(body))
@@ -344,11 +345,12 @@ _ionos_build_server_body() {
     local name="$1" cores="$2" ram="$3"
     python3 -c "
 import json, sys
+name, cores, ram = sys.argv[1:4]
 body = {
     'properties': {
-        'name': sys.argv[1],
-        'cores': int(sys.argv[2]),
-        'ram': int(sys.argv[3]),
+        'name': name,
+        'cores': int(cores),
+        'ram': int(ram),
         'availabilityZone': 'AUTO',
         'cpuFamily': 'AMD_OPTERON'
     }

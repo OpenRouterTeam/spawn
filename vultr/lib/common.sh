@@ -105,19 +105,20 @@ get_server_name() {
 _vultr_build_instance_body() {
     local name="$1" plan="$2" region="$3" os_id="$4" ssh_key_ids="$5" userdata_b64="$6"
     python3 -c "
-import json
+import json, sys
+name, plan, region, os_id, ssh_key_ids, userdata_b64 = sys.argv[1:7]
 body = {
-    'label': '$name',
-    'hostname': '$name',
-    'region': '$region',
-    'plan': '$plan',
-    'os_id': $os_id,
-    'sshkey_id': $ssh_key_ids,
-    'user_data': '$userdata_b64',
+    'label': name,
+    'hostname': name,
+    'region': region,
+    'plan': plan,
+    'os_id': int(os_id),
+    'sshkey_id': json.loads(ssh_key_ids),
+    'user_data': userdata_b64,
     'backups': 'disabled'
 }
 print(json.dumps(body))
-"
+" "$name" "$plan" "$region" "$os_id" "$ssh_key_ids" "$userdata_b64"
 }
 
 # Wait for Vultr instance to become active and get its IP
