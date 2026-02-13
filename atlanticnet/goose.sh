@@ -51,10 +51,9 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server "${ATLANTICNET_SERVER_IP}" "cat >> ~/.bashrc << 'EOF'
-export GOOSE_PROVIDER=openrouter
-export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-EOF"
+inject_env_vars_ssh "${ATLANTICNET_SERVER_IP}" upload_file run_server \
+    "GOOSE_PROVIDER=openrouter" \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
 log_info "Server setup completed successfully!"
