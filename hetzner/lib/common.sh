@@ -105,7 +105,7 @@ get_server_name() {
 _list_server_types_for_location() {
     local location="$1"
 
-    _ensure_jq || return 1
+    ensure_jq || return 1
 
     local dc_response types_response
     dc_response=$(hetzner_api GET "/datacenters")
@@ -134,7 +134,7 @@ _list_server_types_for_location() {
 # Fetch available locations from /datacenters API
 # Outputs: "name|city|country" lines
 _list_locations() {
-    _ensure_jq || return 1
+    ensure_jq || return 1
 
     local dc_response
     dc_response=$(hetzner_api GET "/datacenters")
@@ -155,40 +155,6 @@ _pick_server_type() {
     _list_server_types_for_current_location() { _list_server_types_for_location "$location"; }
     interactive_pick "HETZNER_SERVER_TYPE" "cpx11" "server types" _list_server_types_for_current_location "cpx11"
     unset -f _list_server_types_for_current_location
-}
-
-# Ensure jq is installed (required for server type validation)
-_ensure_jq() {
-    if command -v jq &>/dev/null; then
-        return 0
-    fi
-
-    log_step "Installing jq..."
-
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        if command -v brew &>/dev/null; then
-            brew install jq || { log_error "Failed to install jq via Homebrew"; return 1; }
-        else
-            log_error "Install jq: brew install jq (or https://jqlang.github.io/jq/download/)"
-            return 1
-        fi
-    elif command -v apt-get &>/dev/null; then
-        sudo apt-get update -qq && sudo apt-get install -y jq || { log_error "Failed to install jq via apt"; return 1; }
-    elif command -v dnf &>/dev/null; then
-        sudo dnf install -y jq || { log_error "Failed to install jq via dnf"; return 1; }
-    elif command -v apk &>/dev/null; then
-        sudo apk add jq || { log_error "Failed to install jq via apk"; return 1; }
-    else
-        log_error "jq is required but not installed. Install from https://jqlang.github.io/jq/download/"
-        return 1
-    fi
-
-    if ! command -v jq &>/dev/null; then
-        log_error "jq not found in PATH after installation"
-        return 1
-    fi
-
-    log_info "jq installed"
 }
 
 # Find cheapest available server type matching spec constraints
@@ -276,7 +242,7 @@ _validate_server_type_for_location() {
     local server_type="$1"
     local location="$2"
 
-    _ensure_jq || return 1
+    ensure_jq || return 1
 
     local available_ids
     available_ids=$(_hetzner_get_available_ids "$location") || return 1
