@@ -163,12 +163,12 @@ Create these teammates:
 
 ## Label Management (MANDATORY)
 
-Track issue lifecycle with labels: "Pending Review" → "Under Review" → "In Progress"
+Track issue lifecycle with labels: "pending-review" → "under-review" → "in-progress"
 
-- At cycle start, transition the issue to "In Progress":
-  \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --add-label "In Progress"\`
+- At cycle start, transition the issue to "in-progress":
+  \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --add-label "in-progress"\`
 - When the fix is merged and the issue is closed, remove all status labels:
-  \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "In Progress"\`
+  \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "in-progress"\`
 - Always check current labels first to avoid errors:
   \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name'\`
 
@@ -176,8 +176,8 @@ Track issue lifecycle with labels: "Pending Review" → "Under Review" → "In P
 
 1. Create the team with TeamCreate
 2. Fetch issue details: \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn\`
-3. Transition label to "In Progress":
-   \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --add-label "In Progress"\`
+3. Transition label to "in-progress":
+   \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --add-label "in-progress"\`
 4. DEDUP CHECK: Check if issue already has comments from automated accounts:
    \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'\`
    Only post acknowledgment if no automated comments exist.
@@ -194,7 +194,7 @@ Track issue lifecycle with labels: "Pending Review" → "Under Review" → "In P
    - Do NOT merge — PR stays open for external review
 10. Post update comment on the issue linking to the PR
 11. Remove status labels and close the issue:
-    \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "In Progress"\`
+    \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "in-progress"\`
     \`gh issue close ${SPAWN_ISSUE}\`
 12. Clean up worktree: \`git worktree remove ${WORKTREE_BASE}\`
 13. Shutdown all teammates and exit
@@ -325,15 +325,15 @@ Create these teammates:
 6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
    - LABEL MANAGEMENT (MANDATORY for every issue interaction):
-     Labels track issue lifecycle: "Pending Review" → "Under Review" → "In Progress"
+     Labels track issue lifecycle: "pending-review" → "under-review" → "in-progress"
      * When you FIRST discover an issue that has NO status label (none of the three above):
-       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --add-label "Pending Review"`
+       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --add-label "pending-review"`
      * When you acknowledge/engage an issue (post first comment):
-       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Pending Review" --add-label "Under Review"`
+       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "pending-review" --add-label "under-review"`
      * When you delegate an issue to a teammate for a fix:
-       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --add-label "In Progress"`
+       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --add-label "in-progress"`
      * When the fix is merged and the issue is closed, remove all status labels:
-       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --remove-label "In Progress"`
+       `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --remove-label "in-progress"`
      Always check existing labels before adding/removing to avoid errors:
        `gh issue view NUMBER --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name'`
    - DEDUP CHECK (MANDATORY before ANY comment): For each issue, FIRST check existing comments:
@@ -372,12 +372,12 @@ Create these teammates:
 When fixing a bug reported in a GitHub issue:
 
 1. Community-coordinator checks for existing comments (dedup) before posting acknowledgment
-2. Community-coordinator transitions label to "Under Review":
-   `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Pending Review" --add-label "Under Review"`
+2. Community-coordinator transitions label to "under-review":
+   `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "pending-review" --add-label "under-review"`
 3. Community-coordinator posts acknowledgment comment on the issue (only if not already acknowledged)
 4. Community-coordinator messages the relevant teammate to investigate
-5. Community-coordinator transitions label to "In Progress" when delegating:
-   `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "Under Review" --add-label "In Progress"`
+5. Community-coordinator transitions label to "in-progress" when delegating:
+   `gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "under-review" --add-label "in-progress"`
 6. Create a worktree for the fix:
    git worktree add WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER -b fix/issue-NUMBER origin/main
 7. Work inside the worktree: cd WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
@@ -393,7 +393,7 @@ When fixing a bug reported in a GitHub issue:
 13. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
 14. Community-coordinator posts final resolution comment with PR link and explanation (only if no resolution exists)
 15. Remove status labels and close the issue:
-    gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "In Progress"
+    gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "in-progress"
     gh issue close NUMBER
 
 NEVER leave a PR without a self-review comment and `needs-team-review` label.
@@ -545,8 +545,8 @@ You MUST remain active until ALL of the following are true:
 2. **All PRs are self-reviewed and labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` and confirm every PR from this cycle has a self-review comment and the `needs-team-review` label. Do NOT merge — PRs stay open for external review.
 3. **All issues are engaged and labeled**: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,labels`
    and for EACH open issue, verify it has at least one comment AND has a status label
-   ("Pending Review", "Under Review", or "In Progress"). If any issue is missing a status
-   label, add "Pending Review". If any issue has zero comments, the community-coordinator
+   ("pending-review", "under-review", or "in-progress"). If any issue is missing a status
+   label, add "pending-review". If any issue has zero comments, the community-coordinator
    MUST post an acknowledgment before shutdown proceeds.
 4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
 5. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
