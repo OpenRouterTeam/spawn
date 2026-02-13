@@ -118,18 +118,19 @@ _build_upcloud_server_body() {
     python3 -c "
 import json, sys
 ssh_key = json.loads(sys.stdin.read()).strip()
+name, zone, plan, template_uuid = sys.argv[1:5]
 body = {
     'server': {
-        'zone': '$zone',
-        'title': '$name',
-        'hostname': '$name',
-        'plan': '$plan',
+        'zone': zone,
+        'title': name,
+        'hostname': name,
+        'plan': plan,
         'storage_devices': {
             'storage_device': [
                 {
                     'action': 'clone',
-                    'storage': '$template_uuid',
-                    'title': '$name-os',
+                    'storage': template_uuid,
+                    'title': name + '-os',
                     'size': 25,
                     'tier': 'maxiops'
                 }
@@ -145,7 +146,7 @@ body = {
     }
 }
 print(json.dumps(body))
-" <<< "$json_ssh_key"
+" "$name" "$zone" "$plan" "$template_uuid" <<< "$json_ssh_key"
 }
 
 # Parse server UUID from create response, or log error and return 1

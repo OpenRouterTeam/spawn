@@ -125,24 +125,25 @@ _linode_build_create_payload() {
     userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
 
     local root_pass
-    root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#$') for _ in range(32)))")
+    root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#\$') for _ in range(32)))")
 
     python3 -c "
-import json
+import json, sys
+name, region, ltype, image, auth_keys, root_pass, userdata_b64 = sys.argv[1:8]
 body = {
-    'label': '$name',
-    'region': '$region',
-    'type': '$type',
-    'image': '$image',
-    'authorized_keys': $authorized_keys,
-    'root_pass': '$root_pass',
+    'label': name,
+    'region': region,
+    'type': ltype,
+    'image': image,
+    'authorized_keys': json.loads(auth_keys),
+    'root_pass': root_pass,
     'metadata': {
-        'user_data': '$userdata_b64'
+        'user_data': userdata_b64
     },
     'booted': True
 }
 print(json.dumps(body))
-"
+" "$name" "$region" "$type" "$image" "$authorized_keys" "$root_pass" "$userdata_b64"
 }
 
 # Poll Linode API until instance is running, sets LINODE_SERVER_IP

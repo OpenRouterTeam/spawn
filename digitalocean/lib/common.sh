@@ -113,18 +113,19 @@ _build_droplet_request_body() {
     python3 -c "
 import json, sys
 userdata = sys.stdin.read()
+name, region, size, image, ssh_key_ids = sys.argv[1:6]
 body = {
-    'name': '$name',
-    'region': '$region',
-    'size': '$size',
-    'image': '$image',
-    'ssh_keys': $ssh_key_ids,
+    'name': name,
+    'region': region,
+    'size': size,
+    'image': image,
+    'ssh_keys': json.loads(ssh_key_ids),
     'user_data': userdata,
     'backups': False,
     'monitoring': False
 }
 print(json.dumps(body))
-"
+" "$name" "$region" "$size" "$image" "$ssh_key_ids"
 }
 
 # Wait for a DigitalOcean droplet to become active and set its IP

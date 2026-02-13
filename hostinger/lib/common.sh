@@ -169,17 +169,18 @@ _hostinger_build_create_body() {
     echo "$userdata" | python3 -c "
 import json, sys
 userdata = sys.stdin.read()
+name, plan, location, os_template, ssh_key_ids = sys.argv[1:6]
 body = {
-    'hostname': '$name',
-    'plan': '$plan',
-    'location': '$location',
-    'os_template': '$os_template',
-    'ssh_keys': $ssh_key_ids,
+    'hostname': name,
+    'plan': plan,
+    'location': location,
+    'os_template': os_template,
+    'ssh_keys': json.loads(ssh_key_ids),
     'cloud_init': userdata,
     'start_after_create': True
 }
 print(json.dumps(body))
-"
+" "$name" "$plan" "$location" "$os_template" "$ssh_key_ids"
 }
 
 # Check Hostinger API response for errors and log diagnostics

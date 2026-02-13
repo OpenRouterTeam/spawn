@@ -162,18 +162,19 @@ _contabo_build_instance_body() {
     echo "$userdata" | python3 -c "
 import json, sys
 userdata = sys.stdin.read()
+name, product_id, region, image_id, period, ssh_secret_ids = sys.argv[1:7]
 body = {
-    'displayName': '$name',
-    'productId': '$product_id',
-    'region': '$region',
-    'imageId': '$image_id',
-    'period': $period,
-    'sshKeys': $ssh_secret_ids,
+    'displayName': name,
+    'productId': product_id,
+    'region': region,
+    'imageId': image_id,
+    'period': int(period),
+    'sshKeys': json.loads(ssh_secret_ids),
     'userData': userdata,
     'defaultUser': 'root'
 }
 print(json.dumps(body))
-"
+" "$name" "$product_id" "$region" "$image_id" "$period" "$ssh_secret_ids"
 }
 
 # Poll Contabo API until instance is running, then extract IP
