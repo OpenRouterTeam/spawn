@@ -1287,7 +1287,7 @@
     "atlanticnet/amazonq": "missing",
     "atlanticnet/cline": "missing",
     "atlanticnet/gptme": "missing",
-    "atlanticnet/opencode": "missing",
+    "atlanticnet/opencode": "implemented",
     "atlanticnet/plandex": "missing",
     "atlanticnet/kilocode": "missing",
     "atlanticnet/continue": "missing",
