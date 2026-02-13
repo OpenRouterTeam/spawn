@@ -129,15 +129,15 @@ function showUnknownCommandError(name: string, manifest: { agents: Record<string
 async function showInfoOrError(name: string): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
-  // Direct key match
-  if (manifest.agents[name]) { await cmdAgentInfo(name); return; }
-  if (manifest.clouds[name]) { await cmdCloudInfo(name); return; }
+  // Direct key match — pass pre-loaded manifest to avoid a redundant spinner
+  if (manifest.agents[name]) { await cmdAgentInfo(name, manifest); return; }
+  if (manifest.clouds[name]) { await cmdCloudInfo(name, manifest); return; }
 
   // Try resolving display names and case-insensitive matches
   const resolvedAgent = resolveAgentKey(manifest, name);
-  if (resolvedAgent) { await cmdAgentInfo(resolvedAgent); return; }
+  if (resolvedAgent) { await cmdAgentInfo(resolvedAgent, manifest); return; }
   const resolvedCloud = resolveCloudKey(manifest, name);
-  if (resolvedCloud) { await cmdCloudInfo(resolvedCloud); return; }
+  if (resolvedCloud) { await cmdCloudInfo(resolvedCloud, manifest); return; }
 
   showUnknownCommandError(name, manifest);
 }

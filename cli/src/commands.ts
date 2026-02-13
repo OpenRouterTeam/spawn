@@ -1418,8 +1418,10 @@ function printGroupedList(
 
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
-export async function cmdAgentInfo(agent: string): Promise<void> {
-  const [manifest, agentKey] = await validateAndGetEntity(agent, "agent");
+export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest): Promise<void> {
+  const [manifest, agentKey] = preloadedManifest
+    ? [preloadedManifest, agent]
+    : await validateAndGetEntity(agent, "agent");
 
   const agentDef = manifest.agents[agentKey];
   printInfoHeader(agentDef);
@@ -1544,8 +1546,10 @@ function printAgentList(
   }
 }
 
-export async function cmdCloudInfo(cloud: string): Promise<void> {
-  const [manifest, cloudKey] = await validateAndGetEntity(cloud, "cloud");
+export async function cmdCloudInfo(cloud: string, preloadedManifest?: Manifest): Promise<void> {
+  const [manifest, cloudKey] = preloadedManifest
+    ? [preloadedManifest, cloud]
+    : await validateAndGetEntity(cloud, "cloud");
 
   const c = manifest.clouds[cloudKey];
   printInfoHeader(c);
