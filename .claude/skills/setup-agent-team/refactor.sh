@@ -337,9 +337,9 @@ Create these teammates:
      Always check existing labels before adding/removing to avoid errors:
        `gh issue view NUMBER --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name'`
    - DEDUP CHECK (MANDATORY before ANY comment): For each issue, FIRST check existing comments:
-     `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'`
-     If the issue already has a comment from your bot account (check for "la14-1" or any automated commenter), SKIP posting an acknowledgment — the issue has already been engaged.
-     Only post an acknowledgment if the issue has ZERO comments from automated accounts.
+     `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[] | "\(.author.login): \(.body[-30:])"'`
+     If the issue already has a comment containing `— refactor/community-coordinator`, SKIP posting — you've already commented.
+     Also check for comments from other automated accounts. Only post if no similar comment exists.
    - For issues that need acknowledgment, post a brief, casual comment thanking them for flagging it (e.g. "Thanks for flagging this!" or "Appreciate the report!") — keep it short and natural, not corporate
    - Before posting ANY comment (acknowledgment, interim update, or resolution), ALWAYS check existing comments first:
      `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[-1].body'`
@@ -366,6 +366,7 @@ Create these teammates:
      acknowledgment comment so the reporter knows we've seen it.
    - EVERY open issue must be engaged by end of cycle. No dangling issues.
    - NEVER post duplicate comments. One acknowledgment per issue. One resolution per issue.
+   - **SIGN-OFF**: Every comment MUST end with a sign-off line: `— refactor/community-coordinator`. This is how agents identify their own comments for dedup.
 
 ## Issue Fix Workflow (CRITICAL follow exactly)
 
@@ -574,6 +575,7 @@ You MUST remain active until ALL of the following are true:
 - If 3 consecutive test failures, pause and investigate
 - Never break existing functionality
 - Focus on high-impact, low-risk improvements
+- **SIGN-OFF**: Every comment on issues/PRs MUST end with `— refactor/AGENT-NAME` (e.g., `— refactor/community-coordinator`, `— refactor/pr-maintainer`, `— refactor/security-auditor`). This is how agents identify their own comments for dedup across cycles.
 
 ## Priority Scoring
 
