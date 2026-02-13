@@ -31,11 +31,10 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server "${ATLANTICNET_SERVER_IP}" "cat >> ~/.bashrc << 'EOF'
-export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-export KILO_PROVIDER_TYPE=openrouter
-export KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}
-EOF"
+inject_env_vars_ssh "${ATLANTICNET_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "KILO_PROVIDER_TYPE=openrouter" \
+    "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
 log_info "Server setup completed successfully!"
@@ -44,4 +43,4 @@ echo ""
 log_step "Starting Kilo Code..."
 sleep 1
 clear
-interactive_session "${ATLANTICNET_SERVER_IP}" "source ~/.bashrc && kilocode"
+interactive_session "${ATLANTICNET_SERVER_IP}" "source ~/.zshrc && kilocode"

@@ -29,8 +29,9 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server 'echo "export OPENROUTER_API_KEY=\"'"${OPENROUTER_API_KEY}"'\"" >> ~/.bashrc'
-run_server 'echo "export GOOSE_PROVIDER=\"openrouter\"" >> ~/.bashrc'
+inject_env_vars_local upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "GOOSE_PROVIDER=openrouter"
 
 echo ""
 log_info "CodeSandbox setup completed successfully!"
