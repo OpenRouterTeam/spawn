@@ -201,12 +201,23 @@ For each candidate, verify:
 - Has affordable CPU instances (pay-per-hour or pay-per-second pricing)
 - Is actually available (not waitlisted/invite-only)
 
-**MANDATORY: Add new clouds to the test infrastructure.** When adding a new cloud, you MUST also update:
-1. `test/record.sh` — add the cloud to `ALL_RECORDABLE_CLOUDS`, add a case in `get_endpoints()` with the cloud's GET endpoints, add a case in `get_auth_env_var()`, add a case in `call_api()`, and add a `_live_{cloud}()` function for create/delete fixture recording
-2. `test/mock.sh` — add a URL-stripping case in the curl mock so the cloud's API base URL is recognized (look for the `case "$URL" in` block near line 133)
-3. `test/record.sh` `has_api_error()` — add error detection for the cloud's API error format
+**MANDATORY: Add new clouds to the test infrastructure.** When adding a new cloud, you MUST also update ALL of these files:
 
-Without these, the new cloud will have no test coverage and the QA cycle will skip it entirely.
+**`test/record.sh`** (fixture recording):
+1. Add the cloud to `ALL_RECORDABLE_CLOUDS`
+2. Add a case in `get_endpoints()` with the cloud's GET-only API endpoints
+3. Add a case in `get_auth_env_var()` mapping the cloud to its auth env var
+4. Add a case in `call_api()` to dispatch to the cloud's API function
+5. Add a case in `has_api_error()` for the cloud's error response format
+6. Add a `_live_{cloud}()` function for create/delete server fixture recording
+
+**`test/mock.sh`** (mock test infrastructure — ALL of these):
+1. **URL stripping**: Add a case in `_strip_api_base()` to recognize the cloud's API base URL (e.g., `https://api.newcloud.com/v1*`). Without this, mock curl logs `UNHANDLED_URL` warnings.
+2. **Body validation**: Add a case in `_validate_body()` with the cloud's server creation endpoint and required POST body fields
+3. **Cloud API assertions**: Add a case in `assert_cloud_api_calls()` with the cloud's expected API calls (SSH key fetch endpoint + server create endpoint)
+4. **Environment setup**: Add a case in `setup_env_for_cloud()` with the cloud's test env vars (API token, server name, plan, region, etc.)
+
+Without ALL of these, the new cloud will have no test coverage, body validation will be missing, and the QA cycle will skip it entirely.
 
 ### Agent Scout (spawn 1, only if justified)
 Research new AI agents, BUT only add one if there's REAL community demand:
@@ -474,9 +485,13 @@ providers — container platforms, budget VPS providers, or regional clouds with
 REST APIs. We need affordable instances for running agents that use remote API inference, NOT GPU clouds.
 Create lib/common.sh, add to manifest, implement 2-3 agents, add "missing" entries for the rest.
 
-MANDATORY: When adding a new cloud, also add it to the test infrastructure:
+MANDATORY: When adding a new cloud, also update the test infrastructure:
 1. test/record.sh — add to ALL_RECORDABLE_CLOUDS, get_endpoints(), get_auth_env_var(), call_api(), has_api_error(), and add a _live_{cloud}() function
-2. test/mock.sh — add a URL-stripping case in the curl mock (case "$URL" in block)
+2. test/mock.sh — add ALL of these:
+   - _strip_api_base(): URL-stripping case for the cloud's API base URL
+   - _validate_body(): body validation case with server creation endpoint + required fields
+   - assert_cloud_api_calls(): expected API calls (SSH key fetch + server create)
+   - setup_env_for_cloud(): test env vars (API token, server name, plan, region)
 
 Only add a new AGENT if you find one with real community buzz:
 - 1000+ GitHub stars
