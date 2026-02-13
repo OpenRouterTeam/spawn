@@ -495,30 +495,33 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 15. Team lead runs: git worktree prune to clean stale worktree entries
 16. When all work is done, execute the Lifecycle Management shutdown sequence (below) — send shutdown_request to every teammate, wait for confirmations, clean up worktrees, then exit
 
-## CRITICAL: Monitoring Loop (DO NOT SKIP — your session MUST stay alive)
+## CRITICAL: Staying Alive (DO NOT SKIP)
 
 **Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. If you end your conversation after spawning, teammates become orphaned with no coordination.
 
-### TECHNICAL REQUIREMENT: You are running in `claude -p` (print) mode. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response. If you have nothing else to do, run `Bash("sleep 30")` to keep the session active while waiting for teammate messages.
+### TECHNICAL REQUIREMENT: You are running in `claude -p` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
+
+**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long `sleep 30` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use `sleep 5` to briefly yield, then check for messages.
 
 ### Required pattern after spawning:
 ```
 1. Spawn all teammates via Task tool
-2. Immediately start a polling loop — do NOT just output text saying "I'll wait":
-   while teammates are still active:
-     a. Run TaskList to check task status
-     b. When you receive a teammate message, acknowledge it and update task tracking
-     c. If a teammate reports completion, mark their task done
-     d. If a teammate reports an error, coordinate resolution
-     e. If the time budget is almost up, send wrap-up messages to all teammates
-     f. If no messages received yet, run `Bash("sleep 30")` then loop back to (a)
+2. Yield loop (keep it tight):
+   a. Bash("sleep 5") — yield the turn so queued messages can be delivered
+   b. If a message arrived, process it immediately (acknowledge, update task)
+   c. If no message, run TaskList — if tasks still pending, go back to (a)
+   d. Between polls, do useful work: check PR status, verify teammate health
+   e. If the time budget is almost up, send wrap-up messages to all teammates
 3. Only after ALL teammates have finished, proceed to shutdown
 ```
+
+**DO NOT loop on `sleep 15` or `sleep 30`.** Each sleep blocks message delivery. Keep sleeps to 5 seconds max.
 
 ### Common mistake (DO NOT DO THIS):
 ```
 BAD:  Spawn teammates → "I'll wait for their messages" → session ends (agents orphaned!)
-GOOD: Spawn teammates → TaskList → sleep 30 → TaskList → receive message → coordinate → ... → shutdown
+BAD:  Spawn teammates → sleep 30 → sleep 30 → sleep 30 → ... (messages can't be delivered!)
+GOOD: Spawn teammates → sleep 5 → process message → sleep 5 → TaskList → ... → shutdown
 ```
 
 ## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
@@ -537,7 +540,7 @@ You MUST remain active until ALL of the following are true:
 
 ### Shutdown Sequence (execute in this exact order):
 
-1. Check TaskList — if any tasks are still in_progress or pending, wait and check again (poll every 30 seconds, up to 10 minutes)
+1. Check TaskList — if any tasks are still in_progress or pending, yield with `sleep 5` and check again (up to 10 minutes)
 2. Verify all PRs from this cycle have been created with clear descriptions
 3. Verify all issues engaged: `gh issue list --repo OpenRouterTeam/spawn --state open`
 4. For each teammate, send a `shutdown_request` via SendMessage
