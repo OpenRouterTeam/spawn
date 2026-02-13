@@ -70,7 +70,7 @@ echo ""
 
 # 9. Start openclaw interactively
 log_step "Starting openclaw..."
-log_info "First starting openclaw gateway in background..."
+log_step "First starting openclaw gateway in background..."
 run_server "${IONOS_SERVER_IP}" "nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
 log_step "Starting openclaw tui..."

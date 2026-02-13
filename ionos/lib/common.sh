@@ -214,7 +214,7 @@ ensure_datacenter() {
 # Find Ubuntu 24.04 HDD image ID from IONOS API
 # Outputs the image ID on stdout
 _ionos_find_ubuntu_image() {
-    log_info "Finding Ubuntu 24.04 image..."
+    log_step "Finding Ubuntu 24.04 image..."
     local images_response
     images_response=$(ionos_api GET "/images?depth=2")
 

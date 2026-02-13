@@ -682,7 +682,7 @@ _setup_oauth_server() {
     local port_file="${3}"
     local state_file="${4}"
 
-    log_info "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
+    log_step "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
     local server_pid
     server_pid=$(start_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}")
 
@@ -747,7 +747,7 @@ _await_oauth_callback() {
 
     local callback_url="http://localhost:${actual_port}/callback"
     local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}&state=${csrf_state}"
-    log_info "Opening browser to authenticate with OpenRouter..."
+    log_step "Opening browser to authenticate with OpenRouter..."
     open_browser "${auth_url}"
 
     if ! _wait_for_oauth "${code_file}"; then
@@ -770,7 +770,7 @@ _await_oauth_callback() {
 try_oauth_flow() {
     local callback_port=${1:-5180}
 
-    log_info "Attempting OAuth authentication..."
+    log_step "Attempting OAuth authentication..."
 
     if ! _check_oauth_prerequisites; then
         return 1
@@ -798,7 +798,7 @@ try_oauth_flow() {
     cleanup_oauth_session "${server_pid}" "${oauth_dir}"
 
     # Exchange code for API key
-    log_info "Exchanging OAuth code for API key..."
+    log_step "Exchanging OAuth code for API key..."
     local api_key
     api_key=$(exchange_oauth_code "${oauth_code}") || return 1
 
@@ -1328,7 +1328,7 @@ execute_agent_non_interactive() {
     local prompt="${4}"
     local exec_callback="${5}"
 
-    log_info "Executing ${agent_name} with prompt in non-interactive mode..."
+    log_step "Executing ${agent_name} with prompt in non-interactive mode..."
 
     # Escape the prompt for safe shell execution
     # We use printf %q which properly escapes special characters for bash
