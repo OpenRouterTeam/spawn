@@ -1285,7 +1285,7 @@
     "atlanticnet/interpreter": "implemented",
     "atlanticnet/gemini": "implemented",
     "atlanticnet/amazonq": "implemented",
-    "atlanticnet/cline": "missing",
+    "atlanticnet/cline": "implemented",
     "atlanticnet/gptme": "implemented",
     "atlanticnet/opencode": "implemented",
     "atlanticnet/plandex": "implemented",
