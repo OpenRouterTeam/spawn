@@ -28,7 +28,8 @@ GCP_USERNAME=$(whoami)
 
 # SSH_OPTS is now defined in shared/common.sh
 
-ensure_gcloud() {
+# Verify gcloud CLI is installed
+_gcp_check_cli_installed() {
     if ! command -v gcloud &>/dev/null; then
         _log_diagnostic \
             "Google Cloud SDK (gcloud) is required but not installed" \
@@ -38,7 +39,10 @@ ensure_gcloud() {
             "Or on macOS: brew install google-cloud-sdk"
         return 1
     fi
-    # Verify auth
+}
+
+# Verify gcloud has an active authenticated account
+_gcp_check_auth() {
     if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1 | grep -q '@'; then
         _log_diagnostic \
             "gcloud is not authenticated" \
@@ -49,7 +53,10 @@ ensure_gcloud() {
             "Or set credentials via: export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json"
         return 1
     fi
-    # Set project
+}
+
+# Resolve and export GCP_PROJECT from env var or gcloud config
+_gcp_resolve_project() {
     local project="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
     if [[ -z "${project}" || "${project}" == "(unset)" ]]; then
         _log_diagnostic \
@@ -63,6 +70,12 @@ ensure_gcloud() {
     fi
     export GCP_PROJECT="${project}"
     log_info "Using GCP project: ${project}"
+}
+
+ensure_gcloud() {
+    _gcp_check_cli_installed || return 1
+    _gcp_check_auth || return 1
+    _gcp_resolve_project
 }
 
 ensure_ssh_key() {
