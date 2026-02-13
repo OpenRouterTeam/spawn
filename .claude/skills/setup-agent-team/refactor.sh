@@ -33,7 +33,7 @@ else
     CYCLE_TIMEOUT=1800  # 30 min for refactor runs
 fi
 
-LOG_FILE="/home/sprite/spawn/.docs/${TEAM_NAME}.log"
+LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"
 PROMPT_FILE=""
 
 # Ensure .docs directory exists
