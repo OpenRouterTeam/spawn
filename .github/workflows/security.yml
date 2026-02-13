@@ -4,10 +4,8 @@ on:
   issues:
     types: [opened, reopened]
   schedule:
-    # Batch PR security review + hygiene — every 15 min
-    - cron: '*/15 * * * *'
-    # Full repo security scan — every 30 min (offset +5)
-    - cron: '5,35 * * * *'
+    # Consolidated review + scan — every 20 min
+    - cron: '*/20 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -20,7 +18,7 @@ on:
           - scan
 
 concurrency:
-  group: security-${{ github.event_name == 'issues' && format('issue-{0}', github.event.issue.number) || github.event_name == 'schedule' && github.event.schedule || 'manual' }}
+  group: security-${{ github.event_name == 'issues' && format('issue-{0}', github.event.issue.number) || 'scheduled' }}
   cancel-in-progress: true
 
 jobs:
@@ -47,15 +45,7 @@ jobs:
               REASON="triage"
             fi
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            # Distinguish between cron schedules by their cron string
-            CRON="${{ github.event.schedule }}"
-            if [ "$CRON" = "*/15 * * * *" ]; then
-              REASON="review_all"
-            elif [ "$CRON" = "5,35 * * * *" ]; then
-              REASON="schedule"
-            else
-              REASON="schedule"
-            fi
+            REASON="review_all"
             ISSUE_NUM=""
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MODE="${{ github.event.inputs.mode || 'review_all' }}"

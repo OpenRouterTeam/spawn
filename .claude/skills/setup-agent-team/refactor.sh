@@ -193,9 +193,7 @@ Track issue lifecycle with labels: "pending-review" → "under-review" → "in-p
    - Label: \`gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"\`
    - Do NOT merge — PR stays open for external review
 10. Post update comment on the issue linking to the PR
-11. Remove status labels and close the issue:
-    \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "in-progress"\`
-    \`gh issue close ${SPAWN_ISSUE}\`
+11. Do NOT close the issue — the PR body contains \`Fixes #${SPAWN_ISSUE}\` which will auto-close the issue when the PR is merged
 12. Clean up worktree: \`git worktree remove ${WORKTREE_BASE}\`
 13. Shutdown all teammates and exit
 
@@ -352,11 +350,11 @@ Create these teammates:
      * Code quality → message complexity-hunter
    - Post interim updates on issues as teammates report findings (only if no similar update exists):
      gh issue comment NUMBER --body "Update: We've identified the root cause — [summary]. Working on a fix now.\n\n-- refactor/community-coordinator"
-   - When a fix PR is merged, post the final resolution (only if no resolution comment exists yet):
-     gh issue comment NUMBER --body "This has been fixed in PR_URL. [Brief explanation of what was changed and why]. The fix is live on main — please try updating and let us know if you still see the issue.\n\n-- refactor/community-coordinator"
-   - Then close: gh issue close NUMBER
-   - For feature requests: comment acknowledging the request, label as enhancement, and close with a note pointing to discussions
-   - For questions: answer directly in a comment, then close
+   - When a fix PR is created, post an update linking to it (only if no similar update exists):
+     gh issue comment NUMBER --body "A fix is up in PR_URL. [Brief explanation of what was changed and why]. The issue will auto-close when the PR is merged.\n\n-- refactor/community-coordinator"
+   - Do NOT close issues manually — PRs contain \`Fixes #NUMBER\` which auto-closes the issue on merge
+   - For feature requests: comment acknowledging the request and label as enhancement (do NOT close — let the implementing PR close it)
+   - For questions: answer directly in a comment (do NOT close — the reporter may have follow-ups)
    - GOAL: Every issue reporter should feel heard and informed. No cold trails.
    - PERIODIC RE-SCAN: After your initial scan AND after every 5 minutes, re-run
      `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
@@ -396,16 +394,15 @@ When fixing a bug reported in a GitHub issue:
 -- refactor/AGENT-NAME"
     gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"
 13. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
-14. Community-coordinator posts final resolution comment with PR link and explanation (only if no resolution exists)
-15. Remove status labels and close the issue:
-    gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "in-progress"
-    gh issue close NUMBER
+14. Community-coordinator posts update comment with PR link (only if no similar update exists)
+15. Do NOT close the issue — the PR body contains \`Fixes #NUMBER\` which will auto-close the issue when merged
 
-NEVER leave a PR without a self-review comment and `needs-team-review` label.
+NEVER leave a PR without a self-review comment and \`needs-team-review\` label.
 If a PR cannot be created (conflicts, superseded, etc.), close it WITH a comment explaining why.
 NEVER close a PR silently — every closed PR MUST have a comment.
-The full cycle is: acknowledge → investigate → worktree → fix → update → PR (references issue) → self-review → label → cleanup worktree.
-Note: merging is handled externally — agents do NOT merge.
+NEVER close an issue manually — let the PR merge auto-close it via \`Fixes #NUMBER\`.
+The full cycle is: acknowledge → investigate → worktree → fix → update → PR (references issue with \`Fixes #NUMBER\`) → self-review → label → cleanup worktree.
+Note: merging is handled externally — agents do NOT merge. Issues close automatically when the PR merges.
 
 ## Commit Markers (MANDATORY)
 

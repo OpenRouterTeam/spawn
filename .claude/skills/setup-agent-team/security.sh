@@ -6,8 +6,8 @@ set -eo pipefail
 #
 # RUN_MODE=team_building — implement team changes from issue (reason=team_building, 15 min)
 # RUN_MODE=triage        — single-agent issue triage for prompt injection/spam (reason=triage, 5 min)
-# RUN_MODE=review_all    — batch security review + hygiene for ALL open PRs (reason=review_all, 30 min)
-# RUN_MODE=scan          — full repo security scan + issue filing (reason=schedule, 20 min)
+# RUN_MODE=review_all    — consolidated review + scan: batch PR review, hygiene, AND lightweight repo scan (reason=review_all, 35 min)
+# RUN_MODE=scan          — full repo security scan + issue filing (reason=schedule, 20 min) — manual/workflow_dispatch only
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -40,7 +40,7 @@ elif [[ "${SPAWN_REASON}" == "review_all" ]]; then
     RUN_MODE="review_all"
     WORKTREE_BASE="/tmp/spawn-worktrees/security-review-all"
     TEAM_NAME="spawn-security-review-all"
-    CYCLE_TIMEOUT=1800  # 30 min for batch review
+    CYCLE_TIMEOUT=2100  # 35 min for consolidated review + scan
 else
     RUN_MODE="scan"
     WORKTREE_BASE="/tmp/spawn-worktrees/security-scan"
@@ -348,15 +348,15 @@ You are the Team Lead for a batch security review and hygiene cycle on the spawn
 
 ## Mission
 
-List every open PR and run the full security review checklist on each one. Approve+merge clean PRs, request changes on flagged ones. Close stale PRs. Clean up orphan branches.
+List every open PR and run the full security review checklist on each one. Approve+merge clean PRs, request changes on flagged ones. Close stale PRs. Clean up orphan branches. Additionally, perform a lightweight security scan of recently changed files when capacity allows.
 
 ## Time Budget
 
-This cycle MUST complete within 25 minutes. This is a HARD deadline.
+This cycle MUST complete within 30 minutes. This is a HARD deadline.
 
-- At the 20-minute mark, stop spawning new reviewers and wrap up
-- At the 24-minute mark, send shutdown_request to all agents
-- At 25 minutes, force shutdown
+- At the 25-minute mark, stop spawning new reviewers and wrap up
+- At the 29-minute mark, send shutdown_request to all agents
+- At 30 minutes, force shutdown
 
 ## Step 1 — Discover Open PRs
 
@@ -537,6 +537,56 @@ Spawn an **issue-checker** agent (model=haiku, team_name="${TEAM_NAME}", name="i
   * If an issue has no status label at all, add \`pending-review\`
 - Report summary: how many issues re-flagged, how many already active
 
+## Step 4.5 — Lightweight Repo Scan (Conditional)
+
+**Skip this step entirely if there are more than 5 open PRs** — PR review takes priority and we need to stay within budget.
+
+If ≤5 open PRs, spawn two scanner agents to audit recently changed files:
+
+1. **shell-scanner** (model=sonnet, team_name="${TEAM_NAME}", name="shell-scanner"):
+   - Find .sh files changed in the last 24 hours:
+     \`\`\`bash
+     git log --since="24 hours ago" --name-only --pretty=format: origin/main -- '*.sh' | sort -u | grep -v '^$'
+     \`\`\`
+   - For each changed .sh file, scan for:
+     * **Command injection**: unquoted variables in shell commands, unsafe eval/heredoc, unsanitized user input
+     * **Credential leaks**: hardcoded API keys/tokens/passwords, secrets logged to stdout, credentials in committed files
+     * **Path traversal**: unsanitized file paths, directory escape via ../
+     * **Unsafe patterns**: use of \`eval\` with user input, \`source <()\`, unvalidated redirects, TOCTOU races
+     * **curl|bash safety**: broken source/eval fallback patterns, missing error handling on remote fetches
+     * **macOS bash 3.x compat**: echo -e, source <(), ((var++)) with set -e, local in subshells, set -u
+     * **Permission issues**: world-readable credential files, insecure temp file creation
+   - Run \`bash -n\` on every changed .sh file to catch syntax errors
+   - Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
+   - For CRITICAL/HIGH findings, file individual GitHub issues (same format as scan mode):
+     \`\`\`bash
+     gh issue create --repo OpenRouterTeam/spawn \\
+       --title "Security: [brief description]" \\
+       --body "## Security Finding\n\n**Severity**: [CRITICAL/HIGH]\n**File**: \\\`path/to/file:line\\\`\n**Category**: [injection/credential-leak/etc.]\n\n### Description\n[details]\n\n### Remediation\n[steps]\n\n### Found by\n-- security/shell-scanner" \\
+       --label "security" --label "safe-to-work"
+     \`\`\`
+   - **DEDUP**: Before filing, check existing issues: \`gh issue list --repo OpenRouterTeam/spawn --state open --label "security" --json number,title --jq '.[].title'\`
+   - Report all findings to the team lead
+
+2. **code-scanner** (model=sonnet, team_name="${TEAM_NAME}", name="code-scanner"):
+   - Find .ts files changed in the last 24 hours:
+     \`\`\`bash
+     git log --since="24 hours ago" --name-only --pretty=format: origin/main -- '*.ts' | sort -u | grep -v '^$'
+     \`\`\`
+   - For each changed .ts file, scan for:
+     * **XSS/injection**: unsafe HTML rendering, unsanitized output, template injection
+     * **Prototype pollution**: unsafe object merging, __proto__ access
+     * **Unsafe eval**: eval(), Function(), vm.runInNewContext() with user input
+     * **Dependency issues**: known vulnerable patterns, unsafe require/import
+     * **Auth bypass**: missing auth checks, insecure token validation
+     * **Information disclosure**: verbose error messages leaking internals, stack traces exposed
+   - Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
+   - For CRITICAL/HIGH findings, file individual GitHub issues (same format as shell-scanner)
+   - **DEDUP**: Before filing, check existing issues
+   - Report all findings to the team lead
+
+Both scanners run **in parallel** with PR reviewers — they don't block each other.
+
 ## Step 5 — Monitor and Collect Results
 
 Poll TaskList every 15 seconds. As each agent reports back, record:
@@ -545,6 +595,8 @@ Poll TaskList every 15 seconds. As each agent reports back, record:
 - Number of findings by severity
 - Branches deleted (from branch-cleaner)
 - Issues re-flagged (from issue-checker)
+- Scan findings by severity (from shell-scanner and code-scanner, if spawned)
+- Issues filed by scanners (if any)
 
 ## Step 6 — Summary and Slack Notification
 
@@ -555,7 +607,7 @@ If SLACK_WEBHOOK is set, send a Slack notification:
 SLACK_WEBHOOK="${SLACK_WEBHOOK:-NOT_SET}"
 if [ -n "\${SLACK_WEBHOOK}" ] && [ "\${SLACK_WEBHOOK}" != "NOT_SET" ]; then
   curl -s -X POST "\${SLACK_WEBHOOK}" -H 'Content-Type: application/json' \\
-    -d '{"text":":shield: PR review+hygiene complete: N PRs reviewed (X merged, Y flagged, Z closed-stale), K branches cleaned, J issues re-flagged. See https://github.com/OpenRouterTeam/spawn/pulls"}'
+    -d '{"text":":shield: Review+scan cycle complete: N PRs reviewed (X merged, Y flagged, Z closed-stale), K branches cleaned, J issues re-flagged, S scan findings (F issues filed). See https://github.com/OpenRouterTeam/spawn/pulls"}'
 fi
 \`\`\`
 (The SLACK_WEBHOOK env var is: ${SLACK_WEBHOOK:-NOT_SET})
@@ -569,14 +621,15 @@ fi
 5. For each PR:
    a. Create a task with TaskCreate
    b. Spawn a pr-reviewer agent (model=opus, team_name="${TEAM_NAME}", name="pr-reviewer-NUMBER")
-6. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
-7. Monitor teammates (poll TaskList, sleep 15 between checks)
-8. Collect results from all agents via messages
-9. Compile summary (N reviewed, X merged, Y flagged, Z closed-stale, K branches cleaned, J issues re-flagged)
-10. Send Slack notification
-11. Shutdown all teammates via SendMessage (type=shutdown_request)
-12. Clean up with TeamDelete
-13. Exit
+6. If ≤5 open PRs, spawn shell-scanner (model=sonnet) and code-scanner (model=sonnet)
+7. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
+8. Monitor teammates (poll TaskList, sleep 15 between checks)
+9. Collect results from all agents via messages (PR reviews + scan findings)
+10. Compile summary (N reviewed, X merged, Y flagged, Z closed-stale, K branches cleaned, J issues re-flagged, S scan findings, F issues filed)
+11. Send Slack notification
+12. Shutdown all teammates via SendMessage (type=shutdown_request)
+13. Clean up with TeamDelete
+14. Exit
 
 ## CRITICAL: Monitoring Loop
 
@@ -588,7 +641,7 @@ Required pattern:
    a. Run TaskList to check status
    b. If messages received, process them
    c. If no messages yet, run Bash("sleep 15") then loop back
-3. Once all agents report (or time is up), compile summary
+3. Once all agents report (or time is up), compile summary (include scan findings if scanners were spawned)
 4. Send Slack notification
 5. Shutdown teammates and exit
 
