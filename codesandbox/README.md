@@ -36,6 +36,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/goose.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/opencode.sh)
 ```
 
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/plandex.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash

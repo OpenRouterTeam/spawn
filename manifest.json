@@ -873,7 +873,7 @@
     "codesandbox/cline": "missing",
     "codesandbox/gptme": "missing",
     "codesandbox/opencode": "implemented",
-    "codesandbox/plandex": "missing",
+    "codesandbox/plandex": "implemented",
     "codesandbox/kilocode": "missing",
     "codesandbox/continue": "missing",
     "e2b/claude": "implemented",
