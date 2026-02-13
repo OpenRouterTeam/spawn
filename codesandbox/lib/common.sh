@@ -90,29 +90,49 @@ get_server_name() {
     get_resource_name "CODESANDBOX_SANDBOX_NAME" "Enter sandbox name: "
 }
 
+# Run a JS snippet that uses the CodeSandbox SDK.
+# The snippet receives `sdk` (authenticated SDK instance) in scope.
+# All extra env vars are forwarded so callers can pass data safely.
+# Usage: _csb_sdk_eval 'await sdk.sandboxes.list()'
+_csb_sdk_eval() {
+    local js_body="${1}"
+    node -e "
+const { CodeSandbox } = require('@codesandbox/sdk');
+const sdk = new CodeSandbox(process.env.CSB_API_KEY);
+(async () => {
+    try { ${js_body} }
+    catch (e) { console.error('ERROR:', e.message); process.exit(1); }
+})();
+"
+}
+
+# Connect to an existing sandbox, run a command, stream output.
+# Receives sandbox ID via _CSB_SB_ID env var, command via _CSB_CMD.
+_csb_run_cmd() {
+    _csb_sdk_eval "
+        const sb = await sdk.sandboxes.get(process.env._CSB_SB_ID);
+        const c = await sb.connect();
+        const r = await c.commands.run(process.env._CSB_CMD);
+        if (r.output) process.stdout.write(r.output);
+        if (r.stderr) process.stderr.write(r.stderr);
+        process.exit(r.exitCode || 0);
+    "
+}
+
 # Invoke Node.js script to create sandbox via SDK
 # SECURITY: Pass name and template via environment variables to prevent injection
 _invoke_codesandbox_create() {
     local name="${1}"
     local template="${2:-base}"
 
-    CSB_API_KEY="${CSB_API_KEY}" _CSB_NAME="${name}" _CSB_TEMPLATE="${template}" node -e "
-const { CodeSandbox } = require('@codesandbox/sdk');
-const sdk = new CodeSandbox(process.env.CSB_API_KEY);
-
-(async () => {
-    try {
-        const sandbox = await sdk.sandboxes.create({
-            name: process.env._CSB_NAME,
-            template: process.env._CSB_TEMPLATE || 'base'
-        });
-        console.log(sandbox.id);
-    } catch (error) {
-        console.error('ERROR:', error.message);
-        process.exit(1);
-    }
-})();
-" 2>&1
+    CSB_API_KEY="${CSB_API_KEY}" _CSB_NAME="${name}" _CSB_TEMPLATE="${template}" \
+        _csb_sdk_eval "
+            const sb = await sdk.sandboxes.create({
+                name: process.env._CSB_NAME,
+                template: process.env._CSB_TEMPLATE || 'base'
+            });
+            console.log(sb.id);
+        " 2>&1
 }
 
 create_server() {
@@ -168,28 +188,7 @@ run_server() {
     validate_sandbox_id "${CODESANDBOX_SANDBOX_ID}" || return 1
 
     # SECURITY: Pass sandbox ID and command via environment variables to prevent injection
-    CSB_API_KEY="${CSB_API_KEY}" _CSB_SB_ID="${CODESANDBOX_SANDBOX_ID}" _CSB_CMD="${cmd}" node -e "
-const { CodeSandbox } = require('@codesandbox/sdk');
-const sdk = new CodeSandbox(process.env.CSB_API_KEY);
-
-(async () => {
-    try {
-        const sandbox = await sdk.sandboxes.get(process.env._CSB_SB_ID);
-        const client = await sandbox.connect();
-        const result = await client.commands.run(process.env._CSB_CMD);
-        if (result.output) {
-            process.stdout.write(result.output);
-        }
-        if (result.stderr) {
-            process.stderr.write(result.stderr);
-        }
-        process.exit(result.exitCode || 0);
-    } catch (error) {
-        console.error('ERROR:', error.message);
-        process.exit(1);
-    }
-})();
-"
+    CSB_API_KEY="${CSB_API_KEY}" _CSB_SB_ID="${CODESANDBOX_SANDBOX_ID}" _CSB_CMD="${cmd}" _csb_run_cmd
 }
 
 upload_file() {
@@ -213,36 +212,9 @@ upload_file() {
 }
 
 interactive_session() {
-    local cmd="${1}"
-    validate_sandbox_id "${CODESANDBOX_SANDBOX_ID}" || return 1
-
-    # Use CodeSandbox shell for interactive sessions
     log_info "Starting interactive session..."
     log_warn "Note: Use 'csb' CLI dashboard for full terminal experience"
-
-    # SECURITY: Pass sandbox ID and command via environment variables
-    CSB_API_KEY="${CSB_API_KEY}" _CSB_SB_ID="${CODESANDBOX_SANDBOX_ID}" _CSB_CMD="${cmd}" node -e "
-const { CodeSandbox } = require('@codesandbox/sdk');
-const sdk = new CodeSandbox(process.env.CSB_API_KEY);
-
-(async () => {
-    try {
-        const sandbox = await sdk.sandboxes.get(process.env._CSB_SB_ID);
-        const client = await sandbox.connect();
-        const result = await client.commands.run(process.env._CSB_CMD);
-        if (result.output) {
-            process.stdout.write(result.output);
-        }
-        if (result.stderr) {
-            process.stderr.write(result.stderr);
-        }
-        process.exit(result.exitCode || 0);
-    } catch (error) {
-        console.error('ERROR:', error.message);
-        process.exit(1);
-    }
-})();
-"
+    run_server "$1"
 }
 
 destroy_server() {
@@ -251,37 +223,18 @@ destroy_server() {
     log_step "Shutting down sandbox..."
 
     # SECURITY: Pass sandbox ID via environment variable
-    CSB_API_KEY="${CSB_API_KEY}" _CSB_SB_ID="${sandbox_id}" node -e "
-const { CodeSandbox } = require('@codesandbox/sdk');
-const sdk = new CodeSandbox(process.env.CSB_API_KEY);
-
-(async () => {
-    try {
-        await sdk.sandboxes.shutdown(process.env._CSB_SB_ID);
-        console.log('Sandbox shut down');
-    } catch (error) {
-        console.error('ERROR:', error.message);
-        process.exit(1);
-    }
-})();
-" 2>/dev/null || true
+    CSB_API_KEY="${CSB_API_KEY}" _CSB_SB_ID="${sandbox_id}" \
+        _csb_sdk_eval "
+            await sdk.sandboxes.shutdown(process.env._CSB_SB_ID);
+            console.log('Sandbox shut down');
+        " 2>/dev/null || true
     log_info "Sandbox shut down"
 }
 
 list_servers() {
-    CSB_API_KEY="${CSB_API_KEY}" node -e "
-const { CodeSandbox } = require('@codesandbox/sdk');
-const sdk = new CodeSandbox(process.env.CSB_API_KEY);
-
-(async () => {
-    try {
-        const sandboxes = await sdk.sandboxes.list();
-        sandboxes.forEach(sb => {
-            console.log(\`\${sb.id}  \${sb.name || 'unnamed'}\`);
-        });
-    } catch (error) {
-        console.error('No sandboxes found');
-    }
-})();
-" 2>/dev/null || echo "No sandboxes found"
+    CSB_API_KEY="${CSB_API_KEY}" \
+        _csb_sdk_eval "
+            const sbs = await sdk.sandboxes.list();
+            sbs.forEach(sb => console.log(sb.id + '  ' + (sb.name || 'unnamed')));
+        " 2>/dev/null || echo "No sandboxes found"
 }
