@@ -497,6 +497,41 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
   return authVars.length > 0 ? authVars.join(" + ") : undefined;
 }
 
+/** Check for missing credentials before running a script and warn the user.
+ *  In interactive mode, asks for confirmation. In non-interactive mode, just warns. */
+export async function preflightCredentialCheck(manifest: Manifest, cloud: string): Promise<void> {
+  const cloudAuth = manifest.clouds[cloud].auth;
+  if (cloudAuth.toLowerCase() === "none") return;
+
+  const authVars = parseAuthEnvVars(cloudAuth);
+  const missing: string[] = [];
+
+  if (!process.env.OPENROUTER_API_KEY) {
+    missing.push("OPENROUTER_API_KEY");
+  }
+  for (const v of authVars) {
+    if (!process.env[v]) {
+      missing.push(v);
+    }
+  }
+
+  if (missing.length === 0) return;
+
+  const cloudName = manifest.clouds[cloud].name;
+  p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
+  p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
+
+  if (isInteractiveTTY()) {
+    const shouldContinue = await p.confirm({
+      message: "Continue anyway? The script will likely prompt for credentials or fail.",
+      initialValue: true,
+    });
+    if (p.isCancel(shouldContinue) || !shouldContinue) {
+      handleCancel();
+    }
+  }
+}
+
 export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean): Promise<void> {
   const manifest = await loadManifestWithSpinner();
   ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
@@ -509,6 +544,8 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
     showDryRunPreview(manifest, agent, cloud, prompt);
     return;
   }
+
+  await preflightCredentialCheck(manifest, cloud);
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
