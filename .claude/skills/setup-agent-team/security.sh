@@ -399,7 +399,7 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
 
 ---
 *Filed automatically by the security review team to preserve knowledge from closed PRs.*" \\
-         --label "enhancement"
+         --label "enhancement" --label "safe-to-work" --label "Pending Review"
        \`\`\`
      - Then close the PR with a comment referencing the new issue:
        \`\`\`bash
@@ -671,7 +671,7 @@ gh issue create --repo OpenRouterTeam/spawn \\
 ### Found by
 Automated security scan (spawn security team)
 " \\
-  --label "security"
+  --label "security" --label "safe-to-work" --label "Pending Review"
 \`\`\`
 
 ### MEDIUM/LOW findings — file a single batch issue:
@@ -690,7 +690,7 @@ gh issue create --repo OpenRouterTeam/spawn \\
 ### Found by
 Automated security scan (spawn security team)
 " \\
-  --label "security"
+  --label "security" --label "safe-to-work" --label "Pending Review"
 \`\`\`
 
 ### DEDUP: Before filing any issue, check if a similar issue already exists:
@@ -704,7 +704,7 @@ Do NOT file duplicate issues. If a similar issue exists, add a comment with upda
 gh issue create --repo OpenRouterTeam/spawn \\
   --title "Repo hygiene: [description]" \\
   --body "[details]" \\
-  --label "maintenance"
+  --label "maintenance" --label "safe-to-work" --label "Pending Review"
 \`\`\`
 
 ## Slack Notification
