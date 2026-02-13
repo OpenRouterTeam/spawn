@@ -301,7 +301,12 @@ function saveKeys(provider: string, vars: Record<string, string>) {
 }
 
 function validKeyVal(v: string) {
-  return !/[;&'"<>|$`\\(){}]/.test(v);
+  if (v.length === 0 || v.length > 4096) return false;
+  // Block control characters (U+0000–U+001F, U+007F–U+009F)
+  if (/[\x00-\x1f\x7f-\x9f]/.test(v)) return false;
+  // Block shell metacharacters
+  if (/[;&'"<>|$`\\(){}]/.test(v)) return false;
+  return true;
 }
 
 // --- Security headers for HTML responses ---
