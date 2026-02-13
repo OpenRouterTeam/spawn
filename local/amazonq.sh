@@ -21,6 +21,7 @@ if command -v q &>/dev/null; then
 else
     log_step "Installing Amazon Q CLI..."
     curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash
+    export PATH="${HOME}/.local/bin:${PATH}"
 fi
 
 # Verify installation
@@ -51,9 +52,17 @@ echo ""
 log_info "Local setup completed successfully!"
 echo ""
 
-# 5. Start Amazon Q
-log_step "Starting Amazon Q..."
-sleep 1
-clear 2>/dev/null || true
-source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null || true
-exec q chat
+# 5. Start Amazon Q chat
+if [[ -n "${SPAWN_PROMPT:-}" ]]; then
+    log_step "Executing Amazon Q with prompt..."
+    export PATH="${HOME}/.local/bin:${PATH}"
+    source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null || true
+    q chat -p "${SPAWN_PROMPT}"
+else
+    log_step "Starting Amazon Q..."
+    sleep 1
+    clear 2>/dev/null || true
+    export PATH="${HOME}/.local/bin:${PATH}"
+    source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null || true
+    exec q chat
+fi
