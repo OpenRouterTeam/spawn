@@ -1380,30 +1380,8 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   // Prioritize clouds where the user already has credentials
   const { sortedClouds, credCount } = prioritizeCloudsByCredentials(implClouds, manifest);
 
-  // Show quick-start with best available cloud (prefer one with credentials)
   if (sortedClouds.length > 0) {
-    const exampleCloud = sortedClouds[0];
-    const cloudDef = manifest.clouds[exampleCloud];
-    const authVars = parseAuthEnvVars(cloudDef.auth);
-    const hasCreds = hasCloudCredentials(cloudDef.auth);
-    const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
-    const allReady = hasOpenRouterKey && (hasCreds || authVars.length === 0);
-
-    console.log();
-    if (allReady) {
-      console.log(pc.bold("Quick start:") + "  " + pc.green("credentials detected -- ready to go"));
-      console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
-    } else {
-      console.log(pc.bold("Quick start:"));
-      console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
-      if (authVars.length > 0) {
-        for (let i = 0; i < authVars.length; i++) {
-          // Only show the URL hint on the first auth var to avoid repetition
-          console.log(formatAuthVarLine(authVars[i], i === 0 ? cloudDef.url : undefined));
-        }
-      }
-      console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
-    }
+    printAgentQuickStart(manifest, agentKey, sortedClouds[0]);
   }
 
   console.log();
@@ -1429,6 +1407,31 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     }
   );
   console.log();
+}
+
+/** Print quick-start instructions for an agent, using the best available cloud */
+function printAgentQuickStart(manifest: Manifest, agentKey: string, exampleCloud: string): void {
+  const cloudDef = manifest.clouds[exampleCloud];
+  const authVars = parseAuthEnvVars(cloudDef.auth);
+  const hasCreds = hasCloudCredentials(cloudDef.auth);
+  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
+  const allReady = hasOpenRouterKey && (hasCreds || authVars.length === 0);
+
+  console.log();
+  if (allReady) {
+    console.log(pc.bold("Quick start:") + "  " + pc.green("credentials detected -- ready to go"));
+    console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
+  } else {
+    console.log(pc.bold("Quick start:"));
+    console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
+    if (authVars.length > 0) {
+      for (let i = 0; i < authVars.length; i++) {
+        // Only show the URL hint on the first auth var to avoid repetition
+        console.log(formatAuthVarLine(authVars[i], i === 0 ? cloudDef.url : undefined));
+      }
+    }
+    console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
+  }
 }
 
 // ── Cloud Info ─────────────────────────────────────────────────────────────────
