@@ -191,10 +191,6 @@ _ensure_jq() {
     log_info "jq installed"
 }
 
-# Validate that a server type is available at a given location.
-# Uses /datacenters API for authoritative availability + /server_types for specs.
-# If not available, finds the cheapest equivalent (same CPU family, >= specs).
-# Returns 0 and prints a valid server type; returns 1 on failure.
 # Find cheapest available server type matching spec constraints
 # $1=types_response $2=location $3=available_ids_json $4=extra_jq_filter
 # Outputs "price|name" lines sorted by price, empty if none match
@@ -213,13 +209,10 @@ _hetzner_find_candidates() {
          | \"\\(.price)|\\(.name)\""
 }
 
-_validate_server_type_for_location() {
-    local server_type="$1"
-    local location="$2"
-
-    _ensure_jq || return 1
-
-    # Get available server type IDs from /datacenters for this location
+# Get available server type IDs for a location from /datacenters API
+# Prints one ID per line; returns 1 if no datacenter found for the location
+_hetzner_get_available_ids() {
+    local location="$1"
     local dc_response
     dc_response=$(hetzner_api GET "/datacenters")
 
@@ -232,28 +225,15 @@ _validate_server_type_for_location() {
         printf 'ERROR:no_datacenter_for_location\n' >&2
         return 1
     fi
+    printf '%s\n' "$available_ids"
+}
 
-    # Get all server type details
-    local types_response
-    types_response=$(hetzner_api GET "/server_types?per_page=50")
+# Search for a compatible fallback server type when the requested one is unavailable
+# Tries same CPU family first, then any family with >= specs
+# Prints the fallback type name on success; emits FALLBACK: info on stderr
+_hetzner_find_fallback_type() {
+    local server_type="$1" types_response="$2" location="$3" available_ids="$4"
 
-    # Check if the requested type is directly available
-    local wanted_id
-    wanted_id=$(printf '%s' "$types_response" | jq -r \
-        --arg name "$server_type" \
-        '.server_types[] | select(.name == $name and .deprecation == null) | .id')
-
-    if [[ -z "$wanted_id" ]]; then
-        printf 'ERROR:unknown_type\n' >&2
-        return 1
-    fi
-
-    if printf '%s\n' "$available_ids" | grep -qx "$wanted_id"; then
-        printf '%s' "$server_type"
-        return 0
-    fi
-
-    # Type not available — extract specs in a single jq call
     local wanted_specs
     wanted_specs=$(printf '%s' "$types_response" | jq -r \
         --arg name "$server_type" \
@@ -264,7 +244,6 @@ _validate_server_type_for_location() {
     local ids_json
     ids_json=$(printf '%s\n' "$available_ids" | jq -Rn '[inputs | tonumber]')
 
-    # Try same CPU family first, then any family
     local family candidates replacement
     for family in "same" "any"; do
         local filter
@@ -287,6 +266,41 @@ _validate_server_type_for_location() {
 
     printf 'ERROR:no_compatible_type\n' >&2
     return 1
+}
+
+# Validate that a server type is available at a given location.
+# Uses /datacenters API for authoritative availability + /server_types for specs.
+# If not available, finds the cheapest equivalent (same CPU family, >= specs).
+# Returns 0 and prints a valid server type; returns 1 on failure.
+_validate_server_type_for_location() {
+    local server_type="$1"
+    local location="$2"
+
+    _ensure_jq || return 1
+
+    local available_ids
+    available_ids=$(_hetzner_get_available_ids "$location") || return 1
+
+    local types_response
+    types_response=$(hetzner_api GET "/server_types?per_page=50")
+
+    # Check if the requested type exists and is directly available
+    local wanted_id
+    wanted_id=$(printf '%s' "$types_response" | jq -r \
+        --arg name "$server_type" \
+        '.server_types[] | select(.name == $name and .deprecation == null) | .id')
+
+    if [[ -z "$wanted_id" ]]; then
+        printf 'ERROR:unknown_type\n' >&2
+        return 1
+    fi
+
+    if printf '%s\n' "$available_ids" | grep -qx "$wanted_id"; then
+        printf '%s' "$server_type"
+        return 0
+    fi
+
+    _hetzner_find_fallback_type "$server_type" "$types_response" "$location" "$available_ids"
 }
 
 # Build JSON body for Hetzner server creation
@@ -338,25 +352,13 @@ _hetzner_check_create_error() {
     return 1
 }
 
-# Create a Hetzner server with cloud-init
-create_server() {
-    local name="$1"
+# Validate server type at location, handling errors and fallback logging.
+# On success, prints the (possibly replaced) server type name.
+# On failure, logs user-friendly errors and returns 1.
+_hetzner_resolve_server_type() {
+    local server_type="$1" location="$2"
 
-    # Interactive location + server type selection (skipped if env vars are set)
-    local location
-    location=$(_pick_location)
-
-    local server_type
-    server_type=$(_pick_server_type "$location")
-
-    local image="ubuntu-24.04"
-
-    # Validate inputs
-    validate_resource_name "$server_type" || { log_error "Invalid HETZNER_SERVER_TYPE"; return 1; }
-    validate_region_name "$location" || { log_error "Invalid HETZNER_LOCATION"; return 1; }
-
-    # Validate server type is available at selected location; auto-fallback if not
-    local validated_type stderr_output
+    local stderr_output validated_type
     stderr_output=$(mktemp)
     validated_type=$(_validate_server_type_for_location "$server_type" "$location" 2>"$stderr_output") || {
         local err_info
@@ -376,8 +378,29 @@ create_server() {
     if echo "$fallback_info" | grep -q "^FALLBACK:"; then
         log_warn "'$server_type' is not available in '$location'"
         log_warn "Using compatible alternative: $validated_type"
-        server_type="$validated_type"
     fi
+    printf '%s' "$validated_type"
+}
+
+# Create a Hetzner server with cloud-init
+create_server() {
+    local name="$1"
+
+    # Interactive location + server type selection (skipped if env vars are set)
+    local location
+    location=$(_pick_location)
+
+    local server_type
+    server_type=$(_pick_server_type "$location")
+
+    local image="ubuntu-24.04"
+
+    # Validate inputs
+    validate_resource_name "$server_type" || { log_error "Invalid HETZNER_SERVER_TYPE"; return 1; }
+    validate_region_name "$location" || { log_error "Invalid HETZNER_LOCATION"; return 1; }
+
+    # Validate server type at location; auto-fallback if unavailable
+    server_type=$(_hetzner_resolve_server_type "$server_type" "$location") || return 1
 
     log_step "Creating Hetzner server '$name' (type: $server_type, location: $location)..."
 
