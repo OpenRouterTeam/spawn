@@ -836,7 +836,7 @@
     "codesandbox/aider": "implemented",
     "codesandbox/goose": "missing",
     "codesandbox/codex": "missing",
-    "codesandbox/interpreter": "missing",
+    "codesandbox/interpreter": "implemented",
     "codesandbox/gemini": "missing",
     "codesandbox/amazonq": "missing",
     "codesandbox/cline": "missing",
