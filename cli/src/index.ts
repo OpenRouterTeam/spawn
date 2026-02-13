@@ -235,17 +235,36 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
   }
 
   if (promptFile) {
-    const { readFileSync } = await import("fs");
+    const { validatePromptFilePath, validatePromptFileStats } = await import("./security.js");
+    const { readFileSync, statSync } = await import("fs");
+
+    // SECURITY: Validate path before reading to prevent sensitive file exfiltration
+    try {
+      validatePromptFilePath(promptFile);
+    } catch (err) {
+      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+      console.error(pc.red(msg));
+      process.exit(1);
+    }
+
+    // Validate file metadata (regular file, size limits)
+    try {
+      const stats = statSync(promptFile);
+      validatePromptFileStats(promptFile, stats);
+    } catch (err) {
+      const code = err && typeof err === "object" && "code" in err ? err.code : "";
+      if (code === "ENOENT" || code === "EACCES" || code === "EISDIR") {
+        handlePromptFileError(promptFile, err);
+      }
+      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+      console.error(pc.red(msg));
+      process.exit(1);
+    }
+
     try {
       prompt = readFileSync(promptFile, "utf-8");
     } catch (err) {
       handlePromptFileError(promptFile, err);
-    }
-
-    if (prompt !== undefined && prompt.trim() === "") {
-      console.error(pc.red(`Prompt file is empty: ${pc.bold(promptFile)}`));
-      console.error(`\nThe file exists but contains no text. Add your prompt to the file and try again.`);
-      process.exit(1);
     }
   }
 
