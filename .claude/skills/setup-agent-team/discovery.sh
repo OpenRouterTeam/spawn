@@ -251,33 +251,33 @@ Clean up stale remote branches before and after the cycle:
 ### Gap Filler (spawn remaining)
 After scouts commit new entries, pick up the newly-created "missing" matrix entries and implement them.
 
-## CRITICAL: Monitoring Loop (DO NOT SKIP — your session MUST stay alive)
+## CRITICAL: Staying Alive (DO NOT SKIP)
 
-**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them by entering a WaitForMessage loop. If you end your conversation after spawning, teammates become orphaned with no coordination.
+**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. If you end your conversation after spawning, teammates become orphaned with no coordination.
+
+### TECHNICAL REQUIREMENT: You are running in `claude -p` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
+
+**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long `sleep 30` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use `sleep 5` to briefly yield, then check for messages.
 
 ### Required pattern after spawning:
 ```
-1. Spawn all teammates via SendMessage
-2. Enter monitoring loop:
-   while teammates are still active:
-     - Call WaitForMessage (this blocks until a teammate sends you an update)
-     - When you receive a message, acknowledge it and update your task tracking
-     - If a teammate reports completion, mark their task done
-     - If a teammate reports an error, coordinate resolution
-     - If 35 minutes have elapsed, send wrap-up messages to all teammates
-3. Only after ALL teammates have sent their final response, proceed to shutdown
+1. Spawn all teammates via Task tool
+2. Yield loop (keep it tight):
+   a. Bash("sleep 5") — yield the turn so queued messages can be delivered
+   b. If a message arrived, process it immediately (acknowledge, update task)
+   c. If no message, run TaskList — if tasks still pending, go back to (a)
+   d. Between polls, do useful work: check PR status, verify teammate health
+   e. If 35 minutes have elapsed, send wrap-up messages to all teammates
+3. Only after ALL teammates have finished, proceed to shutdown
 ```
 
-### What WaitForMessage does:
-- It pauses your session until a teammate sends a message to you
-- This is how you stay alive while teammates work in parallel
-- Without WaitForMessage, your session ends and teammates are abandoned
-- You MUST call WaitForMessage repeatedly in a loop — one call per teammate response
+**DO NOT loop on `sleep 15` or `sleep 30`.** Each sleep blocks message delivery. Keep sleeps to 5 seconds max.
 
 ### Common mistake (DO NOT DO THIS):
 ```
 BAD:  Spawn teammates → "I've assigned the work, my job is done" → session ends
-GOOD: Spawn teammates → WaitForMessage loop → receive all results → shutdown sequence → session ends
+BAD:  Spawn teammates → sleep 30 → sleep 30 → sleep 30 → ... (messages can't be delivered!)
+GOOD: Spawn teammates → sleep 5 → process message → sleep 5 → TaskList → ... → shutdown
 ```
 
 ## Commit Markers (MANDATORY)

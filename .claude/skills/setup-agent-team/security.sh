@@ -167,26 +167,29 @@ Create these teammates:
 5. Set up worktree: \`git worktree add ${WORKTREE_BASE} -b team-building/issue-${ISSUE_NUM} origin/main\`
 6. Spawn implementer (model=opus) to work in \`${WORKTREE_BASE}\`
 7. Spawn reviewer (model=opus) to review once PR is created
-8. Monitor teammates (poll TaskList, sleep 15 between checks)
+8. Wait for teammates — messages arrive automatically between your turns. Use \`Bash("sleep 5")\` to yield the turn and receive messages. Do NOT use long sleeps (15s+) — they block message delivery.
 9. Once both report:
    - If PR was merged, remove status labels and close the issue:
      \`gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --remove-label "in-progress"\`
      \`gh issue close ${ISSUE_NUM} --repo OpenRouterTeam/spawn --comment "Implemented and merged. See PR #NUMBER.\n\n-- security/team-lead"\`
    - If PR had issues, comment on the issue with findings
 10. Shutdown all teammates via SendMessage (type=shutdown_request)
-10. Clean up worktree and TeamDelete
-11. Exit
+11. Clean up worktree and TeamDelete
+12. Exit
 
-## CRITICAL: Monitoring Loop
+## CRITICAL: Staying Alive
 
-**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response.
+You are running in \`claude -p\` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
+
+**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long \`sleep 30\` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use \`sleep 5\` to briefly yield, then check for messages.
 
 Required pattern:
-1. Spawn teammates via Task tool (with team_name and name params)
-2. Poll loop:
-   a. Run TaskList to check status
-   b. If messages received, process them
-   c. If no messages yet, run Bash("sleep 15") then loop back
+1. Spawn teammates via Task tool
+2. Yield loop (keep it tight):
+   a. \`Bash("sleep 5")\` — yield the turn so queued messages can be delivered
+   b. If a message arrived, process it immediately
+   c. If no message, run TaskList to check status — if tasks still pending, loop back to (a)
+   d. After 20 iterations with no messages (~2 min), do something useful: check PR status, verify teammate health, run \`gh pr list\`
 3. Once both agents report, close the issue or comment
 4. Shutdown teammates and exit
 
@@ -658,27 +661,28 @@ fi
    b. Spawn a pr-reviewer agent (model=opus, team_name="${TEAM_NAME}", name="pr-reviewer-NUMBER")
 6. If ≤5 open PRs, spawn shell-scanner (model=sonnet) and code-scanner (model=sonnet)
 7. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
-8. Monitor teammates (poll TaskList, sleep 15 between checks)
-9. Collect results from all agents via messages (PR reviews + scan findings)
+8. Wait for teammates — use \`Bash("sleep 5")\` to yield the turn and receive messages. Process results as they arrive (don't wait for all agents to finish before acting).
+9. As each agent reports back, record: PR number, verdict, finding count
 10. Compile summary (N reviewed, X merged, Y flagged, Z closed-stale, K branches cleaned, J issues re-flagged, S scan findings, F issues filed)
 11. Send Slack notification
 12. Shutdown all teammates via SendMessage (type=shutdown_request)
 13. Clean up with TeamDelete
 14. Exit
 
-## CRITICAL: Monitoring Loop
+## CRITICAL: Staying Alive
 
-**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response.
+You are running in \`claude -p\` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
 
-Required pattern:
-1. Spawn teammates via Task tool (with team_name and name params)
-2. Poll loop:
-   a. Run TaskList to check status
-   b. If messages received, process them
-   c. If no messages yet, run Bash("sleep 15") then loop back
-3. Once all agents report (or time is up), compile summary (include scan findings if scanners were spawned)
-4. Send Slack notification
-5. Shutdown teammates and exit
+**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long \`sleep 30\` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use \`sleep 5\` to briefly yield, then check for messages.
+
+Required pattern after spawning all agents:
+1. \`Bash("sleep 5")\` — yield the turn so queued messages can be delivered
+2. If a message arrived, process it immediately (record result, update task)
+3. If no message, run TaskList — if tasks still pending, go back to (1)
+4. Between polls, do useful work: track results so far, check wall-clock time, prepare the summary incrementally
+5. Once all agents report (or time is up), compile final summary and shutdown
+
+**DO NOT loop on \`sleep 15\` or \`sleep 30\`.** Each sleep blocks message delivery. Keep sleeps to 5 seconds max.
 
 ## Safety Rules
 
@@ -853,30 +857,27 @@ fi
    - code-auditor (model=opus): audit all .ts files
    - drift-detector (model=haiku): check for anomalies and unexpected files
 4. Assign tasks to teammates using TaskUpdate (set owner to teammate name)
-5. Monitor teammates (poll TaskList, sleep 15 between checks)
-6. Collect results from all agents via messages
-7. Dedup check against existing issues
-8. File new issues for novel findings
-9. Send Slack summary
-10. Shutdown all teammates via SendMessage (type=shutdown_request)
-11. Clean up with TeamDelete
-12. Exit
+5. Wait for teammates — use \`Bash("sleep 5")\` to yield the turn and receive messages. Process results as they arrive.
+6. As each agent reports findings, start dedup checking immediately (don't wait for all agents)
+7. File new issues for novel findings
+8. Send Slack summary
+9. Shutdown all teammates via SendMessage (type=shutdown_request)
+10. Clean up with TeamDelete
+11. Exit
 
-## CRITICAL: Monitoring Loop
+## CRITICAL: Staying Alive
 
-**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. Your session ENDS the moment you produce a response with no tool call. To stay alive, you MUST ALWAYS include at least one tool call in every response.
+You are running in \`claude -p\` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
 
-Required pattern:
-1. Spawn teammates via Task tool (with team_name and name params)
-2. Poll loop:
-   a. Run TaskList to check status
-   b. If messages received, process them
-   c. If no messages yet, run Bash("sleep 15") then loop back
-3. Once all agents report, compile findings
-4. Dedup check against existing issues
-5. File new issues for novel findings
-6. Send Slack summary
-7. Shutdown teammates and exit
+**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long \`sleep 30\` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use \`sleep 5\` to briefly yield, then check for messages.
+
+Required pattern after spawning all agents:
+1. \`Bash("sleep 5")\` — yield the turn so queued messages can be delivered
+2. If a message arrived, process it immediately (dedup + file issues right away)
+3. If no message, run TaskList — if tasks still pending, go back to (1)
+4. Once all agents report (or time is up), compile final summary and shutdown
+
+**DO NOT loop on \`sleep 15\` or \`sleep 30\`.** Each sleep blocks message delivery. Keep sleeps to 5 seconds max.
 
 ## Safety Rules
 
