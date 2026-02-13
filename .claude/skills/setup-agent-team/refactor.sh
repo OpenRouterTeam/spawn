@@ -101,20 +101,17 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
         fi
     done
 
-    log "Pre-cycle cleanup: stale open PRs (merge if possible, never close)..."
-    STALE_PRS=$(gh pr list --repo OpenRouterTeam/spawn --state open --json number,updatedAt --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | .number' 2>/dev/null) || true
-    for pr_num in $STALE_PRS; do
+    log "Pre-cycle cleanup: checking stale open PRs for conflicts..."
+    STALE_PRS=$(gh pr list --repo OpenRouterTeam/spawn --state open --json number,updatedAt,mergeable --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | "\(.number) \(.mergeable)"' 2>/dev/null) || true
+    while IFS=' ' read -r pr_num pr_mergeable; do
         if [[ -n "$pr_num" ]]; then
-            log "Found stale PR #${pr_num}, checking if mergeable..."
-            PR_MERGEABLE=$(gh pr view "$pr_num" --repo OpenRouterTeam/spawn --json mergeable --jq '.mergeable' 2>/dev/null) || PR_MERGEABLE="UNKNOWN"
-            if [[ "$PR_MERGEABLE" == "MERGEABLE" ]]; then
-                log "Merging stale PR #${pr_num}..."
-                gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
-            else
+            if [[ "$pr_mergeable" != "MERGEABLE" ]]; then
                 log "Stale PR #${pr_num} has conflicts — will be handled by pr-maintainer agent"
+            else
+                log "Stale PR #${pr_num} is mergeable — will be reviewed by security team"
             fi
         fi
-    done
+    done <<< "$STALE_PRS"
 fi
 
 # Launch Claude Code with mode-specific prompt
@@ -290,35 +287,40 @@ Create these teammates:
    - Add integration tests for critical paths
 
 5. **pr-maintainer** (Sonnet)
+   - **Role: Keep PRs healthy and mergeable. Do NOT review, approve, or merge PRs — that is the security team's responsibility.**
    - FIRST TASK: List ALL open PRs: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision`
    - For EACH open PR, evaluate and take the appropriate action:
-     * **Mergeable + approved (or no reviews required)**: approve and merge it
-       `gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "Approved by pr-maintainer: looks good, tests pass.\n\n-- refactor/pr-maintainer"`
-       `gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch`
-     * **Mergeable + needs review**: review the diff for correctness, then approve and merge if safe
-       `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
-       - Check for: command injection, credential leaks, broken curl|bash patterns, macOS compat issues
-       - If safe: approve + merge (squash + delete branch)
-       - If concerns: post a review comment describing the issue (request changes, do NOT close)
      * **Has merge conflicts**: rebase the PR branch onto main to resolve
        ```
        git fetch origin
-       git worktree add /tmp/spawn-worktrees/pr-rebase-NUMBER -b pr-rebase-NUMBER origin/BRANCH
+       BRANCH=$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json headRefName --jq '.headRefName')
+       git worktree add /tmp/spawn-worktrees/pr-rebase-NUMBER origin/$BRANCH
        cd /tmp/spawn-worktrees/pr-rebase-NUMBER
        git rebase origin/main
        # If rebase succeeds: force-push the branch
-       git push --force-with-lease origin BRANCH
-       # Then re-evaluate: if clean, approve and merge
-       git worktree remove /tmp/spawn-worktrees/pr-rebase-NUMBER
+       git push --force-with-lease origin $BRANCH
+       cd /path/to/repo
+       git worktree remove /tmp/spawn-worktrees/pr-rebase-NUMBER --force
        ```
-       If rebase has unresolvable conflicts, post a comment asking the author to resolve:
-       `gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "This PR has merge conflicts that couldn't be auto-resolved. Could you rebase on main and push? Happy to re-review once updated.\n\n-- refactor/branch-manager"`
-     * **Failing checks**: investigate the failure, fix if trivial, otherwise comment with failure details
+       If rebase has unresolvable conflicts, post a comment:
+       `gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "Attempted to rebase onto main but conflicts couldn't be auto-resolved. Manual resolution needed.\n\n-- refactor/pr-maintainer"`
+     * **Has review comments requesting changes**: read the review comments, address them with code fixes in a worktree
+       ```
+       gh pr view NUMBER --repo OpenRouterTeam/spawn --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | .body'
+       gh api repos/OpenRouterTeam/spawn/pulls/NUMBER/comments --jq '.[].body'
+       ```
+       - Check out the PR branch in a worktree, make the requested fixes, commit, and push
+       - Post a comment summarizing what was addressed:
+         `gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "Addressed review feedback:\n- [list of changes]\n\n-- refactor/pr-maintainer"`
+     * **Failing checks**: investigate the failure in a worktree, fix if trivial (e.g., `bash -n` errors, test failures), push the fix
+       - If the failure is non-trivial, comment with failure details for the author
+     * **Mergeable + no issues**: leave it alone — the security team handles review and merge
    - ALSO clean up orphan branches (no open PR, stale >4 hours): `git push origin --delete BRANCH`
+   - **NEVER review, approve, or merge PRs** — that is exclusively the security team's job
    - **NEVER close a PR** — always try to rebase, fix, or request changes instead
-   - After processing all PRs, report summary: how many merged, rebased, commented, branches cleaned
+   - After processing all PRs, report summary: how many rebased, fixed, commented, branches cleaned
    - Run this check AGAIN at the end of the cycle to catch PRs created during the cycle
-   - GOAL: Zero stale unreviewed PRs left on the remote after each cycle.
+   - GOAL: All open PRs are conflict-free, review feedback is addressed, and checks are passing — ready for security review.
 
 6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
@@ -495,7 +497,7 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 1. Create the team with TeamCreate
 2. Set up worktree directory: mkdir -p WORKTREE_BASE_PLACEHOLDER
 3. Create tasks using TaskCreate for each area:
-   - PR maintenance: review, rebase, and merge all open PRs; clean orphan branches
+   - PR maintenance: rebase conflicting PRs, address review comments, fix failing checks; clean orphan branches
    - Community coordination: scan all open issues, post acknowledgments, categorize, and delegate
    - Security scan of all scripts
    - UX test of main user flows
@@ -503,7 +505,7 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
    - Test coverage for recent changes
 4. Spawn teammates with Task tool using subagent_type='general-purpose'
 5. Assign tasks to teammates using TaskUpdate
-6. PR-maintainer reviews all open PRs: merge clean ones, rebase conflicting ones, comment on issues
+6. PR-maintainer maintains all open PRs: rebase conflicting ones, address review comments, fix failing checks
 7. Community-coordinator engages issues FIRST — posts acknowledgments before other agents start investigating
 8. Community-coordinator delegates issue investigations to relevant teammates
 9. All agents use worktrees for their branch work (never git checkout in the main repo)
@@ -540,7 +542,7 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 ### Common mistake (DO NOT DO THIS):
 ```
 BAD:  Spawn teammates → "I'll wait for their messages" → session ends (agents orphaned!)
-GOOD: Spawn teammates → TaskList → sleep 30 → TaskList → receive message → merge PR → ... → shutdown
+GOOD: Spawn teammates → TaskList → sleep 30 → TaskList → receive message → coordinate → ... → shutdown
 ```
 
 ## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
@@ -548,7 +550,7 @@ GOOD: Spawn teammates → TaskList → sleep 30 → TaskList → receive message
 You MUST remain active until ALL of the following are true:
 
 1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
-2. **All PRs are self-reviewed and labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` and confirm every PR from this cycle has a self-review comment and the `needs-team-review` label. Do NOT merge — PRs stay open for external review.
+2. **All PRs are self-reviewed and labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` and confirm every PR from this cycle has a self-review comment and the `needs-team-review` label. PRs stay open for the security team to review and merge.
 3. **All issues are engaged and labeled**: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,labels`
    and for EACH open issue, verify it has at least one comment AND has a status label
    ("pending-review", "under-review", or "in-progress"). If any issue is missing a status
@@ -560,7 +562,7 @@ You MUST remain active until ALL of the following are true:
 ### Shutdown Sequence (execute in this exact order):
 
 1. Check TaskList — if any tasks are still in_progress or pending, wait and check again (poll every 30 seconds, up to 10 minutes)
-2. Verify all PRs are self-reviewed and labeled: `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` (PRs stay open — do NOT merge)
+2. Verify all PRs are self-reviewed and labeled: `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` (PRs stay open for security team review)
 3. Verify all issues engaged: `gh issue list --repo OpenRouterTeam/spawn --state open`
 4. For each teammate, send a `shutdown_request` via SendMessage
 5. Wait for all `shutdown_response` confirmations

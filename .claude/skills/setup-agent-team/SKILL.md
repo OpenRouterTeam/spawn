@@ -336,7 +336,9 @@ git fetch origin main
 git pull origin main
 ```
 
-### 2. Use git worktrees for all branch work
+### 2. Use git worktrees for ALL work (mandatory)
+
+**Every agent MUST work in a git worktree — NEVER operate directly in the main repo checkout.** This applies to all work: creating branches, reviewing PRs, running tests, reading code for audits, etc.
 
 When multiple agents work in parallel, they MUST use worktrees instead of `git checkout -b` to avoid clobbering each other's uncommitted changes:
 
@@ -349,18 +351,29 @@ git worktree add /tmp/spawn-worktrees/BRANCH-NAME -b BRANCH-NAME origin/main
 
 # Work inside the worktree
 cd /tmp/spawn-worktrees/BRANCH-NAME
-# ... make changes ...
+# ... make changes, run tests, etc. ...
 
-# Commit, push, create PR, merge
+# Commit, push, create PR
 git push -u origin BRANCH-NAME
 gh pr create --title "..." --body "...
 
 -- TEAM-NAME/AGENT-NAME"
-gh pr merge --squash --delete-branch
 
 # Clean up
 git worktree remove /tmp/spawn-worktrees/BRANCH-NAME
 ```
+
+**For PR review/testing** (read-only worktree):
+```bash
+git worktree add /tmp/spawn-worktrees/pr-NUMBER -b review-pr-NUMBER origin/main
+cd /tmp/spawn-worktrees/pr-NUMBER
+gh pr checkout NUMBER
+# ... run bash -n, bun test, read files ...
+cd /path/to/repo
+git worktree remove /tmp/spawn-worktrees/pr-NUMBER --force
+```
+
+**Why:** The main checkout must stay clean so concurrent agents don't conflict. Worktrees provide isolated working directories for each agent.
 
 ### 3. Include Agent markers in commits
 
