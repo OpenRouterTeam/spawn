@@ -99,7 +99,5 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx \
 |----------|-------------|---------|
 | `DAYTONA_API_KEY` | Daytona API key | _(prompted)_ |
 | `DAYTONA_SANDBOX_NAME` | Sandbox name | _(prompted)_ |
-| `DAYTONA_CPU` | Number of vCPUs | `2` |
-| `DAYTONA_MEMORY` | Memory in MB | `2048` |
-| `DAYTONA_DISK` | Disk size in GB | `5` |
+| `DAYTONA_CLASS` | Sandbox class (e.g. `small`, `medium`, `large`) | `small` |
 | `OPENROUTER_API_KEY` | OpenRouter API key | _(OAuth or prompted)_ |

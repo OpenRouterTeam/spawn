@@ -2,7 +2,7 @@
 # Common bash functions for Daytona sandbox spawn scripts
 # Uses Daytona CLI (daytona) — https://www.daytona.io
 # Sandboxes are cloud dev environments with true SSH access
-# Default: 1 vCPU / 1GB RAM / 3GB disk (max: 4 vCPU / 8GB / 10GB)
+# Default class: small (use DAYTONA_CLASS env var to override)
 
 # Bash safety flags
 set -eo pipefail
@@ -96,24 +96,21 @@ get_server_name() {
 
 create_server() {
     local name="${1}"
-    local cpu="${DAYTONA_CPU:-2}"
-    local memory="${DAYTONA_MEMORY:-2048}"
-    local disk="${DAYTONA_DISK:-5}"
+    local sandbox_class="${DAYTONA_CLASS:-small}"
 
-    # Validate numeric env vars to prevent command injection
-    if [[ ! "${cpu}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_CPU: must be numeric"; return 1; fi
-    if [[ ! "${memory}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_MEMORY: must be numeric"; return 1; fi
-    if [[ ! "${disk}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_DISK: must be numeric"; return 1; fi
+    # Validate class to prevent command injection (alphanumeric + hyphens only)
+    if [[ ! "${sandbox_class}" =~ ^[a-zA-Z0-9-]+$ ]]; then
+        log_error "Invalid DAYTONA_CLASS: must be alphanumeric (e.g. small, medium, large)"
+        return 1
+    fi
 
-    log_step "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
+    log_step "Creating Daytona sandbox '${name}' (class: ${sandbox_class})..."
 
-    # Create sandbox with resource flags and auto-stop disabled
+    # Create sandbox with class-based sizing (--class avoids conflict with snapshots)
     local output
     output=$(daytona create \
         --name "${name}" \
-        --cpu "${cpu}" \
-        --memory "${memory}" \
-        --disk "${disk}" \
+        --class "${sandbox_class}" \
         --auto-stop 0 \
         --auto-archive 0 \
         2>&1)
