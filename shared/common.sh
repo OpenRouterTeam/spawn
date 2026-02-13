@@ -113,6 +113,49 @@ check_python_available() {
 }
 
 # Install jq if not already present (required by some cloud providers)
+# Platform-specific jq install helpers
+_install_jq_brew() {
+    if command -v brew &>/dev/null; then
+        brew install jq || { log_error "Failed to install jq via Homebrew. Run 'brew install jq' manually."; return 1; }
+    else
+        log_error "jq is required but not installed"
+        log_error "Install it with: brew install jq"
+        log_error "If Homebrew is not available: https://jqlang.github.io/jq/download/"
+        return 1
+    fi
+}
+
+_install_jq_apt() {
+    sudo apt-get update -qq && sudo apt-get install -y jq || {
+        log_error "Failed to install jq via apt. Run 'sudo apt-get install -y jq' manually."
+        return 1
+    }
+}
+
+_install_jq_dnf() {
+    sudo dnf install -y jq || {
+        log_error "Failed to install jq via dnf. Run 'sudo dnf install -y jq' manually."
+        return 1
+    }
+}
+
+_install_jq_apk() {
+    sudo apk add jq || {
+        log_error "Failed to install jq via apk. Run 'sudo apk add jq' manually."
+        return 1
+    }
+}
+
+_report_jq_not_found() {
+    log_error "jq is required but not installed"
+    log_error ""
+    log_error "Install jq for your system:"
+    log_error "  Ubuntu/Debian:  sudo apt-get install -y jq"
+    log_error "  Fedora/RHEL:    sudo dnf install -y jq"
+    log_error "  macOS:          brew install jq"
+    log_error "  Other:          https://jqlang.github.io/jq/download/"
+}
+
 ensure_jq() {
     if command -v jq &>/dev/null; then
         return 0
@@ -121,28 +164,15 @@ ensure_jq() {
     log_step "Installing jq..."
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        if command -v brew &>/dev/null; then
-            brew install jq || { log_error "Failed to install jq via Homebrew. Run 'brew install jq' manually."; return 1; }
-        else
-            log_error "jq is required but not installed"
-            log_error "Install it with: brew install jq"
-            log_error "If Homebrew is not available: https://jqlang.github.io/jq/download/"
-            return 1
-        fi
+        _install_jq_brew || return 1
     elif command -v apt-get &>/dev/null; then
-        sudo apt-get update -qq && sudo apt-get install -y jq || { log_error "Failed to install jq via apt. Run 'sudo apt-get install -y jq' manually."; return 1; }
+        _install_jq_apt || return 1
     elif command -v dnf &>/dev/null; then
-        sudo dnf install -y jq || { log_error "Failed to install jq via dnf. Run 'sudo dnf install -y jq' manually."; return 1; }
+        _install_jq_dnf || return 1
     elif command -v apk &>/dev/null; then
-        sudo apk add jq || { log_error "Failed to install jq via apk. Run 'sudo apk add jq' manually."; return 1; }
+        _install_jq_apk || return 1
     else
-        log_error "jq is required but not installed"
-        log_error ""
-        log_error "Install jq for your system:"
-        log_error "  Ubuntu/Debian:  sudo apt-get install -y jq"
-        log_error "  Fedora/RHEL:    sudo dnf install -y jq"
-        log_error "  macOS:          brew install jq"
-        log_error "  Other:          https://jqlang.github.io/jq/download/"
+        _report_jq_not_found
         return 1
     fi
 

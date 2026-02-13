@@ -33,6 +33,44 @@ fi
 # ensure_gh_cli — Install gh CLI if not already present
 # ============================================================
 
+# Install gh via Homebrew (macOS)
+_install_gh_brew() {
+    if command -v brew &>/dev/null; then
+        brew install gh || {
+            log_error "Failed to install gh via Homebrew"
+            return 1
+        }
+    else
+        log_error "Homebrew not found. Install Homebrew first: https://brew.sh"
+        log_error "Then run: brew install gh"
+        return 1
+    fi
+}
+
+# Install gh via APT with GitHub's official repository (Debian/Ubuntu)
+_install_gh_apt() {
+    log_step "Adding GitHub CLI APT repository..."
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
+    sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+    printf 'deb [arch=%s signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' \
+        "$(dpkg --print-architecture)" \
+        | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    sudo apt-get update -qq
+    sudo apt-get install -y gh || {
+        log_error "Failed to install gh via apt"
+        return 1
+    }
+}
+
+# Install gh via DNF (Fedora/RHEL)
+_install_gh_dnf() {
+    sudo dnf install -y gh || {
+        log_error "Failed to install gh via dnf"
+        return 1
+    }
+}
+
 ensure_gh_cli() {
     if command -v gh &>/dev/null; then
         log_info "GitHub CLI (gh) available: $(gh --version | head -1)"
@@ -42,44 +80,16 @@ ensure_gh_cli() {
     log_step "Installing GitHub CLI (gh)..."
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS — require Homebrew
-        if command -v brew &>/dev/null; then
-            brew install gh || {
-                log_error "Failed to install gh via Homebrew"
-                return 1
-            }
-        else
-            log_error "Homebrew not found. Install Homebrew first: https://brew.sh"
-            log_error "Then run: brew install gh"
-            return 1
-        fi
+        _install_gh_brew || return 1
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         if command -v apt-get &>/dev/null; then
-            # Debian/Ubuntu — add GitHub's official APT repo
-            log_step "Adding GitHub CLI APT repository..."
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-                | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
-            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            printf 'deb [arch=%s signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' \
-                "$(dpkg --print-architecture)" \
-                | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            sudo apt-get update -qq
-            sudo apt-get install -y gh || {
-                log_error "Failed to install gh via apt"
-                return 1
-            }
+            _install_gh_apt || return 1
         elif command -v dnf &>/dev/null; then
-            # Fedora/RHEL
-            sudo dnf install -y gh || {
-                log_error "Failed to install gh via dnf"
-                return 1
-            }
+            _install_gh_dnf || return 1
         else
-            # Fallback — download prebuilt binary
             _install_gh_binary || return 1
         fi
     else
-        # Unknown OS — try binary fallback
         _install_gh_binary || return 1
     fi
 
@@ -95,9 +105,9 @@ ensure_gh_cli() {
 # Binary fallback installer (non-apt/non-brew systems)
 # ============================================================
 
-_install_gh_binary() {
-    log_step "Installing gh from GitHub releases (binary fallback)..."
-
+# Detect OS and architecture for binary downloads, outputting "os arch" on stdout.
+# Returns 1 with error message if platform is unsupported.
+_detect_gh_platform() {
     local os arch gh_os gh_arch
     os="$(uname -s)"
     arch="$(uname -m)"
@@ -120,7 +130,11 @@ _install_gh_binary() {
             ;;
     esac
 
-    # Get latest release version
+    echo "${gh_os} ${gh_arch}"
+}
+
+# Fetch the latest gh release version string from GitHub API
+_fetch_gh_latest_version() {
     local latest_version
     latest_version=$(curl -fsSL "https://api.github.com/repos/cli/cli/releases/latest" \
         | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/') || {
@@ -133,10 +147,18 @@ _install_gh_binary() {
         return 1
     fi
 
-    log_step "Downloading gh v${latest_version} for ${gh_os}/${gh_arch}..."
+    echo "${latest_version}"
+}
 
-    local tarball="gh_${latest_version}_${gh_os}_${gh_arch}.tar.gz"
-    local url="https://github.com/cli/cli/releases/download/v${latest_version}/${tarball}"
+# Download and extract a gh release tarball into ~/.local/bin
+# Usage: _download_and_install_gh VERSION GH_OS GH_ARCH
+_download_and_install_gh() {
+    local version="${1}" gh_os="${2}" gh_arch="${3}"
+
+    log_step "Downloading gh v${version} for ${gh_os}/${gh_arch}..."
+
+    local tarball="gh_${version}_${gh_os}_${gh_arch}.tar.gz"
+    local url="https://github.com/cli/cli/releases/download/v${version}/${tarball}"
     local tmpdir
     tmpdir=$(mktemp -d)
 
@@ -152,9 +174,8 @@ _install_gh_binary() {
         return 1
     }
 
-    # Install to ~/.local/bin
     mkdir -p "${HOME}/.local/bin"
-    cp "${tmpdir}/gh_${latest_version}_${gh_os}_${gh_arch}/bin/gh" "${HOME}/.local/bin/gh"
+    cp "${tmpdir}/gh_${version}_${gh_os}_${gh_arch}/bin/gh" "${HOME}/.local/bin/gh"
     chmod +x "${HOME}/.local/bin/gh"
     rm -rf "${tmpdir}"
 
@@ -165,6 +186,20 @@ _install_gh_binary() {
     esac
 
     log_info "gh installed to ${HOME}/.local/bin/gh"
+}
+
+_install_gh_binary() {
+    log_step "Installing gh from GitHub releases (binary fallback)..."
+
+    local platform
+    platform=$(_detect_gh_platform) || return 1
+    local gh_os gh_arch
+    read -r gh_os gh_arch <<< "${platform}"
+
+    local latest_version
+    latest_version=$(_fetch_gh_latest_version) || return 1
+
+    _download_and_install_gh "${latest_version}" "${gh_os}" "${gh_arch}"
 }
 
 # ============================================================
