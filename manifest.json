@@ -1268,7 +1268,7 @@
     "atlanticnet/goose": "missing",
     "atlanticnet/codex": "missing",
     "atlanticnet/interpreter": "missing",
-    "atlanticnet/gemini": "missing",
+    "atlanticnet/gemini": "implemented",
     "atlanticnet/amazonq": "missing",
     "atlanticnet/cline": "missing",
     "atlanticnet/gptme": "missing",
