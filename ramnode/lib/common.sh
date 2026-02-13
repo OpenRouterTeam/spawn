@@ -277,42 +277,14 @@ print(json.dumps(body))
 " "$@"
 }
 
-# Poll the RamNode API until the server has an IPv4 address
+# Wait for RamNode instance to become ACTIVE and get its IP
 # Sets RAMNODE_SERVER_IP on success
 _ramnode_wait_for_ip() {
-    log_step "Waiting for IP address..."
-    local max_attempts=30
-    local attempt=0
-    while [[ $attempt -lt $max_attempts ]]; do
-        sleep 2
-        local server_info
-        server_info=$(ramnode_compute_api GET "/servers/$RAMNODE_SERVER_ID")
-
-        RAMNODE_SERVER_IP=$(echo "$server_info" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-addresses = data.get('server', {}).get('addresses', {})
-for net_name, addrs in addresses.items():
-    for addr in addrs:
-        if addr.get('version') == 4:
-            print(addr['addr'])
-            sys.exit(0)
-" 2>/dev/null || echo "")
-
-        if [[ -n "$RAMNODE_SERVER_IP" ]]; then
-            export RAMNODE_SERVER_IP
-            log_info "IP address assigned: $RAMNODE_SERVER_IP"
-            return 0
-        fi
-
-        attempt=$((attempt + 1))
-        if [[ $((attempt % 5)) -eq 0 ]]; then
-            log_step "Still waiting for IP address... (attempt ${attempt}/${max_attempts})"
-        fi
-    done
-
-    log_error "Timeout waiting for IP address after ${max_attempts} attempts"
-    return 1
+    INSTANCE_STATUS_POLL_DELAY=2 generic_wait_for_instance ramnode_compute_api \
+        "/servers/$RAMNODE_SERVER_ID" "ACTIVE" \
+        "d['server']['status']" \
+        "next(addr['addr'] for addrs in d['server']['addresses'].values() for addr in addrs if addr.get('version')==4)" \
+        RAMNODE_SERVER_IP "RamNode instance" 30
 }
 
 # Parse server ID from create response, or log error and return 1
