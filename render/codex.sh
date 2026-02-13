@@ -30,7 +30,7 @@ run_server "npm install -g @openai/codex"
 
 # Verify installation
 if ! run_server "command -v codex" >/dev/null 2>&1; then
-    log_error "Codex CLI installation failed"
+    log_install_failed "Codex CLI" "npm install -g @openai/codex"
     exit 1
 fi
 log_info "Codex CLI installed"

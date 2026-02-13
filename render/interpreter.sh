@@ -30,7 +30,7 @@ run_server "pip3 install open-interpreter"
 
 # Verify installation
 if ! run_server "command -v interpreter" >/dev/null 2>&1; then
-    log_error "Open Interpreter installation failed"
+    log_install_failed "Open Interpreter" "pip install open-interpreter"
     exit 1
 fi
 log_info "Open Interpreter installed"

@@ -26,8 +26,7 @@ run_server "curl -fsSL https://bun.sh/install | bash && export PATH=\"\$HOME/.bu
 
 # Verify installation
 if ! run_server "command -v kilocode &> /dev/null"; then
-    log_error "kilocode installation verification failed"
-    log_error "The 'kilocode' command is not available"
+    log_install_failed "Kilo Code" "npm install -g @kilocode/cli"
     exit 1
 fi
 log_info "Kilo Code installation verified successfully"

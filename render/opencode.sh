@@ -29,7 +29,7 @@ run_server "$(opencode_install_cmd)"
 
 # Verify installation
 if ! run_server "command -v opencode" >/dev/null 2>&1; then
-    log_error "OpenCode installation failed"
+    log_install_failed "OpenCode" "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
     exit 1
 fi
 log_info "OpenCode installed"

@@ -33,8 +33,7 @@ run_server "${NETCUP_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 ins
 
 # Verify installation succeeded
 if ! run_server "${NETCUP_SERVER_IP}" "command -v aider &> /dev/null && aider --version &> /dev/null"; then
-    log_error "Aider installation verification failed"
-    log_error "The 'aider' command is not available or not working properly on server ${NETCUP_SERVER_IP}"
+    log_install_failed "Aider" "pip install aider-chat" "${NETCUP_SERVER_IP}"
     exit 1
 fi
 log_info "Aider installation verified successfully"

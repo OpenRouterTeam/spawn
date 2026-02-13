@@ -31,8 +31,7 @@ run_sprite "${SPRITE_NAME}" "pip install aider-chat 2>/dev/null || pip3 install 
 
 # Verify installation succeeded
 if ! run_sprite "${SPRITE_NAME}" "command -v aider &> /dev/null && aider --version &> /dev/null"; then
-    log_error "Aider installation verification failed"
-    log_error "The 'aider' command is not available or not working properly"
+    log_install_failed "Aider" "pip install aider-chat"
     exit 1
 fi
 log_info "Aider installation verified successfully"

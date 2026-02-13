@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v codex &> /dev/null"; then
-    log_error "Codex CLI installation verification failed"
-    log_error "The 'codex' command is not available on server ${IONOS_SERVER_IP}"
+    log_install_failed "Codex CLI" "npm install -g @openai/codex" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "Codex CLI installation verified successfully"

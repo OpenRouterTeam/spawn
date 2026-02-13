@@ -23,7 +23,7 @@ log_step "Installing gptme..."
 run_server "${UPCLOUD_SERVER_IP}" "pip install gptme 2>/dev/null || pip3 install gptme"
 
 if ! run_server "${UPCLOUD_SERVER_IP}" "command -v gptme &> /dev/null && gptme --version &> /dev/null"; then
-    log_error "gptme installation verification failed"
+    log_install_failed "gptme" "pip install gptme" "${UPCLOUD_SERVER_IP}"
     exit 1
 fi
 log_info "gptme installation verified successfully"

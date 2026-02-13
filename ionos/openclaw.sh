@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v openclaw &> /dev/null"; then
-    log_error "openclaw installation verification failed"
-    log_error "The 'openclaw' command is not available on server ${IONOS_SERVER_IP}"
+    log_install_failed "OpenClaw" "bun install -g openclaw" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "openclaw installation verified successfully"

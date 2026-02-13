@@ -30,7 +30,7 @@ run_server "npm install -g @google/gemini-cli"
 
 # Verify installation
 if ! run_server "command -v gemini" >/dev/null 2>&1; then
-    log_error "Gemini CLI installation failed"
+    log_install_failed "Gemini CLI" "npm install -g @google/gemini-cli"
     exit 1
 fi
 log_info "Gemini CLI installed"

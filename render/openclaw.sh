@@ -29,7 +29,7 @@ run_server "curl -fsSL https://bun.sh/install | bash"
 
 # Verify Bun installation
 if ! run_server "command -v /root/.bun/bin/bun" >/dev/null 2>&1; then
-    log_error "Bun installation failed"
+    log_install_failed "OpenClaw" "bun install -g openclaw"
     exit 1
 fi
 log_info "Bun installed"

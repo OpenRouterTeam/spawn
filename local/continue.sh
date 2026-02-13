@@ -32,9 +32,7 @@ fi
 
 # Verify installation
 if ! command -v cn &>/dev/null; then
-    log_error "Continue installation failed"
-    log_error "The 'cn' command is not available"
-    log_error "Try installing manually: npm install -g @continuedev/cli"
+    log_install_failed "Continue" "npm install -g @continuedev/cli"
     exit 1
 fi
 log_info "Continue installation verified"

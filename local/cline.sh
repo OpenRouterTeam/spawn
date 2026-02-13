@@ -25,9 +25,7 @@ npm install -g cline
 
 # Verify installation
 if ! command -v cline &>/dev/null; then
-    log_error "Cline installation failed"
-    log_error "The 'cline' command is not available"
-    log_error "Try installing manually: npm install -g cline"
+    log_install_failed "Cline" "npm install -g cline"
     exit 1
 fi
 log_info "Cline installation verified"

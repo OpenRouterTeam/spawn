@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v cline &> /dev/null"; then
-    log_error "Cline installation verification failed"
-    log_error "The 'cline' command is not available on server ${IONOS_SERVER_IP}"
+    log_install_failed "Cline" "npm install -g cline" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "Cline installation verified successfully"

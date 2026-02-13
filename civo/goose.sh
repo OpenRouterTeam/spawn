@@ -26,8 +26,7 @@ log_step "Installing Goose..."
 run_server "${CIVO_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
 
 if ! run_server "${CIVO_SERVER_IP}" "command -v goose &> /dev/null && goose --version &> /dev/null"; then
-    log_error "Goose installation verification failed"
-    log_error "The 'goose' command is not available or not working properly on server ${CIVO_SERVER_IP}"
+    log_install_failed "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" "${CIVO_SERVER_IP}"
     exit 1
 fi
 log_info "Goose installation verified successfully"

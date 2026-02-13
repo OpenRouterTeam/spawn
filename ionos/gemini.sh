@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v gemini &> /dev/null"; then
-    log_error "Gemini CLI installation verification failed"
-    log_error "The 'gemini' command is not available on server ${IONOS_SERVER_IP}"
+    log_install_failed "Gemini CLI" "npm install -g @google/gemini-cli" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "Gemini CLI installation verified successfully"

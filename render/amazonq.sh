@@ -29,7 +29,7 @@ run_server "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/
 
 # Verify installation
 if ! run_server "command -v q" >/dev/null 2>&1; then
-    log_error "Amazon Q CLI installation failed"
+    log_install_failed "Amazon Q CLI" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
     exit 1
 fi
 log_info "Amazon Q CLI installed"

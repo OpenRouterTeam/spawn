@@ -36,7 +36,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${RAMNODE_SERVER_IP}" "command -v cline &> /dev/null"; then
-    log_error "Cline installation verification failed"
+    log_install_failed "Cline" "npm install -g cline" "${RAMNODE_SERVER_IP}"
     exit 1
 fi
 log_info "Cline installation verified successfully"

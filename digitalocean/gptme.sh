@@ -32,8 +32,7 @@ run_server "$DO_SERVER_IP" "pip install gptme 2>/dev/null || pip3 install gptme"
 
 # Verify installation succeeded
 if ! run_server "$DO_SERVER_IP" "command -v gptme &> /dev/null && gptme --version &> /dev/null"; then
-    log_error "gptme installation verification failed"
-    log_error "The 'gptme' command is not available or not working properly on server $DO_SERVER_IP"
+    log_install_failed "gptme" "pip install gptme" "${DO_SERVER_IP}"
     exit 1
 fi
 log_info "gptme installation verified successfully"

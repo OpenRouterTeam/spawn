@@ -36,7 +36,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${RAMNODE_SERVER_IP}" "command -v aider &> /dev/null"; then
-    log_error "Aider installation verification failed"
+    log_install_failed "Aider" "pip install aider-chat" "${RAMNODE_SERVER_IP}"
     exit 1
 fi
 log_info "Aider installation verified successfully"

@@ -25,9 +25,7 @@ fi
 
 # Verify installation
 if ! command -v gptme &>/dev/null; then
-    log_error "gptme installation failed"
-    log_error "The 'gptme' command is not available"
-    log_error "Try installing manually: pip install gptme"
+    log_install_failed "gptme" "pip install gptme"
     exit 1
 fi
 log_info "gptme installation verified"

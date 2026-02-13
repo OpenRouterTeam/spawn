@@ -29,7 +29,7 @@ run_server "curl -sL https://plandex.ai/install.sh | bash"
 
 # Verify installation
 if ! run_server "command -v plandex && plandex version" >/dev/null 2>&1; then
-    log_error "Plandex installation failed"
+    log_install_failed "Plandex" "curl -sL https://plandex.ai/install.sh | bash"
     exit 1
 fi
 log_info "Plandex installed"
