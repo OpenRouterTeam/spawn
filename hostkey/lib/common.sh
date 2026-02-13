@@ -79,10 +79,11 @@ hostkey_register_ssh_key() {
     local pub_path="$2"
     local pub_key
     pub_key=$(cat "$pub_path")
-    local json_pub_key
+    local json_pub_key json_name
     json_pub_key=$(json_escape "$pub_key")
+    json_name=$(json_escape "$key_name")
 
-    local register_body="{\"name\":\"$key_name\",\"public_key\":$json_pub_key}"
+    local register_body="{\"name\":$json_name,\"public_key\":$json_pub_key}"
     local register_response
     register_response=$(hostkey_api POST "/ssh_keys" "$register_body")
 
@@ -243,7 +244,9 @@ destroy_server() {
 
     log_step "Destroying instance $instance_id..."
     local response
-    response=$(hostkey_api POST "/eq/terminate" "{\"id\":\"$instance_id\"}")
+    local json_id
+    json_id=$(json_escape "$instance_id")
+    response=$(hostkey_api POST "/eq/terminate" "{\"id\":$json_id}")
 
     if echo "$response" | grep -qi "error"; then
         log_error "Failed to destroy instance: $response"

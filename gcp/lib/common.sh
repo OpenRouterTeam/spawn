@@ -108,10 +108,14 @@ create_server() {
 
     log_step "Creating GCP instance '${name}' (type: ${machine_type}, zone: ${zone})..."
 
-    local userdata
-    userdata=$(get_cloud_init_userdata)
     local pub_key
     pub_key=$(cat "${HOME}/.ssh/id_ed25519.pub")
+
+    # Write startup script to a temp file to avoid --metadata comma delimiter issues
+    local startup_script_file
+    startup_script_file=$(mktemp)
+    track_temp_file "${startup_script_file}"
+    get_cloud_init_userdata > "${startup_script_file}"
 
     local gcloud_err
     gcloud_err=$(mktemp)
@@ -122,7 +126,8 @@ create_server() {
         --machine-type="${machine_type}" \
         --image-family="${image_family}" \
         --image-project="${image_project}" \
-        --metadata="startup-script=${userdata},ssh-keys=${GCP_USERNAME}:${pub_key}" \
+        --metadata-from-file="startup-script=${startup_script_file}" \
+        --metadata="ssh-keys=${GCP_USERNAME}:${pub_key}" \
         --project="${GCP_PROJECT}" \
         --quiet \
         >/dev/null 2>"${gcloud_err}"; then
