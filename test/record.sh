@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
@@ -125,6 +125,11 @@ get_endpoints() {
                 "flavors:/core/flavors" \
                 "ssh_keys:/core/keypairs"
             ;;
+        atlanticnet)
+            printf '%s\n' \
+                "ssh_keys:list-sshkeys" \
+                "plans:describe-plan"
+            ;;
     esac
 }
 
@@ -146,6 +151,7 @@ get_auth_env_var() {
         kamatera)      printf "KAMATERA_API_CLIENT_ID" ;;
         latitude)      printf "LATITUDE_API_KEY" ;;
         hyperstack)    printf "HYPERSTACK_API_KEY" ;;
+        atlanticnet)   printf "ATLANTICNET_API_KEY" ;;
     esac
 }
 
@@ -188,6 +194,27 @@ except: print('\t\t\t')
         return 0
     fi
 
+    # Atlantic.Net uses separate config with two fields
+    if [[ "$cloud" == "atlanticnet" ]]; then
+        if [[ -f "$config_file" ]]; then
+            local atlanticnet_vals
+            atlanticnet_vals=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print('\t'.join(d.get(k, '') for k in ['api_key', 'api_private_key']))
+except: print('\t\t')
+" "$config_file" 2>/dev/null) || true
+            if [[ -n "${atlanticnet_vals:-}" ]]; then
+                local IFS=$'\t'
+                read -r ak apk <<< "$atlanticnet_vals"
+                [[ -n "${ak:-}" ]] && export ATLANTICNET_API_KEY="$ak"
+                [[ -n "${apk:-}" ]] && export ATLANTICNET_API_PRIVATE_KEY="$apk"
+            fi
+        fi
+        return 0
+    fi
+
     # Standard single-token config
     if [[ -f "$config_file" ]]; then
         local token
@@ -214,6 +241,9 @@ has_credentials() {
             ;;
         kamatera)
             [[ -n "${KAMATERA_API_CLIENT_ID:-}" ]] && [[ -n "${KAMATERA_API_SECRET:-}" ]]
+            ;;
+        atlanticnet)
+            [[ -n "${ATLANTICNET_API_KEY:-}" ]] && [[ -n "${ATLANTICNET_API_PRIVATE_KEY:-}" ]]
             ;;
         *)
             local env_var
@@ -251,6 +281,12 @@ import json, sys
 print(json.dumps({'client_id': sys.argv[1], 'secret': sys.argv[2]}, indent=2))
 " "${KAMATERA_API_CLIENT_ID:-}" "${KAMATERA_API_SECRET:-}" > "$config_file"
             ;;
+        atlanticnet)
+            python3 -c "
+import json, sys
+print(json.dumps({'api_key': sys.argv[1], 'api_private_key': sys.argv[2]}, indent=2))
+" "${ATLANTICNET_API_KEY:-}" "${ATLANTICNET_API_PRIVATE_KEY:-}" > "$config_file"
+            ;;
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
@@ -276,6 +312,9 @@ prompt_credentials() {
             ;;
         kamatera)
             vars_needed="KAMATERA_API_CLIENT_ID KAMATERA_API_SECRET"
+            ;;
+        atlanticnet)
+            vars_needed="ATLANTICNET_API_KEY ATLANTICNET_API_PRIVATE_KEY"
             ;;
         *)
             vars_needed=$(get_auth_env_var "$cloud")
@@ -320,6 +359,7 @@ call_api() {
         kamatera)      kamatera_api GET "$endpoint" ;;
         latitude)      latitude_api GET "$endpoint" ;;
         hyperstack)    hyperstack_api GET "$endpoint" ;;
+        atlanticnet)   atlanticnet_api "$endpoint" ;;
     esac
 }
 
@@ -358,6 +398,8 @@ elif cloud == 'kamatera':
     sys.exit(0 if d.get('status') == 'error' else 1)
 elif cloud == 'latitude':
     sys.exit(0 if 'error' in d or ('errors' in d and d['errors']) else 1)
+elif cloud == 'atlanticnet':
+    sys.exit(0 if 'error' in d and d['error'] else 1)
 else:
     sys.exit(1)
 " "$cloud" 2>/dev/null
@@ -386,6 +428,7 @@ _record_live_cycle() {
         vultr)         _live_vultr "$fixture_dir" ;;
         linode)        _live_linode "$fixture_dir" ;;
         civo)          _live_civo "$fixture_dir" ;;
+        atlanticnet)   _live_atlanticnet "$fixture_dir" ;;
         *)  return 0 ;;  # No live cycle for this cloud yet
     esac
 }
@@ -657,6 +700,69 @@ print(json.dumps(body))
 _live_civo() {
     _live_create_delete_cycle "$1" civo_api "/instances" "/instances/{id}" \
         "d['id']" _live_civo_body 3
+}
+
+_live_atlanticnet_body() {
+    local fixture_dir="$1"
+    local name="spawn-record-$(date +%s)"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test server '${name}' (G2.2GB, USEAST2)..." >&2
+
+    local ssh_keys_response
+    ssh_keys_response=$(atlanticnet_api list-sshkeys)
+    local ssh_key_name
+    ssh_key_name=$(echo "$ssh_keys_response" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+items = d.get('list-sshkeysresponse', {}).get('sshkeylist', {}).get('item', [])
+if isinstance(items, dict): items = [items]
+for k in items:
+    name = k.get('ssh_key_name', '')
+    if 'spawn' in name.lower():
+        print(name); break
+else:
+    if items: print(items[0].get('ssh_key_name', ''))
+" 2>/dev/null) || ssh_key_name=""
+
+    # Atlantic.Net uses query params, not JSON body
+    # We need to output parameters for atlanticnet_api to use
+    echo "server_name:$name planname:G2.2GB imageid:ubuntu-24.04_64bit vm_location:USEAST2 ServerQty:1 key_id:$ssh_key_name"
+}
+
+_live_atlanticnet() {
+    local fixture_dir="$1"
+    local params
+    params=$(_live_atlanticnet_body "$fixture_dir") || return 0
+
+    # Parse params and create server
+    local create_response
+    create_response=$(atlanticnet_api run-instance $params)
+
+    _save_live_fixture "$fixture_dir" "create_server" "run-instance" "$create_response" || {
+        printf '%b\n' "  ${RED}fail${NC} Could not create — skipping delete fixture"
+        return 0
+    }
+
+    local instance_id
+    instance_id=$(echo "$create_response" | python3 -c "
+import json,sys
+d = json.loads(sys.stdin.read())
+print(d.get('run-instanceresponse',{}).get('instancesSet',{}).get('item',{}).get('instanceid',''))
+" 2>/dev/null) || instance_id=""
+
+    if [[ -z "${instance_id:-}" ]]; then
+        printf '%b\n' "  ${RED}fail${NC} Could not extract instance ID from create response"
+        cloud_errors=$((cloud_errors + 1))
+        return 0
+    fi
+
+    printf '%b\n' "  ${CYAN}live${NC} Created (ID: ${instance_id}). Deleting..."
+    sleep 3
+
+    local delete_response
+    delete_response=$(atlanticnet_api terminate-instance instanceid "$instance_id")
+
+    _save_live_fixture "$fixture_dir" "delete_server" "terminate-instance" "$delete_response"
+    printf '%b\n' "  ${CYAN}live${NC} Instance ${instance_id} deleted"
 }
 
 # --- Record one cloud ---
