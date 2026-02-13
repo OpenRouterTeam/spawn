@@ -123,6 +123,15 @@ atlanticnet_check_ssh_key() {
     return 1
 }
 
+# Extract error message from Atlantic.Net API response
+# Atlantic.Net nests errors as {"error":{"message":"..."}} or {"message":"..."}
+_atlanticnet_extract_error() {
+    local response="$1"
+    _extract_json_field "$response" \
+        "d.get('error',{}).get('message','') or d.get('message','Unknown error')" \
+        "Unknown error"
+}
+
 # Register SSH key with Atlantic.Net
 # Args: key_name pub_path
 atlanticnet_register_ssh_key() {
@@ -136,9 +145,7 @@ atlanticnet_register_ssh_key() {
     response=$(atlanticnet_api add-sshkey ssh_key_name "$key_name" ssh_key "$pub_key")
 
     if echo "$response" | grep -qi '"error"'; then
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('error',{}).get('message','') or d.get('message','Unknown error'))" 2>/dev/null || echo "Unknown error")
-        log_error "Failed to register SSH key: $error_msg"
+        log_error "Failed to register SSH key: $(_atlanticnet_extract_error "$response")"
         log_error ""
         log_error "Possible causes:"
         log_error "  - SSH key name already exists (try a different hostname or delete the existing key)"
@@ -191,6 +198,50 @@ get_location() {
     fi
 }
 
+# Check Atlantic.Net API response for errors and log diagnostics
+# Returns 0 if error detected, 1 if no error
+_atlanticnet_check_create_error() {
+    local response="$1"
+
+    if ! echo "$response" | grep -qi '"error"'; then
+        return 1
+    fi
+
+    log_error "Failed to create Atlantic.Net server: $(_atlanticnet_extract_error "$response")"
+    log_error ""
+    log_error "Common issues:"
+    log_error "  - Insufficient account balance or payment method required"
+    log_error "  - Plan unavailable in selected location (try different ATLANTICNET_PLAN or ATLANTICNET_LOCATION)"
+    log_error "  - Server limit reached for your account"
+    log_error "  - SSH key not found (ensure key is registered with Atlantic.Net)"
+    return 0
+}
+
+# Parse instance ID and IP from Atlantic.Net run-instance response
+# Sets ATLANTICNET_SERVER_ID and ATLANTICNET_SERVER_IP on success
+_atlanticnet_parse_instance_response() {
+    local response="$1"
+
+    local instance_id
+    instance_id=$(_extract_json_field "$response" \
+        "d.get('run-instanceresponse',{}).get('instancesSet',{}).get('item',{}).get('instanceid','')")
+
+    local ip_address
+    ip_address=$(_extract_json_field "$response" \
+        "d.get('run-instanceresponse',{}).get('instancesSet',{}).get('item',{}).get('ip_address','')")
+
+    if [[ -z "$instance_id" || -z "$ip_address" ]]; then
+        log_error "Failed to parse server details from API response"
+        log_error "The server may have been created but returned unexpected data"
+        log_error "Check your Atlantic.Net dashboard: https://cloud.atlantic.net/"
+        return 1
+    fi
+
+    ATLANTICNET_SERVER_ID="$instance_id"
+    ATLANTICNET_SERVER_IP="$ip_address"
+    export ATLANTICNET_SERVER_ID ATLANTICNET_SERVER_IP
+}
+
 # Create Atlantic.Net Cloud Server
 # Args: server_name
 create_server() {
@@ -219,37 +270,11 @@ create_server() {
         ServerQty 1 \
         key_id "$ssh_key_name")
 
-    if echo "$response" | grep -qi '"error"'; then
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('error',{}).get('message','') or d.get('message','Unknown error'))" 2>/dev/null || echo "Unknown error")
-        log_error "Failed to create Atlantic.Net server: $error_msg"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient account balance or payment method required"
-        log_error "  - Plan unavailable in selected location (try different ATLANTICNET_PLAN or ATLANTICNET_LOCATION)"
-        log_error "  - Server limit reached for your account"
-        log_error "  - SSH key not found (ensure key is registered with Atlantic.Net)"
+    if _atlanticnet_check_create_error "$response"; then
         return 1
     fi
 
-    # Extract instance ID and IP
-    local instance_id
-    instance_id=$(echo "$response" | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('run-instanceresponse',{}).get('instancesSet',{}).get('item',{}).get('instanceid',''))")
-
-    local ip_address
-    ip_address=$(echo "$response" | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('run-instanceresponse',{}).get('instancesSet',{}).get('item',{}).get('ip_address',''))")
-
-    if [[ -z "$instance_id" || -z "$ip_address" ]]; then
-        log_error "Failed to parse server details from API response"
-        log_error "The server may have been created but returned unexpected data"
-        log_error "Check your Atlantic.Net dashboard: https://cloud.atlantic.net/"
-        return 1
-    fi
-
-    # Export for use by agent scripts
-    ATLANTICNET_SERVER_ID="$instance_id"
-    ATLANTICNET_SERVER_IP="$ip_address"
-    export ATLANTICNET_SERVER_ID ATLANTICNET_SERVER_IP
+    _atlanticnet_parse_instance_response "$response" || return 1
 
     log_info "Server created: ID=$ATLANTICNET_SERVER_ID, IP=$ATLANTICNET_SERVER_IP"
 }

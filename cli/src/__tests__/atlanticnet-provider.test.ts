@@ -393,36 +393,35 @@ describe("Atlantic.Net SSH delegation", () => {
 
 describe("Atlantic.Net server lifecycle", () => {
   it("should extract instance ID from run-instance response", () => {
-    const createFunc = extractFunctionBody(libContent, "create_server");
-    expect(createFunc).toContain("instanceid");
+    const parseFunc = extractFunctionBody(libContent, "_atlanticnet_parse_instance_response");
+    expect(parseFunc).toContain("instanceid");
   });
 
   it("should extract IP address from run-instance response", () => {
-    const createFunc = extractFunctionBody(libContent, "create_server");
-    expect(createFunc).toContain("ip_address");
+    const parseFunc = extractFunctionBody(libContent, "_atlanticnet_parse_instance_response");
+    expect(parseFunc).toContain("ip_address");
   });
 
   it("should export ATLANTICNET_SERVER_ID after creation", () => {
-    const createFunc = extractFunctionBody(libContent, "create_server");
-    expect(createFunc).toContain("export ATLANTICNET_SERVER_ID");
+    const parseFunc = extractFunctionBody(libContent, "_atlanticnet_parse_instance_response");
+    expect(parseFunc).toContain("export ATLANTICNET_SERVER_ID");
   });
 
   it("should export ATLANTICNET_SERVER_IP after creation", () => {
-    const createFunc = extractFunctionBody(libContent, "create_server");
-    // May be combined export: "export ATLANTICNET_SERVER_ID ATLANTICNET_SERVER_IP"
-    expect(createFunc).toContain("ATLANTICNET_SERVER_IP");
-    expect(createFunc).toContain("export");
+    const parseFunc = extractFunctionBody(libContent, "_atlanticnet_parse_instance_response");
+    expect(parseFunc).toContain("ATLANTICNET_SERVER_IP");
+    expect(parseFunc).toContain("export");
   });
 
   it("should check for empty instance ID or IP", () => {
-    const createFunc = extractFunctionBody(libContent, "create_server");
-    expect(createFunc).toContain('-z "$instance_id"');
-    expect(createFunc).toContain('-z "$ip_address"');
+    const parseFunc = extractFunctionBody(libContent, "_atlanticnet_parse_instance_response");
+    expect(parseFunc).toContain('-z "$instance_id"');
+    expect(parseFunc).toContain('-z "$ip_address"');
   });
 
   it("should check for API errors in response", () => {
-    const createFunc = extractFunctionBody(libContent, "create_server");
-    expect(createFunc).toContain('"error"');
+    const checkFunc = extractFunctionBody(libContent, "_atlanticnet_check_create_error");
+    expect(checkFunc).toContain('"error"');
   });
 
   it("should call terminate-instance in destroy_server", () => {
@@ -800,7 +799,8 @@ describe("Atlantic.Net error handling", () => {
 
   it("should check for API errors in create_server", () => {
     const createFunc = extractFunctionBody(libContent, "create_server");
-    expect(createFunc).toContain('"error"');
+    // Error checking is delegated to _atlanticnet_check_create_error helper
+    expect(createFunc).toContain("_atlanticnet_check_create_error");
     expect(createFunc).toContain("return 1");
   });
 
