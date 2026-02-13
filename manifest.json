@@ -1195,7 +1195,7 @@
     "local/interpreter": "implemented",
     "local/gemini": "implemented",
     "local/amazonq": "missing",
-    "local/cline": "missing",
+    "local/cline": "implemented",
     "local/gptme": "implemented",
     "local/opencode": "implemented",
     "local/plandex": "missing",
