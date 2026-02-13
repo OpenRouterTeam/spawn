@@ -365,10 +365,12 @@ const server = Bun.serve({
       }
       const issue = url.searchParams.get("issue") ?? "";
 
-      // Validate issue is a positive integer (prevents injection into shell commands)
-      if (issue && !/^\d+$/.test(issue)) {
+      // Validate issue is a positive integer with reasonable bounds (prevents injection
+      // into shell commands and path traversal via absurdly long numbers in worktree paths).
+      // Digits-only regex is the primary defense; length cap is defense-in-depth.
+      if (issue && (!/^\d+$/.test(issue) || issue.length > 10)) {
         return Response.json(
-          { error: "issue must be a positive integer" },
+          { error: "issue must be a positive integer (max 10 digits)" },
           { status: 400 }
         );
       }
