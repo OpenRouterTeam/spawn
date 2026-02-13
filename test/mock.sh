@@ -263,6 +263,7 @@ _strip_api_base() {
         https://cloudapi.atlantic.net/*)    ENDPOINT=$(echo "$URL" | sed 's|https://cloudapi.atlantic.net/\?||') ;;
         https://invapi.hostkey.com*)        ENDPOINT="${URL#https://invapi.hostkey.com}" ;;
         https://*.cloudsigma.com/api/2.0*)  ENDPOINT=$(echo "$URL" | sed 's|https://[^/]*.cloudsigma.com/api/2.0||') ;;
+        https://api.webdock.io/v1*)         ENDPOINT="${URL#https://api.webdock.io/v1}" ;;
     esac
     EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
 }
@@ -288,6 +289,7 @@ _validate_body() {
         vultr)       case "$EP_CLEAN" in /instances)        _check_fields "label region plan os_id" ;; esac ;;
         linode)      case "$EP_CLEAN" in /linode/instances) _check_fields "label region type image" ;; esac ;;
         civo)        case "$EP_CLEAN" in /instances)        _check_fields "hostname size region" ;; esac ;;
+        webdock)     case "$EP_CLEAN" in /servers)          _check_fields "name slug locationId profileSlug imageSlug" ;; esac ;;
     esac
 }
 

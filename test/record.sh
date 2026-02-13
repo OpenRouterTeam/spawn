@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma webdock"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
@@ -141,6 +141,14 @@ get_endpoints() {
                 "keypairs:/keypairs/" \
                 "servers:/servers/"
             ;;
+        webdock)
+            printf '%s\n' \
+                "account:/account" \
+                "publicKeys:/account/publicKeys" \
+                "servers:/servers" \
+                "profiles:/profiles" \
+                "locations:/locations"
+            ;;
     esac
 }
 
@@ -165,6 +173,7 @@ get_auth_env_var() {
         atlanticnet)   printf "ATLANTICNET_API_KEY" ;;
         hostkey)       printf "HOSTKEY_API_KEY" ;;
         cloudsigma)    printf "CLOUDSIGMA_EMAIL" ;;
+        webdock)       printf "WEBDOCK_API_TOKEN" ;;
     esac
 }
 
@@ -399,6 +408,7 @@ call_api() {
         atlanticnet)   atlanticnet_api "$endpoint" ;;
         hostkey)       hostkey_api "$endpoint" ;;
         cloudsigma)    cloudsigma_api GET "$endpoint" ;;
+        webdock)       webdock_api GET "$endpoint" ;;
     esac
 }
 
@@ -444,6 +454,9 @@ elif cloud == 'hostkey':
 elif cloud == 'cloudsigma':
     # CloudSigma returns error objects with 'error_message', 'error_type', etc
     sys.exit(0 if 'error_message' in d or 'error_type' in d else 1)
+elif cloud == 'webdock':
+    # Webdock returns error objects with 'message' field
+    sys.exit(0 if 'message' in d and len(d) <= 3 and not any(k in d for k in ('slug','name','status','ipv4')) else 1)
 else:
     sys.exit(1)
 " "$cloud" 2>/dev/null
@@ -819,6 +832,12 @@ _live_hostkey() {
 _live_cloudsigma() {
     local fixture_dir="$1"
     printf '%b\n' "  ${YELLOW}skip${NC} CloudSigma live test (requires drive cloning, complex multi-step process)" >&2
+    return 0
+}
+
+_live_webdock() {
+    local fixture_dir="$1"
+    printf '%b\n' "  ${YELLOW}skip${NC} Webdock live test (not implemented yet)" >&2
     return 0
 }
 

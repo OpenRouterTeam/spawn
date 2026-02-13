@@ -795,6 +795,21 @@
         "region": "zrh"
       },
       "notes": "API-centric cloud platform with regions in ZRH (Zurich), WDC (Washington DC), and LVS (Las Vegas). Granular resource control (CPU/RAM/Disk independently configurable). Uses 'cloudsigma' user for SSH."
+    },
+    "webdock": {
+      "name": "Webdock",
+      "description": "European VPS provider with affordable plans",
+      "url": "https://webdock.io/",
+      "type": "api",
+      "auth": "WEBDOCK_API_TOKEN",
+      "provision_method": "POST /v1/servers",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "profile": "webdockmicro",
+        "location": "fi",
+        "image": "ubuntu2404"
+      }
     }
   },
   "matrix": {
@@ -1337,6 +1352,21 @@
     "cloudsigma/opencode": "missing",
     "cloudsigma/plandex": "missing",
     "cloudsigma/kilocode": "missing",
-    "cloudsigma/continue": "implemented"
+    "cloudsigma/continue": "implemented",
+    "webdock/claude": "implemented",
+    "webdock/openclaw": "missing",
+    "webdock/nanoclaw": "missing",
+    "webdock/aider": "implemented",
+    "webdock/goose": "missing",
+    "webdock/codex": "missing",
+    "webdock/interpreter": "missing",
+    "webdock/gemini": "missing",
+    "webdock/amazonq": "missing",
+    "webdock/cline": "implemented",
+    "webdock/gptme": "missing",
+    "webdock/opencode": "missing",
+    "webdock/plandex": "missing",
+    "webdock/kilocode": "missing",
+    "webdock/continue": "missing"
   }
 }
