@@ -104,58 +104,10 @@ test_atlanticnet_credentials() {
 
 # Ensure Atlantic.Net API credentials are available
 ensure_atlanticnet_credentials() {
-    local config_file="$HOME/.config/spawn/atlanticnet.json"
-
-    # Try environment variables first
-    if [[ -n "${ATLANTICNET_API_KEY:-}" && -n "${ATLANTICNET_API_PRIVATE_KEY:-}" ]]; then
-        if test_atlanticnet_credentials; then
-            return 0
-        fi
-        log_warn "Environment variables set but authentication failed"
-    fi
-
-    # Try config file
-    if [[ -f "$config_file" ]]; then
-        log_step "Loading Atlantic.Net credentials from $config_file"
-        ATLANTICNET_API_KEY=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('api_key',''))" "$config_file")
-        ATLANTICNET_API_PRIVATE_KEY=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('api_private_key',''))" "$config_file")
-        export ATLANTICNET_API_KEY ATLANTICNET_API_PRIVATE_KEY
-
-        if [[ -n "${ATLANTICNET_API_KEY}" && -n "${ATLANTICNET_API_PRIVATE_KEY}" ]]; then
-            if test_atlanticnet_credentials; then
-                return 0
-            fi
-            log_warn "Saved credentials are invalid"
-        fi
-    fi
-
-    # Prompt for credentials
-    log_info ""
-    log_info "Atlantic.Net Cloud API credentials required"
-    log_info ""
-    log_info "Get your credentials at: https://cloud.atlantic.net/ → API Info"
-    log_info ""
-
-    ATLANTICNET_API_KEY=$(safe_read "API Access Key ID: ")
-    ATLANTICNET_API_PRIVATE_KEY=$(safe_read "API Private Key: ")
-    export ATLANTICNET_API_KEY ATLANTICNET_API_PRIVATE_KEY
-
-    log_step "Testing credentials..."
-    if ! test_atlanticnet_credentials; then
-        log_error "Invalid credentials"
-        return 1
-    fi
-
-    log_info "Credentials valid!"
-
-    # Save to config file
-    mkdir -p "$(dirname "$config_file")"
-    python3 -c "import json,sys; json.dump({'api_key': sys.argv[1], 'api_private_key': sys.argv[2]}, open(sys.argv[3], 'w'), indent=2)" \
-        "$ATLANTICNET_API_KEY" "$ATLANTICNET_API_PRIVATE_KEY" "$config_file"
-    chmod 600 "$config_file"
-    log_info "Credentials saved to $config_file"
-
-    return 0
+    ensure_multi_credentials "Atlantic.Net" "$HOME/.config/spawn/atlanticnet.json" \
+        "https://cloud.atlantic.net/ -> API Info" test_atlanticnet_credentials \
+        "ATLANTICNET_API_KEY:api_key:API Access Key ID" \
+        "ATLANTICNET_API_PRIVATE_KEY:api_private_key:API Private Key"
 }
 
 # Check if SSH key is registered with Atlantic.Net
