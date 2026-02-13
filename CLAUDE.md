@@ -55,9 +55,9 @@ We bias heavily toward adding more clouds/sandboxes over more agents. To add one
 3. Add `"missing"` entries to the matrix for every existing agent
 4. Implement at least 2-3 agent scripts to prove the lib works
 5. Update the cloud's `README.md`
-6. **Add test coverage** (mandatory):
+6. **Add test coverage** (mandatory — see "Mock Test Infrastructure" section below for full details):
    - `test/record.sh` — add to `ALL_RECORDABLE_CLOUDS`, add cases in `get_endpoints()`, `get_auth_env_var()`, `call_api()`, `has_api_error()`, and add a `_live_{cloud}()` function
-   - `test/mock.sh` — add a URL-stripping case in the curl mock (`case "$URL" in` block)
+   - `test/mock.sh` — add cases in `_strip_api_base()`, `_validate_body()`, `assert_cloud_api_calls()`, and `setup_env_for_cloud()`
 
 **Good candidate clouds (cheap CPU compute for agents using remote API inference):**
 - Container/sandbox platforms (fast spin-up, developer-friendly)
@@ -243,6 +243,29 @@ macOS ships bash 3.2. All scripts MUST work on it:
 - Test files go in `cli/src/__tests__/`
 - Run tests with `bun test`
 - Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
+
+### Mock Test Infrastructure (MANDATORY for new clouds)
+
+When adding a new cloud provider, you **MUST** update all of these in `test/mock.sh`:
+
+| Function | What to add |
+|---|---|
+| `_strip_api_base()` | URL pattern to strip the cloud's API base (e.g., `https://api.newcloud.com/v1*`) |
+| `_validate_body()` | Server creation endpoint + required POST fields |
+| `assert_cloud_api_calls()` | Expected API calls (SSH key fetch + server create endpoints) |
+| `setup_env_for_cloud()` | Test env vars (API token, server name, plan, region) |
+
+And in `test/record.sh`:
+
+| Function | What to add |
+|---|---|
+| `ALL_RECORDABLE_CLOUDS` | Cloud name to the list |
+| `get_endpoints()` | GET-only API endpoints for fixture recording |
+| `get_auth_env_var()` | Auth env var name mapping |
+| `call_api()` | API function dispatcher |
+| `has_api_error()` | Error response detection for the cloud's API |
+
+Without these, the cloud has **no test coverage**, body validation is missing, mock tests log `UNHANDLED_URL` warnings, and the QA cycle skips the cloud entirely.
 
 ## CLI Version Management
 
