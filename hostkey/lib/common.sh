@@ -128,7 +128,7 @@ _pick_location() {
 _list_instance_presets() {
     local location="$1"
 
-    _ensure_jq || return 1
+    ensure_jq || return 1
 
     # Call HOSTKEY presets API
     local response
@@ -150,40 +150,6 @@ _pick_instance_preset() {
     _list_presets_for_location() { _list_instance_presets "$location"; }
     interactive_pick "HOSTKEY_INSTANCE_PRESET" "1" "instance presets" _list_presets_for_location "1"
     unset -f _list_presets_for_location
-}
-
-# Ensure jq is installed (required for JSON parsing)
-_ensure_jq() {
-    if command -v jq &>/dev/null; then
-        return 0
-    fi
-
-    log_step "Installing jq..."
-
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        if command -v brew &>/dev/null; then
-            brew install jq || { log_error "Failed to install jq via Homebrew"; return 1; }
-        else
-            log_error "Install jq: brew install jq (or https://jqlang.github.io/jq/download/)"
-            return 1
-        fi
-    elif command -v apt-get &>/dev/null; then
-        sudo apt-get update -qq && sudo apt-get install -y jq || { log_error "Failed to install jq via apt"; return 1; }
-    elif command -v dnf &>/dev/null; then
-        sudo dnf install -y jq || { log_error "Failed to install jq via dnf"; return 1; }
-    elif command -v apk &>/dev/null; then
-        sudo apk add jq || { log_error "Failed to install jq via apk"; return 1; }
-    else
-        log_error "jq is required but not installed. Install from https://jqlang.github.io/jq/download/"
-        return 1
-    fi
-
-    if ! command -v jq &>/dev/null; then
-        log_error "jq not found in PATH after installation"
-        return 1
-    fi
-
-    log_info "jq installed"
 }
 
 # Create a HOSTKEY compute instance

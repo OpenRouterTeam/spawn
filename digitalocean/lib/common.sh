@@ -140,6 +140,26 @@ _wait_for_droplet_active() {
         DO_SERVER_IP "Droplet" "${max_attempts}"
 }
 
+# Check DigitalOcean API response for errors and log diagnostics
+# Returns 0 if error detected, 1 if no error
+_do_check_create_error() {
+    local response="$1"
+
+    if echo "$response" | grep -q '"id"' && echo "$response" | grep -q '"droplet"'; then
+        return 1  # No error
+    fi
+
+    log_error "Failed to create DigitalOcean droplet"
+    log_error "API Error: $(extract_api_error_message "$response" "Unknown error")"
+    log_warn "Common issues:"
+    log_warn "  - Insufficient account balance or payment method required"
+    log_warn "  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)"
+    log_warn "  - Droplet limit reached (check account limits)"
+    log_warn "  - Invalid cloud-init userdata"
+    log_warn "Check your dashboard: https://cloud.digitalocean.com/droplets"
+    return 0
+}
+
 # Create a DigitalOcean droplet with cloud-init
 create_server() {
     local name="$1"
@@ -169,27 +189,13 @@ create_server() {
     local response
     response=$(do_api POST "/droplets" "$body")
 
-    # Check for errors
-    if echo "$response" | grep -q '"id"' && echo "$response" | grep -q '"droplet"'; then
-        DO_DROPLET_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['id'])")
-        export DO_DROPLET_ID
-        log_info "Droplet created: ID=$DO_DROPLET_ID"
-    else
-        log_error "Failed to create DigitalOcean droplet"
-
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance or payment method required"
-        log_warn "  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)"
-        log_warn "  - Droplet limit reached (check account limits)"
-        log_warn "  - Invalid cloud-init userdata"
-        log_warn "Check your dashboard: https://cloud.digitalocean.com/droplets"
+    if _do_check_create_error "$response"; then
         return 1
     fi
+
+    DO_DROPLET_ID=$(_extract_json_field "$response" "d['droplet']['id']")
+    export DO_DROPLET_ID
+    log_info "Droplet created: ID=$DO_DROPLET_ID"
 
     _wait_for_droplet_active "$DO_DROPLET_ID"
 }
