@@ -194,6 +194,123 @@ get_server_name() {
     get_validated_server_name "ALIYUN_INSTANCE_NAME" "Enter instance name: "
 }
 
+# ============================================================
+# JSON parsing helpers
+# ============================================================
+
+# Extract a field from the first item in a nested JSON list.
+# Usage: _aliyun_json_field JSON_STRING OUTER_KEY INNER_KEY FIELD_NAME
+# Example: _aliyun_json_field "$response" "Vpcs" "Vpc" "VpcId"
+_aliyun_json_field() {
+    local json="$1" outer="$2" inner="$3" field="$4"
+    echo "$json" | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    items = data.get('$outer', {}).get('$inner', [])
+    if items:
+        print(items[0].get('$field', ''))
+except:
+    pass
+" 2>/dev/null || echo ""
+}
+
+# Extract a top-level field from a JSON response.
+# Usage: _aliyun_json_top_field JSON_STRING FIELD_NAME
+_aliyun_json_top_field() {
+    local json="$1" field="$2"
+    echo "$json" | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    print(data.get('$field', ''))
+except:
+    pass
+" 2>/dev/null || echo ""
+}
+
+# ============================================================
+# Network resource helpers
+# ============================================================
+
+# Get or create a VPC in the current region.
+# Prints the VPC ID on success.
+# Usage: _ensure_vpc
+_ensure_vpc() {
+    log_step "Checking for VPC..."
+    local response
+    response=$(aliyun ecs DescribeVpcs --output json 2>/dev/null || echo "{}")
+    local vpc_id
+    vpc_id=$(_aliyun_json_field "$response" "Vpcs" "Vpc" "VpcId")
+
+    if [[ -n "$vpc_id" ]]; then
+        echo "$vpc_id"
+        return 0
+    fi
+
+    log_step "Creating VPC..."
+    response=$(aliyun ecs CreateVpc \
+        --CidrBlock "172.16.0.0/12" \
+        --VpcName "spawn-vpc" \
+        --output json 2>&1 || echo "")
+    vpc_id=$(_aliyun_json_top_field "$response" "VpcId")
+
+    if [[ -z "$vpc_id" ]]; then
+        log_error "Failed to create VPC: $response"
+        return 1
+    fi
+    sleep 3  # Wait for VPC to be ready
+    echo "$vpc_id"
+}
+
+# Get or create a vSwitch in the given VPC.
+# Prints the vSwitch ID on success.
+# Usage: _ensure_vswitch VPC_ID
+_ensure_vswitch() {
+    local vpc_id="$1"
+
+    log_step "Checking for vSwitch..."
+    local response
+    response=$(aliyun ecs DescribeVSwitches --VpcId "$vpc_id" --output json 2>/dev/null || echo "{}")
+    local vswitch_id
+    vswitch_id=$(_aliyun_json_field "$response" "VSwitches" "VSwitch" "VSwitchId")
+
+    if [[ -n "$vswitch_id" ]]; then
+        echo "$vswitch_id"
+        return 0
+    fi
+
+    # Get first availability zone
+    local zone_response zone_id
+    zone_response=$(aliyun ecs DescribeZones --output json 2>/dev/null || echo "{}")
+    zone_id=$(_aliyun_json_field "$zone_response" "Zones" "Zone" "ZoneId")
+
+    if [[ -z "$zone_id" ]]; then
+        log_error "Failed to get availability zone"
+        return 1
+    fi
+
+    log_step "Creating vSwitch in zone $zone_id..."
+    response=$(aliyun ecs CreateVSwitch \
+        --VpcId "$vpc_id" \
+        --ZoneId "$zone_id" \
+        --CidrBlock "172.16.0.0/24" \
+        --VSwitchName "spawn-vswitch" \
+        --output json 2>&1 || echo "")
+    vswitch_id=$(_aliyun_json_top_field "$response" "VSwitchId")
+
+    if [[ -z "$vswitch_id" ]]; then
+        log_error "Failed to create vSwitch: $response"
+        return 1
+    fi
+    sleep 3  # Wait for vSwitch to be ready
+    echo "$vswitch_id"
+}
+
+# ============================================================
+# Instance lifecycle
+# ============================================================
+
 # Wait for Alibaba Cloud ECS instance to become running
 # Sets: ALIYUN_INSTANCE_IP
 # Usage: _wait_for_aliyun_instance INSTANCE_ID [MAX_ATTEMPTS]
@@ -210,18 +327,10 @@ _wait_for_aliyun_instance() {
             --InstanceIds "[\"$instance_id\"]" \
             --output json 2>/dev/null || echo "{}")
 
-        local status ip_address
-        status=$(echo "$response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    instances = data.get('Instances', {}).get('Instance', [])
-    if instances:
-        print(instances[0].get('Status', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
+        local status
+        status=$(_aliyun_json_field "$response" "Instances" "Instance" "Status")
 
+        local ip_address
         ip_address=$(echo "$response" | python3 -c "
 import json, sys
 try:
@@ -255,12 +364,12 @@ except:
 }
 
 # Create security group if it doesn't exist
-# Usage: _ensure_security_group
+# Prints the security group ID on success.
+# Usage: _ensure_security_group VPC_ID
 _ensure_security_group() {
     local vpc_id="$1"
     local sg_name="${ALIYUN_SECURITY_GROUP_NAME:-spawn-default}"
 
-    # Check if security group already exists
     local response
     response=$(aliyun ecs DescribeSecurityGroups \
         --VpcId "$vpc_id" \
@@ -268,23 +377,13 @@ _ensure_security_group() {
         --output json 2>/dev/null || echo "{}")
 
     local sg_id
-    sg_id=$(echo "$response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    groups = data.get('SecurityGroups', {}).get('SecurityGroup', [])
-    if groups:
-        print(groups[0].get('SecurityGroupId', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
+    sg_id=$(_aliyun_json_field "$response" "SecurityGroups" "SecurityGroup" "SecurityGroupId")
 
     if [[ -n "$sg_id" ]]; then
         echo "$sg_id"
         return 0
     fi
 
-    # Create new security group
     log_step "Creating security group '$sg_name'..."
     response=$(aliyun ecs CreateSecurityGroup \
         --VpcId "$vpc_id" \
@@ -292,21 +391,13 @@ except:
         --Description "Created by spawn for AI agent instances" \
         --output json 2>&1 || echo "")
 
-    sg_id=$(echo "$response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    print(data.get('SecurityGroupId', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
+    sg_id=$(_aliyun_json_top_field "$response" "SecurityGroupId")
 
     if [[ -z "$sg_id" ]]; then
         log_error "Failed to create security group: $response"
         return 1
     fi
 
-    # Add SSH rule
     log_step "Adding SSH rule to security group..."
     aliyun ecs AuthorizeSecurityGroup \
         --SecurityGroupId "$sg_id" \
@@ -330,119 +421,21 @@ create_server() {
     validate_resource_name "$instance_type" || { log_error "Invalid ALIYUN_INSTANCE_TYPE"; return 1; }
     validate_region_name "$region" || { log_error "Invalid ALIYUN_REGION"; return 1; }
 
-    # Get or create VPC
-    log_step "Checking for VPC in region $region..."
-    local vpc_response
-    vpc_response=$(aliyun ecs DescribeVpcs --output json 2>/dev/null || echo "{}")
+    # Ensure network infrastructure
     local vpc_id
-    vpc_id=$(echo "$vpc_response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    vpcs = data.get('Vpcs', {}).get('Vpc', [])
-    if vpcs:
-        print(vpcs[0].get('VpcId', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
-
-    if [[ -z "$vpc_id" ]]; then
-        log_step "Creating VPC..."
-        local create_vpc_response
-        create_vpc_response=$(aliyun ecs CreateVpc \
-            --CidrBlock "172.16.0.0/12" \
-            --VpcName "spawn-vpc" \
-            --output json 2>&1 || echo "")
-        vpc_id=$(echo "$create_vpc_response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    print(data.get('VpcId', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
-
-        if [[ -z "$vpc_id" ]]; then
-            log_error "Failed to create VPC: $create_vpc_response"
-            return 1
-        fi
-        sleep 3  # Wait for VPC to be ready
-    fi
+    vpc_id=$(_ensure_vpc) || return 1
     log_info "Using VPC: $vpc_id"
 
-    # Get or create vSwitch
-    log_step "Checking for vSwitch..."
-    local vswitch_response
-    vswitch_response=$(aliyun ecs DescribeVSwitches --VpcId "$vpc_id" --output json 2>/dev/null || echo "{}")
     local vswitch_id
-    vswitch_id=$(echo "$vswitch_response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    vswitches = data.get('VSwitches', {}).get('VSwitch', [])
-    if vswitches:
-        print(vswitches[0].get('VSwitchId', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
-
-    if [[ -z "$vswitch_id" ]]; then
-        # Get first availability zone
-        local zone_id
-        zone_id=$(aliyun ecs DescribeZones --output json 2>/dev/null | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    zones = data.get('Zones', {}).get('Zone', [])
-    if zones:
-        print(zones[0].get('ZoneId', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
-
-        if [[ -z "$zone_id" ]]; then
-            log_error "Failed to get availability zone"
-            return 1
-        fi
-
-        log_step "Creating vSwitch in zone $zone_id..."
-        local create_vs_response
-        create_vs_response=$(aliyun ecs CreateVSwitch \
-            --VpcId "$vpc_id" \
-            --ZoneId "$zone_id" \
-            --CidrBlock "172.16.0.0/24" \
-            --VSwitchName "spawn-vswitch" \
-            --output json 2>&1 || echo "")
-        vswitch_id=$(echo "$create_vs_response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    print(data.get('VSwitchId', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
-
-        if [[ -z "$vswitch_id" ]]; then
-            log_error "Failed to create vSwitch: $create_vs_response"
-            return 1
-        fi
-        sleep 3  # Wait for vSwitch to be ready
-    fi
+    vswitch_id=$(_ensure_vswitch "$vpc_id") || return 1
     log_info "Using vSwitch: $vswitch_id"
 
-    # Get or create security group
     local security_group_id
-    security_group_id=$(_ensure_security_group "$vpc_id")
-    if [[ -z "$security_group_id" ]]; then
-        log_error "Failed to get or create security group"
-        return 1
-    fi
+    security_group_id=$(_ensure_security_group "$vpc_id") || return 1
     log_info "Using security group: $security_group_id"
 
-    # Get SSH key name
+    # Prepare instance parameters
     local key_name="spawn-$(whoami)-$(hostname)"
-
-    # Prepare userdata for cloud-init
     local userdata
     userdata=$(get_cloud_init_userdata)
     local userdata_b64
@@ -467,14 +460,15 @@ except:
         --SystemDisk.Size 20 \
         --output json 2>&1 || echo "")
 
+    # InstanceIdSet is a flat list of strings, not objects
     local instance_id
     instance_id=$(echo "$create_response" | python3 -c "
 import json, sys
 try:
     data = json.loads(sys.stdin.read())
-    instances = data.get('InstanceIdSets', {}).get('InstanceIdSet', [])
-    if instances:
-        print(instances[0])
+    ids = data.get('InstanceIdSets', {}).get('InstanceIdSet', [])
+    if ids:
+        print(ids[0])
 except:
     pass
 " 2>/dev/null || echo "")
