@@ -379,7 +379,44 @@ git worktree prune
 rm -rf /tmp/spawn-worktrees
 ```
 
-These conventions are already embedded in the prompts of `discovery.sh` and `refactor.sh`. When adding new service scripts, copy the same patterns.
+### 5. Comment sign-off for dedup
+
+Every comment posted by an agent on issues or PRs MUST end with a sign-off line in this format:
+
+```
+-- team/agent-name
+```
+
+**Format:** `-- <team-name>/<agent-name>` using double-hyphen (`--`), not emdash.
+
+**Examples:**
+```
+-- security/triage
+-- security/pr-reviewer
+-- security/issue-checker
+-- security/scan
+-- refactor/community-coordinator
+-- refactor/pr-maintainer
+-- discovery/issue-responder
+-- discovery/cloud-scout
+-- qa/cycle
+```
+
+**Why:** Agents run on schedules (every 15-30 min). Without sign-offs, the same issue gets re-triaged and re-commented every cycle. The sign-off lets each agent grep for its own prior comments and skip duplicates:
+
+```bash
+# Check if this agent already commented on this issue
+gh issue view NUMBER --json comments --jq '.comments[].body' | grep -q '-- security/triage'
+```
+
+**Rules:**
+- Use `--` (double hyphen), never `—` (emdash) — emdash causes encoding issues in shell strings
+- The team name matches the script: `security.sh` → `security`, `refactor.sh` → `refactor`, `discovery.sh` → `discovery`, `qa-cycle.sh` → `qa`
+- The agent name matches the teammate name defined in the prompt (e.g., `pr-reviewer`, `community-coordinator`, `issue-responder`)
+- Sign-off goes on its own line at the very end of the comment body
+- For PR review bodies, wrap in italics: `*-- security/pr-reviewer*`
+
+These conventions are already embedded in the prompts of `discovery.sh`, `refactor.sh`, `security.sh`, and `qa-cycle.sh`. When adding new service scripts, copy the same patterns.
 
 ## Step 10: Commit and push
 
