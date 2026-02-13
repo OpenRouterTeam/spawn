@@ -35,7 +35,7 @@ cleanup() {
     cd "${REPO_ROOT}" 2>/dev/null || true
     git worktree prune 2>/dev/null || true
     rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
-    rm -f "${RESULTS_PHASE2}" "${RESULTS_PHASE4}" "/tmp/spawn-qa-record-output.txt" 2>/dev/null || true
+    rm -f "${RESULTS_PHASE2}" "${RESULTS_PHASE4}" "/tmp/spawn-qa-record-output.txt" "/tmp/spawn-qa-escalate.txt" 2>/dev/null || true
     log "=== QA Cycle Done (exit_code=${exit_code}) ==="
     exit $exit_code
 }
@@ -222,7 +222,13 @@ check_timeout || exit 0
 log "=== Phase 1: Record fixtures ==="
 
 RECORD_OUTPUT="/tmp/spawn-qa-record-output.txt"
+RECORD_FAILURES_FILE="${REPO_ROOT}/.docs/qa-record-failures.json"
 rm -f "${RECORD_OUTPUT}"
+
+# Initialize persistent failure tracker if missing
+if [[ ! -f "${RECORD_FAILURES_FILE}" ]]; then
+    printf '{}' > "${RECORD_FAILURES_FILE}"
+fi
 
 RECORD_EXIT=0
 bash test/record.sh allsaved 2>&1 | tee -a "${LOG_FILE}" | tee "${RECORD_OUTPUT}" || RECORD_EXIT=$?
@@ -399,6 +405,104 @@ Only modify ${cloud}/lib/common.sh and test/record.sh if the recording infrastru
         log "Phase 1: Requesting fresh keys for stale providers: ${STALE_KEY_PROVIDERS}"
         request_missing_cloud_keys
         log "Phase 1: Key request sent (email notification will be sent if KEY_SERVER_URL is configured)"
+    fi
+fi
+
+# --- Track consecutive Phase 1 failures per cloud ---
+# Parse the final recording output to determine which clouds failed vs succeeded
+FINAL_RECORD_FAILED=""
+FINAL_RECORD_SUCCEEDED=""
+if [[ -f "${RECORD_OUTPUT}" ]]; then
+    _current_cloud=""
+    _cloud_had_error=""
+    while IFS= read -r line; do
+        clean=$(printf '%s' "$line" | sed 's/\x1b\[[0-9;]*m//g')
+        case "$clean" in
+            *"Recording "*" ━━━"*)
+                # Save previous cloud result
+                if [[ -n "${_current_cloud}" ]]; then
+                    if [[ "${_cloud_had_error}" == "true" ]]; then
+                        FINAL_RECORD_FAILED="${FINAL_RECORD_FAILED} ${_current_cloud}"
+                    else
+                        FINAL_RECORD_SUCCEEDED="${FINAL_RECORD_SUCCEEDED} ${_current_cloud}"
+                    fi
+                fi
+                _current_cloud=$(printf '%s' "$clean" | sed 's/.*Recording //; s/ ━━━.*//')
+                _cloud_had_error=""
+                ;;
+            *"fail "*)
+                _cloud_had_error="true"
+                ;;
+        esac
+    done < "${RECORD_OUTPUT}"
+    # Handle last cloud
+    if [[ -n "${_current_cloud}" ]]; then
+        if [[ "${_cloud_had_error}" == "true" ]]; then
+            FINAL_RECORD_FAILED="${FINAL_RECORD_FAILED} ${_current_cloud}"
+        else
+            FINAL_RECORD_SUCCEEDED="${FINAL_RECORD_SUCCEEDED} ${_current_cloud}"
+        fi
+    fi
+fi
+FINAL_RECORD_FAILED=$(printf '%s' "${FINAL_RECORD_FAILED}" | sed 's/^ //')
+FINAL_RECORD_SUCCEEDED=$(printf '%s' "${FINAL_RECORD_SUCCEEDED}" | sed 's/^ //')
+
+# Update the persistent failure tracker and escalate if threshold hit
+if [[ -f "${RECORD_FAILURES_FILE}" ]]; then
+    python3 -c "
+import json, sys
+
+tracker_path = sys.argv[1]
+failed = sys.argv[2].split() if sys.argv[2] else []
+succeeded = sys.argv[3].split() if sys.argv[3] else []
+
+try:
+    with open(tracker_path) as f:
+        tracker = json.load(f)
+except (json.JSONDecodeError, FileNotFoundError):
+    tracker = {}
+
+# Increment consecutive failures for failed clouds
+for cloud in failed:
+    tracker[cloud] = tracker.get(cloud, 0) + 1
+
+# Reset counter for clouds that succeeded
+for cloud in succeeded:
+    tracker[cloud] = 0
+
+with open(tracker_path, 'w') as f:
+    json.dump(tracker, f, indent=2, sort_keys=True)
+
+# Output clouds that hit the threshold (3+ consecutive failures)
+escalate = [c for c, count in tracker.items() if count >= 3]
+if escalate:
+    print(' '.join(escalate))
+" "${RECORD_FAILURES_FILE}" "${FINAL_RECORD_FAILED}" "${FINAL_RECORD_SUCCEEDED}" > /tmp/spawn-qa-escalate.txt 2>/dev/null || true
+
+    ESCALATE_CLOUDS=$(cat /tmp/spawn-qa-escalate.txt 2>/dev/null || true)
+    rm -f /tmp/spawn-qa-escalate.txt
+
+    if [[ -n "${ESCALATE_CLOUDS}" ]]; then
+        for cloud in ${ESCALATE_CLOUDS}; do
+            consecutive=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get(sys.argv[2], 0))" "${RECORD_FAILURES_FILE}" "${cloud}" 2>/dev/null || printf "3+")
+            log "Phase 1: ESCALATION — ${cloud} has failed ${consecutive} consecutive cycles"
+
+            # Check if an issue already exists for this cloud
+            existing_issue=$(gh issue list --repo OpenRouterTeam/spawn --state open \
+                --search "fixture recording failing ${cloud}" \
+                --json number --jq '.[0].number' 2>/dev/null) || existing_issue=""
+
+            if [[ -z "${existing_issue}" ]]; then
+                gh issue create --repo OpenRouterTeam/spawn \
+                    --title "QA: ${cloud} fixture recording failing for ${consecutive} consecutive cycles" \
+                    --body "$(printf 'The automated QA cycle has detected that fixture recording for **%s** has failed for **%s consecutive cycles**.\n\nThis likely indicates a persistent issue with the cloud provider'\''s API or our integration.\n\n## What to check\n- Has the %s API changed? (new auth requirements, endpoint changes, rate limits)\n- Are the API credentials still valid?\n- Check `%s/lib/common.sh` for outdated API calls\n- Run `bash test/record.sh %s` locally to reproduce\n\n## Auto-generated\nThis issue was created automatically by the QA cycle (`qa-cycle.sh`).\n\n-- qa/cycle' "${cloud}" "${consecutive}" "${cloud}" "${cloud}" "${cloud}")" \
+                    --label "bug" \
+                    2>&1 | tee -a "${LOG_FILE}" || true
+                log "Phase 1: Created GitHub issue for ${cloud} persistent failure"
+            else
+                log "Phase 1: Issue #${existing_issue} already open for ${cloud}, skipping duplicate"
+            fi
+        done
     fi
 fi
 
