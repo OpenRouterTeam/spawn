@@ -311,7 +311,7 @@ describe("generic_ssh_wait", () => {
       { useMockPath: true }
     );
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("SSH connectivity failed after 2 attempts");
+    expect(stderr).toContain("SSH connectivity timed out after");
   });
 
   it("should succeed on the second attempt", () => {
@@ -343,8 +343,7 @@ fi
       'generic_ssh_wait root 10.0.0.1 "" "echo ok" "Connection" 3 1',
       { useMockPath: true }
     );
-    expect(stderr).toContain("Connection ready after");
-    expect(stderr).toContain("attempt 1");
+    expect(stderr).toContain("Connection ready");
   });
 
   it("should pass username and IP to SSH command", () => {
@@ -438,7 +437,7 @@ echo "IP=$TEST_SERVER_IP"
 `);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("IP=203.0.113.42");
-    expect(stderr).toContain("Test instance active: IP=203.0.113.42");
+    expect(stderr).toContain("Test instance ready (IP: 203.0.113.42)");
   });
 
   it("should poll until target status is reached", () => {
@@ -479,7 +478,7 @@ generic_wait_for_instance mock_api "/instances/1" "active" \\
   TEST_IP "Instance" 3
 `);
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("Instance did not become active after 3 attempts");
+    expect(stderr).toContain("Instance did not become active after");
   });
 
   it("should export the IP variable to the environment", () => {

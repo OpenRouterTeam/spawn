@@ -22,7 +22,7 @@ function warnExtraArgs(
 ): { warned: boolean; extra: string[]; message: string } {
   const extra = filteredArgs.slice(maxExpected);
   if (extra.length > 0) {
-    const message = `Warning: extra argument${extra.length > 1 ? "s" : ""} ignored: ${extra.join(", ")}`;
+    const message = `Extra argument${extra.length > 1 ? "s" : ""} ignored: ${extra.join(", ")}`;
     return { warned: true, extra, message };
   }
   return { warned: false, extra: [], message: "" };
@@ -118,7 +118,7 @@ describe("warnExtraArgs", () => {
       const result = warnExtraArgs(["list", "extra1"], 1);
       expect(result.warned).toBe(true);
       expect(result.extra).toEqual(["extra1"]);
-      expect(result.message).toBe("Warning: extra argument ignored: extra1");
+      expect(result.message).toBe("Extra argument ignored: extra1");
       expect(result.message).not.toContain("arguments"); // singular
     });
 
@@ -126,7 +126,7 @@ describe("warnExtraArgs", () => {
       const result = warnExtraArgs(["list", "extra1", "extra2"], 1);
       expect(result.warned).toBe(true);
       expect(result.extra).toEqual(["extra1", "extra2"]);
-      expect(result.message).toBe("Warning: extra arguments ignored: extra1, extra2");
+      expect(result.message).toBe("Extra arguments ignored: extra1, extra2");
     });
 
     it("should warn on three extra args for default handler", () => {

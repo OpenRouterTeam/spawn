@@ -457,7 +457,7 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   printDryRunSection("Credentials", credLines);
   const allSet = credLines.every(l => l.includes("-- set"));
   if (!allSet) {
-    p.log.warn("Some credentials are missing. Set them before running without --dry-run.");
+    p.log.warn("Some credentials are missing. Set them before launching.");
     p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
     console.log();
   }
@@ -606,8 +606,8 @@ function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryS
     console.error(`  2. Try again later (the script may be deploying)`);
     console.error(`  3. Report the issue: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
   } else {
-    p.log.error(`Script download failed (HTTP ${primaryStatus}/${fallbackStatus})`);
-    console.error(`\nBoth download sources returned errors.`);
+    p.log.error(`Script download failed`);
+    console.error(`\nBoth download sources returned errors (HTTP ${primaryStatus} and ${fallbackStatus}).`);
     if (primaryStatus >= 500 || fallbackStatus >= 500) {
       console.error("The server may be experiencing temporary issues.");
     }
