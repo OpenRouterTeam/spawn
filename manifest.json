@@ -810,6 +810,21 @@
         "location": "fi",
         "image": "ubuntu2404"
       }
+    },
+    "alibabacloud": {
+      "name": "Alibaba Cloud",
+      "description": "Alibaba Cloud ECS instances via CLI",
+      "url": "https://www.alibabacloud.com/",
+      "type": "cli",
+      "auth": "ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET",
+      "provision_method": "aliyun ecs RunInstances with UserData",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "instance_type": "ecs.t5-lc1m2.small",
+        "region": "cn-hangzhou",
+        "image_id": "ubuntu_24_04_x64_20G_alibase_20240812.vhd"
+      }
     }
   },
   "matrix": {
@@ -1367,6 +1382,21 @@
     "webdock/opencode": "missing",
     "webdock/plandex": "missing",
     "webdock/kilocode": "missing",
-    "webdock/continue": "missing"
+    "webdock/continue": "missing",
+    "alibabacloud/claude": "implemented",
+    "alibabacloud/codex": "implemented",
+    "alibabacloud/gemini": "implemented",
+    "alibabacloud/aider": "missing",
+    "alibabacloud/amazonq": "missing",
+    "alibabacloud/cline": "missing",
+    "alibabacloud/continue": "missing",
+    "alibabacloud/goose": "missing",
+    "alibabacloud/gptme": "missing",
+    "alibabacloud/interpreter": "missing",
+    "alibabacloud/kilocode": "missing",
+    "alibabacloud/nanoclaw": "missing",
+    "alibabacloud/openclaw": "missing",
+    "alibabacloud/opencode": "missing",
+    "alibabacloud/plandex": "missing"
   }
 }
