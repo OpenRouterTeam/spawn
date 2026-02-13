@@ -16,7 +16,7 @@ import {
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
-import { saveSpawnRecord, filterHistory, type SpawnRecord } from "./history.js";
+import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord } from "./history.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -418,6 +418,7 @@ function buildCredentialStatusLines(manifest: Manifest, cloud: string): string[]
   const lines: string[] = [];
   const cloudAuth = manifest.clouds[cloud].auth;
   const authVars = parseAuthEnvVars(cloudAuth);
+  const cloudUrl = manifest.clouds[cloud].url;
 
   // Always check OPENROUTER_API_KEY
   const orSet = !!process.env.OPENROUTER_API_KEY;
@@ -425,12 +426,17 @@ function buildCredentialStatusLines(manifest: Manifest, cloud: string): string[]
     ? `  ${pc.green("OPENROUTER_API_KEY")} ${pc.dim("-- set")}`
     : `  ${pc.red("OPENROUTER_API_KEY")} ${pc.dim("-- not set")}  ${pc.dim("https://openrouter.ai/settings/keys")}`);
 
-  // Check cloud-specific auth vars
-  for (const v of authVars) {
+  // Check cloud-specific auth vars (show provider URL hint for missing vars)
+  for (let i = 0; i < authVars.length; i++) {
+    const v = authVars[i];
     const isSet = !!process.env[v];
-    lines.push(isSet
-      ? `  ${pc.green(v)} ${pc.dim("-- set")}`
-      : `  ${pc.red(v)} ${pc.dim("-- not set")}`);
+    if (isSet) {
+      lines.push(`  ${pc.green(v)} ${pc.dim("-- set")}`);
+    } else {
+      // Show the cloud provider URL on the first missing var to help users find their credentials
+      const urlHint = i === 0 && cloudUrl ? `  ${pc.dim(cloudUrl)}` : "";
+      lines.push(`  ${pc.red(v)} ${pc.dim("-- not set")}${urlHint}`);
+    }
   }
 
   return lines;
@@ -1185,6 +1191,15 @@ async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest 
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
 
+export function cmdListClear(): void {
+  const count = clearHistory();
+  if (count === 0) {
+    p.log.info("No spawn history to clear.");
+  } else {
+    p.log.success(`Cleared ${count} spawn record${count !== 1 ? "s" : ""} from history.`);
+  }
+}
+
 export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
   const resolved = await resolveListFilters(agentFilter, cloudFilter);
   const manifest = resolved.manifest;
@@ -1551,6 +1566,7 @@ ${pc.bold("USAGE")}
   spawn list <filter>                Filter history by agent or cloud name
   spawn list -a <agent>              Filter spawn history by agent (or --agent)
   spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
+  spawn list --clear                 Clear all spawn history
                                      Aliases: ls, history
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
