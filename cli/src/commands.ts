@@ -941,14 +941,7 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
 
 function showListFooter(records: SpawnRecord[], agentFilter?: string, cloudFilter?: string): void {
   const latest = records[0];
-  if (latest.prompt) {
-    const shortPrompt = latest.prompt.length > 30 ? latest.prompt.slice(0, 30) + "..." : latest.prompt;
-    // Escape double quotes so the suggested command is valid shell
-    const safePrompt = shortPrompt.replace(/"/g, '\\"');
-    console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud} --prompt "${safePrompt}"`)}`);
-  } else {
-    console.log(`Rerun last: ${pc.cyan(`spawn ${latest.agent} ${latest.cloud}`)}`);
-  }
+  console.log(`Rerun last: ${pc.cyan(buildRetryCommand(latest.agent, latest.cloud, latest.prompt))}`);
 
   if (agentFilter || cloudFilter) {
     const totalRecords = filterHistory();
