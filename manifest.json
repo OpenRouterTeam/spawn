@@ -372,7 +372,7 @@
       "defaults": {
         "template": "base"
       },
-      "notes": "No SSH \u2014 uses CodeSandbox SDK/CLI for exec. Firecracker microVMs with ~2s start. Free tier: 40 hrs/mo on Build plan. Requires npm install -g @codesandbox/sdk."
+      "notes": "No SSH — uses CodeSandbox SDK/CLI for exec. Firecracker microVMs with ~2s start. Free tier: 40 hrs/mo on Build plan. Requires npm install -g @codesandbox/sdk."
     },
     "e2b": {
       "name": "E2B",
@@ -386,7 +386,7 @@
       "defaults": {
         "template": "base"
       },
-      "notes": "No SSH \u2014 uses E2B CLI for exec. Sandboxes start in ~150ms. Requires npm install -g @e2b/cli."
+      "notes": "No SSH — uses E2B CLI for exec. Sandboxes start in ~150ms. Requires npm install -g @e2b/cli."
     },
     "modal": {
       "name": "Modal",
@@ -400,7 +400,7 @@
       "defaults": {
         "image": "debian_slim"
       },
-      "notes": "No SSH \u2014 uses Modal Python SDK for exec. Sub-second cold starts. Requires pip install modal."
+      "notes": "No SSH — uses Modal Python SDK for exec. Sub-second cold starts. Requires pip install modal."
     },
     "fly": {
       "name": "Fly.io",
@@ -656,7 +656,7 @@
         "disk_size": 20,
         "location": "us/las"
       },
-      "notes": "Budget European cloud provider with minute-based billing starting at $2/month. Requires IONOS_USERNAME (email) and IONOS_PASSWORD (API key) from https://dcd.ionos.com/ \u2192 Management \u2192 Users & Keys. Datacenters are created automatically if needed."
+      "notes": "Budget European cloud provider with minute-based billing starting at $2/month. Requires IONOS_USERNAME (email) and IONOS_PASSWORD (API key) from https://dcd.ionos.com/ → Management → Users & Keys. Datacenters are created automatically if needed."
     },
     "exoscale": {
       "name": "Exoscale",
@@ -704,7 +704,7 @@
         "location": "eu-central",
         "os_template": "ubuntu-24.04"
       },
-      "notes": "Budget VPS provider with cloud-init pre-installed. Starting at $4.95/mo. Requires HOSTINGER_API_KEY from hPanel \u2192 Profile \u2192 Account Information \u2192 API. API docs at developers.hostinger.com"
+      "notes": "Budget VPS provider with cloud-init pre-installed. Starting at $4.95/mo. Requires HOSTINGER_API_KEY from hPanel → Profile → Account Information → API. API docs at developers.hostinger.com"
     },
     "netcup": {
       "name": "Netcup",
@@ -720,7 +720,7 @@
         "datacenter": "Nuremberg",
         "image": "ubuntu-24.04"
       },
-      "notes": "German budget VPS provider starting at \u20ac3.86/mo. Session-based REST API launched Oct 2025. Requires NETCUP_CUSTOMER_NUMBER, NETCUP_API_KEY, and NETCUP_API_PASSWORD from https://ccp.netcup.net/ \u2192 Settings \u2192 API"
+      "notes": "German budget VPS provider starting at €3.86/mo. Session-based REST API launched Oct 2025. Requires NETCUP_CUSTOMER_NUMBER, NETCUP_API_KEY, and NETCUP_API_PASSWORD from https://ccp.netcup.net/ → Settings → API"
     },
     "local": {
       "name": "Local Machine",
@@ -746,7 +746,7 @@
         "flavor": "1GB",
         "image": "Ubuntu 24.04"
       },
-      "notes": "Budget VPS provider with OpenStack API. Hourly billing starting at $0.006/hr (~$4.38/mo). Full OpenStack compatibility. Get credentials from https://manage.ramnode.com/ \u2192 Cloud \u2192 API Users. Requires RAMNODE_USERNAME, RAMNODE_PASSWORD, and RAMNODE_PROJECT_ID."
+      "notes": "Budget VPS provider with OpenStack API. Hourly billing starting at $0.006/hr (~$4.38/mo). Full OpenStack compatibility. Get credentials from https://manage.ramnode.com/ → Cloud → API Users. Requires RAMNODE_USERNAME, RAMNODE_PASSWORD, and RAMNODE_PROJECT_ID."
     },
     "atlanticnet": {
       "name": "Atlantic.Net",
@@ -762,7 +762,22 @@
         "location": "USEAST2",
         "image": "ubuntu-24.04_64bit"
       },
-      "notes": "Budget VPS provider starting at $4/mo. Uses HMAC-SHA256 signature auth with API key + private key. Requires ATLANTICNET_API_KEY and ATLANTICNET_API_PRIVATE_KEY from https://cloud.atlantic.net/ \u2192 API Info."
+      "notes": "Budget VPS provider starting at $4/mo. Uses HMAC-SHA256 signature auth with API key + private key. Requires ATLANTICNET_API_KEY and ATLANTICNET_API_PRIVATE_KEY from https://cloud.atlantic.net/ → API Info."
+    },
+    "hostkey": {
+      "name": "HOSTKEY",
+      "description": "HOSTKEY VPS hosting via REST API",
+      "url": "https://hostkey.com/",
+      "type": "api",
+      "auth": "HOSTKEY_API_KEY",
+      "provision_method": "POST /eq/order_instance",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "preset": "1",
+        "location": "nl",
+        "os": "ubuntu-24.04"
+      }
     }
   },
   "matrix": {
@@ -1275,6 +1290,21 @@
     "atlanticnet/opencode": "missing",
     "atlanticnet/plandex": "missing",
     "atlanticnet/kilocode": "missing",
-    "atlanticnet/continue": "missing"
+    "atlanticnet/continue": "missing",
+    "hostkey/claude": "implemented",
+    "hostkey/openclaw": "implemented",
+    "hostkey/nanoclaw": "missing",
+    "hostkey/aider": "missing",
+    "hostkey/goose": "missing",
+    "hostkey/codex-cli": "missing",
+    "hostkey/open-interpreter": "missing",
+    "hostkey/gemini-cli": "missing",
+    "hostkey/amazonq": "missing",
+    "hostkey/cline": "missing",
+    "hostkey/gptme": "missing",
+    "hostkey/opencode": "missing",
+    "hostkey/plandex": "missing",
+    "hostkey/kilo": "missing",
+    "hostkey/continue": "missing"
   }
 }

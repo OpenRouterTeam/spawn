@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
@@ -130,6 +130,11 @@ get_endpoints() {
                 "ssh_keys:list-sshkeys" \
                 "plans:describe-plan"
             ;;
+        hostkey)
+            printf '%s\n' \
+                "services:/v1/services" \
+                "ssh_keys:/ssh_keys"
+            ;;
     esac
 }
 
@@ -152,6 +157,7 @@ get_auth_env_var() {
         latitude)      printf "LATITUDE_API_KEY" ;;
         hyperstack)    printf "HYPERSTACK_API_KEY" ;;
         atlanticnet)   printf "ATLANTICNET_API_KEY" ;;
+        hostkey)       printf "HOSTKEY_API_KEY" ;;
     esac
 }
 
@@ -360,6 +366,7 @@ call_api() {
         latitude)      latitude_api GET "$endpoint" ;;
         hyperstack)    hyperstack_api GET "$endpoint" ;;
         atlanticnet)   atlanticnet_api "$endpoint" ;;
+        hostkey)       hostkey_api "$endpoint" ;;
     esac
 }
 
@@ -399,6 +406,8 @@ elif cloud == 'kamatera':
 elif cloud == 'latitude':
     sys.exit(0 if 'error' in d or ('errors' in d and d['errors']) else 1)
 elif cloud == 'atlanticnet':
+    sys.exit(0 if 'error' in d and d['error'] else 1)
+elif cloud == 'hostkey':
     sys.exit(0 if 'error' in d and d['error'] else 1)
 else:
     sys.exit(1)
@@ -763,6 +772,13 @@ print(d.get('run-instanceresponse',{}).get('instancesSet',{}).get('item',{}).get
 
     _save_live_fixture "$fixture_dir" "delete_server" "terminate-instance" "$delete_response"
     printf '%b\n' "  ${CYAN}live${NC} Instance ${instance_id} deleted"
+}
+
+_live_hostkey() {
+    local fixture_dir="$1"
+    # HOSTKEY live testing not implemented yet - requires instance creation via eq/order_instance
+    # Skipping live fixtures for now
+    return 0
 }
 
 # --- Record one cloud ---
