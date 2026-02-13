@@ -432,7 +432,7 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
 }
 
 /** Validate inputs for injection attacks (SECURITY) and check they're non-empty */
-function validateRunSecurity(agent: string, cloud: string, prompt?: string): void {
+export function validateRunSecurity(agent: string, cloud: string, prompt?: string): void {
   try {
     validateIdentifier(agent, "Agent name");
     validateIdentifier(cloud, "Cloud name");
