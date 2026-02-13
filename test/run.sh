@@ -195,6 +195,49 @@ assert_common_fails() {
     fi
 }
 
+# --- Sprite command assertions ---
+# Assert that a sprite script follows the standard command lifecycle:
+# auth check -> list -> create -> exec -> env upload -> interactive launch
+_assert_sprite_common_commands() {
+    local script_name="$1"
+    assert_contains "${MOCK_LOG}" "sprite org list" "Checks sprite authentication"
+    assert_contains "${MOCK_LOG}" "sprite list" "Checks if sprite exists"
+    assert_contains "${MOCK_LOG}" "sprite create.*test-sprite-${script_name}" "Creates sprite with correct name"
+    assert_contains "${MOCK_LOG}" "sprite exec.*test-sprite-${script_name}" "Runs commands on sprite"
+    assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/env_config" "Uploads env config to sprite"
+    assert_contains "${MOCK_LOG}" "sprite exec.*-tty.*" "Launches interactive session"
+}
+
+# Assert that a sprite script installs agent-specific components
+_assert_agent_specific() {
+    local script_name="$1"
+    case "${script_name}" in
+        claude)
+            assert_contains "${MOCK_LOG}" "sprite exec.*claude.*install" "Installs Claude Code"
+            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*settings.json" "Uploads Claude settings"
+            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*\.claude\.json" "Uploads Claude global state"
+            ;;
+        openclaw)
+            assert_contains "${MOCK_LOG}" "sprite exec.*\.sprite.*bun.*openclaw" "Installs openclaw via bun"
+            assert_contains "${MOCK_LOG}" "sprite exec.*openclaw gateway" "Starts openclaw gateway"
+            ;;
+        nanoclaw)
+            assert_contains "${MOCK_LOG}" "sprite exec.*git.*nanoclaw" "Clones nanoclaw repo"
+            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/nanoclaw_env" "Uploads nanoclaw .env"
+            ;;
+    esac
+}
+
+# Assert no temp files were leaked during script execution
+_assert_no_temp_leaks() {
+    local leaked_temps
+    leaked_temps=$(find /tmp -maxdepth 1 -name "tmp.*" -newer "${MOCK_LOG}" 2>/dev/null | wc -l)
+    if [[ "${leaked_temps}" -eq 0 ]]; then
+        printf '%b\n' "  ${GREEN}✓${NC} No temp files leaked"
+        ((PASSED++))
+    fi
+}
+
 # --- Test runner for a single script ---
 run_script_test() {
     local script_name="$1"
@@ -217,46 +260,9 @@ run_script_test() {
         timeout 30 bash "${script_path}" > "${output_file}" 2>&1 || exit_code=$?
 
     assert_exit_code "${exit_code}" 0 "Script exits successfully"
-
-    # Common assertions for all scripts
-    assert_contains "${MOCK_LOG}" "sprite org list" "Checks sprite authentication"
-    assert_contains "${MOCK_LOG}" "sprite list" "Checks if sprite exists"
-    assert_contains "${MOCK_LOG}" "sprite create.*test-sprite-${script_name}" "Creates sprite with correct name"
-    assert_contains "${MOCK_LOG}" "sprite exec.*test-sprite-${script_name}" "Runs commands on sprite"
-
-    # Check env var injection (temp file upload)
-    assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/env_config" "Uploads env config to sprite"
-
-    # Check final interactive launch (flag order varies: -s NAME -tty or -tty -s NAME)
-    assert_contains "${MOCK_LOG}" "sprite exec.*-tty.*" "Launches interactive session"
-
-    # Script-specific assertions
-    case "${script_name}" in
-        claude)
-            assert_contains "${MOCK_LOG}" "sprite exec.*claude.*install" "Installs Claude Code"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*settings.json" "Uploads Claude settings"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*\.claude\.json" "Uploads Claude global state"
-            ;;
-        openclaw)
-            assert_contains "${MOCK_LOG}" "sprite exec.*\.sprite.*bun.*openclaw" "Installs openclaw via bun"
-            assert_contains "${MOCK_LOG}" "sprite exec.*openclaw gateway" "Starts openclaw gateway"
-            ;;
-        nanoclaw)
-            assert_contains "${MOCK_LOG}" "sprite exec.*git.*nanoclaw" "Clones nanoclaw repo"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/nanoclaw_env" "Uploads nanoclaw .env"
-            ;;
-        *)
-            # No agent-specific assertions for other agents
-            ;;
-    esac
-
-    # Check no temp files leaked
-    local leaked_temps
-    leaked_temps=$(find /tmp -maxdepth 1 -name "tmp.*" -newer "${MOCK_LOG}" 2>/dev/null | wc -l)
-    if [[ "${leaked_temps}" -eq 0 ]]; then
-        printf '%b\n' "  ${GREEN}✓${NC} No temp files leaked"
-        ((PASSED++))
-    fi
+    _assert_sprite_common_commands "${script_name}"
+    _assert_agent_specific "${script_name}"
+    _assert_no_temp_leaks
 }
 
 # --- Test common.sh sourcing ---
@@ -576,44 +582,36 @@ test_source_detection() {
 }
 
 # --- Static analysis with shellcheck ---
-run_shellcheck() {
-    echo ""
-    printf '%b\n' "${YELLOW}━━━ Running shellcheck (static analysis) ━━━${NC}"
 
-    # Check if shellcheck is available
-    if ! command -v shellcheck &> /dev/null; then
-        printf '%b\n' "  ${YELLOW}⚠${NC} shellcheck not found (install with: apt install shellcheck / brew install shellcheck)"
-        printf '%b\n' "  ${YELLOW}⚠${NC} Skipping static analysis"
-        return 0
-    fi
-
-    # Dynamically discover all shell scripts (agent scripts + lib files + test harness)
-    local all_scripts=()
+# Discover all shell scripts in the repo: agent scripts, lib files, shared, and test harness.
+# Populates the DISCOVERED_SCRIPTS array.
+_discover_shell_scripts() {
+    DISCOVERED_SCRIPTS=()
     local dir
     for dir in "${REPO_ROOT}"/*/; do
         local cloud
         cloud=$(basename "${dir}")
-        # Skip non-cloud directories
         case "${cloud}" in
             cli|shared|test|node_modules|.git|.github|.claude|.docs) continue ;;
         esac
-        # Add agent scripts and lib/common.sh if they exist
         local f
         for f in "${dir}"*.sh; do
-            [[ -f "${f}" ]] && all_scripts+=("${f}")
+            [[ -f "${f}" ]] && DISCOVERED_SCRIPTS+=("${f}")
         done
-        [[ -f "${dir}lib/common.sh" ]] && all_scripts+=("${dir}lib/common.sh")
+        [[ -f "${dir}lib/common.sh" ]] && DISCOVERED_SCRIPTS+=("${dir}lib/common.sh")
     done
-    all_scripts+=("${REPO_ROOT}/shared/common.sh" "${REPO_ROOT}/test/run.sh")
+    DISCOVERED_SCRIPTS+=("${REPO_ROOT}/shared/common.sh" "${REPO_ROOT}/test/run.sh")
+}
 
+# Run shellcheck on each discovered script and report results.
+_run_shellcheck_on_scripts() {
     local issue_count=0
     local checked_count=0
 
-    for script in "${all_scripts[@]}"; do
+    for script in "${DISCOVERED_SCRIPTS[@]}"; do
         [[ -f "${script}" ]] || continue
         ((checked_count++))
 
-        # Run shellcheck with warning severity, exclude some noisy checks
         # SC1090: Can't follow non-constant source
         # SC2312: Consider invoking this command separately to avoid masking its return value
         local output
@@ -631,8 +629,21 @@ run_shellcheck() {
         ((PASSED++))
     else
         printf '%b\n' "  ${YELLOW}⚠${NC} Found issues in ${issue_count}/${checked_count} scripts (advisory only)"
-        # Don't fail the build, just warn
     fi
+}
+
+run_shellcheck() {
+    echo ""
+    printf '%b\n' "${YELLOW}━━━ Running shellcheck (static analysis) ━━━${NC}"
+
+    if ! command -v shellcheck &> /dev/null; then
+        printf '%b\n' "  ${YELLOW}⚠${NC} shellcheck not found (install with: apt install shellcheck / brew install shellcheck)"
+        printf '%b\n' "  ${YELLOW}⚠${NC} Skipping static analysis"
+        return 0
+    fi
+
+    _discover_shell_scripts
+    _run_shellcheck_on_scripts
 }
 
 # --- Main ---
