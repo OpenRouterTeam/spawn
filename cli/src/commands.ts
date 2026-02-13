@@ -329,7 +329,7 @@ export async function cmdInteractive(): Promise<void> {
   const { sortedClouds, hintOverrides, credCount } = prioritizeCloudsByCredentials(clouds, manifest);
 
   if (credCount > 0) {
-    p.log.info(`${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected`);
+    p.log.info(`${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected (shown first)`);
   }
 
   const cloudChoice = await p.select({
@@ -469,7 +469,12 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   }
 
   if (prompt) {
-    printDryRunSection("Prompt", [`  ${prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt}`]);
+    const preview = prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt;
+    const lines = [`  ${preview}`];
+    if (prompt.length > 100) {
+      lines.push(pc.dim(`  (${prompt.length} characters total)`));
+    }
+    printDryRunSection("Prompt", lines);
   }
 
   p.log.success("Dry run complete -- no resources were provisioned");
@@ -1191,13 +1196,25 @@ async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest 
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
 
-export function cmdListClear(): void {
-  const count = clearHistory();
-  if (count === 0) {
+export async function cmdListClear(): Promise<void> {
+  const records = filterHistory();
+  if (records.length === 0) {
     p.log.info("No spawn history to clear.");
-  } else {
-    p.log.success(`Cleared ${count} spawn record${count !== 1 ? "s" : ""} from history.`);
+    return;
   }
+
+  if (isInteractiveTTY()) {
+    const shouldClear = await p.confirm({
+      message: `Delete ${records.length} spawn record${records.length !== 1 ? "s" : ""} from history?`,
+      initialValue: false,
+    });
+    if (p.isCancel(shouldClear) || !shouldClear) {
+      handleCancel();
+    }
+  }
+
+  const count = clearHistory();
+  p.log.success(`Cleared ${count} spawn record${count !== 1 ? "s" : ""} from history.`);
 }
 
 export async function cmdList(agentFilter?: string, cloudFilter?: string): Promise<void> {
