@@ -1208,7 +1208,7 @@
     "ramnode/goose": "implemented",
     "ramnode/codex": "missing",
     "ramnode/interpreter": "implemented",
-    "ramnode/gemini": "missing",
+    "ramnode/gemini": "implemented",
     "ramnode/amazonq": "missing",
     "ramnode/cline": "implemented",
     "ramnode/gptme": "implemented",
