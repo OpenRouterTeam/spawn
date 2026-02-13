@@ -66,6 +66,7 @@ const VALID_REASONS = new Set([
   "manual",
   "schedule",
   "issues",
+  "workflow_dispatch",
   "team_building",
   "triage",
   "review_all",
