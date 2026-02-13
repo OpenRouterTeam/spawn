@@ -869,7 +869,7 @@
     "codesandbox/codex": "missing",
     "codesandbox/interpreter": "missing",
     "codesandbox/gemini": "implemented",
-    "codesandbox/amazonq": "missing",
+    "codesandbox/amazonq": "implemented",
     "codesandbox/cline": "missing",
     "codesandbox/gptme": "missing",
     "codesandbox/opencode": "implemented",

@@ -54,6 +54,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/plandex.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/gemini.sh)
 ```
 
+#### Amazon Q CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/amazonq.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
