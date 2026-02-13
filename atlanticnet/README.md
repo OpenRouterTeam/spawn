@@ -30,6 +30,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/kilocode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
 ```
 
+#### Cline
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/cline.sh)
+```
+
 #### Open Interpreter
 
 ```bash
