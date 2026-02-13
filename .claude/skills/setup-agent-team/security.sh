@@ -24,6 +24,12 @@ if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
+# Validate SLACK_WEBHOOK format to prevent injection via heredoc expansion
+if [[ -n "${SLACK_WEBHOOK}" ]] && [[ ! "${SLACK_WEBHOOK}" =~ ^https://hooks\.slack\.com/ ]]; then
+    echo "WARNING: SLACK_WEBHOOK does not match expected format (https://hooks.slack.com/...), disabling" >&2
+    SLACK_WEBHOOK=""
+fi
+
 if [[ "${SPAWN_REASON}" == "issues" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
     # Workflow passed raw event_name — detect mode from issue labels
     if gh issue view "${SPAWN_ISSUE}" --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name' 2>/dev/null | grep -q '^team-building$'; then
@@ -712,7 +718,7 @@ if [ -n "\${SLACK_WEBHOOK}" ] && [ "\${SLACK_WEBHOOK}" != "NOT_SET" ]; then
     -d '{"text":":shield: Review+scan cycle complete: N PRs reviewed (X merged, Y flagged, Z closed-stale), K branches cleaned, J issues re-flagged, S scan findings (F issues filed). See https://github.com/OpenRouterTeam/spawn/pulls"}'
 fi
 \`\`\`
-(The SLACK_WEBHOOK env var is: ${SLACK_WEBHOOK:-NOT_SET})
+(SLACK_WEBHOOK is configured: $(if [ -n "${SLACK_WEBHOOK}" ]; then echo "yes"; else echo "no"; fi))
 
 ## Workflow
 
