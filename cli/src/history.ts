@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -43,6 +43,17 @@ export function saveSpawnRecord(record: SpawnRecord): void {
     history = history.slice(history.length - MAX_HISTORY_ENTRIES);
   }
   writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
+}
+
+export function clearHistory(): number {
+  const path = getHistoryPath();
+  if (!existsSync(path)) return 0;
+  const records = loadHistory();
+  const count = records.length;
+  if (count > 0) {
+    unlinkSync(path);
+  }
+  return count;
 }
 
 export function filterHistory(

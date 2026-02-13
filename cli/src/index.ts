@@ -3,6 +3,7 @@ import {
   cmdInteractive,
   cmdRun,
   cmdList,
+  cmdListClear,
   cmdMatrix,
   cmdAgents,
   cmdClouds,
@@ -64,6 +65,7 @@ const KNOWN_FLAGS = new Set([
   "--prompt", "-p", "--prompt-file", "-f",
   "--dry-run", "-n",
   "-a", "-c", "--agent", "--cloud",
+  "--clear",
 ]);
 
 /** Expand --flag=value into --flag value so all flag parsing works uniformly */
@@ -368,6 +370,10 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
 
   if (LIST_COMMANDS.has(cmd)) {
     if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+    if (filteredArgs.slice(1).includes("--clear")) {
+      cmdListClear();
+      return;
+    }
     const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
     await cmdList(agentFilter, cloudFilter);
     return;
