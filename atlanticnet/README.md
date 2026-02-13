@@ -62,10 +62,18 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/opencode.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/plandex.sh)
+```
+
 #### Amazon Q
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/amazonq.sh)
+```
+
+#### Goose
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/goose.sh)
 ```
 
 ## Non-Interactive Mode
