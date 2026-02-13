@@ -150,7 +150,6 @@ Create these teammates:
    - Implement the fix in an isolated worktree
    - Run tests to verify the fix
    - Create a PR with \`Fixes #${SPAWN_ISSUE}\` in the body
-   - Self-review the PR and label with \`needs-team-review\` (do NOT merge)
 
 2. **issue-tester** (Haiku)
    - Review the fix for correctness and edge cases
@@ -186,9 +185,6 @@ Track issue lifecycle with labels: "pending-review" → "under-review" → "in-p
 9. When fix is ready:
    - Push: \`git push -u origin fix/issue-${SPAWN_ISSUE}\`
    - PR: \`gh pr create --title "fix: Description" --body "Fixes #${SPAWN_ISSUE}\n\n-- refactor/issue-fixer"\`
-   - Self-review: \`gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by issue-fixer: [summary]\n\n-- refactor/issue-fixer"\`
-   - Label: \`gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"\`
-   - Do NOT merge — PR stays open for external review
 10. Post update comment on the issue linking to the PR
 11. Do NOT close the issue — the PR body contains \`Fixes #${SPAWN_ISSUE}\` which will auto-close the issue when the PR is merged
 12. Clean up worktree: \`git worktree remove ${WORKTREE_BASE}\`
@@ -232,28 +228,24 @@ Complexity-hunter: pick the top 1-2 worst functions, fix them, PR, done. Do NOT 
 Test-engineer: add ONE focused test file, PR, done. Do NOT aim for 100% coverage.
 Security-auditor: scan for HIGH/CRITICAL only. Document medium/low, don't fix them.
 
-## No Self-Merge Rule (MANDATORY)
+## Separation of Concerns (MANDATORY)
 
-Agents must NEVER merge their own PRs. This applies to ALL agents including the team lead.
+The refactor team **creates PRs** — the security team **reviews and merges** them.
 
-### What agents MUST do after creating a PR:
-1. **Self-review**: Read the PR diff and add a review comment with findings:
-   `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
-   `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of changes, what was tested, any concerns]\n\n-- refactor/AGENT-NAME"`
-2. **Label for external review**: Add `needs-team-review` label:
-   `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
-3. **Leave the PR open** — do NOT run `gh pr merge`
+### What refactor agents MUST do:
+1. **Research deeply**: Use web search, code exploration, and deep-dives to understand the problem before writing code
+2. **Create a PR** with clear title and description explaining the change and rationale
+3. **Leave the PR open** — the security team handles review, approval, and merge
 
-### What agents must NEVER do:
-- `gh pr merge` — NEVER, under any circumstances
-- Approve their own PR — self-review is comment-only, not approval
+### What refactor agents must NEVER do:
+- `gh pr review` — NEVER review PRs (that's the security team's job)
+- `gh pr merge` — NEVER merge PRs
+- Approve or request changes on any PR
 
 ### Why:
-- Prevents duplicate or conflicting work from landing unreviewed
-- Ensures a second set of eyes (human or another team) validates every change
-- Catches planning issues before they hit main
-
-PRs will be reviewed and merged externally (by maintainers or a separate review cycle).
+- Clear ownership: refactor team solves problems, security team gates quality
+- Prevents unreviewed code from landing
+- Lets each team focus on what they do best
 
 ## Team Structure
 
@@ -389,22 +381,15 @@ When fixing a bug reported in a GitHub issue:
     gh pr create --title "Fix: description" --body "Fixes #NUMBER
 
 -- refactor/AGENT-NAME"
-12. Self-review and label (DO NOT merge — see No Self-Merge Rule):
-    gh pr diff NUMBER --repo OpenRouterTeam/spawn
-    gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of fix, tests run, confidence level]
+12. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
+13. Community-coordinator posts update comment with PR link (only if no similar update exists)
+14. Do NOT close the issue — the PR body contains \`Fixes #NUMBER\` which will auto-close the issue when merged
 
--- refactor/AGENT-NAME"
-    gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"
-13. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
-14. Community-coordinator posts update comment with PR link (only if no similar update exists)
-15. Do NOT close the issue — the PR body contains \`Fixes #NUMBER\` which will auto-close the issue when merged
-
-NEVER leave a PR without a self-review comment and \`needs-team-review\` label.
 If a PR cannot be created (conflicts, superseded, etc.), close it WITH a comment explaining why.
 NEVER close a PR silently — every closed PR MUST have a comment.
 NEVER close an issue manually — let the PR merge auto-close it via \`Fixes #NUMBER\`.
-The full cycle is: acknowledge → investigate → worktree → fix → update → PR (references issue with \`Fixes #NUMBER\`) → self-review → label → cleanup worktree.
-Note: merging is handled externally — agents do NOT merge. Issues close automatically when the PR merges.
+The full cycle is: acknowledge → investigate → worktree → fix → update → PR (references issue with \`Fixes #NUMBER\`) → cleanup worktree.
+Note: review and merging is handled by the security team. Issues close automatically when the PR merges.
 
 ## Commit Markers (MANDATORY)
 
@@ -467,14 +452,7 @@ gh pr create --title "title" --body "body
 
 -- refactor/AGENT-NAME"
 
-# 5. Self-review and label (DO NOT merge — see No Self-Merge Rule)
-gh pr diff NUMBER --repo OpenRouterTeam/spawn
-gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]
-
--- refactor/AGENT-NAME"
-gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"
-
-# 6. Clean up worktree (PR stays open for external review)
+# 5. Clean up worktree (PR stays open for security team review)
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 ```
 
@@ -529,13 +507,11 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 2. Immediately start a polling loop — do NOT just output text saying "I'll wait":
    while teammates are still active:
      a. Run TaskList to check task status
-     b. Run `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` to verify PRs have been self-reviewed and labeled
-     c. When you receive a teammate message, acknowledge it and update task tracking
-     d. If a teammate reports completion, mark their task done — verify their PR has a self-review comment and label
-     e. If a teammate reports an error, coordinate resolution
-     f. If the time budget is almost up, send wrap-up messages to all teammates
-     g. If no messages received yet, run `Bash("sleep 30")` then loop back to (a)
-     h. REMINDER: Do NOT merge any PRs — they stay open for external review
+     b. When you receive a teammate message, acknowledge it and update task tracking
+     c. If a teammate reports completion, mark their task done
+     d. If a teammate reports an error, coordinate resolution
+     e. If the time budget is almost up, send wrap-up messages to all teammates
+     f. If no messages received yet, run `Bash("sleep 30")` then loop back to (a)
 3. Only after ALL teammates have finished, proceed to shutdown
 ```
 
@@ -550,7 +526,7 @@ GOOD: Spawn teammates → TaskList → sleep 30 → TaskList → receive message
 You MUST remain active until ALL of the following are true:
 
 1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
-2. **All PRs are self-reviewed and labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` and confirm every PR from this cycle has a self-review comment and the `needs-team-review` label. PRs stay open for the security team to review and merge.
+2. **All PRs are created**: Verify PRs from this cycle exist and have clear descriptions. PRs stay open for the security team to review and merge.
 3. **All issues are engaged and labeled**: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,labels`
    and for EACH open issue, verify it has at least one comment AND has a status label
    ("pending-review", "under-review", or "in-progress"). If any issue is missing a status
@@ -562,7 +538,7 @@ You MUST remain active until ALL of the following are true:
 ### Shutdown Sequence (execute in this exact order):
 
 1. Check TaskList — if any tasks are still in_progress or pending, wait and check again (poll every 30 seconds, up to 10 minutes)
-2. Verify all PRs are self-reviewed and labeled: `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` (PRs stay open for security team review)
+2. Verify all PRs from this cycle have been created with clear descriptions
 3. Verify all issues engaged: `gh issue list --repo OpenRouterTeam/spawn --state open`
 4. For each teammate, send a `shutdown_request` via SendMessage
 5. Wait for all `shutdown_response` confirmations
