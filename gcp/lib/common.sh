@@ -95,6 +95,63 @@ touch /tmp/.cloud-init-complete
 CLOUD_INIT_EOF
 }
 
+# Prepare startup script and SSH metadata temp files for gcloud instance creation
+# Sets startup_script_file and pub_key variables in caller's scope
+_gcp_prepare_instance_files() {
+    startup_script_file=$(mktemp)
+    track_temp_file "${startup_script_file}"
+    get_cloud_init_userdata > "${startup_script_file}"
+
+    pub_key=$(cat "${HOME}/.ssh/id_ed25519.pub")
+}
+
+# Run gcloud compute instances create and handle errors
+# Returns 0 on success, 1 on failure with diagnostic output
+_gcp_run_create() {
+    local name="${1}" zone="${2}" machine_type="${3}"
+    local image_family="${4}" image_project="${5}" startup_script_file="${6}" pub_key="${7}"
+
+    local gcloud_err
+    gcloud_err=$(mktemp)
+    track_temp_file "${gcloud_err}"
+
+    if gcloud compute instances create "${name}" \
+        --zone="${zone}" \
+        --machine-type="${machine_type}" \
+        --image-family="${image_family}" \
+        --image-project="${image_project}" \
+        --metadata-from-file="startup-script=${startup_script_file}" \
+        --metadata="ssh-keys=${GCP_USERNAME}:${pub_key}" \
+        --project="${GCP_PROJECT}" \
+        --quiet \
+        >/dev/null 2>"${gcloud_err}"; then
+        return 0
+    fi
+
+    log_error "Failed to create GCP instance"
+    local err_output
+    err_output=$(cat "${gcloud_err}" 2>/dev/null)
+    if [[ -n "${err_output}" ]]; then
+        log_error "gcloud error: ${err_output}"
+    fi
+    log_warn "Common issues:"
+    log_warn "  - Billing not enabled for the project (enable at https://console.cloud.google.com/billing)"
+    log_warn "  - Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)"
+    log_warn "  - Instance quota exceeded in zone (try different GCP_ZONE)"
+    log_warn "  - Machine type unavailable in zone (try different GCP_MACHINE_TYPE or GCP_ZONE)"
+    return 1
+}
+
+# Get the external IP of a GCP instance
+# Usage: _gcp_get_instance_ip NAME ZONE
+_gcp_get_instance_ip() {
+    local name="${1}" zone="${2}"
+    gcloud compute instances describe "${name}" \
+        --zone="${zone}" \
+        --project="${GCP_PROJECT}" \
+        --format='get(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null
+}
+
 create_server() {
     local name="${1}"
     local machine_type="${GCP_MACHINE_TYPE:-e2-medium}"
@@ -108,55 +165,16 @@ create_server() {
 
     log_step "Creating GCP instance '${name}' (type: ${machine_type}, zone: ${zone})..."
 
-    local pub_key
-    pub_key=$(cat "${HOME}/.ssh/id_ed25519.pub")
+    local startup_script_file pub_key
+    _gcp_prepare_instance_files
 
-    # Write startup script to a temp file to avoid --metadata comma delimiter issues
-    local startup_script_file
-    startup_script_file=$(mktemp)
-    track_temp_file "${startup_script_file}"
-    get_cloud_init_userdata > "${startup_script_file}"
+    _gcp_run_create "${name}" "${zone}" "${machine_type}" \
+        "${image_family}" "${image_project}" "${startup_script_file}" "${pub_key}" || return 1
 
-    local gcloud_err
-    gcloud_err=$(mktemp)
-    track_temp_file "${gcloud_err}"
-
-    if ! gcloud compute instances create "${name}" \
-        --zone="${zone}" \
-        --machine-type="${machine_type}" \
-        --image-family="${image_family}" \
-        --image-project="${image_project}" \
-        --metadata-from-file="startup-script=${startup_script_file}" \
-        --metadata="ssh-keys=${GCP_USERNAME}:${pub_key}" \
-        --project="${GCP_PROJECT}" \
-        --quiet \
-        >/dev/null 2>"${gcloud_err}"; then
-        log_error "Failed to create GCP instance"
-        local err_output
-        err_output=$(cat "${gcloud_err}" 2>/dev/null)
-        if [[ -n "${err_output}" ]]; then
-            log_error "gcloud error: ${err_output}"
-        fi
-        log_warn "Common issues:"
-        log_warn "  - Billing not enabled for the project (enable at https://console.cloud.google.com/billing)"
-        log_warn "  - Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)"
-        log_warn "  - Instance quota exceeded in zone (try different GCP_ZONE)"
-        log_warn "  - Machine type unavailable in zone (try different GCP_MACHINE_TYPE or GCP_ZONE)"
-        return 1
-    fi
-
-    # Export instance metadata for use by calling script
     # shellcheck disable=SC2034  # Variables exported for use by sourcing scripts
     export GCP_INSTANCE_NAME_ACTUAL="${name}"
     export GCP_ZONE="${zone}"
-
-    # Get external IP
-    local server_ip
-    server_ip=$(gcloud compute instances describe "${name}" \
-        --zone="${zone}" \
-        --project="${GCP_PROJECT}" \
-        --format='get(networkInterfaces[0].accessConfigs[0].natIP)' 2>/dev/null)
-    export GCP_SERVER_IP="${server_ip}"
+    export GCP_SERVER_IP="$(_gcp_get_instance_ip "${name}" "${zone}")"
 
     log_info "Instance created: IP=${GCP_SERVER_IP}"
 }
