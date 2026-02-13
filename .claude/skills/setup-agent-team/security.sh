@@ -267,12 +267,7 @@ gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --add-label "safe-to-work
 
    Example: \`gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --add-label "bug"\`
 
-3. Add a **lifecycle label** to track status:
-\`\`\`bash
-gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --add-label "Pending Review"
-\`\`\`
-
-4. Leave a brief comment confirming triage:
+3. Leave a brief comment confirming triage:
 \`\`\`bash
 gh issue comment ${ISSUE_NUM} --repo OpenRouterTeam/spawn --body "Security triage: **SAFE** — this issue has been reviewed and is safe for automated processing."
 \`\`\`
@@ -318,7 +313,8 @@ fi
 ## Rules
 
 - ALWAYS apply at least TWO labels: one safety label + one content-type label
-- ALWAYS add \`Pending Review\` lifecycle label for SAFE/UNCLEAR issues so downstream teams can pick them up
+- Do NOT add \`Pending Review\` to SAFE issues — \`safe-to-work\` already means triage is complete and downstream teams can pick them up
+- ALWAYS add \`Pending Review\` lifecycle label for UNCLEAR issues so they get human attention
 - Be conservative: if in doubt, mark as \`needs-human-review\` rather than \`safe-to-work\`
 - Do NOT modify the issue content — only add labels and comments
 - Do NOT start implementing the issue — triage only
@@ -399,7 +395,7 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
 
 ---
 *Filed automatically by the security review team to preserve knowledge from closed PRs.*" \\
-         --label "enhancement" --label "safe-to-work" --label "Pending Review"
+         --label "enhancement" --label "safe-to-work"
        \`\`\`
      - Then close the PR with a comment referencing the new issue:
        \`\`\`bash
@@ -671,7 +667,7 @@ gh issue create --repo OpenRouterTeam/spawn \\
 ### Found by
 Automated security scan (spawn security team)
 " \\
-  --label "security" --label "safe-to-work" --label "Pending Review"
+  --label "security" --label "safe-to-work"
 \`\`\`
 
 ### MEDIUM/LOW findings — file a single batch issue:
@@ -690,7 +686,7 @@ gh issue create --repo OpenRouterTeam/spawn \\
 ### Found by
 Automated security scan (spawn security team)
 " \\
-  --label "security" --label "safe-to-work" --label "Pending Review"
+  --label "security" --label "safe-to-work"
 \`\`\`
 
 ### DEDUP: Before filing any issue, check if a similar issue already exists:
@@ -704,7 +700,7 @@ Do NOT file duplicate issues. If a similar issue exists, add a comment with upda
 gh issue create --repo OpenRouterTeam/spawn \\
   --title "Repo hygiene: [description]" \\
   --body "[details]" \\
-  --label "maintenance" --label "safe-to-work" --label "Pending Review"
+  --label "maintenance" --label "safe-to-work"
 \`\`\`
 
 ## Slack Notification
