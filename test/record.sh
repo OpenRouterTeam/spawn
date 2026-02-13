@@ -427,149 +427,134 @@ _save_live_fixture() {
     return 0
 }
 
-_live_hetzner() {
+# Generic live create+delete cycle for any cloud provider.
+# Calls a per-cloud builder function that prints the API body to stdout,
+# then runs the shared create -> save -> extract-id -> delete -> save flow.
+#
+# Usage: _live_create_delete_cycle FIXTURE_DIR API_FUNC CREATE_ENDPOINT \
+#          DELETE_ENDPOINT_TEMPLATE ID_PY_EXPR BUILDER_FUNC \
+#          [DELETE_DELAY] [EMPTY_DELETE_FALLBACK]
+#
+# Arguments:
+#   FIXTURE_DIR              - Directory for fixture JSON files
+#   API_FUNC                 - Cloud API function (e.g., "hetzner_api")
+#   CREATE_ENDPOINT          - POST endpoint (e.g., "/servers")
+#   DELETE_ENDPOINT_TEMPLATE - DELETE endpoint with {id} placeholder
+#   ID_PY_EXPR               - Python expression to extract ID from response (receives 'd')
+#   BUILDER_FUNC             - Function that prints the JSON create body to stdout
+#   DELETE_DELAY             - Seconds to sleep before delete (default: 3)
+#   EMPTY_DELETE_FALLBACK    - JSON to use when DELETE returns empty body (optional)
+_live_create_delete_cycle() {
     local fixture_dir="$1"
-    local server_name="spawn-record-$(date +%s)"
-    local server_type="cx23"
-    local location="nbg1"
-    local image="ubuntu-24.04"
+    local api_func="$2"
+    local create_endpoint="$3"
+    local delete_endpoint_template="$4"
+    local id_py_expr="$5"
+    local builder_func="$6"
+    local delete_delay="${7:-3}"
+    local empty_delete_fallback="${8:-}"
 
-    printf '%b\n' "  ${CYAN}live${NC} Creating test server '${server_name}' (${server_type}, ${location})..."
+    local body
+    body=$("${builder_func}" "${fixture_dir}") || return 0
 
-    # Get SSH key IDs for the create request
+    local create_response
+    create_response=$("${api_func}" POST "${create_endpoint}" "$body")
+
+    _save_live_fixture "$fixture_dir" "create_server" "POST ${create_endpoint}" "$create_response" || {
+        printf '%b\n' "  ${RED}fail${NC} Could not create — skipping delete fixture"
+        return 0
+    }
+
+    local resource_id
+    resource_id=$(echo "$create_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${id_py_expr})" 2>/dev/null) || true
+
+    if [[ -z "${resource_id:-}" ]]; then
+        printf '%b\n' "  ${RED}fail${NC} Could not extract resource ID from create response"
+        cloud_errors=$((cloud_errors + 1))
+        return 0
+    fi
+
+    printf '%b\n' "  ${CYAN}live${NC} Created (ID: ${resource_id}). Deleting..."
+    sleep "$delete_delay"
+
+    local delete_endpoint="${delete_endpoint_template/\{id\}/${resource_id}}"
+    local delete_response
+    delete_response=$("${api_func}" DELETE "${delete_endpoint}")
+
+    if [[ -z "$delete_response" && -n "$empty_delete_fallback" ]]; then
+        delete_response="$empty_delete_fallback"
+    fi
+
+    _save_live_fixture "$fixture_dir" "delete_server" "DELETE ${delete_endpoint_template}" "$delete_response"
+    printf '%b\n' "  ${CYAN}live${NC} Resource ${resource_id} deleted"
+}
+
+# --- Per-cloud body builders ---
+# Each prints the JSON create body to stdout and logs setup info to stderr.
+
+_live_hetzner_body() {
+    local fixture_dir="$1"
+    local name="spawn-record-$(date +%s)"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test server '${name}' (cx23, nbg1)..." >&2
+
     local ssh_keys_response
     ssh_keys_response=$(hetzner_api GET "/ssh_keys")
     local ssh_key_ids
     ssh_key_ids=$(echo "$ssh_keys_response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
-ids = [k['id'] for k in d.get('ssh_keys', [])]
-print(json.dumps(ids))
+print(json.dumps([k['id'] for k in d.get('ssh_keys', [])]))
 " 2>/dev/null) || ssh_key_ids="[]"
 
-    # Create server (minimal — no cloud-init userdata to speed up)
-    local body
-    body=$(python3 -c "
+    python3 -c "
 import json, sys
-body = {
-    'name': sys.argv[1],
-    'server_type': sys.argv[2],
-    'location': sys.argv[3],
-    'image': sys.argv[4],
-    'ssh_keys': json.loads(sys.argv[5]),
+print(json.dumps({
+    'name': sys.argv[1], 'server_type': 'cx23', 'location': 'nbg1',
+    'image': 'ubuntu-24.04', 'ssh_keys': json.loads(sys.argv[2]),
     'start_after_create': True
-}
-print(json.dumps(body))
-" "$server_name" "$server_type" "$location" "$image" "$ssh_key_ids")
-
-    local create_response
-    create_response=$(hetzner_api POST "/servers" "$body")
-
-    # Save create response
-    _save_live_fixture "$fixture_dir" "create_server" "POST /servers" "$create_response" || {
-        printf '%b\n' "  ${RED}fail${NC} Could not create server — skipping delete fixture"
-        return 0
-    }
-
-    # Extract server ID for deletion
-    local server_id
-    server_id=$(echo "$create_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])" 2>/dev/null) || true
-
-    if [[ -z "${server_id:-}" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} Could not extract server ID from create response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    printf '%b\n' "  ${CYAN}live${NC} Server created (ID: ${server_id}). Deleting..."
-
-    # Brief pause to let the server register
-    sleep 2
-
-    # Delete server
-    local delete_response
-    delete_response=$(hetzner_api DELETE "/servers/${server_id}")
-
-    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /servers/{id}" "$delete_response"
-
-    printf '%b\n' "  ${CYAN}live${NC} Server ${server_id} deleted"
+}))
+" "$name" "$ssh_key_ids"
 }
 
-_live_digitalocean() {
+_live_hetzner() {
+    _live_create_delete_cycle "$1" hetzner_api "/servers" "/servers/{id}" \
+        "d['server']['id']" _live_hetzner_body 2
+}
+
+_live_digitalocean_body() {
     local fixture_dir="$1"
-    local droplet_name="spawn-record-$(date +%s)"
-    local region="nyc3"
-    local size="s-1vcpu-512mb-10gb"
-    local image="ubuntu-24-04-x64"
+    local name="spawn-record-$(date +%s)"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test droplet '${name}' (s-1vcpu-512mb-10gb, nyc3)..." >&2
 
-    printf '%b\n' "  ${CYAN}live${NC} Creating test droplet '${droplet_name}' (${size}, ${region})..."
-
-    # Get SSH key IDs
     local ssh_keys_response
     ssh_keys_response=$(do_api GET "/account/keys")
     local ssh_key_ids
     ssh_key_ids=$(echo "$ssh_keys_response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
-ids = [k['id'] for k in d.get('ssh_keys', [])]
-print(json.dumps(ids))
+print(json.dumps([k['id'] for k in d.get('ssh_keys', [])]))
 " 2>/dev/null) || ssh_key_ids="[]"
 
-    local body
-    body=$(python3 -c "
+    python3 -c "
 import json, sys
-body = {
-    'name': sys.argv[1],
-    'region': sys.argv[2],
-    'size': sys.argv[3],
-    'image': sys.argv[4],
-    'ssh_keys': json.loads(sys.argv[5])
-}
-print(json.dumps(body))
-" "$droplet_name" "$region" "$size" "$image" "$ssh_key_ids")
-
-    local create_response
-    create_response=$(do_api POST "/droplets" "$body")
-
-    _save_live_fixture "$fixture_dir" "create_server" "POST /droplets" "$create_response" || {
-        printf '%b\n' "  ${RED}fail${NC} Could not create droplet — skipping delete fixture"
-        return 0
-    }
-
-    local droplet_id
-    droplet_id=$(echo "$create_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['droplet']['id'])" 2>/dev/null) || true
-
-    if [[ -z "${droplet_id:-}" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} Could not extract droplet ID from create response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    printf '%b\n' "  ${CYAN}live${NC} Droplet created (ID: ${droplet_id}). Deleting..."
-    sleep 3
-
-    local delete_response
-    delete_response=$(do_api DELETE "/droplets/${droplet_id}")
-
-    # DigitalOcean DELETE returns 204 No Content (empty body) on success
-    if [[ -z "$delete_response" ]]; then
-        delete_response='{"status":"deleted","http_code":204}'
-    fi
-
-    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /droplets/{id}" "$delete_response"
-    printf '%b\n' "  ${CYAN}live${NC} Droplet ${droplet_id} deleted"
+print(json.dumps({
+    'name': sys.argv[1], 'region': 'nyc3', 'size': 's-1vcpu-512mb-10gb',
+    'image': 'ubuntu-24-04-x64', 'ssh_keys': json.loads(sys.argv[2])
+}))
+" "$name" "$ssh_key_ids"
 }
 
-_live_vultr() {
+_live_digitalocean() {
+    _live_create_delete_cycle "$1" do_api "/droplets" "/droplets/{id}" \
+        "d['droplet']['id']" _live_digitalocean_body 3 \
+        '{"status":"deleted","http_code":204}'
+}
+
+_live_vultr_body() {
     local fixture_dir="$1"
-    local label="spawn-record-$(date +%s)"
-    local region="ewr"
-    local plan="vc2-1c-1gb"
-    local os_id="2284"  # Ubuntu 24.04
+    local name="spawn-record-$(date +%s)"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${name}' (vc2-1c-1gb, ewr)..." >&2
 
-    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${label}' (${plan}, ${region})..."
-
-    # Get SSH key ID
     local ssh_keys_response
     ssh_keys_response=$(vultr_api GET "/ssh-keys")
     local ssh_key_id
@@ -580,121 +565,57 @@ keys = d.get('ssh_keys', [])
 print(keys[0]['id'] if keys else '')
 " 2>/dev/null) || ssh_key_id=""
 
-    local body
-    body=$(python3 -c "
+    python3 -c "
 import json, sys
-body = {
-    'label': sys.argv[1],
-    'region': sys.argv[2],
-    'plan': sys.argv[3],
-    'os_id': int(sys.argv[4])
-}
-if sys.argv[5]:
-    body['sshkey_id'] = [sys.argv[5]]
+body = {'label': sys.argv[1], 'region': 'ewr', 'plan': 'vc2-1c-1gb', 'os_id': 2284}
+if sys.argv[2]:
+    body['sshkey_id'] = [sys.argv[2]]
 print(json.dumps(body))
-" "$label" "$region" "$plan" "$os_id" "$ssh_key_id")
-
-    local create_response
-    create_response=$(vultr_api POST "/instances" "$body")
-
-    _save_live_fixture "$fixture_dir" "create_server" "POST /instances" "$create_response" || {
-        printf '%b\n' "  ${RED}fail${NC} Could not create instance — skipping delete fixture"
-        return 0
-    }
-
-    local instance_id
-    instance_id=$(echo "$create_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['instance']['id'])" 2>/dev/null) || true
-
-    if [[ -z "${instance_id:-}" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} Could not extract instance ID from create response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    printf '%b\n' "  ${CYAN}live${NC} Instance created (ID: ${instance_id}). Deleting..."
-    sleep 5
-
-    local delete_response
-    delete_response=$(vultr_api DELETE "/instances/${instance_id}")
-
-    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /instances/{id}" "$delete_response"
-    printf '%b\n' "  ${CYAN}live${NC} Instance ${instance_id} deleted"
+" "$name" "$ssh_key_id"
 }
 
-_live_linode() {
+_live_vultr() {
+    _live_create_delete_cycle "$1" vultr_api "/instances" "/instances/{id}" \
+        "d['instance']['id']" _live_vultr_body 5
+}
+
+_live_linode_body() {
     local fixture_dir="$1"
-    local label="spawn-record-$(date +%s)"
-    local region="us-east"
-    local linode_type="g6-nanode-1"
-    local image="linode/ubuntu24.04"
+    local name="spawn-record-$(date +%s)"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test linode '${name}' (g6-nanode-1, us-east)..." >&2
 
-    printf '%b\n' "  ${CYAN}live${NC} Creating test linode '${label}' (${linode_type}, ${region})..."
-
-    # Get SSH keys for authorized_keys
     local ssh_keys_response
     ssh_keys_response=$(linode_api GET "/profile/sshkeys")
     local ssh_keys_json
     ssh_keys_json=$(echo "$ssh_keys_response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
-keys = [k['ssh_key'] for k in d.get('data', [])]
-print(json.dumps(keys))
+print(json.dumps([k['ssh_key'] for k in d.get('data', [])]))
 " 2>/dev/null) || ssh_keys_json="[]"
 
-    # Generate a random root password
     local root_pass
     root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#') for _ in range(24)))")
 
-    local body
-    body=$(python3 -c "
+    python3 -c "
 import json, sys
-body = {
-    'label': sys.argv[1],
-    'region': sys.argv[2],
-    'type': sys.argv[3],
-    'image': sys.argv[4],
-    'root_pass': sys.argv[5],
-    'authorized_keys': json.loads(sys.argv[6])
-}
-print(json.dumps(body))
-" "$label" "$region" "$linode_type" "$image" "$root_pass" "$ssh_keys_json")
-
-    local create_response
-    create_response=$(linode_api POST "/linode/instances" "$body")
-
-    _save_live_fixture "$fixture_dir" "create_server" "POST /linode/instances" "$create_response" || {
-        printf '%b\n' "  ${RED}fail${NC} Could not create linode — skipping delete fixture"
-        return 0
-    }
-
-    local linode_id
-    linode_id=$(echo "$create_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])" 2>/dev/null) || true
-
-    if [[ -z "${linode_id:-}" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} Could not extract linode ID from create response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    printf '%b\n' "  ${CYAN}live${NC} Linode created (ID: ${linode_id}). Deleting..."
-    sleep 3
-
-    local delete_response
-    delete_response=$(linode_api DELETE "/linode/instances/${linode_id}")
-
-    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /linode/instances/{id}" "$delete_response"
-    printf '%b\n' "  ${CYAN}live${NC} Linode ${linode_id} deleted"
+print(json.dumps({
+    'label': sys.argv[1], 'region': 'us-east', 'type': 'g6-nanode-1',
+    'image': 'linode/ubuntu24.04', 'root_pass': sys.argv[2],
+    'authorized_keys': json.loads(sys.argv[3])
+}))
+" "$name" "$root_pass" "$ssh_keys_json"
 }
 
-_live_civo() {
+_live_linode() {
+    _live_create_delete_cycle "$1" linode_api "/linode/instances" "/linode/instances/{id}" \
+        "d['id']" _live_linode_body 3
+}
+
+_live_civo_body() {
     local fixture_dir="$1"
-    local hostname="spawn-record-$(date +%s)"
-    local size="g3.xsmall"
-    local region="nyc1"
+    local name="spawn-record-$(date +%s)"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${name}' (g3.xsmall, nyc1)..." >&2
 
-    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${hostname}' (${size}, ${region})..."
-
-    # Get default network ID
     local networks_response
     networks_response=$(civo_api GET "/networks")
     local network_id
@@ -704,14 +625,11 @@ d = json.loads(sys.stdin.read())
 nets = d if isinstance(d, list) else d.get('items', d.get('networks', []))
 for n in nets:
     if n.get('default', False):
-        print(n['id'])
-        break
+        print(n['id']); break
 else:
-    if nets:
-        print(nets[0]['id'])
+    if nets: print(nets[0]['id'])
 " 2>/dev/null) || network_id=""
 
-    # Get Ubuntu disk image template
     local disk_images_response
     disk_images_response=$(civo_api GET "/disk_images")
     local template_id
@@ -722,53 +640,23 @@ imgs = d if isinstance(d, list) else d.get('items', d.get('disk_images', []))
 for img in imgs:
     name = img.get('name', '').lower()
     if 'ubuntu' in name and ('24' in name or '22' in name):
-        print(img['id'])
-        break
+        print(img['id']); break
 else:
-    if imgs:
-        print(imgs[0]['id'])
+    if imgs: print(imgs[0]['id'])
 " 2>/dev/null) || template_id=""
 
-    local body
-    body=$(python3 -c "
+    python3 -c "
 import json, sys
-body = {
-    'hostname': sys.argv[1],
-    'size': sys.argv[2],
-    'region': sys.argv[3]
-}
-if sys.argv[4]:
-    body['network_id'] = sys.argv[4]
-if sys.argv[5]:
-    body['template_id'] = sys.argv[5]
+body = {'hostname': sys.argv[1], 'size': 'g3.xsmall', 'region': 'nyc1'}
+if sys.argv[2]: body['network_id'] = sys.argv[2]
+if sys.argv[3]: body['template_id'] = sys.argv[3]
 print(json.dumps(body))
-" "$hostname" "$size" "$region" "$network_id" "$template_id")
+" "$name" "$network_id" "$template_id"
+}
 
-    local create_response
-    create_response=$(civo_api POST "/instances" "$body")
-
-    _save_live_fixture "$fixture_dir" "create_server" "POST /instances" "$create_response" || {
-        printf '%b\n' "  ${RED}fail${NC} Could not create instance — skipping delete fixture"
-        return 0
-    }
-
-    local instance_id
-    instance_id=$(echo "$create_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])" 2>/dev/null) || true
-
-    if [[ -z "${instance_id:-}" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} Could not extract instance ID from create response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    printf '%b\n' "  ${CYAN}live${NC} Instance created (ID: ${instance_id}). Deleting..."
-    sleep 3
-
-    local delete_response
-    delete_response=$(civo_api DELETE "/instances/${instance_id}")
-
-    _save_live_fixture "$fixture_dir" "delete_server" "DELETE /instances/{id}" "$delete_response"
-    printf '%b\n' "  ${CYAN}live${NC} Instance ${instance_id} deleted"
+_live_civo() {
+    _live_create_delete_cycle "$1" civo_api "/instances" "/instances/{id}" \
+        "d['id']" _live_civo_body 3
 }
 
 # --- Record one cloud ---
