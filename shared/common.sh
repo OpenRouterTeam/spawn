@@ -394,7 +394,7 @@ get_openrouter_api_key_manual() {
         if [[ -z "${api_key}" ]]; then
             log_error "API key cannot be empty"
         elif [[ ! "${api_key}" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
-            log_warn "Warning: API key format doesn't match expected pattern (sk-or-v1-...)"
+            log_warn "This doesn't look like an OpenRouter API key (expected format: sk-or-v1-...)"
             local confirm
             confirm=$(safe_read "Use this key anyway? (y/N): ") || return 1
             if [[ "${confirm}" =~ ^[Yy]$ ]]; then
@@ -1393,7 +1393,7 @@ generic_ssh_wait() {
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         # shellcheck disable=SC2086
         if ssh ${ssh_opts} "${username}@${ip}" "${test_cmd}" >/dev/null 2>&1; then
-            log_info "${description} ready after ${elapsed_time}s (attempt ${attempt})"
+            log_info "${description} ready (${elapsed_time}s)"
             return 0
         fi
 
@@ -1401,7 +1401,7 @@ generic_ssh_wait() {
         local jitter
         jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
 
-        log_step "Waiting for ${description}... (attempt ${attempt}/${max_attempts}, elapsed ${elapsed_time}s, retry in ${jitter}s)"
+        log_step "Waiting for ${description}... (${elapsed_time}s elapsed)"
         sleep "${jitter}"
 
         elapsed_time=$((elapsed_time + jitter))
@@ -1409,7 +1409,7 @@ generic_ssh_wait() {
         attempt=$((attempt + 1))
     done
 
-    log_error "${description} failed after ${max_attempts} attempts (${elapsed_time}s elapsed)"
+    log_error "${description} timed out after ${elapsed_time}s"
     log_warn "The server at ${ip} may still be booting. You can try again or check its status in your cloud provider dashboard."
     return 1
 }
@@ -1556,7 +1556,8 @@ generic_wait_for_instance() {
         status=$(_extract_json_field "${response}" "${status_py}" "unknown")
 
         if [[ "${status}" != "${target_status}" ]]; then
-            log_step "${description} status: ${status} (${attempt}/${max_attempts})"
+            local elapsed=$((attempt * poll_delay))
+            log_step "${description} status: ${status} (${elapsed}s elapsed)"
             sleep "${poll_delay}"
             attempt=$((attempt + 1))
             continue
@@ -1567,16 +1568,18 @@ generic_wait_for_instance() {
 
         if [[ -n "${ip}" ]]; then
             export "${ip_var}=${ip}"
-            log_info "${description} ${target_status}: IP=${ip}"
+            log_info "${description} ready (IP: ${ip})"
             return 0
         fi
 
-        log_step "${description} status: ${status} (${attempt}/${max_attempts})"
+        local elapsed=$((attempt * poll_delay))
+        log_step "${description} status: ${status} (${elapsed}s elapsed)"
         sleep "${poll_delay}"
         attempt=$((attempt + 1))
     done
 
-    log_error "${description} did not become ${target_status} after ${max_attempts} attempts"
+    local total_time=$((max_attempts * poll_delay))
+    log_error "${description} did not become ${target_status} after ${total_time}s"
     log_warn "The instance may still be provisioning. You can:"
     log_warn "  1. Re-run the command to try again"
     log_warn "  2. Check the instance status in your cloud provider dashboard"
@@ -1641,7 +1644,7 @@ _validate_token_with_provider() {
         log_error ""
         log_error "How to fix:"
         log_error "  1. Re-run the command to enter a new token"
-        log_error "  2. Or set it directly: export ${env_var_name}=your-token spawn ..."
+        log_error "  2. Or set it directly: ${env_var_name}=your-token spawn ..."
         unset "${env_var_name}"
         return 1
     fi

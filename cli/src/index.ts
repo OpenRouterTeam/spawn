@@ -301,7 +301,7 @@ const VERB_ALIASES = new Set(["run", "launch", "start", "deploy", "exec"]);
 function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
   const extra = filteredArgs.slice(maxExpected);
   if (extra.length > 0) {
-    console.error(pc.yellow(`Warning: extra argument${extra.length > 1 ? "s" : ""} ignored: ${extra.join(", ")}`));
+    console.error(pc.yellow(`Extra argument${extra.length > 1 ? "s" : ""} ignored: ${extra.join(", ")}`));
     console.error(pc.dim(`  Usage: spawn <agent> <cloud> [--prompt "..."]`));
     console.error();
   }

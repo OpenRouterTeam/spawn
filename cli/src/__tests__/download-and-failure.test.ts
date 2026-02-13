@@ -279,8 +279,8 @@ describe("Download and Failure Pipeline", () => {
         // Expected
       }
 
-      const logErrorOutput = mockLogError.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(logErrorOutput).toContain("HTTP 500");
+      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(errorOutput).toContain("HTTP 500");
     });
 
     it("should mention temporary server issues on 500 errors", async () => {
@@ -312,11 +312,10 @@ describe("Download and Failure Pipeline", () => {
         // Expected
       }
 
-      // Should show HTTP error (not the "script not found" path)
-      const logErrorOutput = mockLogError.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(logErrorOutput).toContain("HTTP 404");
-      // 500 from fallback should mention temporary issues
+      // Should show HTTP error codes in console output (not the "script not found" path)
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(errorOutput).toContain("HTTP 404");
+      // 500 from fallback should mention temporary issues
       expect(errorOutput).toContain("temporary issues");
     });
   });
