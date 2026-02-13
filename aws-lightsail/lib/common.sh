@@ -30,12 +30,22 @@ INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}  # Delay between ins
 
 ensure_aws_cli() {
     if ! command -v aws &>/dev/null; then
-        log_error "AWS CLI is required. Install: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+        _log_diagnostic \
+            "AWS CLI is required but not installed" \
+            "aws command not found in PATH" \
+            --- \
+            "Install the AWS CLI: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html" \
+            "Or on macOS: brew install awscli"
         return 1
     fi
     # Verify credentials are configured
     if ! aws sts get-caller-identity &>/dev/null; then
-        log_error "AWS CLI not configured. Run: aws configure"
+        _log_diagnostic \
+            "AWS CLI is not configured with valid credentials" \
+            "No AWS credentials found or credentials have expired" \
+            --- \
+            "Run: aws configure" \
+            "Or set environment variables: export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=..."
         return 1
     fi
     local region="${AWS_DEFAULT_REGION:-${LIGHTSAIL_REGION:-us-east-1}}"
@@ -113,7 +123,11 @@ _wait_for_lightsail_instance() {
         attempt=$((attempt + 1))
     done
 
-    log_error "Instance did not become running in time"
+    log_error "Instance did not become running after ${max_attempts} checks"
+    log_warn "The instance may still be provisioning. You can:"
+    log_warn "  1. Re-run the command to try again"
+    log_warn "  2. Check the instance status: aws lightsail get-instance --instance-name '${name}'"
+    log_warn "  3. Check the Lightsail console: https://lightsail.aws.amazon.com/"
     return 1
 }
 
@@ -142,6 +156,11 @@ create_server() {
         --user-data "${userdata}" \
         >/dev/null; then
         log_error "Failed to create Lightsail instance"
+        log_warn "Common issues:"
+        log_warn "  - Instance limit reached for your account"
+        log_warn "  - Bundle unavailable in region (try different LIGHTSAIL_BUNDLE or LIGHTSAIL_REGION)"
+        log_warn "  - AWS credentials lack Lightsail permissions (check IAM policy)"
+        log_warn "  - Instance name '${name}' already in use"
         return 1
     fi
 

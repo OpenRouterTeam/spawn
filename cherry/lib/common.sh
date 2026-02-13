@@ -96,8 +96,8 @@ cherry_register_ssh_key() {
     if printf '%s' "$register_response" | grep -q '"id"'; then
         return 0
     else
-        log_error "Failed to register SSH key"
-        log_error "Response: $register_response"
+        log_error "Failed to register SSH key with Cherry Servers"
+        log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
         return 1
     fi
 }
@@ -190,8 +190,12 @@ print(json.dumps(data))
     server_id=$(_extract_json_field "$response" "d.get('id','')")
 
     if [[ -z "$server_id" ]]; then
-        log_error "Failed to create server"
-        log_error "Response: $response"
+        log_error "Failed to create Cherry Servers server"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance"
+        log_warn "  - Plan unavailable in region (try different CHERRY_DEFAULT_PLAN or CHERRY_DEFAULT_REGION)"
+        log_warn "  - Server limit reached for your account"
         return 1
     fi
 
