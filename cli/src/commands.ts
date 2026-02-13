@@ -1380,8 +1380,10 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
       console.log(pc.bold("Quick start:"));
       console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
       if (authVars.length > 0) {
-        const hint = cloudDef.url ?? `${cloudDef.name} credential`;
-        console.log(formatAuthVarLine(authVars[0], hint));
+        for (let i = 0; i < authVars.length; i++) {
+          // Only show the URL hint on the first auth var to avoid repetition
+          console.log(formatAuthVarLine(authVars[i], i === 0 ? cloudDef.url : undefined));
+        }
       }
       console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
     }
