@@ -219,15 +219,18 @@ The refactor team **creates PRs** — the security team **reviews and merges** t
 2. **Create a PR** with clear title and description explaining the change and rationale
 3. **Leave the PR open** — the security team handles review, approval, and merge
 
+### What refactor agents CAN do:
+- `gh pr merge` — ONLY if the PR is already **approved** by the security team (reviewDecision=APPROVED). Rebase first if needed.
+
 ### What refactor agents must NEVER do:
-- `gh pr review` — NEVER review PRs (that's the security team's job)
-- `gh pr merge` — NEVER merge PRs
-- Approve or request changes on any PR
+- `gh pr review --approve` — NEVER approve PRs (that's the security team's job)
+- `gh pr review --request-changes` — NEVER request changes
+- Merge PRs that haven't been approved yet
 
 ### Why:
-- Clear ownership: refactor team solves problems, security team gates quality
-- Prevents unreviewed code from landing
-- Lets each team focus on what they do best
+- Security team gates quality (review + approve)
+- Refactor team keeps things moving (rebase + merge approved PRs)
+- No unreviewed code lands
 
 ## Team Structure
 
@@ -288,12 +291,24 @@ Create these teammates:
          `gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "Addressed review feedback:\n- [list of changes]\n\n-- refactor/pr-maintainer"`
      * **Failing checks**: investigate the failure in a worktree, fix if trivial (e.g., `bash -n` errors, test failures), push the fix
        - If the failure is non-trivial, comment with failure details for the author
-     * **Mergeable + no issues**: leave it alone — the security team handles review and merge
-   - **NEVER review, approve, or merge PRs** — that is exclusively the security team's job
+     * **Approved + mergeable** (reviewDecision=APPROVED, mergeable=MERGEABLE): rebase onto main if needed, then merge it
+       ```
+       git fetch origin
+       BRANCH=$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json headRefName --jq '.headRefName')
+       git worktree add /tmp/spawn-worktrees/pr-merge-NUMBER origin/$BRANCH
+       cd /tmp/spawn-worktrees/pr-merge-NUMBER
+       git rebase origin/main
+       git push --force-with-lease origin $BRANCH
+       cd /path/to/repo
+       git worktree remove /tmp/spawn-worktrees/pr-merge-NUMBER --force
+       gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch
+       ```
+     * **Mergeable + not yet reviewed**: leave it alone — the security team handles review
+   - **NEVER review or approve PRs** — that is exclusively the security team's job. But if a PR is already approved, DO merge it.
    - **NEVER close a PR** — always try to rebase, fix, or request changes instead
-   - After processing all PRs, report summary: how many rebased, fixed, commented
+   - After processing all PRs, report summary: how many merged, rebased, fixed, commented
    - Run this check AGAIN at the end of the cycle to catch PRs created during the cycle
-   - GOAL: All open PRs are conflict-free, review feedback is addressed, and checks are passing — ready for security review.
+   - GOAL: Approved PRs are merged, conflicting PRs are rebased, review feedback is addressed, checks are passing.
 
 6. **community-coordinator** (Sonnet)
    - FIRST TASK: Run `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
