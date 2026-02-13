@@ -70,10 +70,11 @@ test_cloudsigma_credentials() {
         return 0
     else
         log_error "API Error: $(extract_api_error_message "$response" "Unable to authenticate")"
-        log_warn "Remediation steps:"
-        log_warn "  1. Verify credentials at: https://${CLOUDSIGMA_REGION:-zrh}.cloudsigma.com/"
-        log_warn "  2. Ensure email and password are correct"
-        log_warn "  3. Check account is active and not suspended"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Verify credentials at: https://${CLOUDSIGMA_REGION:-zrh}.cloudsigma.com/"
+        log_error "  2. Ensure email and password are correct"
+        log_error "  3. Check account is active and not suspended"
         return 1
     fi
 }
@@ -132,9 +133,10 @@ print(json.dumps({
         return 0
     else
         log_error "API Error: $(extract_api_error_message "$response" "$response")"
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered with this name"
-        log_warn "  - Invalid SSH key format"
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - SSH key already registered with this name"
+        log_error "  - Invalid SSH key format"
         return 1
     fi
 }
@@ -323,7 +325,14 @@ create_server() {
     CLOUDSIGMA_SERVER_UUID=$(_extract_json_field "$create_response" "d.get('uuid','')")
 
     if [[ -z "$CLOUDSIGMA_SERVER_UUID" ]]; then
-        log_error "Failed to create server: $create_response"
+        log_error "Failed to create CloudSigma server"
+        log_error "API Error: $(extract_api_error_message "$create_response" "$create_response")"
+        log_error ""
+        log_error "Common issues:"
+        log_error "  - Insufficient account balance"
+        log_error "  - Resource quota exceeded (CPU, memory, or drives)"
+        log_error "  - Region capacity limits reached"
+        log_error ""
         return 1
     fi
 

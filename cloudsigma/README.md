@@ -117,7 +117,7 @@ CloudSigma servers typically start in 30-60 seconds. If timeout occurs:
 - **Auth**: HTTP Basic Auth (Base64-encoded `email:password`)
 - **Drive cloning**: Each server gets a fresh Ubuntu 24.04 clone (not shared)
 - **Networking**: DHCP-based IPv4 with virtio NIC model
-- **VNC**: Available via CloudSigma portal (password: `spawn123`)
+- **VNC**: Available via CloudSigma portal (random password generated per server)
 
 ## Resources
 
