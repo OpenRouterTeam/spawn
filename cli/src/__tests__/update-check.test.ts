@@ -197,5 +197,120 @@ describe("update-check", () => {
 
       fetchSpy.mockRestore();
     });
+
+    it("should re-exec with original args after successful update", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["/usr/bin/bun", "/usr/local/bin/spawn", "claude", "sprite"];
+
+      const mockFetch = mock(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ version: "0.3.0" }),
+        } as Response)
+      );
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { executor } = await import("../update-check.js");
+      const calls: string[] = [];
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation((cmd: string) => {
+        calls.push(cmd);
+      });
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      // First call: install script, second call: re-exec with original args
+      expect(calls.length).toBe(2);
+      expect(calls[0]).toContain("install.sh");
+      expect(calls[1]).toContain("spawn");
+      expect(calls[1]).toContain("claude");
+      expect(calls[1]).toContain("sprite");
+
+      // Should show rerunning message
+      const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
+      expect(output).toContain("Rerunning");
+
+      // Should set SPAWN_NO_UPDATE_CHECK=1 to prevent infinite loop
+      expect(execSyncSpy.mock.calls[1][1]).toHaveProperty("env");
+      expect(execSyncSpy.mock.calls[1][1].env.SPAWN_NO_UPDATE_CHECK).toBe("1");
+
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
+      process.argv = originalArgv;
+    });
+
+    it("should forward exit code when re-exec fails", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["/usr/bin/bun", "/usr/local/bin/spawn", "claude", "sprite"];
+
+      const mockFetch = mock(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ version: "0.3.0" }),
+        } as Response)
+      );
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { executor } = await import("../update-check.js");
+      let callCount = 0;
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {
+        callCount++;
+        if (callCount === 2) {
+          // Re-exec fails with exit code 1
+          const err = new Error("Command failed") as Error & { status: number };
+          err.status = 42;
+          throw err;
+        }
+      });
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      // Should forward the exit code from the re-exec
+      expect(processExitSpy).toHaveBeenCalledWith(42);
+
+      fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
+      process.argv = originalArgv;
+    });
+
+    it("should not re-exec when run without arguments (bare spawn)", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["/usr/bin/bun", "/usr/local/bin/spawn"];
+
+      const mockFetch = mock(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ version: "0.3.0" }),
+        } as Response)
+      );
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { executor } = await import("../update-check.js");
+      const calls: string[] = [];
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation((cmd: string) => {
+        calls.push(cmd);
+      });
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      // Only one call: the install script (no re-exec)
+      expect(calls.length).toBe(1);
+      expect(calls[0]).toContain("install.sh");
+
+      // Should show "Run your spawn command again" instead
+      const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
+      expect(output).toContain("Run your spawn command again");
+      expect(output).not.toContain("Rerunning");
+
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
+      process.argv = originalArgv;
+    });
   });
 });
