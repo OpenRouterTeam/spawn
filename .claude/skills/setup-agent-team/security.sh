@@ -396,7 +396,7 @@ If zero open PRs, skip to Step 3 (branch cleanup) — do NOT exit yet.
 2. For EACH open PR, create a task with TaskCreate describing the review work
 3. Spawn a **pr-reviewer** agent (model=opus) for each PR using the Task tool (subagent_type='general-purpose', team_name="${TEAM_NAME}")
    - Name each agent: pr-reviewer-NUMBER (e.g. pr-reviewer-42)
-   - Each agent gets instructions below
+   - **CRITICAL: Every reviewer MUST receive the COMPLETE review protocol below in their prompt.** Do NOT abbreviate with "follow the same protocol as another agent" — each agent runs independently and cannot see other agents' prompts. Copy the full instructions (steps 1-11 including the exact \`gh pr review --approve\` and \`gh pr merge\` commands) into every reviewer's prompt.
 4. Also spawn a **branch-cleaner** agent (model=haiku) — see Step 3
 
 ### Per-PR Reviewer Instructions
