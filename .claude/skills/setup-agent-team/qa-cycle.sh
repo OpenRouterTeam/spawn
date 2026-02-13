@@ -172,25 +172,19 @@ for branch in $REMOTE_README_BRANCHES; do
     fi
 done
 
-# Close stale qa PRs (open > 2 hours)
+# Close stale qa PRs (open > 2 hours) — never auto-merge, leave for human review
 STALE_PRS=$(gh pr list --state open --label '' --json number,headRefName,updatedAt \
     --jq '[.[] | select(.headRefName | startswith("qa/")) | select(.updatedAt < (now - 7200 | todate)) | .number] | .[]' 2>/dev/null) || true
 for pr_num in $STALE_PRS; do
     if [[ -n "$pr_num" ]]; then
-        PR_MERGEABLE=$(gh pr view "$pr_num" --json mergeable --jq '.mergeable' 2>/dev/null) || PR_MERGEABLE="UNKNOWN"
-        if [[ "$PR_MERGEABLE" == "MERGEABLE" ]]; then
-            log "Merging stale QA PR #${pr_num}..."
-            gh pr merge "$pr_num" --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
-        else
-            log "Closing unmergeable stale QA PR #${pr_num}..."
-            gh pr close "$pr_num" --comment "Auto-closing: stale QA PR from a previous cycle.
+        log "Closing stale QA PR #${pr_num}..."
+        gh pr close "$pr_num" --comment "Auto-closing: stale QA PR from a previous cycle.
 
 -- qa/cycle" 2>&1 | tee -a "${LOG_FILE}" || true
-        fi
     fi
 done
 
-# Re-sync after any merges from cleanup
+# Re-sync after cleanup
 git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
