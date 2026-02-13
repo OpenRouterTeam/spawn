@@ -1227,7 +1227,7 @@
     "local/cline": "implemented",
     "local/gptme": "implemented",
     "local/opencode": "implemented",
-    "local/plandex": "missing",
+    "local/plandex": "implemented",
     "local/kilocode": "missing",
     "local/continue": "implemented",
     "ramnode/claude": "implemented",
