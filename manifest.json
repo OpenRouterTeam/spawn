@@ -360,6 +360,20 @@
       },
       "notes": "Pay-as-you-go starting at $0.18/hr (2 core, 4GB). Requires gh CLI (GitHub CLI) installed and authenticated. Free tier available for personal accounts."
     },
+    "codesandbox": {
+      "name": "CodeSandbox",
+      "description": "CodeSandbox Firecracker microVMs via SDK/CLI",
+      "url": "https://codesandbox.io",
+      "type": "sandbox",
+      "auth": "CSB_API_KEY",
+      "provision_method": "CodeSandbox SDK sandbox.create()",
+      "exec_method": "CodeSandbox SDK commands.run()",
+      "interactive_method": "CodeSandbox SDK commands.run() or csb CLI",
+      "defaults": {
+        "template": "base"
+      },
+      "notes": "No SSH — uses CodeSandbox SDK/CLI for exec. Firecracker microVMs with ~2s start. Free tier: 40 hrs/mo on Build plan. Requires npm install -g @codesandbox/sdk."
+    },
     "e2b": {
       "name": "E2B",
       "description": "E2B sandboxed cloud containers via CLI/SDK",
@@ -816,6 +830,21 @@
     "github-codespaces/gemini": "implemented",
     "github-codespaces/amazonq": "implemented",
     "github-codespaces/cline": "implemented",
+    "codesandbox/claude": "implemented",
+    "codesandbox/openclaw": "implemented",
+    "codesandbox/nanoclaw": "missing",
+    "codesandbox/aider": "implemented",
+    "codesandbox/goose": "missing",
+    "codesandbox/codex": "missing",
+    "codesandbox/interpreter": "missing",
+    "codesandbox/gemini": "missing",
+    "codesandbox/amazonq": "missing",
+    "codesandbox/cline": "missing",
+    "codesandbox/gptme": "missing",
+    "codesandbox/opencode": "missing",
+    "codesandbox/plandex": "missing",
+    "codesandbox/kilocode": "missing",
+    "codesandbox/continue": "missing",
     "e2b/claude": "implemented",
     "e2b/openclaw": "implemented",
     "e2b/nanoclaw": "implemented",
