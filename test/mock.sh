@@ -20,12 +20,16 @@ FIXTURES_DIR="${REPO_ROOT}/test/fixtures"
 TEST_DIR=$(mktemp -d)
 MOCK_LOG="${TEST_DIR}/mock_calls.log"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Colors (respect NO_COLOR standard: https://no-color.org/)
+if [[ -n "${NO_COLOR:-}" ]]; then
+    RED='' GREEN='' YELLOW='' CYAN='' NC=''
+else
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    CYAN='\033[0;36m'
+    NC='\033[0m'
+fi
 
 # Counters
 PASSED=0
