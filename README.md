@@ -168,7 +168,13 @@ If something breaks, hangs, or behaves unexpectedly, open an issue using the [bu
 
 ### Request a cloud or agent
 
-Want to see a specific cloud provider or agent supported? Open an issue using the [CLI feature request template](https://github.com/OpenRouterTeam/spawn/issues/new?template=cli_feature_request.yml). Requests with real-world use cases get prioritized.
+Want to see a specific cloud provider or agent supported? Use the dedicated templates:
+
+- [Request a cloud provider](https://github.com/OpenRouterTeam/spawn/issues/new?template=cloud_request.yml)
+- [Request an agent](https://github.com/OpenRouterTeam/spawn/issues/new?template=agent_request.yml)
+- [Request a CLI feature](https://github.com/OpenRouterTeam/spawn/issues/new?template=cli_feature_request.yml)
+
+Requests with real-world use cases get prioritized.
 
 ### Report auth or credential issues
 
