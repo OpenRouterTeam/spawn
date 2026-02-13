@@ -152,6 +152,49 @@ _pick_instance_preset() {
     unset -f _list_presets_for_location
 }
 
+# Build JSON order body for HOSTKEY instance creation
+# Usage: _hostkey_build_order_body NAME LOCATION PRESET
+_hostkey_build_order_body() {
+    local name="$1" location="$2" preset="$3"
+    jq -n \
+        --arg name "$name" \
+        --arg location "$location" \
+        --arg preset "$preset" \
+        '{name: $name, location: $location, preset: $preset, os: "ubuntu-24.04"}'
+}
+
+# Check HOSTKEY API response for errors and log diagnostics
+# Returns 0 if error detected, 1 if no error
+_hostkey_check_create_error() {
+    local response="$1"
+
+    if ! echo "$response" | grep -qi "error"; then
+        return 1
+    fi
+
+    log_error "Failed to create HOSTKEY instance"
+    local error_msg
+    error_msg=$(printf '%s' "$response" | jq -r '.error // .message // "Unknown error"' 2>/dev/null || echo "$response")
+    log_error "API Error: $error_msg"
+    log_error ""
+    log_error "Common issues:"
+    log_error "  - Insufficient account balance"
+    log_error "  - Instance limit reached"
+    log_error "  - Invalid location or preset"
+    log_error ""
+    log_error "Check your account status: https://hostkey.com/"
+    return 0
+}
+
+# Parse instance ID and IP from HOSTKEY order response
+# Sets HOSTKEY_INSTANCE_ID and HOSTKEY_INSTANCE_IP on success
+_hostkey_parse_instance_response() {
+    local response="$1"
+    HOSTKEY_INSTANCE_ID=$(printf '%s' "$response" | jq -r '.id // .instance_id')
+    HOSTKEY_INSTANCE_IP=$(printf '%s' "$response" | jq -r '.ip // .ipv4')
+    export HOSTKEY_INSTANCE_ID HOSTKEY_INSTANCE_IP
+}
+
 # Create a HOSTKEY compute instance
 create_server() {
     local name="$1"
@@ -169,36 +212,17 @@ create_server() {
 
     log_step "Creating HOSTKEY instance '$name' (preset: $preset, location: $location)..."
 
-    # Build order request
     local order_body
-    order_body=$(jq -n \
-        --arg name "$name" \
-        --arg location "$location" \
-        --arg preset "$preset" \
-        '{name: $name, location: $location, preset: $preset, os: "ubuntu-24.04"}')
+    order_body=$(_hostkey_build_order_body "$name" "$location" "$preset")
 
     local response
     response=$(hostkey_api POST "/eq/order_instance" "$order_body")
 
-    if echo "$response" | grep -qi "error"; then
-        log_error "Failed to create HOSTKEY instance"
-        local error_msg
-        error_msg=$(echo "$response" | jq -r '.error // .message // "Unknown error"' 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient account balance"
-        log_error "  - Instance limit reached"
-        log_error "  - Invalid location or preset"
-        log_error ""
-        log_error "Check your account status: https://hostkey.com/"
+    if _hostkey_check_create_error "$response"; then
         return 1
     fi
 
-    # Extract instance ID and IP
-    HOSTKEY_INSTANCE_ID=$(printf '%s' "$response" | jq -r '.id // .instance_id')
-    HOSTKEY_INSTANCE_IP=$(printf '%s' "$response" | jq -r '.ip // .ipv4')
-    export HOSTKEY_INSTANCE_ID HOSTKEY_INSTANCE_IP
+    _hostkey_parse_instance_response "$response"
 
     log_info "Instance created: ID=$HOSTKEY_INSTANCE_ID, IP=$HOSTKEY_INSTANCE_IP"
 
