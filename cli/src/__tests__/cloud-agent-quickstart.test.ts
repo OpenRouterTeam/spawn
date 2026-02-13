@@ -254,24 +254,24 @@ describe("cmdCloudInfo - Quick start with multi-auth", () => {
       expect(output).toContain("OPENROUTER_API_KEY");
     });
 
-    it("should show URL hint only on first auth var export line", async () => {
+    it("should show URL hint only on first auth var line", async () => {
       await cmdCloudInfo("upcloud");
       const lines = consoleSpy.mock.calls.map((c: any[]) => c.join(" "));
-      // Find lines containing the export command for auth env vars
-      const usernameExportLines = lines.filter(
-        (l: string) => l.includes("export") && l.includes("UPCLOUD_USERNAME")
+      // Find lines in quick-start section containing auth env vars
+      const quickStartIdx = lines.findIndex((l: string) => l.includes("Quick start"));
+      const afterQuickStart = lines.slice(quickStartIdx + 1);
+      const usernameLine = afterQuickStart.find(
+        (l: string) => l.includes("UPCLOUD_USERNAME")
       );
-      const passwordExportLines = lines.filter(
-        (l: string) => l.includes("export") && l.includes("UPCLOUD_PASSWORD")
+      const passwordLine = afterQuickStart.find(
+        (l: string) => l.includes("UPCLOUD_PASSWORD")
       );
-      expect(usernameExportLines.length).toBeGreaterThan(0);
-      expect(passwordExportLines.length).toBeGreaterThan(0);
-      // URL hint should appear on the first auth var export line
-      const firstAuthLine = usernameExportLines[0];
-      expect(firstAuthLine).toContain("upcloud.com");
-      // URL hint should NOT be repeated on the second auth var export line
-      const secondAuthLine = passwordExportLines[0];
-      expect(secondAuthLine).not.toContain("upcloud.com");
+      expect(usernameLine).toBeDefined();
+      expect(passwordLine).toBeDefined();
+      // URL hint should appear on the first auth var line
+      expect(usernameLine).toContain("upcloud.com");
+      // URL hint should NOT be repeated on the second auth var line
+      expect(passwordLine).not.toContain("upcloud.com");
     });
 
     it("should show example launch command with first implemented agent", async () => {
@@ -316,10 +316,14 @@ describe("cmdCloudInfo - Quick start with multi-auth", () => {
     it("should not show any auth export besides OPENROUTER_API_KEY", async () => {
       await cmdCloudInfo("nonecloud");
       const lines = consoleSpy.mock.calls.map((c: any[]) => c.join(" "));
-      // Count export lines - should only be OPENROUTER_API_KEY
-      const exportLines = lines.filter((l: string) => l.includes("export"));
-      expect(exportLines.length).toBe(1);
-      expect(exportLines[0]).toContain("OPENROUTER_API_KEY");
+      // No cloud-specific auth vars should appear as export lines
+      const nonOrExportLines = lines.filter(
+        (l: string) => l.includes("export") && !l.includes("OPENROUTER")
+      );
+      expect(nonOrExportLines).toHaveLength(0);
+      // OPENROUTER_API_KEY should still appear (as export or as "set")
+      const orLine = lines.find((l: string) => l.includes("OPENROUTER_API_KEY"));
+      expect(orLine).toBeDefined();
     });
 
     it("should show Auth: none in the type/auth header but not in quick-start", async () => {
@@ -610,10 +614,12 @@ describe("cmdAgentInfo - Quick start auth patterns", () => {
       await cmdAgentInfo("claude");
       const output = getOutput();
       expect(output).toContain("OPENROUTER_API_KEY");
-      // Should only have 1 export line (OPENROUTER_API_KEY)
+      // No cloud-specific auth vars should appear as export lines
       const lines = consoleSpy.mock.calls.map((c: any[]) => c.join(" "));
-      const exportLines = lines.filter((l: string) => l.includes("export"));
-      expect(exportLines.length).toBe(1);
+      const nonOrExportLines = lines.filter(
+        (l: string) => l.includes("export") && !l.includes("OPENROUTER")
+      );
+      expect(nonOrExportLines).toHaveLength(0);
     });
   });
 
@@ -686,6 +692,149 @@ describe("cmdAgentInfo - Quick start auth patterns", () => {
       await cmdAgentInfo("claude");
       const output = getOutput();
       expect(output).toContain("No implemented clouds");
+    });
+  });
+});
+
+// ── Credential status indicators in Quick start ──────────────────────────────
+
+describe("Quick start credential status indicators", () => {
+  let consoleSpy: ReturnType<typeof spyOn>;
+  let consoleErrSpy: ReturnType<typeof spyOn>;
+  let originalFetch: typeof global.fetch;
+  let processExitSpy: ReturnType<typeof spyOn>;
+  let savedEnv: Record<string, string | undefined>;
+
+  function setupManifest(manifest: Manifest) {
+    global.fetch = mock(async () => ({
+      ok: true,
+      json: async () => manifest,
+      text: async () => JSON.stringify(manifest),
+    })) as any;
+    return loadManifest(true);
+  }
+
+  function getOutput(): string {
+    return consoleSpy.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+  }
+
+  function getLines(): string[] {
+    return consoleSpy.mock.calls.map((c: any[]) => c.join(" "));
+  }
+
+  beforeEach(async () => {
+    consoleSpy = spyOn(console, "log").mockImplementation(() => {});
+    consoleErrSpy = spyOn(console, "error").mockImplementation(() => {});
+    mockLogError.mockClear();
+    mockLogInfo.mockClear();
+    mockLogStep.mockClear();
+    mockLogWarn.mockClear();
+    mockSpinnerStart.mockClear();
+    mockSpinnerStop.mockClear();
+
+    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit");
+    }) as any);
+
+    originalFetch = global.fetch;
+
+    // Save env vars we'll modify
+    savedEnv = {
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+      UPCLOUD_USERNAME: process.env.UPCLOUD_USERNAME,
+      UPCLOUD_PASSWORD: process.env.UPCLOUD_PASSWORD,
+      EMPTY_TOKEN: process.env.EMPTY_TOKEN,
+    };
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    processExitSpy.mockRestore();
+    consoleSpy.mockRestore();
+    consoleErrSpy.mockRestore();
+
+    // Restore env vars
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  });
+
+  describe("cmdCloudInfo with credentials set", () => {
+    it("should show 'set' indicator when OPENROUTER_API_KEY is set", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("upcloud");
+      const lines = getLines();
+      const orLine = lines.find((l: string) => l.includes("OPENROUTER_API_KEY"));
+      expect(orLine).toBeDefined();
+      expect(orLine).toContain("set");
+      expect(orLine).not.toContain("export");
+    });
+
+    it("should show 'export' instruction when OPENROUTER_API_KEY is NOT set", async () => {
+      delete process.env.OPENROUTER_API_KEY;
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("upcloud");
+      const lines = getLines();
+      const orLine = lines.find((l: string) => l.includes("OPENROUTER_API_KEY"));
+      expect(orLine).toBeDefined();
+      expect(orLine).toContain("export");
+    });
+
+    it("should show 'set' for cloud auth var when it is configured", async () => {
+      process.env.UPCLOUD_USERNAME = "testuser";
+      delete process.env.UPCLOUD_PASSWORD;
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("upcloud");
+      const lines = getLines();
+      // Find quick-start lines (after the "Quick start:" header, not the Auth: header line)
+      const quickStartIdx = lines.findIndex((l: string) => l.includes("Quick start"));
+      const afterQuickStart = lines.slice(quickStartIdx + 1);
+      const userLine = afterQuickStart.find((l: string) => l.includes("UPCLOUD_USERNAME"));
+      const passLine = afterQuickStart.find((l: string) => l.includes("UPCLOUD_PASSWORD"));
+      expect(userLine).toBeDefined();
+      expect(userLine).toContain("set");
+      expect(userLine).not.toContain("export");
+      expect(passLine).toBeDefined();
+      expect(passLine).toContain("export");
+    });
+  });
+
+  describe("cmdAgentInfo with credentials set", () => {
+    it("should show 'set' for OPENROUTER_API_KEY when configured", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      await setupManifest(multiAuthManifest);
+      await cmdAgentInfo("claude");
+      const lines = getLines();
+      const orLine = lines.find((l: string) => l.includes("OPENROUTER_API_KEY"));
+      expect(orLine).toBeDefined();
+      expect(orLine).toContain("set");
+      expect(orLine).not.toContain("export");
+    });
+
+    it("should show 'export' for OPENROUTER_API_KEY when NOT configured", async () => {
+      delete process.env.OPENROUTER_API_KEY;
+      await setupManifest(multiAuthManifest);
+      await cmdAgentInfo("claude");
+      const lines = getLines();
+      const orLine = lines.find((l: string) => l.includes("OPENROUTER_API_KEY"));
+      expect(orLine).toBeDefined();
+      expect(orLine).toContain("export");
+    });
+
+    it("should show 'set' for cloud auth var in agent quick-start when configured", async () => {
+      process.env.UPCLOUD_USERNAME = "testuser";
+      await setupManifest(multiAuthManifest);
+      await cmdAgentInfo("claude");
+      const lines = getLines();
+      const authLine = lines.find((l: string) => l.includes("UPCLOUD_USERNAME"));
+      expect(authLine).toBeDefined();
+      expect(authLine).toContain("set");
+      expect(authLine).not.toContain("export");
     });
   });
 });
