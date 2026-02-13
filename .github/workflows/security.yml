@@ -4,8 +4,8 @@ on:
   issues:
     types: [opened, reopened]
   schedule:
-    # Consolidated review + scan — every 45 min (must exceed 35-min cycle timeout)
-    - cron: '0,45 * * * *'
+    # Consolidated review + scan — every 5 min
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       mode:
