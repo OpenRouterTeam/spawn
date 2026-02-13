@@ -1102,6 +1102,15 @@ export function parseAuthEnvVars(auth: string): string[] {
     .filter((s) => /^[A-Z][A-Z0-9_]{3,}$/.test(s));
 }
 
+/** Format an auth env var line showing whether it's already set or needs to be exported */
+function formatAuthVarLine(varName: string, urlHint?: string): string {
+  if (process.env[varName]) {
+    return `  ${pc.green(varName)} ${pc.dim("-- set")}`;
+  }
+  const hint = urlHint ? `  ${pc.dim(`# ${urlHint}`)}` : "";
+  return `  ${pc.cyan(`export ${varName}=...`)}${hint}`;
+}
+
 /** Check if a cloud's required auth env vars are all set in the environment */
 export function hasCloudCredentials(auth: string): boolean {
   const vars = parseAuthEnvVars(auth);
@@ -1212,10 +1221,10 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     const authVars = parseAuthEnvVars(cloudDef.auth);
     console.log();
     console.log(pc.bold("Quick start:"));
-    console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
+    console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
     if (authVars.length > 0) {
-      const hint = cloudDef.url ? `  ${pc.dim(`# ${cloudDef.url}`)}` : `  ${pc.dim(`# ${cloudDef.name} credential`)}`;
-      console.log(`  ${pc.cyan(`export ${authVars[0]}=...`)}${hint}`);
+      const hint = cloudDef.url ?? `${cloudDef.name} credential`;
+      console.log(formatAuthVarLine(authVars[0], hint));
     }
     console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
   }
@@ -1250,12 +1259,11 @@ function printCloudQuickStart(
 ): void {
   console.log();
   console.log(pc.bold("Quick start:"));
-  console.log(`  ${pc.cyan("export OPENROUTER_API_KEY=sk-or-v1-...")}  ${pc.dim("# https://openrouter.ai/settings/keys")}`);
+  console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
   if (authVars.length > 0) {
-    const hint = cloud.url ? `  ${pc.dim(`# ${cloud.url}`)}` : "";
     for (let i = 0; i < authVars.length; i++) {
       // Only show the URL hint on the first auth var to avoid repetition
-      console.log(`  ${pc.cyan(`export ${authVars[i]}=...`)}${i === 0 ? hint : ""}`);
+      console.log(formatAuthVarLine(authVars[i], i === 0 ? cloud.url : undefined));
     }
   } else if (cloud.auth.toLowerCase() !== "none") {
     console.log(`  ${pc.dim(`Auth: ${cloud.auth}`)}`);
