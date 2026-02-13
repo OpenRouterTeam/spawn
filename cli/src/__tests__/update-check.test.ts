@@ -211,33 +211,37 @@ describe("update-check", () => {
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
-      const calls: string[] = [];
+      const execSyncCalls: string[] = [];
       const execSyncSpy = spyOn(executor, "execSync").mockImplementation((cmd: string) => {
-        calls.push(cmd);
+        execSyncCalls.push(cmd);
       });
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
-      // First call: install script, second call: re-exec with original args
-      expect(calls.length).toBe(2);
-      expect(calls[0]).toContain("install.sh");
-      expect(calls[1]).toContain("spawn");
-      expect(calls[1]).toContain("claude");
-      expect(calls[1]).toContain("sprite");
+      // execSync called once for the install script
+      expect(execSyncCalls.length).toBe(1);
+      expect(execSyncCalls[0]).toContain("install.sh");
+
+      // execFileSync called once for re-exec (no shell interpretation)
+      expect(execFileSyncSpy).toHaveBeenCalledTimes(1);
+      expect(execFileSyncSpy.mock.calls[0][0]).toContain("spawn");
+      expect(execFileSyncSpy.mock.calls[0][1]).toEqual(["claude", "sprite"]);
 
       // Should show rerunning message
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
       expect(output).toContain("Rerunning");
 
       // Should set SPAWN_NO_UPDATE_CHECK=1 to prevent infinite loop
-      expect(execSyncSpy.mock.calls[1][1]).toHaveProperty("env");
-      expect(execSyncSpy.mock.calls[1][1].env.SPAWN_NO_UPDATE_CHECK).toBe("1");
+      expect(execFileSyncSpy.mock.calls[0][2]).toHaveProperty("env");
+      expect(execFileSyncSpy.mock.calls[0][2].env.SPAWN_NO_UPDATE_CHECK).toBe("1");
 
       expect(processExitSpy).toHaveBeenCalledWith(0);
 
       fetchSpy.mockRestore();
       execSyncSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
       process.argv = originalArgv;
     });
 
@@ -254,15 +258,12 @@ describe("update-check", () => {
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
-      let callCount = 0;
-      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {
-        callCount++;
-        if (callCount === 2) {
-          // Re-exec fails with exit code 1
-          const err = new Error("Command failed") as Error & { status: number };
-          err.status = 42;
-          throw err;
-        }
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {
+        // Re-exec fails with exit code 42
+        const err = new Error("Command failed") as Error & { status: number };
+        err.status = 42;
+        throw err;
       });
 
       const { checkForUpdates } = await import("../update-check.js");
@@ -273,6 +274,7 @@ describe("update-check", () => {
 
       fetchSpy.mockRestore();
       execSyncSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
       process.argv = originalArgv;
     });
 
@@ -293,6 +295,7 @@ describe("update-check", () => {
       const execSyncSpy = spyOn(executor, "execSync").mockImplementation((cmd: string) => {
         calls.push(cmd);
       });
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -300,6 +303,9 @@ describe("update-check", () => {
       // Only one call: the install script (no re-exec)
       expect(calls.length).toBe(1);
       expect(calls[0]).toContain("install.sh");
+
+      // execFileSync should NOT be called (no re-exec without args)
+      expect(execFileSyncSpy).not.toHaveBeenCalled();
 
       // Should show "Run your spawn command again" instead
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
@@ -310,6 +316,7 @@ describe("update-check", () => {
 
       fetchSpy.mockRestore();
       execSyncSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
       process.argv = originalArgv;
     });
   });

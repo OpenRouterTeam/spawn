@@ -1,5 +1,5 @@
 import "./unicode-detect.js"; // Ensure TERM is set before using symbols
-import { execSync as nodeExecSync } from "child_process";
+import { execSync as nodeExecSync, execFileSync as nodeExecFileSync } from "child_process";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE } from "./manifest.js";
@@ -9,6 +9,7 @@ const VERSION = pkg.version;
 // Internal executor for testability - can be replaced in tests
 export const executor = {
   execSync: (cmd: string, options?: any) => nodeExecSync(cmd, options),
+  execFileSync: (file: string, args: string[], options?: any) => nodeExecFileSync(file, args, options),
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -52,11 +53,6 @@ function compareVersions(current: string, latest: string): boolean {
   return false; // Versions are equal
 }
 
-/** Shell-quote a string for safe interpolation into a bash command */
-function shellQuote(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`;
-}
-
 /** Print boxed update banner to stderr */
 function printUpdateBanner(latestVersion: string): void {
   const line1 = `Update available: v${VERSION} -> v${latestVersion}`;
@@ -94,13 +90,11 @@ function reExecWithArgs(): void {
   }
 
   const binPath = process.argv[1] || "spawn";
-  const cmd = [shellQuote(binPath), ...args.map(shellQuote)].join(" ");
   console.error(pc.dim(`  Rerunning: spawn ${args.join(" ")}`));
   console.error();
   try {
-    executor.execSync(cmd, {
+    executor.execFileSync(binPath, args, {
       stdio: "inherit",
-      shell: "/bin/bash",
       env: { ...process.env, SPAWN_NO_UPDATE_CHECK: "1" },
     });
     process.exit(0);
