@@ -1263,7 +1263,7 @@
     "ramnode/continue": "implemented",
     "atlanticnet/claude": "implemented",
     "atlanticnet/openclaw": "implemented",
-    "atlanticnet/nanoclaw": "missing",
+    "atlanticnet/nanoclaw": "implemented",
     "atlanticnet/aider": "implemented",
     "atlanticnet/goose": "missing",
     "atlanticnet/codex": "missing",
