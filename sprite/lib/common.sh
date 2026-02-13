@@ -139,7 +139,7 @@ verify_sprite_connectivity() {
         fi
         log_step "Sprite not ready, retrying (${attempt}/${max_attempts})..."
         sleep "${SPRITE_CONNECTIVITY_POLL_DELAY}"
-        ((attempt++))
+        attempt=$((attempt + 1))
     done
 
     log_error "Sprite '${sprite_name}' failed to respond after ${max_attempts} attempts"

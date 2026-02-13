@@ -105,12 +105,12 @@ assert_contains() {
     local file="$1" pattern="$2" msg="$3"
     if grep -qE "${pattern}" "${file}" 2>/dev/null; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg}"
         printf '%b\n' "    expected pattern: ${pattern}"
         printf '%b\n' "    in: ${file}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -118,10 +118,10 @@ assert_not_contains() {
     local file="$1" pattern="$2" msg="$3"
     if ! grep -qE "${pattern}" "${file}" 2>/dev/null; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -129,10 +129,10 @@ assert_exit_code() {
     local actual="$1" expected="$2" msg="$3"
     if [[ "${actual}" -eq "${expected}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg} (got exit code ${actual}, expected ${expected})"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -142,10 +142,10 @@ assert_equals() {
     local actual="$1" expected="$2" msg="$3"
     if [[ "${actual}" == "${expected}" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg} (got '${actual}')"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -158,11 +158,11 @@ assert_match() {
     case "${actual}" in
         ${pattern})
             printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-            ((PASSED++))
+            PASSED=$((PASSED + 1))
             ;;
         *)
             printf '%b\n' "  ${RED}✗${NC} ${msg} (got '${actual}')"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
             ;;
     esac
 }
@@ -174,10 +174,10 @@ assert_common_succeeds() {
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && '"${cmd}" 2>/dev/null)
     if [[ "${result}" == "valid" ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -188,10 +188,10 @@ assert_common_fails() {
     bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && '"${cmd}" </dev/null >/dev/null 2>&1 || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} ${msg}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${RED}✗${NC} ${msg}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 
@@ -255,7 +255,7 @@ run_script_test() {
     leaked_temps=$(find /tmp -maxdepth 1 -name "tmp.*" -newer "${MOCK_LOG}" 2>/dev/null | wc -l)
     if [[ "${leaked_temps}" -eq 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} No temp files leaked"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     fi
 }
 
@@ -350,7 +350,7 @@ _test_model_validation() {
         local test_str
         test_str=$(printf 'bad%smodel' "${char}")
         bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && validate_model_id '"$(printf '%q' "${test_str}")" </dev/null >/dev/null 2>&1 || rc=$?
-        [[ "${rc}" -ne 0 ]] && ((rejected_count++))
+        [[ "${rc}" -ne 0 ]] && rejected_count=$((rejected_count + 1))
     done
     assert_equals "${rejected_count}" "${#dangerous_chars[@]}" \
         "validate_model_id rejects shell metacharacters (${rejected_count}/${#dangerous_chars[@]})"
@@ -611,7 +611,7 @@ run_shellcheck() {
 
     for script in "${all_scripts[@]}"; do
         [[ -f "${script}" ]] || continue
-        ((checked_count++))
+        checked_count=$((checked_count + 1))
 
         # Run shellcheck with warning severity, exclude some noisy checks
         # SC1090: Can't follow non-constant source
@@ -620,7 +620,7 @@ run_shellcheck() {
         output=$(shellcheck --severity=warning --exclude=SC1090,SC2312 "${script}" 2>&1)
 
         if [[ -n "${output}" ]]; then
-            ((issue_count++))
+            issue_count=$((issue_count + 1))
             printf '%b\n' "  ${YELLOW}⚠${NC} $(basename "${script}"): found issues"
             echo "${output}" | sed 's/^/    /'
         fi
@@ -628,7 +628,7 @@ run_shellcheck() {
 
     if [[ "${issue_count}" -eq 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} No issues found in ${checked_count} scripts"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         printf '%b\n' "  ${YELLOW}⚠${NC} Found issues in ${issue_count}/${checked_count} scripts (advisory only)"
         # Don't fail the build, just warn
