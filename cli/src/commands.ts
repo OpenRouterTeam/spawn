@@ -585,22 +585,36 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   process.exit(1);
 }
 
-function credentialHints(cloud: string, authHint?: string, verb = "Missing or invalid"): string[] {
-  const lines: string[] = [];
-
-  if (authHint) {
-    // Check which specific env vars are missing
-    const varsToCheck = authHint.split(/\s*\+\s*/).concat("OPENROUTER_API_KEY");
-    const missing = varsToCheck.filter(v => !process.env[v]);
-    if (missing.length > 0) {
-      lines.push(`  - ${verb} credentials (${missing.map(v => pc.cyan(v)).join(", ")} not set)`);
-    } else {
-      lines.push(`  - Credentials set but may be invalid or expired (${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`);
-    }
-    lines.push(`    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`);
-  } else {
-    lines.push(`  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`);
+/** Check which required env vars are set vs missing and return specific hints */
+export function credentialHints(cloud: string, authHint?: string, verb = "Missing or invalid"): string[] {
+  if (!authHint) {
+    return [
+      `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`,
+    ];
   }
+
+  // Parse individual env var names from the auth hint (e.g. "HCLOUD_TOKEN" or "UPCLOUD_USERNAME + UPCLOUD_PASSWORD")
+  const authVars = authHint.split(/\s*\+\s*/).map(s => s.trim()).filter(Boolean);
+  const allVars = [...authVars, "OPENROUTER_API_KEY"];
+
+  const missing = allVars.filter(v => !process.env[v]);
+
+  if (missing.length === 0) {
+    // All credentials are set -- the issue is likely something else
+    return [
+      `  - Credentials appear to be set (${allVars.map(v => pc.cyan(v)).join(", ")})`,
+      `    The error may be due to invalid or expired credentials`,
+      `    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`,
+    ];
+  }
+
+  // Show which specific vars are missing
+  const lines: string[] = [];
+  lines.push(`  - Missing credentials:`);
+  for (const v of missing) {
+    lines.push(`      ${pc.cyan(v)} -- not set`);
+  }
+  lines.push(`    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`);
 
   return lines;
 }

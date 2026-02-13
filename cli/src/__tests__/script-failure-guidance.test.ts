@@ -356,6 +356,7 @@ describe("getScriptFailureGuidance", () => {
     it("should handle multi-credential auth hint", () => {
       const lines = getScriptFailureGuidance(1, "contabo", "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
       const joined = lines.join("\n");
+      // Each credential var should be listed individually
       expect(joined).toContain("CONTABO_CLIENT_ID");
       expect(joined).toContain("CONTABO_CLIENT_SECRET");
     });
@@ -374,7 +375,7 @@ describe("getScriptFailureGuidance", () => {
 
     it("should include setup instruction line for exit code 1 with authHint", () => {
       const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(5);
+      expect(lines.length).toBeGreaterThanOrEqual(5);
       const joined = lines.join("\n");
       expect(joined).toContain("spawn hetzner");
       expect(joined).toContain("setup");
@@ -382,7 +383,7 @@ describe("getScriptFailureGuidance", () => {
 
     it("should include setup instruction line for default case with authHint", () => {
       const lines = getScriptFailureGuidance(42, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(5);
+      expect(lines.length).toBeGreaterThanOrEqual(5);
       const joined = lines.join("\n");
       expect(joined).toContain("spawn hetzner");
       expect(joined).toContain("setup");
