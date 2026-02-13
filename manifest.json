@@ -838,7 +838,7 @@
     "codesandbox/codex": "missing",
     "codesandbox/interpreter": "missing",
     "codesandbox/gemini": "missing",
-    "codesandbox/amazonq": "missing",
+    "codesandbox/amazonq": "implemented",
     "codesandbox/cline": "missing",
     "codesandbox/gptme": "missing",
     "codesandbox/opencode": "missing",
