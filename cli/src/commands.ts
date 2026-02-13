@@ -1214,11 +1214,15 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   const allClouds = cloudKeys(manifest);
   const implClouds = getImplementedClouds(manifest, agentKey);
 
-  // Show quick-start with first available cloud
-  if (implClouds.length > 0) {
-    const exampleCloud = implClouds[0];
+  // Prioritize clouds where the user already has credentials
+  const { sortedClouds, credCount } = prioritizeCloudsByCredentials(implClouds, manifest);
+
+  // Show quick-start with best available cloud (prefer one with credentials)
+  if (sortedClouds.length > 0) {
+    const exampleCloud = sortedClouds[0];
     const cloudDef = manifest.clouds[exampleCloud];
     const authVars = parseAuthEnvVars(cloudDef.auth);
+    const hasCreds = hasCloudCredentials(cloudDef.auth);
     console.log();
     console.log(pc.bold("Quick start:"));
     console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
@@ -1230,20 +1234,26 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
   }
 
   console.log();
-  console.log(pc.bold(`Available clouds:`) + pc.dim(` ${implClouds.length} of ${allClouds.length}`));
+  console.log(pc.bold(`Available clouds:`) + pc.dim(` ${sortedClouds.length} of ${allClouds.length}`));
+  if (credCount > 0) {
+    console.log(pc.dim(`  ${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected (shown first)`));
+  }
   console.log();
 
-  if (implClouds.length === 0) {
+  if (sortedClouds.length === 0) {
     console.log(pc.dim("  No implemented clouds yet."));
     console.log();
     return;
   }
 
-  const byType = groupByType(implClouds, (c) => manifest.clouds[c].type);
+  const byType = groupByType(sortedClouds, (c) => manifest.clouds[c].type);
   printGroupedList(
     byType,
     (c) => manifest.clouds[c].name,
-    (c) => `spawn ${agentKey} ${c}`
+    (c) => {
+      const hint = `spawn ${agentKey} ${c}`;
+      return hasCloudCredentials(manifest.clouds[c].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
+    }
   );
   console.log();
 }
@@ -1257,6 +1267,7 @@ function printCloudQuickStart(
   exampleAgent: string | undefined,
   cloudKey: string
 ): void {
+  const hasCreds = hasCloudCredentials(cloud.auth);
   console.log();
   console.log(pc.bold("Quick start:"));
   console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
@@ -1300,7 +1311,8 @@ export async function cmdCloudInfo(cloud: string): Promise<void> {
 
   const c = manifest.clouds[cloudKey];
   printInfoHeader(c);
-  console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}`));
+  const credStatus = hasCloudCredentials(c.auth) ? pc.green("credentials detected") : pc.dim("no credentials set");
+  console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}  |  `) + credStatus);
 
   const authVars = parseAuthEnvVars(c.auth);
   const implAgents = getImplementedAgents(manifest, cloudKey);
