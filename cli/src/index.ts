@@ -95,6 +95,11 @@ function checkUnknownFlags(args: string[]): void {
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
       console.error();
+      console.error(`  For ${pc.cyan("spawn list")}:`);
+      console.error(`    ${pc.cyan("-a, --agent")}         Filter history by agent`);
+      console.error(`    ${pc.cyan("-c, --cloud")}         Filter history by cloud`);
+      console.error(`    ${pc.cyan("--clear")}             Clear all spawn history`);
+      console.error();
       console.error(`  Run ${pc.cyan("spawn help")} for full usage information.`);
       process.exit(1);
     }
@@ -235,6 +240,12 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
       prompt = readFileSync(promptFile, "utf-8");
     } catch (err) {
       handlePromptFileError(promptFile, err);
+    }
+
+    if (prompt !== undefined && prompt.trim() === "") {
+      console.error(pc.red(`Prompt file is empty: ${pc.bold(promptFile)}`));
+      console.error(`\nThe file exists but contains no text. Add your prompt to the file and try again.`);
+      process.exit(1);
     }
   }
 
