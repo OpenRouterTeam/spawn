@@ -93,25 +93,7 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
         log "Removed stale ${WORKTREE_BASE} directory"
     fi
 
-    log "Pre-cycle cleanup: merged remote branches..."
-    MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ') || true
-    for branch in $MERGED_BRANCHES; do
-        if [[ -n "$branch" && "$branch" != "main" ]]; then
-            git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
-        fi
-    done
-
-    log "Pre-cycle cleanup: checking stale open PRs for conflicts..."
-    STALE_PRS=$(gh pr list --repo OpenRouterTeam/spawn --state open --json number,updatedAt,mergeable --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | "\(.number) \(.mergeable)"' 2>/dev/null) || true
-    while IFS=' ' read -r pr_num pr_mergeable; do
-        if [[ -n "$pr_num" ]]; then
-            if [[ "$pr_mergeable" != "MERGEABLE" ]]; then
-                log "Stale PR #${pr_num} has conflicts — will be handled by pr-maintainer agent"
-            else
-                log "Stale PR #${pr_num} is mergeable — will be reviewed by security team"
-            fi
-        fi
-    done <<< "$STALE_PRS"
+    # Note: branch pruning and PR management is handled by the security team
 fi
 
 # Launch Claude Code with mode-specific prompt
@@ -307,10 +289,9 @@ Create these teammates:
      * **Failing checks**: investigate the failure in a worktree, fix if trivial (e.g., `bash -n` errors, test failures), push the fix
        - If the failure is non-trivial, comment with failure details for the author
      * **Mergeable + no issues**: leave it alone — the security team handles review and merge
-   - ALSO clean up orphan branches (no open PR, stale >4 hours): `git push origin --delete BRANCH`
    - **NEVER review, approve, or merge PRs** — that is exclusively the security team's job
    - **NEVER close a PR** — always try to rebase, fix, or request changes instead
-   - After processing all PRs, report summary: how many rebased, fixed, commented, branches cleaned
+   - After processing all PRs, report summary: how many rebased, fixed, commented
    - Run this check AGAIN at the end of the cycle to catch PRs created during the cycle
    - GOAL: All open PRs are conflict-free, review feedback is addressed, and checks are passing — ready for security review.
 
@@ -475,7 +456,7 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 1. Create the team with TeamCreate
 2. Set up worktree directory: mkdir -p WORKTREE_BASE_PLACEHOLDER
 3. Create tasks using TaskCreate for each area:
-   - PR maintenance: rebase conflicting PRs, address review comments, fix failing checks; clean orphan branches
+   - PR maintenance: rebase conflicting PRs, address review comments, fix failing checks
    - Community coordination: scan all open issues, post acknowledgments, categorize, and delegate
    - Security scan of all scripts
    - UX test of main user flows
