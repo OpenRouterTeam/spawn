@@ -857,6 +857,8 @@ get_openrouter_api_key_oauth() {
 generate_env_config() {
     echo ""
     echo "# [spawn:env]"
+    # All spawn environments are disposable cloud VMs — mark as sandbox
+    echo "export IS_SANDBOX='1'"
     for env_pair in "$@"; do
         local key="${env_pair%%=*}"
         local value="${env_pair#*=}"
@@ -1033,6 +1035,9 @@ runcmd:
   - su - root -c 'curl -fsSL https://bun.sh/install | bash'
   # Install Claude Code
   - su - root -c 'curl -fsSL https://claude.ai/install.sh | bash'
+  # Mark as sandbox environment (disposable cloud VM)
+  - echo 'export IS_SANDBOX=1' >> /root/.bashrc
+  - echo 'export IS_SANDBOX=1' >> /root/.zshrc
   # Configure PATH in .bashrc
   - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
   # Configure PATH in .zshrc
