@@ -245,9 +245,9 @@ describe("--prompt-file EISDIR (path is a directory)", () => {
     mkdirSync(dirPath, { recursive: true });
   });
 
-  it("should show 'is a directory, not a file' for a directory path", () => {
+  it("should show 'is not a regular file' for a directory path", () => {
     const result = runCli(["claude", "sprite", "--prompt-file", dirPath]);
-    expect(output(result)).toContain("is a directory, not a file");
+    expect(output(result)).toContain("is not a regular file");
     expect(result.exitCode).not.toBe(0);
   });
 

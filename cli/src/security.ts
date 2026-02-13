@@ -79,6 +79,87 @@ export function validateScriptContent(script: string): void {
   }
 }
 
+// Sensitive path patterns that should never be read as prompt files
+// These protect credentials and system files from accidental exfiltration
+const SENSITIVE_PATH_PATTERNS: ReadonlyArray<{ pattern: RegExp; description: string }> = [
+  { pattern: /(?:^|\/)\.ssh\//, description: "SSH directory (may contain private keys)" },
+  { pattern: /(?:^|\/)\.aws\//, description: "AWS credentials directory" },
+  { pattern: /(?:^|\/)\.config\/gcloud\//, description: "Google Cloud credentials" },
+  { pattern: /(?:^|\/)\.azure\//, description: "Azure credentials directory" },
+  { pattern: /(?:^|\/)\.kube\//, description: "Kubernetes config (may contain tokens)" },
+  { pattern: /(?:^|\/)\.docker\/config\.json$/, description: "Docker registry credentials" },
+  { pattern: /(?:^|\/)\.npmrc$/, description: "npm credentials" },
+  { pattern: /(?:^|\/)\.netrc$/, description: "netrc credentials" },
+  { pattern: /(?:^|\/)\.env(?:\.\w+)?$/, description: "environment file (may contain secrets)" },
+  { pattern: /(?:^|\/)\.git-credentials$/, description: "Git credentials" },
+  { pattern: /^\/etc\/shadow$/, description: "system password hashes" },
+  { pattern: /^\/etc\/master\.passwd$/, description: "system password hashes (macOS)" },
+  { pattern: /id_(?:rsa|ed25519|ecdsa|dsa)(?:\.pub)?$/, description: "SSH key file" },
+];
+
+// Maximum prompt file size (1MB) to prevent accidental reads of large files
+const MAX_PROMPT_FILE_SIZE = 1024 * 1024;
+
+/**
+ * Validates a prompt file path for safety before reading.
+ * SECURITY-CRITICAL: Prevents reading sensitive files and exfiltrating credentials.
+ *
+ * @param filePath - The file path to validate
+ * @throws Error if the path points to a sensitive file or fails validation
+ */
+export function validatePromptFilePath(filePath: string): void {
+  if (!filePath || filePath.trim() === "") {
+    throw new Error("Prompt file path cannot be empty");
+  }
+
+  // Normalize the path to resolve .. and symlink-like textual tricks
+  const { resolve } = require("path");
+  const resolved = resolve(filePath);
+
+  // Check against sensitive path patterns
+  for (const { pattern, description } of SENSITIVE_PATH_PATTERNS) {
+    if (pattern.test(resolved)) {
+      throw new Error(
+        `Refusing to read '${filePath}': ${description}.\n` +
+        `\n` +
+        `Prompt file contents are sent to remote agents and may be logged.\n` +
+        `Use a dedicated text file for your prompt instead.`
+      );
+    }
+  }
+}
+
+/**
+ * Validates prompt file metadata (must be a regular file, within size limit).
+ *
+ * @param filePath - The file path to check
+ * @param statFn - Stat function (injectable for testing)
+ * @throws Error if file is not suitable for reading as a prompt
+ */
+export function validatePromptFileStats(filePath: string, stats: { isFile: () => boolean; size: number }): void {
+  if (!stats.isFile()) {
+    throw new Error(
+      `'${filePath}' is not a regular file.\n` +
+      `Provide a path to a text file containing your prompt.`
+    );
+  }
+
+  if (stats.size > MAX_PROMPT_FILE_SIZE) {
+    const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
+    throw new Error(
+      `Prompt file is too large (${sizeMB}MB). Maximum size is 1MB.\n` +
+      `Use a shorter prompt or split it across multiple runs.`
+    );
+  }
+
+  if (stats.size === 0) {
+    throw new Error(
+      `Prompt file is empty: ${filePath}\n` +
+      `The file exists but contains no text. Add your prompt to the file and try again.`
+    );
+  }
+}
+
 /**
  * Validates a prompt string for non-interactive agent execution.
  * SECURITY-CRITICAL: Prevents command injection via prompt parameter.
