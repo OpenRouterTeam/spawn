@@ -171,7 +171,8 @@ function suggestFilterCorrection(
   return { suggested: false };
 }
 
-// ── Replica of showListFooter logic (commands.ts:799-817) ──────────────────
+// ── Replica of showListFooter logic (commands.ts) ──────────────────────────
+// Now delegates to buildRetryCommand for the rerun hint to avoid truncated prompts.
 
 interface SpawnRecord {
   agent: string;
@@ -186,6 +187,16 @@ interface FooterOutput {
   countInfo: string;
 }
 
+// Replica of buildRetryCommand (commands.ts)
+function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
+  if (!prompt) return `spawn ${agent} ${cloud}`;
+  if (prompt.length <= 80) {
+    const safe = prompt.replace(/"/g, '\\"');
+    return `spawn ${agent} ${cloud} --prompt "${safe}"`;
+  }
+  return `spawn ${agent} ${cloud} --prompt-file <your-prompt-file>`;
+}
+
 function buildFooter(
   records: SpawnRecord[],
   totalRecords: number,
@@ -193,13 +204,7 @@ function buildFooter(
   cloudFilter?: string,
 ): FooterOutput {
   const latest = records[0];
-  let rerunHint: string;
-  if (latest.prompt) {
-    const shortPrompt = latest.prompt.length > 30 ? latest.prompt.slice(0, 30) + "..." : latest.prompt;
-    rerunHint = `spawn ${latest.agent} ${latest.cloud} --prompt "${shortPrompt}"`;
-  } else {
-    rerunHint = `spawn ${latest.agent} ${latest.cloud}`;
-  }
+  const rerunHint = buildRetryCommand(latest.agent, latest.cloud, latest.prompt);
 
   let filterInfo: string;
   let countInfo: string;
@@ -470,7 +475,7 @@ describe("showListFooter logic", () => {
   });
 
   describe("rerun hint with prompt", () => {
-    it("should include prompt in rerun hint", () => {
+    it("should include prompt in rerun hint for short prompts", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z", prompt: "Fix the bug" },
       ];
@@ -479,46 +484,45 @@ describe("showListFooter logic", () => {
       expect(footer.rerunHint).toContain("Fix the bug");
     });
 
-    it("should truncate long prompts at 30 characters", () => {
-      const longPrompt = "This is a very long prompt that exceeds thirty characters by a lot";
+    it("should suggest --prompt-file for long prompts instead of truncating", () => {
+      const longPrompt = "This is a very long prompt that exceeds eighty characters by a lot and keeps going on and on";
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z", prompt: longPrompt },
       ];
       const footer = buildFooter(records, 1);
-      expect(footer.rerunHint).toContain("...");
-      // Should contain the first 30 characters
-      expect(footer.rerunHint).toContain(longPrompt.slice(0, 30));
-      // Should NOT contain the full prompt
-      expect(footer.rerunHint).not.toContain(longPrompt);
-    });
-
-    it("should not truncate short prompts", () => {
-      const shortPrompt = "Fix the bug";
-      const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z", prompt: shortPrompt },
-      ];
-      const footer = buildFooter(records, 1);
-      expect(footer.rerunHint).toContain(shortPrompt);
+      expect(footer.rerunHint).toContain("--prompt-file");
+      // Should NOT contain truncated prompt text with "..."
       expect(footer.rerunHint).not.toContain("...");
+      // Should NOT contain the prompt content
+      expect(footer.rerunHint).not.toContain("This is a very long");
     });
 
-    it("should not truncate prompt exactly 30 characters long", () => {
-      const exactPrompt = "123456789012345678901234567890"; // exactly 30 chars
+    it("should include full prompt up to 80 characters", () => {
+      const prompt80 = "B".repeat(80);
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z", prompt: exactPrompt },
+        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z", prompt: prompt80 },
       ];
       const footer = buildFooter(records, 1);
-      expect(footer.rerunHint).toContain(exactPrompt);
-      expect(footer.rerunHint).not.toContain("...");
+      expect(footer.rerunHint).toContain(prompt80);
+      expect(footer.rerunHint).not.toContain("prompt-file");
     });
 
-    it("should truncate prompt of 31 characters", () => {
-      const prompt31 = "1234567890123456789012345678901"; // 31 chars
+    it("should suggest --prompt-file for prompts over 80 characters", () => {
+      const prompt81 = "C".repeat(81);
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z", prompt: prompt31 },
+        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z", prompt: prompt81 },
       ];
       const footer = buildFooter(records, 1);
-      expect(footer.rerunHint).toContain("...");
+      expect(footer.rerunHint).toContain("--prompt-file");
+      expect(footer.rerunHint).not.toContain("C".repeat(81));
+    });
+
+    it("should escape double quotes in prompt", () => {
+      const records: SpawnRecord[] = [
+        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z", prompt: 'Fix "all" bugs' },
+      ];
+      const footer = buildFooter(records, 1);
+      expect(footer.rerunHint).toBe('spawn claude sprite --prompt "Fix \\"all\\" bugs"');
     });
   });
 
