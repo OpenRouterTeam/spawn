@@ -85,11 +85,34 @@ function performAutoUpdate(latestVersion: string): void {
 
     console.error();
     console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
-    console.error(pc.dim("  Run your spawn command again to use the new version."));
-    console.error();
 
-    // Exit cleanly after update
-    process.exit(0);
+    // Re-exec the updated binary with the same arguments
+    const args = process.argv.slice(2);
+    if (args.length > 0) {
+      const binPath = process.argv[1] || "spawn";
+      const quotedBin = `'${binPath.replace(/'/g, "'\\''")}'`;
+      const quotedArgs = args.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
+      console.error(pc.dim(`  Rerunning: spawn ${args.join(" ")}`));
+      console.error();
+      try {
+        executor.execSync(`${quotedBin} ${quotedArgs}`, {
+          stdio: "inherit",
+          shell: "/bin/bash",
+          env: { ...process.env, SPAWN_NO_UPDATE_CHECK: "1" },
+        });
+        process.exit(0);
+      } catch (reexecErr) {
+        // Forward the exit code from the re-executed command
+        const code = reexecErr && typeof reexecErr === "object" && "status" in reexecErr
+          ? (reexecErr as { status: number }).status
+          : 1;
+        process.exit(code);
+      }
+    } else {
+      console.error(pc.dim("  Run your spawn command again to use the new version."));
+      console.error();
+      process.exit(0);
+    }
   } catch (err) {
     console.error();
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
