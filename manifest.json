@@ -1290,7 +1290,7 @@
     "atlanticnet/opencode": "implemented",
     "atlanticnet/plandex": "implemented",
     "atlanticnet/kilocode": "missing",
-    "atlanticnet/continue": "missing",
+    "atlanticnet/continue": "implemented",
     "hostkey/claude": "implemented",
     "hostkey/openclaw": "implemented",
     "hostkey/nanoclaw": "missing",
