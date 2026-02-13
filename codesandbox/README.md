@@ -24,6 +24,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/aider.sh)
 ```
 
+#### NanoClaw
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/nanoclaw.sh)
+```
+
 #### Goose
 
 ```bash
