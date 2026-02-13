@@ -183,7 +183,9 @@ for pr_num in $STALE_PRS; do
             gh pr merge "$pr_num" --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
         else
             log "Closing unmergeable stale QA PR #${pr_num}..."
-            gh pr close "$pr_num" --comment "Auto-closing: stale QA PR from a previous cycle." 2>&1 | tee -a "${LOG_FILE}" || true
+            gh pr close "$pr_num" --comment "Auto-closing: stale QA PR from a previous cycle.
+
+-- qa/cycle" 2>&1 | tee -a "${LOG_FILE}" || true
         fi
     fi
 done

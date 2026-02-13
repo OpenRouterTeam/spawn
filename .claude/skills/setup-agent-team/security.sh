@@ -143,7 +143,7 @@ Create these teammates:
    - If the change also needs workflow updates (\`.github/workflows/\`), make those too
    - Run \`bash -n\` on all modified .sh files
    - Commit with a descriptive message referencing the issue
-   - Create a PR: \`gh pr create --title "feat: [description]" --body "Implements #${ISSUE_NUM}"\`
+   - Create a PR: \`gh pr create --title "feat: [description]" --body "Implements #${ISSUE_NUM}\n\n-- security/implementer"\`
 
 2. **reviewer** (Opus)
    - Wait for the implementer to create the PR
@@ -171,7 +171,7 @@ Create these teammates:
 9. Once both report:
    - If PR was merged, remove status labels and close the issue:
      \`gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --remove-label "in-progress"\`
-     \`gh issue close ${ISSUE_NUM} --repo OpenRouterTeam/spawn --comment "Implemented and merged. See PR #NUMBER."\`
+     \`gh issue close ${ISSUE_NUM} --repo OpenRouterTeam/spawn --comment "Implemented and merged. See PR #NUMBER.\n\n-- security/team-lead"\`
    - If PR had issues, comment on the issue with findings
 10. Shutdown all teammates via SendMessage (type=shutdown_request)
 10. Clean up worktree and TeamDelete
@@ -416,11 +416,15 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
        \`\`\`
      - Then close the PR with a comment referencing the new issue:
        \`\`\`bash
-       gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Auto-closing: this PR has been stale for >48h with merge conflicts. The change is still valid — filed ISSUE_URL to track re-implementation."
+       gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Auto-closing: this PR has been stale for >48h with merge conflicts. The change is still valid — filed ISSUE_URL to track re-implementation.
+
+-- security/pr-reviewer"
        \`\`\`
      - **If the PR is trivial, outdated, or no longer relevant**, close without filing an issue:
        \`\`\`bash
-       gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Auto-closing: this PR has been stale for >48h with merge conflicts and the changes are no longer relevant. Please reopen or create a fresh PR if still needed."
+       gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Auto-closing: this PR has been stale for >48h with merge conflicts and the changes are no longer relevant. Please reopen or create a fresh PR if still needed.
+
+-- security/pr-reviewer"
        \`\`\`
      - Then delete the branch:
        \`\`\`bash
@@ -455,20 +459,20 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
 
    **If CRITICAL or HIGH issues found** — request changes + label:
    \`\`\`bash
-   gh pr review NUMBER --repo OpenRouterTeam/spawn --request-changes --body "REVIEW_BODY"
+   gh pr review NUMBER --repo OpenRouterTeam/spawn --request-changes --body "REVIEW_BODY\n\n-- security/pr-reviewer"
    gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "security-review-required"
    \`\`\`
 
    **If only MEDIUM/LOW issues** — approve, label, and merge:
    \`\`\`bash
-   gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY"
+   gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY\n\n-- security/pr-reviewer"
    gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "security-approved" --remove-label "security-review-required"
    gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch
    \`\`\`
 
    **If no issues at all** — approve, label, and merge:
    \`\`\`bash
-   gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY"
+   gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "REVIEW_BODY\n\n-- security/pr-reviewer"
    gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "security-approved" --remove-label "security-review-required"
    gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch
    \`\`\`
