@@ -152,6 +152,46 @@ _cherry_wait_for_ip() {
         CHERRY_SERVER_IP "Server" 60
 }
 
+# Build JSON request body for Cherry Servers server creation
+# Usage: _cherry_build_server_body PLAN REGION IMAGE HOSTNAME SSH_KEY_ID
+_cherry_build_server_body() {
+    python3 -c "
+import json, sys
+data = {
+    'plan': sys.argv[1],
+    'region': sys.argv[2],
+    'image': sys.argv[3],
+    'hostname': sys.argv[4],
+    'ssh_keys': [int(sys.argv[5])]
+}
+print(json.dumps(data))
+" "$1" "$2" "$3" "$4" "$5"
+}
+
+# Submit server creation request and extract server ID
+# Prints server ID on success, returns 1 on failure with diagnostics
+_cherry_submit_create() {
+    local project_id="$1" payload="$2"
+
+    local response
+    response=$(cherry_api POST "/projects/${project_id}/servers" "$payload")
+
+    local server_id
+    server_id=$(_extract_json_field "$response" "d.get('id','')")
+
+    if [[ -z "$server_id" ]]; then
+        log_error "Failed to create Cherry Servers server"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance"
+        log_warn "  - Plan unavailable in region (try different CHERRY_DEFAULT_PLAN or CHERRY_DEFAULT_REGION)"
+        log_warn "  - Server limit reached for your account"
+        return 1
+    fi
+
+    printf '%s' "$server_id"
+}
+
 create_server() {
     local hostname="$1"
     local plan="${CHERRY_DEFAULT_PLAN}"
@@ -172,40 +212,13 @@ create_server() {
     log_info "Plan: $plan, Region: $region, Image: $image"
 
     local payload
-    payload=$(python3 -c "
-import json, sys
-data = {
-    'plan': sys.argv[1],
-    'region': sys.argv[2],
-    'image': sys.argv[3],
-    'hostname': sys.argv[4],
-    'ssh_keys': [int(sys.argv[5])]
-}
-print(json.dumps(data))
-" "$plan" "$region" "$image" "$hostname" "${CHERRY_SSH_KEY_ID}")
+    payload=$(_cherry_build_server_body "$plan" "$region" "$image" "$hostname" "${CHERRY_SSH_KEY_ID}")
 
-    local response
-    response=$(cherry_api POST "/projects/${project_id}/servers" "$payload")
-
-    local server_id
-    server_id=$(_extract_json_field "$response" "d.get('id','')")
-
-    if [[ -z "$server_id" ]]; then
-        log_error "Failed to create Cherry Servers server"
-        log_error "API Error: $(extract_api_error_message "$response" "$response")"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Plan unavailable in region (try different CHERRY_DEFAULT_PLAN or CHERRY_DEFAULT_REGION)"
-        log_warn "  - Server limit reached for your account"
-        return 1
-    fi
-
-    log_info "Server created with ID: $server_id"
-    CHERRY_SERVER_ID="$server_id"
+    CHERRY_SERVER_ID=$(_cherry_submit_create "$project_id" "$payload") || return 1
     export CHERRY_SERVER_ID
+    log_info "Server created with ID: $CHERRY_SERVER_ID"
 
-    # Wait for IP assignment
-    _cherry_wait_for_ip "$server_id"
+    _cherry_wait_for_ip "$CHERRY_SERVER_ID"
 }
 
 # ============================================================
