@@ -133,22 +133,22 @@ print(json.dumps(ids))
 _latitude_build_server_body() {
     local hostname="$1" plan="$2" site="$3" os="$4" project_id="$5" ssh_key_ids="$6"
     python3 -c "
-import json
+import json, sys
 body = {
     'data': {
         'type': 'servers',
         'attributes': {
-            'hostname': '$hostname',
-            'plan': '$plan',
-            'site': '$site',
-            'operating_system': '$os',
-            'project': '$project_id',
-            'ssh_keys': $ssh_key_ids
+            'hostname': sys.argv[1],
+            'plan': sys.argv[2],
+            'site': sys.argv[3],
+            'operating_system': sys.argv[4],
+            'project': sys.argv[5],
+            'ssh_keys': json.loads(sys.argv[6])
         }
     }
 }
 print(json.dumps(body))
-"
+" "$hostname" "$plan" "$site" "$os" "$project_id" "$ssh_key_ids"
 }
 
 # Check if SSH key is registered with Latitude.sh
@@ -171,13 +171,13 @@ body = {
     'data': {
         'type': 'ssh_keys',
         'attributes': {
-            'name': '$key_name',
+            'name': sys.argv[1],
             'public_key': pub_key
         }
     }
 }
 print(json.dumps(body))
-")
+" "$key_name")
 
     local response
     response=$(latitude_api POST "/ssh_keys" "$body")

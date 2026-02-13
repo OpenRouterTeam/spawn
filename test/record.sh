@@ -167,16 +167,23 @@ try_load_config() {
     # OVH uses separate config with multiple fields
     if [[ "$cloud" == "ovh" ]]; then
         if [[ -f "$config_file" ]]; then
-            eval "$(python3 -c "
+            local ovh_vals
+            ovh_vals=$(python3 -c "
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
-    for k, e in [('application_key','OVH_APPLICATION_KEY'), ('application_secret','OVH_APPLICATION_SECRET'),
-                 ('consumer_key','OVH_CONSUMER_KEY'), ('project_id','OVH_PROJECT_ID')]:
-        v = d.get(k, '')
-        if v: print(f'export {e}=\"{v}\"')
-except: pass
-" "$config_file" 2>/dev/null)" || true
+    # Output tab-separated values in fixed order
+    print('\t'.join(d.get(k, '') for k in ['application_key', 'application_secret', 'consumer_key', 'project_id']))
+except: print('\t\t\t')
+" "$config_file" 2>/dev/null) || true
+            if [[ -n "${ovh_vals:-}" ]]; then
+                local IFS=$'\t'
+                read -r ak as ck pid <<< "$ovh_vals"
+                [[ -n "${ak:-}" ]] && export OVH_APPLICATION_KEY="$ak"
+                [[ -n "${as:-}" ]] && export OVH_APPLICATION_SECRET="$as"
+                [[ -n "${ck:-}" ]] && export OVH_CONSUMER_KEY="$ck"
+                [[ -n "${pid:-}" ]] && export OVH_PROJECT_ID="$pid"
+            fi
         fi
         return 0
     fi
@@ -226,29 +233,29 @@ save_config() {
     case "$cloud" in
         ovh)
             python3 -c "
-import json
-d = {'application_key': '${OVH_APPLICATION_KEY:-}', 'application_secret': '${OVH_APPLICATION_SECRET:-}',
-     'consumer_key': '${OVH_CONSUMER_KEY:-}', 'project_id': '${OVH_PROJECT_ID:-}'}
+import json, sys
+d = {'application_key': sys.argv[1], 'application_secret': sys.argv[2],
+     'consumer_key': sys.argv[3], 'project_id': sys.argv[4]}
 print(json.dumps(d, indent=2))
-" > "$config_file"
+" "${OVH_APPLICATION_KEY:-}" "${OVH_APPLICATION_SECRET:-}" "${OVH_CONSUMER_KEY:-}" "${OVH_PROJECT_ID:-}" > "$config_file"
             ;;
         upcloud)
             python3 -c "
-import json
-print(json.dumps({'username': '${UPCLOUD_USERNAME:-}', 'password': '${UPCLOUD_PASSWORD:-}'}, indent=2))
-" > "$config_file"
+import json, sys
+print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}, indent=2))
+" "${UPCLOUD_USERNAME:-}" "${UPCLOUD_PASSWORD:-}" > "$config_file"
             ;;
         kamatera)
             python3 -c "
-import json
-print(json.dumps({'client_id': '${KAMATERA_API_CLIENT_ID:-}', 'secret': '${KAMATERA_API_SECRET:-}'}, indent=2))
-" > "$config_file"
+import json, sys
+print(json.dumps({'client_id': sys.argv[1], 'secret': sys.argv[2]}, indent=2))
+" "${KAMATERA_API_CLIENT_ID:-}" "${KAMATERA_API_SECRET:-}" > "$config_file"
             ;;
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
             eval "local val=\"\${${env_var}:-}\""
-            python3 -c "import json; print(json.dumps({'api_key': '${val}'}, indent=2))" > "$config_file"
+            python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"
             ;;
     esac
     printf '%b\n' "  ${GREEN}saved${NC} → ${config_file}"
@@ -328,7 +335,7 @@ has_api_error() {
     echo "$response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
-cloud = '$cloud'
+cloud = sys.argv[1]
 
 if cloud == 'hetzner':
     err = d.get('error')
@@ -353,7 +360,7 @@ elif cloud == 'latitude':
     sys.exit(0 if 'error' in d or ('errors' in d and d['errors']) else 1)
 else:
     sys.exit(1)
-" 2>/dev/null
+" "$cloud" 2>/dev/null
 }
 
 # --- Pretty print JSON ---
@@ -443,17 +450,17 @@ print(json.dumps(ids))
     # Create server (minimal — no cloud-init userdata to speed up)
     local body
     body=$(python3 -c "
-import json
+import json, sys
 body = {
-    'name': '${server_name}',
-    'server_type': '${server_type}',
-    'location': '${location}',
-    'image': '${image}',
-    'ssh_keys': ${ssh_key_ids},
+    'name': sys.argv[1],
+    'server_type': sys.argv[2],
+    'location': sys.argv[3],
+    'image': sys.argv[4],
+    'ssh_keys': json.loads(sys.argv[5]),
     'start_after_create': True
 }
 print(json.dumps(body))
-")
+" "$server_name" "$server_type" "$location" "$image" "$ssh_key_ids")
 
     local create_response
     create_response=$(hetzner_api POST "/servers" "$body")
@@ -510,16 +517,16 @@ print(json.dumps(ids))
 
     local body
     body=$(python3 -c "
-import json
+import json, sys
 body = {
-    'name': '${droplet_name}',
-    'region': '${region}',
-    'size': '${size}',
-    'image': '${image}',
-    'ssh_keys': ${ssh_key_ids}
+    'name': sys.argv[1],
+    'region': sys.argv[2],
+    'size': sys.argv[3],
+    'image': sys.argv[4],
+    'ssh_keys': json.loads(sys.argv[5])
 }
 print(json.dumps(body))
-")
+" "$droplet_name" "$region" "$size" "$image" "$ssh_key_ids")
 
     local create_response
     create_response=$(do_api POST "/droplets" "$body")
@@ -575,17 +582,17 @@ print(keys[0]['id'] if keys else '')
 
     local body
     body=$(python3 -c "
-import json
+import json, sys
 body = {
-    'label': '${label}',
-    'region': '${region}',
-    'plan': '${plan}',
-    'os_id': ${os_id}
+    'label': sys.argv[1],
+    'region': sys.argv[2],
+    'plan': sys.argv[3],
+    'os_id': int(sys.argv[4])
 }
-if '${ssh_key_id}':
-    body['sshkey_id'] = ['${ssh_key_id}']
+if sys.argv[5]:
+    body['sshkey_id'] = [sys.argv[5]]
 print(json.dumps(body))
-")
+" "$label" "$region" "$plan" "$os_id" "$ssh_key_id")
 
     local create_response
     create_response=$(vultr_api POST "/instances" "$body")
@@ -640,17 +647,17 @@ print(json.dumps(keys))
 
     local body
     body=$(python3 -c "
-import json
+import json, sys
 body = {
-    'label': '${label}',
-    'region': '${region}',
-    'type': '${linode_type}',
-    'image': '${image}',
-    'root_pass': '${root_pass}',
-    'authorized_keys': ${ssh_keys_json}
+    'label': sys.argv[1],
+    'region': sys.argv[2],
+    'type': sys.argv[3],
+    'image': sys.argv[4],
+    'root_pass': sys.argv[5],
+    'authorized_keys': json.loads(sys.argv[6])
 }
 print(json.dumps(body))
-")
+" "$label" "$region" "$linode_type" "$image" "$root_pass" "$ssh_keys_json")
 
     local create_response
     create_response=$(linode_api POST "/linode/instances" "$body")
@@ -724,18 +731,18 @@ else:
 
     local body
     body=$(python3 -c "
-import json
+import json, sys
 body = {
-    'hostname': '${hostname}',
-    'size': '${size}',
-    'region': '${region}'
+    'hostname': sys.argv[1],
+    'size': sys.argv[2],
+    'region': sys.argv[3]
 }
-if '${network_id}':
-    body['network_id'] = '${network_id}'
-if '${template_id}':
-    body['template_id'] = '${template_id}'
+if sys.argv[4]:
+    body['network_id'] = sys.argv[4]
+if sys.argv[5]:
+    body['template_id'] = sys.argv[5]
 print(json.dumps(body))
-")
+" "$hostname" "$size" "$region" "$network_id" "$template_id")
 
     local create_response
     create_response=$(civo_api POST "/instances" "$body")

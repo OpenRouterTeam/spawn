@@ -126,15 +126,15 @@ _genesis_build_instance_body() {
 import json, sys
 userdata = sys.stdin.read()
 body = {
-    'name': '$name',
-    'type': '$instance_type',
-    'region': '$region',
-    'image': '$image',
-    'ssh_key_ids': $ssh_key_ids,
+    'name': sys.argv[1],
+    'type': sys.argv[2],
+    'region': sys.argv[3],
+    'image': sys.argv[4],
+    'ssh_key_ids': json.loads(sys.argv[5]),
     'startup_script': userdata
 }
 print(json.dumps(body))
-"
+" "$name" "$instance_type" "$region" "$image" "$ssh_key_ids"
 }
 
 # Poll Genesis Cloud API until instance is active, then extract IP

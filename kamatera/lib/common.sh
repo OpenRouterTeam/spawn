@@ -68,13 +68,15 @@ _kamatera_queue_field() {
     python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
+field = sys.argv[1]
+default = sys.argv[2]
 if isinstance(data, list) and len(data) > 0:
-    print(data[0].get('$field', '$default'))
+    print(data[0].get(field, default))
 elif isinstance(data, dict):
-    print(data.get('$field', '$default'))
+    print(data.get(field, default))
 else:
-    print('$default')
-" <<< "$json_data" 2>/dev/null
+    print(default)
+" "$field" "$default" <<< "$json_data" 2>/dev/null
 }
 
 # Wait for an async Kamatera command to complete
@@ -222,25 +224,25 @@ build_kamatera_server_body() {
 import json, sys
 data = json.loads(sys.stdin.read())
 body = {
-    'name': '$name',
-    'password': '$password',
-    'passwordValidate': '$password',
+    'name': sys.argv[1],
+    'password': sys.argv[2],
+    'passwordValidate': sys.argv[2],
     'ssh-key': data['ssh_key'],
-    'datacenter': '$datacenter',
-    'image': '$image',
-    'cpu': '$cpu',
-    'ram': $ram,
-    'disk': '$disk',
+    'datacenter': sys.argv[3],
+    'image': sys.argv[4],
+    'cpu': sys.argv[5],
+    'ram': int(sys.argv[6]),
+    'disk': sys.argv[7],
     'dailybackup': 'no',
     'managed': 'no',
     'network': 'name=wan,ip=auto',
     'quantity': 1,
-    'billingcycle': '$billing',
+    'billingcycle': sys.argv[8],
     'poweronaftercreate': 'yes',
     'script-file': data['script']
 }
 print(json.dumps(body))
-" <<< "{\"ssh_key\": $json_ssh_key, \"script\": $json_script}"
+" "$name" "$password" "$datacenter" "$image" "$cpu" "$ram" "$disk" "$billing" <<< "{\"ssh_key\": $json_ssh_key, \"script\": $json_script}"
 }
 
 # Read SSH public key if available, prints to stdout
