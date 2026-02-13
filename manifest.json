@@ -1288,7 +1288,7 @@
     "atlanticnet/cline": "missing",
     "atlanticnet/gptme": "missing",
     "atlanticnet/opencode": "implemented",
-    "atlanticnet/plandex": "missing",
+    "atlanticnet/plandex": "implemented",
     "atlanticnet/kilocode": "missing",
     "atlanticnet/continue": "missing",
     "hostkey/claude": "implemented",
