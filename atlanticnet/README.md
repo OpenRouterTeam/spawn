@@ -18,6 +18,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/aider.sh)
 
 #### OpenClaw
 
+#### Gemini
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/gemini.sh)
+```
+
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
 ```
