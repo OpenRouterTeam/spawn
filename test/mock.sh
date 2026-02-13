@@ -741,25 +741,77 @@ printf "Fixtures dir: %s\n" "${FIXTURES_DIR}"
 printf "Clouds:       %s\n" "$CLOUDS"
 printf '\n'
 
+# --- Run clouds in parallel ---
+CLOUD_RESULTS_DIR="${TEST_DIR}/cloud_results"
+mkdir -p "${CLOUD_RESULTS_DIR}"
+
+CLOUD_PIDS=""
 for cloud in $CLOUDS; do
-    printf '%b\n' "${CYAN}━━━ ${cloud} ━━━${NC}"
+    (
+        # Isolated per-cloud state
+        CLOUD_TEST_DIR=$(mktemp -d)
+        MOCK_LOG="${CLOUD_TEST_DIR}/mock_calls.log"
+        CLOUD_PASSED=0
+        CLOUD_FAILED=0
+        CLOUD_SKIPPED=0
 
-    if [[ -n "$FILTER_AGENT" ]]; then
-        AGENTS="$FILTER_AGENT"
-    else
-        AGENTS=$(discover_agents "$cloud")
+        # Re-create mocks in per-cloud temp dir (curl/ssh/agents need own copies)
+        TEST_DIR="${CLOUD_TEST_DIR}"
+        setup_mock_curl
+        setup_mock_ssh
+        setup_mock_agents
+
+        # Override counters used by assertions (they modify PASSED/FAILED/SKIPPED)
+        PASSED=0
+        FAILED=0
+        SKIPPED=0
+
+        printf '%b\n' "${CYAN}━━━ ${cloud} ━━━${NC}"
+
+        if [[ -n "$FILTER_AGENT" ]]; then
+            AGENTS="$FILTER_AGENT"
+        else
+            AGENTS=$(discover_agents "$cloud")
+        fi
+
+        if [[ -z "$AGENTS" ]]; then
+            printf '%b\n' "  ${YELLOW}skip${NC} no agent scripts found in ${cloud}/"
+            SKIPPED=$((SKIPPED + 1))
+        else
+            for agent in $AGENTS; do
+                run_test "$cloud" "$agent"
+            done
+        fi
+        printf '\n'
+
+        # Write counts to results file for aggregation
+        printf '%d %d %d\n' "$PASSED" "$FAILED" "$SKIPPED" > "${CLOUD_RESULTS_DIR}/${cloud}.counts"
+
+        rm -rf "${CLOUD_TEST_DIR}"
+    ) > "${CLOUD_RESULTS_DIR}/${cloud}.log" 2>&1 &
+    CLOUD_PIDS="${CLOUD_PIDS} $!"
+done
+
+# Wait for all clouds to finish
+for pid in $CLOUD_PIDS; do
+    wait "$pid" 2>/dev/null || true
+done
+
+# Print output from each cloud (in discovery order for consistent output)
+for cloud in $CLOUDS; do
+    if [[ -f "${CLOUD_RESULTS_DIR}/${cloud}.log" ]]; then
+        cat "${CLOUD_RESULTS_DIR}/${cloud}.log"
     fi
+done
 
-    if [[ -z "$AGENTS" ]]; then
-        printf '%b\n' "  ${YELLOW}skip${NC} no agent scripts found in ${cloud}/"
-        SKIPPED=$((SKIPPED + 1))
-        continue
+# Aggregate results from all clouds
+for cloud in $CLOUDS; do
+    if [[ -f "${CLOUD_RESULTS_DIR}/${cloud}.counts" ]]; then
+        read -r p f s < "${CLOUD_RESULTS_DIR}/${cloud}.counts"
+        PASSED=$((PASSED + p))
+        FAILED=$((FAILED + f))
+        SKIPPED=$((SKIPPED + s))
     fi
-
-    for agent in $AGENTS; do
-        run_test "$cloud" "$agent"
-    done
-    printf '\n'
 done
 
 # --- Summary ---
