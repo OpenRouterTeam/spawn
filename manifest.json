@@ -872,7 +872,7 @@
     "codesandbox/amazonq": "missing",
     "codesandbox/cline": "missing",
     "codesandbox/gptme": "missing",
-    "codesandbox/opencode": "missing",
+    "codesandbox/opencode": "implemented",
     "codesandbox/plandex": "missing",
     "codesandbox/kilocode": "missing",
     "codesandbox/continue": "missing",

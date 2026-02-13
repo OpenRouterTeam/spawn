@@ -30,6 +30,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/goose.sh)
 ```
 
+#### OpenCode
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/opencode.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
