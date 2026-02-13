@@ -268,33 +268,33 @@ describe("cmdListClear", () => {
     }
   });
 
-  it("should call log.info when no history exists", () => {
-    cmdListClear();
+  it("should call log.info when no history exists", async () => {
+    await cmdListClear();
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     const msg = mockLogInfo.mock.calls[0][0] as string;
     expect(msg).toContain("No spawn history to clear");
   });
 
-  it("should call log.success with count when clearing records", () => {
+  it("should call log.success with count when clearing records", async () => {
     const records: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
       { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    cmdListClear();
+    await cmdListClear();
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
     const msg = mockLogSuccess.mock.calls[0][0] as string;
     expect(msg).toContain("Cleared 2 spawn records from history");
   });
 
-  it("should use singular 'record' for a single entry", () => {
+  it("should use singular 'record' for a single entry", async () => {
     const records: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    cmdListClear();
+    await cmdListClear();
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
     const msg = mockLogSuccess.mock.calls[0][0] as string;
     expect(msg).toContain("Cleared 1 spawn record from history");
@@ -302,37 +302,37 @@ describe("cmdListClear", () => {
     expect(msg).not.toContain("Cleared 1 spawn records");
   });
 
-  it("should actually delete the history file", () => {
+  it("should actually delete the history file", async () => {
     const records: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    cmdListClear();
+    await cmdListClear();
     expect(existsSync(join(testDir, "history.json"))).toBe(false);
   });
 
-  it("should handle empty array history file as no history", () => {
+  it("should handle empty array history file as no history", async () => {
     writeFileSync(join(testDir, "history.json"), "[]");
 
-    cmdListClear();
+    await cmdListClear();
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     expect(mockLogSuccess).not.toHaveBeenCalled();
     const msg = mockLogInfo.mock.calls[0][0] as string;
     expect(msg).toContain("No spawn history to clear");
   });
 
-  it("should handle corrupted history file as no history", () => {
+  it("should handle corrupted history file as no history", async () => {
     writeFileSync(join(testDir, "history.json"), "corrupt{{{");
 
-    cmdListClear();
+    await cmdListClear();
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     expect(mockLogSuccess).not.toHaveBeenCalled();
     const msg = mockLogInfo.mock.calls[0][0] as string;
     expect(msg).toContain("No spawn history to clear");
   });
 
-  it("should display correct count for large history", () => {
+  it("should display correct count for large history", async () => {
     const records: SpawnRecord[] = [];
     for (let i = 0; i < 50; i++) {
       records.push({
@@ -343,19 +343,19 @@ describe("cmdListClear", () => {
     }
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    cmdListClear();
+    await cmdListClear();
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
     const msg = mockLogSuccess.mock.calls[0][0] as string;
     expect(msg).toContain("Cleared 50 spawn records from history");
   });
 
-  it("should allow saving new records after clearing via cmdListClear", () => {
+  it("should allow saving new records after clearing via cmdListClear", async () => {
     const records: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
-    cmdListClear();
+    await cmdListClear();
 
     // Save new record after clearing
     saveSpawnRecord({ agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
@@ -364,9 +364,9 @@ describe("cmdListClear", () => {
     expect(loaded[0].agent).toBe("aider");
   });
 
-  it("should use log.info for zero records and log.success for non-zero", () => {
+  it("should use log.info for zero records and log.success for non-zero", async () => {
     // Test with zero
-    cmdListClear();
+    await cmdListClear();
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     expect(mockLogSuccess).not.toHaveBeenCalled();
 
@@ -379,7 +379,7 @@ describe("cmdListClear", () => {
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
-    cmdListClear();
+    await cmdListClear();
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
     expect(mockLogInfo).not.toHaveBeenCalled();
   });

@@ -259,6 +259,7 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
     console.error(pc.yellow("No interactive terminal detected."));
     console.error();
     console.error(`  Launch directly:  ${pc.cyan("spawn <agent> <cloud>")}`);
+    console.error(`  Rerun previous:   ${pc.cyan("spawn list")}`);
     console.error(`  Browse agents:    ${pc.cyan("spawn agents")}`);
     console.error(`  Browse clouds:    ${pc.cyan("spawn clouds")}`);
     console.error(`  Full help:        ${pc.cyan("spawn help")}`);
@@ -284,6 +285,7 @@ function showVersion(): void {
   console.log(pc.dim(`  ${process.versions.bun ? "bun" : "node"} ${process.versions.bun ?? process.versions.node}  ${process.platform} ${process.arch}`));
   const age = getCacheAge();
   console.log(pc.dim(`  manifest cache: ${formatCacheAge(age)}`));
+  console.log(pc.dim(`  https://github.com/OpenRouterTeam/spawn`));
   console.log(pc.dim(`  Run ${pc.cyan("spawn update")} to check for updates.`));
 }
 
@@ -364,7 +366,7 @@ function hasTrailingHelpFlag(args: string[]): boolean {
 async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
   if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
   if (filteredArgs.slice(1).includes("--clear")) {
-    cmdListClear();
+    await cmdListClear();
     return;
   }
   const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
