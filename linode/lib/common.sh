@@ -33,6 +33,16 @@ linode_api() {
     generic_cloud_api "$LINODE_API_BASE" "$LINODE_API_TOKEN" "$method" "$endpoint" "$body"
 }
 
+# Extract error message from Linode API response (errors: [{reason: ...}])
+# Joins all error reasons with '; ' or returns fallback
+_linode_extract_error() {
+    local response="$1"
+    local fallback="${2:-Unknown error}"
+    _extract_json_field "$response" \
+        "'; '.join(e.get('reason','Unknown') for e in d.get('errors',[])) or '$fallback'" \
+        "$fallback"
+}
+
 test_linode_token() {
     local response
     response=$(linode_api GET "/profile")
@@ -40,9 +50,7 @@ test_linode_token() {
         log_info "API token validated"
         return 0
     else
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print(errs[0].get('reason','No details') if errs else 'Unable to parse')" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(_linode_extract_error "$response" "Unable to parse error")"
         log_error "How to fix:"
         log_warn "  1. Verify token at: https://cloud.linode.com/profile/tokens"
         log_warn "  2. Ensure the token has read/write permissions"
@@ -81,10 +89,7 @@ linode_register_ssh_key() {
     if echo "$register_response" | grep -q '"id"'; then
         return 0
     else
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; errs=json.loads(sys.stdin.read()).get('errors',[]); print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')" 2>/dev/null || echo "$register_response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(_linode_extract_error "$register_response" "$register_response")"
 
         log_warn "Common causes:"
         log_warn "  - SSH key already registered"
@@ -155,6 +160,19 @@ _linode_wait_for_active() {
         LINODE_SERVER_IP "Linode" 60
 }
 
+# Log error details when Linode instance creation fails
+_linode_handle_create_error() {
+    local response="$1"
+    log_error "Failed to create Linode instance"
+    log_error "API Error: $(_linode_extract_error "$response" "$response")"
+    log_warn "Common issues:"
+    log_warn "  - Insufficient account balance"
+    log_warn "  - Type/region unavailable (try different LINODE_TYPE or LINODE_REGION)"
+    log_warn "  - Instance limit reached"
+    log_warn "  - Invalid cloud-init metadata"
+    log_warn "Check your dashboard: https://cloud.linode.com/"
+}
+
 create_server() {
     local name="$1"
     local type="${LINODE_TYPE:-g6-standard-1}"
@@ -177,27 +195,11 @@ create_server() {
     response=$(linode_api POST "/linode/instances" "$body")
 
     if echo "$response" | grep -q '"id"' && ! echo "$response" | grep -q '"errors"'; then
-        LINODE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+        LINODE_SERVER_ID=$(_extract_json_field "$response" "d['id']")
         export LINODE_SERVER_ID
         log_info "Linode created: ID=$LINODE_SERVER_ID"
     else
-        log_error "Failed to create Linode instance"
-
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "
-import json,sys
-d = json.loads(sys.stdin.read())
-errs = d.get('errors', [])
-print('; '.join(e.get('reason','Unknown') for e in errs) if errs else 'Unknown error')
-" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
-
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Type/region unavailable (try different LINODE_TYPE or LINODE_REGION)"
-        log_warn "  - Instance limit reached"
-        log_warn "  - Invalid cloud-init metadata"
-        log_warn "Check your dashboard: https://cloud.linode.com/"
+        _linode_handle_create_error "$response"
         return 1
     fi
 
