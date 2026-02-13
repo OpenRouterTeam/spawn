@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
@@ -135,6 +135,12 @@ get_endpoints() {
                 "services:/v1/services" \
                 "ssh_keys:/ssh_keys"
             ;;
+        cloudsigma)
+            printf '%s\n' \
+                "balance:/balance/" \
+                "keypairs:/keypairs/" \
+                "servers:/servers/"
+            ;;
     esac
 }
 
@@ -158,6 +164,7 @@ get_auth_env_var() {
         hyperstack)    printf "HYPERSTACK_API_KEY" ;;
         atlanticnet)   printf "ATLANTICNET_API_KEY" ;;
         hostkey)       printf "HOSTKEY_API_KEY" ;;
+        cloudsigma)    printf "CLOUDSIGMA_EMAIL" ;;
     esac
 }
 
@@ -221,6 +228,27 @@ except: print('\t\t')
         return 0
     fi
 
+    # CloudSigma uses email + password for HTTP Basic Auth
+    if [[ "$cloud" == "cloudsigma" ]]; then
+        if [[ -f "$config_file" ]]; then
+            local cloudsigma_vals
+            cloudsigma_vals=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print('\t'.join(d.get(k, '') for k in ['email', 'password']))
+except: print('\t\t')
+" "$config_file" 2>/dev/null) || true
+            if [[ -n "${cloudsigma_vals:-}" ]]; then
+                local IFS=$'\t'
+                read -r email password <<< "$cloudsigma_vals"
+                [[ -n "${email:-}" ]] && export CLOUDSIGMA_EMAIL="$email"
+                [[ -n "${password:-}" ]] && export CLOUDSIGMA_PASSWORD="$password"
+            fi
+        fi
+        return 0
+    fi
+
     # Standard single-token config
     if [[ -f "$config_file" ]]; then
         local token
@@ -250,6 +278,9 @@ has_credentials() {
             ;;
         atlanticnet)
             [[ -n "${ATLANTICNET_API_KEY:-}" ]] && [[ -n "${ATLANTICNET_API_PRIVATE_KEY:-}" ]]
+            ;;
+        cloudsigma)
+            [[ -n "${CLOUDSIGMA_EMAIL:-}" ]] && [[ -n "${CLOUDSIGMA_PASSWORD:-}" ]]
             ;;
         *)
             local env_var
@@ -367,6 +398,7 @@ call_api() {
         hyperstack)    hyperstack_api GET "$endpoint" ;;
         atlanticnet)   atlanticnet_api "$endpoint" ;;
         hostkey)       hostkey_api "$endpoint" ;;
+        cloudsigma)    cloudsigma_api GET "$endpoint" ;;
     esac
 }
 
@@ -409,6 +441,9 @@ elif cloud == 'atlanticnet':
     sys.exit(0 if 'error' in d and d['error'] else 1)
 elif cloud == 'hostkey':
     sys.exit(0 if 'error' in d and d['error'] else 1)
+elif cloud == 'cloudsigma':
+    # CloudSigma returns error objects with 'error_message', 'error_type', etc
+    sys.exit(0 if 'error_message' in d or 'error_type' in d else 1)
 else:
     sys.exit(1)
 " "$cloud" 2>/dev/null
@@ -778,6 +813,12 @@ _live_hostkey() {
     local fixture_dir="$1"
     # HOSTKEY live testing not implemented yet - requires instance creation via eq/order_instance
     # Skipping live fixtures for now
+    return 0
+}
+
+_live_cloudsigma() {
+    local fixture_dir="$1"
+    printf '%b\n' "  ${YELLOW}skip${NC} CloudSigma live test (requires drive cloning, complex multi-step process)" >&2
     return 0
 }
 
