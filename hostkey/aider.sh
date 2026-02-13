@@ -1,0 +1,77 @@
+#!/bin/bash
+set -eo pipefail
+
+# Source common functions - try local file first, fall back to remote
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+# shellcheck source=hostkey/lib/common.sh
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
+else
+    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hostkey/lib/common.sh)"
+fi
+
+log_info "Aider on HOSTKEY"
+echo ""
+
+# 1. Resolve HOSTKEY API token
+ensure_hostkey_token
+
+# 2. Generate + register SSH key
+ensure_ssh_key
+
+# 3. Get server name and create server
+SERVER_NAME=$(get_server_name)
+create_server "${SERVER_NAME}"
+
+# 4. Wait for SSH and cloud-init
+verify_server_connectivity "${HOSTKEY_INSTANCE_IP}"
+wait_for_cloud_init "${HOSTKEY_INSTANCE_IP}" 60
+
+# 5. Install Aider
+log_step "Installing Aider..."
+run_server "${HOSTKEY_INSTANCE_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
+
+# Verify installation succeeded
+if ! run_server "${HOSTKEY_INSTANCE_IP}" "command -v aider &> /dev/null && aider --version &> /dev/null"; then
+    log_install_failed "Aider" "pip install aider-chat" "${HOSTKEY_INSTANCE_IP}"
+    exit 1
+fi
+log_info "Aider installation verified successfully"
+
+# 6. Get OpenRouter API key via OAuth
+echo ""
+if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+    log_info "Using OpenRouter API key from environment"
+else
+    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
+fi
+
+# Get model preference
+MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
+
+log_step "Setting up environment variables..."
+inject_env_vars_ssh "${HOSTKEY_INSTANCE_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+
+echo ""
+log_info "HOSTKEY server setup completed successfully!"
+log_info "Server: ${SERVER_NAME} (ID: ${HOSTKEY_INSTANCE_ID}, IP: ${HOSTKEY_INSTANCE_IP})"
+echo ""
+
+# Check if running in non-interactive mode
+if [[ -n "${SPAWN_PROMPT:-}" ]]; then
+    # Non-interactive mode: execute prompt and exit
+    log_step "Executing Aider with prompt..."
+
+    # Escape prompt for safe shell execution
+    escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
+
+    # Execute without interactive session, using -m (message) for non-interactive execution
+    run_server "${HOSTKEY_INSTANCE_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID} -m ${escaped_prompt}"
+else
+    # Interactive mode: start Aider normally
+    log_step "Starting Aider..."
+    sleep 1
+    clear
+    interactive_session "${HOSTKEY_INSTANCE_IP}" "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"
+fi
