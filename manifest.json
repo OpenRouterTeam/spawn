@@ -1235,15 +1235,15 @@
     "ramnode/nanoclaw": "implemented",
     "ramnode/aider": "implemented",
     "ramnode/goose": "implemented",
-    "ramnode/codex": "missing",
+    "ramnode/codex": "implemented",
     "ramnode/interpreter": "implemented",
-    "ramnode/gemini": "missing",
-    "ramnode/amazonq": "missing",
+    "ramnode/gemini": "implemented",
+    "ramnode/amazonq": "implemented",
     "ramnode/cline": "implemented",
     "ramnode/gptme": "implemented",
     "ramnode/opencode": "implemented",
-    "ramnode/plandex": "missing",
-    "ramnode/kilocode": "missing",
+    "ramnode/plandex": "implemented",
+    "ramnode/kilocode": "implemented",
     "ramnode/continue": "implemented"
   }
 }
