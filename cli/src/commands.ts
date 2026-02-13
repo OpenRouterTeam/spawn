@@ -337,7 +337,7 @@ export async function cmdInteractive(): Promise<void> {
   const cloudName = manifest.clouds[cloudChoice].name;
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
-  p.outro("Handing off to spawn script...");
+  p.outro("Starting provisioning...");
 
   await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice));
 }
@@ -394,11 +394,14 @@ function buildAgentLines(agentInfo: { name: string; description: string; install
   return lines;
 }
 
-function buildCloudLines(cloudInfo: { name: string; description: string; defaults?: Record<string, string> }): string[] {
+function buildCloudLines(cloudInfo: { name: string; description: string; auth?: string; defaults?: Record<string, string> }): string[] {
   const lines = [
     `  Name:        ${cloudInfo.name}`,
     `  Description: ${cloudInfo.description}`,
   ];
+  if (cloudInfo.auth) {
+    lines.push(`  Auth:        ${cloudInfo.auth}`);
+  }
   if (cloudInfo.defaults) {
     lines.push(`  Defaults:`);
     for (const [k, v] of Object.entries(cloudInfo.defaults)) {
@@ -424,11 +427,28 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
     printDryRunSection("Environment variables", envLines);
   }
 
+  // Show credential readiness so users know what they need before running
+  const authVars = parseAuthEnvVars(manifest.clouds[cloud].auth);
+  if (authVars.length > 0) {
+    const credLines = authVars.map((v) => {
+      const isSet = !!process.env[v];
+      const status = isSet ? pc.green("set") : pc.red("not set");
+      return `  ${v}: ${status}`;
+    });
+    const orKeySet = !!process.env.OPENROUTER_API_KEY;
+    credLines.push(`  OPENROUTER_API_KEY: ${orKeySet ? pc.green("set") : pc.red("not set")}`);
+    printDryRunSection("Credentials", credLines);
+  }
+
   if (prompt) {
     printDryRunSection("Prompt", [`  ${prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt}`]);
   }
 
   p.log.success("Dry run complete -- no resources were provisioned");
+  const runCmd = prompt
+    ? buildRetryCommand(agent, cloud, prompt)
+    : `spawn ${agent} ${cloud}`;
+  p.log.info(`Run for real: ${pc.cyan(runCmd)}`);
 }
 
 /** Validate inputs for injection attacks (SECURITY) and check they're non-empty */
@@ -699,7 +719,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
       // Only retry for potentially transient failures
       if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
         const delay = RETRY_DELAYS[attempt - 1];
-        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+        p.log.warn(`SSH connection failed. Server may still be booting. Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
         await new Promise(r => setTimeout(r, delay * 1000));
         continue;
       }

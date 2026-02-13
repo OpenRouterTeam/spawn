@@ -62,12 +62,16 @@ function buildAgentLines(agentInfo: {
 function buildCloudLines(cloudInfo: {
   name: string;
   description: string;
+  auth?: string;
   defaults?: Record<string, string>;
 }): string[] {
   const lines = [
     `  Name:        ${cloudInfo.name}`,
     `  Description: ${cloudInfo.description}`,
   ];
+  if (cloudInfo.auth) {
+    lines.push(`  Auth:        ${cloudInfo.auth}`);
+  }
   if (cloudInfo.defaults) {
     lines.push(`  Defaults:`);
     for (const [k, v] of Object.entries(cloudInfo.defaults)) {
@@ -322,6 +326,17 @@ describe("buildCloudLines", () => {
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain("Sprite");
     expect(lines[1]).toContain("Lightweight VMs");
+  });
+
+  it("includes auth when present", () => {
+    const lines = buildCloudLines({
+      name: "Hetzner Cloud",
+      description: "European cloud provider",
+      auth: "HCLOUD_TOKEN",
+    });
+    expect(lines).toHaveLength(3);
+    expect(lines[2]).toContain("Auth:");
+    expect(lines[2]).toContain("HCLOUD_TOKEN");
   });
 
   it("includes defaults when present", () => {
