@@ -23,35 +23,20 @@ fi
 readonly HOSTKEY_API_BASE="https://invapi.hostkey.com"
 
 # Centralized curl wrapper for HOSTKEY API
+# Delegates to generic_cloud_api for retry logic and error handling
+# Usage: hostkey_api METHOD ENDPOINT [BODY]
 hostkey_api() {
-    local endpoint="$1"
-    local body="${2:-}"
+    local method="$1"
+    local endpoint="$2"
+    local body="${3:-}"
 
-    if [[ -z "${HOSTKEY_API_KEY:-}" ]]; then
-        log_error "HOSTKEY_API_KEY is not set"
-        return 1
-    fi
-
-    local response
-    if [[ -n "$body" ]]; then
-        response=$(curl -s "${HOSTKEY_API_BASE}${endpoint}" \
-            -H "Authorization: Bearer ${HOSTKEY_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$body")
-    else
-        response=$(curl -s "${HOSTKEY_API_BASE}${endpoint}" \
-            -H "Authorization: Bearer ${HOSTKEY_API_KEY}")
-    fi
-
-    printf '%s' "$response"
+    generic_cloud_api "$HOSTKEY_API_BASE" "$HOSTKEY_API_KEY" "$method" "$endpoint" "$body"
 }
 
 # Test HOSTKEY API key validity
 test_hostkey_token() {
     local response
-    # Try to get server list as a simple auth test
-    response=$(curl -s "${HOSTKEY_API_BASE}/v1/services" \
-        -H "Authorization: Bearer ${HOSTKEY_API_KEY:-}" 2>&1)
+    response=$(hostkey_api GET "/v1/services" 2>&1) || true
 
     if echo "$response" | grep -qi "unauthorized\|invalid\|error"; then
         log_error "API Error: Invalid or expired HOSTKEY API key"
@@ -80,7 +65,7 @@ ensure_hostkey_token() {
 hostkey_check_ssh_key() {
     local fingerprint="$1"
     local response
-    response=$(hostkey_api "/ssh_keys")
+    response=$(hostkey_api GET "/ssh_keys")
 
     if echo "$response" | grep -q "$fingerprint"; then
         return 0
@@ -99,7 +84,7 @@ hostkey_register_ssh_key() {
 
     local register_body="{\"name\":\"$key_name\",\"public_key\":$json_pub_key}"
     local register_response
-    register_response=$(hostkey_api "/ssh_keys" "$register_body")
+    register_response=$(hostkey_api POST "/ssh_keys" "$register_body")
 
     if echo "$register_response" | grep -qi "error"; then
         log_error "API Error: $(echo "$register_response" | grep -o '"message":"[^"]*"' || echo "$register_response")"
@@ -227,7 +212,7 @@ create_server() {
         '{name: $name, location: $location, preset: $preset, os: "ubuntu-24.04"}')
 
     local response
-    response=$(hostkey_api "/eq/order_instance" "$order_body")
+    response=$(hostkey_api POST "/eq/order_instance" "$order_body")
 
     if echo "$response" | grep -qi "error"; then
         log_error "Failed to create HOSTKEY instance"
@@ -268,7 +253,7 @@ destroy_server() {
 
     log_step "Destroying instance $instance_id..."
     local response
-    response=$(hostkey_api "/eq/terminate" "{\"id\":\"$instance_id\"}")
+    response=$(hostkey_api POST "/eq/terminate" "{\"id\":\"$instance_id\"}")
 
     if echo "$response" | grep -qi "error"; then
         log_error "Failed to destroy instance: $response"
@@ -281,7 +266,7 @@ destroy_server() {
 # List all HOSTKEY instances
 list_servers() {
     local response
-    response=$(hostkey_api "/v1/services")
+    response=$(hostkey_api GET "/v1/services")
 
     local count
     count=$(printf '%s' "$response" | jq 'length' 2>/dev/null || echo "0")

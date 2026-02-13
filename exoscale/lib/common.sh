@@ -165,38 +165,25 @@ get_server_name() {
     get_validated_server_name "EXOSCALE_SERVER_NAME" "Enter server name: "
 }
 
+# Thin wrapper around exo CLI that matches the generic_wait_for_instance API
+# signature (func METHOD ENDPOINT) so the shared polling loop can be reused.
+# The endpoint is the instance ID.
+_exoscale_instance_api() {
+    local _method="$1"  # unused; exo CLI doesn't distinguish methods
+    local instance_id="$2"
+    exo compute instance show "$instance_id" -O json 2>/dev/null || echo '{}'
+}
+
 # Wait for Exoscale instance to become running and get its IP
 # Sets: EXOSCALE_SERVER_IP
 # Usage: _wait_for_exoscale_instance INSTANCE_ID [MAX_ATTEMPTS]
 _wait_for_exoscale_instance() {
     local instance_id="$1"
-    local max_attempts=${2:-60}
-    local attempt=1
-
-    log_step "Waiting for instance to become running..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_json
-        status_json=$(exo compute instance show "$instance_id" -O json 2>/dev/null || echo '{}')
-
-        local status
-        status=$(echo "$status_json" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('state','unknown'))" 2>/dev/null || echo "unknown")
-
-        if [[ "$status" == "running" ]]; then
-            EXOSCALE_SERVER_IP=$(echo "$status_json" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('public-ip',''))" 2>/dev/null)
-            export EXOSCALE_SERVER_IP
-            if [[ -n "$EXOSCALE_SERVER_IP" ]]; then
-                log_info "Instance running: IP=$EXOSCALE_SERVER_IP"
-                return 0
-            fi
-        fi
-
-        log_step "Instance status: $status ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become running in time"
-    return 1
+    local max_attempts="${2:-60}"
+    generic_wait_for_instance _exoscale_instance_api "$instance_id" \
+        "running" "d.get('state','unknown')" \
+        "d.get('public-ip','')" \
+        EXOSCALE_SERVER_IP "Instance" "$max_attempts"
 }
 
 # Write cloud-init userdata to a temporary file for exo CLI
