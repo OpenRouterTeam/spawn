@@ -28,8 +28,11 @@ readonly CLOUDSIGMA_REGION_DEFAULT="zrh"
 readonly CLOUDSIGMA_API_VERSION="2.0"
 
 # Get API base URL for the selected region
+# SECURITY: validate_region_name prevents SSRF — a crafted region like "evil.com/foo#"
+# would redirect API calls (including Basic Auth credentials) to an attacker's server.
 get_cloudsigma_api_base() {
     local region="${CLOUDSIGMA_REGION:-$CLOUDSIGMA_REGION_DEFAULT}"
+    validate_region_name "$region" || { log_error "Invalid CLOUDSIGMA_REGION: '${region}'"; return 1; }
     echo "https://${region}.cloudsigma.com/api/${CLOUDSIGMA_API_VERSION}"
 }
 
@@ -314,9 +317,7 @@ create_server() {
     local mem_gb="${CLOUDSIGMA_MEMORY_GB:-2}"
     local mem_bytes=$((mem_gb * 1024 * 1024 * 1024))
 
-    # Validate region before using it in API URLs
-    local region="${CLOUDSIGMA_REGION:-$CLOUDSIGMA_REGION_DEFAULT}"
-    validate_region_name "$region" || { log_error "Invalid CLOUDSIGMA_REGION"; return 1; }
+    # Note: region is validated in get_cloudsigma_api_base() on every API call
 
     log_step "Creating CloudSigma server '$name'..."
     log_step "  CPU: ${cpu_mhz} MHz, Memory: ${mem_gb}GB"
