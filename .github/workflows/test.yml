@@ -17,6 +17,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run mock tests
+        env:
+          NO_COLOR: 1
         run: |
           bash test/mock.sh 2>&1 | tee /tmp/mock-output.log
       - name: Post summary
