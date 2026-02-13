@@ -58,10 +58,18 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/gemini.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/amazonq.sh)
+```
+
 #### Cline
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/cline.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/interpreter.sh)
 ```
 
 ## Non-Interactive Mode
