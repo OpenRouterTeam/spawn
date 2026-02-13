@@ -379,6 +379,11 @@ create_server() {
     image_id=$(_ionos_find_ubuntu_image)
     if [[ -z "$image_id" ]]; then
         log_error "Could not find Ubuntu 24.04 image"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  - The image may not be available in your datacenter region"
+        log_error "  - Try a different IONOS_LOCATION (e.g., us/las, de/fra, de/txl)"
+        log_error "  - Check available images at: https://dcd.ionos.com/"
         return 1
     fi
     log_info "Using image ID: $image_id"

@@ -89,7 +89,12 @@ _northflank_wait_for_service() {
         attempt=$((attempt + 1))
     done
 
-    log_error "Service did not start in time"
+    log_error "Service did not start after ${max_attempts} attempts"
+    log_error ""
+    log_error "The service may still be starting. You can:"
+    log_error "  1. Check service status: northflank get service --name ${name} --project ${project_name}"
+    log_error "  2. View logs in the dashboard: https://app.northflank.com/"
+    log_error "  3. Re-run the command to try again"
     return 1
 }
 
@@ -121,7 +126,17 @@ create_server() {
         --replicas 1 2>&1)
 
     if [[ $? -ne 0 ]]; then
-        log_error "Failed to create service: ${service_output}"
+        log_error "Failed to create Northflank service"
+        if [[ -n "${service_output}" ]]; then
+            log_error "Error: ${service_output}"
+        fi
+        log_error ""
+        log_error "Common issues:"
+        log_error "  - Free tier limit reached (max 2 services)"
+        log_error "  - Project does not exist or token lacks permissions"
+        log_error "  - Image '${image}' not found or inaccessible"
+        log_error ""
+        log_error "Check your dashboard: https://app.northflank.com/"
         return 1
     fi
 

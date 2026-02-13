@@ -86,7 +86,7 @@ ramnode_compute_api() {
     local url="${RAMNODE_COMPUTE_API}${endpoint}"
 
     if [[ -z "${RAMNODE_AUTH_TOKEN:-}" ]]; then
-        log_error "RAMNODE_AUTH_TOKEN not set"
+        log_error "RAMNODE_AUTH_TOKEN not set. Authenticate first with ramnode_authenticate."
         return 1
     fi
 
@@ -326,6 +326,11 @@ create_server() {
     image_id=$(_list_images)
     if [[ -z "$image_id" ]]; then
         log_error "Could not find Ubuntu 24.04 image"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  - The image may not be available in your region"
+        log_error "  - Check available images at: https://manage.ramnode.com/"
+        log_error "  - Contact RamNode support if the issue persists"
         return 1
     fi
 

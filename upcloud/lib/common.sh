@@ -92,6 +92,11 @@ else:
 
     if [[ -z "${template_uuid}" ]]; then
         log_error "Could not find Ubuntu template"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  - Ubuntu templates may not be available in zone ${UPCLOUD_ZONE:-de-fra1}"
+        log_error "  - Try a different UPCLOUD_ZONE (e.g., de-fra1, us-chi1, fi-hel1)"
+        log_error "  - Check available templates at: https://hub.upcloud.com/"
         return 1
     fi
 

@@ -132,6 +132,7 @@ get_ubuntu_image_id() {
     done
 
     log_error "Could not find Ubuntu image for zone ${SCALEWAY_ZONE}"
+    log_error "Try a different SCALEWAY_ZONE (e.g., fr-par-1, nl-ams-1, pl-waw-1)"
     return 1
 }
 

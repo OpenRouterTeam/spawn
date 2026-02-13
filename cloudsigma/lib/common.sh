@@ -190,6 +190,11 @@ create_cloudsigma_drive() {
     ubuntu_image_uuid=$(_find_ubuntu_image_uuid)
     if [[ -z "$ubuntu_image_uuid" ]]; then
         log_error "Could not find Ubuntu 24.04 image in CloudSigma library"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  - The image may not be available in region ${CLOUDSIGMA_REGION:-zrh}"
+        log_error "  - Try a different CLOUDSIGMA_REGION (e.g., zrh, sjc, wdc)"
+        log_error "  - Check available images at: https://cloudsigma.com/"
         return 1
     fi
 
@@ -198,6 +203,12 @@ create_cloudsigma_drive() {
 
     if [[ -z "$CLOUDSIGMA_DRIVE_UUID" ]]; then
         log_error "Failed to clone drive"
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - Insufficient account balance or storage quota"
+        log_error "  - The source image is temporarily unavailable"
+        log_error "  - Try a different CLOUDSIGMA_REGION"
+        log_error "Check your account: https://zrh.cloudsigma.com/ui/"
         return 1
     fi
 

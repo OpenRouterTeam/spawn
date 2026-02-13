@@ -218,6 +218,7 @@ _ovh_resolve_resources() {
     image_id=$(_ovh_find_image_id "${region}")
     if [[ -z "${image_id}" ]]; then
         log_error "Failed to find Ubuntu 24.04 image in region ${region}"
+        log_error "Try a different OVH_REGION (e.g., GRA11, SBG5, BHS5, WAW1)"
         return 1
     fi
     log_info "Found image: ${image_id}"
@@ -226,6 +227,7 @@ _ovh_resolve_resources() {
     flavor_id=$(_ovh_find_flavor_id "${region}" "${flavor_name}")
     if [[ -z "${flavor_id}" ]]; then
         log_error "Failed to find flavor '${flavor_name}' in region ${region}"
+        log_error "Try a different OVH_FLAVOR (e.g., d2-2, d2-4, s1-2) or OVH_REGION"
         return 1
     fi
     log_info "Found flavor: ${flavor_id}"
