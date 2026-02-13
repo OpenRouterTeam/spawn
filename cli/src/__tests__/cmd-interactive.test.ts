@@ -33,6 +33,7 @@ const mockLogWarn = mock(() => {});
 const mockIntro = mock(() => {});
 const mockOutro = mock(() => {});
 const mockCancel = mock(() => {});
+const mockConfirm = mock(async () => true);
 const mockSpinnerStart = mock(() => {});
 const mockSpinnerStop = mock(() => {});
 const mockSpinnerMessage = mock(() => {});
@@ -52,6 +53,7 @@ mock.module("@clack/prompts", () => ({
   intro: mockIntro,
   outro: mockOutro,
   cancel: mockCancel,
+  confirm: mockConfirm,
   select: mock(async () => {
     const value = selectReturnValues[selectCallIndex] ?? "claude";
     selectCallIndex++;
@@ -77,6 +79,7 @@ describe("cmdInteractive", () => {
     mockIntro.mockClear();
     mockOutro.mockClear();
     mockCancel.mockClear();
+    mockConfirm.mockClear();
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
     mockSpinnerMessage.mockClear();
@@ -444,6 +447,133 @@ describe("cmdInteractive", () => {
 
       await expect(cmdInteractive()).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  // ── Preflight credential check ──────────────────────────────────────────
+
+  describe("preflight credential check", () => {
+    it("should warn about missing credentials before launching", async () => {
+      // Use a manifest with a real-looking auth var that won't be set
+      const credManifest = {
+        ...mockManifest,
+        clouds: {
+          ...mockManifest.clouds,
+          sprite: {
+            ...mockManifest.clouds.sprite,
+            auth: "SPRITE_API_KEY",
+          },
+        },
+      };
+
+      selectReturnValues = ["claude", "sprite"];
+      delete process.env.SPRITE_API_KEY;
+
+      global.fetch = mock(async (url: string) => {
+        if (typeof url === "string" && url.includes("manifest.json")) {
+          return {
+            ok: true,
+            json: async () => credManifest,
+            text: async () => JSON.stringify(credManifest),
+          };
+        }
+        return {
+          ok: true,
+          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
+        };
+      }) as any;
+      await loadManifest(true);
+
+      await cmdInteractive();
+
+      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      expect(warnCalls.some((msg: string) => msg.includes("SPRITE_API_KEY"))).toBe(true);
+    });
+
+    it("should not warn when all credentials are set", async () => {
+      // Use a manifest with auth var that IS set
+      const credManifest = {
+        ...mockManifest,
+        clouds: {
+          ...mockManifest.clouds,
+          sprite: {
+            ...mockManifest.clouds.sprite,
+            auth: "SPRITE_API_KEY",
+          },
+        },
+      };
+
+      selectReturnValues = ["claude", "sprite"];
+      const savedKey = process.env.SPRITE_API_KEY;
+      const savedOR = process.env.OPENROUTER_API_KEY;
+      process.env.SPRITE_API_KEY = "test-sprite-key";
+      process.env.OPENROUTER_API_KEY = "sk-or-test";
+
+      global.fetch = mock(async (url: string) => {
+        if (typeof url === "string" && url.includes("manifest.json")) {
+          return {
+            ok: true,
+            json: async () => credManifest,
+            text: async () => JSON.stringify(credManifest),
+          };
+        }
+        return {
+          ok: true,
+          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
+        };
+      }) as any;
+      await loadManifest(true);
+
+      await cmdInteractive();
+
+      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      const credWarn = warnCalls.find((msg: string) => msg.includes("Missing credentials"));
+      expect(credWarn).toBeUndefined();
+
+      // Restore env
+      if (savedKey === undefined) delete process.env.SPRITE_API_KEY;
+      else process.env.SPRITE_API_KEY = savedKey;
+      if (savedOR === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = savedOR;
+    });
+
+    it("should still launch script after credential warning", async () => {
+      const credManifest = {
+        ...mockManifest,
+        clouds: {
+          ...mockManifest.clouds,
+          sprite: {
+            ...mockManifest.clouds.sprite,
+            auth: "SPRITE_API_KEY",
+          },
+        },
+      };
+
+      selectReturnValues = ["claude", "sprite"];
+      delete process.env.SPRITE_API_KEY;
+
+      let fetchedUrls: string[] = [];
+      global.fetch = mock(async (url: string) => {
+        if (typeof url === "string") fetchedUrls.push(url);
+        if (typeof url === "string" && url.includes("manifest.json")) {
+          return {
+            ok: true,
+            json: async () => credManifest,
+            text: async () => JSON.stringify(credManifest),
+          };
+        }
+        return {
+          ok: true,
+          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
+        };
+      }) as any;
+      await loadManifest(true);
+
+      await cmdInteractive();
+
+      // Script should still be downloaded despite credential warning
+      const scriptUrls = fetchedUrls.filter(u => u.includes(".sh"));
+      expect(scriptUrls.length).toBeGreaterThanOrEqual(1);
     });
   });
 });
