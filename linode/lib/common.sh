@@ -71,9 +71,10 @@ linode_register_ssh_key() {
     local pub_path="$2"
     local pub_key
     pub_key=$(cat "$pub_path")
-    local json_pub_key
+    local json_pub_key json_name
     json_pub_key=$(json_escape "$pub_key")
-    local register_body="{\"label\":\"$key_name\",\"ssh_key\":$json_pub_key}"
+    json_name=$(json_escape "$key_name")
+    local register_body="{\"label\":$json_name,\"ssh_key\":$json_pub_key}"
     local register_response
     register_response=$(linode_api POST "/profile/sshkeys" "$register_body")
 
