@@ -602,8 +602,9 @@ describe("cmdClouds output", () => {
       await cmdClouds();
 
       const output = captureOutput(consoleMocks.log);
-      expect(output).toContain("auth: SPRITE_TOKEN");
-      expect(output).toContain("auth: HCLOUD_TOKEN");
+      expect(output).toContain("needs");
+      expect(output).toContain("SPRITE_TOKEN");
+      expect(output).toContain("HCLOUD_TOKEN");
     });
 
     it("should display footer with usage hints", async () => {

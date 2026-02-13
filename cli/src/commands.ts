@@ -1086,7 +1086,7 @@ function showListFooter(records: SpawnRecord[], agentFilter?: string, cloudFilte
     console.log(pc.dim(`Clear filter: ${pc.cyan("spawn list")}`));
   } else {
     console.log(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
-    console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}`));
+    console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`));
   }
   console.log();
 }
@@ -1317,13 +1317,15 @@ export async function cmdClouds(): Promise<void> {
         ? ""
         : hasCreds
           ? `  ${pc.green("ready")}`
-          : `  auth: ${c.auth}`;
-      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator ? (hasCreds ? credIndicator : pc.dim(credIndicator)) : ""}`);
+          : `  ${pc.yellow("needs")} ${pc.dim(c.auth)}`;
+      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator}`);
     }
   }
   console.log();
   if (credCount > 0) {
-    console.log(pc.dim(`  ${pc.green("ready")} = credentials detected in environment`));
+    console.log(pc.dim(`  ${pc.green("ready")} = credentials detected  ${pc.yellow("needs")} = credentials not set`));
+  } else {
+    console.log(pc.dim(`  ${pc.yellow("needs")} = credentials not set (run ${pc.cyan("spawn <cloud>")} for setup instructions)`));
   }
   console.log(pc.dim(`  Run ${pc.cyan("spawn <cloud>")} for setup instructions, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
   console.log();
@@ -1524,7 +1526,7 @@ async function fetchRemoteVersion(): Promise<string> {
   const res = await fetch(`${RAW_BASE}/cli/package.json`, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT),
   });
-  if (!res.ok) throw new Error("fetch failed");
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
   const remotePkg = (await res.json()) as { version: string };
   return remotePkg.version;
 }
@@ -1595,8 +1597,8 @@ ${pc.bold("USAGE")}
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
   spawn update                       Check for CLI updates
-  spawn version                      Show version
-  spawn help                         Show this help message
+  spawn version                      Show version (or --version, -v)
+  spawn help                         Show this help message (or --help, -h)
 
 ${pc.bold("EXAMPLES")}
   spawn                              ${pc.dim("# Pick interactively")}
@@ -1639,7 +1641,7 @@ ${pc.bold("ENVIRONMENT VARIABLES")}
   ${pc.cyan("OPENROUTER_API_KEY")}        OpenRouter API key (all agents require this)
   ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")}   Skip auto-update check on startup
   ${pc.cyan("SPAWN_NO_UNICODE=1")}        Force ASCII output (no unicode symbols)
-  ${pc.cyan("SPAWN_UNICODE=1")}           Force unicode output (override SSH auto-detection)
+  ${pc.cyan("SPAWN_UNICODE=1")}           Force Unicode output (override auto-detection)
   ${pc.cyan("SPAWN_HOME")}                Override spawn data directory (default: ~/.spawn)
   ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)
 
