@@ -356,7 +356,8 @@ describe("getScriptFailureGuidance", () => {
     it("should handle multi-credential auth hint", () => {
       const lines = getScriptFailureGuidance(1, "contabo", "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
       const joined = lines.join("\n");
-      expect(joined).toContain("CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
+      expect(joined).toContain("CONTABO_CLIENT_ID");
+      expect(joined).toContain("CONTABO_CLIENT_SECRET");
     });
 
     it("should not affect non-credential exit codes (130, 137, etc.)", () => {

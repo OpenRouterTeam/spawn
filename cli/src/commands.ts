@@ -408,6 +408,29 @@ function buildCloudLines(cloudInfo: { name: string; description: string; default
   return lines;
 }
 
+/** Build credential status lines for dry-run preview showing which env vars are set/missing */
+function buildCredentialStatusLines(manifest: Manifest, cloud: string): string[] {
+  const lines: string[] = [];
+  const cloudAuth = manifest.clouds[cloud].auth;
+  const authVars = parseAuthEnvVars(cloudAuth);
+
+  // Always check OPENROUTER_API_KEY
+  const orSet = !!process.env.OPENROUTER_API_KEY;
+  lines.push(orSet
+    ? `  ${pc.green("OPENROUTER_API_KEY")} ${pc.dim("-- set")}`
+    : `  ${pc.red("OPENROUTER_API_KEY")} ${pc.dim("-- not set")}  ${pc.dim("https://openrouter.ai/settings/keys")}`);
+
+  // Check cloud-specific auth vars
+  for (const v of authVars) {
+    const isSet = !!process.env[v];
+    lines.push(isSet
+      ? `  ${pc.green(v)} ${pc.dim("-- set")}`
+      : `  ${pc.red(v)} ${pc.dim("-- not set")}`);
+  }
+
+  return lines;
+}
+
 function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, prompt?: string): void {
   p.log.info(pc.bold("Dry run -- no resources will be provisioned\n"));
 
@@ -422,6 +445,16 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
       return `  ${k}=${display}`;
     });
     printDryRunSection("Environment variables", envLines);
+  }
+
+  // Show credential readiness
+  const credLines = buildCredentialStatusLines(manifest, cloud);
+  printDryRunSection("Credentials", credLines);
+  const allSet = credLines.every(l => l.includes("-- set"));
+  if (!allSet) {
+    p.log.warn("Some credentials are missing. Set them before running without --dry-run.");
+    p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
+    console.log();
   }
 
   if (prompt) {
@@ -553,15 +586,23 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
 }
 
 function credentialHints(cloud: string, authHint?: string, verb = "Missing or invalid"): string[] {
+  const lines: string[] = [];
+
   if (authHint) {
-    return [
-      `  - ${verb} credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`,
-      `    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`,
-    ];
+    // Check which specific env vars are missing
+    const varsToCheck = authHint.split(/\s*\+\s*/).concat("OPENROUTER_API_KEY");
+    const missing = varsToCheck.filter(v => !process.env[v]);
+    if (missing.length > 0) {
+      lines.push(`  - ${verb} credentials (${missing.map(v => pc.cyan(v)).join(", ")} not set)`);
+    } else {
+      lines.push(`  - Credentials set but may be invalid or expired (${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`);
+    }
+    lines.push(`    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`);
+  } else {
+    lines.push(`  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`);
   }
-  return [
-    `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`,
-  ];
+
+  return lines;
 }
 
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
