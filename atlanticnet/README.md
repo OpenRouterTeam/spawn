@@ -24,8 +24,16 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/kilocode.sh)
 ```
 
+#### OpenClaw
+
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
+```
+
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/interpreter.sh)
 ```
 
 #### Codex

@@ -1282,7 +1282,7 @@
     "atlanticnet/aider": "implemented",
     "atlanticnet/goose": "implemented",
     "atlanticnet/codex": "implemented",
-    "atlanticnet/interpreter": "missing",
+    "atlanticnet/interpreter": "implemented",
     "atlanticnet/gemini": "implemented",
     "atlanticnet/amazonq": "implemented",
     "atlanticnet/cline": "missing",
