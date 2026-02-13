@@ -255,7 +255,7 @@ interactive_session() {
         return 1
     fi
 
-    log_info "Starting interactive session..."
+    log_step "Starting interactive session..."
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$launch_cmd")

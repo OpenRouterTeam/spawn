@@ -21,7 +21,10 @@ YELLOW='\033[1;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+CYAN='\033[0;36m'
+
 log_info()  { printf "${GREEN}[spawn]${NC} %s\n" "$1"; }
+log_step()  { printf "${CYAN}[spawn]${NC} %s\n" "$1"; }
 log_warn()  { printf "${YELLOW}[spawn]${NC} %s\n" "$1"; }
 log_error() { printf "${RED}[spawn]${NC} %s\n" "$1"; }
 
@@ -129,7 +132,7 @@ ensure_in_path() {
 clone_cli() {
     local dest="$1"
     if command -v git &>/dev/null; then
-        log_info "Cloning CLI source..."
+        log_step "Cloning CLI source..."
         git clone --depth 1 --filter=blob:none --sparse \
             "https://github.com/${SPAWN_REPO}.git" "${dest}/repo" 2>/dev/null
         cd "${dest}/repo"
@@ -138,7 +141,7 @@ clone_cli() {
         cd "${dest}"
         rm -rf "${dest}/repo"
     else
-        log_info "Downloading CLI source..."
+        log_step "Downloading CLI source..."
         mkdir -p "${dest}/cli/src"
         # Download all source files via GitHub API
         local files
@@ -184,7 +187,7 @@ build_and_install() {
 
 # --- Install bun if not present ---
 if ! command -v bun &>/dev/null; then
-    log_info "bun not found. Installing bun..."
+    log_step "bun not found. Installing bun..."
     curl -fsSL https://bun.sh/install | bash
 
     # Source the updated PATH so bun is available immediately
@@ -207,5 +210,5 @@ fi
 
 ensure_min_bun_version
 
-log_info "Installing spawn via bun..."
+log_step "Installing spawn via bun..."
 build_and_install
