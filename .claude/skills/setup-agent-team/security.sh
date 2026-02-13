@@ -35,7 +35,7 @@ elif [[ "${SPAWN_REASON}" == "triage" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
     ISSUE_NUM="${SPAWN_ISSUE}"
     WORKTREE_BASE="/tmp/spawn-worktrees/triage-${ISSUE_NUM}"
     TEAM_NAME="spawn-triage-${ISSUE_NUM}"
-    CYCLE_TIMEOUT=300   # 5 min for issue triage
+    CYCLE_TIMEOUT=600   # 10 min for issue triage
 elif [[ "${SPAWN_REASON}" == "review_all" ]]; then
     RUN_MODE="review_all"
     WORKTREE_BASE="/tmp/spawn-worktrees/security-review-all"

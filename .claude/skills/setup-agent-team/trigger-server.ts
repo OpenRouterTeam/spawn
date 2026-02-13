@@ -388,6 +388,22 @@ const server = Bun.serve({
         }
       }
 
+      // Dedup: reject if a non-issue run with the same reason is already in progress
+      if (!issue) {
+        for (const [, run] of runs) {
+          if (!run.issue && run.reason === reason) {
+            return Response.json(
+              {
+                error: "run with this reason already in progress",
+                reason,
+                running: runs.size,
+              },
+              { status: 409 }
+            );
+          }
+        }
+      }
+
       // Disable idle timeout for this request — the stream may be silent for
       // minutes at a time while Claude thinks. 0 = no timeout.
       server.timeout(req, 0);
