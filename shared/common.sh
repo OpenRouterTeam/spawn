@@ -1176,6 +1176,34 @@ _make_api_request() {
 # Retries on: 429 (rate limit), 503 (service unavailable), network errors
 # Internal retry loop shared by generic_cloud_api and generic_cloud_api_custom_auth
 # Usage: _cloud_api_retry_loop REQUEST_FUNC MAX_RETRIES API_DESCRIPTION [REQUEST_FUNC_ARGS...]
+# Classify the result of an API request attempt.
+# Returns a retry reason string on stdout if the request failed with a retryable error,
+# or empty string on success. Caller checks the return string.
+_classify_api_result() {
+    local curl_ok="${1}"
+    if [[ "${curl_ok}" != "0" ]]; then
+        echo "Cloud API network error"
+    elif [[ "${API_HTTP_CODE}" == "429" ]]; then
+        echo "Cloud API returned rate limit (HTTP 429)"
+    elif [[ "${API_HTTP_CODE}" == "503" ]]; then
+        echo "Cloud API returned service unavailable (HTTP 503)"
+    fi
+}
+
+# Report a final API failure after retries are exhausted
+_report_api_failure() {
+    local retry_reason="${1}"
+    local max_retries="${2}"
+    log_error "${retry_reason} after ${max_retries} attempts"
+    if [[ "${retry_reason}" == "Cloud API network error" ]]; then
+        log_warn "Check your internet connection and verify the provider's API is reachable."
+    else
+        log_warn "This is usually caused by rate limiting or temporary provider issues."
+        log_warn "Wait a minute and try again, or check the provider's status page."
+        echo "${API_RESPONSE_BODY}"
+    fi
+}
+
 _cloud_api_retry_loop() {
     local request_func="${1}"
     local max_retries="${2}"
@@ -1187,30 +1215,19 @@ _cloud_api_retry_loop() {
     local max_interval=30
 
     while [[ "${attempt}" -le "${max_retries}" ]]; do
-        local retry_reason=""
+        local curl_ok=0
+        "${request_func}" "$@" || curl_ok=$?
 
-        if ! "${request_func}" "$@"; then
-            retry_reason="Cloud API network error"
-        elif [[ "${API_HTTP_CODE}" == "429" ]]; then
-            retry_reason="Cloud API returned rate limit (HTTP 429)"
-        elif [[ "${API_HTTP_CODE}" == "503" ]]; then
-            retry_reason="Cloud API returned service unavailable (HTTP 503)"
-        fi
+        local retry_reason
+        retry_reason=$(_classify_api_result "${curl_ok}")
 
-        # Success — no retryable error
         if [[ -z "${retry_reason}" ]]; then
             echo "${API_RESPONSE_BODY}"
             return 0
         fi
 
-        # Retry or fail
         if ! _api_should_retry_on_error "${attempt}" "${max_retries}" "${interval}" "${max_interval}" "${retry_reason}"; then
-            log_error "${retry_reason} after ${max_retries} attempts"
-            if [[ "${retry_reason}" == "Cloud API network error" ]]; then
-                log_warn "Check your internet connection and verify the provider's API is reachable."
-            else
-                echo "${API_RESPONSE_BODY}"
-            fi
+            _report_api_failure "${retry_reason}" "${max_retries}"
             return 1
         fi
         _update_retry_interval interval max_interval

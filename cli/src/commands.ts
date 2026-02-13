@@ -657,6 +657,37 @@ export function isRetryableExitCode(errMsg: string): boolean {
   return code === 255;
 }
 
+function handleUserInterrupt(errMsg: string): void {
+  if (!errMsg.includes("interrupted by user")) return;
+  console.error();
+  p.log.warn("Script interrupted (Ctrl+C).");
+  p.log.warn("If a server was already created, it may still be running.");
+  p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
+  process.exit(130);
+}
+
+async function runWithRetries(script: string, prompt?: string): Promise<string | undefined> {
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    try {
+      await runBash(script, prompt);
+      return undefined; // success
+    } catch (err) {
+      const errMsg = getErrorMessage(err);
+      handleUserInterrupt(errMsg);
+
+      if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
+        const delay = RETRY_DELAYS[attempt - 1];
+        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+        await new Promise(r => setTimeout(r, delay * 1000));
+        continue;
+      }
+
+      return errMsg;
+    }
+  }
+  return "Script failed after all retries";
+}
+
 async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
   const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
@@ -680,36 +711,10 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     // Non-fatal: don't block the spawn if history write fails
   }
 
-  let lastErr: string | undefined;
-  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
-    try {
-      await runBash(scriptContent, prompt);
-      return; // success
-    } catch (err) {
-      const errMsg = getErrorMessage(err);
-      if (errMsg.includes("interrupted by user")) {
-        console.error();
-        p.log.warn("Script interrupted (Ctrl+C).");
-        p.log.warn("If a server was already created, it may still be running.");
-        p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
-        process.exit(130);
-      }
-      lastErr = errMsg;
-
-      // Only retry for potentially transient failures
-      if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
-        const delay = RETRY_DELAYS[attempt - 1];
-        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
-        await new Promise(r => setTimeout(r, delay * 1000));
-        continue;
-      }
-
-      // Non-retryable or out of retries
-      break;
-    }
+  const lastErr = await runWithRetries(scriptContent, prompt);
+  if (lastErr) {
+    reportScriptFailure(lastErr, cloud, agent, authHint, prompt);
   }
-
-  reportScriptFailure(lastErr!, cloud, agent, authHint, prompt);
 }
 
 function runBash(script: string, prompt?: string): Promise<void> {
