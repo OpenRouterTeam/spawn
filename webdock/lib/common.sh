@@ -134,26 +134,12 @@ _wait_for_webdock_server() {
         WEBDOCK_SERVER_IP "Server" "${max_attempts}"
 }
 
-create_server() {
-    local name="$1"
-    local slug="${name}"
-    local location_id="${WEBDOCK_LOCATION:-fi}"
-    local profile_slug="${WEBDOCK_PROFILE:-webdockmicro}"
-    local image_slug="${WEBDOCK_IMAGE:-ubuntu2404}"
-
-    # Validate env var inputs to prevent injection into Python code
-    validate_resource_name "$location_id" || { log_error "Invalid WEBDOCK_LOCATION"; return 1; }
-    validate_resource_name "$profile_slug" || { log_error "Invalid WEBDOCK_PROFILE"; return 1; }
-    validate_resource_name "$image_slug" || { log_error "Invalid WEBDOCK_IMAGE"; return 1; }
-    validate_resource_name "$slug" || { log_error "Invalid server slug"; return 1; }
-
-    log_step "Creating Webdock server '$name' (profile: $profile_slug, location: $location_id)..."
-
-    # Get all SSH public key IDs
-    local public_keys_response
-    public_keys_response=$(webdock_api GET "/account/publicKeys")
-    local public_key_ids
-    public_key_ids=$(echo "$public_keys_response" | python3 -c "
+# Fetch all SSH public key IDs from the Webdock account
+# Returns: JSON array of key IDs (e.g., [1, 2, 3]) or "[]" if none
+_webdock_get_public_key_ids() {
+    local response
+    response=$(webdock_api GET "/account/publicKeys")
+    echo "$response" | python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
 if isinstance(data, list):
@@ -161,7 +147,53 @@ if isinstance(data, list):
 else:
     ids = []
 print(json.dumps(ids))
-" 2>/dev/null || echo "[]")
+" 2>/dev/null || echo "[]"
+}
+
+# Validate Webdock server creation inputs
+# Usage: _webdock_validate_inputs LOCATION PROFILE IMAGE SLUG
+_webdock_validate_inputs() {
+    validate_resource_name "$1" || { log_error "Invalid WEBDOCK_LOCATION"; return 1; }
+    validate_resource_name "$2" || { log_error "Invalid WEBDOCK_PROFILE"; return 1; }
+    validate_resource_name "$3" || { log_error "Invalid WEBDOCK_IMAGE"; return 1; }
+    validate_resource_name "$4" || { log_error "Invalid server slug"; return 1; }
+}
+
+# Extract server slug from creation response or report failure
+# Sets: WEBDOCK_SERVER_SLUG on success
+# Usage: _webdock_handle_create_response RESPONSE
+_webdock_handle_create_response() {
+    local response="$1"
+    if echo "$response" | grep -q '"slug"'; then
+        WEBDOCK_SERVER_SLUG=$(_extract_json_field "$response" "d['slug']")
+        export WEBDOCK_SERVER_SLUG
+        log_info "Server created: slug=$WEBDOCK_SERVER_SLUG"
+        return 0
+    fi
+    log_error "Failed to create Webdock server"
+    log_error "API Error: $(extract_api_error_message "$response" "$response")"
+    log_warn "Common issues:"
+    log_warn "  - Insufficient account balance"
+    log_warn "  - Profile/location unavailable (try different WEBDOCK_PROFILE or WEBDOCK_LOCATION)"
+    log_warn "  - Server limit reached"
+    log_warn "  - Slug already in use"
+    log_warn "Check your dashboard: https://my.webdock.io/"
+    return 1
+}
+
+create_server() {
+    local name="$1"
+    local slug="${name}"
+    local location_id="${WEBDOCK_LOCATION:-fi}"
+    local profile_slug="${WEBDOCK_PROFILE:-webdockmicro}"
+    local image_slug="${WEBDOCK_IMAGE:-ubuntu2404}"
+
+    _webdock_validate_inputs "$location_id" "$profile_slug" "$image_slug" "$slug" || return 1
+
+    log_step "Creating Webdock server '$name' (profile: $profile_slug, location: $location_id)..."
+
+    local public_key_ids
+    public_key_ids=$(_webdock_get_public_key_ids)
 
     local body
     body=$(_webdock_build_server_body "$name" "$slug" "$location_id" "$profile_slug" "$image_slug" "$public_key_ids")
@@ -169,21 +201,7 @@ print(json.dumps(ids))
     local response
     response=$(webdock_api POST "/servers" "$body")
 
-    if echo "$response" | grep -q '"slug"'; then
-        WEBDOCK_SERVER_SLUG=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['slug'])")
-        export WEBDOCK_SERVER_SLUG
-        log_info "Server created: slug=$WEBDOCK_SERVER_SLUG"
-    else
-        log_error "Failed to create Webdock server"
-        log_error "API Error: $(extract_api_error_message "$response" "$response")"
-        log_warn "Common issues:"
-        log_warn "  - Insufficient account balance"
-        log_warn "  - Profile/location unavailable (try different WEBDOCK_PROFILE or WEBDOCK_LOCATION)"
-        log_warn "  - Server limit reached"
-        log_warn "  - Slug already in use"
-        log_warn "Check your dashboard: https://my.webdock.io/"
-        return 1
-    fi
+    _webdock_handle_create_response "$response" || return 1
 
     _wait_for_webdock_server "$WEBDOCK_SERVER_SLUG"
 }
