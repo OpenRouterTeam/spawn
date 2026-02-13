@@ -152,6 +152,100 @@ get_endpoints() {
     esac
 }
 
+# --- Multi-credential cloud specs ---
+# Returns "config_key:env_var" pairs (one per line) for multi-credential clouds.
+# Single-credential clouds return nothing (handled by get_auth_env_var).
+_get_multi_cred_spec() {
+    local cloud="$1"
+    case "$cloud" in
+        ovh)
+            printf '%s\n' \
+                "application_key:OVH_APPLICATION_KEY" \
+                "application_secret:OVH_APPLICATION_SECRET" \
+                "consumer_key:OVH_CONSUMER_KEY" \
+                "project_id:OVH_PROJECT_ID"
+            ;;
+        upcloud)
+            printf '%s\n' \
+                "username:UPCLOUD_USERNAME" \
+                "password:UPCLOUD_PASSWORD"
+            ;;
+        kamatera)
+            printf '%s\n' \
+                "client_id:KAMATERA_API_CLIENT_ID" \
+                "secret:KAMATERA_API_SECRET"
+            ;;
+        atlanticnet)
+            printf '%s\n' \
+                "api_key:ATLANTICNET_API_KEY" \
+                "api_private_key:ATLANTICNET_API_PRIVATE_KEY"
+            ;;
+        cloudsigma)
+            printf '%s\n' \
+                "email:CLOUDSIGMA_EMAIL" \
+                "password:CLOUDSIGMA_PASSWORD"
+            ;;
+    esac
+}
+
+# Load multiple fields from a JSON config file and export as env vars.
+# Arguments: CONFIG_FILE SPEC...  (each spec is "config_key:ENV_VAR")
+_load_multi_config_from_file() {
+    local config_file="$1"; shift
+    [[ -f "$config_file" ]] || return 1
+
+    local config_keys=() env_vars=()
+    local spec
+    for spec in "$@"; do
+        config_keys+=("${spec%%:*}")
+        env_vars+=("${spec#*:}")
+    done
+
+    local vals
+    vals=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print('\t'.join(d.get(k, '') for k in sys.argv[2:]))
+except: pass
+" "$config_file" "${config_keys[@]}" 2>/dev/null) || return 1
+
+    [[ -n "${vals:-}" ]] || return 1
+
+    local IFS=$'\t'
+    local fields
+    read -ra fields <<< "$vals"
+    local i
+    for i in "${!env_vars[@]}"; do
+        [[ -n "${fields[$i]:-}" ]] && export "${env_vars[$i]}=${fields[$i]}"
+    done
+    return 0
+}
+
+# Save multiple env vars to a JSON config file.
+# Arguments: CONFIG_FILE SPEC...  (each spec is "config_key:ENV_VAR")
+_save_multi_config_to_file() {
+    local config_file="$1"; shift
+
+    local py_args=()
+    local py_keys=""
+    local idx=1
+    local spec
+    for spec in "$@"; do
+        local config_key="${spec%%:*}"
+        local env_var="${spec#*:}"
+        eval "local val=\"\${${env_var}:-}\""
+        py_args+=("$val")
+        py_keys="${py_keys}'${config_key}': sys.argv[${idx}], "
+        idx=$((idx + 1))
+    done
+
+    python3 -c "
+import json, sys
+print(json.dumps({${py_keys}}, indent=2))
+" "${py_args[@]}" > "$config_file"
+}
+
 # --- Auth env var check ---
 get_auth_env_var() {
     local cloud="$1"
@@ -189,72 +283,17 @@ try_load_config() {
         return 0
     fi
 
-    # Map cloud name to config file
     local config_file="$HOME/.config/spawn/${cloud}.json"
 
-    # OVH uses separate config with multiple fields
-    if [[ "$cloud" == "ovh" ]]; then
-        if [[ -f "$config_file" ]]; then
-            local ovh_vals
-            ovh_vals=$(python3 -c "
-import json, sys
-try:
-    d = json.load(open(sys.argv[1]))
-    # Output tab-separated values in fixed order
-    print('\t'.join(d.get(k, '') for k in ['application_key', 'application_secret', 'consumer_key', 'project_id']))
-except: print('\t\t\t')
-" "$config_file" 2>/dev/null) || true
-            if [[ -n "${ovh_vals:-}" ]]; then
-                local IFS=$'\t'
-                read -r ak as ck pid <<< "$ovh_vals"
-                [[ -n "${ak:-}" ]] && export OVH_APPLICATION_KEY="$ak"
-                [[ -n "${as:-}" ]] && export OVH_APPLICATION_SECRET="$as"
-                [[ -n "${ck:-}" ]] && export OVH_CONSUMER_KEY="$ck"
-                [[ -n "${pid:-}" ]] && export OVH_PROJECT_ID="$pid"
-            fi
-        fi
-        return 0
-    fi
-
-    # Atlantic.Net uses separate config with two fields
-    if [[ "$cloud" == "atlanticnet" ]]; then
-        if [[ -f "$config_file" ]]; then
-            local atlanticnet_vals
-            atlanticnet_vals=$(python3 -c "
-import json, sys
-try:
-    d = json.load(open(sys.argv[1]))
-    print('\t'.join(d.get(k, '') for k in ['api_key', 'api_private_key']))
-except: print('\t\t')
-" "$config_file" 2>/dev/null) || true
-            if [[ -n "${atlanticnet_vals:-}" ]]; then
-                local IFS=$'\t'
-                read -r ak apk <<< "$atlanticnet_vals"
-                [[ -n "${ak:-}" ]] && export ATLANTICNET_API_KEY="$ak"
-                [[ -n "${apk:-}" ]] && export ATLANTICNET_API_PRIVATE_KEY="$apk"
-            fi
-        fi
-        return 0
-    fi
-
-    # CloudSigma uses email + password for HTTP Basic Auth
-    if [[ "$cloud" == "cloudsigma" ]]; then
-        if [[ -f "$config_file" ]]; then
-            local cloudsigma_vals
-            cloudsigma_vals=$(python3 -c "
-import json, sys
-try:
-    d = json.load(open(sys.argv[1]))
-    print('\t'.join(d.get(k, '') for k in ['email', 'password']))
-except: print('\t\t')
-" "$config_file" 2>/dev/null) || true
-            if [[ -n "${cloudsigma_vals:-}" ]]; then
-                local IFS=$'\t'
-                read -r email password <<< "$cloudsigma_vals"
-                [[ -n "${email:-}" ]] && export CLOUDSIGMA_EMAIL="$email"
-                [[ -n "${password:-}" ]] && export CLOUDSIGMA_PASSWORD="$password"
-            fi
-        fi
+    # Multi-credential clouds (OVH, AtlanticNet, CloudSigma, etc.)
+    local specs
+    specs=$(_get_multi_cred_spec "$cloud")
+    if [[ -n "$specs" ]]; then
+        local spec_args=()
+        while IFS= read -r line; do
+            spec_args+=("$line")
+        done <<< "$specs"
+        _load_multi_config_from_file "$config_file" "${spec_args[@]}" || true
         return 0
     fi
 
@@ -274,29 +313,22 @@ has_credentials() {
     # Try loading from config file first
     try_load_config "$cloud"
 
-    case "$cloud" in
-        upcloud)
-            [[ -n "${UPCLOUD_USERNAME:-}" ]] && [[ -n "${UPCLOUD_PASSWORD:-}" ]]
-            ;;
-        ovh)
-            [[ -n "${OVH_APPLICATION_KEY:-}" ]] && [[ -n "${OVH_APPLICATION_SECRET:-}" ]] && \
-            [[ -n "${OVH_CONSUMER_KEY:-}" ]] && [[ -n "${OVH_PROJECT_ID:-}" ]]
-            ;;
-        kamatera)
-            [[ -n "${KAMATERA_API_CLIENT_ID:-}" ]] && [[ -n "${KAMATERA_API_SECRET:-}" ]]
-            ;;
-        atlanticnet)
-            [[ -n "${ATLANTICNET_API_KEY:-}" ]] && [[ -n "${ATLANTICNET_API_PRIVATE_KEY:-}" ]]
-            ;;
-        cloudsigma)
-            [[ -n "${CLOUDSIGMA_EMAIL:-}" ]] && [[ -n "${CLOUDSIGMA_PASSWORD:-}" ]]
-            ;;
-        *)
-            local env_var
-            env_var=$(get_auth_env_var "$cloud")
-            eval "[[ -n \"\${${env_var}:-}\" ]]"
-            ;;
-    esac
+    # Multi-credential clouds: check all env vars from spec
+    local specs
+    specs=$(_get_multi_cred_spec "$cloud")
+    if [[ -n "$specs" ]]; then
+        local line
+        while IFS= read -r line; do
+            local env_var="${line#*:}"
+            eval "[[ -n \"\${${env_var}:-}\" ]]" || return 1
+        done <<< "$specs"
+        return 0
+    fi
+
+    # Single-credential clouds
+    local env_var
+    env_var=$(get_auth_env_var "$cloud")
+    eval "[[ -n \"\${${env_var}:-}\" ]]"
 }
 
 # Save credentials to ~/.config/spawn/{cloud}.json for future use
@@ -306,40 +338,22 @@ save_config() {
     local config_file="${config_dir}/${cloud}.json"
     mkdir -p "$config_dir"
 
-    case "$cloud" in
-        ovh)
-            python3 -c "
-import json, sys
-d = {'application_key': sys.argv[1], 'application_secret': sys.argv[2],
-     'consumer_key': sys.argv[3], 'project_id': sys.argv[4]}
-print(json.dumps(d, indent=2))
-" "${OVH_APPLICATION_KEY:-}" "${OVH_APPLICATION_SECRET:-}" "${OVH_CONSUMER_KEY:-}" "${OVH_PROJECT_ID:-}" > "$config_file"
-            ;;
-        upcloud)
-            python3 -c "
-import json, sys
-print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}, indent=2))
-" "${UPCLOUD_USERNAME:-}" "${UPCLOUD_PASSWORD:-}" > "$config_file"
-            ;;
-        kamatera)
-            python3 -c "
-import json, sys
-print(json.dumps({'client_id': sys.argv[1], 'secret': sys.argv[2]}, indent=2))
-" "${KAMATERA_API_CLIENT_ID:-}" "${KAMATERA_API_SECRET:-}" > "$config_file"
-            ;;
-        atlanticnet)
-            python3 -c "
-import json, sys
-print(json.dumps({'api_key': sys.argv[1], 'api_private_key': sys.argv[2]}, indent=2))
-" "${ATLANTICNET_API_KEY:-}" "${ATLANTICNET_API_PRIVATE_KEY:-}" > "$config_file"
-            ;;
-        *)
-            local env_var
-            env_var=$(get_auth_env_var "$cloud")
-            eval "local val=\"\${${env_var}:-}\""
-            python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"
-            ;;
-    esac
+    # Multi-credential clouds
+    local specs
+    specs=$(_get_multi_cred_spec "$cloud")
+    if [[ -n "$specs" ]]; then
+        local spec_args=()
+        while IFS= read -r line; do
+            spec_args+=("$line")
+        done <<< "$specs"
+        _save_multi_config_to_file "$config_file" "${spec_args[@]}"
+    else
+        # Standard single-token config
+        local env_var
+        env_var=$(get_auth_env_var "$cloud")
+        eval "local val=\"\${${env_var}:-}\""
+        python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"
+    fi
     printf '%b\n' "  ${GREEN}saved${NC} → ${config_file}"
 }
 
@@ -349,23 +363,17 @@ prompt_credentials() {
     local vars_needed=""
     local val=""
 
-    case "$cloud" in
-        ovh)
-            vars_needed="OVH_APPLICATION_KEY OVH_APPLICATION_SECRET OVH_CONSUMER_KEY OVH_PROJECT_ID"
-            ;;
-        upcloud)
-            vars_needed="UPCLOUD_USERNAME UPCLOUD_PASSWORD"
-            ;;
-        kamatera)
-            vars_needed="KAMATERA_API_CLIENT_ID KAMATERA_API_SECRET"
-            ;;
-        atlanticnet)
-            vars_needed="ATLANTICNET_API_KEY ATLANTICNET_API_PRIVATE_KEY"
-            ;;
-        *)
-            vars_needed=$(get_auth_env_var "$cloud")
-            ;;
-    esac
+    # Multi-credential clouds: extract env var names from spec
+    local specs
+    specs=$(_get_multi_cred_spec "$cloud")
+    if [[ -n "$specs" ]]; then
+        local line
+        while IFS= read -r line; do
+            vars_needed="${vars_needed} ${line#*:}"
+        done <<< "$specs"
+    else
+        vars_needed=$(get_auth_env_var "$cloud")
+    fi
 
     for var_name in $vars_needed; do
         eval "local current=\"\${${var_name}:-}\""
@@ -988,12 +996,20 @@ list_clouds() {
             status=$(printf '%b' "${RED}not set${NC}")
         fi
 
-        # For multi-var clouds, show all required vars
-        case "$cloud" in
-            upcloud)    env_var="UPCLOUD_USERNAME + UPCLOUD_PASSWORD" ;;
-            ovh)        env_var="OVH_APPLICATION_KEY + 3 more" ;;
-            kamatera)   env_var="KAMATERA_API_CLIENT_ID + SECRET" ;;
-        esac
+        # For multi-var clouds, show required env vars from spec
+        local specs
+        specs=$(_get_multi_cred_spec "$cloud")
+        if [[ -n "$specs" ]]; then
+            local first_var var_count
+            first_var=$(head -1 <<< "$specs")
+            first_var="${first_var#*:}"
+            var_count=$(wc -l <<< "$specs" | tr -d ' ')
+            if [[ "$var_count" -gt 1 ]]; then
+                env_var="${first_var} + $((var_count - 1)) more"
+            else
+                env_var="$first_var"
+            fi
+        fi
 
         printf "  %-15s %-30s %b\n" "$cloud" "$env_var" "$status"
     done
