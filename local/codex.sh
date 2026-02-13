@@ -48,7 +48,7 @@ else
 fi
 
 # 5. Inject environment variables
-log_step "Appending environment variables to ~/.zshrc..."
+log_step "Setting up environment variables..."
 inject_env_vars_local upload_file run_server \
     "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
     "OPENAI_BASE_URL=https://openrouter.ai/api/v1" \
