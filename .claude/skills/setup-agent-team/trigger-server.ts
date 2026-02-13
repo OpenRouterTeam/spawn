@@ -22,6 +22,8 @@
  */
 
 import { timingSafeEqual } from "crypto";
+import { realpathSync, existsSync } from "fs";
+import { resolve, dirname } from "path";
 
 const PORT = 8080;
 const TRIGGER_SECRET = process.env.TRIGGER_SECRET ?? "";
@@ -41,6 +43,38 @@ if (!TARGET_SCRIPT) {
   console.error("ERROR: TARGET_SCRIPT env var is required");
   process.exit(1);
 }
+
+// Validate TARGET_SCRIPT against an allowlist of directories and file extensions.
+// This prevents an attacker who can control the env var from executing arbitrary scripts.
+const SKILL_DIR = realpathSync(dirname(new URL(import.meta.url).pathname));
+const ALLOWED_SCRIPT_DIRS = [SKILL_DIR];
+
+function validateTargetScript(scriptPath: string): string {
+  if (!scriptPath.endsWith(".sh")) {
+    console.error(
+      `ERROR: TARGET_SCRIPT must be a .sh file, got: ${scriptPath}`
+    );
+    process.exit(1);
+  }
+  const resolved = resolve(scriptPath);
+  if (!existsSync(resolved)) {
+    console.error(`ERROR: TARGET_SCRIPT does not exist: ${resolved}`);
+    process.exit(1);
+  }
+  const real = realpathSync(resolved);
+  const inAllowedDir = ALLOWED_SCRIPT_DIRS.some((dir) =>
+    real.startsWith(dir + "/")
+  );
+  if (!inAllowedDir) {
+    console.error(
+      `ERROR: TARGET_SCRIPT must be inside an allowed directory (${ALLOWED_SCRIPT_DIRS.join(", ")}), got: ${real}`
+    );
+    process.exit(1);
+  }
+  return real;
+}
+
+const VALIDATED_TARGET_SCRIPT = validateTargetScript(TARGET_SCRIPT);
 
 interface RunEntry {
   proc: ReturnType<typeof Bun.spawn>;
@@ -175,10 +209,13 @@ function startStreamingRun(reason: string, issue: string): Response {
     `[trigger] Run #${id} starting (reason=${reason}${issue ? `, issue=#${issue}` : ""}, concurrent=${runs.size + 1}/${MAX_CONCURRENT})`
   );
 
-  const proc = Bun.spawn(["bash", TARGET_SCRIPT], {
+  const proc = Bun.spawn(["bash", VALIDATED_TARGET_SCRIPT], {
     cwd:
       process.env.REPO_ROOT ||
-      TARGET_SCRIPT.substring(0, TARGET_SCRIPT.lastIndexOf("/")) ||
+      VALIDATED_TARGET_SCRIPT.substring(
+        0,
+        VALIDATED_TARGET_SCRIPT.lastIndexOf("/")
+      ) ||
       ".",
     stdout: "pipe",
     stderr: "pipe",
@@ -427,7 +464,7 @@ const reapInterval = setInterval(() => {
 reapInterval.unref?.();
 
 console.log(`[trigger] Listening on port ${server.port}`);
-console.log(`[trigger] TARGET_SCRIPT=${TARGET_SCRIPT}`);
+console.log(`[trigger] TARGET_SCRIPT=${VALIDATED_TARGET_SCRIPT}`);
 console.log(`[trigger] MAX_CONCURRENT=${MAX_CONCURRENT}`);
 console.log(
   `[trigger] RUN_TIMEOUT_MS=${RUN_TIMEOUT_MS} (${Math.round(RUN_TIMEOUT_MS / 1000 / 60)}min)`
