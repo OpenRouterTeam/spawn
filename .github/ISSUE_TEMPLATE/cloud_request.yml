@@ -1,7 +1,7 @@
 name: Cloud Provider Request
 description: Request support for a new cloud provider
 title: "[Cloud]: "
-labels: ["cloud-request", "needs-triage"]
+labels: ["cloud-request", "enhancement", "pending-review"]
 body:
   - type: markdown
     attributes:

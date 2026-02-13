@@ -1,7 +1,7 @@
 name: Agent Request
 description: Request support for a new AI coding agent
 title: "[Agent]: "
-labels: ["agent-request", "needs-triage"]
+labels: ["agent-request", "enhancement", "pending-review"]
 body:
   - type: markdown
     attributes:

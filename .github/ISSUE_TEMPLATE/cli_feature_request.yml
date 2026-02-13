@@ -1,7 +1,7 @@
 name: CLI Feature Request
 description: Suggest a new feature or improvement for the spawn CLI
 title: "[CLI]: "
-labels: ["cli", "enhancement", "needs-triage"]
+labels: ["cli", "enhancement", "pending-review"]
 body:
   - type: markdown
     attributes:
