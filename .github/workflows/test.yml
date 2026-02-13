@@ -24,5 +24,6 @@ jobs:
         run: |
           echo '## Mock Test Results' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          grep -E '(Results:|✓|✗|skip|━━━)' /tmp/mock-output.log | head -100 >> "$GITHUB_STEP_SUMMARY"
+          # Strip ANSI color codes before grepping (output has escape sequences)
+          sed 's/\x1b\[[0-9;]*m//g' /tmp/mock-output.log | grep -E '(Results:|✓|✗|skip|━━━)' | head -100 >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
