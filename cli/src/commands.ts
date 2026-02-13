@@ -359,6 +359,8 @@ export async function cmdInteractive(): Promise<void> {
   });
   if (p.isCancel(cloudChoice)) handleCancel();
 
+  await preflightCredentialCheck(manifest, cloudChoice);
+
   const agentName = manifest.agents[agentChoice].name;
   const cloudName = manifest.clouds[cloudChoice].name;
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
