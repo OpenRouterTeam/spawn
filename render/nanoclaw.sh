@@ -29,7 +29,7 @@ run_server "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get
 
 # Verify Node.js installation
 if ! run_server "command -v node" >/dev/null 2>&1; then
-    log_error "Node.js installation failed"
+    log_install_failed "NanoClaw" "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
     exit 1
 fi
 log_info "Node.js installed"

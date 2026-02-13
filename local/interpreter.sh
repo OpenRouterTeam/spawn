@@ -25,9 +25,7 @@ fi
 
 # Verify installation
 if ! command -v interpreter &>/dev/null; then
-    log_error "Open Interpreter installation failed"
-    log_error "The 'interpreter' command is not available"
-    log_error "Try installing manually: pip install open-interpreter"
+    log_install_failed "Open Interpreter" "pip install open-interpreter"
     exit 1
 fi
 log_info "Open Interpreter installation verified"

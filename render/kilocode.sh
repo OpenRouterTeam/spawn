@@ -29,7 +29,7 @@ run_server "npm install -g @kilocode/cli"
 
 # Verify installation
 if ! run_server "command -v kilocode" >/dev/null 2>&1; then
-    log_error "Kilo Code CLI installation failed"
+    log_install_failed "Kilo Code" "npm install -g @kilocode/cli"
     exit 1
 fi
 log_info "Kilo Code CLI installed"

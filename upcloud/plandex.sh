@@ -23,7 +23,7 @@ log_step "Installing Plandex..."
 run_server "${UPCLOUD_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | bash"
 
 if ! run_server "${UPCLOUD_SERVER_IP}" "command -v plandex &> /dev/null && plandex version &> /dev/null"; then
-    log_error "Plandex installation verification failed"
+    log_install_failed "Plandex" "curl -sL https://plandex.ai/install.sh | bash" "${UPCLOUD_SERVER_IP}"
     exit 1
 fi
 log_info "Plandex installation verified successfully"

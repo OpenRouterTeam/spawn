@@ -31,8 +31,7 @@ run_sprite "$SPRITE_NAME" "pip install gptme 2>/dev/null || pip3 install gptme"
 
 # Verify installation succeeded
 if ! run_sprite "$SPRITE_NAME" "command -v gptme &> /dev/null && gptme --version &> /dev/null"; then
-    log_error "gptme installation verification failed"
-    log_error "The 'gptme' command is not available or not working properly"
+    log_install_failed "gptme" "pip install gptme"
     exit 1
 fi
 log_info "gptme installation verified successfully"

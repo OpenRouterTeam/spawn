@@ -26,9 +26,7 @@ fi
 
 # Verify installation
 if ! command -v q &>/dev/null; then
-    log_error "Amazon Q CLI installation failed"
-    log_error "The 'q' command is not available"
-    log_error "Try installing manually: curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
+    log_install_failed "Amazon Q CLI" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
     exit 1
 fi
 log_info "Amazon Q CLI installation verified"

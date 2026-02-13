@@ -23,7 +23,7 @@ log_step "Installing Aider..."
 run_server "${UPCLOUD_SERVER_IP}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
 
 if ! run_server "${UPCLOUD_SERVER_IP}" "command -v aider &> /dev/null && aider --version &> /dev/null"; then
-    log_error "Aider installation verification failed"
+    log_install_failed "Aider" "pip install aider-chat" "${UPCLOUD_SERVER_IP}"
     exit 1
 fi
 log_info "Aider installation verified successfully"

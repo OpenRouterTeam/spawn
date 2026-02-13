@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v gptme &> /dev/null && gptme --version &> /dev/null"; then
-    log_error "gptme installation verification failed"
-    log_error "The 'gptme' command is not available or not working properly on server ${IONOS_SERVER_IP}"
+    log_install_failed "gptme" "pip install gptme" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "gptme installation verified successfully"

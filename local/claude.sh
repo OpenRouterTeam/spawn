@@ -26,9 +26,7 @@ fi
 
 # Verify installation
 if ! command -v claude &>/dev/null; then
-    log_error "Claude Code installation failed"
-    log_error "The 'claude' command is not available"
-    log_error "Try installing manually: curl -fsSL https://claude.ai/install.sh | bash"
+    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash"
     exit 1
 fi
 log_info "Claude Code installation verified"

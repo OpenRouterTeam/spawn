@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v cn &> /dev/null"; then
-    log_error "Continue CLI installation verification failed"
-    log_error "The 'cn' command is not available on server ${IONOS_SERVER_IP}"
+    log_install_failed "Continue" "npm install -g @continuedev/cli" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "Continue CLI installation verified successfully"

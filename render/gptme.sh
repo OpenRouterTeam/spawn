@@ -29,7 +29,7 @@ run_server "pip install gptme 2>/dev/null || pip3 install gptme"
 
 # Verify installation
 if ! run_server "command -v gptme && gptme --version" >/dev/null 2>&1; then
-    log_error "gptme installation failed"
+    log_install_failed "gptme" "pip install gptme"
     exit 1
 fi
 log_info "gptme installed"

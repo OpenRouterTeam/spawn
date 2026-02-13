@@ -25,9 +25,7 @@ fi
 
 # Verify installation
 if ! command -v aider &>/dev/null || ! aider --version &>/dev/null; then
-    log_error "Aider installation failed"
-    log_error "The 'aider' command is not available or not working properly"
-    log_error "Try installing manually: pip install aider-chat"
+    log_install_failed "Aider" "pip install aider-chat"
     exit 1
 fi
 log_info "Aider installation verified"

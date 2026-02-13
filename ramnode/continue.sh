@@ -36,7 +36,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${RAMNODE_SERVER_IP}" "command -v cn &> /dev/null"; then
-    log_error "Continue installation verification failed"
+    log_install_failed "Continue" "npm install -g @continuedev/cli" "${RAMNODE_SERVER_IP}"
     exit 1
 fi
 log_info "Continue installation verified successfully"

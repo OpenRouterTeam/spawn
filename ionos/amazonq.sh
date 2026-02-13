@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v q &> /dev/null"; then
-    log_error "Amazon Q CLI installation verification failed"
-    log_error "The 'q' command is not available on server ${IONOS_SERVER_IP}"
+    log_install_failed "Amazon Q CLI" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "Amazon Q CLI installation verified successfully"

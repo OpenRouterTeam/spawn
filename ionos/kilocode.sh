@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v kilocode &> /dev/null"; then
-    log_error "Kilo Code CLI installation verification failed"
-    log_error "The 'kilocode' command is not available on server ${IONOS_SERVER_IP}"
+    log_install_failed "Kilo Code" "npm install -g @kilocode/cli" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "Kilo Code CLI installation verified successfully"
