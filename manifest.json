@@ -1280,7 +1280,7 @@
     "atlanticnet/openclaw": "implemented",
     "atlanticnet/nanoclaw": "implemented",
     "atlanticnet/aider": "implemented",
-    "atlanticnet/goose": "missing",
+    "atlanticnet/goose": "implemented",
     "atlanticnet/codex": "implemented",
     "atlanticnet/interpreter": "missing",
     "atlanticnet/gemini": "implemented",
