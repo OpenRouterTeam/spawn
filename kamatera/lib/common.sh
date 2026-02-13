@@ -290,7 +290,7 @@ _submit_and_wait_kamatera_server() {
         log_warn "  - Insufficient account balance"
         log_warn "  - Datacenter unavailable (try different KAMATERA_DATACENTER)"
         log_warn "  - Invalid image name"
-        log_warn "Remediation: Check https://console.kamatera.com/"
+        log_warn "Check your dashboard: https://console.kamatera.com/"
         return 1
     fi
 

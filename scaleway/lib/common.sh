@@ -55,7 +55,7 @@ test_scaleway_token() {
     response=$(scaleway_instance_api GET "/servers?per_page=1")
     if echo "$response" | grep -q '"message"'; then
         log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
-        log_warn "Remediation steps:"
+        log_error "How to fix:"
         log_warn "  1. Verify secret key at: https://console.scaleway.com/iam/api-keys"
         log_warn "  2. Ensure the key has appropriate permissions"
         log_warn "  3. Check key hasn't been revoked"
@@ -241,7 +241,7 @@ create_server() {
         log_warn "  - Insufficient account balance"
         log_warn "  - Commercial type unavailable in zone (try different SCALEWAY_TYPE or SCALEWAY_ZONE)"
         log_warn "  - Instance limit reached"
-        log_warn "Remediation: Check https://console.scaleway.com/"
+        log_warn "Check your dashboard: https://console.scaleway.com/"
         return 1
     fi
 

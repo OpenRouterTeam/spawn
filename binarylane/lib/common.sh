@@ -161,7 +161,7 @@ _binarylane_handle_create_response() {
     log_warn "  - Size/region/image unavailable (try different BINARYLANE_SIZE, BINARYLANE_REGION, or BINARYLANE_IMAGE)"
     log_warn "  - Server limit reached"
     log_warn "  - Invalid cloud-init userdata"
-    log_warn "Remediation: Check https://home.binarylane.com.au/"
+    log_warn "Check your dashboard: https://home.binarylane.com.au/"
     return 1
 }
 

@@ -43,7 +43,7 @@ test_upcloud_credentials() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('error_message','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
+        log_error "How to fix:"
         log_warn "  1. Verify credentials at: https://hub.upcloud.com/people/account"
         log_warn "  2. Ensure your sub-account has API access enabled"
         log_warn "  3. Check username and password are correct"
@@ -163,7 +163,7 @@ _upcloud_handle_create_response() {
         log_warn "  - Insufficient account balance"
         log_warn "  - Plan not available in zone (try different UPCLOUD_PLAN or UPCLOUD_ZONE)"
         log_warn "  - Server limit reached"
-        log_warn "Remediation: Check https://hub.upcloud.com/"
+        log_warn "Check your dashboard: https://hub.upcloud.com/"
         return 1
     fi
 

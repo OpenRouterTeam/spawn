@@ -102,7 +102,7 @@ _validate_fly_token() {
     if echo "$response" | grep -q '"error"'; then
         log_error "Authentication failed: Invalid Fly.io API token"
         log_error "API Error: $(echo "$response" | _fly_parse_error "No details available")"
-        log_warn "Remediation steps:"
+        log_error "How to fix:"
         log_warn "  1. Run: fly tokens deploy"
         log_warn "  2. Or generate a token at: https://fly.io/dashboard"
         log_warn "  3. Ensure the token has appropriate permissions"
@@ -248,7 +248,7 @@ _fly_create_machine() {
         log_warn "  - Insufficient account balance or payment method required"
         log_warn "  - Region unavailable (try different FLY_REGION)"
         log_warn "  - Machine limit reached"
-        log_warn "Remediation: Check https://fly.io/dashboard"
+        log_warn "Check your dashboard: https://fly.io/dashboard"
         return 1
     fi
 

@@ -67,7 +67,7 @@ test_codesandbox_token() {
     if [[ ${exit_code} -ne 0 ]]; then
         if echo "${test_output}" | grep -qi "unauthorized\|invalid.*key\|authentication\|401"; then
             log_error "Invalid API key"
-            log_warn "Remediation steps:"
+            log_error "How to fix:"
             log_warn "  1. Get a new API key at: https://codesandbox.io/t/api"
             log_warn "  2. Enable all scopes when creating the key"
             log_warn "  3. Export it as: export CSB_API_KEY=your-key-here"

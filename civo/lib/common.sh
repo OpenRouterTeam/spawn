@@ -247,7 +247,7 @@ _handle_civo_create_error() {
     log_warn "  - Insufficient account balance"
     log_warn "  - Size unavailable in region (try different CIVO_SIZE or CIVO_REGION)"
     log_warn "  - Instance limit reached"
-    log_warn "Remediation: Check https://dashboard.civo.com/"
+    log_warn "Check your dashboard: https://dashboard.civo.com/"
 }
 
 create_server() {

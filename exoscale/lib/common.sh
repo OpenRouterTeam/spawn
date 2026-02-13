@@ -207,7 +207,7 @@ _handle_exoscale_create_error() {
     log_warn "  - Instance type/zone unavailable"
     log_warn "  - Template not found"
     log_warn "  - SSH key not registered"
-    log_warn "Remediation: Check https://portal.exoscale.com/"
+    log_warn "Check your dashboard: https://portal.exoscale.com/"
 }
 
 create_server() {

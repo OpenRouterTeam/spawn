@@ -43,7 +43,7 @@ test_genesis_token() {
         local error_msg
         error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message', d.get('message','No details available')))" 2>/dev/null || echo "Unable to parse error")
         log_error "API Error: $error_msg"
-        log_warn "Remediation steps:"
+        log_error "How to fix:"
         log_warn "  1. Verify API key at: https://developers.genesiscloud.com/"
         log_warn "  2. Ensure the key has read/write permissions"
         log_warn "  3. Check key hasn't been revoked"
@@ -182,7 +182,7 @@ create_server() {
         log_warn "  - Insufficient account balance"
         log_warn "  - Instance type unavailable in region (try different GENESIS_INSTANCE_TYPE or GENESIS_REGION)"
         log_warn "  - Instance limit reached"
-        log_warn "Remediation: Check https://console.genesiscloud.com/"
+        log_warn "Check your dashboard: https://console.genesiscloud.com/"
         return 1
     fi
 

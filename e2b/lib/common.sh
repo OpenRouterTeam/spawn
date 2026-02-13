@@ -45,7 +45,7 @@ test_e2b_token() {
     if [[ ${exit_code} -ne 0 ]]; then
         if echo "${test_response}" | grep -qi "unauthorized\|invalid.*key\|authentication"; then
             log_error "Invalid API key"
-            log_warn "Remediation steps:"
+            log_error "How to fix:"
             log_warn "  1. Verify API key at: https://e2b.dev/dashboard"
             log_warn "  2. Ensure the key has appropriate permissions"
             log_warn "  3. Check key hasn't been revoked"
