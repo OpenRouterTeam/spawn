@@ -52,7 +52,7 @@ else
 fi
 
 # 6. Inject environment variables
-log_step "Appending environment variables to ~/.zshrc..."
+log_step "Setting up environment variables..."
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
