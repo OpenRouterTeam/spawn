@@ -353,6 +353,10 @@ create_server() {
     local mem_gb="${CLOUDSIGMA_MEMORY_GB:-2}"
     local mem_bytes=$((mem_gb * 1024 * 1024 * 1024))
 
+    # Validate region before using it in API URLs
+    local region="${CLOUDSIGMA_REGION:-$CLOUDSIGMA_REGION_DEFAULT}"
+    validate_region_name "$region" || { log_error "Invalid CLOUDSIGMA_REGION"; return 1; }
+
     log_step "Creating CloudSigma server '$name'..."
     log_step "  CPU: ${cpu_mhz} MHz, Memory: ${mem_gb}GB"
 
