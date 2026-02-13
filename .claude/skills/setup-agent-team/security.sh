@@ -162,15 +162,15 @@ Create these teammates:
 1. Create the team with TeamCreate (team_name="${TEAM_NAME}")
 2. Create tasks with TaskCreate for implementer and reviewer work
 3. Fetch issue details: \`gh issue view ${ISSUE_NUM} --repo OpenRouterTeam/spawn\`
-4. Transition issue label to "In Progress":
-   \`gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --remove-label "Pending Review" --remove-label "Under Review" --add-label "In Progress"\`
+4. Transition issue label to "in-progress":
+   \`gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --add-label "in-progress"\`
 5. Set up worktree: \`git worktree add ${WORKTREE_BASE} -b team-building/issue-${ISSUE_NUM} origin/main\`
 6. Spawn implementer (model=opus) to work in \`${WORKTREE_BASE}\`
 7. Spawn reviewer (model=opus) to review once PR is created
 8. Monitor teammates (poll TaskList, sleep 15 between checks)
 9. Once both report:
    - If PR was merged, remove status labels and close the issue:
-     \`gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --remove-label "In Progress"\`
+     \`gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --remove-label "in-progress"\`
      \`gh issue close ${ISSUE_NUM} --repo OpenRouterTeam/spawn --comment "Implemented and merged. See PR #NUMBER."\`
    - If PR had issues, comment on the issue with findings
 10. Shutdown all teammates via SendMessage (type=shutdown_request)
@@ -281,7 +281,7 @@ gh issue close ${ISSUE_NUM} --repo OpenRouterTeam/spawn --comment "Security tria
 ### UNCLEAR — Cannot determine safety with confidence
 \`\`\`bash
 gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --add-label "needs-human-review"
-gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --add-label "Pending Review"
+gh issue edit ${ISSUE_NUM} --repo OpenRouterTeam/spawn --add-label "pending-review"
 gh issue comment ${ISSUE_NUM} --repo OpenRouterTeam/spawn --body "Security triage: **NEEDS REVIEW** — this issue requires human review before automated agents can work on it. Reason: [brief explanation]"
 \`\`\`
 If SLACK_WEBHOOK is set, notify the team:
@@ -507,7 +507,7 @@ Spawn an **issue-checker** agent (model=haiku, team_name="${TEAM_NAME}", name="i
     - If labeled \`security\` or \`security-review-required\`: ensure it has an assignee or a linked PR. If not, add \`Pending Review\` label
   * If stale AND has NO security labels: check if it should have been triaged
     - If the issue has zero comments from automated accounts, it was never triaged — add \`Pending Review\` label:
-      \`gh issue edit NUMBER --repo OpenRouterTeam/spawn --add-label "Pending Review"\`
+      \`gh issue edit NUMBER --repo OpenRouterTeam/spawn --add-label "pending-review"\`
 - Also verify label consistency on ALL open issues:
   * Every issue should have exactly ONE status label (\`Pending Review\`, \`Under Review\`, \`In Progress\`, \`safe-to-work\`, or \`needs-human-review\`)
   * If an issue has no status label at all, add \`Pending Review\`
