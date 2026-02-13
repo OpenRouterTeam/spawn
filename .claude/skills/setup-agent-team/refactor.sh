@@ -86,14 +86,30 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
     # Reset main checkout to origin/main
     git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
-    log "Pre-cycle cleanup: stale worktrees..."
+    log "Pre-cycle cleanup: stale worktrees and branches..."
     git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
     if [[ -d "${WORKTREE_BASE}" ]]; then
         rm -rf "${WORKTREE_BASE}" 2>&1 | tee -a "${LOG_FILE}" || true
         log "Removed stale ${WORKTREE_BASE} directory"
     fi
 
-    # Note: branch pruning and PR management is handled by the security team
+    # Delete merged refactor-related remote branches (fix/*, refactor/*, test/*, ux/*)
+    MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'origin/main\|origin/HEAD' | grep -E 'origin/(fix/|refactor/|test/|ux/)' | sed 's|origin/||' | tr -d ' ') || true
+    for branch in $MERGED_BRANCHES; do
+        if [[ -n "$branch" ]]; then
+            git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
+        fi
+    done
+
+    # Delete stale local refactor-related branches
+    LOCAL_BRANCHES=$(git branch --list 'fix/*' --list 'refactor/*' --list 'test/*' --list 'ux/*' | tr -d ' *') || true
+    for branch in $LOCAL_BRANCHES; do
+        if [[ -n "$branch" ]]; then
+            git branch -D "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
+        fi
+    done
+
+    log "Pre-cycle cleanup done."
 fi
 
 # Launch Claude Code with mode-specific prompt

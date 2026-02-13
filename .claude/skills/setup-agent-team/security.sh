@@ -115,9 +115,34 @@ if [[ "${RUN_MODE}" == "team_building" ]] || [[ "${RUN_MODE}" == "triage" ]]; th
     log "Issue: #${ISSUE_NUM}"
 fi
 
-# Fetch latest refs (read-only, safe for concurrent runs)
-log "Fetching latest refs..."
+# Pre-cycle cleanup (stale branches, worktrees from prior runs)
+log "Pre-cycle cleanup..."
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
+
+# Clean stale worktrees
+git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
+if [[ -d "${WORKTREE_BASE}" ]]; then
+    rm -rf "${WORKTREE_BASE}" 2>&1 | tee -a "${LOG_FILE}" || true
+    log "Removed stale ${WORKTREE_BASE} directory"
+fi
+
+# Delete merged security-related remote branches (team-building/*, review-pr-*)
+MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -E 'origin/(team-building/|review-pr-)' | sed 's|origin/||' | tr -d ' ') || true
+for branch in $MERGED_BRANCHES; do
+    if [[ -n "$branch" ]]; then
+        git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
+    fi
+done
+
+# Delete stale local security-related branches
+LOCAL_BRANCHES=$(git branch --list 'team-building/*' --list 'review-pr-*' | tr -d ' *') || true
+for branch in $LOCAL_BRANCHES; do
+    if [[ -n "$branch" ]]; then
+        git branch -D "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
+    fi
+done
+
+log "Pre-cycle cleanup done."
 
 # Launch Claude Code with mode-specific prompt
 log "Launching ${RUN_MODE} cycle..."
