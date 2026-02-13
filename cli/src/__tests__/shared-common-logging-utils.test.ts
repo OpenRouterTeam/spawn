@@ -667,9 +667,9 @@ describe("SSH_OPTS defaults", () => {
     expect(result.stdout.length).toBeGreaterThan(0);
   });
 
-  it("should disable strict host key checking", () => {
+  it("should use accept-new for strict host key checking (TOFU)", () => {
     const result = runBash('echo "$SSH_OPTS"');
-    expect(result.stdout).toContain("StrictHostKeyChecking=no");
+    expect(result.stdout).toContain("StrictHostKeyChecking=accept-new");
   });
 
   it("should use /dev/null for known hosts file", () => {
