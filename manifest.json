@@ -850,7 +850,7 @@
     "codesandbox/openclaw": "implemented",
     "codesandbox/nanoclaw": "missing",
     "codesandbox/aider": "implemented",
-    "codesandbox/goose": "missing",
+    "codesandbox/goose": "implemented",
     "codesandbox/codex": "missing",
     "codesandbox/interpreter": "missing",
     "codesandbox/gemini": "missing",
