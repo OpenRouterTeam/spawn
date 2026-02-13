@@ -122,24 +122,33 @@ ensure_jq() {
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
         if command -v brew &>/dev/null; then
-            brew install jq || { log_error "Failed to install jq via Homebrew"; return 1; }
+            brew install jq || { log_error "Failed to install jq via Homebrew. Run 'brew install jq' manually."; return 1; }
         else
-            log_error "Install jq: brew install jq (or https://jqlang.github.io/jq/download/)"
+            log_error "jq is required but not installed"
+            log_error "Install it with: brew install jq"
+            log_error "If Homebrew is not available: https://jqlang.github.io/jq/download/"
             return 1
         fi
     elif command -v apt-get &>/dev/null; then
-        sudo apt-get update -qq && sudo apt-get install -y jq || { log_error "Failed to install jq via apt"; return 1; }
+        sudo apt-get update -qq && sudo apt-get install -y jq || { log_error "Failed to install jq via apt. Run 'sudo apt-get install -y jq' manually."; return 1; }
     elif command -v dnf &>/dev/null; then
-        sudo dnf install -y jq || { log_error "Failed to install jq via dnf"; return 1; }
+        sudo dnf install -y jq || { log_error "Failed to install jq via dnf. Run 'sudo dnf install -y jq' manually."; return 1; }
     elif command -v apk &>/dev/null; then
-        sudo apk add jq || { log_error "Failed to install jq via apk"; return 1; }
+        sudo apk add jq || { log_error "Failed to install jq via apk. Run 'sudo apk add jq' manually."; return 1; }
     else
-        log_error "jq is required but not installed. Install from https://jqlang.github.io/jq/download/"
+        log_error "jq is required but not installed"
+        log_error ""
+        log_error "Install jq for your system:"
+        log_error "  Ubuntu/Debian:  sudo apt-get install -y jq"
+        log_error "  Fedora/RHEL:    sudo dnf install -y jq"
+        log_error "  macOS:          brew install jq"
+        log_error "  Other:          https://jqlang.github.io/jq/download/"
         return 1
     fi
 
     if ! command -v jq &>/dev/null; then
-        log_error "jq not found in PATH after installation"
+        log_error "jq was installed but is not found in PATH"
+        log_error "Try opening a new terminal or run: hash -r"
         return 1
     fi
 
@@ -444,7 +453,12 @@ get_openrouter_api_key_manual() {
     while [[ -z "${api_key}" ]]; do
         attempts=$((attempts + 1))
         if [[ ${attempts} -gt ${max_attempts} ]]; then
-            log_error "Too many failed attempts. Set OPENROUTER_API_KEY environment variable and try again."
+            log_error "Too many failed attempts."
+            log_error ""
+            log_error "How to fix:"
+            log_error "  1. Get your key from: https://openrouter.ai/settings/keys"
+            log_error "  2. Set it before running spawn: export OPENROUTER_API_KEY=sk-or-v1-..."
+            log_error "  3. Then re-run: spawn <agent> <cloud>"
             return 1
         fi
         api_key=$(safe_read "Enter your OpenRouter API key: ") || return 1
@@ -1033,9 +1047,21 @@ generate_ssh_key_if_missing() {
     if [[ -f "${key_path}" ]]; then
         return 0
     fi
-    log_step "Generating SSH key..."
-    mkdir -p "$(dirname "${key_path}")"
-    ssh-keygen -t ed25519 -f "${key_path}" -N "" -q
+    log_step "Generating SSH key at ${key_path}..."
+    mkdir -p "$(dirname "${key_path}")" || {
+        log_error "Failed to create SSH key directory: $(dirname "${key_path}")"
+        log_error "Check that you have write permissions to this directory."
+        return 1
+    }
+    ssh-keygen -t ed25519 -f "${key_path}" -N "" -q || {
+        log_error "Failed to generate SSH key at ${key_path}"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Check disk space: df -h $(dirname "${key_path}")"
+        log_error "  2. Check permissions: ls -la $(dirname "${key_path}")"
+        log_error "  3. Generate manually: ssh-keygen -t ed25519 -f ${key_path}"
+        return 1
+    }
     log_info "SSH key generated at ${key_path}"
 }
 
@@ -1043,7 +1069,21 @@ generate_ssh_key_if_missing() {
 # Usage: get_ssh_fingerprint PUB_KEY_PATH
 get_ssh_fingerprint() {
     local pub_path="${1}"
-    ssh-keygen -lf "${pub_path}" -E md5 2>/dev/null | awk '{print $2}' | sed 's/MD5://'
+    if [[ ! -f "${pub_path}" ]]; then
+        log_error "SSH public key not found: ${pub_path}"
+        log_error "Expected a public key file alongside your private key."
+        log_error "Regenerate with: ssh-keygen -t ed25519 -f ${pub_path%.pub}"
+        return 1
+    fi
+    local fingerprint
+    fingerprint=$(ssh-keygen -lf "${pub_path}" -E md5 2>/dev/null | awk '{print $2}' | sed 's/MD5://')
+    if [[ -z "${fingerprint}" ]]; then
+        log_error "Failed to read SSH public key fingerprint from ${pub_path}"
+        log_error "The key file may be corrupted or in an unsupported format."
+        log_error "Regenerate with: ssh-keygen -t ed25519 -f ${pub_path%.pub}"
+        return 1
+    fi
+    echo "${fingerprint}"
 }
 
 # JSON-escape a string (for embedding in JSON bodies)
@@ -1255,7 +1295,13 @@ _report_api_failure() {
     local max_retries="${2}"
     log_error "${retry_reason} after ${max_retries} attempts"
     if [[ "${retry_reason}" == "Cloud API network error" ]]; then
-        log_warn "Check your internet connection and verify the provider's API is reachable."
+        log_warn "Could not reach the cloud provider's API."
+        log_warn ""
+        log_warn "How to fix:"
+        log_warn "  1. Check your internet connection: curl -s https://httpbin.org/ip"
+        log_warn "  2. Check DNS resolution: nslookup the provider's API hostname"
+        log_warn "  3. If behind a proxy or firewall, ensure HTTPS traffic is allowed"
+        log_warn "  4. Try again in a few moments (the API may be temporarily down)"
     else
         log_warn "This is usually caused by rate limiting or temporary provider issues."
         log_warn "Wait a minute and try again, or check the provider's status page."
@@ -1468,8 +1514,15 @@ generic_ssh_wait() {
         attempt=$((attempt + 1))
     done
 
-    log_error "${description} timed out after ${elapsed_time}s"
-    log_warn "The server at ${ip} may still be booting. You can try again or check its status in your cloud provider dashboard."
+    log_error "${description} timed out after ${elapsed_time}s (server: ${ip})"
+    log_warn ""
+    log_warn "The server may still be booting or the connection may be blocked."
+    log_warn ""
+    log_warn "How to fix:"
+    log_warn "  1. Re-run the command to try again (the server may need more time)"
+    log_warn "  2. Check your cloud provider dashboard to verify the server is running"
+    log_warn "  3. Test SSH manually: ssh ${username}@${ip}"
+    log_warn "  4. Check that port 22 is open in the server's firewall/security group"
     return 1
 }
 

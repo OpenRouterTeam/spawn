@@ -60,7 +60,9 @@ ensure_exo_cli() {
     local temp_dir
     temp_dir=$(mktemp -d)
     if ! curl -fsSL "$exo_url" -o "${temp_dir}/exo.tar.gz"; then
-        log_error "Failed to download exo CLI"
+        log_error "Failed to download exo CLI from: $exo_url"
+        log_error "Check your internet connection and try again."
+        log_error "You can also install manually: https://community.exoscale.com/documentation/tools/exoscale-command-line-interface/"
         rm -rf "$temp_dir"
         return 1
     fi
@@ -77,6 +79,7 @@ ensure_exo_cli() {
 test_exoscale_creds() {
     if ! exo config list &>/dev/null; then
         log_error "Exoscale credentials not configured or invalid"
+        log_error "Get your API credentials at: https://portal.exoscale.com/iam/api-keys"
         return 1
     fi
 
@@ -128,6 +131,11 @@ ensure_exoscale_creds() {
         return 0
     else
         log_error "Failed to configure Exoscale credentials"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Verify your API Key and Secret at: https://portal.exoscale.com/iam/api-keys"
+        log_error "  2. Ensure the API key has the required permissions (compute, SSH keys)"
+        log_error "  3. Re-run the command to enter new credentials"
         return 1
     fi
 }
