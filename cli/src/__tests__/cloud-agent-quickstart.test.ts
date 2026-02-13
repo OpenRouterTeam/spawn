@@ -837,4 +837,130 @@ describe("Quick start credential status indicators", () => {
       expect(authLine).not.toContain("export");
     });
   });
+
+  describe("cmdCloudInfo 'ready to go' shortcut", () => {
+    it("should show 'ready to go' when all credentials are set", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      process.env.UPCLOUD_USERNAME = "testuser";
+      process.env.UPCLOUD_PASSWORD = "testpass";
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("upcloud");
+      const output = getOutput();
+      expect(output).toContain("ready to go");
+      expect(output).toContain("spawn claude upcloud");
+    });
+
+    it("should NOT show export instructions when all creds are ready", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      process.env.UPCLOUD_USERNAME = "testuser";
+      process.env.UPCLOUD_PASSWORD = "testpass";
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("upcloud");
+      const lines = getLines();
+      const quickStartIdx = lines.findIndex((l: string) => l.includes("Quick start"));
+      const afterQuickStart = lines.slice(quickStartIdx + 1);
+      const exportLines = afterQuickStart.filter((l: string) => l.includes("export"));
+      expect(exportLines).toHaveLength(0);
+    });
+
+    it("should NOT show 'ready to go' when OPENROUTER_API_KEY is missing", async () => {
+      delete process.env.OPENROUTER_API_KEY;
+      process.env.UPCLOUD_USERNAME = "testuser";
+      process.env.UPCLOUD_PASSWORD = "testpass";
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("upcloud");
+      const output = getOutput();
+      expect(output).not.toContain("ready to go");
+    });
+
+    it("should NOT show 'ready to go' when cloud auth var is missing", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      delete process.env.UPCLOUD_USERNAME;
+      process.env.UPCLOUD_PASSWORD = "testpass";
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("upcloud");
+      const output = getOutput();
+      expect(output).not.toContain("ready to go");
+    });
+
+    it("should show 'ready to go' for none-auth cloud when OPENROUTER_API_KEY is set", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("nonecloud");
+      const output = getOutput();
+      expect(output).toContain("ready to go");
+    });
+
+    it("should NOT show 'ready to go' for cloud with no implemented agents", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      process.env.EMPTY_TOKEN = "test-token";
+      await setupManifest(multiAuthManifest);
+      await cmdCloudInfo("emptycloud");
+      const output = getOutput();
+      expect(output).not.toContain("ready to go");
+    });
+  });
+
+  describe("cmdAgentInfo 'ready to go' shortcut", () => {
+    it("should show 'ready to go' when first cloud has all creds set", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      process.env.UPCLOUD_USERNAME = "testuser";
+      process.env.UPCLOUD_PASSWORD = "testpass";
+      await setupManifest(multiAuthManifest);
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("ready to go");
+      expect(output).toContain("spawn claude upcloud");
+    });
+
+    it("should NOT show 'ready to go' when OPENROUTER_API_KEY is missing", async () => {
+      delete process.env.OPENROUTER_API_KEY;
+      process.env.UPCLOUD_USERNAME = "testuser";
+      process.env.UPCLOUD_PASSWORD = "testpass";
+      await setupManifest(multiAuthManifest);
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).not.toContain("ready to go");
+    });
+
+    it("should show 'ready to go' for agent with none-auth cloud when OPENROUTER_API_KEY is set", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      const noneFirstManifest: Manifest = {
+        agents: {
+          claude: {
+            name: "Claude Code", description: "AI assistant",
+            url: "https://claude.ai", install: "npm install -g claude",
+            launch: "claude", env: {},
+          },
+        },
+        clouds: {
+          nonecloud: {
+            name: "Local Runner", description: "Run locally",
+            url: "https://example.com", type: "local", auth: "none",
+            provision_method: "none", exec_method: "bash", interactive_method: "bash",
+          },
+        },
+        matrix: { "nonecloud/claude": "implemented" },
+      };
+      await setupManifest(noneFirstManifest);
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      expect(output).toContain("ready to go");
+    });
+
+    it("should NOT show export instructions when all creds are ready", async () => {
+      process.env.OPENROUTER_API_KEY = "sk-or-v1-test";
+      process.env.UPCLOUD_USERNAME = "testuser";
+      process.env.UPCLOUD_PASSWORD = "testpass";
+      await setupManifest(multiAuthManifest);
+      await cmdAgentInfo("claude");
+      const lines = getLines();
+      const quickStartIdx = lines.findIndex((l: string) => l.includes("Quick start"));
+      const nextLine = lines[quickStartIdx + 1];
+      expect(nextLine).toContain("spawn claude");
+      const afterQuickStart = lines.slice(quickStartIdx + 1, quickStartIdx + 3);
+      const exportLines = afterQuickStart.filter((l: string) => l.includes("export"));
+      expect(exportLines).toHaveLength(0);
+    });
+  });
 });

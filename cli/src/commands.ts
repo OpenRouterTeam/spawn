@@ -1349,14 +1349,22 @@ export async function cmdAgentInfo(agent: string): Promise<void> {
     const cloudDef = manifest.clouds[exampleCloud];
     const authVars = parseAuthEnvVars(cloudDef.auth);
     const hasCreds = hasCloudCredentials(cloudDef.auth);
+    const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
+    const allReady = hasOpenRouterKey && (hasCreds || authVars.length === 0);
+
     console.log();
-    console.log(pc.bold("Quick start:"));
-    console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
-    if (authVars.length > 0) {
-      const hint = cloudDef.url ?? `${cloudDef.name} credential`;
-      console.log(formatAuthVarLine(authVars[0], hint));
+    if (allReady) {
+      console.log(pc.bold("Quick start:") + "  " + pc.green("credentials detected -- ready to go"));
+      console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
+    } else {
+      console.log(pc.bold("Quick start:"));
+      console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
+      if (authVars.length > 0) {
+        const hint = cloudDef.url ?? `${cloudDef.name} credential`;
+        console.log(formatAuthVarLine(authVars[0], hint));
+      }
+      console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
     }
-    console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
   }
 
   console.log();
@@ -1394,7 +1402,16 @@ function printCloudQuickStart(
   cloudKey: string
 ): void {
   const hasCreds = hasCloudCredentials(cloud.auth);
+  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
+  const allReady = hasOpenRouterKey && (hasCreds || authVars.length === 0);
+
   console.log();
+  if (allReady && exampleAgent) {
+    console.log(pc.bold("Quick start:") + "  " + pc.green("credentials detected -- ready to go"));
+    console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
+    return;
+  }
+
   console.log(pc.bold("Quick start:"));
   console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
   if (authVars.length > 0) {
