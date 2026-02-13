@@ -23,6 +23,18 @@ fi
 # Render specific functions
 # ============================================================
 
+RENDER_API_BASE="https://api.render.com/v1"
+
+# Centralized API wrapper for Render — delegates to generic_cloud_api
+# for automatic retry with exponential backoff on 429/503/network errors.
+# Usage: render_api METHOD ENDPOINT [BODY]
+render_api() {
+    local method="$1"
+    local endpoint="$2"
+    local body="${3:-}"
+    generic_cloud_api "$RENDER_API_BASE" "$RENDER_API_KEY" "$method" "$endpoint" "$body"
+}
+
 # Ensure Render CLI is installed
 ensure_render_cli() {
     if command -v render &>/dev/null; then
@@ -115,21 +127,13 @@ body = {
 print(json.dumps(body))
 ")
 
-    # Create service via API
     local create_response
-    create_response=$(curl -s -X POST "https://api.render.com/v1/services" \
-        -H "Authorization: Bearer ${RENDER_API_KEY}" \
-        -H "Content-Type: application/json" \
-        -d "$body" 2>&1)
-
-    if echo "$create_response" | grep -q "error"; then
+    create_response=$(render_api POST "/services" "$body") || {
         log_error "Failed to create Render service"
-        log_error "$create_response"
         return 1
-    fi
+    }
 
-    # Extract service ID from response
-    RENDER_SERVICE_ID=$(echo "$create_response" | python3 -c "import json, sys; data = json.load(sys.stdin); print(data.get('service', {}).get('id', ''))" 2>/dev/null)
+    RENDER_SERVICE_ID=$(_extract_json_field "$create_response" "d.get('service',{}).get('id','')")
 
     if [[ -z "$RENDER_SERVICE_ID" ]]; then
         log_error "Failed to get Render service ID from response"
@@ -144,14 +148,16 @@ print(json.dumps(body))
 _render_wait_for_service() {
     local service_id="$1"
     local max_attempts=${2:-60}
-    local attempt=0
+    local attempt=1
+    local poll_delay="${INSTANCE_STATUS_POLL_DELAY:-5}"
 
-    log_step "Waiting for service to be live..."
-    while [[ $attempt -lt $max_attempts ]]; do
+    log_step "Waiting for service to become live..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local response
+        response=$(render_api GET "/services/${service_id}" 2>/dev/null) || true
+
         local status
-        status=$(curl -s "https://api.render.com/v1/services/${service_id}" \
-            -H "Authorization: Bearer ${RENDER_API_KEY}" | \
-            python3 -c "import json, sys; data = json.load(sys.stdin); print(data.get('service', {}).get('serviceDetails', {}).get('deployStatus', ''))" 2>/dev/null)
+        status=$(_extract_json_field "$response" "d.get('service',{}).get('serviceDetails',{}).get('deployStatus','')" "unknown")
 
         if [[ "$status" == "live" ]]; then
             log_info "Service is live"
@@ -163,11 +169,15 @@ _render_wait_for_service() {
             return 1
         fi
 
+        log_step "Service status: $status ($attempt/$max_attempts)"
+        sleep "$poll_delay"
         attempt=$((attempt + 1))
-        sleep 5
     done
 
-    log_error "Timeout waiting for service to be live"
+    log_error "Service did not become live after $max_attempts attempts"
+    log_warn "The service may still be deploying. You can:"
+    log_warn "  1. Re-run the command to try again"
+    log_warn "  2. Check the service status in the Render dashboard"
     return 1
 }
 
@@ -266,7 +276,6 @@ interactive_session() {
 cleanup_server() {
     if [[ -n "${RENDER_SERVICE_ID:-}" ]]; then
         log_step "Deleting Render service: $RENDER_SERVICE_NAME"
-        curl -s -X DELETE "https://api.render.com/v1/services/${RENDER_SERVICE_ID}" \
-            -H "Authorization: Bearer ${RENDER_API_KEY}" >/dev/null 2>&1 || true
+        render_api DELETE "/services/${RENDER_SERVICE_ID}" >/dev/null 2>&1 || true
     fi
 }
