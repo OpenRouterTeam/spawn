@@ -114,6 +114,7 @@ if data:
 
     if [[ -z "$network_id" ]]; then
         log_error "Failed to find a network in region $region"
+        log_error "Try a different CIVO_REGION (e.g., LON1, NYC1, FRA1, PHX1)"
         return 1
     fi
 
@@ -147,7 +148,8 @@ sys.exit(1)
 " <<< "$response" 2>/dev/null)
 
     if [[ -z "$template_id" ]]; then
-        log_error "Failed to find Ubuntu disk image"
+        log_error "Failed to find Ubuntu disk image in region ${region}"
+        log_error "Try a different CIVO_REGION (e.g., LON1, NYC1, FRA1)"
         return 1
     fi
 
@@ -167,7 +169,8 @@ if data:
 " <<< "$response" 2>/dev/null)
 
     if [[ -z "$ssh_key_id" ]]; then
-        log_error "No SSH keys found"
+        log_error "No SSH keys found in your Civo account"
+        log_error "Register a key at: https://dashboard.civo.com/ssh-keys"
         return 1
     fi
 

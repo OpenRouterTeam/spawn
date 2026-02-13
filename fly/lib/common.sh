@@ -280,7 +280,12 @@ _fly_wait_for_machine_start() {
         attempt=$((attempt + 1))
     done
 
-    log_error "Machine did not start in time"
+    log_error "Machine did not start after $max_attempts attempts"
+    log_error ""
+    log_error "The machine may still be starting. You can:"
+    log_error "  1. Check status: fly machines list -a $name"
+    log_error "  2. Try a different region: FLY_REGION=ord (Chicago), FLY_REGION=ams (Amsterdam)"
+    log_error "  3. View in dashboard: https://fly.io/dashboard"
     return 1
 }
 

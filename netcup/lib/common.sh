@@ -54,6 +54,13 @@ netcup_get_session() {
 
     if [[ -z "$customer_number" || -z "$api_key" || -z "$api_password" ]]; then
         log_error "Missing Netcup credentials"
+        log_error ""
+        log_error "Required environment variables:"
+        [[ -z "$customer_number" ]] && log_error "  - NETCUP_CUSTOMER_NUMBER (not set)"
+        [[ -z "$api_key" ]] && log_error "  - NETCUP_API_KEY (not set)"
+        [[ -z "$api_password" ]] && log_error "  - NETCUP_API_PASSWORD (not set)"
+        log_error ""
+        log_error "Get your API credentials at: https://ccp.netcup.net/ -> Master Data -> API"
         return 1
     fi
 
@@ -70,7 +77,11 @@ netcup_get_session() {
 
     if ! _netcup_is_success "$response"; then
         log_error "Failed to authenticate with Netcup API"
-        log_error "Response: $response"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Verify your credentials at: https://ccp.netcup.net/ -> Master Data -> API"
+        log_error "  2. Ensure NETCUP_CUSTOMER_NUMBER, NETCUP_API_KEY, and NETCUP_API_PASSWORD are correct"
+        log_error "  3. Check that API access is enabled for your account"
         return 1
     fi
 
