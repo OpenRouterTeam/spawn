@@ -18,6 +18,10 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/aider.sh)
 
 #### OpenClaw
 
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
+```
+
 #### Codex
 
 ```bash
@@ -30,8 +34,10 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/continue.sh)
 ```
 
+#### gptme
+
 ```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/gptme.sh)
 ```
 
 #### Gemini
