@@ -324,7 +324,7 @@ fi
 - \`Pending Review\` → \`Under Review\` → \`In Progress\`
 
 **PR labels** (used by review_all mode):
-- \`security-approved\`, \`security-review-required\`, \`security-notes\`, \`needs-team-review\`
+- \`security-approved\`, \`security-review-required\`, \`security-notes\`
 
 ## Rules
 
