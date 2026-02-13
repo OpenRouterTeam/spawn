@@ -259,82 +259,24 @@ create_server() {
     log_step "Waiting for server provisioning (this may take a few minutes for bare metal)..."
 }
 
-# Extract the IPv4 address from a Latitude.sh server API response
-# Checks network.ip, ip_addresses[], and primary_ipv4 fields
-# Usage: extract_latitude_server_ip JSON_RESPONSE
-extract_latitude_server_ip() {
-    local response="$1"
-    echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-server = data.get('data', {})
-attrs = server.get('attributes', {})
-# Check for IP in network attributes
-network = attrs.get('network', {})
-if isinstance(network, dict):
-    ip = network.get('ip', '')
-    if ip:
-        print(ip)
-        sys.exit(0)
-# Check for IP in relationships or included data
-ips = attrs.get('ip_addresses', [])
-if isinstance(ips, list):
-    for ip_obj in ips:
-        if isinstance(ip_obj, dict):
-            addr = ip_obj.get('address', '')
-            if addr and ':' not in addr:  # Skip IPv6
-                print(addr)
-                sys.exit(0)
-        elif isinstance(ip_obj, str) and ':' not in ip_obj:
-            print(ip_obj)
-            sys.exit(0)
-# Fallback: try primary_ipv4
-primary = attrs.get('primary_ipv4', '')
-if primary:
-    print(primary)
-    sys.exit(0)
-sys.exit(1)
-" 2>/dev/null
-}
+# Python expression to extract IPv4 from Latitude.sh JSON:API response.
+# Checks: network.ip, ip_addresses[] (dict or string, skip IPv6), primary_ipv4.
+# Used by generic_wait_for_instance; receives 'd' as the parsed JSON dict.
+readonly _LATITUDE_IP_PY="(lambda a: (a.get('network',{}).get('ip','') if isinstance(a.get('network'),dict) else '') or next((o.get('address','') if isinstance(o,dict) else o for o in (a.get('ip_addresses') or []) if ':' not in (o.get('address','') if isinstance(o,dict) else o)),None) or a.get('primary_ipv4',''))(d.get('data',{}).get('attributes',{}))"
 
 # Wait for server to become active and get its IP address
+# Delegates to generic_wait_for_instance from shared/common.sh.
+# Latitude reports status as "on" when active, so we match on "on".
 wait_for_server_ready() {
     local server_id="$1"
     local max_attempts=${2:-60}
-    local attempt=1
 
-    log_step "Waiting for server $server_id to become active..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local response
-        response=$(latitude_api GET "/servers/$server_id")
-
-        local status
-        status=$(echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-server = data.get('data', {})
-attrs = server.get('attributes', {})
-print(attrs.get('status', 'unknown'))
-" 2>/dev/null || echo "unknown")
-
-        if [[ "$status" == "on" ]] || [[ "$status" == "active" ]]; then
-            LATITUDE_SERVER_IP=$(extract_latitude_server_ip "$response")
-            if [[ -n "$LATITUDE_SERVER_IP" ]]; then
-                export LATITUDE_SERVER_IP
-                log_info "Server active: IP=$LATITUDE_SERVER_IP"
-                return 0
-            fi
-            log_step "Server active but IP not yet assigned... (attempt $attempt/$max_attempts)"
-        else
-            log_step "Server status: $status (attempt $attempt/$max_attempts)"
-        fi
-
-        sleep 10
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Server failed to become active after $max_attempts attempts"
-    return 1
+    INSTANCE_STATUS_POLL_DELAY=10 generic_wait_for_instance latitude_api \
+        "/servers/$server_id" \
+        "on" \
+        "d.get('data',{}).get('attributes',{}).get('status','unknown')" \
+        "${_LATITUDE_IP_PY}" \
+        LATITUDE_SERVER_IP "Latitude.sh server" "${max_attempts}"
 }
 
 # SSH operations — delegates to shared helpers (SSH_USER defaults to root)

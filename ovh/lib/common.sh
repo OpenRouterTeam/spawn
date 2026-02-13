@@ -115,11 +115,11 @@ ovh_register_ssh_key() {
 import json, sys
 pub_key = sys.stdin.read().strip()
 body = {
-    'name': '$key_name',
+    'name': sys.argv[1],
     'publicKey': pub_key
 }
 print(json.dumps(body))
-")
+" "$key_name")
 
     local response
     response=$(ovh_api_call POST "/cloud/project/${OVH_PROJECT_ID}/sshkey" "$body")
@@ -178,13 +178,13 @@ _ovh_find_flavor_id() {
     python3 -c "
 import json, sys
 flavors = json.loads(sys.stdin.read())
-target = '${flavor_name}'
+target = sys.argv[1]
 for f in flavors:
     if f.get('name', '') == target:
         print(f['id'])
         sys.exit(0)
 print('')
-" <<< "${flavors_response}"
+" "$flavor_name" <<< "${flavors_response}"
 }
 
 # Get SSH key ID from OVH
@@ -196,7 +196,7 @@ _ovh_get_ssh_key_id() {
     python3 -c "
 import json, sys
 keys = json.loads(sys.stdin.read())
-fp = '${fingerprint}'
+fp = sys.argv[1]
 for k in keys:
     if fp in k.get('fingerprint', '') or fp in k.get('publicKey', ''):
         print(k['id'])
@@ -204,7 +204,7 @@ for k in keys:
 # Fallback: return first key
 if keys:
     print(keys[0]['id'])
-" <<< "${keys_response}"
+" "$fingerprint" <<< "${keys_response}"
 }
 
 # Resolve image ID, flavor ID, and SSH key ID for OVH instance creation
@@ -244,19 +244,18 @@ _ovh_resolve_resources() {
 _ovh_build_instance_body() {
     local name="$1" flavor_id="$2" image_id="$3" region="$4" ssh_key_id="$5"
     python3 -c "
-import json
+import json, sys
 body = {
-    'name': '${name}',
-    'flavorId': '${flavor_id}',
-    'imageId': '${image_id}',
-    'region': '${region}',
+    'name': sys.argv[1],
+    'flavorId': sys.argv[2],
+    'imageId': sys.argv[3],
+    'region': sys.argv[4],
     'monthlyBilling': False
 }
-ssh_key_id = '${ssh_key_id}'
-if ssh_key_id:
-    body['sshKeyId'] = ssh_key_id
+if sys.argv[5]:
+    body['sshKeyId'] = sys.argv[5]
 print(json.dumps(body))
-"
+" "$name" "$flavor_id" "$image_id" "$region" "$ssh_key_id"
 }
 
 # Create an OVH Public Cloud instance
