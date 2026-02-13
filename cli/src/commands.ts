@@ -552,11 +552,33 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   process.exit(1);
 }
 
+/** Format a single credential var with set/missing status */
+function formatCredentialStatus(varName: string): string {
+  if (process.env[varName]) {
+    return `${pc.green(varName)} ${pc.dim("-- set")}`;
+  }
+  return `${pc.red(varName)} ${pc.dim("-- not set")}`;
+}
+
 function credentialHints(cloud: string, authHint?: string, verb = "Missing or invalid"): string[] {
   if (authHint) {
+    const authVars = authHint.split(/\s*\+\s*/).map((s) => s.trim()).filter(Boolean);
+    const allVars = [...authVars, "OPENROUTER_API_KEY"];
+    const anyMissing = allVars.some((v) => !process.env[v]);
+
+    if (anyMissing) {
+      const lines = [`  - Credential status:`];
+      for (const v of allVars) {
+        lines.push(`    ${formatCredentialStatus(v)}`);
+      }
+      lines.push(`    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`);
+      return lines;
+    }
+
+    // All set -- credentials are probably valid but something else failed
     return [
-      `  - ${verb} credentials (need ${pc.cyan(authHint)} + ${pc.cyan("OPENROUTER_API_KEY")})`,
-      `    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`,
+      `  - Credentials appear set (but may be invalid or expired)`,
+      `    Run ${pc.cyan(`spawn ${cloud}`)} to verify setup`,
     ];
   }
   return [

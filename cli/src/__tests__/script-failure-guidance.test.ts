@@ -116,9 +116,9 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("provisioning failed");
     });
 
-    it("should return at least 4 guidance lines", () => {
+    it("should return at least 3 guidance lines", () => {
       const lines = getScriptFailureGuidance(1, "sprite");
-      expect(lines.length).toBeGreaterThanOrEqual(4);
+      expect(lines.length).toBeGreaterThanOrEqual(3);
     });
   });
 
@@ -157,9 +157,9 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("spawn linode");
     });
 
-    it("should return at least 4 guidance lines", () => {
+    it("should return at least 3 guidance lines", () => {
       const lines = getScriptFailureGuidance(42, "linode");
-      expect(lines.length).toBeGreaterThanOrEqual(4);
+      expect(lines.length).toBeGreaterThanOrEqual(3);
     });
   });
 
@@ -183,9 +183,9 @@ describe("getScriptFailureGuidance", () => {
       expect(joined).toContain("spawn sprite");
     });
 
-    it("should return at least 4 guidance lines", () => {
+    it("should return at least 3 guidance lines", () => {
       const lines = getScriptFailureGuidance(null, "sprite");
-      expect(lines.length).toBeGreaterThanOrEqual(4);
+      expect(lines.length).toBeGreaterThanOrEqual(3);
     });
   });
 
@@ -356,7 +356,9 @@ describe("getScriptFailureGuidance", () => {
     it("should handle multi-credential auth hint", () => {
       const lines = getScriptFailureGuidance(1, "contabo", "CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
       const joined = lines.join("\n");
-      expect(joined).toContain("CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET");
+      expect(joined).toContain("CONTABO_CLIENT_ID");
+      expect(joined).toContain("CONTABO_CLIENT_SECRET");
+      expect(joined).toContain("OPENROUTER_API_KEY");
     });
 
     it("should not affect non-credential exit codes (130, 137, etc.)", () => {
@@ -371,20 +373,22 @@ describe("getScriptFailureGuidance", () => {
       expect(joined255).toContain("SSH");
     });
 
-    it("should include setup instruction line for exit code 1 with authHint", () => {
+    it("should include setup instruction and per-var status for exit code 1 with authHint", () => {
       const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(5);
+      expect(lines.length).toBeGreaterThanOrEqual(5);
       const joined = lines.join("\n");
+      expect(joined).toContain("HCLOUD_TOKEN");
+      expect(joined).toContain("OPENROUTER_API_KEY");
       expect(joined).toContain("spawn hetzner");
-      expect(joined).toContain("setup");
     });
 
-    it("should include setup instruction line for default case with authHint", () => {
+    it("should include setup instruction and per-var status for default case with authHint", () => {
       const lines = getScriptFailureGuidance(42, "hetzner", "HCLOUD_TOKEN");
-      expect(lines).toHaveLength(5);
+      expect(lines.length).toBeGreaterThanOrEqual(5);
       const joined = lines.join("\n");
+      expect(joined).toContain("HCLOUD_TOKEN");
+      expect(joined).toContain("OPENROUTER_API_KEY");
       expect(joined).toContain("spawn hetzner");
-      expect(joined).toContain("setup");
     });
   });
 

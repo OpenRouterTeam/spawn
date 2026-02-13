@@ -77,16 +77,36 @@ function buildCloudLines(cloudInfo: {
   return lines;
 }
 
-// commands.ts:525-534
+// commands.ts – credentialHints (updated: now shows per-var set/missing status)
+function formatCredentialStatus(varName: string): string {
+  if (process.env[varName]) {
+    return `${varName} -- set`;
+  }
+  return `${varName} -- not set`;
+}
+
 function credentialHints(
   cloud: string,
   authHint?: string,
   verb = "Missing or invalid"
 ): string[] {
   if (authHint) {
+    const authVars = authHint.split(/\s*\+\s*/).map((s) => s.trim()).filter(Boolean);
+    const allVars = [...authVars, "OPENROUTER_API_KEY"];
+    const anyMissing = allVars.some((v) => !process.env[v]);
+
+    if (anyMissing) {
+      const lines = [`  - Credential status:`];
+      for (const v of allVars) {
+        lines.push(`    ${formatCredentialStatus(v)}`);
+      }
+      lines.push(`    Run spawn ${cloud} for setup instructions`);
+      return lines;
+    }
+
     return [
-      `  - ${verb} credentials (need ${authHint} + OPENROUTER_API_KEY)`,
-      `    Run spawn ${cloud} for setup instructions`,
+      `  - Credentials appear set (but may be invalid or expired)`,
+      `    Run spawn ${cloud} to verify setup`,
     ];
   }
   return [
@@ -387,19 +407,19 @@ describe("buildCloudLines", () => {
 // ── credentialHints tests ────────────────────────────────────────────────────
 
 describe("credentialHints", () => {
-  it("shows auth hint with named env vars and setup instruction when authHint is provided", () => {
+  it("shows per-var status and setup instruction when authHint is provided and vars are missing", () => {
     const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
     const joined = hints.join("\n");
     expect(joined).toContain("HCLOUD_TOKEN");
+    expect(joined).toContain("not set");
     expect(joined).toContain("OPENROUTER_API_KEY");
-    expect(joined).toContain("Missing or invalid");
     expect(joined).toContain("spawn hetzner");
     expect(joined).toContain("setup instructions");
   });
 
-  it("returns two lines when authHint is provided", () => {
+  it("shows Credential status header when authHint is provided and vars missing", () => {
     const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-    expect(hints).toHaveLength(2);
+    expect(hints[0]).toContain("Credential status");
   });
 
   it("shows cloud setup command when authHint is not provided", () => {
@@ -415,32 +435,20 @@ describe("credentialHints", () => {
     expect(hints).toHaveLength(1);
   });
 
-  it("uses custom verb when provided", () => {
-    const hints = credentialHints("sprite", "SPRITE_TOKEN", "Missing");
-    const joined = hints.join("\n");
-    expect(joined).toContain("Missing");
-    expect(joined).not.toContain("Missing or invalid");
-  });
-
-  it("uses default verb when not provided", () => {
-    const hints = credentialHints("sprite", "SPRITE_TOKEN");
-    const joined = hints.join("\n");
-    expect(joined).toContain("Missing or invalid");
-  });
-
   it("shows cloud name in setup fallback", () => {
     const hints = credentialHints("digitalocean");
     const joined = hints.join("\n");
     expect(joined).toContain("spawn digitalocean");
   });
 
-  it("works with multi-token authHint", () => {
+  it("works with multi-token authHint and shows each var separately", () => {
     const hints = credentialHints(
       "upcloud",
       "UPCLOUD_USERNAME + UPCLOUD_PASSWORD"
     );
     const joined = hints.join("\n");
-    expect(joined).toContain("UPCLOUD_USERNAME + UPCLOUD_PASSWORD");
+    expect(joined).toContain("UPCLOUD_USERNAME");
+    expect(joined).toContain("UPCLOUD_PASSWORD");
     expect(joined).toContain("OPENROUTER_API_KEY");
   });
 
@@ -449,6 +457,20 @@ describe("credentialHints", () => {
     const joined = hints.join("\n");
     expect(joined).toContain("Missing");
     expect(joined).toContain("spawn vultr");
+  });
+
+  it("shows 'appear set' message when all creds are present", () => {
+    const origEnv = { ...process.env };
+    process.env.TEST_TOKEN_CRED = "test-value";
+    process.env.OPENROUTER_API_KEY = "sk-or-test";
+    try {
+      const hints = credentialHints("test-cloud", "TEST_TOKEN_CRED");
+      const joined = hints.join("\n");
+      expect(joined).toContain("appear set");
+      expect(joined).toContain("verify setup");
+    } finally {
+      process.env = origEnv;
+    }
   });
 });
 
@@ -741,12 +763,15 @@ describe("groupByType with manifest clouds", () => {
 // ── Integration: credentialHints in error message context ────────────────────
 
 describe("credentialHints in error context", () => {
-  it("produces valid hints for exit code 1 with auth", () => {
+  it("produces valid hints for exit code 1 with auth (vars missing)", () => {
     const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-    // First line is the credential hint, second is the setup instruction
+    // First line is the credential status header
     expect(hints[0]).toMatch(/^\s+-/);
-    expect(hints[0]).toContain("credentials");
-    expect(hints[1]).toContain("spawn hetzner");
+    expect(hints[0]).toContain("Credential status");
+    // Per-var status lines follow
+    const joined = hints.join("\n");
+    expect(joined).toContain("HCLOUD_TOKEN");
+    expect(joined).toContain("spawn hetzner");
   });
 
   it("produces valid hint for default exit code without auth", () => {
