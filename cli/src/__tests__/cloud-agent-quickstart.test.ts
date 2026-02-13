@@ -578,6 +578,35 @@ describe("cmdAgentInfo - Quick start auth patterns", () => {
       const output = getOutput();
       expect(output).toContain("upcloud.com");
     });
+
+    it("should show ALL auth env vars for multi-credential clouds", async () => {
+      await setupManifest(multiAuthManifest);
+      await cmdAgentInfo("claude");
+      const output = getOutput();
+      // Both vars from "UPCLOUD_USERNAME + UPCLOUD_PASSWORD" should appear
+      expect(output).toContain("UPCLOUD_USERNAME");
+      expect(output).toContain("UPCLOUD_PASSWORD");
+    });
+
+    it("should show URL hint only on first auth var, not repeated", async () => {
+      await setupManifest(multiAuthManifest);
+      await cmdAgentInfo("claude");
+      const lines = consoleSpy.mock.calls.map((c: any[]) => c.join(" "));
+      const quickStartIdx = lines.findIndex((l: string) => l.includes("Quick start"));
+      const afterQuickStart = lines.slice(quickStartIdx + 1);
+      const usernameLine = afterQuickStart.find(
+        (l: string) => l.includes("UPCLOUD_USERNAME")
+      );
+      const passwordLine = afterQuickStart.find(
+        (l: string) => l.includes("UPCLOUD_PASSWORD")
+      );
+      expect(usernameLine).toBeDefined();
+      expect(passwordLine).toBeDefined();
+      // URL hint should appear on the first auth var line
+      expect(usernameLine).toContain("upcloud.com");
+      // URL hint should NOT be repeated on the second auth var line
+      expect(passwordLine).not.toContain("upcloud.com");
+    });
   });
 
   describe("agent where first cloud has 'none' auth", () => {
