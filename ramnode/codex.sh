@@ -17,8 +17,8 @@ ensure_ssh_key
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 
-log_step "Waiting for server to be ready..."
 verify_server_connectivity "${RAMNODE_SERVER_IP}"
+wait_for_cloud_init "${RAMNODE_SERVER_IP}" 60
 
 log_step "Installing Codex CLI..."
 run_server "${RAMNODE_SERVER_IP}" "npm install -g @openai/codex"
@@ -31,17 +31,17 @@ else
 fi
 
 log_step "Setting up environment variables..."
-run_server "${RAMNODE_SERVER_IP}" "cat >> ~/.bashrc << 'ENVEOF'
-export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-export OPENAI_API_KEY=${OPENROUTER_API_KEY}
-export OPENAI_BASE_URL=https://openrouter.ai/api/v1
-ENVEOF"
+inject_env_vars_ssh "${RAMNODE_SERVER_IP}" upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "RamNode server setup completed successfully!"
+log_info "Server: ${SERVER_NAME} (ID: ${RAMNODE_SERVER_ID}, IP: ${RAMNODE_SERVER_IP})"
 echo ""
 
 log_step "Starting Codex..."
 sleep 1
 clear
-interactive_session "${RAMNODE_SERVER_IP}" "source ~/.bashrc && codex"
+interactive_session "${RAMNODE_SERVER_IP}" "source ~/.zshrc && codex"
