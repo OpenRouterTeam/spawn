@@ -835,7 +835,7 @@
     "codesandbox/nanoclaw": "missing",
     "codesandbox/aider": "implemented",
     "codesandbox/goose": "missing",
-    "codesandbox/codex": "missing",
+    "codesandbox/codex": "implemented",
     "codesandbox/interpreter": "missing",
     "codesandbox/gemini": "missing",
     "codesandbox/amazonq": "missing",
