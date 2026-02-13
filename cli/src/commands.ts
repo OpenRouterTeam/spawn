@@ -8,6 +8,7 @@ import {
   cloudKeys,
   matrixStatus,
   countImplemented,
+  isStaleCache,
   RAW_BASE,
   REPO,
   type Manifest,
@@ -45,7 +46,11 @@ async function withSpinner<T>(msg: string, fn: () => Promise<T>, doneMsg?: strin
 }
 
 export async function loadManifestWithSpinner(): Promise<Manifest> {
-  return withSpinner("Loading manifest...", loadManifest);
+  const manifest = await withSpinner("Loading manifest...", loadManifest);
+  if (isStaleCache()) {
+    p.log.warn("Using cached manifest (offline). Data may be outdated.");
+  }
+  return manifest;
 }
 
 function validateNonEmptyString(value: string, fieldName: string, helpCommand: string): void {

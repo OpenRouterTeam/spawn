@@ -331,11 +331,11 @@ describe("cmdList prompt display", () => {
       const { cmdList } = await import("../commands.js");
       await cmdList();
       const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
-      // Should show first 40 chars + "..."
+      // Row display should show first 40 chars + "..."
       expect(allOutput).toContain(longPrompt.slice(0, 40));
       expect(allOutput).toContain("...");
-      // Should NOT show the full prompt
-      expect(allOutput).not.toContain(longPrompt);
+      // Rerun hint shows full prompt (<=80 chars) so it's a valid copyable command
+      expect(allOutput).toContain(`--prompt "${longPrompt}"`);
     });
 
     it("should show prompt exactly at 40 chars without truncation", async () => {
@@ -416,7 +416,7 @@ describe("cmdList prompt display", () => {
       expect(allOutput).toContain("Fix bugs");
     });
 
-    it("should truncate prompt in rerun hint at 30 chars", async () => {
+    it("should show full prompt in rerun hint when <= 80 chars", async () => {
       const longPrompt = "Fix all linter errors and refactor the auth module completely";
       writeFileSync(
         join(testDir, "history.json"),
@@ -431,9 +431,26 @@ describe("cmdList prompt display", () => {
       await cmdList();
       const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
       expect(allOutput).toContain("Rerun last");
-      // Should show first 30 chars + "..."
-      expect(allOutput).toContain(longPrompt.slice(0, 30));
-      expect(allOutput).toContain("...");
+      // buildRetryCommand includes full prompt when <= 80 chars for a valid copyable command
+      expect(allOutput).toContain(`--prompt "${longPrompt}"`);
+    });
+
+    it("should suggest --prompt-file in rerun hint when > 80 chars", async () => {
+      const veryLongPrompt = "A".repeat(81);
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify([{
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-02-11T10:00:00Z",
+          prompt: veryLongPrompt,
+        }])
+      );
+      const { cmdList } = await import("../commands.js");
+      await cmdList();
+      const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+      expect(allOutput).toContain("Rerun last");
+      expect(allOutput).toContain("--prompt-file");
     });
 
     it("should not truncate prompt in rerun hint at exactly 30 chars", async () => {

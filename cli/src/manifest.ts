@@ -109,6 +109,7 @@ async function fetchManifestFromGitHub(): Promise<Manifest | null> {
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 let _cached: Manifest | null = null;
+let _staleCache = false;
 
 function tryLoadFromDiskCache(): Manifest | null {
   if (cacheAge() >= CACHE_TTL) return null;
@@ -172,6 +173,7 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
   const stale = readCache();
   if (stale) {
     _cached = stale;
+    _staleCache = true;
     return stale;
   }
 
@@ -208,9 +210,20 @@ export function countImplemented(m: Manifest): number {
   return count;
 }
 
+/** Returns true if the manifest was loaded from a stale (expired) cache as offline fallback */
+export function isStaleCache(): boolean {
+  return _staleCache;
+}
+
+/** Returns the age of the disk cache in seconds, or Infinity if not available */
+export function getCacheAge(): number {
+  return cacheAge();
+}
+
 /** Clear the in-memory manifest cache (for testing only) */
 export function _resetCacheForTesting(): void {
   _cached = null;
+  _staleCache = false;
 }
 
 export { RAW_BASE, REPO, CACHE_DIR };

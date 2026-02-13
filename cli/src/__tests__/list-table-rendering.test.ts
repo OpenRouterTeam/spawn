@@ -298,10 +298,13 @@ describe("cmdList table rendering", () => {
 
       await cmdList();
       const output = getOutput();
-      // Should show first 40 chars + "..."
+      // Row display should show first 40 chars + "..."
       expect(output).toContain("A".repeat(40) + "...");
-      // Should NOT show the full 50-char prompt
-      expect(output).not.toContain("A".repeat(50));
+      // Rerun hint at footer shows full prompt (<=80 chars) for valid copy-paste
+      const rerunLine = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .find((l: string) => l.includes("Rerun last"));
+      expect(rerunLine!).toContain("A".repeat(50));
     });
 
     it("should show exactly 40-char prompt without truncation", async () => {
@@ -344,17 +347,29 @@ describe("cmdList table rendering", () => {
       expect(output).toContain('--prompt "Fix bugs"');
     });
 
-    it("should truncate long prompt in rerun hint (> 30 chars)", async () => {
+    it("should show full prompt in rerun hint when <= 80 chars", async () => {
       await setManifest(mockManifest);
-      const longPrompt = "C".repeat(35);
+      const shortPrompt = "C".repeat(35);
+      writeHistory([
+        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00.000Z", prompt: shortPrompt },
+      ]);
+
+      await cmdList();
+      const output = getOutput();
+      // Rerun hint shows full prompt when <= 80 chars (valid copyable command)
+      expect(output).toContain(`--prompt "${shortPrompt}"`);
+    });
+
+    it("should suggest --prompt-file in rerun hint for very long prompts", async () => {
+      await setManifest(mockManifest);
+      const longPrompt = "C".repeat(81);
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00.000Z", prompt: longPrompt },
       ]);
 
       await cmdList();
       const output = getOutput();
-      // Footer truncates at 30 chars
-      expect(output).toContain("C".repeat(30) + "...");
+      expect(output).toContain("--prompt-file");
     });
 
     it("should not include --prompt in rerun hint when latest has no prompt", async () => {

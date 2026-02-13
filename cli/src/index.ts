@@ -18,7 +18,7 @@ import {
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { checkForUpdates } from "./update-check.js";
-import { loadManifest, agentKeys, cloudKeys } from "./manifest.js";
+import { loadManifest, agentKeys, cloudKeys, getCacheAge } from "./manifest.js";
 
 const VERSION = pkg.version;
 
@@ -265,6 +265,14 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
   }
 }
 
+function formatCacheAge(seconds: number): string {
+  if (!isFinite(seconds)) return "no cache";
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
 function showVersion(): void {
   console.log(`spawn v${VERSION}`);
   const binPath = process.argv[1];
@@ -272,6 +280,8 @@ function showVersion(): void {
     console.log(pc.dim(`  ${binPath}`));
   }
   console.log(pc.dim(`  ${process.versions.bun ? "bun" : "node"} ${process.versions.bun ?? process.versions.node}  ${process.platform} ${process.arch}`));
+  const age = getCacheAge();
+  console.log(pc.dim(`  manifest cache: ${formatCacheAge(age)}`));
   console.log(pc.dim(`  Run ${pc.cyan("spawn update")} to check for updates.`));
 }
 
