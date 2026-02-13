@@ -82,8 +82,8 @@ ensure_cloudsigma_credentials() {
     # CloudSigma uses email + password for API auth
     if [[ -z "${CLOUDSIGMA_EMAIL:-}" ]]; then
         if [[ -f "$HOME/.config/spawn/cloudsigma.json" ]]; then
-            CLOUDSIGMA_EMAIL=$(python3 -c "import json; print(json.load(open('$HOME/.config/spawn/cloudsigma.json')).get('email', ''))" 2>/dev/null || echo "")
-            CLOUDSIGMA_PASSWORD=$(python3 -c "import json; print(json.load(open('$HOME/.config/spawn/cloudsigma.json')).get('password', ''))" 2>/dev/null || echo "")
+            CLOUDSIGMA_EMAIL=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('email', ''))" "$HOME/.config/spawn/cloudsigma.json" 2>/dev/null || echo "")
+            CLOUDSIGMA_PASSWORD=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('password', ''))" "$HOME/.config/spawn/cloudsigma.json" 2>/dev/null || echo "")
         fi
     fi
 
@@ -100,10 +100,10 @@ ensure_cloudsigma_credentials() {
         # Save credentials
         mkdir -p "$HOME/.config/spawn"
         python3 -c "
-import json
-with open('$HOME/.config/spawn/cloudsigma.json', 'w') as f:
-    json.dump({'email': '$CLOUDSIGMA_EMAIL', 'password': '$CLOUDSIGMA_PASSWORD'}, f)
-"
+import json, sys
+with open(sys.argv[1], 'w') as f:
+    json.dump({'email': sys.argv[2], 'password': sys.argv[3]}, f)
+" "$HOME/.config/spawn/cloudsigma.json" "$CLOUDSIGMA_EMAIL" "$CLOUDSIGMA_PASSWORD"
         chmod 600 "$HOME/.config/spawn/cloudsigma.json"
     fi
 
@@ -120,13 +120,13 @@ cloudsigma_check_ssh_key() {
     if echo "$response" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-fingerprint = '$fingerprint'.replace(':', '').lower()
+fingerprint = sys.argv[1].replace(':', '').lower()
 for kp in data.get('objects', []):
     kp_fp = kp.get('fingerprint', '').replace(':', '').lower()
     if kp_fp == fingerprint:
         sys.exit(0)
 sys.exit(1)
-" 2>/dev/null; then
+" "$fingerprint" 2>/dev/null; then
         return 0
     else
         return 1
@@ -207,13 +207,13 @@ for drive in data.get('objects', []):
     # Clone the image to create a new drive
     local clone_body
     clone_body=$(python3 -c "
-import json
+import json, sys
 print(json.dumps({
-    'name': '${name}-disk',
-    'size': ${size_bytes},
+    'name': sys.argv[1] + '-disk',
+    'size': int(sys.argv[2]),
     'media': 'disk'
 }))
-")
+" "$name" "$size_bytes")
 
     local clone_response
     clone_response=$(cloudsigma_api POST "/libdrives/${ubuntu_image_uuid}/action/?do=clone" "$clone_body")
@@ -245,7 +245,7 @@ _cloudsigma_build_server_body() {
 
     python3 -c "
 import json, sys
-name, cpu_mhz, mem_bytes, drive_uuid, ssh_key_uuid = sys.argv[1:6]
+name, cpu_mhz, mem_bytes, drive_uuid, ssh_key_uuid, vnc_pass = sys.argv[1:7]
 
 body = {
     'name': name,
@@ -254,7 +254,7 @@ body = {
     'smp': 1,
     'cpu_type': 'amd',
     'hypervisor': 'kvm',
-    'vnc_password': 'spawn123',
+    'vnc_password': vnc_pass,
     'drives': [
         {
             'boot_order': 1,
@@ -278,7 +278,7 @@ if ssh_key_uuid:
     body['pubkeys'] = [{'uuid': ssh_key_uuid}]
 
 print(json.dumps(body))
-" "$name" "$cpu_mhz" "$mem_bytes" "$drive_uuid" "$ssh_key_uuid"
+" "$name" "$cpu_mhz" "$mem_bytes" "$drive_uuid" "$ssh_key_uuid" "$(openssl rand -hex 8)"
 }
 
 # Wait for CloudSigma server to become running and get its IP
@@ -328,7 +328,9 @@ for nic in data.get('nics', []):
                 ip=$(echo "$ip_response" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-print(data.get('uuid', ''))
+# CloudSigma IP resources use 'uuid' as the IP address string
+addr = data.get('uuid', '')
+print(addr)
 " 2>/dev/null || echo "")
             fi
 
@@ -368,13 +370,13 @@ create_server() {
     ssh_key_uuid=$(echo "$keypairs_response" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-fingerprint = '$fingerprint'.replace(':', '').lower()
+fingerprint = sys.argv[1].replace(':', '').lower()
 for kp in data.get('objects', []):
     kp_fp = kp.get('fingerprint', '').replace(':', '').lower()
     if kp_fp == fingerprint:
         print(kp['uuid'])
         break
-" 2>/dev/null || echo "")
+" "$fingerprint" 2>/dev/null || echo "")
 
     # Build server creation request
     local server_body
