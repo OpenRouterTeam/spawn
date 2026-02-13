@@ -875,7 +875,7 @@
     "codesandbox/opencode": "implemented",
     "codesandbox/plandex": "implemented",
     "codesandbox/kilocode": "missing",
-    "codesandbox/continue": "missing",
+    "codesandbox/continue": "implemented",
     "e2b/claude": "implemented",
     "e2b/openclaw": "implemented",
     "e2b/nanoclaw": "implemented",
