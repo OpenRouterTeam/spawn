@@ -227,9 +227,14 @@ Research new AI agents, BUT only add one if there's REAL community demand:
 Check the repo's GitHub issues for user requests:
 - Run: `gh issue list --repo OpenRouterTeam/spawn --state open --limit 20`
 - Look for issues requesting specific agents or cloud providers
+- **DEDUP CHECK (MANDATORY before ANY comment):** For each issue, FIRST check existing comments:
+  `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[] | "\(.author.login): \(.body[-40:])"'`
+  If the issue already has a comment containing `-- discovery/issue-responder`, SKIP — you've already commented.
+  Also check for similar content from other accounts. Never duplicate information.
 - If a request is actionable, implement it and create a PR (self-review + label, do NOT merge)
-- Comment on the issue with the PR link when done
-- If a request is already implemented, close the issue with a comment
+- Comment on the issue with the PR link when done (only if no similar comment already exists)
+- If a request is already implemented, close the issue with a comment (only if not already commented)
+- **SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`. This is how agents identify their own comments for dedup.
 
 ### Branch Cleaner (spawn 1)
 Clean up stale remote branches before and after the cycle:
@@ -434,6 +439,7 @@ The cycle is NOT complete until this final README update is committed and pushed
 - Update manifest.json, the cloud's README.md, AND the root README.md matrix
 - Clean up worktrees after every PR: `git worktree remove PATH`
 - NEVER revert prior macOS/curl-bash compatibility fixes
+- **SIGN-OFF**: Every comment on issues/PRs MUST end with `-- discovery/AGENT-NAME` (e.g., `-- discovery/issue-responder`, `-- discovery/cloud-scout`). This is how agents identify their own comments for dedup across cycles.
 
 Begin now. Your session has THREE phases — all are mandatory:
 1. **Setup** — Update README, create team, spawn teammates via SendMessage

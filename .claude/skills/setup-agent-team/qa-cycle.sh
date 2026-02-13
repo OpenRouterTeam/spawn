@@ -119,7 +119,7 @@ push_and_create_pr() {
     if [[ -n "${pr_number}" ]]; then
         # Self-review: add a comment summarizing the changes
         gh pr review "${pr_number}" --repo OpenRouterTeam/spawn --comment \
-            --body "Self-review by QA cycle: ${pr_title}. Automated change — tests were run before submission." \
+            --body "Self-review by QA cycle: ${pr_title}. Automated change -- tests were run before submission.\n\n-- qa/cycle" \
             2>&1 | tee -a "${LOG_FILE}" || true
 
         # Label for external review
