@@ -23,37 +23,36 @@ fi
 # Koyeb specific functions
 # ============================================================
 
-# Ensure Koyeb CLI is installed
-ensure_koyeb_cli() {
-    if command -v koyeb &>/dev/null; then
-        log_info "Koyeb CLI available"
-        return 0
-    fi
-
-    log_step "Installing Koyeb CLI..."
-
-    # Detect OS and architecture
-    local os=""
-    local arch=""
-
+# Detect OS name for binary downloads (darwin or linux)
+# Outputs the OS name to stdout; returns 1 on unsupported OS
+_koyeb_detect_os() {
     case "$(uname -s)" in
-        Darwin) os="darwin" ;;
-        Linux) os="linux" ;;
+        Darwin) echo "darwin" ;;
+        Linux) echo "linux" ;;
         *)
             log_error "Unsupported operating system: $(uname -s)"
             return 1
             ;;
     esac
+}
 
+# Detect CPU architecture for binary downloads (amd64 or arm64)
+# Outputs the arch name to stdout; returns 1 on unsupported architecture
+_koyeb_detect_arch() {
     case "$(uname -m)" in
-        x86_64|amd64) arch="amd64" ;;
-        arm64|aarch64) arch="arm64" ;;
+        x86_64|amd64) echo "amd64" ;;
+        arm64|aarch64) echo "arm64" ;;
         *)
             log_error "Unsupported architecture: $(uname -m)"
             return 1
             ;;
     esac
+}
 
+# Download and install the Koyeb CLI binary
+# Usage: _koyeb_install_cli OS ARCH
+_koyeb_install_cli() {
+    local os="$1" arch="$2"
     local install_dir="$HOME/.koyeb/bin"
     mkdir -p "$install_dir"
 
@@ -72,6 +71,22 @@ ensure_koyeb_cli() {
         log_error "Koyeb CLI not found in PATH after installation"
         return 1
     fi
+}
+
+# Ensure Koyeb CLI is installed
+ensure_koyeb_cli() {
+    if command -v koyeb &>/dev/null; then
+        log_info "Koyeb CLI available"
+        return 0
+    fi
+
+    log_step "Installing Koyeb CLI..."
+
+    local os arch
+    os=$(_koyeb_detect_os) || return 1
+    arch=$(_koyeb_detect_arch) || return 1
+
+    _koyeb_install_cli "$os" "$arch" || return 1
 
     log_info "Koyeb CLI installed"
 }
