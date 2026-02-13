@@ -31,13 +31,20 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet"
+ALL_RECORDABLE_CLOUDS="atlantic hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
 get_endpoints() {
     local cloud="$1"
     case "$cloud" in
+        atlantic)
+            printf '%s\n' \
+                "locations:/?Action=list-locations&Format=json" \
+                "plans:/?Action=list-plans&Format=json" \
+                "images:/?Action=list-images&Format=json" \
+                "ssh_keys:/?Action=list-sshkeys&Format=json"
+            ;;
         hetzner)
             printf '%s\n' \
                 "server_types:/server_types?per_page=50" \
@@ -137,6 +144,7 @@ get_endpoints() {
 get_auth_env_var() {
     local cloud="$1"
     case "$cloud" in
+        atlantic)      printf "ATLANTIC_API_ACCESS_KEY" ;;
         hetzner)       printf "HCLOUD_TOKEN" ;;
         digitalocean)  printf "DO_API_TOKEN" ;;
         vultr)         printf "VULTR_API_KEY" ;;
@@ -169,6 +177,27 @@ try_load_config() {
 
     # Map cloud name to config file
     local config_file="$HOME/.config/spawn/${cloud}.json"
+
+    # Atlantic.Net uses dual credentials (access_key + private_key)
+    if [[ "$cloud" == "atlantic" ]]; then
+        if [[ -f "$config_file" ]]; then
+            local atlantic_vals
+            atlantic_vals=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print('\t'.join(d.get(k, '') for k in ['access_key', 'private_key']))
+except: print('\t')
+" "$config_file" 2>/dev/null) || true
+            if [[ -n "${atlantic_vals:-}" ]]; then
+                local IFS=$'\t'
+                read -r ak pk <<< "$atlantic_vals"
+                [[ -n "${ak:-}" ]] && export ATLANTIC_API_ACCESS_KEY="$ak"
+                [[ -n "${pk:-}" ]] && export ATLANTIC_API_PRIVATE_KEY="$pk"
+            fi
+        fi
+        return 0
+    fi
 
     # OVH uses separate config with multiple fields
     if [[ "$cloud" == "ovh" ]]; then
@@ -232,6 +261,9 @@ has_credentials() {
     try_load_config "$cloud"
 
     case "$cloud" in
+        atlantic)
+            [[ -n "${ATLANTIC_API_ACCESS_KEY:-}" ]] && [[ -n "${ATLANTIC_API_PRIVATE_KEY:-}" ]]
+            ;;
         upcloud)
             [[ -n "${UPCLOUD_USERNAME:-}" ]] && [[ -n "${UPCLOUD_PASSWORD:-}" ]]
             ;;
@@ -261,6 +293,12 @@ save_config() {
     mkdir -p "$config_dir"
 
     case "$cloud" in
+        atlantic)
+            python3 -c "
+import json, sys
+print(json.dumps({'access_key': sys.argv[1], 'private_key': sys.argv[2]}, indent=2))
+" "${ATLANTIC_API_ACCESS_KEY:-}" "${ATLANTIC_API_PRIVATE_KEY:-}" > "$config_file"
+            ;;
         ovh)
             python3 -c "
 import json, sys
@@ -304,6 +342,9 @@ prompt_credentials() {
     local val=""
 
     case "$cloud" in
+        atlantic)
+            vars_needed="ATLANTIC_API_ACCESS_KEY ATLANTIC_API_PRIVATE_KEY"
+            ;;
         ovh)
             vars_needed="OVH_APPLICATION_KEY OVH_APPLICATION_SECRET OVH_CONSUMER_KEY OVH_PROJECT_ID"
             ;;
@@ -345,6 +386,7 @@ call_api() {
     local cloud="$1"
     local endpoint="$2"
     case "$cloud" in
+        atlantic)      atlantic_api "$(echo "$endpoint" | grep -oP 'Action=\K[^&]+')" ;;
         hetzner)       hetzner_api GET "$endpoint" ;;
         digitalocean)  do_api GET "$endpoint" ;;
         vultr)         vultr_api GET "$endpoint" ;;
@@ -377,7 +419,12 @@ import json, sys
 d = json.loads(sys.stdin.read())
 cloud = sys.argv[1]
 
-if cloud == 'hetzner':
+if cloud == 'atlantic':
+    # Atlantic.Net returns success responses with keys like 'locations', 'plans', 'images', 'keys_info'
+    # Error responses typically have 'error' or 'message' without data keys
+    has_data = any(k in d for k in ('locations', 'plans', 'images', 'keys_info', 'instanceid'))
+    sys.exit(0 if not has_data and 'error' in d else 1)
+elif cloud == 'hetzner':
     err = d.get('error')
     sys.exit(0 if err and isinstance(err, dict) else 1)
 elif cloud == 'digitalocean':
@@ -423,6 +470,7 @@ _record_live_cycle() {
     source "${REPO_ROOT}/${cloud}/lib/common.sh" 2>/dev/null || true
 
     case "$cloud" in
+        atlantic)      _live_atlantic "$fixture_dir" ;;
         hetzner)       _live_hetzner "$fixture_dir" ;;
         digitalocean)  _live_digitalocean "$fixture_dir" ;;
         vultr)         _live_vultr "$fixture_dir" ;;
@@ -557,6 +605,65 @@ print(json.dumps({
     'start_after_create': True
 }))
 " "$name" "$ssh_key_ids"
+}
+
+_live_atlantic_body() {
+    local fixture_dir="$1"
+    local name="spawn-record-$(date +%s)"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${name}' (G2.2GB, USEAST2)..." >&2
+
+    # Get SSH key ID
+    local ssh_keys_response key_id
+    ssh_keys_response=$(atlantic_api "list-sshkeys")
+    key_id=$(echo "$ssh_keys_response" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+keys = d.get('keys_info', [])
+if keys:
+    print(keys[0].get('key_id', ''))
+" 2>/dev/null) || key_id=""
+
+    # URL-encode parameters
+    local encoded_name
+    encoded_name=$(python3 -c "from urllib.parse import quote; print(quote('$name'), end='')")
+
+    # Return the query parameters (Atlantic.Net uses URL params, not JSON body)
+    echo "servername=${encoded_name}&imageid=ubuntu-24.04-x64&planname=G2.2GB&vm_location=USEAST2&key_id=${key_id}&enablebackup=N"
+}
+
+_live_atlantic() {
+    local fixture_dir="$1"
+    local params
+    params=$(_live_atlantic_body "$fixture_dir") || return 0
+
+    # Create instance
+    local create_response
+    create_response=$(atlantic_api "run-instance" "$params")
+
+    _save_live_fixture "$fixture_dir" "create_server" "POST /?Action=run-instance" "$create_response" || {
+        printf '%b\n' "  ${RED}fail${NC} Could not create — skipping delete fixture"
+        return 0
+    }
+
+    # Extract instance ID
+    local instance_id
+    instance_id=$(echo "$create_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('instanceid', ''), end='')" 2>/dev/null) || true
+
+    if [[ -z "${instance_id:-}" ]]; then
+        printf '%b\n' "  ${RED}fail${NC} Could not extract instance ID from create response"
+        cloud_errors=$((cloud_errors + 1))
+        return 0
+    fi
+
+    printf '%b\n' "  ${CYAN}live${NC} Created (ID: ${instance_id}). Deleting..."
+    sleep 3
+
+    # Delete instance
+    local delete_response
+    delete_response=$(atlantic_api "terminate-instance" "instanceid=${instance_id}")
+
+    _save_live_fixture "$fixture_dir" "delete_server" "POST /?Action=terminate-instance" "$delete_response"
+    printf '%b\n' "  ${CYAN}live${NC} Instance ${instance_id} terminated"
 }
 
 _live_hetzner() {

@@ -242,6 +242,7 @@ _handle_special_urls() {
 _strip_api_base() {
     ENDPOINT="$URL"
     case "$URL" in
+        https://cloudapi.atlantic.net/*)    ENDPOINT="${URL#https://cloudapi.atlantic.net}" ;;
         https://api.hetzner.cloud/v1*)     ENDPOINT="${URL#https://api.hetzner.cloud/v1}" ;;
         https://api.digitalocean.com/v2*)   ENDPOINT="${URL#https://api.digitalocean.com/v2}" ;;
         https://api.vultr.com/v2*)          ENDPOINT="${URL#https://api.vultr.com/v2}" ;;

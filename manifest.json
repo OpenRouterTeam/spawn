@@ -242,6 +242,22 @@
     }
   },
   "clouds": {
+    "atlantic": {
+      "name": "Atlantic.Net",
+      "description": "Atlantic.Net Cloud VPS via REST API",
+      "url": "https://www.atlantic.net/",
+      "type": "api",
+      "auth": "ATLANTIC_API_ACCESS_KEY + ATLANTIC_API_PRIVATE_KEY",
+      "provision_method": "POST /?Action=run-instance with cloud-init",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "plan": "G2.2GB",
+        "location": "USEAST2",
+        "image": "ubuntu-24.04-x64"
+      },
+      "notes": "Budget VPS provider with hourly billing starting at $0.0119/hr ($8/mo cap). Uses HMAC-SHA256 signature auth. Get API credentials from Control Panel → Account → API Info."
+    },
     "sprite": {
       "name": "Sprite",
       "description": "Sprites.dev managed VMs with CLI",
@@ -766,6 +782,21 @@
     }
   },
   "matrix": {
+    "atlantic/claude": "implemented",
+    "atlantic/openclaw": "implemented",
+    "atlantic/nanoclaw": "missing",
+    "atlantic/aider": "implemented",
+    "atlantic/goose": "missing",
+    "atlantic/codex": "missing",
+    "atlantic/interpreter": "missing",
+    "atlantic/gemini": "missing",
+    "atlantic/amazonq": "missing",
+    "atlantic/cline": "missing",
+    "atlantic/gptme": "missing",
+    "atlantic/opencode": "missing",
+    "atlantic/plandex": "missing",
+    "atlantic/kilocode": "missing",
+    "atlantic/continue": "missing",
     "sprite/claude": "implemented",
     "sprite/openclaw": "implemented",
     "sprite/nanoclaw": "implemented",
