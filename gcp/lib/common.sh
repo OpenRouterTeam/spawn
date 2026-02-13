@@ -30,19 +30,35 @@ GCP_USERNAME=$(whoami)
 
 ensure_gcloud() {
     if ! command -v gcloud &>/dev/null; then
-        log_error "Google Cloud SDK (gcloud) is required."
-        log_error "Install: https://cloud.google.com/sdk/docs/install"
+        _log_diagnostic \
+            "Google Cloud SDK (gcloud) is required but not installed" \
+            "gcloud CLI has not been installed on this machine" \
+            --- \
+            "Install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install" \
+            "Or on macOS: brew install google-cloud-sdk"
         return 1
     fi
     # Verify auth
     if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1 | grep -q '@'; then
-        log_error "gcloud not authenticated. Run: gcloud auth login"
+        _log_diagnostic \
+            "gcloud is not authenticated" \
+            "No active Google Cloud account found" \
+            "Previous authentication may have expired" \
+            --- \
+            "Run: gcloud auth login" \
+            "Or set credentials via: export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json"
         return 1
     fi
     # Set project
     local project="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
     if [[ -z "${project}" || "${project}" == "(unset)" ]]; then
-        log_error "No GCP project set. Run: gcloud config set project YOUR_PROJECT"
+        _log_diagnostic \
+            "No GCP project configured" \
+            "No project is set in gcloud config or GCP_PROJECT env var" \
+            --- \
+            "Set via environment: export GCP_PROJECT=your-project-id" \
+            "Or via gcloud: gcloud config set project YOUR_PROJECT" \
+            "List your projects: gcloud projects list"
         return 1
     fi
     export GCP_PROJECT="${project}"
@@ -97,6 +113,10 @@ create_server() {
     local pub_key
     pub_key=$(cat "${HOME}/.ssh/id_ed25519.pub")
 
+    local gcloud_err
+    gcloud_err=$(mktemp)
+    track_temp_file "${gcloud_err}"
+
     if ! gcloud compute instances create "${name}" \
         --zone="${zone}" \
         --machine-type="${machine_type}" \
@@ -105,8 +125,18 @@ create_server() {
         --metadata="startup-script=${userdata},ssh-keys=${GCP_USERNAME}:${pub_key}" \
         --project="${GCP_PROJECT}" \
         --quiet \
-        >/dev/null 2>&1; then
+        >/dev/null 2>"${gcloud_err}"; then
         log_error "Failed to create GCP instance"
+        local err_output
+        err_output=$(cat "${gcloud_err}" 2>/dev/null)
+        if [[ -n "${err_output}" ]]; then
+            log_error "gcloud error: ${err_output}"
+        fi
+        log_warn "Common issues:"
+        log_warn "  - Billing not enabled for the project (enable at https://console.cloud.google.com/billing)"
+        log_warn "  - Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)"
+        log_warn "  - Instance quota exceeded in zone (try different GCP_ZONE)"
+        log_warn "  - Machine type unavailable in zone (try different GCP_MACHINE_TYPE or GCP_ZONE)"
         return 1
     fi
 

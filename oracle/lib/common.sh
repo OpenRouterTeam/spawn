@@ -172,7 +172,10 @@ _create_vcn() {
         --raw-output 2>/dev/null)
 
     if [[ -z "${vcn_id}" || "${vcn_id}" == "null" ]]; then
-        log_error "Failed to create VCN"
+        log_error "Failed to create VCN (Virtual Cloud Network)"
+        log_warn "Common issues:"
+        log_warn "  - VCN limit exceeded in this compartment (check OCI service limits)"
+        log_warn "  - Compartment permissions insufficient (check IAM policies)"
         return 1
     fi
 
@@ -248,7 +251,10 @@ _create_subnet() {
         --raw-output 2>/dev/null)
 
     if [[ -z "${subnet_id}" || "${subnet_id}" == "null" ]]; then
-        log_error "Failed to create subnet"
+        log_error "Failed to create subnet in VCN"
+        log_warn "Common issues:"
+        log_warn "  - Subnet limit exceeded in this VCN"
+        log_warn "  - Compartment permissions insufficient (check IAM policies)"
         return 1
     fi
 
@@ -327,6 +333,10 @@ _launch_oci_instance() {
     fi
 
     local instance_id
+    local oci_err
+    oci_err=$(mktemp)
+    track_temp_file "${oci_err}"
+
     instance_id=$(oci compute instance launch \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
         --availability-domain "${ad}" \
@@ -340,11 +350,20 @@ _launch_oci_instance() {
         --user-data "${userdata_b64}" \
         --wait-for-state RUNNING \
         --query 'data.id' \
-        --raw-output 2>/dev/null) || true
+        --raw-output 2>"${oci_err}") || true
 
     if [[ -z "${instance_id}" || "${instance_id}" == "null" ]]; then
         log_error "Failed to create OCI instance"
-        log_error "Check your quota and compartment permissions"
+        local err_output
+        err_output=$(cat "${oci_err}" 2>/dev/null)
+        if [[ -n "${err_output}" ]]; then
+            log_error "OCI error: ${err_output}"
+        fi
+        log_warn "Common issues:"
+        log_warn "  - Service limit (quota) exceeded for this shape in the availability domain"
+        log_warn "  - Compartment permissions insufficient (check IAM policies)"
+        log_warn "  - Shape not available in this region (try different OCI_SHAPE)"
+        log_warn "  - Out of host capacity (try a different availability domain)"
         return 1
     fi
 
