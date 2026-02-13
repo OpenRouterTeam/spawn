@@ -301,7 +301,11 @@ destroy_server() {
     response=$(netcup_api "deleteVServer" "{\"vserverid\": \"$server_id\"}")
 
     if ! _netcup_is_success "$response"; then
-        log_error "Failed to destroy VPS: $response"
+        log_error "Failed to destroy VPS $server_id"
+        log_error "API Error: $(_extract_json_field "$response" "d.get('longmessage','Unknown error')")"
+        log_error ""
+        log_error "The VPS may still be running and incurring charges."
+        log_error "Delete it manually at: https://ccp.netcup.net/"
         return 1
     fi
 

@@ -329,7 +329,11 @@ destroy_ovh_instance() {
     response=$(ovh_api_call DELETE "/cloud/project/${OVH_PROJECT_ID}/instance/${instance_id}")
 
     if echo "$response" | grep -q '"message"'; then
-        log_error "Failed to destroy instance: $response"
+        log_error "Failed to destroy instance $instance_id"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
+        log_error ""
+        log_error "The instance may still be running and incurring charges."
+        log_error "Delete it manually at: https://www.ovhcloud.com/manager/"
         return 1
     fi
 

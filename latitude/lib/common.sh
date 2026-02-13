@@ -294,7 +294,11 @@ destroy_server() {
     response=$(latitude_api DELETE "/servers/$server_id")
 
     if echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); sys.exit(0 if d.get('errors') else 1)" 2>/dev/null; then
-        log_error "Failed to destroy server: $response"
+        log_error "Failed to destroy server $server_id"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
+        log_error ""
+        log_error "The server may still be running and incurring charges."
+        log_error "Delete it manually at: https://www.latitude.sh/dashboard"
         return 1
     fi
 

@@ -98,8 +98,19 @@ get_server_name() {
 _koyeb_create_app() {
     local app_name="$1"
     log_step "Creating Koyeb app: $app_name"
-    if ! koyeb app create "$app_name" >/dev/null 2>&1; then
-        log_error "Failed to create Koyeb app"
+    local create_output
+    create_output=$(koyeb app create "$app_name" 2>&1)
+    if [[ $? -ne 0 ]]; then
+        log_error "Failed to create Koyeb app '$app_name'"
+        if [[ -n "$create_output" ]]; then
+            log_error "Error: $create_output"
+        fi
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - App name already taken by another user"
+        log_error "  - Invalid app name (must be lowercase alphanumeric with hyphens)"
+        log_error "  - API token lacks permissions"
+        log_error "Check your dashboard: https://app.koyeb.com/"
         return 1
     fi
 }
@@ -124,8 +135,14 @@ _koyeb_create_service() {
         2>&1)
 
     if echo "$create_output" | grep -q "Error"; then
-        log_error "Failed to create Koyeb service"
+        log_error "Failed to create Koyeb service '$service_name'"
         log_error "$create_output"
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - Insufficient account balance or payment method required"
+        log_error "  - Region unavailable (try a different region)"
+        log_error "  - Instance type not available"
+        log_error "Check your dashboard: https://app.koyeb.com/"
         return 1
     fi
 
@@ -158,7 +175,13 @@ _koyeb_wait_for_service() {
         fi
 
         if [[ "$status" == "error" || "$status" == "failed" ]]; then
-            log_error "Service deployment failed"
+            log_error "Service deployment failed (status: $status)"
+            log_error ""
+            log_error "Common causes:"
+            log_error "  - Docker image pull failure"
+            log_error "  - Insufficient resources for the selected instance type"
+            log_error "  - Health check failure (service crashed on startup)"
+            log_error "View deployment logs: https://app.koyeb.com/"
             return 1
         fi
 
@@ -166,7 +189,11 @@ _koyeb_wait_for_service() {
         sleep 5
     done
 
-    log_error "Timeout waiting for service to be ready"
+    log_error "Service did not become ready after $((max_attempts * 5))s"
+    log_error ""
+    log_error "The service may still be deploying. You can:"
+    log_error "  1. Check status at: https://app.koyeb.com/"
+    log_error "  2. Re-run the command to try again"
     return 1
 }
 
@@ -179,7 +206,10 @@ _koyeb_get_instance_id() {
     KOYEB_INSTANCE_ID=$(koyeb instances list --service "$service_id" 2>/dev/null | grep -v "^ID" | awk '{print $1}' | head -1)
 
     if [[ -z "$KOYEB_INSTANCE_ID" ]]; then
-        log_error "Failed to get instance ID"
+        log_error "Failed to get instance ID for service $service_id"
+        log_error ""
+        log_error "The service may not have any running instances yet."
+        log_error "Check service status at: https://app.koyeb.com/"
         return 1
     fi
 

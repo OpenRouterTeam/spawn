@@ -103,7 +103,15 @@ create_codespace() {
 
     if [[ $? -ne 0 ]]; then
         log_error "Failed to create codespace"
-        log_error "$codespace_name"
+        if [[ -n "$codespace_name" ]]; then
+            log_error "Error: $codespace_name"
+        fi
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - Codespace spending limit reached (check: https://github.com/settings/billing)"
+        log_error "  - Machine type unavailable for this repository"
+        log_error "  - Repository does not exist or you lack access"
+        log_error "  - GitHub CLI not authenticated (run: gh auth login)"
         return 1
     fi
 
@@ -133,6 +141,11 @@ wait_for_codespace() {
     done
 
     log_error "Codespace failed to become ready after $max_attempts attempts"
+    log_error ""
+    log_error "The codespace may still be starting. You can:"
+    log_error "  1. Check status: gh codespace list"
+    log_error "  2. Connect manually: gh codespace ssh --codespace $codespace"
+    log_error "  3. View in browser: https://github.com/codespaces"
     return 1
 }
 
