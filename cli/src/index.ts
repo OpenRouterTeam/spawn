@@ -395,6 +395,17 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
     process.exit(1);
   }
 
+  // Handle slash notation: "spawn claude/hetzner" or "spawn hetzner/claude"
+  if (filteredArgs.length === 1 && cmd.includes("/")) {
+    const parts = cmd.split("/");
+    if (parts.length === 2 && parts[0] && parts[1]) {
+      console.error(pc.dim(`Tip: use a space instead of slash: ${pc.cyan(`spawn ${parts[0]} ${parts[1]}`)}`));
+      console.error();
+      await handleDefaultCommand(parts[0], parts[1], prompt, dryRun);
+      return;
+    }
+  }
+
   warnExtraArgs(filteredArgs, 2);
   await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt, dryRun);
 }
