@@ -156,7 +156,7 @@ try_load_config() {
     env_var=$(get_auth_env_var "$cloud")
 
     # Already set via env var — nothing to do
-    eval "local current_val=\"\${${env_var}:-}\""
+    local current_val="${!env_var:-}"
     if [[ -n "$current_val" ]]; then
         return 0
     fi
@@ -218,7 +218,7 @@ has_credentials() {
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
-            eval "[[ -n \"\${${env_var}:-}\" ]]"
+            [[ -n "${!env_var:-}" ]]
             ;;
     esac
 }
@@ -254,7 +254,7 @@ print(json.dumps({'client_id': sys.argv[1], 'secret': sys.argv[2]}, indent=2))
         *)
             local env_var
             env_var=$(get_auth_env_var "$cloud")
-            eval "local val=\"\${${env_var}:-}\""
+            local val="${!env_var:-}"
             python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"
             ;;
     esac
@@ -283,7 +283,7 @@ prompt_credentials() {
     esac
 
     for var_name in $vars_needed; do
-        eval "local current=\"\${${var_name}:-}\""
+        local current="${!var_name:-}"
         if [[ -n "$current" ]]; then
             continue
         fi
