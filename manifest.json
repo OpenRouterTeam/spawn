@@ -1281,7 +1281,7 @@
     "atlanticnet/nanoclaw": "implemented",
     "atlanticnet/aider": "implemented",
     "atlanticnet/goose": "missing",
-    "atlanticnet/codex": "missing",
+    "atlanticnet/codex": "implemented",
     "atlanticnet/interpreter": "missing",
     "atlanticnet/gemini": "implemented",
     "atlanticnet/amazonq": "missing",
