@@ -623,9 +623,12 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
 
 export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
   if (!prompt) return `spawn ${agent} ${cloud}`;
-  const short = prompt.length > 60 ? prompt.slice(0, 60) + "..." : prompt;
-  const safe = short.replace(/"/g, '\\"');
-  return `spawn ${agent} ${cloud} --prompt "${safe}"`;
+  if (prompt.length <= 80) {
+    const safe = prompt.replace(/"/g, '\\"');
+    return `spawn ${agent} ${cloud} --prompt "${safe}"`;
+  }
+  // Long prompts: suggest --prompt-file instead of truncating into a broken command
+  return `spawn ${agent} ${cloud} --prompt-file <your-prompt-file>`;
 }
 
 function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, prompt?: string): never {

@@ -439,7 +439,7 @@ describe("fuzzy matching edge cases in showInfoOrError", () => {
     // "abcdefgh" is far from any agent/cloud
     const result = runCli(["abcdefgh"]);
     const out = output(result);
-    expect(out).toContain("Unknown command");
+    expect(out).toContain("Unknown agent or cloud");
     expect(out).not.toContain("Did you mean");
   });
 
