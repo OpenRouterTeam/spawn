@@ -54,9 +54,7 @@ test_scaleway_token() {
     local response
     response=$(scaleway_instance_api GET "/servers?per_page=1")
     if echo "$response" | grep -q '"message"'; then
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
         log_warn "Remediation steps:"
         log_warn "  1. Verify secret key at: https://console.scaleway.com/iam/api-keys"
         log_warn "  2. Ensure the key has appropriate permissions"
@@ -86,7 +84,7 @@ get_scaleway_project_id() {
     local response
     response=$(scaleway_api GET "${SCALEWAY_ACCOUNT_API}/projects?page_size=1&order_by=created_at_asc")
     local project_id
-    project_id=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('projects',[{}])[0].get('id',''))" 2>/dev/null)
+    project_id=$(_extract_json_field "$response" "d.get('projects',[{}])[0].get('id','')")
 
     if [[ -z "$project_id" ]]; then
         log_error "Failed to get Scaleway project ID"
@@ -152,20 +150,11 @@ scaleway_register_ssh_key() {
     local project_id
     project_id=$(get_scaleway_project_id) || return 1
 
-    local json_pub_key
+    local json_pub_key json_name json_project
     json_pub_key=$(json_escape "$pub_key")
-
-    local register_body
-    register_body=$(python3 -c "
-import json, sys
-pub_key = json.loads(sys.stdin.read())
-body = {
-    'name': sys.argv[1],
-    'public_key': pub_key,
-    'project_id': sys.argv[2]
-}
-print(json.dumps(body))
-" "$key_name" "$project_id" <<< "$json_pub_key")
+    json_name=$(json_escape "$key_name")
+    json_project=$(json_escape "$project_id")
+    local register_body="{\"name\":${json_name},\"public_key\":${json_pub_key},\"project_id\":${json_project}}"
 
     local register_response
     register_response=$(scaleway_api POST "${SCALEWAY_ACCOUNT_API}/ssh-keys" "$register_body")
@@ -173,9 +162,7 @@ print(json.dumps(body))
     if echo "$register_response" | grep -q '"id"'; then
         return 0
     else
-        local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
         log_warn "Common causes:"
         log_warn "  - SSH key already registered with this name"
         log_warn "  - Invalid SSH key format"
@@ -190,24 +177,6 @@ ensure_ssh_key() {
 
 get_server_name() {
     get_validated_server_name "SCALEWAY_SERVER_NAME" "Enter server name: "
-}
-
-# Parse Scaleway server response to extract public IP address
-_scaleway_extract_ip() {
-    python3 -c "
-import json, sys
-server = json.loads(sys.stdin.read())['server']
-ip = server.get('public_ip', {})
-if ip:
-    print(ip.get('address', ''))
-else:
-    ips = server.get('public_ips', [])
-    for pip in ips:
-        if pip.get('address'):
-            print(pip['address'])
-            sys.exit(0)
-    print('')
-"
 }
 
 # Power on and wait for Scaleway instance to become running with a public IP
@@ -225,31 +194,12 @@ _scaleway_power_on_and_wait() {
         log_warn "Power on may have failed, checking status..."
     fi
 
-    log_step "Waiting for instance to become active..."
-    local max_attempts=60
-    local attempt=1
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(scaleway_instance_api GET "/servers/$server_id")
-        local state
-        state=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['state'])")
-
-        if [[ "$state" == "running" ]]; then
-            SCALEWAY_SERVER_IP=$(echo "$status_response" | _scaleway_extract_ip)
-            if [[ -n "$SCALEWAY_SERVER_IP" ]]; then
-                export SCALEWAY_SERVER_IP
-                log_info "Instance active: IP=$SCALEWAY_SERVER_IP"
-                return 0
-            fi
-        fi
-
-        log_step "Instance state: $state ($attempt/$max_attempts)"
-        sleep "${INSTANCE_STATUS_POLL_DELAY}"
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Instance did not become active in time"
-    return 1
+    # Scaleway IP extraction: prefer public_ip.address, fallback to first public_ips entry
+    generic_wait_for_instance scaleway_instance_api "/servers/${server_id}" \
+        "running" \
+        "d.get('server',{}).get('state','')" \
+        "(d.get('server',{}).get('public_ip') or {}).get('address','') or next((p['address'] for p in d.get('server',{}).get('public_ips',[]) if p.get('address')),'')" \
+        SCALEWAY_SERVER_IP "Scaleway instance" 60
 }
 
 create_server() {
@@ -257,7 +207,7 @@ create_server() {
     local commercial_type="${SCALEWAY_TYPE:-DEV1-S}"
     local zone="${SCALEWAY_ZONE:-fr-par-1}"
 
-    # Validate env var inputs to prevent injection into Python code
+    # Validate env var inputs
     validate_resource_name "$commercial_type" || { log_error "Invalid SCALEWAY_TYPE"; return 1; }
     validate_region_name "$zone" || { log_error "Invalid SCALEWAY_ZONE"; return 1; }
 
@@ -270,31 +220,23 @@ create_server() {
     image_id=$(get_ubuntu_image_id) || return 1
     log_info "Using image: $image_id"
 
-    local body
-    body=$(python3 -c "
-import json, sys
-body = {
-    'name': sys.argv[1],
-    'commercial_type': sys.argv[2],
-    'image': sys.argv[3],
-    'project': sys.argv[4],
-    'dynamic_ip_required': True
-}
-print(json.dumps(body))
-" "$name" "$commercial_type" "$image_id" "$project_id")
+    local json_name json_type json_image json_project
+    json_name=$(json_escape "$name")
+    json_type=$(json_escape "$commercial_type")
+    json_image=$(json_escape "$image_id")
+    json_project=$(json_escape "$project_id")
+    local body="{\"name\":${json_name},\"commercial_type\":${json_type},\"image\":${json_image},\"project\":${json_project},\"dynamic_ip_required\":true}"
 
     local response
     response=$(scaleway_instance_api POST "/servers" "$body")
 
     if echo "$response" | grep -q '"server"'; then
-        SCALEWAY_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])")
+        SCALEWAY_SERVER_ID=$(_extract_json_field "$response" "d['server']['id']")
         export SCALEWAY_SERVER_ID
         log_info "Instance created: ID=$SCALEWAY_SERVER_ID"
     else
         log_error "Failed to create Scaleway instance"
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
         log_warn "Common issues:"
         log_warn "  - Insufficient account balance"
         log_warn "  - Commercial type unavailable in zone (try different SCALEWAY_TYPE or SCALEWAY_ZONE)"

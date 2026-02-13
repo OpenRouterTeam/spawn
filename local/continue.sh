@@ -52,24 +52,10 @@ log_step "Appending environment variables to ~/.zshrc..."
 inject_env_vars_local upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
-# 6. Configure Continue
-log_step "Configuring Continue..."
-CONTINUE_CONFIG_DIR="${HOME}/.continue"
-mkdir -p "${CONTINUE_CONFIG_DIR}"
-
-cat > "${CONTINUE_CONFIG_DIR}/config.json" <<EOF
-{
-  "models": [
-    {
-      "title": "OpenRouter",
-      "provider": "openrouter",
-      "model": "openrouter/auto",
-      "apiBase": "https://openrouter.ai/api/v1",
-      "apiKey": "${OPENROUTER_API_KEY}"
-    }
-  ]
-}
-EOF
+# 6. Configure Continue (uses json_escape to prevent injection)
+setup_continue_config "${OPENROUTER_API_KEY}" \
+    "upload_file" \
+    "run_server"
 
 echo ""
 log_info "Local setup completed successfully!"

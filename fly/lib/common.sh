@@ -33,17 +33,29 @@ fly_api() {
     generic_cloud_api "$FLY_API_BASE" "$FLY_API_TOKEN" "$method" "$endpoint" "$body"
 }
 
+# Resolve the flyctl CLI command name ("fly" or "flyctl")
+# Prints the command name on stdout; returns 1 if neither is found
+_get_fly_cmd() {
+    if command -v fly &>/dev/null; then
+        echo "fly"
+    elif command -v flyctl &>/dev/null; then
+        echo "flyctl"
+    else
+        return 1
+    fi
+}
+
+# Parse the "error" field from a Fly.io API JSON response
+# Usage: echo "$response" | _fly_parse_error [DEFAULT]
+_fly_parse_error() {
+    local default="${1:-Unknown error}"
+    python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',sys.argv[1]))" "$default" 2>/dev/null || cat
+}
+
 # Ensure flyctl CLI is installed
 ensure_fly_cli() {
-    if command -v fly &>/dev/null; then
+    if _get_fly_cmd &>/dev/null; then
         log_info "flyctl CLI available"
-        return 0
-    fi
-    if command -v flyctl &>/dev/null; then
-        log_info "flyctl CLI available (as flyctl)"
-        # Create alias function so we can use 'fly' consistently
-        fly() { flyctl "$@"; }
-        export -f fly
         return 0
     fi
 
@@ -59,7 +71,7 @@ ensure_fly_cli() {
         export PATH="$HOME/.fly/bin:$PATH"
     fi
 
-    if ! command -v fly &>/dev/null && ! command -v flyctl &>/dev/null; then
+    if ! _get_fly_cmd &>/dev/null; then
         log_error "flyctl not found in PATH after installation"
         return 1
     fi
@@ -71,14 +83,8 @@ ensure_fly_cli() {
 
 # Try to get token from flyctl CLI if available
 _try_flyctl_auth() {
-    local fly_cmd=""
-    if command -v fly &>/dev/null; then
-        fly_cmd="fly"
-    elif command -v flyctl &>/dev/null; then
-        fly_cmd="flyctl"
-    else
-        return 1
-    fi
+    local fly_cmd
+    fly_cmd=$(_get_fly_cmd) || return 1
 
     local token
     token=$("$fly_cmd" auth token 2>/dev/null || true)
@@ -94,10 +100,8 @@ _validate_fly_token() {
     local response
     response=$(fly_api GET "/apps?org_slug=personal")
     if echo "$response" | grep -q '"error"'; then
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
         log_error "Authentication failed: Invalid Fly.io API token"
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(echo "$response" | _fly_parse_error "No details available")"
         log_warn "Remediation steps:"
         log_warn "  1. Run: fly tokens deploy"
         log_warn "  2. Or generate a token at: https://fly.io/dashboard"
@@ -174,12 +178,12 @@ _fly_create_app() {
     # SECURITY: Use json_escape to prevent JSON injection
     local app_body
     app_body=$(printf '{"app_name":%s,"org_slug":%s}' "$(json_escape "$name")" "$(json_escape "$org")")
-    local app_response
-    app_response=$(fly_api POST "/apps" "$app_body")
+    local response
+    response=$(fly_api POST "/apps" "$app_body")
 
-    if echo "$app_response" | grep -q '"error"'; then
+    if echo "$response" | grep -q '"error"'; then
         local error_msg
-        error_msg=$(echo "$app_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$app_response")
+        error_msg=$(echo "$response" | _fly_parse_error)
         if echo "$error_msg" | grep -qi "already exists"; then
             log_info "App '$name' already exists, reusing it"
             return 0
@@ -196,18 +200,11 @@ _fly_create_app() {
     log_info "App '$name' created"
 }
 
-# Create a Fly.io machine via the Machines API
-# Sets FLY_MACHINE_ID and FLY_APP_NAME on success
-_fly_create_machine() {
-    local name="$1"
-    local region="$2"
-    local vm_memory="$3"
-
-    log_step "Creating Fly.io machine (region: $region, memory: ${vm_memory}MB)..."
-
-    # SECURITY: Pass values via environment variables to prevent Python injection
-    local machine_body
-    machine_body=$(_FLY_NAME="$name" _FLY_REGION="$region" _FLY_MEM="$vm_memory" python3 -c "
+# Build JSON request body for Fly.io machine creation
+# SECURITY: Pass values via environment variables to prevent Python injection
+_fly_build_machine_body() {
+    local name="$1" region="$2" vm_memory="$3"
+    _FLY_NAME="$name" _FLY_REGION="$region" _FLY_MEM="$vm_memory" python3 -c "
 import json, os
 body = {
     'name': os.environ['_FLY_NAME'],
@@ -226,16 +223,27 @@ body = {
     }
 }
 print(json.dumps(body))
-")
+"
+}
+
+# Create a Fly.io machine via the Machines API
+# Sets FLY_MACHINE_ID and FLY_APP_NAME on success
+_fly_create_machine() {
+    local name="$1"
+    local region="$2"
+    local vm_memory="$3"
+
+    log_step "Creating Fly.io machine (region: $region, memory: ${vm_memory}MB)..."
+
+    local machine_body
+    machine_body=$(_fly_build_machine_body "$name" "$region" "$vm_memory")
 
     local response
     response=$(fly_api POST "/apps/$name/machines" "$machine_body")
 
     if echo "$response" | grep -q '"error"'; then
         log_error "Failed to create Fly.io machine"
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(echo "$response" | _fly_parse_error)"
         log_warn "Common issues:"
         log_warn "  - Insufficient account balance or payment method required"
         log_warn "  - Region unavailable (try different FLY_REGION)"
@@ -244,7 +252,7 @@ print(json.dumps(body))
         return 1
     fi
 
-    FLY_MACHINE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    FLY_MACHINE_ID=$(_extract_json_field "$response" "d['id']")
     export FLY_MACHINE_ID FLY_APP_NAME="$name"
     log_info "Machine created: ID=$FLY_MACHINE_ID, App=$name"
 }
@@ -259,10 +267,8 @@ _fly_wait_for_machine_start() {
 
     log_step "Waiting for machine to start..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
-        local status_response
-        status_response=$(fly_api GET "/apps/$name/machines/$machine_id")
         local state
-        state=$(echo "$status_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('state','unknown'))")
+        state=$(_extract_json_field "$(fly_api GET "/apps/$name/machines/$machine_id")" "d.get('state','unknown')")
 
         if [[ "$state" == "started" ]]; then
             log_info "Machine is running"
@@ -311,9 +317,7 @@ run_server() {
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$cmd")
-    local fly_cmd="fly"
-    command -v fly &>/dev/null || fly_cmd="flyctl"
-    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
+    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
 }
 
 # Upload a file to the machine via base64 encoding through exec
@@ -340,9 +344,7 @@ interactive_session() {
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$cmd")
-    local fly_cmd="fly"
-    command -v fly &>/dev/null || fly_cmd="flyctl"
-    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd"
+    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd"
 }
 
 # Destroy a Fly.io machine and app
@@ -352,8 +354,10 @@ destroy_server() {
     log_step "Destroying Fly.io app and machines for '$app_name'..."
 
     # List and destroy all machines in the app
-    local machines=$(fly_api GET "/apps/$app_name/machines")
-    local machine_ids=$(echo "$machines" | python3 -c "
+    local machines
+    machines=$(fly_api GET "/apps/$app_name/machines")
+    local machine_ids
+    machine_ids=$(echo "$machines" | python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
 if isinstance(data, list):

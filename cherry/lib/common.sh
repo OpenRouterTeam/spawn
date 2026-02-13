@@ -19,40 +19,6 @@ CHERRY_DEFAULT_REGION="${CHERRY_DEFAULT_REGION:-eu_nord_1}"
 CHERRY_DEFAULT_IMAGE="${CHERRY_DEFAULT_IMAGE:-Ubuntu 24.04 64bit}"
 
 # ============================================================
-# JSON Helpers
-# ============================================================
-
-# Extract a field from a JSON object via stdin
-# Usage: echo '{"id": 123}' | _cherry_json_field "id"
-_cherry_json_field() {
-    local field="$1"
-    python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    print(data.get(sys.argv[1], ''))
-except:
-    pass
-" "$field" 2>&1
-}
-
-# Extract the primary IP address from a Cherry server info response
-# Usage: echo '{"ip_addresses":[...]}' | _cherry_extract_primary_ip
-_cherry_extract_primary_ip() {
-    python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    for addr in data.get('ip_addresses', []):
-        if addr.get('type') == 'primary-ip':
-            print(addr.get('address', ''))
-            break
-except:
-    pass
-" 2>&1
-}
-
-# ============================================================
 # API Wrapper
 # ============================================================
 
@@ -132,14 +98,7 @@ get_cherry_project_id() {
     projects=$(cherry_api GET "/projects")
 
     local project_id
-    project_id=$(printf '%s' "$projects" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    if isinstance(data, list) and len(data) > 0:
-        print(data[0].get('id', ''))
-except: pass
-" 2>&1)
+    project_id=$(_extract_json_field "$projects" "d[0]['id'] if isinstance(d,list) and d else ''")
 
     if [[ -z "$project_id" ]]; then
         log_error "No project found in Cherry Servers account"
@@ -161,39 +120,18 @@ get_server_name() {
     printf '%s' "$server_name"
 }
 
-# Create server
-# Sets CHERRY_SERVER_ID and CHERRY_SERVER_IP as exports
-# Poll the Cherry Servers API until the server has an IP address
+# Python expression to extract primary IPv4 from Cherry Servers response.
+# Finds the first ip_addresses entry with type == 'primary-ip'.
+readonly _CHERRY_IP_PY="next((a.get('address','') for a in d.get('ip_addresses',[]) if a.get('type')=='primary-ip'), '')"
+
+# Wait for Cherry server to be deployed and get IP
 # Sets CHERRY_SERVER_IP on success
 _cherry_wait_for_ip() {
     local server_id="$1"
-    log_step "Waiting for IP address assignment..."
-    local ip_address=""
-    local attempts=0
-    local max_attempts=60
-
-    while [[ -z "$ip_address" ]] && [[ $attempts -lt $max_attempts ]]; do
-        sleep "${POLL_INTERVAL}"
-
-        local server_info
-        server_info=$(cherry_api GET "/servers/${server_id}")
-
-        ip_address=$(printf '%s' "$server_info" | _cherry_extract_primary_ip)
-
-        attempts=$((attempts + 1))
-        if [[ -z "$ip_address" ]] && [[ $((attempts % 5)) -eq 0 ]]; then
-            log_step "Still waiting for IP address... (attempt ${attempts}/${max_attempts})"
-        fi
-    done
-
-    if [[ -z "$ip_address" ]]; then
-        log_error "Failed to get server IP address after ${max_attempts} attempts"
-        return 1
-    fi
-
-    log_info "Server IP: $ip_address"
-    CHERRY_SERVER_IP="$ip_address"
-    export CHERRY_SERVER_IP
+    generic_wait_for_instance cherry_api "/servers/${server_id}" \
+        "deployed" "d.get('status','')" \
+        "${_CHERRY_IP_PY}" \
+        CHERRY_SERVER_IP "Cherry server" 60
 }
 
 create_server() {
@@ -232,7 +170,7 @@ print(json.dumps(data))
     response=$(cherry_api POST "/projects/${project_id}/servers" "$payload")
 
     local server_id
-    server_id=$(printf '%s' "$response" | _cherry_json_field "id")
+    server_id=$(_extract_json_field "$response" "d.get('id','')")
 
     if [[ -z "$server_id" ]]; then
         log_error "Failed to create server"

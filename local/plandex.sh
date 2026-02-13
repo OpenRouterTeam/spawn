@@ -40,25 +40,8 @@ fi
 
 # Inject environment variables
 log_step "Setting up environment variables..."
-
-# Add to shell config
-SHELL_CONFIG=""
-if [[ -f "${HOME}/.zshrc" ]]; then
-    SHELL_CONFIG="${HOME}/.zshrc"
-elif [[ -f "${HOME}/.bashrc" ]]; then
-    SHELL_CONFIG="${HOME}/.bashrc"
-else
-    SHELL_CONFIG="${HOME}/.bashrc"
-    touch "${SHELL_CONFIG}"
-fi
-
-# Check if already configured
-if ! grep -q "export OPENROUTER_API_KEY=" "${SHELL_CONFIG}" 2>/dev/null; then
-    printf '\n# OpenRouter API Key for Plandex\nexport OPENROUTER_API_KEY="%s"\n' "${OPENROUTER_API_KEY}" >> "${SHELL_CONFIG}"
-fi
-
-# Export for current session
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
+inject_env_vars_local upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
 echo ""
 log_info "Local setup completed successfully!"
@@ -73,11 +56,13 @@ if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
 
     # Execute without TTY
-    bash -c "source ${SHELL_CONFIG} && plandex new && plandex tell ${escaped_prompt}"
+    source ~/.zshrc 2>/dev/null || true
+    plandex new && plandex tell ${escaped_prompt}
 else
     # Interactive mode: start Plandex normally
     log_step "Starting Plandex..."
     sleep 1
     clear
-    interactive_session "source ${SHELL_CONFIG} && plandex"
+    source ~/.zshrc 2>/dev/null || true
+    exec plandex
 fi

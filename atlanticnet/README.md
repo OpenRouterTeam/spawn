@@ -18,8 +18,32 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/aider.sh)
 
 #### OpenClaw
 
+#### Codex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/codex.sh)
+```
+
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
+```
+
+#### Gemini
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/gemini.sh)
+```
+
+#### OpenCode
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/opencode.sh)
+```
+
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/plandex.sh)
 ```
 
 ## Non-Interactive Mode

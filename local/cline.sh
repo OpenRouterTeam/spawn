@@ -31,32 +31,10 @@ else
 fi
 
 log_step "Setting up environment variables..."
-# Export env vars for current session
-export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_API_KEY="${OPENROUTER_API_KEY}"
-export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
-
-# Persist to shell config
-SHELL_CONFIG=""
-if [[ -f "${HOME}/.zshrc" ]]; then
-    SHELL_CONFIG="${HOME}/.zshrc"
-elif [[ -f "${HOME}/.bashrc" ]]; then
-    SHELL_CONFIG="${HOME}/.bashrc"
-fi
-
-if [[ -n "${SHELL_CONFIG}" ]]; then
-    # Remove old entries if they exist
-    sed -i.bak '/^export OPENROUTER_API_KEY=/d' "${SHELL_CONFIG}" 2>/dev/null || true
-    sed -i.bak '/^export OPENAI_API_KEY=/d' "${SHELL_CONFIG}" 2>/dev/null || true
-    sed -i.bak '/^export OPENAI_BASE_URL=/d' "${SHELL_CONFIG}" 2>/dev/null || true
-
-    # Add new entries
-    printf '\nexport OPENROUTER_API_KEY="%s"\n' "${OPENROUTER_API_KEY}" >> "${SHELL_CONFIG}"
-    printf 'export OPENAI_API_KEY="%s"\n' "${OPENROUTER_API_KEY}" >> "${SHELL_CONFIG}"
-    printf 'export OPENAI_BASE_URL="https://openrouter.ai/api/v1"\n' >> "${SHELL_CONFIG}"
-
-    log_info "Environment variables persisted to ${SHELL_CONFIG}"
-fi
+inject_env_vars_local upload_file run_server \
+    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 
 echo ""
 log_info "Local machine setup completed successfully!"

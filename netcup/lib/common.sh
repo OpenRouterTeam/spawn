@@ -23,6 +23,28 @@ fi
 readonly NETCUP_API_BASE="https://ccp.netcup.net/run/webservice/servers/endpoint.php"
 # SSH_OPTS is now defined in shared/common.sh
 
+# Check if a Netcup API response indicates success
+# Returns 0 on success, 1 on failure
+_netcup_is_success() {
+    local response="$1"
+    _extract_json_field "$response" "d.get('status','')" | grep -q "^success$"
+}
+
+# Build JSON login request body
+_netcup_build_login_body() {
+    python3 -c "
+import json, sys
+print(json.dumps({
+    'action': 'login',
+    'param': {
+        'customernumber': sys.argv[1],
+        'apikey': sys.argv[2],
+        'apipassword': sys.argv[3]
+    }
+}))
+" "$1" "$2" "$3"
+}
+
 # Netcup uses session-based authentication with API credentials
 # Get session token from API credentials
 netcup_get_session() {
@@ -36,17 +58,7 @@ netcup_get_session() {
     fi
 
     local body
-    body=$(python3 -c "
-import json, sys
-print(json.dumps({
-    'action': 'login',
-    'param': {
-        'customernumber': sys.argv[1],
-        'apikey': sys.argv[2],
-        'apipassword': sys.argv[3]
-    }
-}))
-" "$customer_number" "$api_key" "$api_password")
+    body=$(_netcup_build_login_body "$customer_number" "$api_key" "$api_password")
 
     local response
     response=$(curl -fsSL -X POST "$NETCUP_API_BASE" \
@@ -56,25 +68,13 @@ print(json.dumps({
         return 1
     }
 
-    # Extract session ID (apisessionid)
-    local session_id
-    session_id=$(echo "$response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    if data.get('status') == 'success':
-        print(data['responsedata']['apisessionid'])
-    else:
-        sys.exit(1)
-except:
-    sys.exit(1)
-" 2>/dev/null) || {
+    if ! _netcup_is_success "$response"; then
         log_error "Failed to authenticate with Netcup API"
         log_error "Response: $response"
         return 1
-    }
+    fi
 
-    echo "$session_id"
+    _extract_json_field "$response" "d['responsedata']['apisessionid']"
 }
 
 # Centralized API call wrapper for Netcup
@@ -217,21 +217,14 @@ print(json.dumps(param))
 # Sets NETCUP_SERVER_IP on success
 _netcup_wait_for_ip() {
     log_step "Waiting for IP assignment..."
-    local ip=""
-    local attempts=0
+    local ip="" attempts=0
     while [[ -z "$ip" ]] && [[ $attempts -lt 60 ]]; do
         sleep 5
         local info_response
         info_response=$(netcup_api "getVServerInfo" "{\"vserverid\": \"$NETCUP_SERVER_ID\"}")
-        ip=$(echo "$info_response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    if data.get('status') == 'success':
-        print(data['responsedata'].get('ipv4', ''))
-except:
-    pass
-" 2>/dev/null || echo "")
+        if _netcup_is_success "$info_response"; then
+            ip=$(_extract_json_field "$info_response" "d.get('responsedata',{}).get('ipv4','')")
+        fi
         attempts=$((attempts + 1))
         if [[ -z "$ip" ]] && [[ $((attempts % 5)) -eq 0 ]]; then
             log_step "Still waiting for IP assignment... (attempt ${attempts}/60)"
@@ -270,15 +263,9 @@ create_server() {
     local response
     response=$(netcup_api "createVServer" "$param")
 
-    # Check for errors
-    local status
-    status=$(echo "$response" | python3 -c "import json, sys; print(json.loads(sys.stdin.read()).get('status', 'error'))")
-
-    if [[ "$status" != "success" ]]; then
+    if ! _netcup_is_success "$response"; then
         log_error "Failed to create Netcup VPS"
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('longmessage','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(_extract_json_field "$response" "d.get('longmessage','Unknown error')")"
         log_error ""
         log_error "Common issues:"
         log_error "  - Insufficient account balance"
@@ -290,7 +277,7 @@ create_server() {
     fi
 
     # Extract server ID
-    NETCUP_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['responsedata']['vserverid'])")
+    NETCUP_SERVER_ID=$(_extract_json_field "$response" "d['responsedata']['vserverid']")
     export NETCUP_SERVER_ID
     log_info "VPS created: ID=$NETCUP_SERVER_ID"
 
@@ -313,10 +300,7 @@ destroy_server() {
     local response
     response=$(netcup_api "deleteVServer" "{\"vserverid\": \"$server_id\"}")
 
-    local status
-    status=$(echo "$response" | python3 -c "import json, sys; print(json.loads(sys.stdin.read()).get('status', 'error'))")
-
-    if [[ "$status" != "success" ]]; then
+    if ! _netcup_is_success "$response"; then
         log_error "Failed to destroy VPS: $response"
         return 1
     fi
