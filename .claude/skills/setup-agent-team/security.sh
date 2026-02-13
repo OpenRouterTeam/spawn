@@ -177,21 +177,21 @@ Create these teammates:
 11. Clean up worktree and TeamDelete
 12. Exit
 
-## CRITICAL: Staying Alive
+## CRITICAL: Team Coordination (ref: https://code.claude.com/docs/en/agent-teams)
 
-You are running in \`claude -p\` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
+You are using **agent teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
 
-**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long \`sleep 30\` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use \`sleep 5\` to briefly yield, then check for messages.
+**Your session ENDS the moment you produce a response with no tool call.** You MUST include at least one tool call in every response.
 
-Required pattern:
-1. Spawn teammates via Task tool
-2. Yield loop (keep it tight):
-   a. \`Bash("sleep 5")\` — yield the turn so queued messages can be delivered
-   b. If a message arrived, process it immediately
-   c. If no message, run TaskList to check status — if tasks still pending, loop back to (a)
-   d. After 20 iterations with no messages (~2 min), do something useful: check PR status, verify teammate health, run \`gh pr list\`
-3. Once both agents report, close the issue or comment
-4. Shutdown teammates and exit
+### Required monitoring pattern:
+
+1. Call \`TaskList\` to check task status
+2. Process any teammate messages that arrived
+3. If tasks still pending, call \`Bash("sleep 5")\` to yield, then go back to step 1
+4. Once both agents report, close the issue or comment
+5. Shutdown teammates and exit
+
+**EVERY iteration MUST call TaskList.** Do NOT just loop on \`sleep 5\`.
 
 ## Safety Rules
 
@@ -396,7 +396,7 @@ If zero open PRs, skip to Step 3 (branch cleanup) — do NOT exit yet.
 2. For EACH open PR, create a task with TaskCreate describing the review work
 3. Spawn a **pr-reviewer** agent (model=opus) for each PR using the Task tool (subagent_type='general-purpose', team_name="${TEAM_NAME}")
    - Name each agent: pr-reviewer-NUMBER (e.g. pr-reviewer-42)
-   - Each agent gets instructions below
+   - **CRITICAL: Every reviewer MUST receive the COMPLETE review protocol below in their prompt.** Do NOT abbreviate with "follow the same protocol as another agent" — each agent runs independently and cannot see other agents' prompts. Copy the full instructions (steps 1-11 including the exact \`gh pr review --approve\` and \`gh pr merge\` commands) into every reviewer's prompt.
 4. Also spawn a **branch-cleaner** agent (model=haiku) — see Step 3
 
 ### Per-PR Reviewer Instructions
@@ -669,20 +669,28 @@ fi
 13. Clean up with TeamDelete
 14. Exit
 
-## CRITICAL: Staying Alive
+## CRITICAL: Team Coordination (ref: https://code.claude.com/docs/en/agent-teams)
 
-You are running in \`claude -p\` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
+You are using **agent teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
 
-**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long \`sleep 30\` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use \`sleep 5\` to briefly yield, then check for messages.
+**Your session ENDS the moment you produce a response with no tool call.** You MUST include at least one tool call in every response.
 
-Required pattern after spawning all agents:
-1. \`Bash("sleep 5")\` — yield the turn so queued messages can be delivered
-2. If a message arrived, process it immediately (record result, update task)
-3. If no message, run TaskList — if tasks still pending, go back to (1)
-4. Between polls, do useful work: track results so far, check wall-clock time, prepare the summary incrementally
-5. Once all agents report (or time is up), compile final summary and shutdown
+### Required monitoring pattern:
 
-**DO NOT loop on \`sleep 15\` or \`sleep 30\`.** Each sleep blocks message delivery. Keep sleeps to 5 seconds max.
+After spawning all teammates, enter this loop:
+
+1. Call \`TaskList\` to check task status
+2. Check if any teammate messages arrived (they appear as user messages in your conversation)
+3. If a teammate reported results, process them: record the verdict, update the task with \`TaskUpdate\`
+4. If tasks are still pending and no messages waiting, call \`Bash("sleep 5")\` to yield your turn — this allows queued messages to be delivered
+5. Go back to step 1
+
+**EVERY iteration MUST call TaskList.** Do NOT just loop on \`sleep 5\` — that blocks message delivery without checking progress.
+
+### Common mistakes:
+- **BAD:** \`sleep 5\` → \`sleep 5\` → \`sleep 5\` (never checks TaskList, never processes messages)
+- **BAD:** Only calling \`sleep\` without any other tool (messages queue but are never processed)
+- **GOOD:** \`TaskList\` → process results → \`sleep 5\` → \`TaskList\` → process results → ...
 
 ## Safety Rules
 
@@ -865,19 +873,20 @@ fi
 10. Clean up with TeamDelete
 11. Exit
 
-## CRITICAL: Staying Alive
+## CRITICAL: Team Coordination (ref: https://code.claude.com/docs/en/agent-teams)
 
-You are running in \`claude -p\` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
+You are using **agent teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
 
-**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long \`sleep 30\` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use \`sleep 5\` to briefly yield, then check for messages.
+**Your session ENDS the moment you produce a response with no tool call.** You MUST include at least one tool call in every response.
 
-Required pattern after spawning all agents:
-1. \`Bash("sleep 5")\` — yield the turn so queued messages can be delivered
-2. If a message arrived, process it immediately (dedup + file issues right away)
-3. If no message, run TaskList — if tasks still pending, go back to (1)
+### Required monitoring pattern:
+
+1. Call \`TaskList\` to check task status
+2. Process any teammate messages that arrived (dedup + file issues right away)
+3. If tasks still pending, call \`Bash("sleep 5")\` to yield, then go back to step 1
 4. Once all agents report (or time is up), compile final summary and shutdown
 
-**DO NOT loop on \`sleep 15\` or \`sleep 30\`.** Each sleep blocks message delivery. Keep sleeps to 5 seconds max.
+**EVERY iteration MUST call TaskList.** Do NOT just loop on \`sleep 5\`.
 
 ## Safety Rules
 

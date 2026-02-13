@@ -476,33 +476,31 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 15. Team lead runs: git worktree prune to clean stale worktree entries
 16. When all work is done, execute the Lifecycle Management shutdown sequence (below) — send shutdown_request to every teammate, wait for confirmations, clean up worktrees, then exit
 
-## CRITICAL: Staying Alive (DO NOT SKIP)
+## CRITICAL: Team Coordination (ref: https://code.claude.com/docs/en/agent-teams)
 
-**Spawning teammates is the BEGINNING of your job, not the end.** After spawning all teammates, you MUST actively monitor them. If you end your conversation after spawning, teammates become orphaned with no coordination.
+You are using **agent teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
 
-### TECHNICAL REQUIREMENT: You are running in `claude -p` (print) mode. Your session ENDS the moment you produce a response with no tool call. You MUST include at least one tool call in every response.
+**Your session ENDS the moment you produce a response with no tool call.** You MUST include at least one tool call in every response.
 
-**How message delivery works:** Teammate messages arrive as new user turns BETWEEN your responses. A long `sleep 30` blocks your turn for 30 seconds — during which messages queue up but can't be delivered. Use `sleep 5` to briefly yield, then check for messages.
+### Required monitoring pattern:
 
-### Required pattern after spawning:
+After spawning all teammates, enter this loop:
+
 ```
-1. Spawn all teammates via Task tool
-2. Yield loop (keep it tight):
-   a. Bash("sleep 5") — yield the turn so queued messages can be delivered
-   b. If a message arrived, process it immediately (acknowledge, update task)
-   c. If no message, run TaskList — if tasks still pending, go back to (a)
-   d. Between polls, do useful work: check PR status, verify teammate health
-   e. If the time budget is almost up, send wrap-up messages to all teammates
-3. Only after ALL teammates have finished, proceed to shutdown
+1. Call TaskList to check task status
+2. Process any teammate messages that arrived (acknowledge, update task)
+3. If tasks still pending, call Bash("sleep 5") to yield, then go back to step 1
+4. If the time budget is almost up, send wrap-up messages to all teammates
+5. Only after ALL teammates have finished, proceed to shutdown
 ```
 
-**DO NOT loop on `sleep 15` or `sleep 30`.** Each sleep blocks message delivery. Keep sleeps to 5 seconds max.
+**EVERY iteration MUST call TaskList.** Do NOT just loop on `sleep 5`.
 
 ### Common mistake (DO NOT DO THIS):
 ```
 BAD:  Spawn teammates → "I'll wait for their messages" → session ends (agents orphaned!)
-BAD:  Spawn teammates → sleep 30 → sleep 30 → sleep 30 → ... (messages can't be delivered!)
-GOOD: Spawn teammates → sleep 5 → process message → sleep 5 → TaskList → ... → shutdown
+BAD:  sleep 5 → sleep 5 → sleep 5 (never calls TaskList, never processes messages!)
+GOOD: TaskList → process results → sleep 5 → TaskList → process results → ... → shutdown
 ```
 
 ## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
