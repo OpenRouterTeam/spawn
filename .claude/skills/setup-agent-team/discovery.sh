@@ -517,15 +517,32 @@ run_team_cycle() {
     git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
-    # --- Pre-cycle cleanup: stale worktrees ---
-    log_info "Pre-cycle cleanup: stale worktrees..."
+    # --- Pre-cycle cleanup: stale worktrees and branches ---
+    log_info "Pre-cycle cleanup..."
     git worktree prune 2>/dev/null || true
     if [[ -d "${WORKTREE_BASE}" ]]; then
         rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
         log_info "Removed stale ${WORKTREE_BASE} directory"
     fi
 
-    # Note: branch pruning and PR management is handled by the security team
+    # Delete merged discovery-related remote branches
+    # Discovery agents create branches like: add-*, impl-*, gap-filler-*, {cloud}-{agent}
+    MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'origin/main\|origin/HEAD' | grep -E 'origin/(add-|impl-|gap-filler-)' | sed 's|origin/||' | tr -d ' ') || true
+    for branch in $MERGED_BRANCHES; do
+        if [[ -n "$branch" ]]; then
+            git push origin --delete "$branch" 2>&1 && log_info "Deleted merged branch: $branch" || true
+        fi
+    done
+
+    # Delete stale local discovery-related branches
+    LOCAL_BRANCHES=$(git branch --list 'add-*' --list 'impl-*' --list 'gap-filler-*' | tr -d ' *') || true
+    for branch in $LOCAL_BRANCHES; do
+        if [[ -n "$branch" ]]; then
+            git branch -D "$branch" 2>/dev/null || true
+        fi
+    done
+
+    log_info "Pre-cycle cleanup done."
 
     # Set up worktree directory for parallel agent work
     mkdir -p "${WORKTREE_BASE}"
