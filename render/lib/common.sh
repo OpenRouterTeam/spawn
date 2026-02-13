@@ -217,9 +217,9 @@ upload_file() {
         return 1
     fi
 
-    # Validate remote_path to prevent command injection
-    if [[ "$remote_path" == *"'"* || "$remote_path" == *'$'* || "$remote_path" == *'`'* || "$remote_path" == *$'\n'* ]]; then
-        log_error "Invalid remote path (contains unsafe characters): $remote_path"
+    # SECURITY: Strict allowlist validation — only safe path characters
+    if [[ ! "${remote_path}" =~ ^[a-zA-Z0-9/_.~-]+$ ]]; then
+        log_error "Invalid remote path (must contain only alphanumeric, /, _, ., ~, -): ${remote_path}"
         return 1
     fi
 
@@ -228,7 +228,7 @@ upload_file() {
     content=$(base64 < "$local_path")
 
     # Write file on remote service
-    run_server "printf '%s' '$content' | base64 -d > '$remote_path'"
+    run_server "printf '%s' '${content}' | base64 -d > '${remote_path}'"
 }
 
 # Wait for basic system readiness (Render services are pre-configured)

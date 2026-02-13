@@ -343,18 +343,9 @@ describe("codesandbox upload_file() security", () => {
     expect(body).not.toBeNull();
   });
 
-  it("should validate remote_path against injection characters", () => {
-    // Must reject single quotes, dollar signs, backticks, or newlines
-    expect(body!).toContain(`"'"`);
-    expect(body!).toMatch(/['"]\$['"]/);
-  });
-
-  it("should reject backtick characters in remote_path", () => {
-    expect(body!).toContain("`");
-  });
-
-  it("should reject newlines in remote_path", () => {
-    expect(body!).toMatch(/\\n/);
+  it("should use strict allowlist regex for remote_path validation", () => {
+    // Must use allowlist regex instead of blocklist
+    expect(body!).toMatch(/\[a-zA-Z0-9/);
   });
 
   it("should base64-encode file content", () => {
@@ -368,21 +359,20 @@ describe("codesandbox upload_file() security", () => {
     expect(body!).toContain("|| base64");
   });
 
-  it("should decode base64 on the remote side", () => {
-    expect(body!).toContain("base64 -d");
+  it("should use SDK filesystem API via env vars", () => {
+    // Must pass path and content via environment variables, not shell interpolation
+    expect(body!).toContain("_CSB_REMOTE_PATH");
+    expect(body!).toContain("_CSB_CONTENT");
+    expect(body!).toContain("process.env._CSB_REMOTE_PATH");
+    expect(body!).toContain("process.env._CSB_CONTENT");
   });
 
-  it("should use printf '%s' for safe content output", () => {
-    expect(body!).toContain("printf '%s'");
+  it("should use _csb_sdk_eval for remote execution", () => {
+    expect(body!).toContain("_csb_sdk_eval");
   });
 
-  it("should use escaped_path for safe path embedding", () => {
-    expect(body!).toContain("escaped_path");
-    expect(body!).toContain("printf '%q'");
-  });
-
-  it("should use run_server for remote execution", () => {
-    expect(body!).toContain("run_server");
+  it("should validate sandbox ID", () => {
+    expect(body!).toContain("validate_sandbox_id");
   });
 
   it("should return error on invalid remote path", () => {

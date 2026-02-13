@@ -195,20 +195,32 @@ upload_file() {
     local local_path="${1}"
     local remote_path="${2}"
 
-    # Validate remote_path to prevent command injection
-    if [[ "$remote_path" == *"'"* || "$remote_path" == *'$'* || "$remote_path" == *'`'* || "$remote_path" == *$'\n'* ]]; then
-        log_error "Invalid remote path (contains unsafe characters): $remote_path"
+    # SECURITY: Strict allowlist validation — only safe path characters
+    if [[ ! "${remote_path}" =~ ^[a-zA-Z0-9/_.~-]+$ ]]; then
+        log_error "Invalid remote path (must contain only alphanumeric, /, _, ., ~, -): ${remote_path}"
         return 1
     fi
 
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
 
-    # SECURITY: Properly escape remote_path to prevent injection
-    local escaped_path
-    escaped_path=$(printf '%q' "${remote_path}")
-    # base64 output is safe (alphanumeric + /+=) so no injection risk
-    run_server "printf '%s' '${content}' | base64 -d > ${escaped_path}"
+    # SECURITY: Use SDK filesystem API via env vars — no shell interpolation
+    validate_sandbox_id "${CODESANDBOX_SANDBOX_ID}" || return 1
+    CSB_API_KEY="${CSB_API_KEY}" _CSB_SB_ID="${CODESANDBOX_SANDBOX_ID}" \
+        _CSB_REMOTE_PATH="${remote_path}" _CSB_CONTENT="${content}" \
+        _csb_sdk_eval "
+            const fs = require('fs');
+            const path = require('path');
+            const sb = await sdk.sandboxes.get(process.env._CSB_SB_ID);
+            const c = await sb.connect();
+            const remotePath = process.env._CSB_REMOTE_PATH;
+            const dir = path.dirname(remotePath);
+            if (dir !== '.' && dir !== '/') {
+                await c.commands.run('mkdir -p ' + dir);
+            }
+            const content = Buffer.from(process.env._CSB_CONTENT, 'base64');
+            await c.fs.writeFile(remotePath, content);
+        "
 }
 
 interactive_session() {
