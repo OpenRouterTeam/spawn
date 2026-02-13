@@ -1,5 +1,5 @@
 #!/bin/bash
-# Continuous discovery loop for spawn using Claude Code Agent Teams
+# Continuous discovery loop for spawn using Claude Code spawn teams
 #
 # Discovery priorities:
 #   1. Clouds/sandboxes > agents (bias toward new compute targets)
@@ -151,17 +151,17 @@ Commit and push this README update directly to main before spawning any teammate
 
 Each cycle MUST complete within 45 minutes. This is a HARD deadline.
 
-- At the 35-minute mark, stop spawning new work and tell all agents to wrap up
-- At the 40-minute mark, send shutdown_request to any agent that hasn't finished
+- At the 35-minute mark, stop spawning new work and tell all teammates to wrap up
+- At the 40-minute mark, send shutdown_request to any teammate that hasn't finished
 - At 45 minutes, force shutdown — the cycle is over regardless
 
-Agents should aim for focused, high-impact work. Do NOT exhaustively expand everything.
+Teammates should aim for focused, high-impact work. Do NOT exhaustively expand everything.
 
 ## No Self-Merge Rule (MANDATORY)
 
-Agents must NEVER merge their own PRs. This applies to ALL agents including the team lead.
+Teammates must NEVER merge their own PRs. This applies to ALL teammates including the team lead.
 
-After creating a PR, every agent MUST:
+After creating a PR, every teammate MUST:
 1. **Self-review**: Read the diff and add a review comment summarizing changes, tests run, and any concerns:
    `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
    `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of changes, what was tested, any concerns]\n\n-- discovery/AGENT-NAME"`
@@ -234,14 +234,14 @@ Check the repo's GitHub issues for user requests:
 - If a request is actionable, implement it and create a PR (self-review + label, do NOT merge)
 - Comment on the issue with the PR link when done (only if no similar comment already exists)
 - If a request is already implemented, close the issue with a comment (only if not already commented)
-- **SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`. This is how agents identify their own comments for dedup.
+- **SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`. This is how teammates identify their own comments for dedup.
 
 ### Gap Filler (spawn remaining)
 After scouts commit new entries, pick up the newly-created "missing" matrix entries and implement them.
 
 ## CRITICAL: Team Coordination (ref: https://code.claude.com/docs/en/agent-teams)
 
-You are using **agent teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
+You are using **spawn teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
 
 **Your session ENDS the moment you produce a response with no tool call.** You MUST include at least one tool call in every response.
 
@@ -284,14 +284,14 @@ NEVER omit the Agent trailer. EVERY commit from a teammate must have one.
 
 ## Git Worktrees (MANDATORY for parallel work)
 
-Multiple agents working simultaneously MUST use git worktrees instead of switching branches in the main checkout. This prevents agents from clobbering each other's uncommitted changes.
+Multiple teammates working simultaneously MUST use git worktrees instead of switching branches in the main checkout. This prevents teammates from clobbering each other's uncommitted changes.
 
 ### Setup (Team Lead does this at cycle start)
 ```bash
 mkdir -p WORKTREE_BASE_PLACEHOLDER
 ```
 
-### Per-Agent Worktree Pattern
+### Per-Teammate Worktree Pattern
 
 CRITICAL: Always fetch latest main before creating a worktree.
 
@@ -333,13 +333,13 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 ```
 
 ### Why Worktrees?
-- Multiple agents work on different branches simultaneously without conflicts
-- No risk of `git checkout` clobbering another agent's uncommitted changes
-- Each agent gets a clean, isolated working directory
+- Multiple teammates work on different branches simultaneously without conflicts
+- No risk of `git checkout` clobbering another teammate's uncommitted changes
+- Each teammate gets a clean, isolated working directory
 - The main checkout stays on `main` and is never switched away
 
 ### Rules
-- NEVER use `git checkout -b` or `git switch` in the main repo when other agents are active
+- NEVER use `git checkout -b` or `git switch` in the main repo when other teammates are active
 - ALWAYS `git fetch origin main` before `git worktree add` to ensure the branch starts from latest main
 - ALWAYS clean up worktrees after PR is merged: `git worktree remove PATH`
 - At end of cycle, team lead runs: `git worktree prune`
@@ -373,7 +373,7 @@ Every PR must reach one of these terminal states:
 ### NEVER:
 - Run `gh pr merge` — merging is handled externally
 - Push directly to main
-- Use `git checkout -b` when other agents are active — use worktrees
+- Use `git checkout -b` when other teammates are active — use worktrees
 - Close a PR without a comment explaining why
 - Leave PRs without a self-review comment and `needs-team-review` label
 - Leave branches or worktrees hanging after work is done
@@ -407,7 +407,7 @@ You MUST remain active until ALL of the following are true:
 7. Print final summary of what was accomplished (include count of PRs merged/closed)
 8. ONLY THEN may the session end
 
-### CRITICAL: If you exit before completing this sequence, running agents will be orphaned and the cycle will be incomplete. You MUST wait for all teammates to shut down before exiting.
+### CRITICAL: If you exit before completing this sequence, running teammates will be orphaned and the cycle will be incomplete. You MUST wait for all teammates to shut down before exiting.
 
 ## FINAL STEP: Update README Matrix Again (MANDATORY — Team Lead does this LAST)
 
@@ -429,7 +429,7 @@ The cycle is NOT complete until this final README update is committed and pushed
 - Update manifest.json, the cloud's README.md, AND the root README.md matrix
 - Clean up worktrees after every PR: `git worktree remove PATH`
 - NEVER revert prior macOS/curl-bash compatibility fixes
-- **SIGN-OFF**: Every comment on issues/PRs MUST end with `-- discovery/AGENT-NAME` (e.g., `-- discovery/issue-responder`, `-- discovery/cloud-scout`). This is how agents identify their own comments for dedup across cycles.
+- **SIGN-OFF**: Every comment on issues/PRs MUST end with `-- discovery/AGENT-NAME` (e.g., `-- discovery/issue-responder`, `-- discovery/cloud-scout`). This is how teammates identify their own comments for dedup across cycles.
 
 Begin now. Your session has THREE phases — all are mandatory:
 1. **Setup** — Update README, create team, spawn teammates via SendMessage
@@ -526,7 +526,7 @@ run_team_cycle() {
     fi
 
     # Delete merged discovery-related remote branches
-    # Discovery agents create branches like: add-*, impl-*, gap-filler-*, {cloud}-{agent}
+    # Discovery teammates create branches like: add-*, impl-*, gap-filler-*, {cloud}-{agent}
     MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'origin/main\|origin/HEAD' | grep -E 'origin/(add-|impl-|gap-filler-)' | sed 's|origin/||' | tr -d ' ') || true
     for branch in $MERGED_BRANCHES; do
         if [[ -n "$branch" ]]; then
@@ -544,7 +544,7 @@ run_team_cycle() {
 
     log_info "Pre-cycle cleanup done."
 
-    # Set up worktree directory for parallel agent work
+    # Set up worktree directory for parallel teammate work
     mkdir -p "${WORKTREE_BASE}"
 
     # Write prompt to temp file (from refactor.sh pattern)
@@ -554,15 +554,15 @@ run_team_cycle() {
     # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
 
-    log_info "Launching agent team..."
+    log_info "Launching spawn team..."
     log_info "Worktree base: ${WORKTREE_BASE}"
     echo ""
 
     # Activity watchdog: kill claude if no output for IDLE_TIMEOUT seconds.
     # This catches hung API calls (pre-flight check hangs, network issues) much
     # faster than the trigger server's RUN_TIMEOUT_MS. The next cron trigger
-    # starts a fresh cycle. 10 min is long enough for legitimate agent work
-    # (agents send messages every few minutes) but short enough to catch hangs.
+    # starts a fresh cycle. 10 min is long enough for legitimate teammate work
+    # (teammates send messages every few minutes) but short enough to catch hangs.
     local IDLE_TIMEOUT=600  # 10 minutes of silence = hung
     local HARD_TIMEOUT=3600 # 60 min wall-clock safety net
 
@@ -612,7 +612,7 @@ run_team_cycle() {
 
         # Check if the stream-json "result" event has been emitted (session complete).
         # Only check content written SINCE this cycle started (skip old log entries).
-        # After this, claude hangs waiting for agent subprocesses — kill immediately.
+        # After this, claude hangs waiting for teammate subprocesses — kill immediately.
         if [[ "${SESSION_ENDED}" = false ]] && tail -c +"$((LOG_START_SIZE + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
             SESSION_ENDED=true
             log_info "Session ended (result event detected) — waiting 30s for cleanup then killing"

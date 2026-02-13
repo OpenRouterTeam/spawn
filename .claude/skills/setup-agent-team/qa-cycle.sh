@@ -6,7 +6,7 @@ set -eo pipefail
 #
 # Phase 1: Record fixtures (bash test/record.sh allsaved)
 # Phase 2: Run mock tests → results file
-# Phase 3: Spawn agents to fix failures
+# Phase 3: Spawn teammates to fix failures
 # Phase 4: Re-run tests → update README → commit + push
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -273,7 +273,7 @@ else
             error_output=$(sed -n "/Recording ${cloud}/,/Recording \|━━━ \|Results:/p" "${RECORD_OUTPUT}" | head -50 || true)
 
             if printf '%s' "${error_output}" | grep -iqE "${AUTH_PATTERN}"; then
-                log "Phase 1: Auth failure for ${cloud} — key is stale, skipping fix agent"
+                log "Phase 1: Auth failure for ${cloud} — key is stale, skipping fix teammate"
                 if type invalidate_cloud_key &>/dev/null; then
                     invalidate_cloud_key "${cloud}"
                     while IFS= read -r var_name; do
@@ -292,7 +292,7 @@ else
             log "Phase 1: Stale keys detected: ${STALE_KEY_PROVIDERS}"
         fi
 
-        # Spawn ONE agent per non-auth failed cloud (10 min each, one attempt only)
+        # Spawn ONE teammate per non-auth failed cloud (10 min each, one attempt only)
         RECORD_FIX_PIDS=""
         for cloud in ${NON_AUTH_FAILED_CLOUDS}; do
             check_timeout || break
@@ -300,7 +300,7 @@ else
             # Extract error context for this cloud
             error_lines=$(sed -n "/Recording ${cloud}/,/Recording \|━━━ \|Results:/p" "${RECORD_OUTPUT}" | head -30 || true)
 
-            log "Phase 1: Spawning agent to debug ${cloud} recording failure"
+            log "Phase 1: Spawning teammate to debug ${cloud} recording failure"
             worktree="${WORKTREE_BASE}/record-fix-${cloud}"
             branch_name="qa/record-fix-${cloud}"
 
@@ -360,7 +360,7 @@ This likely means the cloud provider's API has changed. Investigate thoroughly a
 Only modify ${cloud}/lib/common.sh and test/record.sh if the recording infrastructure needs updating." \
                     2>&1 | tee -a "${LOG_FILE}" || true
 
-                # Check for changes (uncommitted OR committed by the agent)
+                # Check for changes (uncommitted OR committed by the teammate)
                 has_uncommitted=$(git status --porcelain 2>/dev/null)
                 has_commits=$(git log origin/main..HEAD --oneline 2>/dev/null)
 
@@ -377,7 +377,7 @@ Only modify ${cloud}/lib/common.sh and test/record.sh if the recording infrastru
             RECORD_FIX_PIDS="${RECORD_FIX_PIDS} $!"
         done
 
-        # Wait for record-fix agents
+        # Wait for record-fix teammates
         for pid in ${RECORD_FIX_PIDS}; do
             wait "$pid" 2>/dev/null || true
         done
@@ -393,7 +393,7 @@ Only modify ${cloud}/lib/common.sh and test/record.sh if the recording infrastru
         git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
         git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
-        log "Phase 1: Re-recording after fixes (no agents on second failure)..."
+        log "Phase 1: Re-recording after fixes (no teammates on second failure)..."
         bash test/record.sh allsaved 2>&1 | tee -a "${LOG_FILE}" || {
             log "Phase 1: Re-record still has failures — continuing with existing fixtures"
         }
@@ -440,7 +440,7 @@ log "=== Phase 3: Fix failures ==="
 if [[ "${FAIL_COUNT:-0}" -eq 0 ]]; then
     log "Phase 3: No failures to fix"
 else
-    # Collect failures grouped by cloud (one agent per cloud, not per script)
+    # Collect failures grouped by cloud (one teammate per cloud, not per script)
     FAILURES=""
     FAILED_CLOUDS=""
     if [[ -f "${RESULTS_PHASE2}" ]]; then
@@ -476,7 +476,7 @@ ${ctx}
         failing_agents=$(printf '%s' "$failing_agents" | sed 's/^ //')
 
         fail_count=$(printf '%s\n' $cloud_failures | wc -l | tr -d ' ')
-        log "Phase 3: Spawning agent to fix ${fail_count} failing script(s) in ${cloud}"
+        log "Phase 3: Spawning teammate to fix ${fail_count} failing script(s) in ${cloud}"
 
         worktree="${WORKTREE_BASE}/fix-${cloud}"
         branch_name="qa/fix-${cloud}"
@@ -486,7 +486,7 @@ ${ctx}
             continue
         }
 
-        # Spawn ONE Claude agent per cloud to fix all its failing scripts (15 min timeout)
+        # Spawn ONE Claude teammate per cloud to fix all its failing scripts (15 min timeout)
         (
             cd "${worktree}"
             run_with_timeout 900 \
@@ -541,7 +541,7 @@ ${error_context}
 You can modify: scripts in ${cloud}/, test/fixtures/${cloud}/, and test/mock.sh if infrastructure updates are needed." \
                 2>&1 | tee -a "${LOG_FILE}" || true
 
-            # Always check for changes — agent may have committed partial fixes before timeout
+            # Always check for changes — teammate may have committed partial fixes before timeout
             syntax_ok=true
             for script in ${failing_scripts}; do
                 if [[ -f "${script}" ]] && ! bash -n "${script}" 2>/dev/null; then
@@ -550,7 +550,7 @@ You can modify: scripts in ${cloud}/, test/fixtures/${cloud}/, and test/mock.sh 
                 fi
             done
 
-            # Stage any uncommitted changes the agent left behind
+            # Stage any uncommitted changes the teammate left behind
             if [[ "$syntax_ok" == "true" ]] && [[ -n "$(git status --porcelain)" ]]; then
                 git add ${failing_scripts} "${cloud}/lib/common.sh" "test/fixtures/${cloud}/" "test/mock.sh" 2>/dev/null || true
                 git commit -m "$(cat <<FIXEOF
@@ -570,7 +570,7 @@ FIXEOF
         AGENT_PIDS="${AGENT_PIDS} $!"
     done
 
-    # Wait for all fix agents to complete
+    # Wait for all fix teammates to complete
     for pid in $AGENT_PIDS; do
         wait "$pid" 2>/dev/null || true
     done
@@ -582,7 +582,7 @@ FIXEOF
     done
     git worktree prune 2>/dev/null || true
 
-    log "Phase 3: Fix agents complete"
+    log "Phase 3: Fix teammates complete"
 fi
 
 check_timeout || exit 0

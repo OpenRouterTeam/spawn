@@ -4,8 +4,8 @@ set -eo pipefail
 # Refactoring Team Service — Single Cycle (Dual-Mode)
 # Triggered by trigger-server.ts via GitHub Actions
 #
-# RUN_MODE=issue   — lightweight 2-agent fix for a specific GitHub issue (15 min)
-# RUN_MODE=refactor — full 6-agent team for codebase maintenance (30 min)
+# RUN_MODE=issue   — lightweight 2-teammate fix for a specific GitHub issue (15 min)
+# RUN_MODE=refactor — full 6-teammate team for codebase maintenance (30 min)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -118,7 +118,7 @@ log "Launching ${RUN_MODE} cycle..."
 PROMPT_FILE=$(mktemp /tmp/refactor-prompt-XXXXXX.md)
 
 if [[ "${RUN_MODE}" == "issue" ]]; then
-    # --- Issue mode: lightweight 2-agent fix ---
+    # --- Issue mode: lightweight 2-teammate fix ---
     cat > "${PROMPT_FILE}" << ISSUE_PROMPT_EOF
 You are the Team Lead for a focused issue-fix cycle on the spawn codebase.
 
@@ -136,7 +136,7 @@ gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn
 This cycle MUST complete within 10 minutes. This is a HARD deadline.
 
 - At the 7-minute mark, stop new work and wrap up
-- At the 9-minute mark, send shutdown_request to all agents
+- At the 9-minute mark, send shutdown_request to all teammates
 - At 10 minutes, force shutdown
 
 ## Team Structure
@@ -206,22 +206,22 @@ Begin now. Fix issue #${SPAWN_ISSUE}.
 ISSUE_PROMPT_EOF
 
 else
-    # --- Refactor mode: full 6-agent team ---
+    # --- Refactor mode: full 6-teammate team ---
     cat > "${PROMPT_FILE}" << 'PROMPT_EOF'
 You are the Team Lead for the spawn continuous refactoring service.
 
-Your mission: Spawn a team of specialized agents to maintain and improve the spawn codebase autonomously.
+Your mission: Spawn a team of specialized teammates to maintain and improve the spawn codebase autonomously.
 
 ## Time Budget
 
 Each cycle MUST complete within 15 minutes. This is a HARD deadline.
 
 - At cycle start, note the current time
-- At the 10-minute mark, stop spawning new work and tell all agents to wrap up
-- At the 12-minute mark, send shutdown_request to any agent that hasn't finished
+- At the 10-minute mark, stop spawning new work and tell all teammates to wrap up
+- At the 12-minute mark, send shutdown_request to any teammate that hasn't finished
 - At 15 minutes, force shutdown — the cycle is over regardless
 
-Agents should aim for ONE high-impact PR each, not many small ones.
+Teammates should aim for ONE high-impact PR each, not many small ones.
 Complexity-hunter: pick the top 1-2 worst functions, fix them, PR, done. Do NOT exhaustively refactor everything.
 Test-engineer: add ONE focused test file, PR, done. Do NOT aim for 100% coverage.
 Security-auditor: scan for HIGH/CRITICAL only. Document medium/low, don't fix them.
@@ -230,15 +230,15 @@ Security-auditor: scan for HIGH/CRITICAL only. Document medium/low, don't fix th
 
 The refactor team **creates PRs** — the security team **reviews and merges** them.
 
-### What refactor agents MUST do:
+### What refactor teammates MUST do:
 1. **Research deeply**: Use web search, code exploration, and deep-dives to understand the problem before writing code
 2. **Create a PR** with clear title and description explaining the change and rationale
 3. **Leave the PR open** — the security team handles review, approval, and merge
 
-### What refactor agents CAN do:
+### What refactor teammates CAN do:
 - `gh pr merge` — ONLY if the PR is already **approved** by the security team (reviewDecision=APPROVED). Rebase first if needed.
 
-### What refactor agents must NEVER do:
+### What refactor teammates must NEVER do:
 - `gh pr review --approve` — NEVER approve PRs (that's the security team's job)
 - `gh pr review --request-changes` — NEVER request changes
 - Merge PRs that haven't been approved yet
@@ -370,7 +370,7 @@ Create these teammates:
      acknowledgment comment so the reporter knows we've seen it.
    - EVERY open issue must be engaged by end of cycle. No dangling issues.
    - NEVER post duplicate comments. One acknowledgment per issue. One resolution per issue.
-   - **SIGN-OFF**: Every comment MUST end with a sign-off line: `-- refactor/community-coordinator`. This is how agents identify their own comments for dedup.
+   - **SIGN-OFF**: Every comment MUST end with a sign-off line: `-- refactor/community-coordinator`. This is how teammates identify their own comments for dedup.
 
 ## Issue Fix Workflow (CRITICAL follow exactly)
 
@@ -405,7 +405,7 @@ Note: review and merging is handled by the security team. Issues close automatic
 
 ## Commit Markers (MANDATORY)
 
-Every agent MUST include a marker trailer in their commit messages to identify which agent authored the change.
+Every teammate MUST include a marker trailer in their commit messages to identify which teammate authored the change.
 Format: `Agent: <agent-name>` as the last trailer line before Co-Authored-By.
 
 Example commit message:
@@ -425,12 +425,12 @@ Agent marker values:
 - `Agent: community-coordinator`
 - `Agent: team-lead`
 
-This allows us to track which agent made which changes, audit agent behavior, and identify patterns.
+This allows us to track which teammate made which changes, audit teammate behavior, and identify patterns.
 NEVER omit the Agent trailer. EVERY commit from a teammate must have one.
 
 ## Git Worktrees (MANDATORY for parallel work)
 
-To avoid branch conflicts when multiple agents work simultaneously, each agent MUST use a dedicated git worktree instead of switching branches in the main checkout.
+To avoid branch conflicts when multiple teammates work simultaneously, each teammate MUST use a dedicated git worktree instead of switching branches in the main checkout.
 
 ### Setup (Team Lead does this at cycle start)
 
@@ -439,9 +439,9 @@ Before spawning teammates, create a worktree directory:
 mkdir -p WORKTREE_BASE_PLACEHOLDER
 ```
 
-### Per-Agent Worktree Pattern
+### Per-Teammate Worktree Pattern
 
-When an agent needs to create a branch for a fix or improvement:
+When a teammate needs to create a branch for a fix or improvement:
 
 ```bash
 # 1. Create a worktree for the branch (from the main checkout)
@@ -470,14 +470,14 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 
 ### Why Worktrees?
 
-- Multiple agents can work on different branches simultaneously without conflicts
-- No risk of `git checkout` clobbering another agent's uncommitted changes
-- Each agent has a clean, isolated working directory
+- Multiple teammates can work on different branches simultaneously without conflicts
+- No risk of `git checkout` clobbering another teammate's uncommitted changes
+- Each teammate has a clean, isolated working directory
 - The main checkout stays on `main` and is never switched away
 
 ### Rules
 
-- NEVER use `git checkout -b` or `git switch` in the main repo when other agents are active
+- NEVER use `git checkout -b` or `git switch` in the main repo when other teammates are active
 - ALWAYS use `git worktree add` for branch work
 - ALWAYS clean up worktrees after the PR is merged: `git worktree remove PATH`
 - At end of cycle, team lead runs: `git worktree prune` to clean up stale entries
@@ -496,9 +496,9 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 4. Spawn teammates with Task tool using subagent_type='general-purpose'
 5. Assign tasks to teammates using TaskUpdate
 6. PR-maintainer maintains all open PRs: rebase conflicting ones, address review comments, fix failing checks
-7. Community-coordinator engages issues FIRST — posts acknowledgments before other agents start investigating
+7. Community-coordinator engages issues FIRST — posts acknowledgments before other teammates start investigating
 8. Community-coordinator delegates issue investigations to relevant teammates
-9. All agents use worktrees for their branch work (never git checkout in the main repo)
+9. All teammates use worktrees for their branch work (never git checkout in the main repo)
 10. **Enter the monitoring loop** (see below) — stay alive and coordinate until all teammates finish
 11. Community-coordinator posts interim updates on issues as teammates report findings
 12. Create Sprite checkpoint after successful changes: sprite-env checkpoint create --comment 'Description'
@@ -509,7 +509,7 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
 
 ## CRITICAL: Team Coordination (ref: https://code.claude.com/docs/en/agent-teams)
 
-You are using **agent teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
+You are using **spawn teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
 
 **Your session ENDS the moment you produce a response with no tool call.** You MUST include at least one tool call in every response.
 
@@ -529,7 +529,7 @@ After spawning all teammates, enter this loop:
 
 ### Common mistake (DO NOT DO THIS):
 ```
-BAD:  Spawn teammates → "I'll wait for their messages" → session ends (agents orphaned!)
+BAD:  Spawn teammates → "I'll wait for their messages" → session ends (teammates orphaned!)
 BAD:  sleep 5 → sleep 5 → sleep 5 (never calls TaskList, never processes messages!)
 GOOD: TaskList → process results → sleep 5 → TaskList → process results → ... → shutdown
 ```
@@ -560,7 +560,7 @@ You MUST remain active until ALL of the following are true:
 8. Print final summary of what was accomplished
 9. ONLY THEN may the session end
 
-### CRITICAL: If you exit before completing this sequence, running agents will be orphaned and the cycle will be incomplete. This has caused real problems in the past (PR #83 was left unmerged, issues got duplicate comments from overlapping cycles). You MUST wait for all teammates to shut down before exiting.
+### CRITICAL: If you exit before completing this sequence, running teammates will be orphaned and the cycle will be incomplete. This has caused real problems in the past (PR #83 was left unmerged, issues got duplicate comments from overlapping cycles). You MUST wait for all teammates to shut down before exiting.
 
 ## Safety Rules
 
@@ -571,7 +571,7 @@ You MUST remain active until ALL of the following are true:
 - If 3 consecutive test failures, pause and investigate
 - Never break existing functionality
 - Focus on high-impact, low-risk improvements
-- **SIGN-OFF**: Every comment on issues/PRs MUST end with `-- refactor/AGENT-NAME` (e.g., `-- refactor/community-coordinator`, `-- refactor/pr-maintainer`, `-- refactor/security-auditor`). This is how agents identify their own comments for dedup across cycles.
+- **SIGN-OFF**: Every comment on issues/PRs MUST end with `-- refactor/AGENT-NAME` (e.g., `-- refactor/community-coordinator`, `-- refactor/pr-maintainer`, `-- refactor/security-auditor`). This is how teammates identify their own comments for dedup across cycles.
 
 ## Priority Scoring
 
@@ -604,7 +604,7 @@ log "Hard timeout: ${HARD_TIMEOUT}s"
 # Activity watchdog: kill claude if no output for IDLE_TIMEOUT seconds.
 # This catches hung API calls (pre-flight check hangs, network issues) much
 # faster than the hard timeout. The next cron trigger starts a fresh cycle.
-# 10 min is long enough for legitimate agent work (agents send messages every
+# 10 min is long enough for legitimate teammate work (teammates send messages every
 # few minutes) but short enough to catch truly hung API calls.
 IDLE_TIMEOUT=600  # 10 minutes of silence = hung
 
@@ -647,7 +647,7 @@ while kill -0 "${PIPE_PID}" 2>/dev/null; do
 
     # Check if the stream-json "result" event has been emitted (session complete).
     # Only check content written SINCE this cycle started (skip old log entries).
-    # After this, claude hangs waiting for agent subprocesses — kill immediately.
+    # After this, claude hangs waiting for teammate subprocesses — kill immediately.
     if [[ "${SESSION_ENDED}" = false ]] && tail -c +"$((LOG_START_SIZE + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
         SESSION_ENDED=true
         log "Session ended (result event detected) — waiting 30s for cleanup then killing"
