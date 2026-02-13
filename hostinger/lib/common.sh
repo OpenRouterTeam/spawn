@@ -265,7 +265,13 @@ destroy_server() {
     response=$(hostinger_api DELETE "/virtual-machines/$vps_id")
 
     if echo "$response" | grep -q '"error"\|"message".*fail'; then
-        log_error "Failed to destroy VPS: $response"
+        log_error "Failed to destroy VPS $vps_id"
+        local error_msg
+        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','') or d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
+        log_error "API Error: $error_msg"
+        log_error ""
+        log_error "The VPS may still be running and incurring charges."
+        log_error "Delete it manually at: https://hpanel.hostinger.com/"
         return 1
     fi
 

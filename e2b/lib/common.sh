@@ -85,7 +85,16 @@ create_server() {
     fi
 
     if [[ -z "${E2B_SANDBOX_ID}" ]]; then
-        log_error "Failed to create sandbox: ${output}"
+        log_error "Failed to create E2B sandbox"
+        if [[ -n "${output}" ]]; then
+            log_error "Error: ${output}"
+        fi
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - Invalid or expired API key (verify at: https://e2b.dev/dashboard)"
+        log_error "  - Sandbox limit reached for your account"
+        log_error "  - Template '${template}' not found"
+        log_error "  - Network connectivity issues"
         return 1
     fi
 

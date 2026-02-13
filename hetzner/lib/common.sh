@@ -409,7 +409,11 @@ destroy_server() {
     response=$(hetzner_api DELETE "/servers/$server_id")
 
     if echo "$response" | grep -q '"error"'; then
-        log_error "Failed to destroy server: $response"
+        log_error "Failed to destroy server $server_id"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
+        log_error ""
+        log_error "The server may still be running and incurring charges."
+        log_error "Delete it manually at: https://console.hetzner.cloud/"
         return 1
     fi
 
