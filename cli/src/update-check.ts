@@ -84,12 +84,24 @@ function performAutoUpdate(latestVersion: string): void {
     });
 
     console.error();
-    console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
-    console.error(pc.dim("  Run your spawn command again to use the new version."));
+    console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully! Re-running command...`)));
     console.error();
 
-    // Exit cleanly after update
-    process.exit(0);
+    // Re-exec with original args, skipping update check to avoid infinite loop
+    try {
+      const args = process.argv
+        .slice(1)
+        .map((a) => `"${a.replace(/"/g, '\\"')}"`)
+        .join(" ");
+      executor.execSync(`"${process.execPath}" ${args}`, {
+        stdio: "inherit",
+        shell: "/bin/bash",
+        env: { ...process.env, SPAWN_NO_UPDATE_CHECK: "1" },
+      });
+      process.exit(0);
+    } catch (e: any) {
+      process.exit(e.status ?? 1);
+    }
   } catch (err) {
     console.error();
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));

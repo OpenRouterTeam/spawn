@@ -104,11 +104,80 @@ describe("update-check", () => {
       expect(output).toContain("0.3.0");
       expect(output).toContain("Updating automatically");
 
-      // Should have run the install script
-      expect(execSyncSpy).toHaveBeenCalled();
+      // Should have called execSync twice: install script + re-exec
+      expect(execSyncSpy).toHaveBeenCalledTimes(2);
+
+      // First call: install script
+      const installCall = execSyncSpy.mock.calls[0][0] as string;
+      expect(installCall).toContain("install.sh");
+
+      // Second call: re-exec with original args
+      const reexecCall = execSyncSpy.mock.calls[1][0] as string;
+      expect(reexecCall).toContain(process.execPath);
+      const reexecOpts = execSyncSpy.mock.calls[1][1] as any;
+      expect(reexecOpts.env.SPAWN_NO_UPDATE_CHECK).toBe("1");
 
       // Should have exited
       expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
+    });
+
+    it("should re-exec with SPAWN_NO_UPDATE_CHECK=1 after successful update", async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ version: "0.3.0" }),
+        } as Response)
+      );
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { executor } = await import("../update-check.js");
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      // Should show "Re-running command" message
+      const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
+      expect(output).toContain("Re-running command");
+
+      // Second execSync call should set SPAWN_NO_UPDATE_CHECK
+      const reexecOpts = execSyncSpy.mock.calls[1][1] as any;
+      expect(reexecOpts.env.SPAWN_NO_UPDATE_CHECK).toBe("1");
+      expect(reexecOpts.stdio).toBe("inherit");
+
+      fetchSpy.mockRestore();
+      execSyncSpy.mockRestore();
+    });
+
+    it("should propagate non-zero exit code from re-exec'd process", async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ version: "0.3.0" }),
+        } as Response)
+      );
+      const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
+
+      const { executor } = await import("../update-check.js");
+      let callCount = 0;
+      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {
+        callCount++;
+        if (callCount === 2) {
+          // Second call (re-exec) fails with exit code 2
+          const err: any = new Error("Command failed");
+          err.status = 2;
+          throw err;
+        }
+      });
+
+      const { checkForUpdates } = await import("../update-check.js");
+      await checkForUpdates();
+
+      // Should propagate the exit code from the re-exec'd process
+      expect(processExitSpy).toHaveBeenCalledWith(2);
 
       fetchSpy.mockRestore();
       execSyncSpy.mockRestore();
