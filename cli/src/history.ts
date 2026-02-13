@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
-import { join } from "path";
+import { join, resolve, isAbsolute } from "path";
 import { homedir } from "os";
 
 export interface SpawnRecord {
@@ -9,9 +9,21 @@ export interface SpawnRecord {
   prompt?: string;
 }
 
-/** Returns the directory for spawn data, respecting SPAWN_HOME env var */
+/** Returns the directory for spawn data, respecting SPAWN_HOME env var.
+ *  SPAWN_HOME must be an absolute path if set; relative paths are rejected
+ *  to prevent unintended file writes. */
 export function getSpawnDir(): string {
-  return process.env.SPAWN_HOME || join(homedir(), ".spawn");
+  const spawnHome = process.env.SPAWN_HOME;
+  if (!spawnHome) return join(homedir(), ".spawn");
+  // Require absolute path to prevent path traversal via relative paths
+  if (!isAbsolute(spawnHome)) {
+    throw new Error(
+      `SPAWN_HOME must be an absolute path (got "${spawnHome}").\n` +
+      `Example: export SPAWN_HOME=/home/user/.spawn`
+    );
+  }
+  // Resolve to canonical form (collapses .. segments)
+  return resolve(spawnHome);
 }
 
 export function getHistoryPath(): string {
