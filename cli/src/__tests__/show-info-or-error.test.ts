@@ -9,7 +9,7 @@ import { resolve } from "path";
  * case where a user types "spawn <name>" and the name could be:
  * - A valid agent key -> shows agent info (cmdAgentInfo)
  * - A valid cloud key -> shows cloud info (cmdCloudInfo)
- * - An unknown name -> shows "Unknown command" with fuzzy suggestions
+ * - An unknown name -> shows "Unknown agent or cloud" with fuzzy suggestions
  *
  * Since showInfoOrError is not exported and calls loadManifest + process.exit,
  * we test it by spawning bun subprocesses (same approach as index-main-routing.test.ts).
@@ -122,13 +122,13 @@ describe("showInfoOrError - single argument routing", () => {
     });
   });
 
-  // ── Unknown command: error output ──────────────────────────────────────
+  // ── Unknown agent or cloud: error output ──────────────────────────────────────
 
   describe("unknown single argument", () => {
-    it("should show 'Unknown command' for an unrecognized name", () => {
+    it("should show 'Unknown agent or cloud' for an unrecognized name", () => {
       const result = runCli(["xyzzyplugh"]);
       const output = result.stdout + result.stderr;
-      expect(output).toContain("Unknown command");
+      expect(output).toContain("Unknown agent or cloud");
       expect(result.exitCode).not.toBe(0);
     });
 
@@ -185,7 +185,7 @@ describe("showInfoOrError - single argument routing", () => {
       // "kubernetes" is far from any agent or cloud name
       const result = runCli(["kubernetes"]);
       const output = result.stdout + result.stderr;
-      expect(output).toContain("Unknown command");
+      expect(output).toContain("Unknown agent or cloud");
       expect(output).not.toContain("Did you mean");
     });
 
@@ -230,14 +230,14 @@ describe("showInfoOrError - single argument routing", () => {
     it("should not treat numeric-only input as a valid agent or cloud", () => {
       const result = runCli(["12345"]);
       const output = result.stdout + result.stderr;
-      expect(output).toContain("Unknown command");
+      expect(output).toContain("Unknown agent or cloud");
       expect(result.exitCode).not.toBe(0);
     });
 
     it("should handle hyphenated names that are not real entries", () => {
       const result = runCli(["not-a-real-entry"]);
       const output = result.stdout + result.stderr;
-      expect(output).toContain("Unknown command");
+      expect(output).toContain("Unknown agent or cloud");
       expect(result.exitCode).not.toBe(0);
     });
 

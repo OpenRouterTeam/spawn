@@ -90,7 +90,7 @@ function showUnknownCommandError(name: string, manifest: { agents: Record<string
   const agentMatch = findClosestKeyByNameOrKey(name, agentKeys(manifest), (k) => manifest.agents[k].name);
   const cloudMatch = findClosestKeyByNameOrKey(name, cloudKeys(manifest), (k) => manifest.clouds[k].name);
 
-  console.error(pc.red(`Unknown command: ${pc.bold(name)}`));
+  console.error(pc.red(`Unknown agent or cloud: ${pc.bold(name)}`));
   console.error();
   if (agentMatch || cloudMatch) {
     const suggestions: string[] = [];

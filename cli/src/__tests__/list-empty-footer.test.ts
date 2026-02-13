@@ -271,7 +271,7 @@ function buildUnknownCommandError(
   if (cloudMatch) suggestions.push(`${cloudMatch} (cloud: ${manifest.clouds[cloudMatch].name})`);
 
   return {
-    errorMessage: `Unknown command: ${name}`,
+    errorMessage: `Unknown agent or cloud: ${name}`,
     hasSuggestion: suggestions.length > 0,
     suggestion: suggestions.length > 0 ? `Did you mean ${suggestions.join(" or ")}?` : undefined,
   };
@@ -662,9 +662,9 @@ describe("showUnknownCommandError logic", () => {
   });
 
   describe("error message format", () => {
-    it("should always include Unknown command prefix", () => {
+    it("should always include Unknown agent or cloud prefix", () => {
       const result = buildUnknownCommandError("foo", mockManifest);
-      expect(result.errorMessage).toStartWith("Unknown command:");
+      expect(result.errorMessage).toStartWith("Unknown agent or cloud:");
     });
 
     it("should include the actual input in error message", () => {

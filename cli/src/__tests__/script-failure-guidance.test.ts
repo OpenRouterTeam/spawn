@@ -468,18 +468,24 @@ describe("buildRetryCommand", () => {
     );
   });
 
-  it("should truncate long prompts to 60 characters", () => {
+  it("should suggest --prompt-file for long prompts instead of truncating", () => {
     const longPrompt = "A".repeat(100);
     const result = buildRetryCommand("claude", "sprite", longPrompt);
-    expect(result).toContain("A".repeat(60) + "...");
-    expect(result).not.toContain("A".repeat(61));
+    expect(result).toBe("spawn claude sprite --prompt-file <your-prompt-file>");
+    expect(result).not.toContain("A"); // no truncated prompt content
   });
 
-  it("should not truncate prompts at exactly 60 characters", () => {
-    const exactPrompt = "B".repeat(60);
+  it("should include full prompt at exactly 80 characters", () => {
+    const exactPrompt = "B".repeat(80);
     const result = buildRetryCommand("aider", "hetzner", exactPrompt);
     expect(result).toBe(`spawn aider hetzner --prompt "${exactPrompt}"`);
-    expect(result).not.toContain("...");
+    expect(result).not.toContain("prompt-file");
+  });
+
+  it("should suggest --prompt-file for prompts over 80 characters", () => {
+    const longPrompt = "C".repeat(81);
+    const result = buildRetryCommand("aider", "hetzner", longPrompt);
+    expect(result).toBe("spawn aider hetzner --prompt-file <your-prompt-file>");
   });
 
   it("should escape double quotes in prompt", () => {
