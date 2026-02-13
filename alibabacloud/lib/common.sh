@@ -72,19 +72,10 @@ test_aliyun_credentials() {
     fi
 }
 
-# Ensure Alibaba Cloud credentials are configured
-ensure_aliyun_credentials() {
-    ensure_aliyun_cli
-
-    # Check if already configured
-    if aliyun configure list 2>/dev/null | grep -q "Profile"; then
-        if test_aliyun_credentials; then
-            return 0
-        fi
-        log_warn "Existing credentials invalid, need to reconfigure"
-    fi
-
-    # Get credentials from env vars or config file or prompt
+# Load Alibaba Cloud credentials from env vars, config file, or user prompt.
+# Outputs three tab-separated values: ak_id, ak_secret, region
+# Usage: creds=$(_aliyun_load_or_prompt_credentials)
+_aliyun_load_or_prompt_credentials() {
     local config_file="$HOME/.config/spawn/alibabacloud.json"
     local ak_id="${ALIYUN_ACCESS_KEY_ID:-}"
     local ak_secret="${ALIYUN_ACCESS_KEY_SECRET:-}"
@@ -125,7 +116,14 @@ ensure_aliyun_credentials() {
         log_info "Credentials saved to $config_file"
     fi
 
-    # Configure aliyun CLI
+    printf '%s\t%s\t%s' "$ak_id" "$ak_secret" "$region"
+}
+
+# Configure the aliyun CLI with the given credentials and verify them.
+# Usage: _aliyun_configure_cli AK_ID AK_SECRET REGION
+_aliyun_configure_cli() {
+    local ak_id="$1" ak_secret="$2" region="$3"
+
     log_step "Configuring Alibaba Cloud CLI..."
     aliyun configure set \
         --mode AK \
@@ -134,13 +132,31 @@ ensure_aliyun_credentials() {
         --region "$region" \
         --language en
 
-    # Verify
     if test_aliyun_credentials; then
         return 0
     else
         log_error "Credential configuration failed"
         return 1
     fi
+}
+
+# Ensure Alibaba Cloud credentials are configured
+ensure_aliyun_credentials() {
+    ensure_aliyun_cli
+
+    # Check if already configured
+    if aliyun configure list 2>/dev/null | grep -q "Profile"; then
+        if test_aliyun_credentials; then
+            return 0
+        fi
+        log_warn "Existing credentials invalid, need to reconfigure"
+    fi
+
+    local creds ak_id ak_secret region
+    creds=$(_aliyun_load_or_prompt_credentials) || return 1
+    IFS=$'\t' read -r ak_id ak_secret region <<< "$creds"
+
+    _aliyun_configure_cli "$ak_id" "$ak_secret" "$region"
 }
 
 # Check if SSH key pair exists in Alibaba Cloud
@@ -311,6 +327,25 @@ _ensure_vswitch() {
 # Instance lifecycle
 # ============================================================
 
+# Extract the first public IP from an Alibaba Cloud DescribeInstances response.
+# The IP is nested at Instances.Instance[0].PublicIpAddress.IpAddress[0].
+# Usage: ip=$(_aliyun_instance_public_ip "$response")
+_aliyun_instance_public_ip() {
+    local json="$1"
+    echo "$json" | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    instances = data.get('Instances', {}).get('Instance', [])
+    if instances:
+        ips = instances[0].get('PublicIpAddress', {}).get('IpAddress', [])
+        if ips:
+            print(ips[0])
+except:
+    pass
+" 2>/dev/null || echo ""
+}
+
 # Wait for Alibaba Cloud ECS instance to become running
 # Sets: ALIYUN_INSTANCE_IP
 # Usage: _wait_for_aliyun_instance INSTANCE_ID [MAX_ATTEMPTS]
@@ -331,18 +366,7 @@ _wait_for_aliyun_instance() {
         status=$(_aliyun_json_field "$response" "Instances" "Instance" "Status")
 
         local ip_address
-        ip_address=$(echo "$response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    instances = data.get('Instances', {}).get('Instance', [])
-    if instances:
-        ips = instances[0].get('PublicIpAddress', {}).get('IpAddress', [])
-        if ips:
-            print(ips[0])
-except:
-    pass
-" 2>/dev/null || echo "")
+        ip_address=$(_aliyun_instance_public_ip "$response")
 
         if [[ "$status" == "Running" ]] && [[ -n "$ip_address" ]]; then
             ALIYUN_INSTANCE_IP="$ip_address"
