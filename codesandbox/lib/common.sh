@@ -213,7 +213,7 @@ upload_file() {
 
 interactive_session() {
     log_info "Starting interactive session..."
-    log_warn "Note: Use 'csb' CLI dashboard for full terminal experience"
+    log_step "For a full terminal, open your sandbox at: https://codesandbox.io/dashboard"
     run_server "$1"
 }
 
