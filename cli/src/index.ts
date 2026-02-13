@@ -360,6 +360,61 @@ function hasTrailingHelpFlag(args: string[]): boolean {
   return args.slice(1).some(a => HELP_FLAGS.includes(a));
 }
 
+/** Handle list/ls/history commands with filters and --clear */
+async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
+  if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+  if (filteredArgs.slice(1).includes("--clear")) {
+    cmdListClear();
+    return;
+  }
+  const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
+  await cmdList(agentFilter, cloudFilter);
+}
+
+/** Handle named subcommands (agents, clouds, matrix, etc.) */
+async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<void> {
+  if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+
+  // "spawn agents <name>" or "spawn clouds <name>" -> show info for that name
+  if ((cmd === "agents" || cmd === "clouds") && filteredArgs.length > 1 && !filteredArgs[1].startsWith("-")) {
+    const name = filteredArgs[1];
+    warnExtraArgs(filteredArgs, 2);
+    console.error(pc.dim(`Tip: next time you can just run ${pc.cyan(`spawn ${name}`)}`));
+    console.error();
+    await showInfoOrError(name);
+    return;
+  }
+
+  warnExtraArgs(filteredArgs, 1);
+  await SUBCOMMANDS[cmd]();
+}
+
+/** Handle verb aliases like "spawn run claude sprite" -> "spawn claude sprite" */
+async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
+  if (filteredArgs.length > 1) {
+    const remaining = filteredArgs.slice(1);
+    warnExtraArgs(remaining, 2);
+    await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun);
+    return;
+  }
+  console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent and cloud`));
+  console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud>")}`);
+  console.error(pc.dim(`  The "${cmd}" keyword is optional -- just use ${pc.cyan("spawn <agent> <cloud>")} directly.`));
+  process.exit(1);
+}
+
+/** Handle slash notation: "spawn claude/hetzner" -> "spawn claude hetzner" */
+async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean): Promise<boolean> {
+  const parts = cmd.split("/");
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    console.error(pc.dim(`Tip: use a space instead of slash: ${pc.cyan(`spawn ${parts[0]} ${parts[1]}`)}`));
+    console.error();
+    await handleDefaultCommand(parts[0], parts[1], prompt, dryRun);
+    return true;
+  }
+  return false;
+}
+
 /** Dispatch a named command or fall through to agent/cloud handling */
 async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
@@ -368,58 +423,12 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
     return;
   }
 
-  if (LIST_COMMANDS.has(cmd)) {
-    if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
-    if (filteredArgs.slice(1).includes("--clear")) {
-      cmdListClear();
-      return;
-    }
-    const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
-    await cmdList(agentFilter, cloudFilter);
-    return;
-  }
+  if (LIST_COMMANDS.has(cmd)) { await dispatchListCommand(filteredArgs); return; }
+  if (SUBCOMMANDS[cmd]) { await dispatchSubcommand(cmd, filteredArgs); return; }
+  if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun); return; }
 
-  if (SUBCOMMANDS[cmd]) {
-    if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
-
-    // "spawn agents <name>" or "spawn clouds <name>" -> show info for that name
-    if ((cmd === "agents" || cmd === "clouds") && filteredArgs.length > 1 && !filteredArgs[1].startsWith("-")) {
-      const name = filteredArgs[1];
-      warnExtraArgs(filteredArgs, 2);
-      console.error(pc.dim(`Tip: next time you can just run ${pc.cyan(`spawn ${name}`)}`));
-      console.error();
-      await showInfoOrError(name);
-      return;
-    }
-
-    warnExtraArgs(filteredArgs, 1);
-    await SUBCOMMANDS[cmd]();
-    return;
-  }
-
-  // Handle verb aliases: "spawn run claude sprite" -> "spawn claude sprite"
-  if (VERB_ALIASES.has(cmd)) {
-    if (filteredArgs.length > 1) {
-      const remaining = filteredArgs.slice(1);
-      warnExtraArgs(remaining, 2);
-      await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun);
-      return;
-    }
-    console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent and cloud`));
-    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud>")}`);
-    console.error(pc.dim(`  The "${cmd}" keyword is optional -- just use ${pc.cyan("spawn <agent> <cloud>")} directly.`));
-    process.exit(1);
-  }
-
-  // Handle slash notation: "spawn claude/hetzner" or "spawn hetzner/claude"
   if (filteredArgs.length === 1 && cmd.includes("/")) {
-    const parts = cmd.split("/");
-    if (parts.length === 2 && parts[0] && parts[1]) {
-      console.error(pc.dim(`Tip: use a space instead of slash: ${pc.cyan(`spawn ${parts[0]} ${parts[1]}`)}`));
-      console.error();
-      await handleDefaultCommand(parts[0], parts[1], prompt, dryRun);
-      return;
-    }
+    if (await dispatchSlashNotation(cmd, prompt, dryRun)) return;
   }
 
   warnExtraArgs(filteredArgs, 2);
