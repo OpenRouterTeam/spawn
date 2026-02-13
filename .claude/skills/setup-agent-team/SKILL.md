@@ -376,6 +376,43 @@ If converting from a looping script, remove the `while true` / `sleep` and keep 
 - `discovery.sh` — Continuous discovery loop for spawn (already single-cycle ready)
 - `refactor.sh` — Refactoring team service (already single-cycle ready)
 
+## Agent Teams (ref: https://code.claude.com/docs/en/agent-teams)
+
+All service scripts use **agent teams**, not subagents. Key differences:
+
+| | Subagents | Agent Teams |
+|---|---|---|
+| **Communication** | Results return to caller only | Teammates message each other directly |
+| **Context** | Shares caller's context | Independent context window |
+| **Coordination** | Caller manages all work | Shared task list with self-coordination |
+
+### Team coordination pattern for `claude -p` mode
+
+In `claude -p` (print) mode, the session ends when no tool call is made. The lead must stay alive by always including a tool call. **The correct monitoring loop is:**
+
+```
+1. Call TaskList to check task status
+2. Process any teammate messages (they arrive automatically as user turns)
+3. If tasks still pending, call Bash("sleep 5") to yield, then go back to step 1
+4. Once all tasks complete, shutdown teammates and exit
+```
+
+**EVERY iteration MUST call TaskList.** Looping on `sleep 5` alone blocks message delivery without checking progress. This is the #1 cause of stuck cycles.
+
+### Spawning teammates correctly
+
+When spawning teammates via the Task tool, **always pass `team_name` and `name`** so they join the team:
+
+```
+Task(subagent_type='general-purpose', team_name='my-team', name='reviewer-1', prompt='...')
+```
+
+Without `team_name`, agents spawn as subagents that can't use team messaging.
+
+### Prompt completeness
+
+Each teammate gets its own context window and **cannot see other teammates' prompts**. Always include the COMPLETE instructions in every teammate's prompt. Never abbreviate with "follow the same protocol as agent X".
+
 ## Git Conventions for Agent Team Scripts
 
 All agent team scripts (`discovery.sh`, `refactor.sh`, and any future scripts) MUST instruct their agents to follow these conventions:
