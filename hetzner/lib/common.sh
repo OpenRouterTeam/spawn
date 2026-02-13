@@ -195,6 +195,24 @@ _ensure_jq() {
 # Uses /datacenters API for authoritative availability + /server_types for specs.
 # If not available, finds the cheapest equivalent (same CPU family, >= specs).
 # Returns 0 and prints a valid server type; returns 1 on failure.
+# Find cheapest available server type matching spec constraints
+# $1=types_response $2=location $3=available_ids_json $4=extra_jq_filter
+# Outputs "price|name" lines sorted by price, empty if none match
+_hetzner_find_candidates() {
+    local types_response="$1" location="$2" ids_json="$3" extra_filter="$4"
+    printf '%s' "$types_response" | jq -r \
+        --arg loc "$location" \
+        --argjson ids "$ids_json" \
+        "[.server_types[]
+          | select(.deprecation == null)
+          | select(.id as \$id | \$ids | index(\$id))
+          | ${extra_filter}
+          | { name, price: (.prices[] | select(.location == \$loc) | .price_hourly.gross) }]
+         | sort_by(.price | tonumber)
+         | .[]
+         | \"\\(.price)|\\(.name)\""
+}
+
 _validate_server_type_for_location() {
     local server_type="$1"
     local location="$2"
@@ -235,66 +253,37 @@ _validate_server_type_for_location() {
         return 0
     fi
 
-    # Type not available at this location — find a compatible alternative
+    # Type not available — extract specs in a single jq call
+    local wanted_specs
+    wanted_specs=$(printf '%s' "$types_response" | jq -r \
+        --arg name "$server_type" \
+        '.server_types[] | select(.name == $name) | "\(.cpu_type) \(.cores) \(.memory)"')
     local wanted_cpu wanted_cores wanted_memory
-    wanted_cpu=$(printf '%s' "$types_response" | jq -r \
-        --arg name "$server_type" \
-        '.server_types[] | select(.name == $name) | .cpu_type')
-    wanted_cores=$(printf '%s' "$types_response" | jq -r \
-        --arg name "$server_type" \
-        '.server_types[] | select(.name == $name) | .cores')
-    wanted_memory=$(printf '%s' "$types_response" | jq -r \
-        --arg name "$server_type" \
-        '.server_types[] | select(.name == $name) | .memory')
+    read -r wanted_cpu wanted_cores wanted_memory <<< "$wanted_specs"
 
-    # Build newline-separated list of "price|name" for available types
-    # matching same CPU family with >= cores and >= memory, sorted by price
-    local candidates
-    candidates=$(printf '%s' "$types_response" | jq -r \
-        --arg loc "$location" \
-        --arg cpu "$wanted_cpu" \
-        --argjson cores "$wanted_cores" \
-        --argjson mem "$wanted_memory" \
-        --argjson ids "$(printf '%s\n' "$available_ids" | jq -Rn '[inputs | tonumber]')" \
-        '[.server_types[]
-          | select(.deprecation == null)
-          | select(.id as $id | $ids | index($id))
-          | select(.cpu_type == $cpu and .cores >= $cores and .memory >= $mem)
-          | { name, price: (.prices[] | select(.location == $loc) | .price_hourly.gross) }]
-         | sort_by(.price | tonumber)
-         | .[]
-         | "\(.price)|\(.name)"')
+    local ids_json
+    ids_json=$(printf '%s\n' "$available_ids" | jq -Rn '[inputs | tonumber]')
 
-    if [[ -n "$candidates" ]]; then
-        local replacement
-        replacement=$(printf '%s\n' "$candidates" | head -1 | cut -d'|' -f2)
-        printf 'FALLBACK:%s:%s:%s:%s\n' "$server_type" "$replacement" "$location" "$wanted_cpu" >&2
-        printf '%s' "$replacement"
-        return 0
-    fi
+    # Try same CPU family first, then any family
+    local family candidates replacement
+    for family in "same" "any"; do
+        local filter
+        if [[ "$family" == "same" ]]; then
+            filter="select(.cpu_type == \"${wanted_cpu}\" and .cores >= ${wanted_cores} and .memory >= ${wanted_memory})"
+        else
+            filter="select(.cores >= ${wanted_cores} and .memory >= ${wanted_memory})"
+        fi
 
-    # No same-family match — try any type with >= specs
-    candidates=$(printf '%s' "$types_response" | jq -r \
-        --arg loc "$location" \
-        --argjson cores "$wanted_cores" \
-        --argjson mem "$wanted_memory" \
-        --argjson ids "$(printf '%s\n' "$available_ids" | jq -Rn '[inputs | tonumber]')" \
-        '[.server_types[]
-          | select(.deprecation == null)
-          | select(.id as $id | $ids | index($id))
-          | select(.cores >= $cores and .memory >= $mem)
-          | { name, price: (.prices[] | select(.location == $loc) | .price_hourly.gross) }]
-         | sort_by(.price | tonumber)
-         | .[]
-         | "\(.price)|\(.name)"')
-
-    if [[ -n "$candidates" ]]; then
-        local replacement
-        replacement=$(printf '%s\n' "$candidates" | head -1 | cut -d'|' -f2)
-        printf 'FALLBACK:%s:%s:%s:any\n' "$server_type" "$replacement" "$location" >&2
-        printf '%s' "$replacement"
-        return 0
-    fi
+        candidates=$(_hetzner_find_candidates "$types_response" "$location" "$ids_json" "$filter")
+        if [[ -n "$candidates" ]]; then
+            replacement=$(printf '%s\n' "$candidates" | head -1 | cut -d'|' -f2)
+            local label="${wanted_cpu}"
+            [[ "$family" == "any" ]] && label="any"
+            printf 'FALLBACK:%s:%s:%s:%s\n' "$server_type" "$replacement" "$location" "$label" >&2
+            printf '%s' "$replacement"
+            return 0
+        fi
+    done
 
     printf 'ERROR:no_compatible_type\n' >&2
     return 1
