@@ -546,6 +546,15 @@ else
         FAILED_CLOUDS=$(grep ':fail$' "${RESULTS_PHASE2}" | sed 's/:fail$//' | cut -d/ -f1 | sort -u || true)
     fi
 
+    # Capture full mock test output per-cloud for richer agent context
+    MOCK_OUTPUT_DIR="/tmp/spawn-qa-mock-output"
+    rm -rf "${MOCK_OUTPUT_DIR}"
+    mkdir -p "${MOCK_OUTPUT_DIR}"
+    for cloud in $FAILED_CLOUDS; do
+        log "Phase 3: Capturing full mock test output for ${cloud}..."
+        bash test/mock.sh "$cloud" > "${MOCK_OUTPUT_DIR}/${cloud}.log" 2>&1 || true
+    done
+
     AGENT_PIDS=""
     for cloud in $FAILED_CLOUDS; do
         check_timeout || break
@@ -554,24 +563,20 @@ else
         cloud_failures=$(printf '%s\n' $FAILURES | grep "^${cloud}/" || true)
         failing_scripts=""
         failing_agents=""
-        error_context=""
         for combo in $cloud_failures; do
             agent=$(printf '%s' "$combo" | cut -d/ -f2)
             script_path="${cloud}/${agent}.sh"
             failing_scripts="${failing_scripts} ${script_path}"
             failing_agents="${failing_agents} ${agent}"
-            if [[ -f "${LOG_FILE}" ]]; then
-                ctx=$(grep -A 10 "test ${script_path}" "${LOG_FILE}" | tail -10 || true)
-                if [[ -n "$ctx" ]]; then
-                    error_context="${error_context}
---- ${script_path} ---
-${ctx}
-"
-                fi
-            fi
         done
         failing_scripts=$(printf '%s' "$failing_scripts" | sed 's/^ //')
         failing_agents=$(printf '%s' "$failing_agents" | sed 's/^ //')
+
+        # Use full mock test output as error context (not just 10 lines from log)
+        error_context=""
+        if [[ -f "${MOCK_OUTPUT_DIR}/${cloud}.log" ]]; then
+            error_context=$(cat "${MOCK_OUTPUT_DIR}/${cloud}.log")
+        fi
 
         fail_count=$(printf '%s\n' $cloud_failures | wc -l | tr -d ' ')
         log "Phase 3: Spawning teammate to fix ${fail_count} failing script(s) in ${cloud}"
@@ -679,6 +684,9 @@ FIXEOF
         git branch -D "qa/fix-${cloud}" 2>/dev/null || true
     done
     git worktree prune 2>/dev/null || true
+
+    # Clean up per-cloud mock output
+    rm -rf "${MOCK_OUTPUT_DIR}" 2>/dev/null || true
 
     log "Phase 3: Fix teammates complete"
 fi
