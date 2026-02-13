@@ -138,28 +138,7 @@ get_fly_org() {
 
 # Get server name from env var or prompt
 get_server_name() {
-    if [[ -n "${FLY_APP_NAME:-}" ]]; then
-        log_info "Using app name from environment: $FLY_APP_NAME"
-        if ! validate_server_name "$FLY_APP_NAME"; then
-            return 1
-        fi
-        echo "$FLY_APP_NAME"
-        return 0
-    fi
-
-    local server_name=$(safe_read "Enter app name: ")
-    if [[ -z "$server_name" ]]; then
-        log_error "App name is required"
-        log_warn "Set FLY_APP_NAME environment variable for non-interactive usage:"
-        log_warn "  FLY_APP_NAME=dev-mk1 curl ... | bash"
-        return 1
-    fi
-
-    if ! validate_server_name "$server_name"; then
-        return 1
-    fi
-
-    echo "$server_name"
+    get_validated_server_name "FLY_APP_NAME" "Enter app name: "
 }
 
 # Create Fly.io app, returning 0 on success or if app already exists
