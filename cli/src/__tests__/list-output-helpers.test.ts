@@ -238,12 +238,11 @@ describe("buildRecordLabel", () => {
 
 describe("buildRecordHint", () => {
   describe("without prompt", () => {
-    it("should return formatted timestamp only", () => {
+    it("should return formatted relative time only", () => {
       const result = buildRecordHint({
-        timestamp: "2026-02-11T14:30:00.000Z",
+        timestamp: new Date().toISOString(),
       });
-      expect(result).toContain("Feb");
-      expect(result).toContain("2026");
+      expect(result).toContain("just now");
       expect(result).not.toContain("--prompt");
     });
 
@@ -309,13 +308,12 @@ describe("buildRecordHint", () => {
       expect(result).not.toContain(longPrompt);
     });
 
-    it("should include both timestamp and truncated prompt", () => {
+    it("should include both relative time and truncated prompt", () => {
       const result = buildRecordHint({
-        timestamp: "2026-02-11T14:30:00.000Z",
+        timestamp: new Date().toISOString(),
         prompt: "A very long prompt that exceeds the thirty character limit",
       });
-      expect(result).toContain("Feb");
-      expect(result).toContain("2026");
+      expect(result).toContain("just now");
       expect(result).toContain("--prompt");
       expect(result).toContain("...");
     });
@@ -637,14 +635,14 @@ describe("edge cases for combined helpers", () => {
     const record = {
       agent: "claude",
       cloud: "sprite",
-      timestamp: "2026-02-11T14:30:00.000Z",
+      timestamp: new Date().toISOString(),
       prompt: "Fix authentication bugs",
     };
     const label = buildRecordLabel(record, manifest);
     const hint = buildRecordHint(record);
 
     expect(label).toBe("Claude Code on Sprite");
-    expect(hint).toContain("Feb");
+    // buildRecordHint uses formatRelativeTime, so check for relative time format
     expect(hint).toContain("Fix authentication bugs");
   });
 
@@ -653,7 +651,7 @@ describe("edge cases for combined helpers", () => {
     const record = {
       agent: "claude",
       cloud: "sprite",
-      timestamp: "2026-02-11T14:30:00.000Z",
+      timestamp: new Date().toISOString(),
       prompt: longPrompt,
     };
     const label = buildRecordLabel(record, manifest);
