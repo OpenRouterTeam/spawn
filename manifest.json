@@ -1289,7 +1289,7 @@
     "atlanticnet/gptme": "implemented",
     "atlanticnet/opencode": "implemented",
     "atlanticnet/plandex": "implemented",
-    "atlanticnet/kilocode": "missing",
+    "atlanticnet/kilocode": "implemented",
     "atlanticnet/continue": "implemented",
     "hostkey/claude": "implemented",
     "hostkey/openclaw": "implemented",

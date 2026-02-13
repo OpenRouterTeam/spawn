@@ -18,6 +18,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/aider.sh)
 
 #### OpenClaw
 
+#### Kilo Code
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/kilocode.sh)
+```
+
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
 ```
