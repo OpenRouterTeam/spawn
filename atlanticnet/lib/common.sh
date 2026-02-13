@@ -31,7 +31,7 @@ atlanticnet_sign() {
     local private_key="${ATLANTICNET_API_PRIVATE_KEY}"
 
     local string_to_sign="${timestamp}${rndguid}"
-    printf '%s' "$string_to_sign" | openssl dgst -sha256 -hmac "$private_key" -binary | base64 -w 0
+    printf '%s' "$string_to_sign" | openssl dgst -sha256 -hmac "$private_key" -binary | (base64 -w 0 2>/dev/null || base64)
 }
 
 # Generate random GUID for request deduplication

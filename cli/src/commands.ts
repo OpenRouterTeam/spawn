@@ -528,7 +528,7 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
 
   if (isInteractiveTTY()) {
     const shouldContinue = await p.confirm({
-      message: "Continue anyway? The script will likely prompt for credentials or fail.",
+      message: "Continue anyway? The script will prompt you to authenticate.",
       initialValue: true,
     });
     if (p.isCancel(shouldContinue) || !shouldContinue) {
