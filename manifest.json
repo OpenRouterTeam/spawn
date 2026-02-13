@@ -874,7 +874,7 @@
     "codesandbox/gptme": "implemented",
     "codesandbox/opencode": "implemented",
     "codesandbox/plandex": "implemented",
-    "codesandbox/kilocode": "missing",
+    "codesandbox/kilocode": "implemented",
     "codesandbox/continue": "implemented",
     "e2b/claude": "implemented",
     "e2b/openclaw": "implemented",
