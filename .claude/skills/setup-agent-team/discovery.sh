@@ -236,18 +236,6 @@ Check the repo's GitHub issues for user requests:
 - If a request is already implemented, close the issue with a comment (only if not already commented)
 - **SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`. This is how agents identify their own comments for dedup.
 
-### Branch Cleaner (spawn 1)
-Clean up stale remote branches before and after the cycle:
-- List all remote branches: `git branch -r --format='%(refname:short) %(committerdate:unix)'`
-- For each branch (excluding main):
-  * Check if there's an open PR: `gh pr list --head BRANCH --state open --json number,title`
-  * If open PR and branch is stale (last commit >4 hours ago):
-    - If PR has conflicts/failing checks → close with `gh pr close NUMBER --comment "Auto-closing: stale branch. Please reopen if still needed.\n\n-- discovery/branch-cleaner"`
-    - If PR is mergeable → ensure it has `needs-team-review` label, add a comment noting it's stale (do NOT merge — merging is external)
-  * If no open PR and stale >4 hours → delete with `git push origin --delete BRANCH`
-  * If fresh (<4 hours) → leave alone
-- Run again at end of cycle to catch branches created during the cycle
-
 ### Gap Filler (spawn remaining)
 After scouts commit new entries, pick up the newly-created "missing" matrix entries and implement them.
 
@@ -293,7 +281,7 @@ Agent: cloud-scout
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 ```
 
-Marker values: `cloud-scout`, `agent-scout`, `issue-responder`, `branch-cleaner`, `gap-filler`, `team-lead`.
+Marker values: `cloud-scout`, `agent-scout`, `issue-responder`, `gap-filler`, `team-lead`.
 NEVER omit the Agent trailer. EVERY commit from a teammate must have one.
 
 ## Git Worktrees (MANDATORY for parallel work)
@@ -507,7 +495,7 @@ EOF
 cleanup_between_cycles() {
     log_info "Cleaning up between cycles..."
 
-    # Ensure we're on main and up to date, prune stale remote-tracking refs
+    # Ensure we're on main and up to date
     cd "${REPO_ROOT}"
     git checkout main 2>/dev/null || true
     git fetch --prune origin 2>/dev/null || true
@@ -517,48 +505,10 @@ cleanup_between_cycles() {
     git worktree prune 2>/dev/null || true
     rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
 
-    # Delete merged remote branches (not main)
-    local merged_branches
-    merged_branches=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ')
-    for branch in $merged_branches; do
-        if [[ -n "$branch" && "$branch" != "main" ]]; then
-            git push origin --delete "$branch" 2>/dev/null && log_info "Deleted merged branch: $branch" || true
-        fi
-    done
-
     # Delete local branches that are merged
     git branch --merged main | grep -v 'main' | grep -v '^\*' | xargs -r git branch -d 2>/dev/null || true
 
-    # Resolve any open PRs left behind by the previous cycle
-    log_info "Between-cycle cleanup: checking for leftover open PRs..."
-    local open_prs
-    open_prs=$(gh pr list --repo OpenRouterTeam/spawn --state open \
-        --json number,updatedAt,title,headRefName \
-        --jq '.[] | "\(.number)\t\(.headRefName)\t\(.title)"' 2>/dev/null) || true
-
-    while IFS=$'\t' read -r pr_num pr_branch pr_title; do
-        if [[ -z "$pr_num" ]]; then
-            continue
-        fi
-
-        log_info "Leftover PR #${pr_num}: ${pr_title} (branch: ${pr_branch})"
-
-        local pr_mergeable
-        pr_mergeable=$(gh pr view "$pr_num" --repo OpenRouterTeam/spawn --json mergeable --jq '.mergeable' 2>/dev/null) || pr_mergeable="UNKNOWN"
-
-        if [[ "$pr_mergeable" == "MERGEABLE" ]]; then
-            log_info "Merging leftover PR #${pr_num}..."
-            gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
-        else
-            log_info "Closing unmergeable leftover PR #${pr_num} (status: ${pr_mergeable})..."
-            gh pr close "$pr_num" --repo OpenRouterTeam/spawn \
-                --comment "Auto-closing: leftover PR between discovery cycles (unmergeable: ${pr_mergeable}). Please reopen if still needed.
-
--- discovery/cleanup" \
-                2>&1 | tee -a "${LOG_FILE}" || true
-        fi
-    done <<< "$open_prs"
-
+    # Note: branch pruning and PR management is handled by the security team
     log_info "Cleanup complete"
 }
 
@@ -577,48 +527,7 @@ run_team_cycle() {
         log_info "Removed stale ${WORKTREE_BASE} directory"
     fi
 
-    # --- Pre-cycle cleanup: merged remote branches ---
-    log_info "Pre-cycle cleanup: merged remote branches..."
-    local merged_branches
-    merged_branches=$(git branch -r --merged origin/main | grep -v 'main' | grep 'origin/' | sed 's|origin/||' | tr -d ' ') || true
-    for branch in $merged_branches; do
-        if [[ -n "$branch" && "$branch" != "main" ]]; then
-            git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log_info "Deleted merged branch: $branch" || true
-        fi
-    done
-
-    # --- Pre-cycle cleanup: open PRs from previous cycles ---
-    # Resolve stale open PRs (updated >2 hours ago) — especially provider-related ones
-    # that may have been left behind by interrupted discovery cycles.
-    log_info "Pre-cycle cleanup: stale open PRs..."
-    local stale_prs
-    stale_prs=$(gh pr list --repo OpenRouterTeam/spawn --state open \
-        --json number,updatedAt,title,headRefName \
-        --jq '.[] | select(.updatedAt < (now - 7200 | todate)) | "\(.number)\t\(.headRefName)\t\(.title)"' 2>/dev/null) || true
-
-    while IFS=$'\t' read -r pr_num pr_branch pr_title; do
-        if [[ -z "$pr_num" ]]; then
-            continue
-        fi
-
-        log_info "Found stale PR #${pr_num}: ${pr_title} (branch: ${pr_branch})"
-
-        # Check mergeability
-        local pr_mergeable
-        pr_mergeable=$(gh pr view "$pr_num" --repo OpenRouterTeam/spawn --json mergeable --jq '.mergeable' 2>/dev/null) || pr_mergeable="UNKNOWN"
-
-        if [[ "$pr_mergeable" == "MERGEABLE" ]]; then
-            log_info "Merging stale PR #${pr_num}..."
-            gh pr merge "$pr_num" --repo OpenRouterTeam/spawn --squash --delete-branch 2>&1 | tee -a "${LOG_FILE}" || true
-        else
-            log_info "Closing unmergeable stale PR #${pr_num} (status: ${pr_mergeable})..."
-            gh pr close "$pr_num" --repo OpenRouterTeam/spawn \
-                --comment "Auto-closing: stale PR from a previous interrupted discovery cycle (unmergeable: ${pr_mergeable}). Please reopen if still needed.
-
--- discovery/cleanup" \
-                2>&1 | tee -a "${LOG_FILE}" || true
-        fi
-    done <<< "$stale_prs"
+    # Note: branch pruning and PR management is handled by the security team
 
     # Set up worktree directory for parallel agent work
     mkdir -p "${WORKTREE_BASE}"
