@@ -1646,56 +1646,65 @@ except:
 #   generic_wait_for_instance vultr_api "/instances/$id" "active" \
 #       "d['instance']['status']" "d['instance']['main_ip']" \
 #       VULTR_SERVER_IP "Instance" 60
+# Single polling attempt: fetch status, check readiness, log progress.
+# Returns 0 if instance is ready (IP exported), 1 to keep polling, 2 on status mismatch.
+# Arguments: API_FUNC ENDPOINT TARGET_STATUS STATUS_PY IP_PY IP_VAR DESCRIPTION ATTEMPT POLL_DELAY
+_poll_instance_once() {
+    local api_func="${1}" endpoint="${2}" target_status="${3}"
+    local status_py="${4}" ip_py="${5}" ip_var="${6}"
+    local description="${7}" attempt="${8}" poll_delay="${9}"
+
+    local response
+    response=$("${api_func}" GET "${endpoint}" 2>/dev/null) || true
+
+    local status
+    status=$(_extract_json_field "${response}" "${status_py}" "unknown")
+
+    if [[ "${status}" != "${target_status}" ]]; then
+        log_step "${description} status: ${status} ($((attempt * poll_delay))s elapsed)"
+        return 2
+    fi
+
+    local ip
+    ip=$(_extract_json_field "${response}" "${ip_py}")
+    if [[ -n "${ip}" ]]; then
+        export "${ip_var}=${ip}"
+        log_info "${description} ready (IP: ${ip})"
+        return 0
+    fi
+
+    log_step "${description} status: ${status} ($((attempt * poll_delay))s elapsed)"
+    return 1
+}
+
+# Report timeout when instance polling exhausts all attempts.
+_report_instance_timeout() {
+    local description="${1}" target_status="${2}" total_time="${3}"
+    log_error "${description} did not become ${target_status} after ${total_time}s"
+    log_warn "The instance may still be provisioning. You can:"
+    log_warn "  1. Re-run the command to try again"
+    log_warn "  2. Check the instance status in your cloud provider dashboard"
+    log_warn "  3. Try a different region (some regions provision faster)"
+}
+
 generic_wait_for_instance() {
-    local api_func="${1}"
-    local endpoint="${2}"
-    local target_status="${3}"
-    local status_py="${4}"
-    local ip_py="${5}"
-    local ip_var="${6}"
-    local description="${7}"
-    local max_attempts="${8:-60}"
+    local api_func="${1}" endpoint="${2}" target_status="${3}"
+    local status_py="${4}" ip_py="${5}" ip_var="${6}"
+    local description="${7}" max_attempts="${8:-60}"
     local poll_delay="${INSTANCE_STATUS_POLL_DELAY:-5}"
 
     local attempt=1
     log_step "Waiting for ${description} to become ${target_status}..."
 
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
-        local response
-        response=$("${api_func}" GET "${endpoint}" 2>/dev/null) || true
-
-        local status
-        status=$(_extract_json_field "${response}" "${status_py}" "unknown")
-
-        if [[ "${status}" != "${target_status}" ]]; then
-            local elapsed=$((attempt * poll_delay))
-            log_step "${description} status: ${status} (${elapsed}s elapsed)"
-            sleep "${poll_delay}"
-            attempt=$((attempt + 1))
-            continue
-        fi
-
-        local ip
-        ip=$(_extract_json_field "${response}" "${ip_py}")
-
-        if [[ -n "${ip}" ]]; then
-            export "${ip_var}=${ip}"
-            log_info "${description} ready (IP: ${ip})"
-            return 0
-        fi
-
-        local elapsed=$((attempt * poll_delay))
-        log_step "${description} status: ${status} (${elapsed}s elapsed)"
+        _poll_instance_once "${api_func}" "${endpoint}" "${target_status}" \
+            "${status_py}" "${ip_py}" "${ip_var}" \
+            "${description}" "${attempt}" "${poll_delay}" && return 0
         sleep "${poll_delay}"
         attempt=$((attempt + 1))
     done
 
-    local total_time=$((max_attempts * poll_delay))
-    log_error "${description} did not become ${target_status} after ${total_time}s"
-    log_warn "The instance may still be provisioning. You can:"
-    log_warn "  1. Re-run the command to try again"
-    log_warn "  2. Check the instance status in your cloud provider dashboard"
-    log_warn "  3. Try a different region (some regions provision faster)"
+    _report_instance_timeout "${description}" "${target_status}" "$((max_attempts * poll_delay))"
     return 1
 }
 
