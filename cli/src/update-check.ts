@@ -52,7 +52,13 @@ function compareVersions(current: string, latest: string): boolean {
   return false; // Versions are equal
 }
 
-function performAutoUpdate(latestVersion: string): void {
+/** Shell-quote a string for safe interpolation into a bash command */
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+/** Print boxed update banner to stderr */
+function printUpdateBanner(latestVersion: string): void {
   const line1 = `Update available: v${VERSION} -> v${latestVersion}`;
   const line2 = "Updating automatically...";
   const width = Math.max(line1.length, line2.length) + 4;
@@ -75,9 +81,41 @@ function performAutoUpdate(latestVersion: string): void {
   );
   console.error(pc.yellow(border));
   console.error();
+}
+
+/** Re-exec the updated binary with the original CLI arguments, forwarding the exit code */
+function reExecWithArgs(): void {
+  const args = process.argv.slice(2);
+  if (args.length === 0) {
+    console.error(pc.dim("  Run your spawn command again to use the new version."));
+    console.error();
+    process.exit(0);
+    return; // unreachable in production, but needed when process.exit is mocked in tests
+  }
+
+  const binPath = process.argv[1] || "spawn";
+  const cmd = [shellQuote(binPath), ...args.map(shellQuote)].join(" ");
+  console.error(pc.dim(`  Rerunning: spawn ${args.join(" ")}`));
+  console.error();
+  try {
+    executor.execSync(cmd, {
+      stdio: "inherit",
+      shell: "/bin/bash",
+      env: { ...process.env, SPAWN_NO_UPDATE_CHECK: "1" },
+    });
+    process.exit(0);
+  } catch (reexecErr) {
+    const code = reexecErr && typeof reexecErr === "object" && "status" in reexecErr
+      ? (reexecErr as { status: number }).status
+      : 1;
+    process.exit(code);
+  }
+}
+
+function performAutoUpdate(latestVersion: string): void {
+  printUpdateBanner(latestVersion);
 
   try {
-    // Run the install script to update
     executor.execSync(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`, {
       stdio: "inherit",
       shell: "/bin/bash",
@@ -85,35 +123,8 @@ function performAutoUpdate(latestVersion: string): void {
 
     console.error();
     console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
-
-    // Re-exec the updated binary with the same arguments
-    const args = process.argv.slice(2);
-    if (args.length > 0) {
-      const binPath = process.argv[1] || "spawn";
-      const quotedBin = `'${binPath.replace(/'/g, "'\\''")}'`;
-      const quotedArgs = args.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-      console.error(pc.dim(`  Rerunning: spawn ${args.join(" ")}`));
-      console.error();
-      try {
-        executor.execSync(`${quotedBin} ${quotedArgs}`, {
-          stdio: "inherit",
-          shell: "/bin/bash",
-          env: { ...process.env, SPAWN_NO_UPDATE_CHECK: "1" },
-        });
-        process.exit(0);
-      } catch (reexecErr) {
-        // Forward the exit code from the re-executed command
-        const code = reexecErr && typeof reexecErr === "object" && "status" in reexecErr
-          ? (reexecErr as { status: number }).status
-          : 1;
-        process.exit(code);
-      }
-    } else {
-      console.error(pc.dim("  Run your spawn command again to use the new version."));
-      console.error();
-      process.exit(0);
-    }
-  } catch (err) {
+    reExecWithArgs();
+  } catch {
     console.error();
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
     console.error(pc.dim("  Please update manually:"));
