@@ -1206,7 +1206,7 @@
     "ramnode/nanoclaw": "implemented",
     "ramnode/aider": "implemented",
     "ramnode/goose": "implemented",
-    "ramnode/codex": "missing",
+    "ramnode/codex": "implemented",
     "ramnode/interpreter": "implemented",
     "ramnode/gemini": "missing",
     "ramnode/amazonq": "missing",
