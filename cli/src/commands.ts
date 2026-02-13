@@ -305,15 +305,36 @@ export function prioritizeCloudsByCredentials(
   return { sortedClouds: [...withCreds, ...withoutCreds], hintOverrides, credCount: withCreds.length };
 }
 
+/** Build hint overrides for the agent picker showing cloud count and credential readiness */
+export function buildAgentPickerHints(manifest: Manifest): Record<string, string> {
+  const hints: Record<string, string> = {};
+  for (const agent of agentKeys(manifest)) {
+    const implClouds = getImplementedClouds(manifest, agent);
+    if (implClouds.length === 0) {
+      hints[agent] = "no clouds available yet";
+      continue;
+    }
+    const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+    const cloudLabel = `${implClouds.length} cloud${implClouds.length !== 1 ? "s" : ""}`;
+    if (readyCount > 0) {
+      hints[agent] = `${cloudLabel}, ${readyCount} ready`;
+    } else {
+      hints[agent] = cloudLabel;
+    }
+  }
+  return hints;
+}
+
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
   const manifest = await loadManifestWithSpinner();
 
   const agents = agentKeys(manifest);
+  const agentHints = buildAgentPickerHints(manifest);
   const agentChoice = await p.select({
     message: "Select an agent",
-    options: mapToSelectOptions(agents, manifest.agents),
+    options: mapToSelectOptions(agents, manifest.agents, agentHints),
   });
   if (p.isCancel(agentChoice)) handleCancel();
 

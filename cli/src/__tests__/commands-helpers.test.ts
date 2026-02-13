@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { levenshtein, findClosestMatch, resolveAgentKey, resolveCloudKey } from "../commands";
+import { levenshtein, findClosestMatch, resolveAgentKey, resolveCloudKey, buildAgentPickerHints } from "../commands";
 import type { Manifest } from "../manifest";
 
 /**
@@ -394,6 +394,127 @@ describe("Command Helpers", () => {
 
     it("should return null for empty input", () => {
       expect(resolveCloudKey(manifest, "")).toBeNull();
+    });
+  });
+
+  describe("buildAgentPickerHints", () => {
+    it("should show cloud count for each agent", () => {
+      const manifest = {
+        agents: {
+          claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
+          aider: { name: "Aider", description: "AI pair programmer", url: "", install: "", launch: "", env: {} },
+        },
+        clouds: {
+          sprite: { name: "Sprite", description: "VMs", url: "", type: "vm", auth: "token", provision_method: "", exec_method: "", interactive_method: "" },
+          hetzner: { name: "Hetzner", description: "EU cloud", url: "", type: "cloud", auth: "HCLOUD_TOKEN", provision_method: "", exec_method: "", interactive_method: "" },
+        },
+        matrix: {
+          "sprite/claude": "implemented",
+          "hetzner/claude": "implemented",
+          "sprite/aider": "implemented",
+          "hetzner/aider": "missing",
+        },
+      } as unknown as Manifest;
+
+      const hints = buildAgentPickerHints(manifest);
+      expect(hints["claude"]).toBe("2 clouds");
+      expect(hints["aider"]).toBe("1 cloud");
+    });
+
+    it("should show 'no clouds available yet' for agents with zero implementations", () => {
+      const manifest = {
+        agents: {
+          claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
+        },
+        clouds: {
+          sprite: { name: "Sprite", description: "VMs", url: "", type: "vm", auth: "token", provision_method: "", exec_method: "", interactive_method: "" },
+        },
+        matrix: {
+          "sprite/claude": "missing",
+        },
+      } as unknown as Manifest;
+
+      const hints = buildAgentPickerHints(manifest);
+      expect(hints["claude"]).toBe("no clouds available yet");
+    });
+
+    it("should show credential readiness when env vars are set", () => {
+      const originalEnv = process.env.HCLOUD_TOKEN;
+      process.env.HCLOUD_TOKEN = "test-token";
+
+      try {
+        const manifest = {
+          agents: {
+            claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
+          },
+          clouds: {
+            hetzner: { name: "Hetzner", description: "EU cloud", url: "", type: "cloud", auth: "HCLOUD_TOKEN", provision_method: "", exec_method: "", interactive_method: "" },
+            sprite: { name: "Sprite", description: "VMs", url: "", type: "vm", auth: "token", provision_method: "", exec_method: "", interactive_method: "" },
+          },
+          matrix: {
+            "hetzner/claude": "implemented",
+            "sprite/claude": "implemented",
+          },
+        } as unknown as Manifest;
+
+        const hints = buildAgentPickerHints(manifest);
+        expect(hints["claude"]).toBe("2 clouds, 1 ready");
+      } finally {
+        if (originalEnv === undefined) {
+          delete process.env.HCLOUD_TOKEN;
+        } else {
+          process.env.HCLOUD_TOKEN = originalEnv;
+        }
+      }
+    });
+
+    it("should show plural 'ready' count when multiple clouds have credentials", () => {
+      const origH = process.env.HCLOUD_TOKEN;
+      const origV = process.env.VULTR_API_KEY;
+      process.env.HCLOUD_TOKEN = "test";
+      process.env.VULTR_API_KEY = "test";
+
+      try {
+        const manifest = {
+          agents: {
+            claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
+          },
+          clouds: {
+            hetzner: { name: "Hetzner", description: "EU", url: "", type: "cloud", auth: "HCLOUD_TOKEN", provision_method: "", exec_method: "", interactive_method: "" },
+            vultr: { name: "Vultr", description: "US", url: "", type: "cloud", auth: "VULTR_API_KEY", provision_method: "", exec_method: "", interactive_method: "" },
+          },
+          matrix: {
+            "hetzner/claude": "implemented",
+            "vultr/claude": "implemented",
+          },
+        } as unknown as Manifest;
+
+        const hints = buildAgentPickerHints(manifest);
+        expect(hints["claude"]).toBe("2 clouds, 2 ready");
+      } finally {
+        if (origH === undefined) delete process.env.HCLOUD_TOKEN;
+        else process.env.HCLOUD_TOKEN = origH;
+        if (origV === undefined) delete process.env.VULTR_API_KEY;
+        else process.env.VULTR_API_KEY = origV;
+      }
+    });
+
+    it("should not count credentials for non-parseable auth fields", () => {
+      const manifest = {
+        agents: {
+          claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
+        },
+        clouds: {
+          sprite: { name: "Sprite", description: "VMs", url: "", type: "vm", auth: "token", provision_method: "", exec_method: "", interactive_method: "" },
+        },
+        matrix: {
+          "sprite/claude": "implemented",
+        },
+      } as unknown as Manifest;
+
+      const hints = buildAgentPickerHints(manifest);
+      // "token" doesn't match the env var pattern, so no credentials detected
+      expect(hints["claude"]).toBe("1 cloud");
     });
   });
 });
