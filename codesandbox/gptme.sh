@@ -20,7 +20,7 @@ ensure_codesandbox_token
 SANDBOX_NAME=$(get_server_name)
 create_server "${SANDBOX_NAME}"
 
-# Install Bun and set up environment
+# Wait for sandbox to be ready
 wait_for_cloud_init
 
 log_step "Installing gptme..."
@@ -47,7 +47,7 @@ MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
 
 # Inject environment variables
 log_step "Setting up environment variables..."
-run_server "echo 'export OPENROUTER_API_KEY=${OPENROUTER_API_KEY}' >> ~/.bashrc"
+run_server 'echo "export OPENROUTER_API_KEY=\"'"${OPENROUTER_API_KEY}"'\"" >> ~/.bashrc'
 
 echo ""
 log_info "CodeSandbox setup completed successfully!"
