@@ -294,11 +294,10 @@ Create these teammates:
      * A previous reviewer flagged it as stale, duplicate, or no-longer-relevant
      If any of these apply:
      ```
-     gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Closing: [reason — e.g., superseded by #NNN / duplicate of #NNN / author abandoned].
+     gh pr close NUMBER --repo OpenRouterTeam/spawn --delete-branch --comment "Closing: [reason — e.g., superseded by #NNN / duplicate of #NNN / author abandoned].
 
 -- refactor/pr-maintainer"
      ```
-     Delete the branch: `git push origin --delete "$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json headRefName --jq '.headRefName')" 2>/dev/null || true`
      Report to team lead and move on to the next PR.
    - For EACH remaining open PR, evaluate and take the appropriate action:
      * **Has merge conflicts**: rebase the PR branch onto main to resolve
