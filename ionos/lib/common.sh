@@ -96,20 +96,18 @@ ionos_register_ssh_key() {
 
     local pub_key
     pub_key=$(cat "$pub_path")
-    local json_pub_key
-    json_pub_key=$(json_escape "$pub_key")
 
     local register_body
     register_body=$(python3 -c "
-import json
+import json, sys
 body = {
     'properties': {
-        'name': '$key_name',
-        'publicKey': json.loads($json_pub_key)
+        'name': sys.argv[1],
+        'publicKey': sys.argv[2]
     }
 }
 print(json.dumps(body))
-")
+" "$key_name" "$pub_key")
 
     local register_response
     register_response=$(ionos_api POST "/datacenters/${datacenter_id}/sshkeys" "$register_body")
@@ -148,16 +146,21 @@ get_server_name() {
 _ionos_find_existing_datacenter() {
     local response="$1"
 
-    local dc_count
-    dc_count=$(echo "$response" | python3 -c "import json,sys; print(len(json.loads(sys.stdin.read()).get('items',[])))" 2>/dev/null || echo "0")
+    # Extract ID and name from first datacenter in a single python3 call
+    local dc_info
+    dc_info=$(printf '%s' "$response" | python3 -c "
+import json, sys
+items = json.loads(sys.stdin.read()).get('items', [])
+if not items:
+    sys.exit(1)
+dc = items[0]
+print(dc['id'])
+print(dc.get('properties', {}).get('name', 'N/A'))
+" 2>/dev/null) || return 1
 
-    if [[ "$dc_count" -eq 0 ]]; then
-        return 1
-    fi
-
-    IONOS_DATACENTER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['items'][0]['id'])")
+    IONOS_DATACENTER_ID=$(printf '%s' "$dc_info" | head -1)
     local dc_name
-    dc_name=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['items'][0]['properties']['name'])")
+    dc_name=$(printf '%s' "$dc_info" | tail -1)
     log_info "Using existing datacenter: $dc_name (ID: $IONOS_DATACENTER_ID)"
 }
 
@@ -169,16 +172,16 @@ _ionos_create_datacenter() {
 
     local dc_body
     dc_body=$(python3 -c "
-import json
+import json, sys
 body = {
     'properties': {
         'name': 'spawn-datacenter',
         'description': 'Spawn datacenter for AI agents',
-        'location': '$location'
+        'location': sys.argv[1]
     }
 }
 print(json.dumps(body))
-")
+" "$location")
 
     local dc_response
     dc_response=$(ionos_api POST "/datacenters" "$dc_body")
@@ -187,7 +190,7 @@ print(json.dumps(body))
         return 1
     fi
 
-    IONOS_DATACENTER_ID=$(echo "$dc_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    IONOS_DATACENTER_ID=$(_extract_json_field "$dc_response" "d['id']")
     log_info "Datacenter created: $IONOS_DATACENTER_ID"
 }
 
@@ -238,24 +241,22 @@ _ionos_build_volume_body() {
 
     local userdata
     userdata=$(get_cloud_init_userdata)
-    local userdata_json
-    userdata_json=$(echo "$userdata" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
 
     python3 -c "
-import json
+import json, sys
 body = {
     'properties': {
-        'name': '${name}-boot',
+        'name': sys.argv[1] + '-boot',
         'type': 'HDD',
-        'size': $disk_size,
+        'size': int(sys.argv[2]),
         'availabilityZone': 'AUTO',
-        'image': '$image_id',
+        'image': sys.argv[3],
         'imagePassword': 'TempPass123!',
-        'userData': json.loads($userdata_json)
+        'userData': sys.argv[4]
     }
 }
 print(json.dumps(body))
-"
+" "$name" "$disk_size" "$image_id" "$userdata"
 }
 
 # Poll until an IONOS volume reaches AVAILABLE state
@@ -270,7 +271,7 @@ _ionos_wait_for_volume() {
         local vol_status
         vol_status=$(ionos_api GET "/datacenters/${IONOS_DATACENTER_ID}/volumes/${volume_id}")
         local state
-        state=$(echo "$vol_status" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('metadata',{}).get('state',''))" 2>/dev/null || echo "")
+        state=$(_extract_json_field "$vol_status" "d.get('metadata',{}).get('state','')")
 
         if [[ "$state" == "AVAILABLE" ]]; then
             log_info "Volume ready"
@@ -302,7 +303,7 @@ _ionos_create_boot_volume() {
     fi
 
     local volume_id
-    volume_id=$(echo "$volume_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    volume_id=$(_extract_json_field "$volume_response" "d['id']")
     log_info "Volume created: $volume_id"
 
     _ionos_wait_for_volume "$volume_id" || true
@@ -320,18 +321,8 @@ _ionos_wait_for_server_ip() {
         local server_status
         server_status=$(ionos_api GET "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}?depth=3")
 
-        IONOS_SERVER_IP=$(echo "$server_status" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-entities = data.get('entities', {})
-nics = entities.get('nics', {}).get('items', [])
-for nic in nics:
-    props = nic.get('properties', {})
-    ips = props.get('ips', [])
-    if ips:
-        print(ips[0])
-        break
-" 2>/dev/null || echo "")
+        IONOS_SERVER_IP=$(_extract_json_field "$server_status" \
+            "next((ip for n in d.get('entities',{}).get('nics',{}).get('items',[]) for ip in n.get('properties',{}).get('ips',[])), '')")
 
         if [[ -n "$IONOS_SERVER_IP" ]]; then
             log_info "Server IP: $IONOS_SERVER_IP"
@@ -352,18 +343,18 @@ for nic in nics:
 _ionos_build_server_body() {
     local name="$1" cores="$2" ram="$3"
     python3 -c "
-import json
+import json, sys
 body = {
     'properties': {
-        'name': '$name',
-        'cores': $cores,
-        'ram': $ram,
+        'name': sys.argv[1],
+        'cores': int(sys.argv[2]),
+        'ram': int(sys.argv[3]),
         'availabilityZone': 'AUTO',
         'cpuFamily': 'AMD_OPTERON'
     }
 }
 print(json.dumps(body))
-"
+" "$name" "$cores" "$ram"
 }
 
 # Create an IONOS server instance via API and attach a boot volume
@@ -383,7 +374,7 @@ _ionos_launch_and_attach() {
         return 1
     fi
 
-    IONOS_SERVER_ID=$(echo "$server_response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    IONOS_SERVER_ID=$(_extract_json_field "$server_response" "d['id']")
     log_info "Server created: $IONOS_SERVER_ID"
     export IONOS_SERVER_ID
 
