@@ -147,6 +147,37 @@ manifest.json             # Source of truth for the matrix
 2. Implement on 1+ cloud by adapting an existing agent script
 3. Must support OpenRouter via env var injection
 
+## Contributing
+
+The easiest way to contribute is by testing and reporting issues. You don't need to write code.
+
+### Test a cloud provider
+
+Pick any agent + cloud combination from the matrix and try it out:
+
+```bash
+spawn claude hetzner      # or any combination
+```
+
+If something breaks, hangs, or behaves unexpectedly, open an issue using the [bug report template](https://github.com/OpenRouterTeam/spawn/issues/new?template=bug_report.yml). Include:
+
+- The exact command you ran
+- The cloud provider and agent
+- What happened vs. what you expected
+- Any error output
+
+### Request a cloud or agent
+
+Want to see a specific cloud provider or agent supported? Open an issue using the [CLI feature request template](https://github.com/OpenRouterTeam/spawn/issues/new?template=cli_feature_request.yml). Requests with real-world use cases get prioritized.
+
+### Report auth or credential issues
+
+Cloud provider APIs change frequently. If you hit authentication failures, expired tokens, or permission errors on a provider that previously worked, please report it — these are high-priority fixes.
+
+### Code contributions
+
+See [CLAUDE.md](CLAUDE.md) for the full contributor guide covering shell script rules, testing, and the shared library pattern.
+
 ## License
 
 [Apache 2.0](LICENSE)
