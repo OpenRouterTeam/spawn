@@ -451,14 +451,30 @@ If zero open PRs, skip to Step 3 (branch cleanup) — do NOT exit yet.
 
 Each pr-reviewer teammate must:
 
-1. Fetch the PR metadata and diff:
+1. Fetch the PR metadata, diff, AND comments:
    \`\`\`bash
    gh pr view NUMBER --repo OpenRouterTeam/spawn --json updatedAt,mergeable,title,headRefName
    gh pr diff NUMBER --repo OpenRouterTeam/spawn
    gh pr view NUMBER --repo OpenRouterTeam/spawn --json files --jq '.files[].path'
+   gh pr view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[] | "\(.author.login): \(.body)"'
+   gh api repos/OpenRouterTeam/spawn/pulls/NUMBER/comments --jq '.[] | "\(.user.login): \(.body)"'
    \`\`\`
 
-2. **Staleness check first** — Before doing security review, check:
+2. **Comment-based triage** — Read all PR comments (both conversation and inline review comments). Look for signals that the PR should be closed:
+   * A maintainer or the author says it's **superseded** by another PR (e.g., "superseded by #NNN", "replaced by #NNN")
+   * Comments indicate the work is **duplicate** of another PR or already merged
+   * The author abandoned the PR (e.g., "closing this", "will redo", "no longer needed")
+   * A previous reviewer flagged the PR as stale, duplicate, or no-longer-relevant
+   If any of these apply, close the PR with a comment explaining why:
+   \`\`\`bash
+   gh pr close NUMBER --repo OpenRouterTeam/spawn --comment "Closing: [reason — e.g., superseded by #NNN / duplicate of #NNN / author abandoned].
+
+-- security/pr-reviewer"
+   \`\`\`
+   Delete the branch: \`git push origin --delete "\$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json headRefName --jq '.headRefName')" 2>/dev/null || true\`
+   Report to team lead and STOP — skip further review.
+
+3. **Staleness check** — Before doing security review, check:
    * Is \`updatedAt\` > 48 hours ago AND \`mergeable\` is \`CONFLICTING\`?
      - YES → Read the PR title, body, and diff to understand the intent.
      - **If the PR contains a valid fix or improvement** (security fix, bug fix, feature, etc.), file a follow-up issue BEFORE closing:
@@ -507,7 +523,7 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
      - The PR is stale but mergeable — still do the security review below (it may be fine to merge).
    * Is the PR fresh (<48h)? → Proceed to security review normally.
 
-3. **Set up a worktree** to test the PR locally:
+4. **Set up a worktree** to test the PR locally:
    \`\`\`bash
    git worktree add ${WORKTREE_BASE}/pr-NUMBER -b review-pr-NUMBER origin/main
    cd ${WORKTREE_BASE}/pr-NUMBER
@@ -516,7 +532,7 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
    All file reads, \`bash -n\` checks, and \`bun test\` runs MUST happen inside this worktree.
    Clean up when done: \`cd ${REPO_ROOT} && git worktree remove ${WORKTREE_BASE}/pr-NUMBER --force\`
 
-4. Review every changed file for security issues:
+5. Review every changed file for security issues:
    * **Command injection**: unquoted variables in shell commands, unsafe eval/heredoc, unsanitized input in bash
    * **Credential leaks**: hardcoded API keys, tokens, passwords; secrets logged to stdout; credentials in committed files
    * **Path traversal**: unsanitized file paths, directory escape via ../
@@ -525,17 +541,17 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
    * **curl|bash safety**: broken source/eval fallback patterns, missing integrity checks
    * **macOS bash 3.x compat**: echo -e, source <(), ((var++)) with set -e, local in subshells, set -u
 
-5. For each changed .sh file (run inside the worktree):
+6. For each changed .sh file (run inside the worktree):
    * Run \`bash -n FILE\` to check syntax
    * Verify the local-or-remote source fallback pattern is used
    * Check for macOS bash 3.x incompatibilities
 
-6. For changed .ts files (run inside the worktree):
+7. For changed .ts files (run inside the worktree):
    * Run \`bun test\` to verify tests pass
 
-7. Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
+8. Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
 
-8. Make the review decision and label the PR:
+9. Make the review decision and label the PR:
 
    **If CRITICAL or HIGH issues found** — request changes + label:
    \`\`\`bash
@@ -558,13 +574,13 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
    \`\`\`
    If merge fails (conflicts, branch protection), log the error and move on.
 
-9. **Clean up the worktree** after review:
+10. **Clean up the worktree** after review:
    \`\`\`bash
    cd ${REPO_ROOT}
    git worktree remove ${WORKTREE_BASE}/pr-NUMBER --force 2>/dev/null || true
    \`\`\`
 
-10. Review body format:
+11. Review body format:
    \`\`\`
    ## Security Review
 
@@ -583,7 +599,7 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
    *-- security/pr-reviewer*
    \`\`\`
 
-11. Report results to the team lead: PR number, verdict (approved+merged / changes-requested / closed-stale), finding count, merge status
+12. Report results to the team lead: PR number, verdict (approved+merged / changes-requested / closed-stale / closed-duplicate), finding count, merge status
 
 ## Step 3 — Branch Cleanup
 
