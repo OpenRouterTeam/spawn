@@ -848,7 +848,7 @@
     "github-codespaces/cline": "implemented",
     "codesandbox/claude": "implemented",
     "codesandbox/openclaw": "implemented",
-    "codesandbox/nanoclaw": "missing",
+    "codesandbox/nanoclaw": "implemented",
     "codesandbox/aider": "implemented",
     "codesandbox/goose": "missing",
     "codesandbox/codex": "missing",
