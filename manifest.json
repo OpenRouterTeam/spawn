@@ -1239,7 +1239,7 @@
     "local/codex": "implemented",
     "local/interpreter": "implemented",
     "local/gemini": "implemented",
-    "local/amazonq": "missing",
+    "local/amazonq": "implemented",
     "local/cline": "implemented",
     "local/gptme": "implemented",
     "local/opencode": "implemented",

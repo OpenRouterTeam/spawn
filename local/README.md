@@ -16,7 +16,13 @@ spawn aider local
 spawn goose local
 spawn codex local
 spawn interpreter local
+spawn gemini local
+spawn amazonq local
+spawn cline local
 spawn gptme local
+spawn opencode local
+spawn plandex local
+spawn kilocode local
 spawn continue local
 ```
 
@@ -30,7 +36,13 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/aider.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/goose.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/cline.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/kilocode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/continue.sh)
 ```
 
