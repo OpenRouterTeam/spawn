@@ -35,12 +35,22 @@ get_contabo_access_token() {
         -d "grant_type=password" \
         "${CONTABO_AUTH_URL}" 2>&1) || {
         log_error "Failed to obtain Contabo OAuth token"
-        log_error "Response: $response"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Verify your credentials at: https://my.contabo.com/api/details"
+        log_error "  2. Check that CONTABO_CLIENT_ID, CONTABO_CLIENT_SECRET, CONTABO_API_USER,"
+        log_error "     and CONTABO_API_PASSWORD are all set correctly"
+        log_error "  3. The API password is separate from your Contabo login password"
         return 1
     }
 
     if echo "$response" | grep -q '"error"'; then
-        log_error "OAuth authentication failed: $response"
+        log_error "Contabo OAuth authentication failed"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Verify credentials at: https://my.contabo.com/api/details"
+        log_error "  2. Ensure your API user has not been deactivated"
+        log_error "  3. Re-run to enter new credentials"
         return 1
     fi
 
@@ -48,7 +58,9 @@ get_contabo_access_token() {
     token=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('access_token',''))" 2>/dev/null)
 
     if [[ -z "$token" ]]; then
-        log_error "Failed to extract access token from response"
+        log_error "Failed to extract access token from Contabo OAuth response"
+        log_error "The API returned an unexpected response format."
+        log_error "Try again, or check Contabo's API status page."
         return 1
     fi
 

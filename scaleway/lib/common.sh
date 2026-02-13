@@ -88,7 +88,11 @@ get_scaleway_project_id() {
 
     if [[ -z "$project_id" ]]; then
         log_error "Failed to get Scaleway project ID"
-        log_warn "Set SCW_DEFAULT_PROJECT_ID environment variable or check API permissions"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Set SCW_DEFAULT_PROJECT_ID in your environment"
+        log_error "  2. Find your Project ID at: https://console.scaleway.com/project/settings"
+        log_error "  3. Ensure your API key has permission to list projects"
         return 1
     fi
 

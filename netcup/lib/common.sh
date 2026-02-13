@@ -72,6 +72,7 @@ netcup_get_session() {
         -H "Content-Type: application/json" \
         -d "$body" 2>&1) || {
         log_error "Failed to connect to Netcup API"
+        log_error "Check your internet connection and try again."
         return 1
     }
 
