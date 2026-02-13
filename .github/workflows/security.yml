@@ -2,29 +2,25 @@ name: Security Review
 
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened, reopened, labeled]
   schedule:
-    # Consolidated review + scan — every 45 min (must exceed 35-min cycle timeout)
-    - cron: '0,45 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
-    inputs:
-      mode:
-        description: 'Run mode: review_all (PR review + hygiene) or scan (repo audit)'
-        required: false
-        default: 'review_all'
-        type: choice
-        options:
-          - review_all
-          - scan
 
 concurrency:
   group: security-${{ github.event_name == 'issues' && format('issue-{0}', github.event.issue.number) || 'scheduled' }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    # Only trigger on issues with safe-to-work AND (team-building or security) labels, or schedule/manual
+    if: >-
+      github.event_name != 'issues' ||
+      (contains(github.event.issue.labels.*.name, 'safe-to-work') &&
+       (contains(github.event.issue.labels.*.name, 'team-building') ||
+        contains(github.event.issue.labels.*.name, 'security')))
     steps:
       - name: Trigger security review
         env:
@@ -36,38 +32,12 @@ jobs:
             exit 0
           fi
 
-          # Determine reason and issue number based on trigger type
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            ISSUE_NUM="${{ github.event.issue.number }}"
-            if [ "${{ contains(github.event.issue.labels.*.name, 'team-building') }}" = "true" ]; then
-              REASON="team_building"
-            else
-              REASON="triage"
-            fi
-          elif [ "${{ github.event_name }}" = "schedule" ]; then
-            REASON="review_all"
-            ISSUE_NUM=""
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MODE="${{ github.event.inputs.mode || 'review_all' }}"
-            if [ "$MODE" = "review_all" ]; then
-              REASON="review_all"
-            else
-              REASON="schedule"
-            fi
-            ISSUE_NUM=""
-          else
-            REASON="schedule"
-            ISSUE_NUM=""
-          fi
-
-          echo "Mode: reason=$REASON, issue=$ISSUE_NUM"
-
           set +e
           # --fail-with-body: exit 22 on HTTP errors but still print the body
           # -N: no output buffering (stream chunks in real-time)
           # --max-time: hard cap matching the Sprite's cycle timeout + grace
           curl -sSN --http1.1 --fail-with-body --max-time 2700 -X POST \
-            "${SPRITE_URL}/trigger?reason=${REASON}&issue=${ISSUE_NUM}" \
+            "${SPRITE_URL}/trigger?reason=${{ github.event_name }}&issue=${{ github.event.issue.number || '' }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
           CURL_EXIT=$?
           set -e

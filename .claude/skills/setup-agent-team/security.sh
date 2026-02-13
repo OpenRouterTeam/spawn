@@ -24,19 +24,42 @@ if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-if [[ "${SPAWN_REASON}" == "team_building" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
+if [[ "${SPAWN_REASON}" == "issues" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
+    # Workflow passed raw event_name — detect mode from issue labels
+    if gh issue view "${SPAWN_ISSUE}" --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name' 2>/dev/null | grep -q '^team-building$'; then
+        RUN_MODE="team_building"
+        ISSUE_NUM="${SPAWN_ISSUE}"
+        WORKTREE_BASE="/tmp/spawn-worktrees/team-building-${ISSUE_NUM}"
+        TEAM_NAME="spawn-team-building-${ISSUE_NUM}"
+        CYCLE_TIMEOUT=900   # 15 min for team building
+    else
+        RUN_MODE="triage"
+        ISSUE_NUM="${SPAWN_ISSUE}"
+        WORKTREE_BASE="/tmp/spawn-worktrees/triage-${ISSUE_NUM}"
+        TEAM_NAME="spawn-triage-${ISSUE_NUM}"
+        CYCLE_TIMEOUT=600   # 10 min for issue triage
+    fi
+elif [[ "${SPAWN_REASON}" == "team_building" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
+    # Legacy: direct team_building reason (backwards compat)
     RUN_MODE="team_building"
     ISSUE_NUM="${SPAWN_ISSUE}"
     WORKTREE_BASE="/tmp/spawn-worktrees/team-building-${ISSUE_NUM}"
     TEAM_NAME="spawn-team-building-${ISSUE_NUM}"
     CYCLE_TIMEOUT=900   # 15 min for team building
 elif [[ "${SPAWN_REASON}" == "triage" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
+    # Legacy: direct triage reason (backwards compat)
     RUN_MODE="triage"
     ISSUE_NUM="${SPAWN_ISSUE}"
     WORKTREE_BASE="/tmp/spawn-worktrees/triage-${ISSUE_NUM}"
     TEAM_NAME="spawn-triage-${ISSUE_NUM}"
     CYCLE_TIMEOUT=600   # 10 min for issue triage
 elif [[ "${SPAWN_REASON}" == "review_all" ]]; then
+    RUN_MODE="review_all"
+    WORKTREE_BASE="/tmp/spawn-worktrees/security-review-all"
+    TEAM_NAME="spawn-security-review-all"
+    CYCLE_TIMEOUT=2100  # 35 min for consolidated review + scan
+elif [[ "${SPAWN_REASON}" == "schedule" ]] || [[ "${SPAWN_REASON}" == "workflow_dispatch" ]]; then
+    # Cron and manual triggers run the consolidated review + scan
     RUN_MODE="review_all"
     WORKTREE_BASE="/tmp/spawn-worktrees/security-review-all"
     TEAM_NAME="spawn-security-review-all"
