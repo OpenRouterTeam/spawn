@@ -324,7 +324,7 @@ fi
 - \`Pending Review\` → \`Under Review\` → \`In Progress\`
 
 **PR labels** (used by review_all mode):
-- \`security-approved\`, \`security-review-required\`, \`security-notes\`, \`needs-team-review\`
+- \`security-approved\`, \`security-review-required\`, \`security-notes\`
 
 ## Rules
 
@@ -357,6 +357,26 @@ This cycle MUST complete within 30 minutes. This is a HARD deadline.
 - At the 25-minute mark, stop spawning new reviewers and wrap up
 - At the 29-minute mark, send shutdown_request to all agents
 - At 30 minutes, force shutdown
+
+## Worktree Requirement
+
+**All agents MUST work in git worktrees — NEVER operate directly in the main repo checkout.** This prevents conflicts between concurrent agents and protects the main working tree.
+
+The team lead sets up the base worktree at \`${WORKTREE_BASE}\` from \`origin/main\`. All agents that need to read or test code should work inside their own worktree:
+
+\`\`\`bash
+# Team lead creates base worktree:
+git worktree add ${WORKTREE_BASE} origin/main --detach
+
+# PR reviewers: checkout the PR branch in a sub-worktree
+git worktree add ${WORKTREE_BASE}/pr-NUMBER -b review-pr-NUMBER origin/main
+cd ${WORKTREE_BASE}/pr-NUMBER
+gh pr checkout NUMBER
+# ... run bash -n, bun test, etc. here ...
+# Clean up when done:
+cd ${REPO_ROOT}
+git worktree remove ${WORKTREE_BASE}/pr-NUMBER --force
+\`\`\`
 
 ## Step 1 — Discover Open PRs
 
@@ -436,7 +456,16 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
      - The PR is stale but mergeable — still do the security review below (it may be fine to merge).
    * Is the PR fresh (<48h)? → Proceed to security review normally.
 
-3. Review every changed file for security issues:
+3. **Set up a worktree** to test the PR locally:
+   \`\`\`bash
+   git worktree add ${WORKTREE_BASE}/pr-NUMBER -b review-pr-NUMBER origin/main
+   cd ${WORKTREE_BASE}/pr-NUMBER
+   gh pr checkout NUMBER
+   \`\`\`
+   All file reads, \`bash -n\` checks, and \`bun test\` runs MUST happen inside this worktree.
+   Clean up when done: \`cd ${REPO_ROOT} && git worktree remove ${WORKTREE_BASE}/pr-NUMBER --force\`
+
+4. Review every changed file for security issues:
    * **Command injection**: unquoted variables in shell commands, unsafe eval/heredoc, unsanitized input in bash
    * **Credential leaks**: hardcoded API keys, tokens, passwords; secrets logged to stdout; credentials in committed files
    * **Path traversal**: unsanitized file paths, directory escape via ../
@@ -445,17 +474,17 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
    * **curl|bash safety**: broken source/eval fallback patterns, missing integrity checks
    * **macOS bash 3.x compat**: echo -e, source <(), ((var++)) with set -e, local in subshells, set -u
 
-4. For each changed .sh file:
+5. For each changed .sh file (run inside the worktree):
    * Run \`bash -n FILE\` to check syntax
    * Verify the local-or-remote source fallback pattern is used
    * Check for macOS bash 3.x incompatibilities
 
-5. For changed .ts files:
+6. For changed .ts files (run inside the worktree):
    * Run \`bun test\` to verify tests pass
 
-6. Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
+7. Classify each finding as CRITICAL, HIGH, MEDIUM, or LOW
 
-7. Make the review decision and label the PR:
+8. Make the review decision and label the PR:
 
    **If CRITICAL or HIGH issues found** — request changes + label:
    \`\`\`bash
@@ -478,7 +507,13 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
    \`\`\`
    If merge fails (conflicts, branch protection), log the error and move on.
 
-8. Review body format:
+9. **Clean up the worktree** after review:
+   \`\`\`bash
+   cd ${REPO_ROOT}
+   git worktree remove ${WORKTREE_BASE}/pr-NUMBER --force 2>/dev/null || true
+   \`\`\`
+
+10. Review body format:
    \`\`\`
    ## Security Review
 
@@ -497,7 +532,7 @@ PR #NUMBER was auto-closed due to staleness + merge conflicts, but the change it
    *-- security/pr-reviewer*
    \`\`\`
 
-9. Report results to the team lead: PR number, verdict (approved+merged / changes-requested / closed-stale), finding count, merge status
+11. Report results to the team lead: PR number, verdict (approved+merged / changes-requested / closed-stale), finding count, merge status
 
 ## Step 3 — Branch Cleanup
 
@@ -647,6 +682,7 @@ Required pattern:
 
 ## Safety Rules
 
+- **ALWAYS use worktrees** for testing PR code — never run \`bash -n\` or \`bun test\` in the main repo checkout
 - NEVER approve a PR with CRITICAL or HIGH findings
 - Auto-merge PRs that have no CRITICAL/HIGH findings and all tests pass
 - MEDIUM/LOW findings are informational — still approve and merge
@@ -678,9 +714,25 @@ This cycle MUST complete within 15 minutes. This is a HARD deadline.
 - At the 14-minute mark, send shutdown_request to all agents
 - At 15 minutes, force shutdown
 
+## Worktree Requirement
+
+**All agents MUST work in git worktrees — NEVER operate directly in the main repo checkout.** This prevents conflicts between concurrent agents.
+
+Set up the base worktree before spawning agents:
+\`\`\`bash
+git worktree add ${WORKTREE_BASE} origin/main --detach
+\`\`\`
+
+Tell each agent to work inside \`${WORKTREE_BASE}\` (or a sub-worktree if needed). Clean up at the end:
+\`\`\`bash
+cd ${REPO_ROOT}
+git worktree remove ${WORKTREE_BASE} --force 2>/dev/null || true
+git worktree prune
+\`\`\`
+
 ## Team Structure
 
-Create these teammates:
+Create these teammates (all working inside \`${WORKTREE_BASE}\`):
 
 1. **shell-auditor** (Opus)
    - Scan ALL .sh files in the repo for security issues:
@@ -828,6 +880,7 @@ Required pattern:
 
 ## Safety Rules
 
+- **ALWAYS use worktrees** — never read or test files in the main repo checkout
 - Do not modify any code — this is audit only
 - Always dedup against existing issues before filing
 - Classify findings conservatively — if unsure, rate it one level higher
