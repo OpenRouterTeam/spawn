@@ -114,7 +114,12 @@ types = []
 for t in data.get('server_types', []):
     if t.get('deprecation') is not None:
         continue
-    # Check if this type is available in the requested location
+    # Check if this type is actually available in the requested location
+    # The 'locations' array is the authoritative source — 'prices' may list
+    # locations where the type cannot actually be provisioned (e.g. ARM in ash)
+    available_locations = {loc['name'] for loc in t.get('locations', [])}
+    if location not in available_locations:
+        continue
     avail = {p['location']: p for p in t.get('prices', [])}
     if location not in avail:
         continue
