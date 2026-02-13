@@ -10,6 +10,7 @@ import {
   getStatusDescription,
   calculateColumnWidth,
   getTerminalWidth,
+  formatRelativeTime,
 } from "../commands";
 import { createMockManifest, createEmptyManifest } from "./test-helpers";
 
@@ -387,5 +388,65 @@ describe("getImplementedClouds (actual export)", () => {
 
   it("should return empty for empty manifest", () => {
     expect(getImplementedClouds(createEmptyManifest(), "claude")).toEqual([]);
+  });
+});
+
+// ── formatRelativeTime ───────────────────────────────────────────────────────
+
+describe("formatRelativeTime", () => {
+  it("should return 'just now' for timestamps less than 60 seconds ago", () => {
+    const now = new Date().toISOString();
+    expect(formatRelativeTime(now)).toBe("just now");
+  });
+
+  it("should return 'just now' for future timestamps", () => {
+    const future = new Date(Date.now() + 60_000).toISOString();
+    expect(formatRelativeTime(future)).toBe("just now");
+  });
+
+  it("should return minutes for timestamps 1-59 minutes ago", () => {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+    expect(formatRelativeTime(fiveMinAgo)).toBe("5 min ago");
+  });
+
+  it("should return hours for timestamps 1-23 hours ago", () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 3600_000).toISOString();
+    expect(formatRelativeTime(threeHoursAgo)).toBe("3h ago");
+  });
+
+  it("should return 'yesterday' for timestamps 24-47 hours ago", () => {
+    const oneDayAgo = new Date(Date.now() - 25 * 3600_000).toISOString();
+    expect(formatRelativeTime(oneDayAgo)).toBe("yesterday");
+  });
+
+  it("should return days for timestamps 2-29 days ago", () => {
+    const fiveDaysAgo = new Date(Date.now() - 5 * 86400_000).toISOString();
+    expect(formatRelativeTime(fiveDaysAgo)).toBe("5d ago");
+  });
+
+  it("should return month/day for timestamps older than 30 days", () => {
+    const oldDate = new Date(Date.now() - 60 * 86400_000).toISOString();
+    const result = formatRelativeTime(oldDate);
+    // Should be a short date like "Dec 15" rather than a relative time
+    expect(result).not.toContain("ago");
+    expect(result).not.toContain("yesterday");
+  });
+
+  it("should return the raw string for invalid timestamps", () => {
+    expect(formatRelativeTime("not-a-date")).toBe("not-a-date");
+  });
+
+  it("should return the raw string for empty string", () => {
+    expect(formatRelativeTime("")).toBe("");
+  });
+
+  it("should return '1 min ago' at exactly 60 seconds", () => {
+    const oneMinAgo = new Date(Date.now() - 60_000).toISOString();
+    expect(formatRelativeTime(oneMinAgo)).toBe("1 min ago");
+  });
+
+  it("should return '1h ago' at exactly 60 minutes", () => {
+    const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
+    expect(formatRelativeTime(oneHourAgo)).toBe("1h ago");
   });
 });
