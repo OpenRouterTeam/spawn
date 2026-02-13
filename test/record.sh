@@ -1051,9 +1051,45 @@ printf '\n'
 
 mkdir -p "$FIXTURES_DIR"
 
+# --- Run clouds in parallel ---
+RECORD_RESULTS_DIR=$(mktemp -d)
+RECORD_PIDS=""
+
 for cloud in $CLOUDS_TO_RECORD; do
-    record_cloud "$cloud"
+    (
+        # Reset counters for this cloud (subshell isolation)
+        RECORDED=0
+        SKIPPED=0
+        ERRORS=0
+        record_cloud "$cloud"
+        printf '%d %d %d\n' "$RECORDED" "$SKIPPED" "$ERRORS" > "${RECORD_RESULTS_DIR}/${cloud}.counts"
+    ) > "${RECORD_RESULTS_DIR}/${cloud}.log" 2>&1 &
+    RECORD_PIDS="${RECORD_PIDS} $!"
 done
+
+# Wait for all clouds to finish
+for pid in $RECORD_PIDS; do
+    wait "$pid" 2>/dev/null || true
+done
+
+# Print output from each cloud (in order)
+for cloud in $CLOUDS_TO_RECORD; do
+    if [[ -f "${RECORD_RESULTS_DIR}/${cloud}.log" ]]; then
+        cat "${RECORD_RESULTS_DIR}/${cloud}.log"
+    fi
+done
+
+# Aggregate results
+for cloud in $CLOUDS_TO_RECORD; do
+    if [[ -f "${RECORD_RESULTS_DIR}/${cloud}.counts" ]]; then
+        read -r r s e < "${RECORD_RESULTS_DIR}/${cloud}.counts"
+        RECORDED=$((RECORDED + r))
+        SKIPPED=$((SKIPPED + s))
+        ERRORS=$((ERRORS + e))
+    fi
+done
+
+rm -rf "${RECORD_RESULTS_DIR}"
 
 # --- Summary ---
 printf '%b\n' "${CYAN}===============================${NC}"
