@@ -7,67 +7,67 @@ Railway serverless container platform via CLI. [Railway](https://railway.app/)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/openclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/aider.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/nanoclaw.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/gptme.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/goose.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/gemini.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/codex.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/amazonq.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/interpreter.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/cline.sh)
 ```
 
 ## Non-Interactive Mode
@@ -76,7 +76,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/cline.sh)
 RAILWAY_SERVICE_NAME=dev-mk1 \
 RAILWAY_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/railway/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/railway/claude.sh)
 ```
 
 ## Environment Variables

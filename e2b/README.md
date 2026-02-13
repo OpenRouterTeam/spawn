@@ -9,79 +9,79 @@ E2B sandboxed cloud containers via CLI/SDK. [E2B](https://e2b.dev)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/plandex.sh)
 ```
 
 ## Non-Interactive Mode
@@ -90,5 +90,5 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/plandex.sh)
 E2B_SANDBOX_NAME=dev-mk1 \
 E2B_API_KEY=your-key \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/e2b/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/e2b/claude.sh)
 ```

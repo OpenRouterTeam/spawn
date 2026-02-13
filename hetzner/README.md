@@ -7,91 +7,91 @@ Hetzner Cloud servers via REST API. [Hetzner Cloud](https://www.hetzner.com/clou
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/plandex.sh)
 ```
 
 #### Kilo Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/kilocode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/kilocode.sh)
 ```
 
 #### Continue
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/continue.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/continue.sh)
 ```
 
 ## Non-Interactive Mode
@@ -100,5 +100,5 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/continue.sh)
 HETZNER_SERVER_NAME=dev-mk1 \
 HCLOUD_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/hetzner/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/hetzner/claude.sh)
 ```

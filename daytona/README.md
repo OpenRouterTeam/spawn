@@ -9,79 +9,79 @@ Daytona sandboxed environments for AI code execution. [Daytona](https://www.dayt
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/plandex.sh)
 ```
 
 ## Non-Interactive Mode
@@ -90,7 +90,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/plandex.sh)
 DAYTONA_SANDBOX_NAME=dev-mk1 \
 DAYTONA_API_KEY=your-api-key \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/daytona/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/claude.sh)
 ```
 
 ## Environment Variables

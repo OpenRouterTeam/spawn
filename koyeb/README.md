@@ -7,19 +7,19 @@ Koyeb serverless container platform via CLI. [Koyeb](https://www.koyeb.com/)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/koyeb/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/koyeb/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/koyeb/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/koyeb/openclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/koyeb/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/koyeb/aider.sh)
 ```
 
 ## Non-Interactive Mode
@@ -27,7 +27,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/koyeb/aider.sh)
 ```bash
 KOYEB_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/koyeb/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/koyeb/claude.sh)
 ```
 
 ## Environment Variables

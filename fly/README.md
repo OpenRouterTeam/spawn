@@ -7,79 +7,79 @@ Fly.io Machines via REST API and flyctl CLI. [Fly.io](https://fly.io)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/plandex.sh)
 ```
 
 ## Non-Interactive Mode
@@ -88,7 +88,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/plandex.sh)
 FLY_APP_NAME=dev-mk1 \
 FLY_API_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/fly/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/fly/claude.sh)
 ```
 
 ## Environment Variables

@@ -658,7 +658,7 @@ export function isRetryableExitCode(errMsg: string): boolean {
 }
 
 async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
-  const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
+  const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
   let scriptContent: string;

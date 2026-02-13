@@ -7,19 +7,19 @@ Exoscale European cloud compute via CLI with per-second billing. [Exoscale](http
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/exoscale/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/exoscale/claude.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/exoscale/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/exoscale/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/exoscale/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/exoscale/goose.sh)
 ```
 
 ## Non-Interactive Mode
@@ -29,7 +29,7 @@ EXOSCALE_SERVER_NAME=dev-mk1 \
 EXOSCALE_API_KEY=your-key \
 EXOSCALE_API_SECRET=your-secret \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/exoscale/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/exoscale/claude.sh)
 ```
 
 ## Environment Variables

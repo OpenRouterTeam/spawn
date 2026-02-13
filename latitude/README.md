@@ -7,79 +7,79 @@ Bare metal and VM cloud servers via REST API. [Latitude.sh](https://www.latitude
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/plandex.sh)
 ```
 
 ## Non-Interactive Mode
@@ -88,7 +88,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/plandex.sh)
 LATITUDE_SERVER_NAME=dev-mk1 \
 LATITUDE_API_KEY=your-api-key \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/latitude/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/latitude/claude.sh)
 ```
 
 ## Environment Variables

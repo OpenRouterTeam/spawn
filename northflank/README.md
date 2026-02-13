@@ -9,67 +9,67 @@ Northflank container platform via CLI with exec access. [Northflank](https://nor
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/openclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/aider.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/nanoclaw.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/gptme.sh)
 ```
 
 ## Setup
@@ -89,7 +89,7 @@ NORTHFLANK_SERVICE_NAME=spawn-dev \
 NORTHFLANK_PROJECT_NAME=spawn-project \
 NORTHFLANK_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/northflank/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/northflank/claude.sh)
 ```
 
 ## Environment Variables

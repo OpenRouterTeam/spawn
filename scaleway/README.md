@@ -7,73 +7,73 @@ Scaleway Cloud instances via REST API. [Scaleway](https://www.scaleway.com/)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/opencode.sh)
 ```
 
 ## Non-Interactive Mode
@@ -82,7 +82,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/opencode.sh)
 SCALEWAY_SERVER_NAME=dev-mk1 \
 SCW_SECRET_KEY=your-secret-key \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/scaleway/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/scaleway/claude.sh)
 ```
 
 ## Environment Variables

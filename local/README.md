@@ -23,22 +23,22 @@ spawn continue local
 Or run directly without the CLI:
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/claude.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/openclaw.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/nanoclaw.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/aider.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/goose.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/codex.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/interpreter.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/gptme.sh)
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/continue.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/continue.sh)
 ```
 
 ## Non-Interactive Mode
 
 ```bash
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/local/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/claude.sh)
 ```
 
 ## What It Does
