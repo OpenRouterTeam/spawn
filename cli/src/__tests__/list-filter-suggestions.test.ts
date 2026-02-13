@@ -500,8 +500,8 @@ describe("cmdList - filter suggestions", () => {
       expect(logOutput).toContain("Fix all linter errors");
     });
 
-    it("should truncate long prompt in rerun hint to 30 chars", async () => {
-      const longPrompt = "B".repeat(50);
+    it("should suggest --prompt-file in rerun hint for very long prompts", async () => {
+      const longPrompt = "B".repeat(81);
       writeFileSync(
         join(testDir, "history.json"),
         JSON.stringify([{
@@ -516,14 +516,35 @@ describe("cmdList - filter suggestions", () => {
 
       const logOutput = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(logOutput).toContain("Rerun last");
-      // The rerun hint truncates to 30 chars
       const rerunLine = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .find((l: string) => l.includes("Rerun last"));
       expect(rerunLine).toBeDefined();
-      // Should not contain the full 50-char prompt
+      // Very long prompts (>80 chars) suggest --prompt-file instead
+      expect(rerunLine!).toContain("--prompt-file");
       expect(rerunLine!).not.toContain(longPrompt);
-      expect(rerunLine!).toContain("...");
+    });
+
+    it("should show full prompt in rerun hint when <= 80 chars", async () => {
+      const shortPrompt = "B".repeat(50);
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify([{
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00Z",
+          prompt: shortPrompt,
+        }])
+      );
+
+      await cmdList();
+
+      const rerunLine = consoleMocks.log.mock.calls
+        .map((c: any[]) => c.join(" "))
+        .find((l: string) => l.includes("Rerun last"));
+      expect(rerunLine).toBeDefined();
+      // Short enough prompts are shown in full for valid copy-paste
+      expect(rerunLine!).toContain(shortPrompt);
     });
 
     it("should not show --prompt in rerun hint when no prompt was used", async () => {
