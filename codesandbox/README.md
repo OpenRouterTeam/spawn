@@ -72,6 +72,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/cline.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/interpreter.sh)
 ```
 
+#### Codex CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/codesandbox/codex.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
