@@ -48,7 +48,7 @@ else
     CYCLE_TIMEOUT=1200  # 20 min for full repo scan
 fi
 
-LOG_FILE="/home/sprite/spawn/.docs/${TEAM_NAME}.log"
+LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"
 PROMPT_FILE=""
 
 # Ensure .docs directory exists
