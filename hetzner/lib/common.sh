@@ -115,21 +115,22 @@ _list_server_types_for_location() {
     echo "$response" | python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
+location = sys.argv[1]
 types = []
 for t in data.get('server_types', []):
     if t.get('deprecation') is not None:
         continue
     # Check if this type is available in the requested location
     avail = {p['location']: p for p in t.get('prices', [])}
-    if '$location' not in avail:
+    if location not in avail:
         continue
-    price = float(avail['$location']['price_hourly']['gross'])
+    price = float(avail[location]['price_hourly']['gross'])
     ram_gb = t['memory']
     types.append((price, t['name'], t['cores'], ram_gb, t['disk'], t['cpu_type']))
 types.sort()
 for price, name, cores, ram, disk, cpu in types:
     print(f'{name}|{cores} vCPU|{ram:.0f} GB RAM|{disk} GB disk|{cpu}|\$  {price:.4f}/hr')
-"
+" "$location"
 }
 
 # Fetch available locations
@@ -172,16 +173,16 @@ _hetzner_build_create_body() {
 import json, sys
 userdata = sys.stdin.read()
 body = {
-    'name': '$name',
-    'server_type': '$server_type',
-    'location': '$location',
-    'image': '$image',
-    'ssh_keys': $ssh_key_ids,
+    'name': sys.argv[1],
+    'server_type': sys.argv[2],
+    'location': sys.argv[3],
+    'image': sys.argv[4],
+    'ssh_keys': json.loads(sys.argv[5]),
     'user_data': userdata,
     'start_after_create': True
 }
 print(json.dumps(body))
-"
+" "$name" "$server_type" "$location" "$image" "$ssh_key_ids"
 }
 
 # Check Hetzner API response for errors and log diagnostics

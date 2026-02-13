@@ -160,12 +160,12 @@ scaleway_register_ssh_key() {
 import json, sys
 pub_key = json.loads(sys.stdin.read())
 body = {
-    'name': '$key_name',
+    'name': sys.argv[1],
     'public_key': pub_key,
-    'project_id': '$project_id'
+    'project_id': sys.argv[2]
 }
 print(json.dumps(body))
-" <<< "$json_pub_key")
+" "$key_name" "$project_id" <<< "$json_pub_key")
 
     local register_response
     register_response=$(scaleway_api POST "${SCALEWAY_ACCOUNT_API}/ssh-keys" "$register_body")
@@ -272,16 +272,16 @@ create_server() {
 
     local body
     body=$(python3 -c "
-import json
+import json, sys
 body = {
-    'name': '$name',
-    'commercial_type': '$commercial_type',
-    'image': '$image_id',
-    'project': '$project_id',
+    'name': sys.argv[1],
+    'commercial_type': sys.argv[2],
+    'image': sys.argv[3],
+    'project': sys.argv[4],
     'dynamic_ip_required': True
 }
 print(json.dumps(body))
-")
+" "$name" "$commercial_type" "$image_id" "$project_id")
 
     local response
     response=$(scaleway_instance_api POST "/servers" "$body")

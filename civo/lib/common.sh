@@ -206,18 +206,18 @@ build_create_instance_body() {
 import json, sys
 script = json.loads(sys.stdin.read())
 body = {
-    'hostname': '$name',
-    'size': '$size',
-    'region': '$region',
-    'network_id': '$network_id',
-    'template_id': '$template_id',
-    'ssh_key_id': '$ssh_key_id',
+    'hostname': sys.argv[1],
+    'size': sys.argv[2],
+    'region': sys.argv[3],
+    'network_id': sys.argv[4],
+    'template_id': sys.argv[5],
+    'ssh_key_id': sys.argv[6],
     'initial_user': 'root',
     'script': script,
     'public_ip': 'create'
 }
 print(json.dumps(body))
-" <<< "$json_script"
+" "$name" "$size" "$region" "$network_id" "$template_id" "$ssh_key_id" <<< "$json_script"
 }
 
 # Wait for a Civo instance to become ACTIVE and retrieve its public IP
