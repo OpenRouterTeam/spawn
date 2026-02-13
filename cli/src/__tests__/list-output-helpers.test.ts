@@ -2,124 +2,40 @@ import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:te
 import { createMockManifest } from "./test-helpers";
 import type { Manifest } from "../manifest";
 
-/**
- * Tests for list command output helper functions in commands.ts.
- *
- * These functions build the user-facing output for `spawn list`, `spawn list -a`,
- * and the interactive list picker. They have specific truncation thresholds,
- * formatting rules, and edge case handling that need direct unit test coverage:
- *
- * - buildRetryCommand: constructs the "Retry:" hint (80-char prompt threshold)
- * - resolveDisplayName: maps keys to display names with null-manifest fallback
- * - buildRecordLabel: creates "Agent on Cloud" labels for the picker
- * - buildRecordHint: creates timestamp + prompt preview hints (30-char threshold)
- * - getScriptFailureGuidance: exit-code-specific error messaging
- * - getImplementedClouds / getImplementedAgents: manifest filtering helpers
- * - prioritizeCloudsByCredentials: credential-aware cloud sorting
- * - parseAuthEnvVars: auth string parsing into env var names
- * - hasCloudCredentials: checks if required auth vars are set
- *
- * Agent: test-engineer
- */
+// Mock @clack/prompts before importing commands
+mock.module("@clack/prompts", () => ({
+  spinner: () => ({
+    start: mock(() => {}),
+    stop: mock(() => {}),
+    message: mock(() => {}),
+  }),
+  log: {
+    step: mock(() => {}),
+    info: mock(() => {}),
+    error: mock(() => {}),
+    warn: mock(() => {}),
+    success: mock(() => {}),
+  },
+  intro: mock(() => {}),
+  outro: mock(() => {}),
+  cancel: mock(() => {}),
+  select: mock(() => {}),
+  isCancel: () => false,
+}));
 
-// ── Exact replicas of functions from commands.ts ───────────────────────────
-
-function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
-  if (!prompt) return `spawn ${agent} ${cloud}`;
-  if (prompt.length <= 80) {
-    const safe = prompt.replace(/"/g, '\\"');
-    return `spawn ${agent} ${cloud} --prompt "${safe}"`;
-  }
-  return `spawn ${agent} ${cloud} --prompt-file <your-prompt-file>`;
-}
-
-function resolveDisplayName(
-  manifest: Manifest | null,
-  key: string,
-  kind: "agent" | "cloud"
-): string {
-  if (!manifest) return key;
-  const entry = kind === "agent" ? manifest.agents[key] : manifest.clouds[key];
-  return entry ? entry.name : key;
-}
-
-function buildRecordLabel(
-  r: { agent: string; cloud: string },
-  manifest: Manifest | null
-): string {
-  const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
-  const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
-  return `${agentDisplay} on ${cloudDisplay}`;
-}
-
-function formatTimestamp(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    const date = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    const time = d.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    return `${date} ${time}`;
-  } catch {
-    return iso;
-  }
-}
-
-function buildRecordHint(r: {
-  timestamp: string;
-  prompt?: string;
-}): string {
-  const when = formatTimestamp(r.timestamp);
-  if (r.prompt) {
-    const preview =
-      r.prompt.length > 30 ? r.prompt.slice(0, 30) + "..." : r.prompt;
-    return `${when}  --prompt "${preview}"`;
-  }
-  return when;
-}
-
-function getStatusDescription(status: number): string {
-  return status === 404 ? "not found" : `HTTP ${status}`;
-}
-
-function isRetryableExitCode(errMsg: string): boolean {
-  const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
-  if (!exitCodeMatch) return false;
-  const code = parseInt(exitCodeMatch[1], 10);
-  return code === 255;
-}
-
-function parseAuthEnvVars(auth: string): string[] {
-  return auth
-    .split(/\s*\+\s*/)
-    .map((s) => s.trim())
-    .filter((s) => /^[A-Z][A-Z0-9_]{3,}$/.test(s));
-}
-
-function hasCloudCredentials(auth: string): boolean {
-  const vars = parseAuthEnvVars(auth);
-  if (vars.length === 0) return false;
-  return vars.every((v) => !!process.env[v]);
-}
-
-function getImplementedClouds(manifest: Manifest, agent: string): string[] {
-  return Object.keys(manifest.clouds).filter(
-    (c) => (manifest.matrix[`${c}/${agent}`] ?? "missing") === "implemented"
-  );
-}
-
-function getImplementedAgents(manifest: Manifest, cloud: string): string[] {
-  return Object.keys(manifest.agents).filter(
-    (a) => (manifest.matrix[`${cloud}/${a}`] ?? "missing") === "implemented"
-  );
-}
+const {
+  buildRetryCommand,
+  resolveDisplayName,
+  buildRecordLabel,
+  buildRecordHint,
+  formatTimestamp,
+  getStatusDescription,
+  isRetryableExitCode,
+  parseAuthEnvVars,
+  hasCloudCredentials,
+  getImplementedClouds,
+  getImplementedAgents,
+} = await import("../commands.js");
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 

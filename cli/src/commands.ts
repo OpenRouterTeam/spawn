@@ -1004,7 +1004,7 @@ export function formatRelativeTime(iso: string): string {
   }
 }
 
-function formatTimestamp(iso: string): string {
+export function formatTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
@@ -1114,14 +1114,14 @@ function isInteractiveTTY(): boolean {
 }
 
 /** Build a display label for a spawn record in the interactive picker */
-function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): string {
+export function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): string {
   const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
   const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
   return `${agentDisplay} on ${cloudDisplay}`;
 }
 
 /** Build a hint string (relative timestamp + optional prompt preview) for the interactive picker */
-function buildRecordHint(r: SpawnRecord): string {
+export function buildRecordHint(r: SpawnRecord): string {
   const relative = formatRelativeTime(r.timestamp);
   if (r.prompt) {
     const preview = r.prompt.length > 30 ? r.prompt.slice(0, 30) + "..." : r.prompt;
