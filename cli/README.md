@@ -260,7 +260,7 @@ When you run `spawn <agent> <cloud>`:
 
 1. **Load manifest**: Fetch from GitHub or use cached version
 2. **Validate combination**: Check that `matrix["<cloud>/<agent>"]` is `"implemented"`
-3. **Download script**: Fetch `https://openrouter.ai/lab/spawn/<cloud>/<agent>.sh`
+3. **Download script**: Fetch `https://openrouter.ai/labs/spawn/<cloud>/<agent>.sh`
    - Fallback to GitHub raw URL if OpenRouter CDN fails
 4. **Execute**: Pipe script to `bash -c` with inherited stdio
 5. **Interactive handoff**: User interacts directly with the spawned agent

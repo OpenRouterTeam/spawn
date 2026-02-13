@@ -7,79 +7,79 @@ UpCloud cloud servers via REST API. [UpCloud](https://upcloud.com/)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/plandex.sh)
 ```
 
 ## Non-Interactive Mode
@@ -89,7 +89,7 @@ UPCLOUD_SERVER_NAME=dev-mk1 \
 UPCLOUD_USERNAME=your-api-username \
 UPCLOUD_PASSWORD=your-api-password \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/upcloud/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/upcloud/claude.sh)
 ```
 
 ## Environment Variables

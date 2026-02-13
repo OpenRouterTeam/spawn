@@ -7,19 +7,19 @@ GitHub Codespaces development environments via gh CLI. [GitHub Codespaces](https
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/github-codespaces/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/github-codespaces/claude.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/github-codespaces/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/github-codespaces/aider.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/github-codespaces/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/github-codespaces/gptme.sh)
 ```
 
 ## Non-Interactive Mode
@@ -27,7 +27,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/github-codespaces/gptme.sh)
 ```bash
 GITHUB_REPO=OpenRouterTeam/spawn \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/github-codespaces/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/github-codespaces/claude.sh)
 ```
 
 ## Environment Variables

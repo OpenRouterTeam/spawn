@@ -7,79 +7,79 @@ Civo cloud-native instances via REST API. [Civo](https://www.civo.com/)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/plandex.sh)
 ```
 
 ## Non-Interactive Mode
@@ -88,7 +88,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/plandex.sh)
 CIVO_SERVER_NAME=dev-mk1 \
 CIVO_API_TOKEN=your-token \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/civo/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/civo/claude.sh)
 ```
 
 ## Environment Variables

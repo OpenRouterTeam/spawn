@@ -7,7 +7,7 @@ Launch any AI agent on any cloud with a single command. Coding agents, research 
 ## Install
 
 ```bash
-curl -fsSL https://openrouter.ai/lab/spawn/cli/install.sh | bash
+curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash
 ```
 
 Or install directly from GitHub:
@@ -56,7 +56,7 @@ spawn claude                             # Show clouds available for Claude
 Every combination works as a one-liner — no install required:
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/{cloud}/{agent}.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/{cloud}/{agent}.sh)
 ```
 
 ### Non-Interactive Mode

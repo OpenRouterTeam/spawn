@@ -7,37 +7,37 @@ Netcup VPS cloud via REST API. [Netcup](https://www.netcup.com/)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/netcup/claude.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/netcup/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/netcup/goose.sh)
 ```
 
 #### Amazon Q
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/netcup/amazonq.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/netcup/plandex.sh)
 ```
 
 #### Kilo Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/kilocode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/netcup/kilocode.sh)
 ```
 
 ## Non-Interactive Mode
@@ -48,7 +48,7 @@ NETCUP_CUSTOMER_NUMBER=12345 \
 NETCUP_API_KEY=your-api-key \
 NETCUP_API_PASSWORD=your-api-password \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/netcup/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/netcup/claude.sh)
 ```
 
 ## Authentication

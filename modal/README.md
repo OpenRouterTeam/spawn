@@ -9,79 +9,79 @@ Modal sandboxed containers via Python SDK. [Modal](https://modal.com)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/plandex.sh)
 ```
 
 ## Non-Interactive Mode
@@ -89,5 +89,5 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/plandex.sh)
 ```bash
 MODAL_SANDBOX_NAME=dev-mk1 \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/modal/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/modal/claude.sh)
 ```

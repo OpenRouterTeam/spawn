@@ -34,79 +34,79 @@ Required API permissions:
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/claude.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/aider.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/nanoclaw.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/cline.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/codex.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/goose.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/amazonq.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/plandex.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/gptme.sh)
 ```
 
 ## Non-Interactive Mode
@@ -118,5 +118,5 @@ OVH_APPLICATION_SECRET=your-app-secret \
 OVH_CONSUMER_KEY=your-consumer-key \
 OVH_PROJECT_ID=your-project-id \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/ovh/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/claude.sh)
 ```

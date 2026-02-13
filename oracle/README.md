@@ -15,19 +15,19 @@ Oracle Cloud compute instances via OCI CLI. [Oracle Cloud](https://cloud.oracle.
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/oracle/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/oracle/claude.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/oracle/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/oracle/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/oracle/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/oracle/goose.sh)
 ```
 
 ## Non-Interactive Mode
@@ -36,7 +36,7 @@ bash <(curl -fsSL https://openrouter.ai/lab/spawn/oracle/goose.sh)
 OCI_COMPARTMENT_ID=ocid1.compartment.oc1..... \
 OCI_INSTANCE_NAME=dev-mk1 \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/oracle/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/oracle/claude.sh)
 ```
 
 ## Environment Variables

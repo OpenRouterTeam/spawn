@@ -100,45 +100,47 @@ get_server_name() {
 # get_cloud_init_userdata is now defined in shared/common.sh
 
 # Fetch available server types for a given location, sorted by price
-# Outputs: "name  vcpus  ram_gb  disk_gb  price" lines
+# Uses /datacenters for authoritative availability, /server_types for specs+pricing
+# Outputs: "name|vcpus|ram|disk|cpu_type|price" lines
 _list_server_types_for_location() {
     local location="$1"
-    local response
-    response=$(hetzner_api GET "/server_types?per_page=50")
 
-    echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-location = sys.argv[1]
-types = []
-for t in data.get('server_types', []):
-    if t.get('deprecation') is not None:
-        continue
-    # Check if this type is available in the requested location
-    avail = {p['location']: p for p in t.get('prices', [])}
-    if location not in avail:
-        continue
-    price = float(avail[location]['price_hourly']['gross'])
-    ram_gb = t['memory']
-    types.append((price, t['name'], t['cores'], ram_gb, t['disk'], t['cpu_type']))
-types.sort()
-for price, name, cores, ram, disk, cpu in types:
-    print(f'{name}|{cores} vCPU|{ram:.0f} GB RAM|{disk} GB disk|{cpu}|\$  {price:.4f}/hr')
-" "$location"
+    _ensure_jq || return 1
+
+    local dc_response types_response
+    dc_response=$(hetzner_api GET "/datacenters")
+    types_response=$(hetzner_api GET "/server_types?per_page=50")
+
+    # Get available type IDs from /datacenters for this location
+    local available_ids
+    available_ids=$(printf '%s' "$dc_response" | jq -c \
+        --arg loc "$location" \
+        '[.datacenters[] | select(.location.name == $loc) | .server_types.available[]] | unique')
+
+    # Cross-reference with /server_types for specs and pricing, sorted by price
+    printf '%s' "$types_response" | jq -r \
+        --arg loc "$location" \
+        --argjson ids "$available_ids" \
+        '[.server_types[]
+          | select(.deprecation == null)
+          | select(.id as $id | $ids | index($id))
+          | { name, cores, memory, disk, cpu_type,
+              price: (.prices[] | select(.location == $loc) | .price_hourly.gross) }]
+         | sort_by(.price | tonumber)
+         | .[]
+         | "\(.name)|\(.cores) vCPU|\(.memory) GB RAM|\(.disk) GB disk|\(.cpu_type)|$  \(.price)/hr"'
 }
 
-# Fetch available locations
+# Fetch available locations from /datacenters API
 # Outputs: "name|city|country" lines
 _list_locations() {
-    local response
-    response=$(hetzner_api GET "/locations")
+    _ensure_jq || return 1
 
-    echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for loc in sorted(data.get('locations', []), key=lambda l: l['name']):
-    print(f\"{loc['name']}|{loc['city']}|{loc['country']}\")
-"
+    local dc_response
+    dc_response=$(hetzner_api GET "/datacenters")
+
+    printf '%s' "$dc_response" | jq -r \
+        '[.datacenters[].location | {name, city, country}] | unique_by(.name) | sort_by(.name) | .[] | "\(.name)|\(.city)|\(.country)"'
 }
 
 # Interactive location picker (skipped if HETZNER_LOCATION is set)
@@ -299,27 +301,22 @@ _validate_server_type_for_location() {
 }
 
 # Build JSON body for Hetzner server creation
-# Pipes cloud-init userdata via stdin to avoid bash quoting issues
 _hetzner_build_create_body() {
     local name="$1" server_type="$2" location="$3" image="$4" ssh_key_ids="$5"
 
     local userdata
     userdata=$(get_cloud_init_userdata)
 
-    echo "$userdata" | python3 -c "
-import json, sys
-userdata = sys.stdin.read()
-body = {
-    'name': sys.argv[1],
-    'server_type': sys.argv[2],
-    'location': sys.argv[3],
-    'image': sys.argv[4],
-    'ssh_keys': json.loads(sys.argv[5]),
-    'user_data': userdata,
-    'start_after_create': True
-}
-print(json.dumps(body))
-" "$name" "$server_type" "$location" "$image" "$ssh_key_ids"
+    jq -n \
+        --arg name "$name" \
+        --arg server_type "$server_type" \
+        --arg location "$location" \
+        --arg image "$image" \
+        --argjson ssh_keys "$ssh_key_ids" \
+        --arg user_data "$userdata" \
+        '{name: $name, server_type: $server_type, location: $location,
+          image: $image, ssh_keys: $ssh_keys, user_data: $user_data,
+          start_after_create: true}'
 }
 
 # Check Hetzner API response for errors and log diagnostics
@@ -329,18 +326,15 @@ print(json.dumps(body))
 _hetzner_check_create_error() {
     local response="$1"
 
+    # Check if .error is a non-null object (not the "error": null in action responses)
     local has_error
-    has_error=$(echo "$response" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-err = d.get('error')
-print('yes' if err and isinstance(err, dict) else 'no')
-" 2>/dev/null || echo "unknown")
+    has_error=$(printf '%s' "$response" | jq -r \
+        'if (.error != null and (.error | type) == "object") then "yes" else "no" end' 2>/dev/null || echo "unknown")
 
-    if [[ "$has_error" != "no" ]] && ! echo "$response" | grep -q '"server"'; then
+    if [[ "$has_error" != "no" ]] && ! printf '%s' "$response" | jq -e '.server' &>/dev/null; then
         log_error "Failed to create Hetzner server"
         local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$response")
+        error_msg=$(printf '%s' "$response" | jq -r '.error.message // "Unknown error"' 2>/dev/null || echo "$response")
         log_error "API Error: $error_msg"
         log_error ""
         log_error "Common issues:"
@@ -368,7 +362,7 @@ create_server() {
 
     local image="ubuntu-24.04"
 
-    # Validate inputs to prevent injection into Python code
+    # Validate inputs
     validate_resource_name "$server_type" || { log_error "Invalid HETZNER_SERVER_TYPE"; return 1; }
     validate_region_name "$location" || { log_error "Invalid HETZNER_LOCATION"; return 1; }
 
@@ -415,8 +409,8 @@ create_server() {
     fi
 
     # Extract server ID and IP
-    HETZNER_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['id'])")
-    HETZNER_SERVER_IP=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['server']['public_net']['ipv4']['ip'])")
+    HETZNER_SERVER_ID=$(printf '%s' "$response" | jq -r '.server.id')
+    HETZNER_SERVER_IP=$(printf '%s' "$response" | jq -r '.server.public_net.ipv4.ip')
     export HETZNER_SERVER_ID HETZNER_SERVER_IP
 
     log_info "Server created: ID=$HETZNER_SERVER_ID, IP=$HETZNER_SERVER_IP"
@@ -449,21 +443,19 @@ list_servers() {
     local response
     response=$(hetzner_api GET "/servers")
 
-    python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-servers = data.get('servers', [])
-if not servers:
-    print('No servers found')
-    sys.exit(0)
-print(f\"{'NAME':<25} {'ID':<12} {'STATUS':<12} {'IP':<16} {'TYPE':<10}\")
-print('-' * 75)
-for s in servers:
-    name = s['name']
-    sid = str(s['id'])
-    status = s['status']
-    ip = s.get('public_net', {}).get('ipv4', {}).get('ip', 'N/A')
-    stype = s['server_type']['name']
-    print(f'{name:<25} {sid:<12} {status:<12} {ip:<16} {stype:<10}')
-" <<< "$response"
+    local count
+    count=$(printf '%s' "$response" | jq '.servers | length')
+
+    if [[ "$count" -eq 0 ]]; then
+        printf 'No servers found\n'
+        return 0
+    fi
+
+    printf '%-25s %-12s %-12s %-16s %-10s\n' "NAME" "ID" "STATUS" "IP" "TYPE"
+    printf '%s\n' "---------------------------------------------------------------------------"
+    printf '%s' "$response" | jq -r \
+        '.servers[] | "\(.name)|\(.id)|\(.status)|\(.public_net.ipv4.ip // "N/A")|\(.server_type.name)"' \
+        | while IFS='|' read -r name sid status ip stype; do
+            printf '%-25s %-12s %-12s %-16s %-10s\n' "$name" "$sid" "$status" "$ip" "$stype"
+        done
 }

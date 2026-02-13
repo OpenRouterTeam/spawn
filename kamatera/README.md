@@ -7,79 +7,79 @@ Kamatera cloud servers via REST API. [Kamatera](https://www.kamatera.com/)
 #### Claude Code
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/claude.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/claude.sh)
 ```
 
 #### OpenClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/openclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/openclaw.sh)
 ```
 
 #### NanoClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/nanoclaw.sh)
 ```
 
 #### Aider
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/aider.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/aider.sh)
 ```
 
 #### Goose
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/goose.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/goose.sh)
 ```
 
 #### Codex CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/codex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/codex.sh)
 ```
 
 #### Open Interpreter
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/interpreter.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/interpreter.sh)
 ```
 
 #### Gemini CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/gemini.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/gemini.sh)
 ```
 
 #### Amazon Q CLI
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/amazonq.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/amazonq.sh)
 ```
 
 #### Cline
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/cline.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/cline.sh)
 ```
 
 #### gptme
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/gptme.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/gptme.sh)
 ```
 
 #### OpenCode
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/opencode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/opencode.sh)
 ```
 
 #### Plandex
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/plandex.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/plandex.sh)
 ```
 
 ## Non-Interactive Mode
@@ -89,7 +89,7 @@ KAMATERA_SERVER_NAME=dev-mk1 \
 KAMATERA_API_CLIENT_ID=your-client-id \
 KAMATERA_API_SECRET=your-api-secret \
 OPENROUTER_API_KEY=sk-or-v1-xxxxx \
-  bash <(curl -fsSL https://openrouter.ai/lab/spawn/kamatera/claude.sh)
+  bash <(curl -fsSL https://openrouter.ai/labs/spawn/kamatera/claude.sh)
 ```
 
 ## Environment Variables
