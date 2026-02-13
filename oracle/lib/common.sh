@@ -182,22 +182,25 @@ _create_vcn() {
     echo "${vcn_id}"
 }
 
-_setup_vcn_networking() {
+_create_internet_gateway() {
     local compartment="${1}"
     local vcn_id="${2}"
 
-    # Create internet gateway
-    local igw_id
-    igw_id=$(oci network internet-gateway create \
+    oci network internet-gateway create \
         --compartment-id "${compartment}" \
         --vcn-id "${vcn_id}" \
         --display-name "spawn-igw" \
         --is-enabled true \
         --wait-for-state AVAILABLE \
         --query 'data.id' \
-        --raw-output 2>/dev/null)
+        --raw-output 2>/dev/null
+}
 
-    # Add default route to internet gateway
+_add_default_route() {
+    local compartment="${1}"
+    local vcn_id="${2}"
+    local igw_id="${3}"
+
     local rt_id
     rt_id=$(oci network route-table list \
         --compartment-id "${compartment}" \
@@ -205,15 +208,19 @@ _setup_vcn_networking() {
         --query 'data[0].id' \
         --raw-output 2>/dev/null)
 
-    if [[ -n "${rt_id}" && "${rt_id}" != "null" && -n "${igw_id}" && "${igw_id}" != "null" ]]; then
+    if [[ -n "${rt_id}" && "${rt_id}" != "null" ]]; then
         oci network route-table update \
             --rt-id "${rt_id}" \
             --route-rules "[{\"destination\":\"0.0.0.0/0\",\"networkEntityId\":\"${igw_id}\",\"destinationType\":\"CIDR_BLOCK\"}]" \
             --force \
             --wait-for-state AVAILABLE >/dev/null 2>&1 || true
     fi
+}
 
-    # Add SSH ingress rule to default security list
+_add_ssh_security_rules() {
+    local compartment="${1}"
+    local vcn_id="${2}"
+
     local sl_id
     sl_id=$(oci network security-list list \
         --compartment-id "${compartment}" \
@@ -229,6 +236,20 @@ _setup_vcn_networking() {
             --force \
             --wait-for-state AVAILABLE >/dev/null 2>&1 || true
     fi
+}
+
+_setup_vcn_networking() {
+    local compartment="${1}"
+    local vcn_id="${2}"
+
+    local igw_id
+    igw_id=$(_create_internet_gateway "${compartment}" "${vcn_id}")
+
+    if [[ -n "${igw_id}" && "${igw_id}" != "null" ]]; then
+        _add_default_route "${compartment}" "${vcn_id}" "${igw_id}"
+    fi
+
+    _add_ssh_security_rules "${compartment}" "${vcn_id}"
 }
 
 _create_subnet() {
