@@ -44,10 +44,7 @@ test_do_token() {
         log_info "API token validated"
         return 0
     else
-        # Parse error details if available
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
         log_warn "Remediation steps:"
         log_warn "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
         log_warn "  2. Ensure the token has read/write permissions"
@@ -86,10 +83,7 @@ do_register_ssh_key() {
     if echo "$register_response" | grep -q '"id"'; then
         return 0
     else
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
 
         log_warn "Common causes:"
         log_warn "  - SSH key already registered (check: doctl compute ssh-key list)"
