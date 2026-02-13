@@ -18,6 +18,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/aider.sh)
 
 #### OpenClaw
 
+#### Codex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/codex.sh)
+```
+
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
 ```
