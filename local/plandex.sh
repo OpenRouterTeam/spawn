@@ -16,7 +16,7 @@ echo ""
 ensure_local_ready
 
 SERVER_NAME=$(get_server_name)
-log_info "Running on: ${SERVER_NAME}"
+create_server "${SERVER_NAME}"
 
 # Install Plandex
 log_step "Installing Plandex..."
@@ -51,18 +51,14 @@ echo ""
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     # Non-interactive mode: execute prompt and exit
     log_step "Executing Plandex with prompt..."
-
-    # Escape prompt for safe shell execution
-    escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
-
-    # Execute without TTY
     source ~/.zshrc 2>/dev/null || true
-    plandex new && plandex tell ${escaped_prompt}
+    plandex new
+    plandex tell "${SPAWN_PROMPT}"
 else
     # Interactive mode: start Plandex normally
     log_step "Starting Plandex..."
     sleep 1
-    clear
+    clear 2>/dev/null || true
     source ~/.zshrc 2>/dev/null || true
     exec plandex
 fi

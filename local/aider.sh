@@ -56,8 +56,7 @@ echo ""
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     log_step "Executing Aider with prompt..."
     source ~/.zshrc 2>/dev/null || true
-    escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
-    aider --model "openrouter/${MODEL_ID}" -m "${escaped_prompt}"
+    aider --model "openrouter/${MODEL_ID}" -m "${SPAWN_PROMPT}"
 else
     log_step "Starting Aider..."
     sleep 1

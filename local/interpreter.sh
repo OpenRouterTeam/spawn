@@ -55,8 +55,7 @@ echo ""
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     log_step "Executing Open Interpreter with prompt..."
     source ~/.zshrc 2>/dev/null || true
-    escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
-    interpreter -m "${escaped_prompt}"
+    interpreter -m "${SPAWN_PROMPT}"
 else
     log_step "Starting Open Interpreter..."
     sleep 1
