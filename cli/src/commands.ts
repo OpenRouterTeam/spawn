@@ -564,61 +564,70 @@ function credentialHints(cloud: string, authHint?: string, verb = "Missing or in
   ];
 }
 
+/** Static guidance lines for known exit codes (no dynamic interpolation needed) */
+const EXIT_CODE_GUIDANCE: Record<number, string[]> = {
+  130: [
+    "Script was interrupted (Ctrl+C).",
+    "Note: If a server was already created, it may still be running.",
+    "  Check your cloud provider dashboard to stop or delete any unused servers.",
+  ],
+  137: [
+    "Script was killed (likely by the system due to timeout or out of memory).",
+    "  - The server may not have enough RAM for this agent",
+    "  - Try a larger instance size or a different cloud provider",
+    "  - Check your cloud provider dashboard to stop or delete any unused servers",
+  ],
+  255: [
+    "SSH connection failed. Common causes:",
+    "  - Server is still booting (wait a moment and retry)",
+    "  - Firewall blocking SSH port 22",
+    "  - Server was terminated before the session started",
+  ],
+  126: [
+    "A command was found but could not be executed (permission denied).",
+    "  - A downloaded binary may lack execute permissions",
+    "  - The script may require root/sudo access",
+  ],
+  2: [
+    "Shell syntax or argument error. This is likely a bug in the script.",
+  ],
+};
+
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
-  switch (exitCode) {
-    case 130:
-      return [
-        "Script was interrupted (Ctrl+C).",
-        "Note: If a server was already created, it may still be running.",
-        "  Check your cloud provider dashboard to stop or delete any unused servers.",
-      ];
-    case 137:
-      return [
-        "Script was killed (likely by the system due to timeout or out of memory).",
-        "  - The server may not have enough RAM for this agent",
-        "  - Try a larger instance size or a different cloud provider",
-        "  - Check your cloud provider dashboard to stop or delete any unused servers",
-      ];
-    case 255:
-      return [
-        "SSH connection failed. Common causes:",
-        "  - Server is still booting (wait a moment and retry)",
-        "  - Firewall blocking SSH port 22",
-        "  - Server was terminated before the session started",
-      ];
-    case 127:
-      return [
-        "A required command was not found. Check that these are installed:",
-        "  - bash, curl, ssh, jq",
-        `  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`,
-      ];
-    case 126:
-      return [
-        "A command was found but could not be executed (permission denied).",
-        "  - A downloaded binary may lack execute permissions",
-        "  - The script may require root/sudo access",
-        `  - Report it if this persists: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
-      ];
-    case 2:
-      return [
-        "Shell syntax or argument error. This is likely a bug in the script.",
-        `  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
-      ];
-    case 1:
-      return [
-        "Common causes:",
-        ...credentialHints(cloud, authHint),
-        "  - Cloud provider API error (quota, rate limit, or region issue)",
-        "  - Server provisioning failed (try again or pick a different region)",
-      ];
-    default:
-      return [
-        "Common causes:",
-        ...credentialHints(cloud, authHint, "Missing"),
-        "  - Cloud provider API rate limit or quota exceeded",
-        "  - Missing local dependencies (SSH, curl, jq)",
-      ];
+  // Static exit codes (no cloud-specific interpolation)
+  const staticLines = exitCode !== null ? EXIT_CODE_GUIDANCE[exitCode] : undefined;
+  if (staticLines) {
+    if (exitCode === 126 || exitCode === 2) {
+      return [...staticLines, `  Report it${exitCode === 2 ? "" : " if this persists"}: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`];
+    }
+    return staticLines;
   }
+
+  // Exit 127: needs cloud name for CLI tool hint
+  if (exitCode === 127) {
+    return [
+      "A required command was not found. Check that these are installed:",
+      "  - bash, curl, ssh, jq",
+      `  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`,
+    ];
+  }
+
+  // Exit 1 and unknown: credential-related hints
+  if (exitCode === 1) {
+    return [
+      "Common causes:",
+      ...credentialHints(cloud, authHint),
+      "  - Cloud provider API error (quota, rate limit, or region issue)",
+      "  - Server provisioning failed (try again or pick a different region)",
+    ];
+  }
+
+  return [
+    "Common causes:",
+    ...credentialHints(cloud, authHint, "Missing"),
+    "  - Cloud provider API rate limit or quota exceeded",
+    "  - Missing local dependencies (SSH, curl, jq)",
+  ];
 }
 
 export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
@@ -657,6 +666,44 @@ export function isRetryableExitCode(errMsg: string): boolean {
   return code === 255;
 }
 
+/** Run script with retries for transient failures (e.g. SSH exit 255).
+ *  Returns on success. On interrupt, calls process.exit(130).
+ *  On final failure, calls reportScriptFailure (which also exits). */
+async function runWithRetries(
+  scriptContent: string,
+  cloud: string,
+  agent: string,
+  prompt?: string,
+  authHint?: string,
+): Promise<void> {
+  let lastErr: string | undefined;
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    try {
+      await runBash(scriptContent, prompt);
+      return;
+    } catch (err) {
+      const errMsg = getErrorMessage(err);
+      if (errMsg.includes("interrupted by user")) {
+        console.error();
+        p.log.warn("Script interrupted (Ctrl+C).");
+        p.log.warn("If a server was already created, it may still be running.");
+        p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
+        process.exit(130);
+      }
+      lastErr = errMsg;
+
+      if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
+        const delay = RETRY_DELAYS[attempt - 1];
+        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+        await new Promise(r => setTimeout(r, delay * 1000));
+        continue;
+      }
+      break;
+    }
+  }
+  reportScriptFailure(lastErr!, cloud, agent, authHint, prompt);
+}
+
 async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
@@ -680,36 +727,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     // Non-fatal: don't block the spawn if history write fails
   }
 
-  let lastErr: string | undefined;
-  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
-    try {
-      await runBash(scriptContent, prompt);
-      return; // success
-    } catch (err) {
-      const errMsg = getErrorMessage(err);
-      if (errMsg.includes("interrupted by user")) {
-        console.error();
-        p.log.warn("Script interrupted (Ctrl+C).");
-        p.log.warn("If a server was already created, it may still be running.");
-        p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
-        process.exit(130);
-      }
-      lastErr = errMsg;
-
-      // Only retry for potentially transient failures
-      if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
-        const delay = RETRY_DELAYS[attempt - 1];
-        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
-        await new Promise(r => setTimeout(r, delay * 1000));
-        continue;
-      }
-
-      // Non-retryable or out of retries
-      break;
-    }
-  }
-
-  reportScriptFailure(lastErr!, cloud, agent, authHint, prompt);
+  await runWithRetries(scriptContent, cloud, agent, prompt, authHint);
 }
 
 function runBash(script: string, prompt?: string): Promise<void> {
