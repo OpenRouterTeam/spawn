@@ -1177,6 +1177,8 @@ async function resolveListFilters(
 
 /** Show interactive picker to select and rerun a previous spawn */
 async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
+  p.log.info(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")} or ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`));
+
   const options = records.map((r, i) => ({
     value: i,
     label: buildRecordLabel(r, manifest),
@@ -1630,12 +1632,14 @@ ${pc.bold("TROUBLESHOOTING")}
   ${pc.dim("*")} Missing credentials: Run ${pc.cyan("spawn <cloud>")} to see setup instructions
   ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
   ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output
+  ${pc.dim("*")} Missing unicode over SSH: Set ${pc.cyan("SPAWN_UNICODE=1")} to force unicode on
   ${pc.dim("*")} Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update
 
 ${pc.bold("ENVIRONMENT VARIABLES")}
   ${pc.cyan("OPENROUTER_API_KEY")}        OpenRouter API key (all agents require this)
   ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")}   Skip auto-update check on startup
   ${pc.cyan("SPAWN_NO_UNICODE=1")}        Force ASCII output (no unicode symbols)
+  ${pc.cyan("SPAWN_UNICODE=1")}           Force unicode output (override SSH auto-detection)
   ${pc.cyan("SPAWN_HOME")}                Override spawn data directory (default: ~/.spawn)
   ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)
 
