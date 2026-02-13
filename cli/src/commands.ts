@@ -1367,47 +1367,96 @@ export async function cmdUpdate(): Promise<void> {
 
 // ── Help ───────────────────────────────────────────────────────────────────────
 
+const HELP_COL = 37; // description column offset (after 2-char indent)
+
+interface HelpEntry {
+  cmd: string;
+  desc: string;
+  /** Extra description line(s) that appear below, aligned to the description column */
+  extra?: string;
+}
+
+/** Format a two-column help entry, wrapping description to next line if cmd is too wide */
+function fmtEntry(e: HelpEntry, fmtDesc: (s: string) => string = (s) => s): string {
+  const pad = HELP_COL - e.cmd.length;
+  const descLine = pad >= 2
+    ? `  ${e.cmd}${" ".repeat(pad)}${fmtDesc(e.desc)}`
+    : `  ${e.cmd}\n${" ".repeat(HELP_COL + 2)}${fmtDesc(e.desc)}`;
+  return e.extra ? `${descLine}\n${" ".repeat(HELP_COL + 2)}${fmtDesc(e.extra)}` : descLine;
+}
+
+const USAGE_ENTRIES: HelpEntry[] = [
+  { cmd: "spawn", desc: "Interactive agent + cloud picker" },
+  { cmd: "spawn <agent> <cloud>", desc: "Launch agent on cloud directly" },
+  { cmd: "spawn <agent> <cloud> --dry-run", desc: "Preview what would be provisioned (or -n)" },
+  { cmd: 'spawn <agent> <cloud> --prompt "text"', desc: "Execute agent with prompt (non-interactive)" },
+  { cmd: "spawn <agent> <cloud> --prompt-file <file>  (or -f)", desc: "Execute agent with prompt from file" },
+  { cmd: "spawn <agent>", desc: "Show available clouds for agent" },
+  { cmd: "spawn <cloud>", desc: "Show available agents for cloud" },
+  { cmd: "spawn list", desc: "Browse and rerun previous spawns" },
+  { cmd: "spawn list <filter>", desc: "Filter history by agent or cloud name" },
+  { cmd: "spawn list -a <agent>", desc: "Filter spawn history by agent (or --agent)" },
+  { cmd: "spawn list -c <cloud>", desc: "Filter spawn history by cloud (or --cloud)", extra: "Aliases: ls, history" },
+  { cmd: "spawn matrix", desc: "Full availability matrix (alias: m)" },
+  { cmd: "spawn agents", desc: "List all agents with descriptions" },
+  { cmd: "spawn clouds", desc: "List all cloud providers" },
+  { cmd: "spawn update", desc: "Check for CLI updates" },
+  { cmd: "spawn version", desc: "Show version" },
+  { cmd: "spawn help", desc: "Show this help message" },
+];
+
+const EXAMPLE_ENTRIES: HelpEntry[] = [
+  { cmd: "spawn", desc: "# Pick interactively" },
+  { cmd: "spawn claude sprite", desc: "# Launch Claude Code on Sprite" },
+  { cmd: "spawn aider hetzner", desc: "# Launch Aider on Hetzner Cloud" },
+  { cmd: 'spawn claude sprite --prompt "Fix all linter errors"', desc: "# Execute Claude with prompt and exit" },
+  { cmd: 'spawn aider sprite -p "Add tests"', desc: "# Short form of --prompt" },
+  { cmd: "spawn claude sprite -f instructions.txt", desc: "# Read prompt from file (short for --prompt-file)" },
+  { cmd: "spawn claude sprite --dry-run", desc: "# Preview without provisioning" },
+  { cmd: "spawn claude", desc: "# Show which clouds support Claude" },
+  { cmd: "spawn hetzner", desc: "# Show which agents run on Hetzner" },
+  { cmd: "spawn list", desc: "# Browse history and pick one to rerun" },
+  { cmd: "spawn list claude", desc: "# Filter history by agent name" },
+  { cmd: "spawn matrix", desc: "# See the full agent x cloud matrix" },
+];
+
+const TROUBLESHOOTING_ENTRIES = [
+  `Script not found: Run ${pc.cyan("spawn matrix")} to verify the combination exists`,
+  `Missing credentials: Run ${pc.cyan("spawn <cloud>")} to see setup instructions`,
+  `Update issues: Try ${pc.cyan("spawn update")} or reinstall manually`,
+  `Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output`,
+  `Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update`,
+];
+
+const ENV_VAR_ENTRIES: [string, string][] = [
+  ["OPENROUTER_API_KEY", "OpenRouter API key (all agents require this)"],
+  ["SPAWN_NO_UPDATE_CHECK=1", "Skip auto-update check on startup"],
+  ["SPAWN_NO_UNICODE=1", "Force ASCII output (no unicode symbols)"],
+  ["SPAWN_HOME", "Override spawn data directory (default: ~/.spawn)"],
+  ["SPAWN_DEBUG=1", "Show debug output (unicode detection, etc.)"],
+];
+
+function fmtEnvVar([name, desc]: [string, string]): string {
+  const colored = pc.cyan(name);
+  // Pad based on the raw (uncolored) name length to align descriptions
+  const pad = HELP_COL - name.length;
+  return `  ${colored}${" ".repeat(pad)}${desc}`;
+}
+
 export function cmdHelp(): void {
+  const usage = USAGE_ENTRIES.map((e) => fmtEntry(e)).join("\n");
+  const examples = EXAMPLE_ENTRIES.map((e) => fmtEntry(e, pc.dim)).join("\n");
+  const troubleshooting = TROUBLESHOOTING_ENTRIES.map((t) => `  ${pc.dim("*")} ${t}`).join("\n");
+  const envVars = ENV_VAR_ENTRIES.map(fmtEnvVar).join("\n");
+
   console.log(`
 ${pc.bold("spawn")} -- Launch any AI coding agent on any cloud
 
 ${pc.bold("USAGE")}
-  spawn                              Interactive agent + cloud picker
-  spawn <agent> <cloud>              Launch agent on cloud directly
-  spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
-  spawn <agent> <cloud> --prompt "text"
-                                     Execute agent with prompt (non-interactive)
-  spawn <agent> <cloud> --prompt-file <file>  (or -f)
-                                     Execute agent with prompt from file
-  spawn <agent>                      Show available clouds for agent
-  spawn <cloud>                      Show available agents for cloud
-  spawn list                         Browse and rerun previous spawns
-  spawn list <filter>                Filter history by agent or cloud name
-  spawn list -a <agent>              Filter spawn history by agent (or --agent)
-  spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
-                                     Aliases: ls, history
-  spawn matrix                       Full availability matrix (alias: m)
-  spawn agents                       List all agents with descriptions
-  spawn clouds                       List all cloud providers
-  spawn update                       Check for CLI updates
-  spawn version                      Show version
-  spawn help                         Show this help message
+${usage}
 
 ${pc.bold("EXAMPLES")}
-  spawn                              ${pc.dim("# Pick interactively")}
-  spawn claude sprite                ${pc.dim("# Launch Claude Code on Sprite")}
-  spawn aider hetzner                ${pc.dim("# Launch Aider on Hetzner Cloud")}
-  spawn claude sprite --prompt "Fix all linter errors"
-                                     ${pc.dim("# Execute Claude with prompt and exit")}
-  spawn aider sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
-  spawn claude sprite -f instructions.txt
-                                     ${pc.dim("# Read prompt from file (short for --prompt-file)")}
-  spawn claude sprite --dry-run      ${pc.dim("# Preview without provisioning")}
-  spawn claude                       ${pc.dim("# Show which clouds support Claude")}
-  spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
-  spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
-  spawn list claude                  ${pc.dim("# Filter history by agent name")}
-  spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}
+${examples}
 
 ${pc.bold("AUTHENTICATION")}
   All agents use OpenRouter for LLM access. Get your API key at:
@@ -1423,18 +1472,10 @@ ${pc.bold("INSTALL")}
   curl -fsSL ${RAW_BASE}/cli/install.sh | bash
 
 ${pc.bold("TROUBLESHOOTING")}
-  ${pc.dim("*")} Script not found: Run ${pc.cyan("spawn matrix")} to verify the combination exists
-  ${pc.dim("*")} Missing credentials: Run ${pc.cyan("spawn <cloud>")} to see setup instructions
-  ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
-  ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output
-  ${pc.dim("*")} Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update
+${troubleshooting}
 
 ${pc.bold("ENVIRONMENT VARIABLES")}
-  ${pc.cyan("OPENROUTER_API_KEY")}        OpenRouter API key (all agents require this)
-  ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")}   Skip auto-update check on startup
-  ${pc.cyan("SPAWN_NO_UNICODE=1")}        Force ASCII output (no unicode symbols)
-  ${pc.cyan("SPAWN_HOME")}                Override spawn data directory (default: ~/.spawn)
-  ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)
+${envVars}
 
 ${pc.bold("MORE INFO")}
   Repository:  https://github.com/${REPO}
