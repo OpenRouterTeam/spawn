@@ -564,28 +564,30 @@ function credentialHints(cloud: string, authHint?: string, verb = "Missing or in
   ];
 }
 
-export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
+/** Static guidance entries keyed by exit code (no cloud-specific interpolation needed) */
+const STATIC_EXIT_CODE_GUIDANCE: Record<number, string[]> = {
+  130: [
+    "Script was interrupted (Ctrl+C).",
+    "Note: If a server was already created, it may still be running.",
+    "  Check your cloud provider dashboard to stop or delete any unused servers.",
+  ],
+  137: [
+    "Script was killed (likely by the system due to timeout or out of memory).",
+    "  - The server may not have enough RAM for this agent",
+    "  - Try a larger instance size or a different cloud provider",
+    "  - Check your cloud provider dashboard to stop or delete any unused servers",
+  ],
+  255: [
+    "SSH connection failed. Common causes:",
+    "  - Server is still booting (wait a moment and retry)",
+    "  - Firewall blocking SSH port 22",
+    "  - Server was terminated before the session started",
+  ],
+};
+
+/** Guidance entries that require cloud-name interpolation */
+function getDynamicExitCodeGuidance(exitCode: number, cloud: string, authHint?: string): string[] | null {
   switch (exitCode) {
-    case 130:
-      return [
-        "Script was interrupted (Ctrl+C).",
-        "Note: If a server was already created, it may still be running.",
-        "  Check your cloud provider dashboard to stop or delete any unused servers.",
-      ];
-    case 137:
-      return [
-        "Script was killed (likely by the system due to timeout or out of memory).",
-        "  - The server may not have enough RAM for this agent",
-        "  - Try a larger instance size or a different cloud provider",
-        "  - Check your cloud provider dashboard to stop or delete any unused servers",
-      ];
-    case 255:
-      return [
-        "SSH connection failed. Common causes:",
-        "  - Server is still booting (wait a moment and retry)",
-        "  - Firewall blocking SSH port 22",
-        "  - Server was terminated before the session started",
-      ];
     case 127:
       return [
         "A required command was not found. Check that these are installed:",
@@ -612,13 +614,25 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         "  - Server provisioning failed (try again or pick a different region)",
       ];
     default:
-      return [
-        "Common causes:",
-        ...credentialHints(cloud, authHint, "Missing"),
-        "  - Cloud provider API rate limit or quota exceeded",
-        "  - Missing local dependencies (SSH, curl, jq)",
-      ];
+      return null;
   }
+}
+
+export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
+  if (exitCode !== null && STATIC_EXIT_CODE_GUIDANCE[exitCode]) {
+    return STATIC_EXIT_CODE_GUIDANCE[exitCode];
+  }
+
+  const dynamic = exitCode !== null ? getDynamicExitCodeGuidance(exitCode, cloud, authHint) : null;
+  if (dynamic) return dynamic;
+
+  // Default: unknown or null exit code
+  return [
+    "Common causes:",
+    ...credentialHints(cloud, authHint, "Missing"),
+    "  - Cloud provider API rate limit or quota exceeded",
+    "  - Missing local dependencies (SSH, curl, jq)",
+  ];
 }
 
 export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
@@ -657,6 +671,36 @@ export function isRetryableExitCode(errMsg: string): boolean {
   return code === 255;
 }
 
+/** Run a bash script with automatic retry on transient SSH failures (exit 255). */
+async function runBashWithRetry(scriptContent: string, prompt?: string): Promise<string | undefined> {
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    try {
+      await runBash(scriptContent, prompt);
+      return undefined; // success — no error
+    } catch (err) {
+      const errMsg = getErrorMessage(err);
+      if (errMsg.includes("interrupted by user")) {
+        console.error();
+        p.log.warn("Script interrupted (Ctrl+C).");
+        p.log.warn("If a server was already created, it may still be running.");
+        p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
+        process.exit(130);
+      }
+
+      // Only retry for potentially transient failures
+      if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
+        const delay = RETRY_DELAYS[attempt - 1];
+        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
+        await new Promise(r => setTimeout(r, delay * 1000));
+        continue;
+      }
+
+      return errMsg; // non-retryable or out of retries
+    }
+  }
+  return "Script failed after all retry attempts";
+}
+
 async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
   const url = `https://openrouter.ai/lab/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
@@ -680,36 +724,10 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     // Non-fatal: don't block the spawn if history write fails
   }
 
-  let lastErr: string | undefined;
-  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
-    try {
-      await runBash(scriptContent, prompt);
-      return; // success
-    } catch (err) {
-      const errMsg = getErrorMessage(err);
-      if (errMsg.includes("interrupted by user")) {
-        console.error();
-        p.log.warn("Script interrupted (Ctrl+C).");
-        p.log.warn("If a server was already created, it may still be running.");
-        p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
-        process.exit(130);
-      }
-      lastErr = errMsg;
-
-      // Only retry for potentially transient failures
-      if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
-        const delay = RETRY_DELAYS[attempt - 1];
-        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
-        await new Promise(r => setTimeout(r, delay * 1000));
-        continue;
-      }
-
-      // Non-retryable or out of retries
-      break;
-    }
+  const errMsg = await runBashWithRetry(scriptContent, prompt);
+  if (errMsg) {
+    reportScriptFailure(errMsg, cloud, agent, authHint, prompt);
   }
-
-  reportScriptFailure(lastErr!, cloud, agent, authHint, prompt);
 }
 
 function runBash(script: string, prompt?: string): Promise<void> {
