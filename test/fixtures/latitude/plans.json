@@ -378,6 +378,7 @@
                 "SJC2"
               ],
               "in_stock": [
+                "DAL",
                 "MIA2"
               ]
             },
@@ -639,9 +640,7 @@
             "stock_level": "unavailable"
           },
           {
-            "deploys_instantly": [
-              "ubuntu_24_04_x64_lts"
-            ],
+            "deploys_instantly": [],
             "locations": {
               "available": [
                 "DAL",
@@ -653,9 +652,7 @@
                 "LAX2",
                 "SJC2"
               ],
-              "in_stock": [
-                "CHI"
-              ]
+              "in_stock": []
             },
             "name": "United States",
             "pricing": {
@@ -670,7 +667,7 @@
                 "year": 1672.0
               }
             },
-            "stock_level": "low"
+            "stock_level": "unavailable"
           },
           {
             "deploys_instantly": [],
@@ -845,6 +842,7 @@
                 "SJC2"
               ],
               "in_stock": [
+                "LAX",
                 "MIA2"
               ]
             },
@@ -1492,7 +1490,7 @@
                 "year": 7896.0
               }
             },
-            "stock_level": "low"
+            "stock_level": "medium"
           },
           {
             "deploys_instantly": [],

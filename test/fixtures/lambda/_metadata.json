@@ -1,9 +1,9 @@
 {
   "cloud": "lambda",
-  "recorded_at": "2026-02-13T05:00:29Z",
+  "recorded_at": "2026-02-13T06:37:11Z",
   "fixtures": {
-    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-13T05:00:28Z"},
-    "ssh_keys": {"endpoint": "/ssh-keys", "recorded_at": "2026-02-13T05:00:28Z"},
-    "instance_types": {"endpoint": "/instance-types", "recorded_at": "2026-02-13T05:00:29Z"}
+    "instances": {"endpoint": "/instances", "recorded_at": "2026-02-13T06:37:10Z"},
+    "ssh_keys": {"endpoint": "/ssh-keys", "recorded_at": "2026-02-13T06:37:10Z"},
+    "instance_types": {"endpoint": "/instance-types", "recorded_at": "2026-02-13T06:37:11Z"}
   }
 }

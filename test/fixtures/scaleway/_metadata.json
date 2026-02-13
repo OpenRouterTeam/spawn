@@ -1,8 +1,8 @@
 {
   "cloud": "scaleway",
-  "recorded_at": "2026-02-13T05:00:30Z",
+  "recorded_at": "2026-02-13T06:37:11Z",
   "fixtures": {
-    "servers": {"endpoint": "/servers", "recorded_at": "2026-02-13T05:00:29Z"},
-    "images": {"endpoint": "/images?per_page=10", "recorded_at": "2026-02-13T05:00:30Z"}
+    "servers": {"endpoint": "/servers", "recorded_at": "2026-02-13T06:37:10Z"},
+    "images": {"endpoint": "/images?per_page=10", "recorded_at": "2026-02-13T06:37:11Z"}
   }
 }

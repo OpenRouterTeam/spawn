@@ -75,6 +75,10 @@
         {
           "description": "Arizona, USA",
           "name": "us-west-2"
+        },
+        {
+          "description": "India",
+          "name": "asia-south-1"
         }
       ]
     },
@@ -146,12 +150,7 @@
           "vcpus": 26
         }
       },
-      "regions_with_capacity_available": [
-        {
-          "description": "Utah, USA",
-          "name": "us-west-3"
-        }
-      ]
+      "regions_with_capacity_available": []
     },
     "gpu_1x_h100_sxm5": {
       "instance_type": {
@@ -246,12 +245,7 @@
           "vcpus": 52
         }
       },
-      "regions_with_capacity_available": [
-        {
-          "description": "Central Texas, USA",
-          "name": "us-south-3"
-        }
-      ]
+      "regions_with_capacity_available": []
     },
     "gpu_4x_a100": {
       "instance_type": {
@@ -311,7 +305,12 @@
           "vcpus": 104
         }
       },
-      "regions_with_capacity_available": []
+      "regions_with_capacity_available": [
+        {
+          "description": "North Texas, USA",
+          "name": "us-south-2"
+        }
+      ]
     },
     "gpu_8x_a100": {
       "instance_type": {

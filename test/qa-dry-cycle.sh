@@ -1,32 +1,44 @@
 #!/bin/bash
 set -eo pipefail
 
-# QA Cycle Service — Daily automated test + fix + README update
-# Triggered by trigger-server.ts via GitHub Actions
-#
-# Phase 1: Record fixtures (bash test/record.sh allsaved)
-# Phase 2: Run mock tests → results file
-# Phase 3: Spawn agents to fix failures
-# Phase 4: Re-run tests → update README → commit + push
+# QA Dry Run — Same phases as qa-cycle.sh but NO GitHub interaction.
+# Runs locally: records fixtures, mock tests, spawns fix agents, re-tests.
+# Skips: git push, PRs, issues, remote branch cleanup, git reset --hard origin/main.
+# Artifacts saved to .docs/qa-dry-run-latest/ for inspection.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [[ -z "${REPO_ROOT}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
 cd "${REPO_ROOT}"
 
 SPAWN_REASON="${SPAWN_REASON:-manual}"
-WORKTREE_BASE="/tmp/spawn-worktrees/qa"
-LOG_FILE="${REPO_ROOT}/.docs/qa-cycle.log"
+WORKTREE_BASE="/tmp/spawn-worktrees/qa-dry"
 CYCLE_TIMEOUT=2700  # 45 min total
 
+# Output directory for dry-run artifacts
+DRY_OUTPUT_DIR="${REPO_ROOT}/.docs/qa-dry-run-latest"
+rm -rf "${DRY_OUTPUT_DIR}"
+mkdir -p "${DRY_OUTPUT_DIR}"
+
+LOG_FILE="${DRY_OUTPUT_DIR}/qa-dry-run.log"
+
 # Results files
-RESULTS_PHASE2="/tmp/spawn-qa-results.txt"
-RESULTS_PHASE4="/tmp/spawn-qa-results-retry.txt"
+RESULTS_PHASE2="/tmp/spawn-qa-dry-results.txt"
+RESULTS_PHASE4="/tmp/spawn-qa-dry-results-retry.txt"
 
 # Ensure directories
 mkdir -p "$(dirname "${LOG_FILE}")" "${WORKTREE_BASE}"
 
 log() {
-    printf '[%s] [qa] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$*" | tee -a "${LOG_FILE}"
+    printf '[%s] [qa-dry] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$*" | tee -a "${LOG_FILE}"
+}
+
+# Log what would happen in a real cycle
+dry_log() {
+    log "DRY_RUN: Would run: $*"
+    printf '[would-run] %s\n' "$*" >> "${DRY_OUTPUT_DIR}/would-commit.txt"
 }
 
 cleanup() {
@@ -35,8 +47,11 @@ cleanup() {
     cd "${REPO_ROOT}" 2>/dev/null || true
     git worktree prune 2>/dev/null || true
     rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
-    rm -f "${RESULTS_PHASE2}" "${RESULTS_PHASE4}" "/tmp/spawn-qa-record-output.txt" 2>/dev/null || true
-    log "=== QA Cycle Done (exit_code=${exit_code}) ==="
+    rm -f "${RESULTS_PHASE2}" "${RESULTS_PHASE4}" "/tmp/spawn-qa-dry-record-output.txt" 2>/dev/null || true
+    # Save results files to output dir before deleting
+    [[ -f "${RESULTS_PHASE2}" ]] && cp "${RESULTS_PHASE2}" "${DRY_OUTPUT_DIR}/results-phase2.txt" 2>/dev/null || true
+    [[ -f "${RESULTS_PHASE4}" ]] && cp "${RESULTS_PHASE4}" "${DRY_OUTPUT_DIR}/results-phase4.txt" 2>/dev/null || true
+    log "=== QA Dry Run Done (exit_code=${exit_code}) ==="
     exit $exit_code
 }
 
@@ -63,8 +78,9 @@ run_with_timeout() {
     wait "$pid" 2>/dev/null
 }
 
-log "=== Starting QA cycle (reason=${SPAWN_REASON}) ==="
+log "=== Starting QA Dry Run ==="
 log "Repo root: ${REPO_ROOT}"
+log "Output dir: ${DRY_OUTPUT_DIR}"
 log "Timeout: ${CYCLE_TIMEOUT}s"
 
 # Track start time for total cycle timeout
@@ -81,64 +97,10 @@ check_timeout() {
     return 0
 }
 
-# Push → PR → self-review (NO merging — merging is handled externally)
-# Usage: push_and_create_pr BRANCH_NAME PR_TITLE PR_BODY
-push_and_create_pr() {
-    local branch_name="$1"
-    local pr_title="$2"
-    local pr_body="$3"
-
-    # Check there are actual commits to push
-    if [[ -z "$(git log origin/main..HEAD --oneline 2>/dev/null)" ]]; then
-        log "push_and_create_pr: No commits to push on ${branch_name}"
-        return 0
-    fi
-
-    git push -u origin "${branch_name}" 2>&1 | tee -a "${LOG_FILE}" || {
-        log "push_and_create_pr: Push failed for ${branch_name}"
-        return 1
-    }
-
-    local pr_url=""
-    pr_url=$(gh pr create \
-        --title "${pr_title}" \
-        --body "${pr_body}" \
-        --base main --head "${branch_name}" 2>/dev/null) || true
-
-    if [[ -z "${pr_url:-}" ]]; then
-        log "push_and_create_pr: PR creation failed for ${branch_name}"
-        return 1
-    fi
-
-    log "push_and_create_pr: PR created: ${pr_url}"
-
-    # Extract PR number from URL
-    local pr_number=""
-    pr_number=$(printf '%s' "${pr_url}" | grep -oE '[0-9]+$') || true
-
-    if [[ -n "${pr_number}" ]]; then
-        # Self-review: add a comment summarizing the changes
-        gh pr review "${pr_number}" --repo OpenRouterTeam/spawn --comment \
-            --body "Self-review by QA cycle: ${pr_title}. Automated change -- tests were run before submission.\n\n-- qa/cycle" \
-            2>&1 | tee -a "${LOG_FILE}" || true
-
-        # Label for external review
-        gh pr edit "${pr_number}" --repo OpenRouterTeam/spawn --add-label "needs-team-review" \
-            2>&1 | tee -a "${LOG_FILE}" || true
-
-        log "push_and_create_pr: Self-reviewed and labeled PR #${pr_number} (not merging — awaiting external review)"
-    fi
-
-    return 0
-}
-
 # ============================================================
-# Pre-cycle cleanup (stale branches, worktrees, PRs from prior runs)
+# Pre-cycle cleanup (local only — no remote branch/PR operations)
 # ============================================================
-log "Pre-cycle cleanup..."
-
-git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
-git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
+log "Pre-cycle cleanup (local only)..."
 
 # Clean stale worktrees
 git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
@@ -148,45 +110,13 @@ if [[ -d "${WORKTREE_BASE}" ]]; then
 fi
 mkdir -p "${WORKTREE_BASE}"
 
-# Delete merged qa/* remote branches
-MERGED_BRANCHES=$(git branch -r --merged origin/main | grep 'origin/qa/' | sed 's|origin/||' | tr -d ' ') || true
-for branch in $MERGED_BRANCHES; do
-    if [[ -n "$branch" ]]; then
-        git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
-    fi
-done
-
-# Delete stale local qa/* branches
-LOCAL_QA_BRANCHES=$(git branch --list 'qa/*' | tr -d ' *') || true
+# Delete stale local qa-dry/* branches only
+LOCAL_QA_BRANCHES=$(git branch --list 'qa-dry/*' | tr -d ' *') || true
 for branch in $LOCAL_QA_BRANCHES; do
     if [[ -n "$branch" ]]; then
         git branch -D "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
     fi
 done
-
-# Clean up stale qa/readme-update-* branches on remote (from Phase 4)
-REMOTE_README_BRANCHES=$(git branch -r --list 'origin/qa/readme-update-*' | sed 's|origin/||' | tr -d ' ') || true
-for branch in $REMOTE_README_BRANCHES; do
-    if [[ -n "$branch" ]]; then
-        git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted stale README branch: $branch" || true
-    fi
-done
-
-# Close stale qa PRs (open > 2 hours) — never auto-merge, leave for human review
-STALE_PRS=$(gh pr list --state open --label '' --json number,headRefName,updatedAt \
-    --jq '[.[] | select(.headRefName | startswith("qa/")) | select(.updatedAt < (now - 7200 | todate)) | .number] | .[]' 2>/dev/null) || true
-for pr_num in $STALE_PRS; do
-    if [[ -n "$pr_num" ]]; then
-        log "Closing stale QA PR #${pr_num}..."
-        gh pr close "$pr_num" --comment "Auto-closing: stale QA PR from a previous cycle.
-
--- qa/cycle" 2>&1 | tee -a "${LOG_FILE}" || true
-    fi
-done
-
-# Re-sync after any merges from cleanup
-git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
-git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
 log "Pre-cycle cleanup complete"
 
@@ -199,14 +129,9 @@ if [[ -f "${REPO_ROOT}/shared/key-request.sh" ]]; then
     source "${REPO_ROOT}/shared/key-request.sh"
     load_cloud_keys_from_config
     if [[ -n "${MISSING_KEY_PROVIDERS:-}" ]]; then
+        log "Key preflight: Missing keys for: ${MISSING_KEY_PROVIDERS}"
         log "Phase 0: Missing keys for: ${MISSING_KEY_PROVIDERS}"
-        if [[ -n "${KEY_SERVER_URL:-}" ]]; then
-            log "Phase 0: Requesting keys via key-server (will trigger email notification)"
-            request_missing_cloud_keys
-        else
-            log "Phase 0: KEY_SERVER_URL not set — skipping email notification"
-            log "Phase 0: Set KEY_SERVER_URL and KEY_SERVER_SECRET to enable email flow"
-        fi
+        dry_log "request_missing_cloud_keys for: ${MISSING_KEY_PROVIDERS}"
     else
         log "Phase 0: All cloud keys available"
     fi
@@ -221,14 +146,8 @@ check_timeout || exit 0
 # ============================================================
 log "=== Phase 1: Record fixtures ==="
 
-RECORD_OUTPUT="/tmp/spawn-qa-record-output.txt"
-RECORD_FAILURES_FILE="${REPO_ROOT}/.docs/qa-record-failures.json"
+RECORD_OUTPUT="/tmp/spawn-qa-dry-record-output.txt"
 rm -f "${RECORD_OUTPUT}"
-
-# Initialize failure tracker if missing
-if [[ ! -f "${RECORD_FAILURES_FILE}" ]]; then
-    printf '{}' > "${RECORD_FAILURES_FILE}"
-fi
 
 RECORD_EXIT=0
 bash test/record.sh allsaved 2>&1 | tee -a "${LOG_FILE}" | tee "${RECORD_OUTPUT}" || RECORD_EXIT=$?
@@ -239,11 +158,9 @@ else
     log "Phase 1: Some fixture recordings failed, identifying failed clouds..."
 
     # Parse which clouds had failures from record.sh output
-    # record.sh prints "━━━ Recording {cloud} ━━━" then "fail" lines for errors
     RECORD_FAILED_CLOUDS=""
     current_cloud=""
     while IFS= read -r line; do
-        # Strip ANSI color codes
         clean=$(printf '%s' "$line" | sed 's/\x1b\[[0-9;]*m//g')
         case "$clean" in
             *"Recording "*" ━━━"*)
@@ -297,14 +214,13 @@ else
         for cloud in ${NON_AUTH_FAILED_CLOUDS}; do
             check_timeout || break
 
-            # Extract error context for this cloud
             error_lines=$(sed -n "/Recording ${cloud}/,/Recording \|━━━ \|Results:/p" "${RECORD_OUTPUT}" | head -30 || true)
 
             log "Phase 1: Spawning agent to debug ${cloud} recording failure"
             worktree="${WORKTREE_BASE}/record-fix-${cloud}"
-            branch_name="qa/record-fix-${cloud}"
+            branch_name="qa-dry/record-fix-${cloud}"
 
-            git worktree add "${worktree}" -b "${branch_name}" origin/main 2>&1 | tee -a "${LOG_FILE}" || {
+            git worktree add "${worktree}" -b "${branch_name}" HEAD 2>&1 | tee -a "${LOG_FILE}" || {
                 log "Phase 1: Could not create worktree for ${cloud}, skipping"
                 continue
             }
@@ -362,17 +278,16 @@ Only modify ${cloud}/lib/common.sh and test/record.sh if the recording infrastru
 
                 # Check for changes (uncommitted OR committed by the agent)
                 has_uncommitted=$(git status --porcelain 2>/dev/null)
-                has_commits=$(git log origin/main..HEAD --oneline 2>/dev/null)
+                has_commits=$(git log HEAD@{1}..HEAD --oneline 2>/dev/null || true)
 
                 if [[ -n "$has_uncommitted" ]] && bash -n "${cloud}/lib/common.sh" 2>/dev/null; then
                     git add "${cloud}/lib/common.sh" "test/record.sh" 2>/dev/null || true
-                    git commit -m "$(printf 'fix: Update %s API integration for recording\n\nAgent: qa-record-fixer\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>' "${cloud}")" || true
+                    git commit -m "$(printf 'fix: Update %s API integration for recording\n\nAgent: qa-record-fixer (dry run)\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>' "${cloud}")" || true
                 fi
 
-                # Push, PR, and merge with retry on stale main
-                push_and_create_pr "${branch_name}" \
-                    "fix: Update ${cloud} API for fixture recording" \
-                    "Automated fix from QA cycle. API recording was failing for ${cloud}." || true
+                # Save diff instead of pushing
+                git diff HEAD~1..HEAD > "${DRY_OUTPUT_DIR}/diff-record-fix-${cloud}.patch" 2>/dev/null || true
+                dry_log "git push -u origin ${branch_name} && gh pr create for ${cloud} record fix"
             ) &
             RECORD_FIX_PIDS="${RECORD_FIX_PIDS} $!"
         done
@@ -385,31 +300,24 @@ Only modify ${cloud}/lib/common.sh and test/record.sh if the recording infrastru
         # Clean up worktrees
         for cloud in ${NON_AUTH_FAILED_CLOUDS}; do
             git worktree remove "${WORKTREE_BASE}/record-fix-${cloud}" 2>/dev/null || true
-            git branch -D "qa/record-fix-${cloud}" 2>/dev/null || true
+            git branch -D "qa-dry/record-fix-${cloud}" 2>/dev/null || true
         done
         git worktree prune 2>/dev/null || true
 
-        # Pull any merged fixes and re-record (ONE retry, no agents on second failure)
-        git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
-        git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
-
+        # Re-record (ONE retry, no agents on second failure) — no git reset to origin
         log "Phase 1: Re-recording after fixes (no agents on second failure)..."
         bash test/record.sh allsaved 2>&1 | tee -a "${LOG_FILE}" || {
             log "Phase 1: Re-record still has failures — continuing with existing fixtures"
         }
     fi
 
-    # Request fresh keys for stale providers (auth failures detected earlier)
-    if [[ -n "${STALE_KEY_PROVIDERS:-}" ]] && type request_missing_cloud_keys &>/dev/null; then
-        MISSING_KEY_PROVIDERS="${STALE_KEY_PROVIDERS}"
-        log "Phase 1: Requesting fresh keys for stale providers: ${STALE_KEY_PROVIDERS}"
-        request_missing_cloud_keys
-        log "Phase 1: Key request sent (email notification will be sent if KEY_SERVER_URL is configured)"
+    # Log stale key request (but don't actually send)
+    if [[ -n "${STALE_KEY_PROVIDERS:-}" ]]; then
+        dry_log "request_missing_cloud_keys for stale providers: ${STALE_KEY_PROVIDERS}"
     fi
 fi
 
 # --- Track consecutive Phase 1 failures per cloud ---
-# Parse the final recording output to determine which clouds failed
 FINAL_RECORD_FAILED=""
 FINAL_RECORD_SUCCEEDED=""
 if [[ -f "${RECORD_OUTPUT}" ]]; then
@@ -419,7 +327,6 @@ if [[ -f "${RECORD_OUTPUT}" ]]; then
         clean=$(printf '%s' "$line" | sed 's/\x1b\[[0-9;]*m//g')
         case "$clean" in
             *"Recording "*" ━━━"*)
-                # Save previous cloud result
                 if [[ -n "${_current_cloud}" ]]; then
                     if [[ "${_cloud_had_error}" == "true" ]]; then
                         FINAL_RECORD_FAILED="${FINAL_RECORD_FAILED} ${_current_cloud}"
@@ -434,11 +341,9 @@ if [[ -f "${RECORD_OUTPUT}" ]]; then
                 _cloud_had_error="true"
                 ;;
             *"done "*)
-                # Cloud section ended
                 ;;
         esac
     done < "${RECORD_OUTPUT}"
-    # Handle last cloud
     if [[ -n "${_current_cloud}" ]]; then
         if [[ "${_cloud_had_error}" == "true" ]]; then
             FINAL_RECORD_FAILED="${FINAL_RECORD_FAILED} ${_current_cloud}"
@@ -450,63 +355,12 @@ fi
 FINAL_RECORD_FAILED=$(printf '%s' "${FINAL_RECORD_FAILED}" | sed 's/^ //')
 FINAL_RECORD_SUCCEEDED=$(printf '%s' "${FINAL_RECORD_SUCCEEDED}" | sed 's/^ //')
 
-# Update the persistent failure tracker
-if [[ -f "${RECORD_FAILURES_FILE}" ]]; then
-    python3 -c "
-import json, sys
-
-tracker_path = sys.argv[1]
-failed = sys.argv[2].split() if sys.argv[2] else []
-succeeded = sys.argv[3].split() if sys.argv[3] else []
-
-try:
-    with open(tracker_path) as f:
-        tracker = json.load(f)
-except (json.JSONDecodeError, FileNotFoundError):
-    tracker = {}
-
-# Increment consecutive failures for failed clouds
-for cloud in failed:
-    tracker[cloud] = tracker.get(cloud, 0) + 1
-
-# Reset counter for clouds that succeeded
-for cloud in succeeded:
-    tracker[cloud] = 0
-
-with open(tracker_path, 'w') as f:
-    json.dump(tracker, f, indent=2, sort_keys=True)
-
-# Output clouds that hit the threshold (3+ consecutive failures)
-escalate = [c for c, count in tracker.items() if count >= 3]
-if escalate:
-    print(' '.join(escalate))
-" "${RECORD_FAILURES_FILE}" "${FINAL_RECORD_FAILED}" "${FINAL_RECORD_SUCCEEDED}" > /tmp/spawn-qa-escalate.txt 2>/dev/null || true
-
-    ESCALATE_CLOUDS=$(cat /tmp/spawn-qa-escalate.txt 2>/dev/null || true)
-    rm -f /tmp/spawn-qa-escalate.txt
-
-    if [[ -n "${ESCALATE_CLOUDS}" ]]; then
-        for cloud in ${ESCALATE_CLOUDS}; do
-            consecutive=$(python3 -c "import json; print(json.load(open('${RECORD_FAILURES_FILE}')).get('${cloud}', 0))" 2>/dev/null || printf "3+")
-            log "Phase 1: ESCALATION — ${cloud} has failed ${consecutive} consecutive cycles"
-
-            # Check if an issue already exists for this cloud
-            existing_issue=$(gh issue list --repo OpenRouterTeam/spawn --state open \
-                --search "fixture recording failing ${cloud}" \
-                --json number --jq '.[0].number' 2>/dev/null) || existing_issue=""
-
-            if [[ -z "${existing_issue}" ]]; then
-                gh issue create --repo OpenRouterTeam/spawn \
-                    --title "QA: ${cloud} fixture recording has been failing for ${consecutive} consecutive cycles" \
-                    --body "$(printf 'The automated QA cycle has detected that fixture recording for **%s** has failed for **%s consecutive cycles**.\n\nThis likely indicates a persistent issue with the cloud provider'\''s API or our integration that requires manual investigation.\n\n## What to check\n- Has the %s API changed? (new auth requirements, endpoint changes, rate limits)\n- Are the API credentials still valid?\n- Check `%s/lib/common.sh` for outdated API calls\n- Run `bash test/record.sh %s` locally to reproduce\n\n## Auto-generated\nThis issue was created automatically by the QA cycle (`qa-cycle.sh`).\n\n-- qa/cycle' "${cloud}" "${consecutive}" "${cloud}" "${cloud}" "${cloud}")" \
-                    --label "bug" \
-                    2>&1 | tee -a "${LOG_FILE}" || true
-                log "Phase 1: Created GitHub issue for ${cloud} persistent failure"
-            else
-                log "Phase 1: Issue #${existing_issue} already open for ${cloud}, skipping duplicate"
-            fi
-        done
-    fi
+# Log escalation info but don't create GitHub issues
+if [[ -n "${FINAL_RECORD_FAILED}" ]]; then
+    log "Phase 1: Failed clouds (would track/escalate): ${FINAL_RECORD_FAILED}"
+    for cloud in ${FINAL_RECORD_FAILED}; do
+        dry_log "gh issue create for ${cloud} persistent recording failure"
+    done
 fi
 
 rm -f "${RECORD_OUTPUT}"
@@ -526,6 +380,7 @@ if [[ -f "${RESULTS_PHASE2}" ]]; then
     PASS_COUNT=$(grep -c ':pass$' "${RESULTS_PHASE2}" || true)
     FAIL_COUNT=$(grep -c ':fail$' "${RESULTS_PHASE2}" || true)
     log "Phase 2: ${PASS_COUNT} passed, ${FAIL_COUNT} failed, ${TOTAL_TESTS} total"
+    cp "${RESULTS_PHASE2}" "${DRY_OUTPUT_DIR}/results-phase2.txt" 2>/dev/null || true
 else
     log "Phase 2: No results file generated"
     FAIL_COUNT=0
@@ -541,7 +396,6 @@ log "=== Phase 3: Fix failures ==="
 if [[ "${FAIL_COUNT:-0}" -eq 0 ]]; then
     log "Phase 3: No failures to fix"
 else
-    # Collect failures grouped by cloud (one agent per cloud, not per script)
     FAILURES=""
     FAILED_CLOUDS=""
     if [[ -f "${RESULTS_PHASE2}" ]]; then
@@ -550,7 +404,7 @@ else
     fi
 
     # Capture full mock test output per-cloud for richer agent context
-    MOCK_OUTPUT_DIR="/tmp/spawn-qa-mock-output"
+    MOCK_OUTPUT_DIR="/tmp/spawn-qa-dry-mock-output"
     rm -rf "${MOCK_OUTPUT_DIR}"
     mkdir -p "${MOCK_OUTPUT_DIR}"
     for cloud in $FAILED_CLOUDS; do
@@ -562,7 +416,6 @@ else
     for cloud in $FAILED_CLOUDS; do
         check_timeout || break
 
-        # Collect all failing scripts for this cloud
         cloud_failures=$(printf '%s\n' $FAILURES | grep "^${cloud}/" || true)
         failing_scripts=""
         failing_agents=""
@@ -575,22 +428,25 @@ else
         failing_scripts=$(printf '%s' "$failing_scripts" | sed 's/^ //')
         failing_agents=$(printf '%s' "$failing_agents" | sed 's/^ //')
 
-        # Use full mock test output as error context (not just 10 lines)
         error_context=""
         if [[ -f "${MOCK_OUTPUT_DIR}/${cloud}.log" ]]; then
             error_context=$(cat "${MOCK_OUTPUT_DIR}/${cloud}.log")
+            # Also save to output dir for inspection
+            cp "${MOCK_OUTPUT_DIR}/${cloud}.log" "${DRY_OUTPUT_DIR}/agent-fix-${cloud}.log" 2>/dev/null || true
         fi
 
         fail_count=$(printf '%s\n' $cloud_failures | wc -l | tr -d ' ')
         log "Phase 3: Spawning agent to fix ${fail_count} failing script(s) in ${cloud}"
 
         worktree="${WORKTREE_BASE}/fix-${cloud}"
-        branch_name="qa/fix-${cloud}"
+        branch_name="qa-dry/fix-${cloud}"
 
-        git worktree add "${worktree}" -b "${branch_name}" origin/main 2>&1 | tee -a "${LOG_FILE}" || {
+        git worktree add "${worktree}" -b "${branch_name}" HEAD 2>&1 | tee -a "${LOG_FILE}" || {
             log "Phase 3: Could not create worktree for ${cloud}, skipping"
             continue
         }
+
+        dry_log "git worktree add ... -b qa/fix-${cloud} origin/main"
 
         # Spawn ONE Claude agent per cloud to fix all its failing scripts (15 min timeout)
         (
@@ -647,7 +503,7 @@ ${error_context}
 You can modify: scripts in ${cloud}/, test/fixtures/${cloud}/, and test/mock.sh if infrastructure updates are needed." \
                 2>&1 | tee -a "${LOG_FILE}" || true
 
-            # Always check for changes — agent may have committed partial fixes before timeout
+            # Always check for changes
             syntax_ok=true
             for script in ${failing_scripts}; do
                 if [[ -f "${script}" ]] && ! bash -n "${script}" 2>/dev/null; then
@@ -662,16 +518,15 @@ You can modify: scripts in ${cloud}/, test/fixtures/${cloud}/, and test/mock.sh 
                 git commit -m "$(cat <<FIXEOF
 fix: Fix ${cloud} mock test failures (${fail_count} scripts)
 
-Agent: qa-fixer
+Agent: qa-fixer (dry run)
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 FIXEOF
                 )" || true
             fi
 
-            # Push, PR, and merge with retry on stale main
-            push_and_create_pr "${branch_name}" \
-                "fix: Fix ${cloud} mock test failures" \
-                "Automated fix from QA cycle. ${fail_count} mock test(s) were failing for ${cloud}: ${failing_scripts}" || true
+            # Save diff instead of pushing
+            git diff HEAD~1..HEAD > "${DRY_OUTPUT_DIR}/diff-fix-${cloud}.patch" 2>/dev/null || true
+            dry_log "git add ${cloud}/ test/fixtures/${cloud}/ test/mock.sh && git commit && git push && gh pr create for ${cloud}"
         ) &
         AGENT_PIDS="${AGENT_PIDS} $!"
     done
@@ -684,7 +539,7 @@ FIXEOF
     # Clean up worktrees (one per cloud)
     for cloud in $FAILED_CLOUDS; do
         git worktree remove "${WORKTREE_BASE}/fix-${cloud}" 2>/dev/null || true
-        git branch -D "qa/fix-${cloud}" 2>/dev/null || true
+        git branch -D "qa-dry/fix-${cloud}" 2>/dev/null || true
     done
     git worktree prune 2>/dev/null || true
 
@@ -697,13 +552,11 @@ fi
 check_timeout || exit 0
 
 # ============================================================
-# Phase 4: Re-run mock tests + update README + push
+# Phase 4: Re-run mock tests + update README (local only)
 # ============================================================
 log "=== Phase 4: Re-run tests and update README ==="
 
-# Pull any merged fixes
-git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
-git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
+# No git fetch/reset — work with current local state
 
 rm -f "${RESULTS_PHASE4}"
 RESULTS_FILE="${RESULTS_PHASE4}" bash test/mock.sh 2>&1 | tee -a "${LOG_FILE}" || true
@@ -712,36 +565,17 @@ if [[ -f "${RESULTS_PHASE4}" ]]; then
     RETRY_PASS=$(grep -c ':pass$' "${RESULTS_PHASE4}" || true)
     RETRY_FAIL=$(grep -c ':fail$' "${RESULTS_PHASE4}" || true)
     log "Phase 4: ${RETRY_PASS} passed, ${RETRY_FAIL} failed"
+    cp "${RESULTS_PHASE4}" "${DRY_OUTPUT_DIR}/results-phase4.txt" 2>/dev/null || true
 
     python3 test/update-readme.py "${RESULTS_PHASE4}" 2>&1 | tee -a "${LOG_FILE}"
 
-    # Commit + push if README changed (using PR workflow to avoid race conditions)
+    # Save README diff instead of pushing
     if [[ -n "$(git diff --name-only README.md 2>/dev/null)" ]]; then
-        # Create feature branch for README update (timestamped to avoid collisions)
-        README_BRANCH="qa/readme-update-$(date +%s)"
-        git checkout -b "${README_BRANCH}" 2>&1 | tee -a "${LOG_FILE}"
-
-        git add README.md
-        git commit -m "$(cat <<'EOF'
-test: Update README matrix after QA cycle
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
-EOF
-        )" 2>&1 | tee -a "${LOG_FILE}" || true
-
-        # Push, PR, and merge with retry on stale main
-        push_and_create_pr "${README_BRANCH}" \
-            "test: Update README matrix after QA cycle" \
-            "Automated README update from QA cycle Phase 4. Test results updated in the matrix." || {
-            log "Phase 4: PR creation failed, check for errors"
-        }
-
-        # Switch back to main and sync
-        git checkout main 2>&1 | tee -a "${LOG_FILE}" || true
-        git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
-        git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
-
-        log "Phase 4: README updated via PR"
+        git diff README.md > "${DRY_OUTPUT_DIR}/diff-readme.patch" 2>/dev/null || true
+        log "Phase 4: README changes saved to ${DRY_OUTPUT_DIR}/diff-readme.patch"
+        dry_log "git checkout -b qa/readme-update-\$(date +%s) && git add README.md && git commit && git push && gh pr create"
+        # Revert the local README change so we don't leave dirty state
+        git checkout README.md 2>/dev/null || true
     else
         log "Phase 4: No README changes needed"
     fi
@@ -750,15 +584,12 @@ else
 fi
 
 # Final summary
-log "=== QA Cycle Summary ==="
+log "=== QA Dry Run Summary ==="
 log "Phase 2: ${PASS_COUNT:-0} pass / ${FAIL_COUNT:-0} fail"
 log "Phase 4: ${RETRY_PASS:-0} pass / ${RETRY_FAIL:-0} fail"
 if [[ "${FAIL_COUNT:-0}" -gt 0 ]] && [[ "${RETRY_FAIL:-0}" -lt "${FAIL_COUNT:-0}" ]]; then
     FIXED=$(( ${FAIL_COUNT:-0} - ${RETRY_FAIL:-0} ))
     log "Fixed ${FIXED} failure(s) this cycle"
 fi
-
-# Create checkpoint if available
-sprite-env checkpoint create --comment "QA cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
-
-log "=== QA Cycle Complete ==="
+log "Artifacts saved to: ${DRY_OUTPUT_DIR}/"
+log "=== QA Dry Run Complete ==="

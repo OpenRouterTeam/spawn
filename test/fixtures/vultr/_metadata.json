@@ -1,8 +1,8 @@
 {
   "cloud": "vultr",
-  "recorded_at": "2026-02-13T05:00:32Z",
+  "recorded_at": "2026-02-13T06:37:13Z",
   "fixtures": {
-    "plans": {"endpoint": "/plans", "recorded_at": "2026-02-13T05:00:30Z"},
-    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-13T05:00:30Z"}
+    "plans": {"endpoint": "/plans", "recorded_at": "2026-02-13T06:37:12Z"},
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-13T06:37:12Z"}
   }
 }

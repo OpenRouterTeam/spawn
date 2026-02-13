@@ -1,9 +1,9 @@
 {
   "cloud": "latitude",
-  "recorded_at": "2026-02-13T05:00:30Z",
+  "recorded_at": "2026-02-13T06:37:12Z",
   "fixtures": {
-    "ssh_keys": {"endpoint": "/ssh_keys", "recorded_at": "2026-02-13T05:00:28Z"},
-    "plans": {"endpoint": "/plans", "recorded_at": "2026-02-13T05:00:30Z"},
-    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-13T05:00:30Z"}
+    "ssh_keys": {"endpoint": "/ssh_keys", "recorded_at": "2026-02-13T06:37:10Z"},
+    "plans": {"endpoint": "/plans", "recorded_at": "2026-02-13T06:37:11Z"},
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-13T06:37:12Z"}
   }
 }

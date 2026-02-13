@@ -1,0 +1,1 @@
+../setup-agent-team/qa-cycle.sh
