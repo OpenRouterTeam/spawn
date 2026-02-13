@@ -1212,7 +1212,7 @@
     "ramnode/amazonq": "missing",
     "ramnode/cline": "implemented",
     "ramnode/gptme": "implemented",
-    "ramnode/opencode": "missing",
+    "ramnode/opencode": "implemented",
     "ramnode/plandex": "missing",
     "ramnode/kilocode": "missing",
     "ramnode/continue": "implemented"
