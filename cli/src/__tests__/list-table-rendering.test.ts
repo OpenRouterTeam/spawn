@@ -473,18 +473,19 @@ describe("cmdList table rendering", () => {
   // ── Timestamp formatting in rows ───────────────────────────────────────
 
   describe("timestamp display", () => {
-    it("should show formatted date for valid ISO timestamp", async () => {
+    it("should show relative time for valid ISO timestamp", async () => {
       await setManifest(mockManifest);
+      // Use a recent timestamp so we get a relative time like "1h ago"
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T14:30:00.000Z" },
+        { agent: "claude", cloud: "sprite", timestamp: new Date(Date.now() - 3600_000).toISOString() },
       ]);
 
       await cmdList();
       const output = getOutput();
-      // Should contain a formatted date, not the raw ISO string
-      expect(output).toContain("2026");
-      // The exact format depends on locale, but should contain month/day
-      expect(output).toContain("Feb");
+      // Should not contain the raw ISO timestamp format
+      expect(output).not.toContain(".000Z");
+      // Should show a relative time like "1h ago" or "just now"
+      expect(output).toMatch(/\d+h ago|just now|\d+ min ago/);
     });
 
     it("should handle invalid timestamp gracefully", async () => {

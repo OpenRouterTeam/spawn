@@ -975,6 +975,30 @@ export async function cmdMatrix(): Promise<void> {
 
 // ── List (History) ──────────────────────────────────────────────────────────────
 
+/** Format an ISO timestamp as a human-readable relative time (e.g., "5 min ago", "2 days ago") */
+export function formatRelativeTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const diffMs = Date.now() - d.getTime();
+    if (diffMs < 0) return "just now";
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} min ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDays = Math.floor(diffHr / 24);
+    if (diffDays === 1) return "yesterday";
+    if (diffDays < 30) return `${diffDays}d ago`;
+    // Fall back to absolute date for old entries
+    const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return date;
+  } catch {
+    return iso;
+  }
+}
+
 function formatTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
@@ -1064,13 +1088,13 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
   console.log(pc.dim("-".repeat(60)));
 
   for (const r of records) {
-    const when = formatTimestamp(r.timestamp);
+    const relative = formatRelativeTime(r.timestamp);
     const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
     const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
     let line =
       pc.green(agentDisplay.padEnd(20)) +
       cloudDisplay.padEnd(20) +
-      pc.dim(when);
+      pc.dim(relative);
     if (r.prompt) {
       const preview = r.prompt.length > 40 ? r.prompt.slice(0, 40) + "..." : r.prompt;
       line += pc.dim(`  --prompt "${preview}"`);
@@ -1091,14 +1115,14 @@ function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): string {
   return `${agentDisplay} on ${cloudDisplay}`;
 }
 
-/** Build a hint string (timestamp + optional prompt preview) for the interactive picker */
+/** Build a hint string (relative timestamp + optional prompt preview) for the interactive picker */
 function buildRecordHint(r: SpawnRecord): string {
-  const when = formatTimestamp(r.timestamp);
+  const relative = formatRelativeTime(r.timestamp);
   if (r.prompt) {
     const preview = r.prompt.length > 30 ? r.prompt.slice(0, 30) + "..." : r.prompt;
-    return `${when}  --prompt "${preview}"`;
+    return `${relative}  --prompt "${preview}"`;
   }
-  return when;
+  return relative;
 }
 
 /** Try to load manifest and resolve filter display names to keys.
@@ -1240,6 +1264,7 @@ export async function cmdClouds(): Promise<void> {
   console.log();
   console.log(pc.bold("Cloud Providers") + pc.dim(` (${allClouds.length} total)`));
 
+  let credCount = 0;
   for (const [type, keys] of Object.entries(byType)) {
     console.log();
     console.log(`  ${pc.dim(type)}`);
@@ -1247,11 +1272,20 @@ export async function cmdClouds(): Promise<void> {
       const c = manifest.clouds[key];
       const implCount = getImplementedAgents(manifest, key).length;
       const countStr = `${implCount}/${allAgents.length}`;
-      const authHint = c.auth.toLowerCase() === "none" ? "" : `  auth: ${c.auth}`;
-      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${authHint ? pc.dim(authHint) : ""}`);
+      const hasCreds = hasCloudCredentials(c.auth);
+      if (hasCreds) credCount++;
+      const credIndicator = c.auth.toLowerCase() === "none"
+        ? ""
+        : hasCreds
+          ? `  ${pc.green("ready")}`
+          : `  auth: ${c.auth}`;
+      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator ? (hasCreds ? credIndicator : pc.dim(credIndicator)) : ""}`);
     }
   }
   console.log();
+  if (credCount > 0) {
+    console.log(pc.dim(`  ${pc.green("ready")} = credentials detected in environment`));
+  }
   console.log(pc.dim(`  Run ${pc.cyan("spawn <cloud>")} for setup instructions, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
   console.log();
 }
