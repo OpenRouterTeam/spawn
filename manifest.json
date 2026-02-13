@@ -1324,19 +1324,19 @@
     "hostkey/kilo": "missing",
     "hostkey/continue": "implemented",
     "cloudsigma/claude": "implemented",
-    "cloudsigma/openclaw": "missing",
-    "cloudsigma/nanoclaw": "missing",
+    "cloudsigma/openclaw": "implemented",
+    "cloudsigma/nanoclaw": "implemented",
     "cloudsigma/aider": "implemented",
     "cloudsigma/goose": "missing",
-    "cloudsigma/codex": "missing",
-    "cloudsigma/interpreter": "missing",
-    "cloudsigma/gemini": "missing",
+    "cloudsigma/codex": "implemented",
+    "cloudsigma/interpreter": "implemented",
+    "cloudsigma/gemini": "implemented",
     "cloudsigma/amazonq": "missing",
     "cloudsigma/cline": "missing",
     "cloudsigma/gptme": "missing",
     "cloudsigma/opencode": "missing",
     "cloudsigma/plandex": "missing",
     "cloudsigma/kilocode": "missing",
-    "cloudsigma/continue": "missing"
+    "cloudsigma/continue": "implemented"
   }
 }
