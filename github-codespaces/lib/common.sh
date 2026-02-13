@@ -69,7 +69,7 @@ ensure_gh_cli() {
 ensure_gh_auth() {
     if ! gh auth status &>/dev/null; then
         log_step "Not authenticated with GitHub CLI"
-        log_info "Initiating GitHub CLI authentication..."
+        log_step "Initiating GitHub CLI authentication..."
         gh auth login || {
             log_error "Failed to authenticate with GitHub CLI"
             log_error "Run: gh auth login"
@@ -160,7 +160,7 @@ copy_to_codespace() {
 # Args: $1 = codespace name
 ssh_to_codespace() {
     local codespace="$1"
-    log_info "Opening SSH session to codespace..."
+    log_step "Opening SSH session to codespace..."
     gh codespace ssh --codespace "$codespace"
 }
 
@@ -168,7 +168,7 @@ ssh_to_codespace() {
 # Args: $1 = codespace name
 delete_codespace() {
     local codespace="$1"
-    log_info "Deleting codespace $codespace..."
+    log_step "Deleting codespace $codespace..."
     gh codespace delete --codespace "$codespace" --force || {
         log_warn "Failed to delete codespace (may already be deleted)"
     }

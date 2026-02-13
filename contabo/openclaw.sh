@@ -51,7 +51,7 @@ inject_env_vars_ssh "${CONTABO_SERVER_IP}" upload_file run_server \
 echo ""
 log_info "Contabo instance setup completed successfully!"
 log_info "Instance: ${SERVER_NAME} (ID: ${CONTABO_INSTANCE_ID}, IP: ${CONTABO_SERVER_IP})"
-log_info "Starting OpenClaw gateway in background..."
+log_step "Starting OpenClaw gateway in background..."
 run_server "${CONTABO_SERVER_IP}" "nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
 sleep 2
 

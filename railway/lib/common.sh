@@ -232,7 +232,7 @@ inject_env_vars() {
 interactive_session() {
     local launch_cmd="${1:-bash}"
 
-    log_info "Starting interactive session..."
+    log_step "Starting interactive session..."
 
     # Railway CLI has a shell command for interactive sessions
     railway shell

@@ -68,7 +68,7 @@ echo ""
 
 # 10. Start openclaw
 log_step "Starting openclaw..."
-log_info "Starting gateway in background, then launching TUI..."
+log_step "Starting gateway in background, then launching TUI..."
 sleep 1
 clear
 interactive_session "source /root/.bashrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 & sleep 2 && openclaw tui"
