@@ -25,7 +25,7 @@ run_server "${BINARYLANE_SERVER_IP}" "curl -sL https://plandex.ai/install.sh | b
 
 log_step "Verifying Plandex installation..."
 if ! run_server "${BINARYLANE_SERVER_IP}" "command -v plandex" >/dev/null 2>&1; then
-    log_error "Plandex installation failed"
+    log_install_failed "Plandex" "curl -sL https://plandex.ai/install.sh | bash" "${BINARYLANE_SERVER_IP}"
     exit 1
 fi
 log_info "Plandex is installed"

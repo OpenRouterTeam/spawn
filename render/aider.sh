@@ -29,7 +29,7 @@ run_server "pip install aider-chat"
 
 # Verify installation
 if ! run_server "command -v aider" >/dev/null 2>&1; then
-    log_error "Aider installation failed"
+    log_install_failed "Aider" "pip install aider-chat"
     exit 1
 fi
 log_info "Aider installed"

@@ -35,8 +35,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${IONOS_SERVER_IP}" "command -v interpreter &> /dev/null"; then
-    log_error "Open Interpreter installation verification failed"
-    log_error "The 'interpreter' command is not available on server ${IONOS_SERVER_IP}"
+    log_install_failed "Open Interpreter" "pip install open-interpreter" "${IONOS_SERVER_IP}"
     exit 1
 fi
 log_info "Open Interpreter installation verified successfully"

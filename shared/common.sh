@@ -57,6 +57,31 @@ _log_diagnostic() {
     done
 }
 
+# Log actionable guidance when agent installation verification fails.
+# Usage: log_install_failed AGENT_NAME [INSTALL_CMD] [SERVER_IP]
+# Example: log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash" "$IP"
+log_install_failed() {
+    local agent_name="${1}"
+    local install_cmd="${2:-}"
+    local server_ip="${3:-}"
+
+    log_error "${agent_name} installation verification failed"
+    log_error ""
+    log_error "Possible causes:"
+    log_error "  - Package manager timeout or network issue on the server"
+    log_error "  - Insufficient disk space or memory on the server"
+    log_error "  - The install script requires a dependency not yet available"
+    log_error ""
+    log_error "How to fix:"
+    if [[ -n "${server_ip}" ]]; then
+        log_error "  1. SSH into the server to debug:  ssh root@${server_ip}"
+    fi
+    if [[ -n "${install_cmd}" ]]; then
+        log_error "  2. Re-run the install manually:  ${install_cmd}"
+    fi
+    log_error "  3. Re-run this spawn command to try again on a fresh server"
+}
+
 # ============================================================
 # Configurable timing constants
 # ============================================================
@@ -2328,6 +2353,8 @@ ensure_ssh_key_with_provider() {
         return 0
     else
         log_error "Failed to register SSH key with ${provider_name}"
+        log_error "The API may have rejected the key format or the token lacks write permissions."
+        log_error "Verify your API token has SSH key management permissions, then try again."
         return 1
     fi
 }

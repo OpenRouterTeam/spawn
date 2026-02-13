@@ -26,8 +26,7 @@ run_server "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/re
 
 # Verify installation
 if ! run_server "command -v opencode &> /dev/null"; then
-    log_error "opencode installation verification failed"
-    log_error "The 'opencode' command is not available"
+    log_install_failed "OpenCode" "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash"
     exit 1
 fi
 log_info "OpenCode installation verified successfully"

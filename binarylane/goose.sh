@@ -25,7 +25,7 @@ run_server "${BINARYLANE_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.
 
 log_step "Verifying Goose installation..."
 if ! run_server "${BINARYLANE_SERVER_IP}" "command -v goose" >/dev/null 2>&1; then
-    log_error "Goose installation failed"
+    log_install_failed "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" "${BINARYLANE_SERVER_IP}"
     exit 1
 fi
 log_info "Goose is installed"

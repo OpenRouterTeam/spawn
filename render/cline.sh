@@ -29,7 +29,7 @@ run_server "npm install -g cline"
 
 # Verify installation
 if ! run_server "command -v cline" >/dev/null 2>&1; then
-    log_error "Cline installation failed"
+    log_install_failed "Cline" "npm install -g cline"
     exit 1
 fi
 log_info "Cline installed"

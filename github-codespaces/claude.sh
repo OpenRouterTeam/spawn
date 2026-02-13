@@ -43,7 +43,7 @@ run_server "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation
 if ! run_server "command -v claude" &>/dev/null; then
-    log_error "Claude Code installation failed"
+    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash"
     delete_codespace "$CODESPACE"
     exit 1
 fi

@@ -31,8 +31,7 @@ run_sprite "${SPRITE_NAME}" "curl -fsSL https://claude.ai/install.sh | bash"
 
 # Verify installation succeeded
 if ! run_sprite "${SPRITE_NAME}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
-    log_error "Claude Code installation verification failed"
-    log_error "The 'claude' command is not available or not working properly"
+    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash"
     exit 1
 fi
 log_info "Claude Code installation verified successfully"

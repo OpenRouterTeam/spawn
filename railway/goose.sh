@@ -27,8 +27,7 @@ run_server "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/l
 
 # Verify installation succeeded
 if ! run_server "command -v goose &> /dev/null && goose --version &> /dev/null"; then
-    log_error "Goose installation verification failed"
-    log_error "The 'goose' command is not available or not working properly"
+    log_install_failed "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
     exit 1
 fi
 log_info "Goose installation verified successfully"

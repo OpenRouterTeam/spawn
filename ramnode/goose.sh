@@ -36,7 +36,7 @@ fi
 
 # Verify installation succeeded
 if ! run_server "${RAMNODE_SERVER_IP}" "command -v goose &> /dev/null"; then
-    log_error "Goose installation verification failed"
+    log_install_failed "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" "${RAMNODE_SERVER_IP}"
     exit 1
 fi
 log_info "Goose installation verified successfully"

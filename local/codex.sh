@@ -32,9 +32,7 @@ fi
 
 # Verify installation
 if ! command -v codex &>/dev/null; then
-    log_error "Codex installation failed"
-    log_error "The 'codex' command is not available"
-    log_error "Try installing manually: npm install -g @openai/codex"
+    log_install_failed "Codex CLI" "npm install -g @openai/codex"
     exit 1
 fi
 log_info "Codex installation verified"

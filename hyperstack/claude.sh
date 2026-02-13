@@ -35,8 +35,7 @@ run_server "${HYPERSTACK_VM_IP}" "curl -fsSL https://claude.ai/install.sh | bash
 
 # Verify installation succeeded
 if ! run_server "${HYPERSTACK_VM_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
-    log_error "Claude Code installation verification failed"
-    log_error "The 'claude' command is not available or not working properly on VM ${HYPERSTACK_VM_IP}"
+    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash" "${HYPERSTACK_VM_IP}"
     exit 1
 fi
 log_info "Claude Code installation verified successfully"

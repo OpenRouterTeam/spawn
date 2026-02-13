@@ -25,9 +25,7 @@ fi
 
 # Verify installation
 if ! command -v kilocode &>/dev/null; then
-    log_error "Kilo Code installation failed"
-    log_error "The 'kilocode' command is not available"
-    log_error "Try installing manually: npm install -g @kilocode/cli"
+    log_install_failed "Kilo Code" "npm install -g @kilocode/cli"
     exit 1
 fi
 log_info "Kilo Code installation verified"

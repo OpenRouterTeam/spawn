@@ -26,9 +26,7 @@ fi
 
 # Verify installation
 if ! command -v gemini &>/dev/null; then
-    log_error "Gemini CLI installation failed"
-    log_error "The 'gemini' command is not available"
-    log_error "Try installing manually: npm install -g @google/gemini-cli"
+    log_install_failed "Gemini CLI" "npm install -g @google/gemini-cli"
     exit 1
 fi
 log_info "Gemini CLI installation verified"
