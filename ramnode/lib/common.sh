@@ -26,6 +26,9 @@ readonly RAMNODE_COMPUTE_API="${RAMNODE_API_BASE}:8774/v2.1"
 readonly RAMNODE_NETWORK_API="${RAMNODE_API_BASE}:9696/v2.0"
 # SSH_OPTS is now defined in shared/common.sh
 
+# Configurable timeout/delay constants
+INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-2}
+
 # Get auth token from RamNode OpenStack API
 _get_ramnode_token() {
     local username="$1"
@@ -277,14 +280,13 @@ print(json.dumps(body))
 " "$@"
 }
 
-# Wait for RamNode instance to become ACTIVE and get its IP
+# Poll the RamNode API until the server is active and has an IPv4 address
 # Sets RAMNODE_SERVER_IP on success
 _ramnode_wait_for_ip() {
-    INSTANCE_STATUS_POLL_DELAY=2 generic_wait_for_instance ramnode_compute_api \
-        "/servers/$RAMNODE_SERVER_ID" "ACTIVE" \
-        "d['server']['status']" \
-        "next(addr['addr'] for addrs in d['server']['addresses'].values() for addr in addrs if addr.get('version')==4)" \
-        RAMNODE_SERVER_IP "RamNode instance" 30
+    INSTANCE_STATUS_POLL_DELAY=2 generic_wait_for_instance ramnode_compute_api "/servers/$RAMNODE_SERVER_ID" \
+        "ACTIVE" "d.get('server',{}).get('status','unknown')" \
+        "next((addr['addr'] for addrs in d.get('server',{}).get('addresses',{}).values() for addr in addrs if addr.get('version')==4), '')" \
+        RAMNODE_SERVER_IP "Instance" 30
 }
 
 # Parse server ID from create response, or log error and return 1

@@ -18,6 +18,27 @@ CHERRY_DEFAULT_PLAN="${CHERRY_DEFAULT_PLAN:-cloud_vps_1}"
 CHERRY_DEFAULT_REGION="${CHERRY_DEFAULT_REGION:-eu_nord_1}"
 CHERRY_DEFAULT_IMAGE="${CHERRY_DEFAULT_IMAGE:-Ubuntu 24.04 64bit}"
 
+# Configurable timeout/delay constants
+INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}
+
+# ============================================================
+# JSON Helpers
+# ============================================================
+
+# Extract a field from a JSON object via stdin
+# Usage: echo '{"id": 123}' | _cherry_json_field "id"
+_cherry_json_field() {
+    local field="$1"
+    python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get(sys.argv[1], ''))
+except:
+    pass
+" "$field" 2>&1
+}
+
 # ============================================================
 # API Wrapper
 # ============================================================
@@ -120,18 +141,14 @@ get_server_name() {
     printf '%s' "$server_name"
 }
 
-# Python expression to extract primary IPv4 from Cherry Servers response.
-# Finds the first ip_addresses entry with type == 'primary-ip'.
-readonly _CHERRY_IP_PY="next((a.get('address','') for a in d.get('ip_addresses',[]) if a.get('type')=='primary-ip'), '')"
-
-# Wait for Cherry server to be deployed and get IP
+# Poll the Cherry Servers API until the server is deployed and has an IP address
 # Sets CHERRY_SERVER_IP on success
 _cherry_wait_for_ip() {
     local server_id="$1"
     generic_wait_for_instance cherry_api "/servers/${server_id}" \
-        "deployed" "d.get('status','')" \
-        "${_CHERRY_IP_PY}" \
-        CHERRY_SERVER_IP "Cherry server" 60
+        "deployed" "d.get('status', 'unknown')" \
+        "next((addr.get('address','') for addr in d.get('ip_addresses',[]) if addr.get('type')=='primary-ip'), '')" \
+        CHERRY_SERVER_IP "Server" 60
 }
 
 create_server() {

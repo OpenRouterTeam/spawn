@@ -194,12 +194,10 @@ _scaleway_power_on_and_wait() {
         log_warn "Power on may have failed, checking status..."
     fi
 
-    # Scaleway IP extraction: prefer public_ip.address, fallback to first public_ips entry
     generic_wait_for_instance scaleway_instance_api "/servers/${server_id}" \
-        "running" \
-        "d.get('server',{}).get('state','')" \
-        "(d.get('server',{}).get('public_ip') or {}).get('address','') or next((p['address'] for p in d.get('server',{}).get('public_ips',[]) if p.get('address')),'')" \
-        SCALEWAY_SERVER_IP "Scaleway instance" 60
+        "running" "d.get('server',{}).get('state','unknown')" \
+        "(d.get('server',{}).get('public_ip') or {}).get('address','') or next((pip.get('address','') for pip in d.get('server',{}).get('public_ips',[]) if pip.get('address')), '')" \
+        SCALEWAY_SERVER_IP "Instance" 60
 }
 
 create_server() {
