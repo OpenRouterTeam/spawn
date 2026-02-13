@@ -7,6 +7,20 @@ import { describe, it, expect } from "bun:test";
  * logic as pure functions to avoid side effects.
  */
 
+/** Replica of expandEqualsFlags from index.ts for testability */
+function expandEqualsFlags(args: string[]): string[] {
+  const result: string[] = [];
+  for (const arg of args) {
+    if (arg.startsWith("--") && arg.includes("=")) {
+      const eqIdx = arg.indexOf("=");
+      result.push(arg.slice(0, eqIdx), arg.slice(eqIdx + 1));
+    } else {
+      result.push(arg);
+    }
+  }
+  return result;
+}
+
 // Extracted from index.ts main() for testability
 function extractPromptArgs(args: string[]): { prompt: string | undefined; filteredArgs: string[] } {
   let prompt: string | undefined;
@@ -217,6 +231,64 @@ describe("CLI Argument Parsing", () => {
 
     it("should handle empty Error", () => {
       expect(handleError(new Error())).toBe("Error: ");
+    });
+  });
+
+  describe("expandEqualsFlags", () => {
+    it("should expand --prompt=value into --prompt value", () => {
+      expect(expandEqualsFlags(["--prompt=Fix bugs"])).toEqual(["--prompt", "Fix bugs"]);
+    });
+
+    it("should expand --prompt-file=path into --prompt-file path", () => {
+      expect(expandEqualsFlags(["--prompt-file=instructions.txt"])).toEqual(["--prompt-file", "instructions.txt"]);
+    });
+
+    it("should expand --agent=claude into --agent claude", () => {
+      expect(expandEqualsFlags(["--agent=claude"])).toEqual(["--agent", "claude"]);
+    });
+
+    it("should expand --cloud=sprite into --cloud sprite", () => {
+      expect(expandEqualsFlags(["--cloud=sprite"])).toEqual(["--cloud", "sprite"]);
+    });
+
+    it("should not modify short flags", () => {
+      expect(expandEqualsFlags(["-p", "test"])).toEqual(["-p", "test"]);
+    });
+
+    it("should not modify positional args", () => {
+      expect(expandEqualsFlags(["claude", "sprite"])).toEqual(["claude", "sprite"]);
+    });
+
+    it("should not modify flags without equals", () => {
+      expect(expandEqualsFlags(["--dry-run"])).toEqual(["--dry-run"]);
+    });
+
+    it("should handle empty args", () => {
+      expect(expandEqualsFlags([])).toEqual([]);
+    });
+
+    it("should handle value containing equals sign", () => {
+      expect(expandEqualsFlags(["--prompt=a=b"])).toEqual(["--prompt", "a=b"]);
+    });
+
+    it("should handle empty value after equals", () => {
+      expect(expandEqualsFlags(["--prompt="])).toEqual(["--prompt", ""]);
+    });
+
+    it("should handle mixed args with and without equals", () => {
+      expect(expandEqualsFlags(["claude", "--prompt=Fix", "sprite", "--dry-run"])).toEqual([
+        "claude", "--prompt", "Fix", "sprite", "--dry-run",
+      ]);
+    });
+
+    it("should not expand single-dash flags with equals", () => {
+      expect(expandEqualsFlags(["-p=test"])).toEqual(["-p=test"]);
+    });
+
+    it("should preserve arg order", () => {
+      expect(expandEqualsFlags(["--prompt=hello", "agent", "--cloud=aws"])).toEqual([
+        "--prompt", "hello", "agent", "--cloud", "aws",
+      ]);
     });
   });
 });
