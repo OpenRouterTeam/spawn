@@ -352,7 +352,9 @@ cd /tmp/spawn-worktrees/BRANCH-NAME
 
 # Commit, push, create PR, merge
 git push -u origin BRANCH-NAME
-gh pr create --title "..." --body "..."
+gh pr create --title "..." --body "...
+
+-- TEAM-NAME/AGENT-NAME"
 gh pr merge --squash --delete-branch
 
 # Clean up

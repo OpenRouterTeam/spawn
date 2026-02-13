@@ -182,14 +182,14 @@ Track issue lifecycle with labels: "pending-review" → "under-review" → "in-p
    \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'\`
    Only post acknowledgment if no automated comments exist.
 5. Post acknowledgment comment on the issue (if not already acknowledged):
-   \`gh issue comment ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now."\`
+   \`gh issue comment ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now.\n\n-- refactor/issue-fixer"\`
 6. Create worktree: \`git worktree add ${WORKTREE_BASE} -b fix/issue-${SPAWN_ISSUE} origin/main\`
 7. Spawn issue-fixer to work in \`${WORKTREE_BASE}\`
 8. Spawn issue-tester to review and test
 9. When fix is ready:
    - Push: \`git push -u origin fix/issue-${SPAWN_ISSUE}\`
-   - PR: \`gh pr create --title "fix: Description" --body "Fixes #${SPAWN_ISSUE}"\`
-   - Self-review: \`gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by issue-fixer: [summary]"\`
+   - PR: \`gh pr create --title "fix: Description" --body "Fixes #${SPAWN_ISSUE}\n\n-- refactor/issue-fixer"\`
+   - Self-review: \`gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by issue-fixer: [summary]\n\n-- refactor/issue-fixer"\`
    - Label: \`gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"\`
    - Do NOT merge — PR stays open for external review
 10. Post update comment on the issue linking to the PR
@@ -244,7 +244,7 @@ Agents must NEVER merge their own PRs. This applies to ALL agents including the 
 ### What agents MUST do after creating a PR:
 1. **Self-review**: Read the PR diff and add a review comment with findings:
    `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
-   `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of changes, what was tested, any concerns]"`
+   `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of changes, what was tested, any concerns]\n\n-- refactor/AGENT-NAME"`
 2. **Label for external review**: Add `needs-team-review` label:
    `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
 3. **Leave the PR open** — do NOT run `gh pr merge`
@@ -295,7 +295,7 @@ Create these teammates:
    - FIRST TASK: List ALL open PRs: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision`
    - For EACH open PR, evaluate and take the appropriate action:
      * **Mergeable + approved (or no reviews required)**: approve and merge it
-       `gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "Approved by pr-maintainer: looks good, tests pass."`
+       `gh pr review NUMBER --repo OpenRouterTeam/spawn --approve --body "Approved by pr-maintainer: looks good, tests pass.\n\n-- refactor/pr-maintainer"`
        `gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch`
      * **Mergeable + needs review**: review the diff for correctness, then approve and merge if safe
        `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
@@ -314,7 +314,7 @@ Create these teammates:
        git worktree remove /tmp/spawn-worktrees/pr-rebase-NUMBER
        ```
        If rebase has unresolvable conflicts, post a comment asking the author to resolve:
-       `gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "This PR has merge conflicts that couldn't be auto-resolved. Could you rebase on main and push? Happy to re-review once updated."`
+       `gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "This PR has merge conflicts that couldn't be auto-resolved. Could you rebase on main and push? Happy to re-review once updated.\n\n-- refactor/branch-manager"`
      * **Failing checks**: investigate the failure, fix if trivial, otherwise comment with failure details
    - ALSO clean up orphan branches (no open PR, stale >4 hours): `git push origin --delete BRANCH`
    - **NEVER close a PR** — always try to rebase, fix, or request changes instead
@@ -351,9 +351,9 @@ Create these teammates:
      * Test failures → message test-engineer
      * Code quality → message complexity-hunter
    - Post interim updates on issues as teammates report findings (only if no similar update exists):
-     gh issue comment NUMBER --body "Update: We've identified the root cause — [summary]. Working on a fix now."
+     gh issue comment NUMBER --body "Update: We've identified the root cause — [summary]. Working on a fix now.\n\n-- refactor/community-coordinator"
    - When a fix PR is merged, post the final resolution (only if no resolution comment exists yet):
-     gh issue comment NUMBER --body "This has been fixed in PR_URL. [Brief explanation of what was changed and why]. The fix is live on main — please try updating and let us know if you still see the issue."
+     gh issue comment NUMBER --body "This has been fixed in PR_URL. [Brief explanation of what was changed and why]. The fix is live on main — please try updating and let us know if you still see the issue.\n\n-- refactor/community-coordinator"
    - Then close: gh issue close NUMBER
    - For feature requests: comment acknowledging the request, label as enhancement, and close with a note pointing to discussions
    - For questions: answer directly in a comment, then close
@@ -386,10 +386,14 @@ When fixing a bug reported in a GitHub issue:
 9. Community-coordinator posts interim update on the issue with root cause summary (only if no similar update exists)
 10. Push the branch: git push -u origin fix/issue-NUMBER
 11. Create a PR that references the issue:
-    gh pr create --title "Fix: description" --body "Fixes #NUMBER"
+    gh pr create --title "Fix: description" --body "Fixes #NUMBER
+
+-- refactor/AGENT-NAME"
 12. Self-review and label (DO NOT merge — see No Self-Merge Rule):
     gh pr diff NUMBER --repo OpenRouterTeam/spawn
-    gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of fix, tests run, confidence level]"
+    gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of fix, tests run, confidence level]
+
+-- refactor/AGENT-NAME"
     gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"
 13. Clean up: git worktree remove WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER
 14. Community-coordinator posts final resolution comment with PR link and explanation (only if no resolution exists)
@@ -460,11 +464,15 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 git push -u origin BRANCH-NAME
 
 # 4. Create PR (can be done from anywhere)
-gh pr create --title "title" --body "body"
+gh pr create --title "title" --body "body
+
+-- refactor/AGENT-NAME"
 
 # 5. Self-review and label (DO NOT merge — see No Self-Merge Rule)
 gh pr diff NUMBER --repo OpenRouterTeam/spawn
-gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]"
+gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]
+
+-- refactor/AGENT-NAME"
 gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"
 
 # 6. Clean up worktree (PR stays open for external review)
