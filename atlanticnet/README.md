@@ -18,12 +18,6 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/aider.sh)
 
 #### OpenClaw
 
-#### Plandex
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/plandex.sh)
-```
-
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/openclaw.sh)
 ```
@@ -38,6 +32,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/gemini.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/opencode.sh)
+```
+
+#### Plandex
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/atlanticnet/plandex.sh)
 ```
 
 ## Non-Interactive Mode
