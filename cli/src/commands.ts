@@ -672,6 +672,45 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
   return lines;
 }
 
+export function getSignalGuidance(signal: string): string[] {
+  switch (signal) {
+    case "SIGKILL":
+      return [
+        "Script was forcibly killed (SIGKILL). Common causes:",
+        "  - Out of memory (OOM killer terminated the process)",
+        "  - The server may not have enough RAM for this agent",
+        "  - Try a larger instance size or a different cloud provider",
+        "  - Check your cloud provider dashboard to stop or delete any unused servers",
+      ];
+    case "SIGTERM":
+      return [
+        "Script was terminated (SIGTERM). Common causes:",
+        "  - The process was stopped by the system or a supervisor",
+        "  - Server shutdown or reboot in progress",
+        "  - Cloud provider terminated the instance (spot/preemptible instance or billing issue)",
+      ];
+    case "SIGINT":
+      return [
+        "Script was interrupted (Ctrl+C).",
+        "Note: If a server was already created, it may still be running.",
+        "  Check your cloud provider dashboard to stop or delete any unused servers.",
+      ];
+    case "SIGHUP":
+      return [
+        "Script lost its terminal connection (SIGHUP). Common causes:",
+        "  - SSH session disconnected or timed out",
+        "  - Terminal window was closed during execution",
+        "  - Try using a more stable connection or a terminal multiplexer (tmux/screen)",
+      ];
+    default:
+      return [
+        `Script was killed by signal ${signal}.`,
+        "  - The process was terminated by the system or another process",
+        "  - Check your cloud provider dashboard for any orphaned servers",
+      ];
+  }
+}
+
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
   switch (exitCode) {
     case 130:
@@ -746,7 +785,13 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
   const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : null;
 
-  const lines = getScriptFailureGuidance(exitCode, cloud, authHint);
+  // Check for signal-killed messages (e.g. "killed by SIGKILL")
+  const signalMatch = errMsg.match(/killed by (SIG\w+)/);
+  const signal = signalMatch ? signalMatch[1] : null;
+
+  const lines = signal
+    ? getSignalGuidance(signal)
+    : getScriptFailureGuidance(exitCode, cloud, authHint);
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
@@ -766,7 +811,7 @@ export function isRetryableExitCode(errMsg: string): boolean {
 }
 
 function handleUserInterrupt(errMsg: string): void {
-  if (!errMsg.includes("interrupted by user")) return;
+  if (!errMsg.includes("interrupted by user") && !errMsg.includes("killed by SIGINT")) return;
   console.error();
   p.log.warn("Script interrupted (Ctrl+C).");
   p.log.warn("If a server was already created, it may still be running.");
@@ -841,13 +886,17 @@ function runBash(script: string, prompt?: string): Promise<void> {
       stdio: "inherit",
       env,
     });
-    child.on("close", (code: number | null) => {
+    child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
       if (code === 0) resolve();
-      else {
+      else if (code !== null) {
         const msg = code === 130
           ? "Script interrupted by user (Ctrl+C)"
           : `Script exited with code ${code}`;
         reject(new Error(msg));
+      } else {
+        // code is null when killed by a signal (SIGKILL, SIGTERM, etc.)
+        const sig = signal ?? "unknown signal";
+        reject(new Error(`Script was killed by ${sig}`));
       }
     });
     child.on("error", reject);

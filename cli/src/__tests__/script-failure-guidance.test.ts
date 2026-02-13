@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { getScriptFailureGuidance, getStatusDescription, buildRetryCommand } from "../commands";
+import { getScriptFailureGuidance, getSignalGuidance, getStatusDescription, buildRetryCommand } from "../commands";
 
 /**
  * Tests for getScriptFailureGuidance() in commands.ts.
@@ -455,6 +455,109 @@ describe("getScriptFailureGuidance", () => {
           expect(all[i].join("\n")).not.toBe(all[j].join("\n"));
         }
       }
+    });
+  });
+});
+
+describe("getSignalGuidance", () => {
+  describe("SIGKILL", () => {
+    it("should mention OOM killer", () => {
+      const lines = getSignalGuidance("SIGKILL");
+      const joined = lines.join("\n");
+      expect(joined).toContain("SIGKILL");
+      expect(joined).toContain("Out of memory");
+    });
+
+    it("should suggest a larger instance size", () => {
+      const lines = getSignalGuidance("SIGKILL");
+      const joined = lines.join("\n");
+      expect(joined).toContain("larger instance size");
+    });
+
+    it("should suggest checking cloud provider dashboard", () => {
+      const lines = getSignalGuidance("SIGKILL");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+    });
+  });
+
+  describe("SIGTERM", () => {
+    it("should mention process was terminated", () => {
+      const lines = getSignalGuidance("SIGTERM");
+      const joined = lines.join("\n");
+      expect(joined).toContain("terminated");
+      expect(joined).toContain("SIGTERM");
+    });
+
+    it("should mention server shutdown or billing", () => {
+      const lines = getSignalGuidance("SIGTERM");
+      const joined = lines.join("\n");
+      expect(joined).toContain("shutdown");
+    });
+  });
+
+  describe("SIGINT", () => {
+    it("should mention Ctrl+C", () => {
+      const lines = getSignalGuidance("SIGINT");
+      const joined = lines.join("\n");
+      expect(joined).toContain("Ctrl+C");
+    });
+
+    it("should warn about orphaned servers", () => {
+      const lines = getSignalGuidance("SIGINT");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+    });
+  });
+
+  describe("SIGHUP", () => {
+    it("should mention terminal disconnection", () => {
+      const lines = getSignalGuidance("SIGHUP");
+      const joined = lines.join("\n");
+      expect(joined).toContain("terminal connection");
+      expect(joined).toContain("SIGHUP");
+    });
+
+    it("should suggest tmux/screen", () => {
+      const lines = getSignalGuidance("SIGHUP");
+      const joined = lines.join("\n");
+      expect(joined).toContain("tmux");
+    });
+  });
+
+  describe("unknown signal", () => {
+    it("should show the signal name for unknown signals", () => {
+      const lines = getSignalGuidance("SIGUSR1");
+      const joined = lines.join("\n");
+      expect(joined).toContain("SIGUSR1");
+    });
+
+    it("should always return a non-empty array", () => {
+      const lines = getSignalGuidance("SIGFOO");
+      expect(lines.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("return type", () => {
+    it("should always return string arrays", () => {
+      const signals = ["SIGKILL", "SIGTERM", "SIGINT", "SIGHUP", "SIGUSR1"];
+      for (const sig of signals) {
+        const lines = getSignalGuidance(sig);
+        expect(Array.isArray(lines)).toBe(true);
+        for (const line of lines) {
+          expect(typeof line).toBe("string");
+        }
+      }
+    });
+
+    it("should produce different output for each handled signal", () => {
+      const sigkill = getSignalGuidance("SIGKILL").join("\n");
+      const sigterm = getSignalGuidance("SIGTERM").join("\n");
+      const sigint = getSignalGuidance("SIGINT").join("\n");
+      const sighup = getSignalGuidance("SIGHUP").join("\n");
+      expect(sigkill).not.toBe(sigterm);
+      expect(sigterm).not.toBe(sigint);
+      expect(sigint).not.toBe(sighup);
     });
   });
 });
