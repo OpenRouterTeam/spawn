@@ -178,7 +178,7 @@ STALE_PRS=$(gh pr list --state open --label '' --json number,headRefName,updated
 for pr_num in $STALE_PRS; do
     if [[ -n "$pr_num" ]]; then
         log "Closing stale QA PR #${pr_num}..."
-        gh pr close "$pr_num" --comment "Auto-closing: stale QA PR from a previous cycle.
+        gh pr close "$pr_num" --delete-branch --comment "Auto-closing: stale QA PR from a previous cycle.
 
 -- qa/cycle" 2>&1 | tee -a "${LOG_FILE}" || true
     fi

@@ -372,7 +372,7 @@ Every teammate MUST follow this workflow using worktrees. NO exceptions.
    `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
 8. **If PR cannot be created** (conflicts, etc.):
    - Comment on the PR explaining WHY
-   - Close with: `gh pr close {number} --comment "Closing: {reason}\n\n-- discovery/AGENT-NAME"`
+   - Close with: `gh pr close {number} --delete-branch --comment "Closing: {reason}\n\n-- discovery/AGENT-NAME"`
    - NEVER close a PR silently — every closed PR MUST have a comment
 9. Clean up worktree: `git worktree remove WORKTREE_BASE_PLACEHOLDER/{branch-name}`
 
@@ -398,7 +398,7 @@ You MUST remain active until ALL of the following are true:
 2. **All PRs are self-reviewed and labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm every PR from this cycle has a self-review comment and the `needs-team-review` label. Do NOT merge — PRs stay open for external review.
 3. **All provider PRs are labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName` and check for ANY open PRs related to cloud providers. For each:
    - Ensure it has a self-review comment and `needs-team-review` label
-   - If not mergeable (conflicts) → close with comment: `gh pr close NUMBER --comment "Auto-closing: provider PR from interrupted cycle (unmergeable). Please reopen if still needed.\n\n-- discovery/team-lead"`
+   - If not mergeable (conflicts) → close with comment: `gh pr close NUMBER --delete-branch --comment "Auto-closing: provider PR from interrupted cycle (unmergeable). Please reopen if still needed.\n\n-- discovery/team-lead"`
    - If mergeable → leave open with label for external review (do NOT merge)
 4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
 5. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
@@ -410,7 +410,7 @@ You MUST remain active until ALL of the following are true:
 3. **Sweep for leftover provider PRs**: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,mergeable`
    - For each PR whose title or branch references a cloud/provider:
      - If mergeable → ensure it has `needs-team-review` label and a self-review comment (do NOT merge)
-     - If not mergeable → close with `gh pr close NUMBER --comment "Auto-closing: stale provider PR (unmergeable). Please reopen if still needed.\n\n-- discovery/team-lead"`
+     - If not mergeable → close with `gh pr close NUMBER --delete-branch --comment "Auto-closing: stale provider PR (unmergeable). Please reopen if still needed.\n\n-- discovery/team-lead"`
    - Log every action taken
 4. For each teammate, send a `shutdown_request` via SendMessage
 5. Wait for all `shutdown_response` confirmations
