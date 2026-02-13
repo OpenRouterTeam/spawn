@@ -36,10 +36,7 @@ test_hcloud_token() {
     local response
     response=$(hetzner_api GET "/servers?per_page=1")
     if echo "$response" | grep -q '"error"'; then
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
         log_error ""
         log_error "How to fix:"
         log_error "  1. Verify your token at: https://console.hetzner.cloud/projects → API Tokens"
@@ -78,10 +75,7 @@ hetzner_register_ssh_key() {
     register_response=$(hetzner_api POST "/ssh_keys" "$register_body")
 
     if echo "$register_response" | grep -q '"error"'; then
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',{}).get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
         log_error ""
         log_error "Common causes:"
         log_error "  - SSH key already registered with this name"

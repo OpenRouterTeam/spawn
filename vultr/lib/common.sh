@@ -42,9 +42,7 @@ test_vultr_token() {
         log_info "API key validated"
         return 0
     else
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
         log_warn "Remediation steps:"
         log_warn "  1. Verify API key at: https://my.vultr.com/settings/#settingsapi"
         log_warn "  2. Ensure the key has appropriate permissions"
@@ -82,10 +80,7 @@ vultr_register_ssh_key() {
     if echo "$register_response" | grep -q '"ssh_key"'; then
         return 0
     else
-        # Parse error details
-        local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$register_response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
 
         log_warn "Common causes:"
         log_warn "  - SSH key already registered with this name"
@@ -175,9 +170,7 @@ create_server() {
         log_info "Instance created: ID=$VULTR_SERVER_ID"
     else
         log_error "Failed to create Vultr instance"
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
         log_warn "Common issues:"
         log_warn "  - Insufficient account balance"
         log_warn "  - Plan/region unavailable (try different VULTR_PLAN or VULTR_REGION)"

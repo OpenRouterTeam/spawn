@@ -76,9 +76,7 @@ test_contabo_credentials() {
     local response
     response=$(contabo_api GET "/compute/instances?page=1&size=1")
     if echo "$response" | grep -q '"error"'; then
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','No details available'))" 2>/dev/null || echo "Unable to parse error")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
         log_error ""
         log_error "How to fix:"
         log_error "  1. Get credentials from: https://my.contabo.com/api/details"
@@ -120,9 +118,7 @@ contabo_register_ssh_key() {
     register_response=$(contabo_api POST "/compute/secrets" "$register_body")
 
     if echo "$register_response" | grep -q '"error"'; then
-        local error_msg
-        error_msg=$(echo "$register_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$register_response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
         log_error ""
         log_error "Common causes:"
         log_error "  - SSH key already registered with this name"
@@ -223,9 +219,7 @@ create_server() {
     # Check for errors
     if echo "$response" | grep -q '"error"' || ! echo "$response" | grep -q '"instanceId"'; then
         log_error "Failed to create Contabo instance"
-        local error_msg
-        error_msg=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('message','Unknown error'))" 2>/dev/null || echo "$response")
-        log_error "API Error: $error_msg"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
         log_error ""
         log_error "Common issues:"
         log_error "  - Insufficient account balance"

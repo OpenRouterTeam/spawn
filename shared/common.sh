@@ -1464,6 +1464,36 @@ _extract_json_field() {
     printf '%s' "${json}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${py_expr})" 2>/dev/null || echo "${default}"
 }
 
+# Extract an error message from a JSON API response.
+# Tries common error field patterns used by cloud provider APIs:
+#   message, error, error.message, error.error_message, reason
+# Falls back to the raw response if no known field matches.
+# Usage: extract_api_error_message JSON_STRING [FALLBACK]
+extract_api_error_message() {
+    local json="${1}"
+    local fallback="${2:-Unknown error}"
+
+    printf '%s' "${json}" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    e = d.get('error', '')
+    msg = (
+        (isinstance(e, dict) and (e.get('message') or e.get('error_message')))
+        or d.get('message')
+        or d.get('reason')
+        or (isinstance(e, str) and e)
+        or ''
+    )
+    if msg:
+        print(msg)
+    else:
+        sys.exit(1)
+except:
+    sys.exit(1)
+" 2>/dev/null || echo "${fallback}"
+}
+
 # Generic instance status polling loop
 # Polls an API endpoint until the instance reaches the target status, then extracts the IP.
 # Usage: generic_wait_for_instance API_FUNC ENDPOINT TARGET_STATUS STATUS_PY IP_PY IP_VAR DESCRIPTION [MAX_ATTEMPTS]
