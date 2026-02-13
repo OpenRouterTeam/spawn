@@ -839,7 +839,7 @@
     "codesandbox/interpreter": "missing",
     "codesandbox/gemini": "missing",
     "codesandbox/amazonq": "missing",
-    "codesandbox/cline": "missing",
+    "codesandbox/cline": "implemented",
     "codesandbox/gptme": "missing",
     "codesandbox/opencode": "missing",
     "codesandbox/plandex": "missing",
