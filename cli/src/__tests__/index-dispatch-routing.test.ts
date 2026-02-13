@@ -147,6 +147,7 @@ type DispatchResult =
   | { type: "subcommand_info"; name: string }
   | { type: "verb_alias"; agent: string; cloud?: string }
   | { type: "verb_alias_bare"; verb: string }
+  | { type: "slash_notation"; first: string; second: string }
   | { type: "default"; agent: string; cloud?: string };
 
 function dispatchCommand(
@@ -179,6 +180,14 @@ function dispatchCommand(
       return { type: "verb_alias", agent: remaining[0], cloud: remaining[1] };
     }
     return { type: "verb_alias_bare", verb: cmd };
+  }
+
+  // Handle slash notation: "spawn claude/hetzner" or "spawn hetzner/claude"
+  if (filteredArgs.length === 1 && cmd.includes("/")) {
+    const parts = cmd.split("/");
+    if (parts.length === 2 && parts[0] && parts[1]) {
+      return { type: "slash_notation", first: parts[0], second: parts[1] };
+    }
   }
 
   return { type: "default", agent: filteredArgs[0], cloud: filteredArgs[1] };
@@ -1002,5 +1011,83 @@ describe("LIST_COMMANDS includes history alias", () => {
 
   it("should have exactly 3 list command aliases", () => {
     expect(LIST_COMMANDS.size).toBe(3);
+  });
+});
+
+describe("slash notation handling", () => {
+  describe("agent/cloud notation", () => {
+    it('should split "claude/hetzner" into first=claude, second=hetzner', () => {
+      const result = dispatchCommand("claude/hetzner", ["claude/hetzner"]);
+      expect(result.type).toBe("slash_notation");
+      if (result.type === "slash_notation") {
+        expect(result.first).toBe("claude");
+        expect(result.second).toBe("hetzner");
+      }
+    });
+
+    it('should split "hetzner/claude" into first=hetzner, second=claude', () => {
+      const result = dispatchCommand("hetzner/claude", ["hetzner/claude"]);
+      expect(result.type).toBe("slash_notation");
+      if (result.type === "slash_notation") {
+        expect(result.first).toBe("hetzner");
+        expect(result.second).toBe("claude");
+      }
+    });
+
+    it('should split "aider/sprite" into first=aider, second=sprite', () => {
+      const result = dispatchCommand("aider/sprite", ["aider/sprite"]);
+      expect(result.type).toBe("slash_notation");
+      if (result.type === "slash_notation") {
+        expect(result.first).toBe("aider");
+        expect(result.second).toBe("sprite");
+      }
+    });
+  });
+
+  describe("does NOT trigger with extra args", () => {
+    it('should NOT trigger slash notation when extra args follow', () => {
+      const result = dispatchCommand("claude/hetzner", ["claude/hetzner", "extra"]);
+      expect(result.type).toBe("default");
+    });
+  });
+
+  describe("does NOT trigger for paths with multiple slashes", () => {
+    it('should NOT trigger for "a/b/c" (three parts)', () => {
+      const result = dispatchCommand("a/b/c", ["a/b/c"]);
+      expect(result.type).toBe("default");
+    });
+  });
+
+  describe("does NOT trigger for empty parts", () => {
+    it('should NOT trigger for "/claude" (empty first part)', () => {
+      const result = dispatchCommand("/claude", ["/claude"]);
+      // This starts with "/" so it might be caught by flag check,
+      // but the slash notation check should not match empty first part
+      expect(result.type).not.toBe("slash_notation");
+    });
+
+    it('should NOT trigger for "claude/" (empty second part)', () => {
+      const result = dispatchCommand("claude/", ["claude/"]);
+      expect(result.type).not.toBe("slash_notation");
+    });
+  });
+
+  describe("does NOT shadow other command types", () => {
+    it("immediate commands still take priority", () => {
+      // "help" doesn't contain "/", so this is fine
+      expect(dispatchCommand("help", ["help"]).type).toBe("immediate");
+    });
+
+    it("list commands still take priority", () => {
+      expect(dispatchCommand("list", ["list"]).type).toBe("list");
+    });
+
+    it("subcommands still take priority", () => {
+      expect(dispatchCommand("agents", ["agents"]).type).toBe("subcommand");
+    });
+
+    it("verb aliases still take priority", () => {
+      expect(dispatchCommand("run", ["run"]).type).toBe("verb_alias_bare");
+    });
   });
 });
