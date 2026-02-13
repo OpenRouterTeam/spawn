@@ -227,9 +227,12 @@ Research new AI agents, BUT only add one if there's REAL community demand:
 Check the repo's GitHub issues for user requests:
 - Run: `gh issue list --repo OpenRouterTeam/spawn --state open --limit 20`
 - Look for issues requesting specific agents or cloud providers
+- **DEDUP CHECK (MANDATORY before ANY comment):** For each issue, FIRST check existing comments:
+  `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[] | "\(.author.login): \(.body[:80])"'`
+  If the issue already has a comment from an automated account or a comment with similar content to what you would post, do NOT post again. Never duplicate information.
 - If a request is actionable, implement it and create a PR (self-review + label, do NOT merge)
-- Comment on the issue with the PR link when done
-- If a request is already implemented, close the issue with a comment
+- Comment on the issue with the PR link when done (only if no similar comment already exists)
+- If a request is already implemented, close the issue with a comment (only if not already commented)
 
 ### Branch Cleaner (spawn 1)
 Clean up stale remote branches before and after the cycle:
