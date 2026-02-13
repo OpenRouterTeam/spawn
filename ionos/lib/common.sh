@@ -39,7 +39,9 @@ ionos_api() {
 # Usage: error_msg=$(ionos_parse_api_error "$response")
 ionos_parse_api_error() {
     local response="$1"
-    echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); msgs=d.get('messages',[]); print(msgs[0].get('message','Unknown error') if msgs else 'Unknown error')" 2>/dev/null || echo "$response"
+    _extract_json_field "$response" \
+        "(lambda m: m[0].get('message','Unknown error') if m else 'Unknown error')(d.get('messages',[]))" \
+        "$response"
 }
 
 # Check if an IONOS API response is an error, log it, and return 1 if so
@@ -146,21 +148,16 @@ get_server_name() {
 _ionos_find_existing_datacenter() {
     local response="$1"
 
-    # Extract ID and name from first datacenter in a single python3 call
-    local dc_info
-    dc_info=$(printf '%s' "$response" | python3 -c "
-import json, sys
-items = json.loads(sys.stdin.read()).get('items', [])
-if not items:
-    sys.exit(1)
-dc = items[0]
-print(dc['id'])
-print(dc.get('properties', {}).get('name', 'N/A'))
-" 2>/dev/null) || return 1
+    IONOS_DATACENTER_ID=$(_extract_json_field "$response" \
+        "d.get('items',[])[0]['id'] if d.get('items') else ''")
 
-    IONOS_DATACENTER_ID=$(printf '%s' "$dc_info" | head -1)
+    if [[ -z "$IONOS_DATACENTER_ID" ]]; then
+        return 1
+    fi
+
     local dc_name
-    dc_name=$(printf '%s' "$dc_info" | tail -1)
+    dc_name=$(_extract_json_field "$response" \
+        "d.get('items',[])[0].get('properties',{}).get('name','N/A')")
     log_info "Using existing datacenter: $dc_name (ID: $IONOS_DATACENTER_ID)"
 }
 
@@ -221,17 +218,8 @@ _ionos_find_ubuntu_image() {
     local images_response
     images_response=$(ionos_api GET "/images?depth=2")
 
-    echo "$images_response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for img in data.get('items', []):
-    props = img.get('properties', {})
-    name = props.get('name', '').lower()
-    image_type = props.get('imageType', '')
-    if 'ubuntu' in name and '24' in name and image_type == 'HDD':
-        print(img['id'])
-        break
-" 2>/dev/null
+    _extract_json_field "$images_response" \
+        "next((i['id'] for i in d.get('items',[]) if 'ubuntu' in i.get('properties',{}).get('name','').lower() and '24' in i.get('properties',{}).get('name','') and i.get('properties',{}).get('imageType','')=='HDD'), '')"
 }
 
 # Build JSON request body for IONOS volume creation
@@ -260,29 +248,16 @@ print(json.dumps(body))
 " "$name" "$disk_size" "$image_id" "$userdata"
 }
 
-# Poll until an IONOS volume reaches AVAILABLE state
-# Usage: _ionos_wait_for_volume VOLUME_ID [MAX_WAIT]
+# Wait for an IONOS volume to reach AVAILABLE state
+# Usage: _ionos_wait_for_volume VOLUME_ID [MAX_ATTEMPTS]
 _ionos_wait_for_volume() {
     local volume_id="$1"
-    local max_wait="${2:-120}"
-
-    log_step "Waiting for volume provisioning..."
-    local waited=0
-    while [[ $waited -lt $max_wait ]]; do
-        local vol_status
-        vol_status=$(ionos_api GET "/datacenters/${IONOS_DATACENTER_ID}/volumes/${volume_id}")
-        local state
-        state=$(_extract_json_field "$vol_status" "d.get('metadata',{}).get('state','')")
-
-        if [[ "$state" == "AVAILABLE" ]]; then
-            log_info "Volume ready"
-            return 0
-        fi
-
-        sleep 5
-        waited=$((waited + 5))
-    done
-    return 1
+    local max_attempts="${2:-24}"
+    generic_wait_for_instance ionos_api \
+        "/datacenters/${IONOS_DATACENTER_ID}/volumes/${volume_id}" \
+        "AVAILABLE" "d.get('metadata',{}).get('state','')" \
+        "str(d.get('id',''))" \
+        _IONOS_VOLUME_READY "IONOS volume" "${max_attempts}"
 }
 
 # Create a boot volume in the datacenter and wait for it to become AVAILABLE
@@ -312,31 +287,18 @@ _ionos_create_boot_volume() {
     echo "$volume_id"
 }
 
-# Poll the IONOS API until the server has an IP address
+# Python expression to extract IPv4 from IONOS server response (depth=3).
+# Walks entities->nics->items[] to find the first assigned IP.
+readonly _IONOS_IP_PY="next((ip for n in d.get('entities',{}).get('nics',{}).get('items',[]) for ip in n.get('properties',{}).get('ips',[])), '')"
+
+# Wait for IONOS server to become AVAILABLE and get its IP
 # Sets IONOS_SERVER_IP on success
 _ionos_wait_for_server_ip() {
-    log_step "Waiting for server to get IP address..."
-    local max_wait=180
-    local waited=0
-    while [[ $waited -lt $max_wait ]]; do
-        local server_status
-        server_status=$(ionos_api GET "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}?depth=3")
-
-        IONOS_SERVER_IP=$(_extract_json_field "$server_status" \
-            "next((ip for n in d.get('entities',{}).get('nics',{}).get('items',[]) for ip in n.get('properties',{}).get('ips',[])), '')")
-
-        if [[ -n "$IONOS_SERVER_IP" ]]; then
-            log_info "Server IP: $IONOS_SERVER_IP"
-            export IONOS_SERVER_IP
-            return 0
-        fi
-
-        sleep 5
-        waited=$((waited + 5))
-    done
-
-    log_error "Failed to get server IP address"
-    return 1
+    generic_wait_for_instance ionos_api \
+        "/datacenters/${IONOS_DATACENTER_ID}/servers/${IONOS_SERVER_ID}?depth=3" \
+        "AVAILABLE" "d.get('metadata',{}).get('state','')" \
+        "${_IONOS_IP_PY}" \
+        IONOS_SERVER_IP "IONOS server" 36
 }
 
 # Build JSON request body for IONOS server creation
