@@ -1,13 +1,13 @@
 {
   "cloud": "linode",
-  "recorded_at": "2026-02-13T05:00:35Z",
+  "recorded_at": "2026-02-13T06:37:17Z",
   "fixtures": {
-    "profile": {"endpoint": "/profile", "recorded_at": "2026-02-13T05:00:28Z"},
-    "ssh_keys": {"endpoint": "/profile/sshkeys", "recorded_at": "2026-02-13T05:00:28Z"},
-    "instances": {"endpoint": "/linode/instances", "recorded_at": "2026-02-13T05:00:28Z"},
-    "types": {"endpoint": "/linode/types", "recorded_at": "2026-02-13T05:00:29Z"},
-    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-13T05:00:29Z"},
-    "create_server": {"endpoint": "POST /linode/instances", "type": "live", "recorded_at": "2026-02-13T05:00:32Z"},
-    "delete_server": {"endpoint": "DELETE /linode/instances/{id}", "type": "live", "recorded_at": "2026-02-13T05:00:35Z"}
+    "profile": {"endpoint": "/profile", "recorded_at": "2026-02-13T06:37:10Z"},
+    "ssh_keys": {"endpoint": "/profile/sshkeys", "recorded_at": "2026-02-13T06:37:10Z"},
+    "instances": {"endpoint": "/linode/instances", "recorded_at": "2026-02-13T06:37:10Z"},
+    "types": {"endpoint": "/linode/types", "recorded_at": "2026-02-13T06:37:11Z"},
+    "regions": {"endpoint": "/regions", "recorded_at": "2026-02-13T06:37:11Z"},
+    "create_server": {"endpoint": "POST /linode/instances", "type": "live", "recorded_at": "2026-02-13T06:37:13Z"},
+    "delete_server": {"endpoint": "DELETE /linode/instances/{id}", "type": "live", "recorded_at": "2026-02-13T06:37:17Z"}
   }
 }
