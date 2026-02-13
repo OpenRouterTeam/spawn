@@ -184,17 +184,19 @@ upload_file() {
         return 1
     fi
 
+    # SECURITY: Strict allowlist validation — only safe path characters
+    if [[ ! "${remote_path}" =~ ^[a-zA-Z0-9/_.~-]+$ ]]; then
+        log_error "Invalid remote path (must contain only alphanumeric, /, _, ., ~, -): ${remote_path}"
+        return 1
+    fi
+
     # SECURITY: base64 -w0 produces single-line output (no newline injection)
     # macOS base64 doesn't support -w0 but produces single-line by default
     local content
     content=$(base64 -w0 "$local_path" 2>/dev/null || base64 "$local_path")
 
-    # SECURITY: Properly escape remote_path to prevent injection via single-quote breakout
-    local escaped_path
-    escaped_path=$(printf '%q' "$remote_path")
-
     # base64 output is alphanumeric+/+= so safe without escaping
-    run_server "printf '%s' '${content}' | base64 -d > ${escaped_path}"
+    run_server "printf '%s' '${content}' | base64 -d > '${remote_path}'"
 }
 
 # Wait for system readiness (Railway containers start with Ubuntu base)

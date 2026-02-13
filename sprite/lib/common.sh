@@ -217,23 +217,23 @@ inject_env_vars_sprite() {
 # Upload file to sprite (for use with setup_claude_code_config callback)
 # Usage: upload_file_sprite SPRITE_NAME LOCAL_PATH REMOTE_PATH
 # Example: upload_file_sprite "$SPRITE_NAME" "/tmp/settings.json" "/root/.claude/settings.json"
-# SECURITY: Uses proper quoting to prevent path injection
+# SECURITY: Strict path validation + proper quoting to prevent injection
 upload_file_sprite() {
     local sprite_name="${1}"
     local local_path="${2}"
     local remote_path="${3}"
 
-    # Generate a unique temp path to avoid collisions
+    # SECURITY: Strict allowlist validation — only safe path characters
+    if [[ ! "${remote_path}" =~ ^[a-zA-Z0-9/_.~-]+$ ]]; then
+        log_error "Invalid remote path (must contain only alphanumeric, /, _, ., ~, -): ${remote_path}"
+        return 1
+    fi
+
+    # Generate a unique temp path to avoid collisions (safe: only uses basename + PID)
     local temp_remote
     temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_$$"
 
-    # Use printf %q for proper shell escaping of paths to prevent injection
-    local escaped_remote
-    escaped_remote=$(printf '%q' "${remote_path}")
-    local escaped_temp
-    escaped_temp=$(printf '%q' "${temp_remote}")
-
-    sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname ${escaped_remote}) && mv ${escaped_temp} ${escaped_remote}"
+    sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
 }
 
 # Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers, validate_model_id) are now in shared/common.sh

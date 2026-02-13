@@ -518,8 +518,7 @@ describe("CodeSandbox does NOT use SSH patterns", () => {
 });
 
 describe("CodeSandbox upload_file security", () => {
-  it("should validate remote path for injection characters", () => {
-    // upload_file should check for single quote, $, `, newline in remote_path
+  it("should validate remote path with strict allowlist regex", () => {
     expect(codesandboxLib).toContain("remote_path");
     // The validation line checks for unsafe characters
     const uploadLines = codesandboxLib.split("\n").filter((l) =>
@@ -527,12 +526,17 @@ describe("CodeSandbox upload_file security", () => {
     );
     // There should be at least one validation check that rejects unsafe chars
     expect(uploadLines.length).toBeGreaterThan(0);
-    // The validation checks for dollar sign and backtick characters
-    expect(codesandboxLib).toContain("*'$'*");
+    // Uses strict allowlist regex instead of blocklist
+    expect(codesandboxLib).toMatch(/\[a-zA-Z0-9/);
   });
 
   it("should use base64 for safe file content transfer", () => {
     expect(codesandboxLib).toContain("base64");
+  });
+
+  it("should use SDK filesystem API via env vars", () => {
+    expect(codesandboxLib).toContain("_CSB_REMOTE_PATH");
+    expect(codesandboxLib).toContain("process.env._CSB_REMOTE_PATH");
   });
 });
 

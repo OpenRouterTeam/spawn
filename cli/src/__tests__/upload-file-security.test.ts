@@ -6,13 +6,12 @@ import type { Manifest } from "../manifest";
 /**
  * Security regression tests for upload_file() functions across all cloud libs.
  *
- * PR #453 fixed command injection vulnerabilities in upload_file() for 5 clouds
- * (fly, northflank, daytona, e2b, koyeb) by replacing unsafe printf '%q'
- * patterns with validated single-quoted embedding.
+ * PR #453 fixed command injection vulnerabilities in upload_file() for 5 clouds.
+ * PR #989 hardened all exec-based upload_file() to use strict allowlist regex
+ * validation ([a-zA-Z0-9/_.~-]+) instead of fragile blocklist/printf '%q' patterns.
  *
  * These tests ensure:
- * 1. Non-SSH upload_file functions validate remote_path for injection chars
- *    OR use printf '%q' escaping for safe embedding
+ * 1. Non-SSH upload_file functions validate remote_path with strict allowlist regex
  * 2. Content is base64-encoded (shell-safe) before embedding in commands
  * 3. No unquoted variable expansion in command strings
  * 4. No use of raw content embedding without base64
@@ -147,19 +146,21 @@ describe("upload_file() Security Patterns", () => {
 
   // ── Remote path injection protection ───────────────────────────────
   // Exec-based clouds must protect against remote_path injection via EITHER:
-  //   (a) Character validation: reject ', $, `, newlines in remote_path
-  //   (b) printf '%q' escaping: shell-escape the path before embedding
+  //   (a) Strict allowlist regex: only allow safe path characters [a-zA-Z0-9/_.~-]
+  //   (b) Character validation: reject ', $, `, newlines in remote_path
+  //   (c) printf '%q' escaping: shell-escape the path before embedding
 
   describe("exec-based upload_file: remote path injection protection", () => {
     for (const { cloud, body } of execBasedClouds) {
       it(`${cloud} should protect remote_path against injection`, () => {
+        const hasAllowlistRegex = /\[a-zA-Z0-9/.test(body);
         const hasCharValidation =
           (body.includes(`"'"`) || body.includes("'\\''")) &&
           (body.includes("'$'") || body.includes("\\$"));
         const hasPrintfEscape = body.includes("printf '%q'");
         // Must use at least one protection method
         expect(
-          hasCharValidation || hasPrintfEscape
+          hasAllowlistRegex || hasCharValidation || hasPrintfEscape
         ).toBe(true);
       });
     }
@@ -184,16 +185,20 @@ describe("upload_file() Security Patterns", () => {
 
   describe("exec-based upload_file: safe command construction", () => {
     for (const { cloud, body } of execBasedClouds) {
-      it(`${cloud} should use base64 decode in the remote command`, () => {
+      it(`${cloud} should use base64 decode or SDK filesystem API`, () => {
         const hasSafeDecode =
-          body.includes("base64 -d") || body.includes("base64 --decode");
+          body.includes("base64 -d") || body.includes("base64 --decode") ||
+          body.includes("Buffer.from") || body.includes("writeFile");
         expect(hasSafeDecode).toBe(true);
       });
 
-      it(`${cloud} should use printf '%s' for safe content output`, () => {
-        // Safe: printf '%s' '${content}' | base64 -d
+      it(`${cloud} should use safe content delivery (printf or env var)`, () => {
+        // Safe: printf '%s' '${content}' | base64 -d (shell-based)
+        // Safe: process.env._CSB_CONTENT (env var-based, SDK)
         // Unsafe: echo ${content} | base64 -d
-        expect(body).toContain("printf '%s'");
+        const hasSafeDelivery =
+          body.includes("printf '%s'") || body.includes("process.env.");
+        expect(hasSafeDelivery).toBe(true);
       });
     }
   });
@@ -242,9 +247,9 @@ describe("upload_file() Security Patterns", () => {
     }
   });
 
-  // ── Regression: specific clouds fixed in PR #453 ───────────────────
+  // ── Regression: specific clouds fixed in PR #453 & #989 ─────────────
 
-  describe("PR #453 regression: fixed clouds have path validation", () => {
+  describe("PR #453/#989 regression: fixed clouds have strict path validation", () => {
     const fixedClouds = ["fly", "northflank", "daytona", "e2b", "koyeb"];
 
     for (const cloud of fixedClouds) {
@@ -255,9 +260,8 @@ describe("upload_file() Security Patterns", () => {
         expect(info.body).toContain("SECURITY");
       });
 
-      it(`${cloud} should validate against single-quote breakout`, () => {
-        // These specific clouds use the char-validation pattern, not printf '%q'
-        expect(info.body).toContain(`"'"`);
+      it(`${cloud} should use strict allowlist regex for path validation`, () => {
+        expect(info.body).toMatch(/\[a-zA-Z0-9/);
       });
 
       it(`${cloud} should use safe content embedding`, () => {
@@ -268,31 +272,27 @@ describe("upload_file() Security Patterns", () => {
 
       it(`${cloud} should use safe path embedding`, () => {
         const hasSafePathEmbed =
-          info.body.includes("'${remote_path}'") || info.body.includes("'$remote_path'") ||
-          info.body.includes("escaped_path");
+          info.body.includes("'${remote_path}'") || info.body.includes("'$remote_path'");
         expect(hasSafePathEmbed).toBe(true);
       });
     }
   });
 
-  // ── Printf '%q' pattern clouds: railway, modal ─────────────────────
+  // ── Additional exec-based clouds with strict validation ──────────────
 
-  describe("printf '%q' pattern clouds have proper escaping", () => {
-    // These clouds use printf '%q' to escape paths (not char-by-char validation)
-    const printfClouds = execBasedClouds.filter(({ body }) =>
-      body.includes("printf '%q'") && !body.includes(`"'"`)
-    );
+  describe("additional exec-based clouds have strict path validation", () => {
+    // These clouds (railway, modal, render, codesandbox) also use strict allowlist
+    const additionalClouds = ["railway", "modal", "render", "codesandbox"];
+    for (const cloud of additionalClouds) {
+      const info = cloudUploadTypes.get(cloud);
+      if (!info || info.type !== "exec-based") continue;
 
-    for (const { cloud, body } of printfClouds) {
-      it(`${cloud} should use printf '%q' to escape remote_path`, () => {
-        expect(body).toContain("printf '%q'");
-        // Escaped variable can be named escaped_path, escaped_remote, etc.
-        expect(body).toMatch(/escaped_\w+/);
+      it(`${cloud} should use strict allowlist regex for path validation`, () => {
+        expect(info.body).toMatch(/\[a-zA-Z0-9/);
       });
 
-      it(`${cloud} should base64-encode content before embedding`, () => {
-        expect(body).toContain("base64");
-        expect(body).toContain("'${content}'");
+      it(`${cloud} should base64-encode content`, () => {
+        expect(info.body).toContain("base64");
       });
     }
   });
@@ -332,8 +332,8 @@ describe("upload_file() Security Patterns", () => {
         expect(info.body).toContain("sprite exec");
       });
 
-      it(`${cloud} should escape paths with printf '%q'`, () => {
-        expect(info.body).toContain("printf '%q'");
+      it(`${cloud} should use strict allowlist regex for path validation`, () => {
+        expect(info.body).toMatch(/\[a-zA-Z0-9/);
       });
     }
   });

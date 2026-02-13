@@ -217,9 +217,9 @@ upload_file() {
     local local_path="${1}"
     local remote_path="${2}"
 
-    # SECURITY: Validate remote_path to prevent command injection via single-quote breakout
-    if [[ "$remote_path" == *"'"* || "$remote_path" == *'$'* || "$remote_path" == *'`'* || "$remote_path" == *$'\n'* ]]; then
-        log_error "Invalid remote path (contains unsafe characters): $remote_path"
+    # SECURITY: Strict allowlist validation — only safe path characters
+    if [[ ! "${remote_path}" =~ ^[a-zA-Z0-9/_.~-]+$ ]]; then
+        log_error "Invalid remote path (must contain only alphanumeric, /, _, ., ~, -): ${remote_path}"
         return 1
     fi
 
