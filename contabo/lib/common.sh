@@ -200,24 +200,56 @@ _contabo_wait_for_instance() {
         CONTABO_SERVER_IP "Instance" 60
 }
 
+# Validate Contabo instance creation inputs
+# Usage: _contabo_validate_inputs PRODUCT_ID REGION IMAGE_ID PERIOD
+_contabo_validate_inputs() {
+    validate_resource_name "$1" || { log_error "Invalid CONTABO_PRODUCT_ID"; return 1; }
+    validate_region_name "$2" || { log_error "Invalid CONTABO_REGION"; return 1; }
+    validate_resource_name "$3" || { log_error "Invalid CONTABO_IMAGE_ID"; return 1; }
+    if [[ ! "$4" =~ ^[0-9]+$ ]]; then
+        log_error "Invalid CONTABO_PERIOD: must be a positive integer"
+        return 1
+    fi
+}
+
+# Check instance creation response for errors and report failure details
+# Usage: _contabo_check_create_error RESPONSE
+# Returns 0 if there IS an error (caller should return 1), 1 if response is OK
+_contabo_check_create_error() {
+    local response="$1"
+    if ! echo "$response" | grep -q '"error"' && echo "$response" | grep -q '"instanceId"'; then
+        return 1
+    fi
+    log_error "Failed to create Contabo instance"
+    log_error "API Error: $(extract_api_error_message "$response" "$response")"
+    log_error ""
+    log_error "Common issues:"
+    log_error "  - Insufficient account balance"
+    log_error "  - Product/region unavailable"
+    log_error "  - Account limits reached"
+    return 0
+}
+
+# Extract instance ID from creation response
+# Sets: CONTABO_INSTANCE_ID on success
+# Usage: _contabo_extract_instance_id RESPONSE
+_contabo_extract_instance_id() {
+    local response="$1"
+    CONTABO_INSTANCE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('data',[{}])[0].get('instanceId',''))")
+    export CONTABO_INSTANCE_ID
+    log_info "Instance created: ID=$CONTABO_INSTANCE_ID"
+}
+
 # Create a Contabo instance with cloud-init
 create_server() {
     local name="$1"
 
-    # Use env vars or defaults
     local region="${CONTABO_REGION:-EU}"
     local product_id="${CONTABO_PRODUCT_ID:-V45}"  # VPS S SSD (2 vCPU, 8 GB RAM)
     local image_id="${CONTABO_IMAGE_ID:-ubuntu-24.04}"
     local period="${CONTABO_PERIOD:-1}"  # 1 month
 
-    # Validate inputs to prevent injection into Python code
-    validate_resource_name "$product_id" || { log_error "Invalid CONTABO_PRODUCT_ID"; return 1; }
-    validate_region_name "$region" || { log_error "Invalid CONTABO_REGION"; return 1; }
-    validate_resource_name "$image_id" || { log_error "Invalid CONTABO_IMAGE_ID"; return 1; }
-    if [[ ! "$period" =~ ^[0-9]+$ ]]; then
-        log_error "Invalid CONTABO_PERIOD: must be a positive integer"
-        return 1
-    fi
+    _contabo_validate_inputs "$product_id" "$region" "$image_id" "$period" || return 1
 
     log_step "Creating Contabo instance '$name' (product: $product_id, region: $region)..."
 
@@ -230,23 +262,11 @@ create_server() {
     local response
     response=$(contabo_api POST "/compute/instances" "$body")
 
-    # Check for errors
-    if echo "$response" | grep -q '"error"' || ! echo "$response" | grep -q '"instanceId"'; then
-        log_error "Failed to create Contabo instance"
-        log_error "API Error: $(extract_api_error_message "$response" "$response")"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient account balance"
-        log_error "  - Product/region unavailable"
-        log_error "  - Account limits reached"
+    if _contabo_check_create_error "$response"; then
         return 1
     fi
 
-    # Extract instance ID
-    CONTABO_INSTANCE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('data',[{}])[0].get('instanceId',''))")
-    export CONTABO_INSTANCE_ID
-
-    log_info "Instance created: ID=$CONTABO_INSTANCE_ID"
+    _contabo_extract_instance_id "$response"
     log_step "Waiting for instance to be provisioned..."
 
     _contabo_wait_for_instance "$CONTABO_INSTANCE_ID"

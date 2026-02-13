@@ -207,6 +207,46 @@ get_server_name() {
     get_validated_server_name "LATITUDE_SERVER_NAME" "Enter server name: "
 }
 
+# Validate Latitude.sh server creation inputs
+# Usage: _latitude_validate_inputs PLAN SITE OS
+_latitude_validate_inputs() {
+    validate_resource_name "$1" || { log_error "Invalid LATITUDE_PLAN"; return 1; }
+    validate_region_name "$2" || { log_error "Invalid LATITUDE_SITE"; return 1; }
+    validate_resource_name "$3" || { log_error "Invalid LATITUDE_OS"; return 1; }
+}
+
+# Check server creation response for errors and report failure details
+# Usage: _latitude_check_create_error RESPONSE
+# Returns 0 if there IS an error (caller should return 1), 1 if response is OK
+_latitude_check_create_error() {
+    local response="$1"
+    if echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); sys.exit(0 if 'data' in d else 1)" 2>/dev/null; then
+        return 1
+    fi
+    log_error "Failed to create Latitude.sh server"
+    local error_msg
+    error_msg=$(echo "$response" | _latitude_extract_error)
+    log_error "API Error: $error_msg"
+    log_error ""
+    log_error "Common issues:"
+    log_error "  - Insufficient account balance or payment method required"
+    log_error "  - Plan/site unavailable (try different LATITUDE_PLAN or LATITUDE_SITE)"
+    log_error "  - Server limit reached for your account"
+    log_error ""
+    log_error "Check your account status: https://www.latitude.sh/dashboard"
+    return 0
+}
+
+# Extract server ID from creation response or report failure
+# Sets: LATITUDE_SERVER_ID on success
+# Usage: _latitude_extract_server_id RESPONSE
+_latitude_extract_server_id() {
+    local response="$1"
+    LATITUDE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['data']['id'])")
+    export LATITUDE_SERVER_ID
+    log_info "Server created: ID=$LATITUDE_SERVER_ID"
+}
+
 # Create a Latitude.sh server
 create_server() {
     local hostname="$1"
@@ -214,18 +254,13 @@ create_server() {
     local site="${LATITUDE_SITE:-DAL2}"
     local os="${LATITUDE_OS:-ubuntu_24_04_x64_lts}"
 
-    # Validate env var inputs to prevent injection into Python code
-    validate_resource_name "$plan" || { log_error "Invalid LATITUDE_PLAN"; return 1; }
-    validate_region_name "$site" || { log_error "Invalid LATITUDE_SITE"; return 1; }
-    validate_resource_name "$os" || { log_error "Invalid LATITUDE_OS"; return 1; }
+    _latitude_validate_inputs "$plan" "$site" "$os" || return 1
 
     log_step "Creating Latitude.sh server '$hostname' (plan: $plan, site: $site)..."
 
-    # Get project ID
     local project_id
     project_id=$(get_latitude_project_id) || return 1
 
-    # Get all SSH key IDs
     local ssh_key_ids
     ssh_key_ids=$(_latitude_get_ssh_key_ids)
 
@@ -235,27 +270,11 @@ create_server() {
     local response
     response=$(latitude_api POST "/servers" "$body")
 
-    # Check for errors
-    if ! echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); sys.exit(0 if 'data' in d else 1)" 2>/dev/null; then
-        log_error "Failed to create Latitude.sh server"
-        local error_msg
-        error_msg=$(echo "$response" | _latitude_extract_error)
-        log_error "API Error: $error_msg"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient account balance or payment method required"
-        log_error "  - Plan/site unavailable (try different LATITUDE_PLAN or LATITUDE_SITE)"
-        log_error "  - Server limit reached for your account"
-        log_error ""
-        log_error "Check your account status: https://www.latitude.sh/dashboard"
+    if _latitude_check_create_error "$response"; then
         return 1
     fi
 
-    # Extract server ID
-    LATITUDE_SERVER_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['data']['id'])")
-    export LATITUDE_SERVER_ID
-
-    log_info "Server created: ID=$LATITUDE_SERVER_ID"
+    _latitude_extract_server_id "$response"
     log_step "Waiting for server provisioning (this may take a few minutes for bare metal)..."
 }
 
