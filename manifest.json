@@ -871,7 +871,7 @@
     "codesandbox/gemini": "implemented",
     "codesandbox/amazonq": "implemented",
     "codesandbox/cline": "implemented",
-    "codesandbox/gptme": "missing",
+    "codesandbox/gptme": "implemented",
     "codesandbox/opencode": "implemented",
     "codesandbox/plandex": "implemented",
     "codesandbox/kilocode": "missing",
