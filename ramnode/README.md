@@ -149,13 +149,19 @@ Uses OpenStack Compute API:
 
 - ✅ Claude Code
 - ✅ Aider
-- ✅ Goose
-- ✅ Open Interpreter
-- ✅ NanoClaw
-- ✅ OpenClaw
+- ✅ Amazon Q
 - ✅ Cline
-- ✅ gptme
+- ✅ Codex
 - ✅ Continue
+- ✅ Gemini CLI
+- ✅ Goose
+- ✅ gptme
+- ✅ Kilocode
+- ✅ NanoClaw
+- ✅ Open Interpreter
+- ✅ OpenClaw
+- ✅ OpenCode
+- ✅ Plandex
 
 ## Documentation
 
