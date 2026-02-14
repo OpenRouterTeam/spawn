@@ -60,6 +60,13 @@ _try_load_env_var() {
     local var_name="${1}"
     local config_file="${2}"
 
+    # SECURITY: Validate var_name to prevent command injection via export
+    # Only allow uppercase letters, numbers, and underscores (standard env var naming)
+    if [[ ! "${var_name}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+        log "SECURITY: Invalid env var name rejected: ${var_name}"
+        return 1
+    fi
+
     # Already set in environment?
     local current_val="${!var_name:-}"
     if [[ -n "${current_val}" ]]; then
