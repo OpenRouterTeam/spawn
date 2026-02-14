@@ -695,10 +695,14 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
   return lines;
 }
 
-export function getSignalGuidance(signal: string, dashboardUrl?: string): string[] {
-  const dashboardHint = dashboardUrl
+function buildDashboardHint(dashboardUrl?: string): string {
+  return dashboardUrl
     ? `  - Check your dashboard: ${pc.cyan(dashboardUrl)}`
     : "  - Check your cloud provider dashboard to stop or delete any unused servers";
+}
+
+export function getSignalGuidance(signal: string, dashboardUrl?: string): string[] {
+  const dashboardHint = buildDashboardHint(dashboardUrl);
   switch (signal) {
     case "SIGKILL":
       return [
@@ -739,9 +743,7 @@ export function getSignalGuidance(signal: string, dashboardUrl?: string): string
 }
 
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string, dashboardUrl?: string): string[] {
-  const dashboardHint = dashboardUrl
-    ? `  - Check your dashboard: ${pc.cyan(dashboardUrl)}`
-    : "  - Check your cloud provider dashboard to stop or delete any unused servers";
+  const dashboardHint = buildDashboardHint(dashboardUrl);
   switch (exitCode) {
     case 130:
       return [
@@ -1472,7 +1474,14 @@ export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest):
   const { sortedClouds, credCount } = prioritizeCloudsByCredentials(implClouds, manifest);
 
   if (sortedClouds.length > 0) {
-    printAgentQuickStart(manifest, agentKey, sortedClouds[0]);
+    const exampleCloud = sortedClouds[0];
+    const cloudDef = manifest.clouds[exampleCloud];
+    printQuickStart({
+      auth: cloudDef.auth,
+      authVars: parseAuthEnvVars(cloudDef.auth),
+      cloudUrl: cloudDef.url,
+      spawnCmd: `spawn ${agentKey} ${exampleCloud}`,
+    });
   }
 
   console.log();
@@ -1500,65 +1509,39 @@ export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest):
   console.log();
 }
 
-/** Print quick-start instructions for an agent, using the best available cloud */
-function printAgentQuickStart(manifest: Manifest, agentKey: string, exampleCloud: string): void {
-  const cloudDef = manifest.clouds[exampleCloud];
-  const authVars = parseAuthEnvVars(cloudDef.auth);
-  const hasCreds = hasCloudCredentials(cloudDef.auth);
+/** Print quick-start instructions showing credential status and example spawn command */
+function printQuickStart(opts: {
+  auth: string;
+  authVars: string[];
+  cloudUrl?: string;
+  spawnCmd?: string;
+}): void {
+  const hasCreds = hasCloudCredentials(opts.auth);
   const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
-  const allReady = hasOpenRouterKey && (hasCreds || authVars.length === 0);
+  const allReady = hasOpenRouterKey && (hasCreds || opts.authVars.length === 0);
 
   console.log();
-  if (allReady) {
+  if (allReady && opts.spawnCmd) {
     console.log(pc.bold("Quick start:") + "  " + pc.green("credentials detected -- ready to go"));
-    console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
-  } else {
-    console.log(pc.bold("Quick start:"));
-    console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
-    if (authVars.length > 0) {
-      for (let i = 0; i < authVars.length; i++) {
-        // Only show the URL hint on the first auth var to avoid repetition
-        console.log(formatAuthVarLine(authVars[i], i === 0 ? cloudDef.url : undefined));
-      }
-    }
-    console.log(`  ${pc.cyan(`spawn ${agentKey} ${exampleCloud}`)}`);
-  }
-}
-
-// ── Cloud Info ─────────────────────────────────────────────────────────────────
-
-/** Print quick-start auth instructions for a cloud provider */
-function printCloudQuickStart(
-  cloud: { auth: string; url?: string },
-  authVars: string[],
-  exampleAgent: string | undefined,
-  cloudKey: string
-): void {
-  const hasCreds = hasCloudCredentials(cloud.auth);
-  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
-  const allReady = hasOpenRouterKey && (hasCreds || authVars.length === 0);
-
-  console.log();
-  if (allReady && exampleAgent) {
-    console.log(pc.bold("Quick start:") + "  " + pc.green("credentials detected -- ready to go"));
-    console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
+    console.log(`  ${pc.cyan(opts.spawnCmd)}`);
     return;
   }
 
   console.log(pc.bold("Quick start:"));
   console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
-  if (authVars.length > 0) {
-    for (let i = 0; i < authVars.length; i++) {
-      // Only show the URL hint on the first auth var to avoid repetition
-      console.log(formatAuthVarLine(authVars[i], i === 0 ? cloud.url : undefined));
+  if (opts.authVars.length > 0) {
+    for (let i = 0; i < opts.authVars.length; i++) {
+      console.log(formatAuthVarLine(opts.authVars[i], i === 0 ? opts.cloudUrl : undefined));
     }
-  } else if (cloud.auth.toLowerCase() !== "none") {
-    console.log(`  ${pc.dim(`Auth: ${cloud.auth}`)}`);
+  } else if (opts.auth.toLowerCase() !== "none") {
+    console.log(`  ${pc.dim(`Auth: ${opts.auth}`)}`);
   }
-  if (exampleAgent) {
-    console.log(`  ${pc.cyan(`spawn ${exampleAgent} ${cloudKey}`)}`);
+  if (opts.spawnCmd) {
+    console.log(`  ${pc.cyan(opts.spawnCmd)}`);
   }
 }
+
+// ── Cloud Info ─────────────────────────────────────────────────────────────────
 
 /** Print the list of implemented agents and any missing ones */
 function printAgentList(
@@ -1594,7 +1577,13 @@ export async function cmdCloudInfo(cloud: string, preloadedManifest?: Manifest):
 
   const authVars = parseAuthEnvVars(c.auth);
   const implAgents = getImplementedAgents(manifest, cloudKey);
-  printCloudQuickStart(c, authVars, implAgents[0], cloudKey);
+  const exampleAgent = implAgents[0];
+  printQuickStart({
+    auth: c.auth,
+    authVars,
+    cloudUrl: c.url,
+    spawnCmd: exampleAgent ? `spawn ${exampleAgent} ${cloudKey}` : undefined,
+  });
 
   const allAgents = agentKeys(manifest);
   const missingAgents = allAgents.filter((a) => !implAgents.includes(a));
