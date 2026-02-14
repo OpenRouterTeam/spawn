@@ -378,7 +378,7 @@ fi
       { useMockPath: true }
     );
     expect(stderr).toContain("10.0.0.1");
-    expect(stderr).toContain("may still be booting");
+    expect(stderr).toContain("Server is still booting");
   });
 });
 
@@ -478,7 +478,7 @@ generic_wait_for_instance mock_api "/instances/1" "active" \\
   TEST_IP "Instance" 3
 `);
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("Instance did not become active after");
+    expect(stderr).toContain("Instance did not become active within");
   });
 
   it("should export the IP variable to the environment", () => {
@@ -582,8 +582,8 @@ generic_wait_for_instance mock_api "/x/1" "ready" \\
   "d['x']['status']" "d['x'].get('ip','')" \\
   X_IP "Droplet" 2
 `);
-    expect(stderr).toContain("Re-run the command to try again");
-    expect(stderr).toContain("Check the instance status");
+    expect(stderr).toContain("Check your cloud dashboard");
+    expect(stderr).toContain("Wait 2-3 minutes and retry");
     expect(stderr).toContain("Try a different region");
   });
 

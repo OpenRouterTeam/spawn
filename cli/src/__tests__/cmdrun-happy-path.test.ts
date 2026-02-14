@@ -565,7 +565,7 @@ describe("cmdRun happy-path pipeline", () => {
 
       const clackErrors = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
       const errOutput = [...clackErrors, ...consoleMocks.error.mock.calls.map((c: any[]) => c.join(" "))].join("\n");
-      expect(errOutput).toContain("shebang");
+      expect(errOutput).toContain("valid bash script");
     });
 
     it("should reject script containing dangerous patterns", async () => {

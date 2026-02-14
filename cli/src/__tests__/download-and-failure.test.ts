@@ -241,7 +241,7 @@ describe("Download and Failure Pipeline", () => {
 
       // reportDownloadFailure should log specific 404 error
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("could not be found");
+      expect(errorOutput).toContain("doesn't exist");
     });
 
     it("should suggest verifying the combination when both return 404", async () => {
@@ -267,7 +267,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("issues");
+      expect(errorOutput).toContain("Report it");
     });
 
     it("should show server error message when both return 500", async () => {
@@ -293,7 +293,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("temporary issues");
+      expect(errorOutput).toContain("temporarily unavailable");
     });
 
     it("should show mixed error for primary 404 and fallback 500", async () => {
@@ -315,8 +315,8 @@ describe("Download and Failure Pipeline", () => {
       // Should show HTTP error codes in console output (not the "script not found" path)
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("HTTP 404");
-      // 500 from fallback should mention temporary issues
-      expect(errorOutput).toContain("temporary issues");
+      // 500 from fallback should mention server issues
+      expect(errorOutput).toContain("recovering");
     });
   });
 
@@ -352,7 +352,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("How to fix");
+      expect(errorOutput).toContain("What to do");
       expect(errorOutput).toContain("internet connection");
     });
 
@@ -368,7 +368,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("spawn matrix");
+      expect(errorOutput).toContain("firewall or proxy");
     });
 
     it("should show the GitHub raw URL for manual access on network error", async () => {

@@ -258,7 +258,7 @@ describe("Script download and execution", () => {
 
     // Should show 404-specific error messaging
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(errorOutput).toContain("could not be found");
+    expect(errorOutput).toContain("doesn't exist");
   });
 
   it("should exit when both primary and fallback URLs return server errors", async () => {
@@ -307,7 +307,7 @@ describe("Script download and execution", () => {
     }
 
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(errorOutput).toContain("How to fix");
+    expect(errorOutput).toContain("What to do");
   });
 
   it("should use fallback URL when primary returns non-OK status", async () => {
@@ -470,9 +470,9 @@ describe("Script download and execution", () => {
     }
 
     const allOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(allOutput).toContain("could not be found");
+    expect(allOutput).toContain("doesn't exist");
     expect(allOutput).toContain("spawn matrix");
-    expect(allOutput).toContain("Report the issue");
+    expect(allOutput).toContain("Report it");
   });
 
   it("should show network error message when primary 500 and fallback 502", async () => {

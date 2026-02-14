@@ -66,7 +66,7 @@ describe("error output formatting", () => {
   it("should show error with valid names hint for invalid identifier", () => {
     const result = runCli(["../hack", "sprite"]);
     const out = output(result);
-    expect(out).toContain("invalid characters");
+    expect(out).toContain("can only contain");
     expect(out).toContain("spawn agents");
     expect(result.exitCode).not.toBe(0);
   });
@@ -74,30 +74,30 @@ describe("error output formatting", () => {
   it("should format error message for semicolon injection", () => {
     const result = runCli(["agent;rm", "sprite"]);
     const out = output(result);
-    expect(out).toContain("invalid characters");
+    expect(out).toContain("can only contain");
     expect(result.exitCode).not.toBe(0);
   });
 
   it("should format error message for dollar sign injection", () => {
     const result = runCli(["agent$var", "sprite"]);
     const out = output(result);
-    expect(out).toContain("invalid characters");
+    expect(out).toContain("can only contain");
     expect(result.exitCode).not.toBe(0);
   });
 
   it("should format error message for backtick injection", () => {
     const result = runCli(["agent`cmd`", "sprite"]);
     const out = output(result);
-    expect(out).toContain("invalid characters");
+    expect(out).toContain("can only contain");
     expect(result.exitCode).not.toBe(0);
   });
 
   it("should show identifier rules in error message", () => {
     const result = runCli(["Agent!", "sprite"]);
     const out = output(result);
-    expect(out).toContain("lowercase letters");
-    expect(out).toContain("numbers");
-    expect(out).toContain("hyphens");
+    expect(out).toContain("Lowercase letters");
+    expect(out).toContain("Numbers");
+    expect(out).toContain("Hyphens");
     expect(result.exitCode).not.toBe(0);
   });
 });
