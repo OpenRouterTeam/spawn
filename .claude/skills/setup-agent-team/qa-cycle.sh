@@ -564,7 +564,11 @@ log "=== Phase 2: Run mock tests ==="
 
 rm -f "${RESULTS_PHASE2}"
 MOCK_EXIT=0
-RESULTS_FILE="${RESULTS_PHASE2}" bash test/mock.sh 2>&1 | tee -a "${LOG_FILE}" || MOCK_EXIT=$?
+run_with_timeout 600 bash -c "RESULTS_FILE='${RESULTS_PHASE2}' bash test/mock.sh" 2>&1 | tee -a "${LOG_FILE}" || MOCK_EXIT=$?
+
+if [[ "${MOCK_EXIT}" -eq 124 ]]; then
+    log "Phase 2: Mock tests timed out after 600s"
+fi
 
 if [[ -f "${RESULTS_PHASE2}" ]]; then
     TOTAL_TESTS=$(wc -l < "${RESULTS_PHASE2}" | tr -d ' ')
@@ -851,7 +855,12 @@ git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
 rm -f "${RESULTS_PHASE4}"
-RESULTS_FILE="${RESULTS_PHASE4}" bash test/mock.sh 2>&1 | tee -a "${LOG_FILE}" || true
+MOCK_EXIT=0
+run_with_timeout 600 bash -c "RESULTS_FILE='${RESULTS_PHASE4}' bash test/mock.sh" 2>&1 | tee -a "${LOG_FILE}" || MOCK_EXIT=$?
+
+if [[ "${MOCK_EXIT}" -eq 124 ]]; then
+    log "Phase 4: Mock tests timed out after 600s"
+fi
 
 if [[ -f "${RESULTS_PHASE4}" ]]; then
     RETRY_PASS=$(grep -c ':pass$' "${RESULTS_PHASE4}" || true)
