@@ -47,14 +47,16 @@ _log_diagnostic() {
     while [[ $# -gt 0 && "${1}" != "---" ]]; do
         log_error "  - ${1}"; shift
     done
-    shift  # skip ---
-    log_error ""
-    log_error "How to fix:"
-    local i=1
-    while [[ $# -gt 0 ]]; do
-        log_error "  ${i}. ${1}"; shift
-        i=$((i + 1))
-    done
+    if [[ $# -gt 0 ]]; then
+        shift  # skip ---
+        log_error ""
+        log_error "How to fix:"
+        local i=1
+        while [[ $# -gt 0 ]]; do
+            log_error "  ${i}. ${1}"; shift
+            i=$((i + 1))
+        done
+    fi
 }
 
 # Log actionable guidance when agent installation verification fails.
@@ -211,10 +213,16 @@ safe_read() {
         # No interactive input available
         log_error "Cannot prompt for input: no interactive terminal available"
         log_error ""
-        log_error "Running in non-interactive mode (pipe, background job, or automated script)."
-        log_error "Set required environment variables before running spawn."
+        log_error "You're running spawn in non-interactive mode (piped input, background job, or CI/CD)."
+        log_error "Set all required environment variables before launching spawn."
         log_error ""
-        log_error "Example: OPENROUTER_API_KEY=sk-or-v1-... spawn claude sprite"
+        log_error "Example:"
+        log_error "  export OPENROUTER_API_KEY=sk-or-v1-..."
+        log_error "  export CLOUD_API_TOKEN=..."
+        log_error "  spawn <agent> <cloud>"
+        log_error ""
+        log_error "Or use inline variables:"
+        log_error "  OPENROUTER_API_KEY=sk-or-v1-... spawn <agent> <cloud>"
         return 1
     fi
 
@@ -253,8 +261,18 @@ validate_model_id() {
     if [[ -z "${model_id}" ]]; then return 0; fi
     if [[ ! "${model_id}" =~ ^[a-zA-Z0-9/_:.-]+$ ]]; then
         log_error "Invalid model ID: '${model_id}'"
-        log_error "Model IDs should only contain: letters, numbers, /, -, _, :, ."
-        log_error "Browse valid models at: https://openrouter.ai/models"
+        log_error ""
+        log_error "Model IDs can only contain:"
+        log_error "  - Letters (a-z, A-Z)"
+        log_error "  - Numbers (0-9)"
+        log_error "  - Special characters: / - _ : ."
+        log_error ""
+        log_error "Examples of valid model IDs:"
+        log_error "  - anthropic/claude-3.5-sonnet"
+        log_error "  - openai/gpt-4-turbo"
+        log_error "  - openrouter/auto"
+        log_error ""
+        log_error "Browse all models at: https://openrouter.ai/models"
         return 1
     fi
     return 0
@@ -262,7 +280,16 @@ validate_model_id() {
 
 # Helper to show server name validation requirements
 show_server_name_requirements() {
-    log_error "Requirements: 3-63 characters, alphanumeric + dash, no leading/trailing dash"
+    log_error ""
+    log_error "Server name requirements:"
+    log_error "  - Length: 3-63 characters"
+    log_error "  - Characters: letters (a-z, A-Z), numbers (0-9), dashes (-)"
+    log_error "  - No leading or trailing dashes"
+    log_error ""
+    log_error "Examples of valid names:"
+    log_error "  - my-server"
+    log_error "  - dev-box-01"
+    log_error "  - spawn-agent"
 }
 
 # Validate server/sprite name to prevent injection and ensure cloud provider compatibility
