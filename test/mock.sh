@@ -273,39 +273,95 @@ setup_fake_home() {
 
 # Strip API base URL to get just the endpoint path.
 # Used by test/test-infra-sync.test.ts to validate cloud coverage.
+_strip_simple_base() {
+    local url="$1" pattern="$2"
+    echo "$url" | sed "s|${pattern}||"
+}
+
+_strip_pattern_base() {
+    local url="$1" sed_pattern="$2"
+    echo "$url" | sed "$sed_pattern"
+}
+
+_strip_gcore_endpoint() {
+    local url="$1"
+    case "$url" in
+        https://api.gcore.com/cloud/v*/instances/*/*/*)
+            echo "$url" | sed 's|.*/instances/[^/]*/[^/]*/|/instances/|' ;;
+        https://api.gcore.com/cloud/v*/instances/*/*)
+            echo "/instances" ;;
+        https://api.gcore.com/cloud/v*/*/*/*/*)
+            echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*/[^/]*/|/\1/|' ;;
+        https://api.gcore.com/cloud/v*/*/*/*)
+            echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*/[^/]*$|/\1|' ;;
+        https://api.gcore.com/cloud/v*/*/*)
+            echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*$|/\1|' ;;
+        https://api.gcore.com/cloud/v*/*)
+            echo "$url" | sed 's|.*/cloud/v[0-9]*/||; s|^|/|' ;;
+        https://api.gcore.com*)
+            echo "$url" | sed 's|https://api.gcore.com||' ;;
+        *) echo "$url" ;;
+    esac
+}
+
+_strip_scaleway_endpoint() {
+    local url="$1"
+    case "$url" in
+        https://api.scaleway.com/instance/v1/zones/*)
+            echo "$url" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||' ;;
+        https://api.scaleway.com/account/v3*)
+            echo "$url" | sed 's|https://api.scaleway.com/account/v3||' ;;
+        https://api.scaleway.com/*)
+            echo "$url" | sed 's|https://api.scaleway.com/[^/]*/[^/]*/||' ;;
+        *) echo "$url" ;;
+    esac
+}
+
 _strip_api_base() {
     local url="$1"
     local endpoint="$url"
 
     case "$url" in
-        https://api.hetzner.cloud/v1*)     endpoint="${url#https://api.hetzner.cloud/v1}" ;;
-        https://api.digitalocean.com/v2*)   endpoint="${url#https://api.digitalocean.com/v2}" ;;
-        https://api.vultr.com/v2*)          endpoint="${url#https://api.vultr.com/v2}" ;;
-        https://api.linode.com/v4*)         endpoint="${url#https://api.linode.com/v4}" ;;
-        https://cloud.lambdalabs.com/api/v1*)  endpoint="${url#https://cloud.lambdalabs.com/api/v1}" ;;
-        https://api.civo.com/v2*)           endpoint="${url#https://api.civo.com/v2}" ;;
-        https://api.upcloud.com/1.3*)       endpoint="${url#https://api.upcloud.com/1.3}" ;;
-        https://api.binarylane.com.au/v2*)  endpoint="${url#https://api.binarylane.com.au/v2}" ;;
-        https://api.scaleway.com/instance/v1/zones/*) endpoint=$(echo "$url" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||') ;;
-        https://api.scaleway.com/account/v3*) endpoint="${url#https://api.scaleway.com/account/v3}" ;;
-        https://api.scaleway.com/*)         endpoint=$(echo "$url" | sed 's|https://api.scaleway.com/[^/]*/[^/]*/||') ;;
-        https://api.genesiscloud.com/compute/v1*) endpoint="${url#https://api.genesiscloud.com/compute/v1}" ;;
-        https://console.kamatera.com/svc*)  endpoint="${url#https://console.kamatera.com/svc}" ;;
-        https://api.latitude.sh*)           endpoint="${url#https://api.latitude.sh}" ;;
-        https://infrahub-api.nexgencloud.com/v1*) endpoint="${url#https://infrahub-api.nexgencloud.com/v1}" ;;
-        *eu.api.ovh.com*)                   endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
-        https://cloudapi.atlantic.net/*)    endpoint=$(echo "$url" | sed 's|https://cloudapi.atlantic.net/\?||') ;;
-        https://invapi.hostkey.com*)        endpoint="${url#https://invapi.hostkey.com}" ;;
-        https://*.cloudsigma.com/api/2.0*)  endpoint=$(echo "$url" | sed 's|https://[^/]*.cloudsigma.com/api/2.0||') ;;
-        https://api.webdock.io/v1*)         endpoint="${url#https://api.webdock.io/v1}" ;;
-        https://api.serverspace.io/api/v1*) endpoint="${url#https://api.serverspace.io/api/v1}" ;;
-        https://api.gcore.com/cloud/v*/instances/*/*/*) endpoint=$(echo "$url" | sed 's|.*/instances/[^/]*/[^/]*/|/instances/|') ;;
-        https://api.gcore.com/cloud/v*/instances/*/*) endpoint="/instances" ;;
-        https://api.gcore.com/cloud/v*/*/*/*/*) endpoint=$(echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*/[^/]*/|/\1/|') ;;
-        https://api.gcore.com/cloud/v*/*/*/*) endpoint=$(echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*/[^/]*$|/\1|') ;;
-        https://api.gcore.com/cloud/v*/*/*) endpoint=$(echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*$|/\1|') ;;
-        https://api.gcore.com/cloud/v*/*) endpoint=$(echo "$url" | sed 's|.*/cloud/v[0-9]*/||; s|^|/|') ;;
-        https://api.gcore.com*)            endpoint="${url#https://api.gcore.com}" ;;
+        https://api.hetzner.cloud/v1*)
+            endpoint="${url#https://api.hetzner.cloud/v1}" ;;
+        https://api.digitalocean.com/v2*)
+            endpoint="${url#https://api.digitalocean.com/v2}" ;;
+        https://api.vultr.com/v2*)
+            endpoint="${url#https://api.vultr.com/v2}" ;;
+        https://api.linode.com/v4*)
+            endpoint="${url#https://api.linode.com/v4}" ;;
+        https://cloud.lambdalabs.com/api/v1*)
+            endpoint="${url#https://cloud.lambdalabs.com/api/v1}" ;;
+        https://api.civo.com/v2*)
+            endpoint="${url#https://api.civo.com/v2}" ;;
+        https://api.upcloud.com/1.3*)
+            endpoint="${url#https://api.upcloud.com/1.3}" ;;
+        https://api.binarylane.com.au/v2*)
+            endpoint="${url#https://api.binarylane.com.au/v2}" ;;
+        https://api.scaleway.com/*)
+            endpoint=$(_strip_scaleway_endpoint "$url") ;;
+        https://api.genesiscloud.com/compute/v1*)
+            endpoint="${url#https://api.genesiscloud.com/compute/v1}" ;;
+        https://console.kamatera.com/svc*)
+            endpoint="${url#https://console.kamatera.com/svc}" ;;
+        https://api.latitude.sh*)
+            endpoint="${url#https://api.latitude.sh}" ;;
+        https://infrahub-api.nexgencloud.com/v1*)
+            endpoint="${url#https://infrahub-api.nexgencloud.com/v1}" ;;
+        *eu.api.ovh.com*)
+            endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
+        https://cloudapi.atlantic.net/*)
+            endpoint=$(echo "$url" | sed 's|https://cloudapi.atlantic.net/\?||') ;;
+        https://invapi.hostkey.com*)
+            endpoint="${url#https://invapi.hostkey.com}" ;;
+        https://*.cloudsigma.com/api/2.0*)
+            endpoint=$(echo "$url" | sed 's|https://[^/]*.cloudsigma.com/api/2.0||') ;;
+        https://api.webdock.io/v1*)
+            endpoint="${url#https://api.webdock.io/v1}" ;;
+        https://api.serverspace.io/api/v1*)
+            endpoint="${url#https://api.serverspace.io/api/v1}" ;;
+        https://api.gcore.com*)
+            endpoint=$(_strip_gcore_endpoint "$url") ;;
     esac
 
     echo "$endpoint" | sed 's|?.*||'
