@@ -32,7 +32,7 @@ log_step "Installing Codex CLI..."
 run_server "${HOSTKEY_INSTANCE_IP}" "npm install -g @openai/codex"
 
 # Verify installation succeeded
-if ! run_server "${HOSTKEY_INSTANCE_IP}" "command -v codex &> /dev/null && codex --version &> /dev/null"; then
+if ! run_server "${HOSTKEY_INSTANCE_IP}" "command -v codex >/dev/null 2>&1 && codex --version >/dev/null 2>&1"; then
     log_install_failed "Codex CLI" "npm install -g @openai/codex" "${HOSTKEY_INSTANCE_IP}"
     exit 1
 fi
