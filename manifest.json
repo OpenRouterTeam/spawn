@@ -1344,7 +1344,7 @@
     "hostkey/aider": "implemented",
     "hostkey/goose": "implemented",
     "hostkey/codex-cli": "missing",
-    "hostkey/open-interpreter": "missing",
+    "hostkey/open-interpreter": "implemented",
     "hostkey/gemini-cli": "missing",
     "hostkey/amazonq": "missing",
     "hostkey/cline": "implemented",
