@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly RAMNODE_API_BASE="https://openstack.ramnode.com"
+SPAWN_DASHBOARD_URL="https://manage.ramnode.com/"
 readonly RAMNODE_IDENTITY_API="${RAMNODE_API_BASE}:5000/v3"
 readonly RAMNODE_COMPUTE_API="${RAMNODE_API_BASE}:8774/v2.1"
 readonly RAMNODE_NETWORK_API="${RAMNODE_API_BASE}:9696/v2.0"

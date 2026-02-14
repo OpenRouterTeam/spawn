@@ -17,6 +17,7 @@ CHERRY_API_BASE="https://api.cherryservers.com/v1"
 CHERRY_DEFAULT_PLAN="${CHERRY_DEFAULT_PLAN:-cloud_vps_1}"
 CHERRY_DEFAULT_REGION="${CHERRY_DEFAULT_REGION:-eu_nord_1}"
 CHERRY_DEFAULT_IMAGE="${CHERRY_DEFAULT_IMAGE:-Ubuntu 24.04 64bit}"
+SPAWN_DASHBOARD_URL="https://portal.cherryservers.com/"
 
 # Configurable timeout/delay constants
 INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}

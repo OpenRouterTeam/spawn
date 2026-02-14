@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly NETCUP_API_BASE="https://ccp.netcup.net/run/webservice/servers/endpoint.php"
+SPAWN_DASHBOARD_URL="https://ccp.netcup.net/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Check if a Netcup API response indicates success

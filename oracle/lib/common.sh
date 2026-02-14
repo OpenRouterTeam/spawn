@@ -21,6 +21,7 @@ fi
 # OCI specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://cloud.oracle.com/compute/instances"
 # SSH_OPTS is defined in shared/common.sh
 
 # Configurable timeout/delay constants

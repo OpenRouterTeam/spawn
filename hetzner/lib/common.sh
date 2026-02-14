@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly HETZNER_API_BASE="https://api.hetzner.cloud/v1"
+SPAWN_DASHBOARD_URL="https://console.hetzner.cloud/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Centralized curl wrapper for Hetzner API

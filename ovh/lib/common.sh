@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly OVH_API_BASE="https://eu.api.ovh.com/1.0"
+SPAWN_DASHBOARD_URL="https://www.ovhcloud.com/manager/"
 
 # OVH API requires signature-based authentication.
 # Headers: X-Ovh-Application, X-Ovh-Consumer, X-Ovh-Timestamp, X-Ovh-Signature

@@ -19,6 +19,7 @@ fi
 # ============================================================
 
 readonly LATITUDE_API_BASE="https://api.latitude.sh"
+SPAWN_DASHBOARD_URL="https://www.latitude.sh/dashboard"
 
 # Centralized curl wrapper for Latitude.sh API
 latitude_api() {

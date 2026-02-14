@@ -19,6 +19,7 @@ fi
 # ============================================================
 
 readonly UPCLOUD_API_BASE="https://api.upcloud.com/1.3"
+SPAWN_DASHBOARD_URL="https://hub.upcloud.com/"
 
 # Configurable timeout/delay constants
 INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}
