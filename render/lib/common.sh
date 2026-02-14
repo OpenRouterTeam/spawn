@@ -166,7 +166,20 @@ _render_wait_for_service() {
         fi
 
         if [[ "$status" == "failed" ]]; then
-            log_error "Service deployment failed"
+            log_error "Service deployment failed with status: $status"
+            log_error ""
+            log_error "Common causes:"
+            log_error "  - Build failure (check Docker image or build command configuration)"
+            log_error "  - Insufficient resources for the selected instance type"
+            log_error "  - Health check failure (service crashed during startup)"
+            log_error "  - Application error in start command or missing runtime dependencies"
+            log_error "  - Network/port configuration issues"
+            log_error ""
+            log_error "Debugging steps:"
+            log_error "  1. View deployment logs at: https://dashboard.render.com/"
+            log_error "  2. Check build and runtime logs for error messages"
+            log_error "  3. Verify service configuration (ports, env vars, start command)"
+            log_error "  4. Try a different region or instance type"
             return 1
         fi
 
@@ -176,9 +189,13 @@ _render_wait_for_service() {
     done
 
     log_error "Service did not become live after $max_attempts attempts"
-    log_warn "The service may still be deploying. You can:"
-    log_warn "  1. Re-run the command to try again"
-    log_warn "  2. Check the service status in the Render dashboard"
+    log_error ""
+    log_error "The service may still be deploying. You can:"
+    log_error "  1. Check deployment status at: https://dashboard.render.com/"
+    log_error "  2. View real-time deployment logs in the dashboard"
+    log_error "  3. Re-run the spawn command to retry"
+    log_error ""
+    log_error "If the issue persists, the service may need manual intervention via the Render dashboard."
     return 1
 }
 
