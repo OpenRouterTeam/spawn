@@ -469,51 +469,41 @@ has_api_error() {
     local cloud="$1"
     local response="$2"
 
-    echo "$response" | python3 -c "
+    echo "$response" | python3 << VALIDATION_EOF 2>/dev/null
 import json, sys
 d = json.loads(sys.stdin.read())
-cloud = sys.argv[1]
+cloud = '$cloud'
 
-if cloud == 'hetzner':
-    err = d.get('error')
-    sys.exit(0 if err and isinstance(err, dict) else 1)
-elif cloud == 'digitalocean':
-    sys.exit(0 if 'id' in d and isinstance(d.get('id'), str) and 'message' in d else 1)
-elif cloud in ('vultr', 'genesiscloud', 'hyperstack'):
-    sys.exit(0 if 'error' in d and d['error'] else 1)
-elif cloud == 'linode':
-    sys.exit(0 if 'errors' in d and d['errors'] else 1)
-elif cloud in ('ovh', 'scaleway', 'binarylane'):
-    # These use 'message' for errors, but some success responses also have 'message'
-    sys.exit(0 if 'message' in d and len(d) <= 3 and not any(k in d for k in ('servers','images','ssh_keys','flavors','sizes','regions')) else 1)
-elif cloud == 'civo':
-    sys.exit(0 if 'reason' in d and 'result' in d and d['result'] == 'failed' else 1)
-elif cloud == 'lambda':
-    err = d.get('error')
-    sys.exit(0 if err and isinstance(err, dict) else 1)
-elif cloud == 'kamatera':
-    sys.exit(0 if d.get('status') == 'error' else 1)
-elif cloud == 'latitude':
-    sys.exit(0 if 'error' in d or ('errors' in d and d['errors']) else 1)
-elif cloud == 'atlanticnet':
-    sys.exit(0 if 'error' in d and d['error'] else 1)
-elif cloud == 'hostkey':
-    sys.exit(0 if 'error' in d and d['error'] else 1)
-elif cloud == 'cloudsigma':
-    # CloudSigma returns error objects with 'error_message', 'error_type', etc
-    sys.exit(0 if 'error_message' in d or 'error_type' in d else 1)
-elif cloud == 'webdock':
-    # Webdock returns error objects with 'message' field
-    sys.exit(0 if 'message' in d and len(d) <= 3 and not any(k in d for k in ('slug','name','status','ipv4')) else 1)
-elif cloud == 'serverspace':
-    # ServerSpace returns error objects with 'error' field
-    sys.exit(0 if 'error' in d and d['error'] else 1)
-elif cloud == 'gcore':
-    # Gcore returns error objects with 'message' or 'detail' fields
-    sys.exit(0 if ('message' in d and len(d) <= 3 and not any(k in d for k in ('count','results','id','name'))) or ('detail' in d and len(d) <= 2) else 1)
+# Helper: data keys that indicate success responses (not errors)
+success_keys = {'servers','images','ssh_keys','flavors','sizes','regions','count','results','id','name','slug','status','ipv4'}
+
+error_checks = {
+    'hetzner': lambda d: d.get('error') and isinstance(d.get('error'), dict),
+    'digitalocean': lambda d: 'id' in d and isinstance(d.get('id'), str) and 'message' in d,
+    'vultr': lambda d: 'error' in d and d['error'],
+    'genesiscloud': lambda d: 'error' in d and d['error'],
+    'hyperstack': lambda d: 'error' in d and d['error'],
+    'linode': lambda d: 'errors' in d and d['errors'],
+    'ovh': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
+    'scaleway': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
+    'binarylane': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
+    'civo': lambda d: 'reason' in d and 'result' in d and d['result'] == 'failed',
+    'lambda': lambda d: d.get('error') and isinstance(d.get('error'), dict),
+    'kamatera': lambda d: d.get('status') == 'error',
+    'latitude': lambda d: 'error' in d or ('errors' in d and d['errors']),
+    'atlanticnet': lambda d: 'error' in d and d['error'],
+    'hostkey': lambda d: 'error' in d and d['error'],
+    'cloudsigma': lambda d: 'error_message' in d or 'error_type' in d,
+    'webdock': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
+    'serverspace': lambda d: 'error' in d and d['error'],
+    'gcore': lambda d: ('message' in d and len(d) <= 3 and not any(k in d for k in success_keys)) or ('detail' in d and len(d) <= 2),
+}
+
+if cloud in error_checks:
+    sys.exit(0 if error_checks[cloud](d) else 1)
 else:
     sys.exit(1)
-" "$cloud" 2>/dev/null
+VALIDATION_EOF
 }
 
 # --- Pretty print JSON ---
@@ -1084,6 +1074,30 @@ record_cloud() {
     printf '\n'
 }
 
+# Format env var name for list display
+# Args: cloud
+_format_env_var_display() {
+    local cloud="$1"
+    local env_var
+    env_var=$(get_auth_env_var "$cloud")
+
+    # For multi-var clouds, show required env vars from spec
+    local specs
+    specs=$(_get_multi_cred_spec "$cloud")
+    if [[ -n "$specs" ]]; then
+        local first_var var_count
+        first_var=$(head -1 <<< "$specs")
+        first_var="${first_var#*:}"
+        var_count=$(wc -l <<< "$specs" | tr -d ' ')
+        if [[ "$var_count" -gt 1 ]]; then
+            env_var="${first_var} + $((var_count - 1)) more"
+        else
+            env_var="$first_var"
+        fi
+    fi
+    printf '%s' "$env_var"
+}
+
 # --- List mode ---
 list_clouds() {
     printf '%b\n' "${CYAN}Recordable clouds:${NC}"
@@ -1091,43 +1105,23 @@ list_clouds() {
     printf "  %-15s %-30s %s\n" "CLOUD" "AUTH ENV VAR" "STATUS"
     printf "  %-15s %-30s %s\n" "-----" "------------" "------"
 
+    local ready_count=0
     for cloud in $ALL_RECORDABLE_CLOUDS; do
         local env_var
-        env_var=$(get_auth_env_var "$cloud")
+        env_var=$(_format_env_var_display "$cloud")
         local status
 
         if has_credentials "$cloud"; then
             status=$(printf '%b' "${GREEN}ready${NC}")
+            ready_count=$((ready_count + 1))
         else
             status=$(printf '%b' "${RED}not set${NC}")
-        fi
-
-        # For multi-var clouds, show required env vars from spec
-        local specs
-        specs=$(_get_multi_cred_spec "$cloud")
-        if [[ -n "$specs" ]]; then
-            local first_var var_count
-            first_var=$(head -1 <<< "$specs")
-            first_var="${first_var#*:}"
-            var_count=$(wc -l <<< "$specs" | tr -d ' ')
-            if [[ "$var_count" -gt 1 ]]; then
-                env_var="${first_var} + $((var_count - 1)) more"
-            else
-                env_var="$first_var"
-            fi
         fi
 
         printf "  %-15s %-30s %b\n" "$cloud" "$env_var" "$status"
     done
 
     printf '\n'
-    local ready_count=0
-    for cloud in $ALL_RECORDABLE_CLOUDS; do
-        if has_credentials "$cloud"; then
-            ready_count=$((ready_count + 1))
-        fi
-    done
-
     local total_count
     total_count=$(echo "$ALL_RECORDABLE_CLOUDS" | wc -w | tr -d ' ')
     printf '%b\n' "  ${ready_count}/${total_count} clouds have credentials set"

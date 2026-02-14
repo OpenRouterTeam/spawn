@@ -565,6 +565,27 @@ discover_agents() {
 # Test runner helpers
 # ============================================================
 
+# Wait for a process to complete or timeout
+# Args: pid timeout_seconds exit_code_var
+_wait_with_timeout() {
+    local pid="$1"
+    local timeout="$2"
+    local exit_code_var="$3"
+    local i=0
+
+    while kill -0 "$pid" 2>/dev/null; do
+        if [[ "$i" -ge "$timeout" ]]; then
+            kill -9 "$pid" 2>/dev/null
+            wait "$pid" 2>/dev/null || true
+            eval "${exit_code_var}=124"
+            return
+        fi
+        sleep 1
+        i=$((i + 1))
+    done
+    wait "$pid" 2>/dev/null || eval "${exit_code_var}=$?"
+}
+
 # Run a script in a sandboxed environment with a 4-second timeout.
 # Sets exit_code variable in the caller's scope.
 # Args: script_path cloud state_file fake_home
@@ -588,18 +609,7 @@ run_script_with_timeout() {
     HOME="${fake_home}" \
         bash "${script_path}" < /dev/null > "${TEST_DIR}/output.log" 2>&1 &
     local pid=$!
-    local i=0
-    while kill -0 "$pid" 2>/dev/null; do
-        if [[ "$i" -ge 4 ]]; then
-            kill -9 "$pid" 2>/dev/null
-            wait "$pid" 2>/dev/null || true
-            exit_code=124
-            return
-        fi
-        sleep 1
-        i=$((i + 1))
-    done
-    wait "$pid" 2>/dev/null || exit_code=$?
+    _wait_with_timeout "$pid" 4 "exit_code"
 }
 
 # Print last 20 lines of output on script failure.
@@ -727,6 +737,35 @@ _has_missing_fixture() {
     grep -q "NO_FIXTURE:" "${MOCK_LOG}" 2>/dev/null && echo 1 || echo 0
 }
 
+# Setup test environment for a script
+# Args: cloud state_file
+_setup_test_env() {
+    local cloud="$1"
+    local state_file="$2"
+    : > "${MOCK_LOG}"
+    setup_env_for_cloud "$cloud"
+    : > "${state_file}"
+}
+
+# Record test result based on failure categories
+# Args: cloud agent pre_failed
+_record_categorized_result() {
+    local cloud="$1"
+    local agent="$2"
+    local pre_failed="$3"
+
+    local pre_fail=$((FAILED - pre_failed))
+    if [[ "$pre_fail" -gt 0 ]]; then
+        local _has_no_fixture
+        _has_no_fixture=$(_has_missing_fixture)
+        local _reason
+        _reason=$(_categorize_failure "$_has_no_fixture" "$_exit_failed" "$_api_failed" "$_ssh_failed" "$_env_failed")
+        record_test_result "${cloud}" "${agent}" "fail" "${_reason}"
+    else
+        record_test_result "${cloud}" "${agent}" "pass"
+    fi
+}
+
 run_test() {
     local cloud="$1"
     local agent="$2"
@@ -741,15 +780,11 @@ run_test() {
     printf '%b\n' "  ${CYAN}test${NC} ${cloud}/${agent}.sh"
 
     local _pre_failed="${FAILED}"
-
-    : > "${MOCK_LOG}"
-    setup_env_for_cloud "$cloud"
-
     local fake_home
     fake_home=$(setup_fake_home)
-
     local state_file="${TEST_DIR}/state_${cloud}_${agent}.log"
-    : > "${state_file}"
+
+    _setup_test_env "$cloud" "$state_file"
 
     local exit_code
     run_script_with_timeout "${script_path}" "${cloud}" "${state_file}" "${fake_home}"
@@ -763,18 +798,7 @@ run_test() {
 
     # Normal mode: run standard assertions and track failures per category
     _run_assertions_and_track "${exit_code}" "${cloud}" "${state_file}"
-
-    # Record result with failure category
-    local pre_fail=$((FAILED - _pre_failed))
-    if [[ "$pre_fail" -gt 0 ]]; then
-        local _has_no_fixture
-        _has_no_fixture=$(_has_missing_fixture)
-        local _reason
-        _reason=$(_categorize_failure "$_has_no_fixture" "$_exit_failed" "$_api_failed" "$_ssh_failed" "$_env_failed")
-        record_test_result "${cloud}" "${agent}" "fail" "${_reason}"
-    else
-        record_test_result "${cloud}" "${agent}" "pass"
-    fi
+    _record_categorized_result "${cloud}" "${agent}" "$_pre_failed"
 
     printf '\n'
 }
