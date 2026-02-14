@@ -1971,6 +1971,7 @@ _validate_token_with_provider() {
     local test_func="${1}"
     local env_var_name="${2}"
     local provider_name="${3}"
+    local help_url="${4:-}"
 
     if [[ -z "${test_func}" ]]; then
         return 0  # No validation needed
@@ -1981,8 +1982,14 @@ _validate_token_with_provider() {
         log_error "The token may be expired, revoked, or incorrectly copied."
         log_error ""
         log_error "How to fix:"
-        log_error "  1. Re-run the command to enter a new token"
-        log_error "  2. Or set it directly: ${env_var_name}=your-token spawn ..."
+        if [[ -n "${help_url}" ]]; then
+            log_error "  1. Get a new token from: ${help_url}"
+            log_error "  2. Re-run the command and paste the new token"
+            log_error "  3. Or set it directly: ${env_var_name}=your-token spawn ..."
+        else
+            log_error "  1. Re-run the command to enter a new token"
+            log_error "  2. Or set it directly: ${env_var_name}=your-token spawn ..."
+        fi
         unset "${env_var_name}"
         return 1
     fi
@@ -2048,7 +2055,7 @@ ensure_api_token_with_provider() {
     export "${env_var_name}=${token}"
 
     # Validate with provider API
-    if ! _validate_token_with_provider "${test_func}" "${env_var_name}" "${provider_name}"; then
+    if ! _validate_token_with_provider "${test_func}" "${env_var_name}" "${provider_name}" "${help_url}"; then
         return 1
     fi
 
@@ -2206,7 +2213,10 @@ _multi_creds_validate() {
     if ! "${test_func}"; then
         log_error "Invalid ${provider_name} credentials"
         log_error "The credentials may be expired, revoked, or incorrectly copied."
-        log_error "Please re-run the command to enter new credentials."
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Get new credentials from: ${help_url}"
+        log_error "  2. Re-run the command and enter the new credentials"
         local v
         for v in "$@"; do
             unset "${v}"
