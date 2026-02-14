@@ -356,36 +356,25 @@ _handle_gcore_create_error() {
     log_warn "Check your dashboard: https://portal.gcore.com/"
 }
 
-create_server() {
-    local name="$1"
-    local region="${GCORE_REGION:-ed-1}"
-
-    # Validate env var inputs
-    validate_region_name "$region" || { log_error "Invalid GCORE_REGION"; return 1; }
-
-    log_step "Creating Gcore instance '$name' (region: $region)..."
-
-    # Gather required resource IDs
+# Gather all required resource IDs for instance creation
+_gather_instance_resources() {
+    local region="$1"
     local flavor image_id ssh_key_name
+
     flavor=$(get_flavor_id "$region") || return 1
     image_id=$(get_ubuntu_image_id "$region") || return 1
     ssh_key_name=$(get_ssh_key_name) || return 1
 
     log_info "Using flavor: $flavor, image: $image_id"
 
-    # Build request body with cloud-init userdata
-    local init_script
-    init_script=$(get_cloud_init_userdata)
+    echo "$flavor|$image_id|$ssh_key_name"
+}
 
-    local body
-    body=$(build_create_instance_body "$name" "$flavor" "$region" "$image_id" "$ssh_key_name" "$init_script")
+# Extract instance ID from API response
+_extract_instance_id() {
+    local response="$1"
 
-    local response
-    response=$(gcore_api POST "/cloud/v2/instances/${GCORE_PROJECT_ID}/${region}" "$body")
-
-    # Gcore v2 create returns a task; extract instance ID from tasks array
-    local instance_id
-    instance_id=$(echo "$response" | python3 -c "
+    echo "$response" | python3 -c "
 import json, sys
 d = json.loads(sys.stdin.read())
 # v2 returns {\"tasks\": [\"task-uuid\"], \"instances\": [\"instance-uuid\"]}
@@ -398,7 +387,36 @@ if 'id' in d:
     print(d['id'])
     sys.exit(0)
 sys.exit(1)
-" 2>/dev/null)
+" 2>/dev/null
+}
+
+create_server() {
+    local name="$1"
+    local region="${GCORE_REGION:-ed-1}"
+
+    # Validate env var inputs
+    validate_region_name "$region" || { log_error "Invalid GCORE_REGION"; return 1; }
+
+    log_step "Creating Gcore instance '$name' (region: $region)..."
+
+    # Gather required resource IDs
+    local resources
+    resources=$(_gather_instance_resources "$region") || return 1
+    IFS='|' read -r flavor image_id ssh_key_name <<< "$resources"
+
+    # Build request body with cloud-init userdata
+    local init_script
+    init_script=$(get_cloud_init_userdata)
+
+    local body
+    body=$(build_create_instance_body "$name" "$flavor" "$region" "$image_id" "$ssh_key_name" "$init_script")
+
+    local response
+    response=$(gcore_api POST "/cloud/v2/instances/${GCORE_PROJECT_ID}/${region}" "$body")
+
+    # Extract instance ID from response
+    local instance_id
+    instance_id=$(_extract_instance_id "$response")
 
     if [[ -z "${instance_id:-}" ]]; then
         _handle_gcore_create_error "$response"

@@ -106,6 +106,145 @@ print(sum(1 for v in m.get('matrix', {}).values() if v == 'missing'))
 PYEOF
 }
 
+# Cleanup stale worktrees, branches, and related state
+_cleanup_stale_artifacts() {
+    log_info "Pre-cycle cleanup..."
+    git worktree prune 2>/dev/null || true
+    if [[ -d "${WORKTREE_BASE}" ]]; then
+        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+        log_info "Removed stale ${WORKTREE_BASE} directory"
+    fi
+
+    # Delete merged discovery-related remote branches
+    local MERGED_BRANCHES
+    MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'origin/main\|origin/HEAD' | grep -E 'origin/(add-|impl-|gap-filler-)' | sed 's|origin/||' | tr -d ' ') || true
+    for branch in $MERGED_BRANCHES; do
+        if [[ -n "$branch" ]]; then
+            git push origin --delete "$branch" 2>&1 && log_info "Deleted merged branch: $branch" || true
+        fi
+    done
+
+    # Delete stale local discovery-related branches
+    local LOCAL_BRANCHES
+    LOCAL_BRANCHES=$(git branch --list 'add-*' --list 'impl-*' --list 'gap-filler-*' | tr -d ' *') || true
+    for branch in $LOCAL_BRANCHES; do
+        if [[ -n "$branch" ]]; then
+            git branch -D "$branch" 2>/dev/null || true
+        fi
+    done
+
+    log_info "Pre-cycle cleanup done."
+}
+
+# Prepare prompt file with interpolated manifest summary
+_prepare_prompt_file() {
+    local output_file="$1"
+    build_team_prompt > "${output_file}"
+
+    # Substitute MATRIX_SUMMARY_PLACEHOLDER with actual summary using python3
+    local summary
+    summary=$(get_matrix_summary)
+    python3 - "${output_file}" "${summary}" <<'PYEOF'
+import sys
+path, replacement = sys.argv[1], sys.argv[2]
+content = open(path).read()
+open(path, 'w').write(content.replace('MATRIX_SUMMARY_PLACEHOLDER', replacement))
+PYEOF
+
+    # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
+    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${output_file}"
+}
+
+# Kill claude process and its full process tree
+_kill_claude_process() {
+    local pipe_pid="$1"
+    local claude_pid_file="$2"
+    local cpid
+    cpid=$(cat "${claude_pid_file}" 2>/dev/null)
+    if [[ -n "${cpid}" ]] && kill -0 "${cpid}" 2>/dev/null; then
+        log_info "Killing claude (pid=${cpid}) and its process tree"
+        pkill -TERM -P "${cpid}" 2>/dev/null || true
+        kill -TERM "${cpid}" 2>/dev/null || true
+        sleep 5
+        pkill -KILL -P "${cpid}" 2>/dev/null || true
+        kill -KILL "${cpid}" 2>/dev/null || true
+    fi
+    kill "${pipe_pid}" 2>/dev/null || true
+}
+
+# Monitor watchdog for claude process and handle timeouts
+_run_watchdog_loop() {
+    local pipe_pid="$1"
+    local idle_timeout="$2"
+    local hard_timeout="$3"
+    local claude_pid_file="$4"
+    local log_start_size="$5"
+
+    local LAST_SIZE
+    LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+    local IDLE_SECONDS=0
+    local WALL_START
+    WALL_START=$(date +%s)
+    local SESSION_ENDED=false
+
+    while kill -0 "${pipe_pid}" 2>/dev/null; do
+        sleep 10
+        local CURR_SIZE
+        CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+        local WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
+
+        # Check if the stream-json "result" event has been emitted (session complete)
+        if [[ "${SESSION_ENDED}" = false ]] && tail -c +"$((log_start_size + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
+            SESSION_ENDED=true
+            log_info "Session ended (result event detected) — waiting 30s for cleanup then killing"
+            sleep 30
+            _kill_claude_process "${pipe_pid}" "${claude_pid_file}"
+            break
+        fi
+
+        if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
+            IDLE_SECONDS=$((IDLE_SECONDS + 10))
+            if [[ "${IDLE_SECONDS}" -ge "${idle_timeout}" ]]; then
+                log_warn "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
+                _kill_claude_process "${pipe_pid}" "${claude_pid_file}"
+                break
+            fi
+        else
+            IDLE_SECONDS=0
+            LAST_SIZE="${CURR_SIZE}"
+        fi
+
+        if [[ "${WALL_ELAPSED}" -ge "${hard_timeout}" ]]; then
+            log_warn "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
+            _kill_claude_process "${pipe_pid}" "${claude_pid_file}"
+            break
+        fi
+    done
+
+    wait "${pipe_pid}" 2>/dev/null
+    echo $?  # return exit code to caller
+}
+
+# Handle post-cycle status and checkpointing
+_handle_cycle_completion() {
+    local exit_code="$1"
+    local idle_seconds="$2"
+    local idle_timeout="$3"
+    local session_ended="$4"
+
+    if [[ "${exit_code}" -eq 0 ]] || [[ "${session_ended}" = true ]]; then
+        log_info "Cycle completed successfully"
+        log_info "Creating checkpoint..."
+        sprite-env checkpoint create --comment "discovery cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+    elif [[ "${idle_seconds}" -ge "${idle_timeout}" ]]; then
+        log_warn "Cycle killed by activity watchdog (no output for ${idle_timeout}s)"
+        log_info "Creating checkpoint for partial work..."
+        sprite-env checkpoint create --comment "discovery cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
+    else
+        log_error "Cycle failed (exit_code=${exit_code})"
+    fi
+}
+
 build_team_prompt() {
     cat <<'PROMPT_EOF'
 You are the lead of the spawn discovery team. Read CLAUDE.md and manifest.json first.
@@ -352,53 +491,15 @@ run_team_cycle() {
     git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
-    # --- Pre-cycle cleanup: stale worktrees and branches ---
-    log_info "Pre-cycle cleanup..."
-    git worktree prune 2>/dev/null || true
-    if [[ -d "${WORKTREE_BASE}" ]]; then
-        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
-        log_info "Removed stale ${WORKTREE_BASE} directory"
-    fi
-
-    # Delete merged discovery-related remote branches
-    # Discovery teammates create branches like: add-*, impl-*, gap-filler-*, {cloud}-{agent}
-    MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'origin/main\|origin/HEAD' | grep -E 'origin/(add-|impl-|gap-filler-)' | sed 's|origin/||' | tr -d ' ') || true
-    for branch in $MERGED_BRANCHES; do
-        if [[ -n "$branch" ]]; then
-            git push origin --delete "$branch" 2>&1 && log_info "Deleted merged branch: $branch" || true
-        fi
-    done
-
-    # Delete stale local discovery-related branches
-    LOCAL_BRANCHES=$(git branch --list 'add-*' --list 'impl-*' --list 'gap-filler-*' | tr -d ' *') || true
-    for branch in $LOCAL_BRANCHES; do
-        if [[ -n "$branch" ]]; then
-            git branch -D "$branch" 2>/dev/null || true
-        fi
-    done
-
-    log_info "Pre-cycle cleanup done."
+    # Cleanup stale artifacts
+    _cleanup_stale_artifacts
 
     # Set up worktree directory for parallel teammate work
     mkdir -p "${WORKTREE_BASE}"
 
-    # Write prompt to temp file (from refactor.sh pattern)
+    # Prepare prompt file with manifest summary interpolated
     PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
-    build_team_prompt > "${PROMPT_FILE}"
-
-    # Substitute MATRIX_SUMMARY_PLACEHOLDER with actual summary using python3
-    # (sed cannot safely handle multi-line replacements; python3 avoids shell expansion)
-    local summary
-    summary=$(get_matrix_summary)
-    python3 - "${PROMPT_FILE}" "${summary}" <<'PYEOF'
-import sys
-path, replacement = sys.argv[1], sys.argv[2]
-content = open(path).read()
-open(path, 'w').write(content.replace('MATRIX_SUMMARY_PLACEHOLDER', replacement))
-PYEOF
-
-    # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    _prepare_prompt_file "${PROMPT_FILE}"
 
     log_info "Launching spawn team..."
     log_info "Worktree base: ${WORKTREE_BASE}"
@@ -426,81 +527,21 @@ PYEOF
     local PIPE_PID=$!
     sleep 2  # let claude start and write its PID
 
-    # Kill claude and its full process tree reliably
-    kill_claude() {
-        local cpid
-        cpid=$(cat "${CLAUDE_PID_FILE}" 2>/dev/null)
-        if [[ -n "${cpid}" ]] && kill -0 "${cpid}" 2>/dev/null; then
-            log_info "Killing claude (pid=${cpid}) and its process tree"
-            pkill -TERM -P "${cpid}" 2>/dev/null || true
-            kill -TERM "${cpid}" 2>/dev/null || true
-            sleep 5
-            pkill -KILL -P "${cpid}" 2>/dev/null || true
-            kill -KILL "${cpid}" 2>/dev/null || true
-        fi
-        kill "${PIPE_PID}" 2>/dev/null || true
-    }
+    local LOG_START_SIZE
+    LOG_START_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
 
-    # Watchdog loop: check log file growth and detect session completion
-    local LAST_SIZE
-    LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
-    local LOG_START_SIZE="${LAST_SIZE}"  # bytes before this cycle — skip old content
-    local IDLE_SECONDS=0
-    local WALL_START
-    WALL_START=$(date +%s)
-    local SESSION_ENDED=false
-
-    while kill -0 "${PIPE_PID}" 2>/dev/null; do
-        sleep 10
-        local CURR_SIZE
-        CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
-        local WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
-
-        # Check if the stream-json "result" event has been emitted (session complete).
-        # Only check content written SINCE this cycle started (skip old log entries).
-        # After this, claude hangs waiting for teammate subprocesses — kill immediately.
-        if [[ "${SESSION_ENDED}" = false ]] && tail -c +"$((LOG_START_SIZE + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
-            SESSION_ENDED=true
-            log_info "Session ended (result event detected) — waiting 30s for cleanup then killing"
-            sleep 30
-            kill_claude
-            break
-        fi
-
-        if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
-            IDLE_SECONDS=$((IDLE_SECONDS + 10))
-            if [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
-                log_warn "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
-                kill_claude
-                break
-            fi
-        else
-            IDLE_SECONDS=0
-            LAST_SIZE="${CURR_SIZE}"
-        fi
-
-        # Hard wall-clock timeout as final safety net
-        if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
-            log_warn "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
-            kill_claude
-            break
-        fi
-    done
-
-    wait "${PIPE_PID}" 2>/dev/null
+    # Run watchdog loop and capture exit code and idle seconds
+    _run_watchdog_loop "${PIPE_PID}" "${IDLE_TIMEOUT}" "${HARD_TIMEOUT}" "${CLAUDE_PID_FILE}" "${LOG_START_SIZE}"
     local CLAUDE_EXIT=$?
 
-    if [[ "${CLAUDE_EXIT}" -eq 0 ]] || [[ "${SESSION_ENDED}" = true ]]; then
-        log_info "Cycle completed successfully"
-        log_info "Creating checkpoint..."
-        sprite-env checkpoint create --comment "discovery cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
-    elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
-        log_warn "Cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
-        log_info "Creating checkpoint for partial work..."
-        sprite-env checkpoint create --comment "discovery cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
-    else
-        log_error "Cycle failed (exit_code=${CLAUDE_EXIT})"
+    # Determine if session ended by checking for "result" in recent log
+    local SESSION_ENDED=false
+    if tail -c +"$((LOG_START_SIZE + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
+        SESSION_ENDED=true
     fi
+
+    # Handle completion and checkpointing
+    _handle_cycle_completion "${CLAUDE_EXIT}" "0" "${IDLE_TIMEOUT}" "${SESSION_ENDED}"
 
     # Clean up PID file
     rm -f "${CLAUDE_PID_FILE}" 2>/dev/null || true
