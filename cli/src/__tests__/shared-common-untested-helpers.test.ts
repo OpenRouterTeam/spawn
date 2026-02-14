@@ -52,7 +52,7 @@ describe("log_install_failed", () => {
   it("should include agent name in error output", () => {
     const result = runBash(`log_install_failed "Claude Code" 2>&1`);
     expect(result.stdout).toContain("Claude Code");
-    expect(result.stdout).toContain("installation failed to complete successfully");
+    expect(result.stdout).toContain("installation failed");
   });
 
   it("should include all three arguments in error output", () => {
@@ -80,7 +80,7 @@ describe("log_install_failed", () => {
     const result = runBash(
       `log_install_failed "Goose" "pip install goose-ai" 2>&1`
     );
-    expect(result.stdout).toContain("Try the installation manually");
+    expect(result.stdout).toContain("Try manual installation");
     expect(result.stdout).toContain("pip install goose-ai");
   });
 
@@ -98,7 +98,7 @@ describe("log_install_failed", () => {
 
   it("should always suggest re-running the spawn command", () => {
     const result = runBash(`log_install_failed "Test" 2>&1`);
-    expect(result.stdout).toContain("Re-run spawn to try on a fresh server");
+    expect(result.stdout).toContain("Retry with a fresh server");
   });
 
   it("should handle agent name with spaces", () => {
@@ -106,7 +106,7 @@ describe("log_install_failed", () => {
       `log_install_failed "Claude Code Extended" "curl install.sh" "1.2.3.4" 2>&1`
     );
     expect(result.stdout).toContain("Claude Code Extended");
-    expect(result.stdout).toContain("installation failed to complete successfully");
+    expect(result.stdout).toContain("installation failed");
   });
 
   it("should not exit with an error code (informational only)", () => {
@@ -117,9 +117,9 @@ describe("log_install_failed", () => {
   it("should handle single argument (only agent name)", () => {
     const result = runBash(`log_install_failed "GPTMe" 2>&1`);
     expect(result.stdout).toContain("GPTMe");
-    expect(result.stdout).toContain("installation failed to complete successfully");
+    expect(result.stdout).toContain("installation failed");
     expect(result.stdout).not.toContain("ssh root@");
-    expect(result.stdout).not.toContain("Try the installation manually");
+    expect(result.stdout).not.toContain("Try manual installation");
   });
 });
 
