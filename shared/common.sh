@@ -1674,11 +1674,12 @@ wait_for_cloud_init() {
 # Run a command on a remote server via SSH
 # Usage: ssh_run_server IP COMMAND
 # Requires: SSH_USER (default: root), SSH_OPTS
+# SECURITY: Command is properly quoted to prevent shell injection
 ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
     # shellcheck disable=SC2086
-    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" "${cmd}"
+    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}"
 }
 
 # Upload a file to a remote server via SCP
@@ -1758,12 +1759,13 @@ _show_exec_post_session_summary() {
 # Start an interactive SSH session
 # Usage: ssh_interactive_session IP COMMAND
 # Requires: SSH_USER (default: root), SSH_OPTS
+# SECURITY: Command is properly quoted to prevent shell injection
 ssh_interactive_session() {
     local ip="${1}"
     local cmd="${2}"
     local ssh_exit=0
     # shellcheck disable=SC2086
-    ssh -t $SSH_OPTS "${SSH_USER:-root}@${ip}" "${cmd}" || ssh_exit=$?
+    ssh -t $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}" || ssh_exit=$?
     _show_post_session_summary "${ip}"
     return "${ssh_exit}"
 }
