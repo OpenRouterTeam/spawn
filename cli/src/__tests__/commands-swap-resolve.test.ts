@@ -569,6 +569,6 @@ describe("prompt handling with swapped args", () => {
     }
 
     const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
-    expect(errorCalls.some((msg: string) => msg.includes("dangerous") || msg.includes("blocked"))).toBe(true);
+    expect(errorCalls.some((msg: string) => msg.includes("shell syntax") || msg.includes("command substitution"))).toBe(true);
   });
 });
