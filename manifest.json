@@ -1346,7 +1346,7 @@
     "hostkey/codex-cli": "missing",
     "hostkey/open-interpreter": "implemented",
     "hostkey/gemini-cli": "missing",
-    "hostkey/amazonq": "missing",
+    "hostkey/amazonq": "implemented",
     "hostkey/cline": "implemented",
     "hostkey/gptme": "implemented",
     "hostkey/opencode": "missing",
