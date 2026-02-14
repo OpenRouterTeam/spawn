@@ -1765,6 +1765,11 @@ _poll_instance_once() {
     local ip
     ip=$(_extract_json_field "${response}" "${ip_py}")
     if [[ -n "${ip}" ]]; then
+        # SECURITY: Validate ip_var to prevent command injection
+        if [[ ! "${ip_var}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+            log_error "SECURITY: Invalid env var name rejected: ${ip_var}"
+            return 1
+        fi
         export "${ip_var}=${ip}"
         log_info "${description} ready (IP: ${ip})"
         return 0
@@ -1829,6 +1834,12 @@ _load_token_from_config() {
     local config_file="${1}"
     local env_var_name="${2}"
     local provider_name="${3}"
+
+    # SECURITY: Validate env_var_name to prevent command injection
+    if [[ ! "${env_var_name}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+        log_error "SECURITY: Invalid env var name rejected: ${env_var_name}"
+        return 1
+    fi
 
     if [[ ! -f "${config_file}" ]]; then
         return 1
@@ -1918,6 +1929,12 @@ ensure_api_token_with_provider() {
 
     local token
     token=$(validated_read "Enter your ${provider_name} API token: " validate_api_token) || return 1
+
+    # SECURITY: Validate env_var_name to prevent command injection
+    if [[ ! "${env_var_name}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+        log_error "SECURITY: Invalid env var name rejected: ${env_var_name}"
+        return 1
+    fi
 
     export "${env_var_name}=${token}"
 
@@ -2017,6 +2034,11 @@ _multi_creds_load_config() {
         if [[ -z "${value}" ]]; then
             return 1
         fi
+        # SECURITY: Validate env var name before export
+        if [[ ! "${env_vars[$i]}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+            log_error "SECURITY: Invalid env var name rejected: ${env_vars[$i]}"
+            return 1
+        fi
         export "${env_vars[$i]}=${value}"
         i=$((i + 1))
     done <<< "${creds}"
@@ -2044,6 +2066,11 @@ _multi_creds_prompt() {
 
     local idx
     for idx in $(seq 0 $((${#env_vars[@]} - 1))); do
+        # SECURITY: Validate env var name before export
+        if [[ ! "${env_vars[$idx]}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+            log_error "SECURITY: Invalid env var name rejected: ${env_vars[$idx]}"
+            return 1
+        fi
         local val
         val=$(safe_read "Enter ${provider_name} ${labels[$idx]}: ") || return 1
         if [[ -z "${val}" ]]; then

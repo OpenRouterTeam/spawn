@@ -225,7 +225,14 @@ except: pass
     read -ra fields <<< "$vals"
     local i
     for i in "${!env_vars[@]}"; do
-        [[ -n "${fields[$i]:-}" ]] && export "${env_vars[$i]}=${fields[$i]}"
+        # SECURITY: Validate env var name before export
+        if [[ -n "${fields[$i]:-}" ]]; then
+            if [[ ! "${env_vars[$i]}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+                echo "SECURITY: Invalid env var name rejected: ${env_vars[$i]}" >&2
+                return 1
+            fi
+            export "${env_vars[$i]}=${fields[$i]}"
+        fi
     done
     return 0
 }
@@ -308,6 +315,11 @@ try_load_config() {
 
     # Standard single-token config
     if [[ -f "$config_file" ]]; then
+        # SECURITY: Validate env var name before export
+        if [[ ! "${env_var}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+            echo "SECURITY: Invalid env var name rejected: ${env_var}" >&2
+            return 1
+        fi
         local token
         token=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('api_key','') or d.get('token',''))" "$config_file" 2>/dev/null) || true
         if [[ -n "${token:-}" ]]; then
@@ -385,6 +397,11 @@ prompt_credentials() {
     fi
 
     for var_name in $vars_needed; do
+        # SECURITY: Validate env var name before using in eval or export
+        if [[ ! "${var_name}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+            echo "SECURITY: Invalid env var name rejected: ${var_name}" >&2
+            return 1
+        fi
         eval "local current=\"\${${var_name}:-}\""
         if [[ -n "$current" ]]; then
             continue
