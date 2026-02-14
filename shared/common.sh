@@ -2034,6 +2034,27 @@ _save_token_to_config() {
 #            "https://cloud.lambdalabs.com/api-keys" test_lambda_token
 # TEST_FUNC should be a function that validates the token and returns 0 on success, 1 on failure
 # TEST_FUNC is optional - if empty, no validation is performed
+_prompt_for_api_token() {
+    local provider_name="${1}"
+    local help_url="${2}"
+
+    echo ""
+    log_step "${provider_name} API Token Required"
+    log_step "Get your token from: ${help_url}"
+    echo ""
+
+    validated_read "Enter your ${provider_name} API token: " validate_api_token
+}
+
+_validate_env_var_name() {
+    local env_var_name="${1}"
+    if [[ ! "${env_var_name}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+        log_error "SECURITY: Invalid env var name rejected: ${env_var_name}"
+        return 1
+    fi
+    return 0
+}
+
 ensure_api_token_with_provider() {
     local provider_name="${1}"
     local env_var_name="${2}"
@@ -2054,19 +2075,11 @@ ensure_api_token_with_provider() {
     fi
 
     # Prompt for new token
-    echo ""
-    log_step "${provider_name} API Token Required"
-    log_step "Get your token from: ${help_url}"
-    echo ""
-
     local token
-    token=$(validated_read "Enter your ${provider_name} API token: " validate_api_token) || return 1
+    token=$(_prompt_for_api_token "${provider_name}" "${help_url}") || return 1
 
     # SECURITY: Validate env_var_name to prevent command injection
-    if [[ ! "${env_var_name}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
-        log_error "SECURITY: Invalid env var name rejected: ${env_var_name}"
-        return 1
-    fi
+    _validate_env_var_name "${env_var_name}" || return 1
 
     export "${env_var_name}=${token}"
 
