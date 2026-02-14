@@ -2096,6 +2096,22 @@ _multi_creds_all_env_set() {
     return 0
 }
 
+# Parse credential specs (env_var:config_key:label format) into three arrays.
+# Sets: PARSED_ENV_VARS, PARSED_CONFIG_KEYS, PARSED_LABELS (global arrays)
+_parse_credential_specs() {
+    local spec
+    PARSED_ENV_VARS=()
+    PARSED_CONFIG_KEYS=()
+    PARSED_LABELS=()
+
+    for spec in "$@"; do
+        PARSED_ENV_VARS+=("${spec%%:*}")
+        local rest="${spec#*:}"
+        PARSED_CONFIG_KEYS+=("${rest%%:*}")
+        PARSED_LABELS+=("${rest#*:}")
+    done
+}
+
 # Load multi-credentials from a JSON config file into env vars.
 # Returns 0 if all fields loaded, 1 if any missing.
 # Usage: _multi_creds_load_config CONFIG_FILE env_vars[@] config_keys[@]
@@ -2209,37 +2225,30 @@ ensure_multi_credentials() {
 
     check_python_available || return 1
 
-    # Parse credential specs into parallel arrays
-    local env_vars=() config_keys=() labels=()
-    local spec
-    for spec in "$@"; do
-        env_vars+=("${spec%%:*}")
-        local rest="${spec#*:}"
-        config_keys+=("${rest%%:*}")
-        labels+=("${rest#*:}")
-    done
-
+    # Parse credential specs into arrays
+    _parse_credential_specs "$@"
+    local env_vars=("${PARSED_ENV_VARS[@]}")
+    local config_keys=("${PARSED_CONFIG_KEYS[@]}")
+    local labels=("${PARSED_LABELS[@]}")
     local n="${#env_vars[@]}"
 
-    # 1. All env vars already set?
+    # Try env vars first
     if _multi_creds_all_env_set "${env_vars[@]}"; then
         log_info "Using ${provider_name} credentials from environment"
         return 0
     fi
 
-    # 2. Try loading from config file
+    # Try config file second
     if _multi_creds_load_config "${config_file}" "${n}" "${env_vars[@]}" "${config_keys[@]}"; then
         log_info "Using ${provider_name} credentials from ${config_file}"
         return 0
     fi
 
-    # 3. Prompt for each credential
+    # Prompt, validate, and save
     _multi_creds_prompt "${provider_name}" "${help_url}" "${n}" "${env_vars[@]}" "${labels[@]}" || return 1
-
-    # 4. Validate credentials
     _multi_creds_validate "${test_func}" "${provider_name}" "${env_vars[@]}" || return 1
 
-    # 5. Save to config file
+    # Build and save config
     local save_args=()
     local idx
     for idx in $(seq 0 $((n - 1))); do
