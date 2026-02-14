@@ -394,10 +394,10 @@ Spawn **branch-cleaner** (model=haiku):
 Spawn **issue-checker** (model=haiku):
 - \`gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels,updatedAt,comments\`
 - For each issue, fetch full context: \`gh issue view NUMBER --repo OpenRouterTeam/spawn --comments\`
-- DEDUP before any comment: check for existing similar comments
-- For stale issues (>1h no activity) with security labels: re-evaluate and nudge if needed
-- For issues with no status label: add \`pending-review\`
-- Verify label consistency: every issue needs exactly ONE status label
+- **STRICT DEDUP — MANDATORY**: Check comments for \`-- security/issue-checker\`. If that sign-off already exists in ANY comment on the issue → **SKIP this issue entirely** (do NOT comment again) UNLESS there are new human comments posted AFTER the last \`-- security/issue-checker\` comment
+- **NEVER** post "status update", "re-triage", "triage update", or "status check" comments that restate existing information
+- For issues with no status label: silently add \`pending-review\` (no comment needed)
+- Verify label consistency silently: every issue needs exactly ONE status label — fix labels without commenting
 - **SIGN-OFF**: \`-- security/issue-checker\`
 
 ## Step 4.5 — Lightweight Repo Scan (if ≤5 open PRs)

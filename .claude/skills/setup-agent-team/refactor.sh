@@ -155,8 +155,8 @@ Track lifecycle: "pending-review" → "under-review" → "in-progress". Check la
 ## Workflow
 
 1. Create team, fetch issue, transition label to "in-progress"
-2. DEDUP: `gh issue view SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'` — only post acknowledgment if no automated comments exist
-3. Post acknowledgment (if needed): `gh issue comment SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now.\n\n-- refactor/issue-fixer"`
+2. DEDUP: `gh issue view SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --json comments --jq '.comments[].body'` — check if ANY comment contains a `-- ` sign-off (e.g. `-- security/triage`, `-- refactor/issue-fixer`, `-- discovery/issue-responder`). If ANY automated team has already commented → **SKIP the acknowledgment entirely**
+3. Post acknowledgment (ONLY if no `-- ` sign-off exists in any comment): `gh issue comment SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now.\n\n-- refactor/issue-fixer"`
 4. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER -b fix/issue-SPAWN_ISSUE_PLACEHOLDER origin/main`
 5. Spawn issue-fixer + issue-tester
 6. When fix is ready: push, create PR with `Fixes #SPAWN_ISSUE_PLACEHOLDER` in body, post update comment linking PR
@@ -242,14 +242,15 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
    Read ALL comments — prior discussion contains decisions, rejected approaches, and scope changes.
 
    **Labels**: "pending-review" → "under-review" → "in-progress". Check before modifying: `gh issue view NUMBER --json labels --jq '.labels[].name'`
-   **DEDUP**: Check `--json comments --jq '.comments[] | "\(.author.login): \(.body[-30:])"'` — skip if `-- refactor/community-coordinator` already exists.
+   **STRICT DEDUP — MANDATORY**: Check `--json comments --jq '.comments[] | "\(.author.login): \(.body[-30:])"'`
+   - If `-- refactor/community-coordinator` already exists in ANY comment → **only comment again if linking a NEW PR or reporting a concrete resolution** (fix merged, issue resolved)
+   - **NEVER** re-acknowledge, re-categorize, or restate what a prior comment already said
+   - **NEVER** post "interim updates", "status checks", or acknowledgment-only follow-ups
 
-   - Acknowledge issues briefly and casually (only if not already acknowledged)
+   - Acknowledge issues briefly and casually (only if NO prior `-- refactor/community-coordinator` comment exists)
    - Categorize (bug/feature/question) and delegate to relevant teammate
-   - Post interim updates as teammates report findings (only if no similar update exists)
    - Link PRs: `gh issue comment NUMBER --body "Fix in PR_URL. [explanation].\n\n-- refactor/community-coordinator"`
    - Do NOT close issues — PRs with `Fixes #NUMBER` auto-close on merge
-   - Re-scan every 5 min + final sweep. Every issue must be engaged by end of cycle.
    - **SIGN-OFF**: Every comment MUST end with `-- refactor/community-coordinator`
 
 ## Issue Fix Workflow
