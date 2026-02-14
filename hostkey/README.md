@@ -10,6 +10,12 @@ HOSTKEY VPS hosting via REST API. [HOSTKEY](https://hostkey.com/)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/claude.sh)
 ```
 
+#### Gemini CLI
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/gemini.sh)
+```
+
 #### OpenClaw
 
 ```bash
