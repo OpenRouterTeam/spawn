@@ -1595,14 +1595,41 @@ ssh_upload_file() {
     scp $SSH_OPTS "${local_path}" "${SSH_USER:-root}@${ip}:${remote_path}"
 }
 
+# Show a post-session summary reminding the user their server is still running.
+# Called automatically by ssh_interactive_session after the SSH session ends.
+# Uses optional env vars for richer output:
+#   SPAWN_DASHBOARD_URL - Cloud provider dashboard URL for managing servers
+# Arguments: IP
+_show_post_session_summary() {
+    local ip="${1}"
+    local dashboard_url="${SPAWN_DASHBOARD_URL:-}"
+
+    printf '\n'
+    log_warn "Session ended. Your server is still running at ${ip}."
+    log_warn ""
+    if [[ -n "${dashboard_url}" ]]; then
+        log_warn "To manage or delete it, visit your dashboard:"
+        log_warn "  ${dashboard_url}"
+    else
+        log_warn "Check your cloud provider dashboard to stop or delete the server"
+        log_warn "if you no longer need it."
+    fi
+    log_warn ""
+    log_warn "To reconnect:"
+    log_warn "  ssh ${SSH_USER:-root}@${ip}"
+}
+
 # Start an interactive SSH session
 # Usage: ssh_interactive_session IP COMMAND
 # Requires: SSH_USER (default: root), SSH_OPTS
 ssh_interactive_session() {
     local ip="${1}"
     local cmd="${2}"
+    local ssh_exit=0
     # shellcheck disable=SC2086
-    ssh -t $SSH_OPTS "${SSH_USER:-root}@${ip}" "${cmd}"
+    ssh -t $SSH_OPTS "${SSH_USER:-root}@${ip}" "${cmd}" || ssh_exit=$?
+    _show_post_session_summary "${ip}"
+    return "${ssh_exit}"
 }
 
 # Wait for SSH connectivity to a server

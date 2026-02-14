@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly IONOS_API_BASE="https://api.ionos.com/cloudapi/v6"
+SPAWN_DASHBOARD_URL="https://dcd.ionos.com/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Centralized curl wrapper for IONOS API

@@ -23,6 +23,7 @@ fi
 # ============================================================
 
 readonly GENESIS_API_BASE="https://api.genesiscloud.com/compute/v1"
+SPAWN_DASHBOARD_URL="https://compute.genesiscloud.com/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Configurable timeout/delay constants

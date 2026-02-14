@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly CONTABO_API_BASE="https://api.contabo.com/v1"
+SPAWN_DASHBOARD_URL="https://my.contabo.com/"
 readonly CONTABO_AUTH_URL="https://auth.contabo.com/auth/realms/contabo/protocol/openid-connect/token"
 
 # Get OAuth access token from Contabo

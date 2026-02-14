@@ -23,6 +23,7 @@ fi
 # ============================================================
 
 readonly BINARYLANE_API_BASE="https://api.binarylane.com.au/v2"
+SPAWN_DASHBOARD_URL="https://manage.binarylane.com.au/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Configurable timeout/delay constants

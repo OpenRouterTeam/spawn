@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly ATLANTICNET_API_BASE="https://cloudapi.atlantic.net"
+SPAWN_DASHBOARD_URL="https://cloud.atlantic.net/"
 readonly ATLANTICNET_API_VERSION="2010-12-30"
 
 # Generate HMAC-SHA256 signature for Atlantic.Net API

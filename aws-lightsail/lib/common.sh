@@ -23,6 +23,7 @@ fi
 # AWS Lightsail specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://lightsail.aws.amazon.com/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Configurable timeout/delay constants

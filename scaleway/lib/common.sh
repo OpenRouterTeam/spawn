@@ -24,6 +24,7 @@ fi
 
 SCALEWAY_ZONE="${SCALEWAY_ZONE:-fr-par-1}"
 readonly SCALEWAY_API_BASE="https://api.scaleway.com/instance/v1/zones/${SCALEWAY_ZONE}"
+SPAWN_DASHBOARD_URL="https://console.scaleway.com/"
 readonly SCALEWAY_ACCOUNT_API="https://api.scaleway.com/account/v3"
 # SSH_OPTS is defined in shared/common.sh
 

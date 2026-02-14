@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly HOSTINGER_API_BASE="https://api.hostinger.com/vps/v1"
+SPAWN_DASHBOARD_URL="https://hpanel.hostinger.com/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Centralized curl wrapper for Hostinger API

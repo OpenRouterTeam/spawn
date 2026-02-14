@@ -23,6 +23,7 @@ fi
 # ============================================================
 
 readonly DO_API_BASE="https://api.digitalocean.com/v2"
+SPAWN_DASHBOARD_URL="https://cloud.digitalocean.com/droplets"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Configurable timeout/delay constants

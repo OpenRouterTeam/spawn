@@ -23,6 +23,7 @@ fi
 # ============================================================
 
 readonly LINODE_API_BASE="https://api.linode.com/v4"
+SPAWN_DASHBOARD_URL="https://cloud.linode.com/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Configurable timeout/delay constants

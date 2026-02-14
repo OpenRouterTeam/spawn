@@ -23,6 +23,7 @@ fi
 # ============================================================
 
 readonly VULTR_API_BASE="https://api.vultr.com/v2"
+SPAWN_DASHBOARD_URL="https://my.vultr.com/"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Configurable timeout/delay constants

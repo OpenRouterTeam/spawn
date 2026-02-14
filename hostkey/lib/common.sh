@@ -21,6 +21,7 @@ fi
 # ============================================================
 
 readonly HOSTKEY_API_BASE="https://invapi.hostkey.com"
+SPAWN_DASHBOARD_URL="https://manage.hostkey.com/"
 
 # Centralized curl wrapper for HOSTKEY API
 # Delegates to generic_cloud_api for retry logic and error handling

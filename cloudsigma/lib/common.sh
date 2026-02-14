@@ -22,6 +22,8 @@ fi
 # CloudSigma specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://zrh.cloudsigma.com/ui/"
+
 # CloudSigma API endpoints by region
 # Default to Zurich (zrh), can be overridden with CLOUDSIGMA_REGION env var
 readonly CLOUDSIGMA_REGION_DEFAULT="zrh"

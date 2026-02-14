@@ -23,6 +23,7 @@ fi
 # ============================================================
 
 readonly CIVO_API_BASE="https://api.civo.com/v2"
+SPAWN_DASHBOARD_URL="https://dashboard.civo.com/"
 
 # Configurable timeout/delay constants
 INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}

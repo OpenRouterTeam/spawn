@@ -23,6 +23,7 @@ fi
 # ============================================================
 
 readonly WEBDOCK_API_BASE="https://api.webdock.io/v1"
+SPAWN_DASHBOARD_URL="https://webdock.io/en/dashboard"
 # SSH_OPTS is now defined in shared/common.sh
 
 # Configurable timeout/delay constants
