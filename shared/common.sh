@@ -2327,7 +2327,12 @@ upload_config_file() {
     rand_suffix=$(basename "${temp_file}")
     local temp_remote="/tmp/spawn_config_${rand_suffix}"
     ${upload_callback} "${temp_file}" "${temp_remote}"
-    ${run_callback} "chmod 600 '${temp_remote}' && mv '${temp_remote}' '${remote_path}'"
+
+    # Extract directory path and create parent directories if needed
+    # This handles paths like ~/.claude/settings.json or ~/.openclaw/openclaw.json
+    local dir_cmd
+    dir_cmd="parent_dir=\$(dirname '${remote_path}') && mkdir -p \"\${parent_dir}\" && chmod 600 '${temp_remote}' && mv '${temp_remote}' '${remote_path}'"
+    ${run_callback} "${dir_cmd}"
 }
 
 # ============================================================
