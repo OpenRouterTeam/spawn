@@ -110,6 +110,8 @@ function getCloudsInStripApiBase(): string[] {
         "cloudapi.atlantic.net": "atlanticnet",
         "invapi.hostkey.com": "hostkey",
         "cloudsigma.com": "cloudsigma",
+        "api.serverspace.io": "serverspace",
+        "api.gcore.com": "gcore",
       };
       for (const [domain, cloud] of Object.entries(urlPatterns)) {
         if (trimmed.includes(domain)) {

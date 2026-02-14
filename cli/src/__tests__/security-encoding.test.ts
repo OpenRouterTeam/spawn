@@ -18,20 +18,20 @@ import { validateIdentifier, validateScriptContent, validatePrompt } from "../se
 describe("Security Encoding Edge Cases", () => {
   describe("validateIdentifier - encoding attacks", () => {
     it("should reject null byte in identifier", () => {
-      expect(() => validateIdentifier("agent\x00name", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("agent\x00name", "Test")).toThrow("Invalid");
     });
 
     it("should reject unicode homoglyphs", () => {
       // Cyrillic 'a' looks like Latin 'a' but is different
-      expect(() => validateIdentifier("cl\u0430ude", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("cl\u0430ude", "Test")).toThrow("Invalid");
     });
 
     it("should reject zero-width characters", () => {
-      expect(() => validateIdentifier("agent\u200Bname", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("agent\u200Bname", "Test")).toThrow("Invalid");
     });
 
     it("should reject right-to-left override character", () => {
-      expect(() => validateIdentifier("agent\u202Ename", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("agent\u202Ename", "Test")).toThrow("Invalid");
     });
 
     it("should accept identifier with only hyphens", () => {
@@ -47,11 +47,11 @@ describe("Security Encoding Edge Cases", () => {
     });
 
     it("should reject windows path separator", () => {
-      expect(() => validateIdentifier("agent\\name", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("agent\\name", "Test")).toThrow("Invalid");
     });
 
     it("should reject URL-encoded path traversal", () => {
-      expect(() => validateIdentifier("%2e%2e", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("%2e%2e", "Test")).toThrow("Invalid");
     });
   });
 
@@ -123,11 +123,11 @@ describe("Security Encoding Edge Cases", () => {
     });
 
     it("should detect backticks even with whitespace inside", () => {
-      expect(() => validatePrompt("Run ` whoami `")).toThrow("command substitution backticks");
+      expect(() => validatePrompt("Run ` whoami `")).toThrow("backtick");
     });
 
     it("should detect empty backticks", () => {
-      expect(() => validatePrompt("Use `` for inline code")).toThrow("command substitution backticks");
+      expect(() => validatePrompt("Use `` for inline code")).toThrow("backtick");
     });
 
     it("should accept single backtick (not closed)", () => {
@@ -135,7 +135,7 @@ describe("Security Encoding Edge Cases", () => {
     });
 
     it("should reject piping to bash in complex expressions", () => {
-      expect(() => validatePrompt("echo 'data' | sort | bash")).toThrow("piping to bash");
+      expect(() => validatePrompt("echo 'data' | sort | bash")).toThrow("shell piping");
     });
 
     it("should accept 'bash' as standalone word not after pipe", () => {
@@ -148,7 +148,7 @@ describe("Security Encoding Edge Cases", () => {
     });
 
     it("should detect rm -rf with semicolons and spaces", () => {
-      expect(() => validatePrompt("do something ;  rm  -rf /")).toThrow("command chaining with rm -rf");
+      expect(() => validatePrompt("do something ;  rm  -rf /")).toThrow("dangerous command sequence");
     });
 
     it("should accept semicolons not followed by rm", () => {
