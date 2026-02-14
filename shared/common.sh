@@ -520,15 +520,13 @@ get_model_id_interactive() {
 # ============================================================
 
 # Manually prompt for API key
-get_openrouter_api_key_manual() {
-    echo ""
-    log_info "Manual API Key Entry"
-    printf '%b\n' "${GREEN}Get your API key from: https://openrouter.ai/settings/keys${NC}"
-    echo ""
-
+# Prompt user for API key with format validation (max 3 attempts)
+# Returns: API key via stdout on success, exits with 1 on failure
+_prompt_and_validate_api_key() {
     local api_key=""
     local attempts=0
     local max_attempts=3
+
     while [[ -z "${api_key}" ]]; do
         attempts=$((attempts + 1))
         if [[ ${attempts} -gt ${max_attempts} ]]; then
@@ -540,25 +538,30 @@ get_openrouter_api_key_manual() {
             log_error "  3. Then re-run: spawn <agent> <cloud>"
             return 1
         fi
-        api_key=$(safe_read "Enter your OpenRouter API key: ") || return 1
 
-        # Basic validation - OpenRouter keys typically start with "sk-or-"
-        if [[ -z "${api_key}" ]]; then
-            log_error "API key cannot be empty"
-        elif [[ ! "${api_key}" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
+        api_key=$(safe_read "Enter your OpenRouter API key: ") || return 1
+        [[ -n "${api_key}" ]] || { log_error "API key cannot be empty"; continue; }
+
+        # Validate format and confirm if invalid
+        if [[ ! "${api_key}" =~ ^sk-or-v1-[a-f0-9]{64}$ ]]; then
             log_warn "This doesn't look like an OpenRouter API key (expected format: sk-or-v1-...)"
             local confirm
             confirm=$(safe_read "Use this key anyway? (y/N): ") || return 1
-            if [[ "${confirm}" =~ ^[Yy]$ ]]; then
-                break
-            else
-                api_key=""
-            fi
+            [[ "${confirm}" =~ ^[Yy]$ ]] && break
+            api_key=""
         fi
     done
 
-    log_info "API key accepted!"
     echo "${api_key}"
+}
+
+get_openrouter_api_key_manual() {
+    echo ""
+    log_info "Manual API Key Entry"
+    printf '%b\n' "${GREEN}Get your API key from: https://openrouter.ai/settings/keys${NC}"
+    echo ""
+
+    _prompt_and_validate_api_key
 }
 
 # Validate port number for OAuth server
