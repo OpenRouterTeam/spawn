@@ -492,7 +492,7 @@ describe("extra positional argument warnings", () => {
   it("should warn when 3 positional args given (agent cloud extra)", () => {
     const result = runCli(["claude", "sprite", "hetzner"]);
     const out = output(result);
-    expect(out).toContain("extra argument");
+    expect(out).toContain("Extra argument ignored");
     expect(out).toContain("hetzner");
     expect(out).toContain("Usage:");
   });
@@ -500,7 +500,7 @@ describe("extra positional argument warnings", () => {
   it("should warn about multiple extra args", () => {
     const result = runCli(["claude", "sprite", "foo", "bar"]);
     const out = output(result);
-    expect(out).toContain("extra arguments ignored");
+    expect(out).toContain("Extra arguments ignored");
     expect(out).toContain("foo");
     expect(out).toContain("bar");
   });

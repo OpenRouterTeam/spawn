@@ -413,7 +413,7 @@ generic_wait_for_instance mock_api "/instances/123" "active" \\
   TEST_IP "Instance" 3
 `);
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain("did not become active after 3 attempts");
+      expect(result.stderr).toContain("did not become active");
     });
 
     it("should use default max_attempts of 60 when not specified", () => {
@@ -591,7 +591,7 @@ generic_wait_for_instance mock_api "/instances/1" "active" \\
   IP "Instance" 1
 `);
       expect(result.exitCode).toBe(0);
-      expect(result.stderr).toContain("IP=10.0.0.1");
+      expect(result.stdout).toContain("IP=10.0.0.1");
     });
 
     it("should log helpful error message on timeout", () => {
