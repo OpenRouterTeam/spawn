@@ -1733,8 +1733,8 @@ async function performUpdate(remoteVersion: string): Promise<void> {
   try {
     execSync(INSTALL_CMD, { stdio: "inherit", shell: "/bin/bash" });
     console.log();
-    p.log.success(`Updated to v${remoteVersion}`);
-    p.log.info("Run your spawn command again to use the new version.");
+    p.log.success(`Updated successfully!`);
+    p.log.info("Run spawn again to use the new version.");
   } catch {
     p.log.error("Auto-update failed. Update manually:");
     console.log();
