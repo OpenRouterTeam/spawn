@@ -825,6 +825,23 @@
         "region": "cn-hangzhou",
         "image_id": "ubuntu_24_04_x64_20G_alibase_20240812.vhd"
       }
+    },
+    "serverspace": {
+      "name": "ServerSpace",
+      "description": "ServerSpace cloud servers via REST API with global locations",
+      "url": "https://serverspace.io/",
+      "type": "api",
+      "auth": "SERVERSPACE_API_KEY",
+      "provision_method": "POST /api/v1/servers with server_init_script",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "cpu": 1,
+        "ram_mb": 1024,
+        "disk_mb": 25600,
+        "location": "nl1"
+      },
+      "notes": "Global cloud provider with locations in EU, US, and Asia. Simple X-API-KEY auth. Async server creation with task polling. Requires SERVERSPACE_API_KEY from https://my.serverspace.io/project/api"
     }
   },
   "matrix": {
@@ -1397,6 +1414,21 @@
     "alibabacloud/nanoclaw": "missing",
     "alibabacloud/openclaw": "missing",
     "alibabacloud/opencode": "missing",
-    "alibabacloud/plandex": "missing"
+    "alibabacloud/plandex": "missing",
+    "serverspace/claude": "implemented",
+    "serverspace/aider": "implemented",
+    "serverspace/goose": "implemented",
+    "serverspace/openclaw": "missing",
+    "serverspace/nanoclaw": "missing",
+    "serverspace/codex": "missing",
+    "serverspace/interpreter": "missing",
+    "serverspace/gemini": "missing",
+    "serverspace/amazonq": "missing",
+    "serverspace/cline": "missing",
+    "serverspace/gptme": "missing",
+    "serverspace/opencode": "missing",
+    "serverspace/plandex": "missing",
+    "serverspace/kilocode": "missing",
+    "serverspace/continue": "missing"
   }
 }

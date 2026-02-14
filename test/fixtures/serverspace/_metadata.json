@@ -1,0 +1,11 @@
+{
+  "cloud": "serverspace",
+  "recorded_at": "2026-02-14T00:00:00Z",
+  "fixtures": {
+    "project": {"endpoint": "/project", "recorded_at": "2026-02-14T00:00:00Z"},
+    "servers": {"endpoint": "/servers", "recorded_at": "2026-02-14T00:00:00Z"},
+    "ssh-keys": {"endpoint": "/ssh-keys", "recorded_at": "2026-02-14T00:00:00Z"},
+    "locations": {"endpoint": "/locations", "recorded_at": "2026-02-14T00:00:00Z"},
+    "images": {"endpoint": "/images", "recorded_at": "2026-02-14T00:00:00Z"}
+  }
+}
