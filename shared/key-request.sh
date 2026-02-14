@@ -91,7 +91,7 @@ _load_cloud_credentials() {
     local auth_string="${2}"
 
     local env_vars
-    env_vars=$(printf '%s' "${auth_string}" | tr '+' '\n' | sed 's/^ *//;s/ *$//')
+    env_vars=$(printf '%s' "${auth_string}" | tr '+,' '\n' | sed 's/^ *//;s/ *$//')
 
     local config_file="${HOME}/.config/spawn/${cloud_key}.json"
     local all_loaded=true
