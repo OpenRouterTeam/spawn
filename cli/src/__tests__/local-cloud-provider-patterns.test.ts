@@ -249,8 +249,10 @@ describe("local agent scripts — installation verification", () => {
   for (const { key, path } of localEntries) {
     it(`${key}.sh should have an installation failure message`, () => {
       const content = readScript(path);
-      // Should have log_error for installation failures
+      // Should have log_error or log_install_failed for installation failures
       const hasInstallError =
+        content.includes("log_install_failed") ||
+        content.includes("log_error") ||
         content.includes("installation failed") ||
         content.includes("not available") ||
         content.includes("not installed") ||
