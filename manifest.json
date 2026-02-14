@@ -1349,7 +1349,7 @@
     "hostkey/amazonq": "missing",
     "hostkey/cline": "implemented",
     "hostkey/gptme": "missing",
-    "hostkey/opencode": "missing",
+    "hostkey/opencode": "implemented",
     "hostkey/plandex": "missing",
     "hostkey/kilo": "missing",
     "hostkey/continue": "implemented",

@@ -16,6 +16,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/openclaw.sh)
 ```
 
+#### OpenCode
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/opencode.sh)
+```
+
 ## Authentication
 
 To use HOSTKEY spawn scripts, you need a HOSTKEY API key:
