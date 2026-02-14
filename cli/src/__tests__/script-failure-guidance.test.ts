@@ -606,3 +606,82 @@ describe("buildRetryCommand", () => {
     expect(buildRetryCommand("aider", "vultr", "")).toBe("spawn aider vultr");
   });
 });
+
+describe("dashboard URL in guidance", () => {
+  describe("getScriptFailureGuidance with dashboardUrl", () => {
+    it("should include dashboard URL for exit code 1 when provided", () => {
+      const lines = getScriptFailureGuidance(1, "hetzner", undefined, "https://console.hetzner.cloud/");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://console.hetzner.cloud/");
+      expect(joined).toContain("dashboard");
+    });
+
+    it("should include dashboard URL for exit code 130 when provided", () => {
+      const lines = getScriptFailureGuidance(130, "sprite", undefined, "https://sprite.sh");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://sprite.sh");
+      expect(joined).toContain("dashboard");
+    });
+
+    it("should include dashboard URL for exit code 137 when provided", () => {
+      const lines = getScriptFailureGuidance(137, "vultr", undefined, "https://my.vultr.com/");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://my.vultr.com/");
+    });
+
+    it("should include dashboard URL for default exit code when provided", () => {
+      const lines = getScriptFailureGuidance(42, "digitalocean", undefined, "https://cloud.digitalocean.com/");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://cloud.digitalocean.com/");
+    });
+
+    it("should fall back to generic message when no dashboardUrl", () => {
+      const lines = getScriptFailureGuidance(130, "sprite");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+      expect(joined).not.toContain("https://");
+    });
+
+    it("should not add dashboard URL for exit codes 127, 126, 255, 2", () => {
+      for (const code of [127, 126, 255, 2]) {
+        const lines = getScriptFailureGuidance(code, "hetzner", undefined, "https://console.hetzner.cloud/");
+        const joined = lines.join("\n");
+        expect(joined).not.toContain("https://console.hetzner.cloud/");
+      }
+    });
+  });
+
+  describe("getSignalGuidance with dashboardUrl", () => {
+    it("should include dashboard URL for SIGKILL when provided", () => {
+      const lines = getSignalGuidance("SIGKILL", "https://console.hetzner.cloud/");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://console.hetzner.cloud/");
+      expect(joined).toContain("dashboard");
+    });
+
+    it("should include dashboard URL for SIGTERM when provided", () => {
+      const lines = getSignalGuidance("SIGTERM", "https://my.vultr.com/");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://my.vultr.com/");
+    });
+
+    it("should include dashboard URL for SIGINT when provided", () => {
+      const lines = getSignalGuidance("SIGINT", "https://cloud.digitalocean.com/");
+      const joined = lines.join("\n");
+      expect(joined).toContain("https://cloud.digitalocean.com/");
+    });
+
+    it("should fall back to generic message when no dashboardUrl", () => {
+      const lines = getSignalGuidance("SIGKILL");
+      const joined = lines.join("\n");
+      expect(joined).toContain("cloud provider dashboard");
+      expect(joined).not.toContain("https://");
+    });
+
+    it("should not add dashboard URL for SIGHUP", () => {
+      const lines = getSignalGuidance("SIGHUP", "https://example.com");
+      const joined = lines.join("\n");
+      expect(joined).not.toContain("https://example.com");
+    });
+  });
+});

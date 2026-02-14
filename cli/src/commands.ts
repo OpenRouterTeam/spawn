@@ -367,7 +367,7 @@ export async function cmdInteractive(): Promise<void> {
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice));
+  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url);
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────
@@ -591,7 +591,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
   const suffix = prompt ? " with prompt..." : "...";
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
-  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud));
+  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), manifest.clouds[cloud].url);
 }
 
 export function getStatusDescription(status: number): string {
@@ -695,7 +695,10 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
   return lines;
 }
 
-export function getSignalGuidance(signal: string): string[] {
+export function getSignalGuidance(signal: string, dashboardUrl?: string): string[] {
+  const dashboardHint = dashboardUrl
+    ? `  - Check your dashboard: ${pc.cyan(dashboardUrl)}`
+    : "  - Check your cloud provider dashboard to stop or delete any unused servers";
   switch (signal) {
     case "SIGKILL":
       return [
@@ -703,7 +706,7 @@ export function getSignalGuidance(signal: string): string[] {
         "  - Out of memory (OOM killer terminated the process)",
         "  - The server may not have enough RAM for this agent",
         "  - Try a larger instance size or a different cloud provider",
-        "  - Check your cloud provider dashboard to stop or delete any unused servers",
+        dashboardHint,
       ];
     case "SIGTERM":
       return [
@@ -711,12 +714,13 @@ export function getSignalGuidance(signal: string): string[] {
         "  - The process was stopped by the system or a supervisor",
         "  - Server shutdown or reboot in progress",
         "  - Cloud provider terminated the instance (spot/preemptible instance or billing issue)",
+        dashboardHint,
       ];
     case "SIGINT":
       return [
         "Script was interrupted (Ctrl+C).",
         "Note: If a server was already created, it may still be running.",
-        "  Check your cloud provider dashboard to stop or delete any unused servers.",
+        dashboardHint,
       ];
     case "SIGHUP":
       return [
@@ -729,25 +733,28 @@ export function getSignalGuidance(signal: string): string[] {
       return [
         `Script was killed by signal ${signal}.`,
         "  - The process was terminated by the system or another process",
-        "  - Check your cloud provider dashboard for any orphaned servers",
+        dashboardHint,
       ];
   }
 }
 
-export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string): string[] {
+export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string, dashboardUrl?: string): string[] {
+  const dashboardHint = dashboardUrl
+    ? `  - Check your dashboard: ${pc.cyan(dashboardUrl)}`
+    : "  - Check your cloud provider dashboard to stop or delete any unused servers";
   switch (exitCode) {
     case 130:
       return [
         "Script was interrupted (Ctrl+C).",
         "Note: If a server was already created, it may still be running.",
-        "  Check your cloud provider dashboard to stop or delete any unused servers.",
+        dashboardHint,
       ];
     case 137:
       return [
         "Script was killed (likely by the system due to timeout or out of memory).",
         "  - The server may not have enough RAM for this agent",
         "  - Try a larger instance size or a different cloud provider",
-        "  - Check your cloud provider dashboard to stop or delete any unused servers",
+        dashboardHint,
       ];
     case 255:
       return [
@@ -780,6 +787,7 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         ...credentialHints(cloud, authHint),
         "  - Cloud provider API error (quota, rate limit, or region issue)",
         "  - Server provisioning failed (try again or pick a different region)",
+        ...(dashboardUrl ? [`  - Check your dashboard: ${pc.cyan(dashboardUrl)}`] : []),
       ];
     default:
       return [
@@ -787,6 +795,7 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         ...credentialHints(cloud, authHint, "Missing"),
         "  - Cloud provider API rate limit or quota exceeded",
         "  - Missing local dependencies (SSH, curl, jq)",
+        ...(dashboardUrl ? [`  - Check your dashboard: ${pc.cyan(dashboardUrl)}`] : []),
       ];
   }
 }
@@ -801,7 +810,7 @@ export function buildRetryCommand(agent: string, cloud: string, prompt?: string)
   return `spawn ${agent} ${cloud} --prompt-file <your-prompt-file>`;
 }
 
-function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, prompt?: string): never {
+function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, prompt?: string, dashboardUrl?: string): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
 
@@ -813,8 +822,8 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   const signal = signalMatch ? signalMatch[1] : null;
 
   const lines = signal
-    ? getSignalGuidance(signal)
-    : getScriptFailureGuidance(exitCode, cloud, authHint);
+    ? getSignalGuidance(signal, dashboardUrl)
+    : getScriptFailureGuidance(exitCode, cloud, authHint, dashboardUrl);
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
@@ -833,23 +842,27 @@ export function isRetryableExitCode(errMsg: string): boolean {
   return code === 255;
 }
 
-function handleUserInterrupt(errMsg: string): void {
+function handleUserInterrupt(errMsg: string, dashboardUrl?: string): void {
   if (!errMsg.includes("interrupted by user") && !errMsg.includes("killed by SIGINT")) return;
   console.error();
   p.log.warn("Script interrupted (Ctrl+C).");
   p.log.warn("If a server was already created, it may still be running.");
-  p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
+  if (dashboardUrl) {
+    p.log.warn(`  Check your dashboard: ${pc.cyan(dashboardUrl)}`);
+  } else {
+    p.log.warn(`  Check your cloud provider dashboard to stop or delete any unused servers.`);
+  }
   process.exit(130);
 }
 
-async function runWithRetries(script: string, prompt?: string): Promise<string | undefined> {
+async function runWithRetries(script: string, prompt?: string, dashboardUrl?: string): Promise<string | undefined> {
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     try {
       await runBash(script, prompt);
       return undefined; // success
     } catch (err) {
       const errMsg = getErrorMessage(err);
-      handleUserInterrupt(errMsg);
+      handleUserInterrupt(errMsg, dashboardUrl);
 
       if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
         const delay = RETRY_DELAYS[attempt - 1];
@@ -864,7 +877,7 @@ async function runWithRetries(script: string, prompt?: string): Promise<string |
   return "Script failed after all retries";
 }
 
-async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string): Promise<void> {
+async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, dashboardUrl?: string): Promise<void> {
   const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
@@ -887,9 +900,9 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     // Non-fatal: don't block the spawn if history write fails
   }
 
-  const lastErr = await runWithRetries(scriptContent, prompt);
+  const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl);
   if (lastErr) {
-    reportScriptFailure(lastErr, cloud, agent, authHint, prompt);
+    reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl);
   }
 }
 

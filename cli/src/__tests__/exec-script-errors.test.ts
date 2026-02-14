@@ -199,7 +199,7 @@ describe("execScript bash execution error handling", () => {
       const warnText = warnMessages.join("\n");
       expect(warnText).toContain("interrupted");
       expect(warnText).toContain("server");
-      expect(warnText).toContain("cloud provider dashboard");
+      expect(warnText).toContain("dashboard");
     });
   });
 
