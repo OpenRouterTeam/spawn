@@ -156,7 +156,7 @@ describe("Security Encoding Edge Cases", () => {
     });
 
     it("should handle prompt with only whitespace", () => {
-      expect(() => validatePrompt("   \t\n  ")).toThrow("Prompt cannot be empty");
+      expect(() => validatePrompt("   \t\n  ")).toThrow("Prompt is required but was not provided");
     });
   });
 });

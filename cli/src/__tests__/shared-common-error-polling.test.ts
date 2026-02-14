@@ -589,6 +589,8 @@ INSTANCE_STATUS_POLL_DELAY=0
 generic_wait_for_instance mock_api "/instances/1" "active" \\
   "d['instance']['status']" "d['instance']['ip']" \\
   IP "Instance" 1
+
+echo "IP=$IP"
 `);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("IP=10.0.0.1");
