@@ -24,6 +24,7 @@ fi
 # ============================================================
 
 RENDER_API_BASE="https://api.render.com/v1"
+SPAWN_DASHBOARD_URL="https://dashboard.render.com/"
 
 # Centralized API wrapper for Render — delegates to generic_cloud_api
 # for automatic retry with exponential backoff on 429/503/network errors.
@@ -269,7 +270,10 @@ interactive_session() {
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$launch_cmd")
-    render ssh --service "$RENDER_SERVICE_ID" -- bash -c "$escaped_cmd"
+    local session_exit=0
+    render ssh --service "$RENDER_SERVICE_ID" -- bash -c "$escaped_cmd" || session_exit=$?
+    SERVER_NAME="${RENDER_SERVICE_NAME:-}" _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 # Cleanup: delete the service

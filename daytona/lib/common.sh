@@ -25,6 +25,8 @@ fi
 # Daytona specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://app.daytona.io/"
+
 ensure_daytona_cli() {
     if ! command -v daytona &>/dev/null; then
         log_step "Installing Daytona CLI..."
@@ -233,16 +235,20 @@ upload_file() {
 # Daytona has true SSH support — much better than exec-only providers
 interactive_session() {
     local cmd="${1}"
+    local session_exit=0
     if [[ -z "${cmd}" ]]; then
         # Pure interactive shell via SSH
-        daytona ssh "${DAYTONA_SANDBOX_ID}"
+        daytona ssh "${DAYTONA_SANDBOX_ID}" || session_exit=$?
     else
         # Run a specific command interactively via exec
         # SECURITY: Properly escape command
         local escaped_cmd
         escaped_cmd=$(printf '%q' "${cmd}")
-        daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${escaped_cmd}"
+        daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${escaped_cmd}" || session_exit=$?
     fi
+    SERVER_NAME="${DAYTONA_SANDBOX_ID:-}" SPAWN_RECONNECT_CMD="daytona ssh ${DAYTONA_SANDBOX_ID:-}" \
+        _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 destroy_server() {

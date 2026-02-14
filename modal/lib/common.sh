@@ -25,6 +25,8 @@ fi
 # Modal specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://modal.com/apps"
+
 ensure_modal_cli() {
     # Check Python 3 is available (required for Modal Python SDK)
     check_python_available || return 1
@@ -198,6 +200,7 @@ interactive_session() {
     local cmd="${1}"
     validate_sandbox_id "${MODAL_SANDBOX_ID}" || return 1
     # SECURITY: Pass sandbox ID and command via environment variables to prevent Python injection
+    local session_exit=0
     _MODAL_SB_ID="${MODAL_SANDBOX_ID}" _MODAL_CMD="${cmd}" python3 -c "
 import modal, sys, os
 sb = modal.Sandbox.from_id(os.environ['_MODAL_SB_ID'])
@@ -205,7 +208,9 @@ p = sb.exec('bash', '-c', os.environ['_MODAL_CMD'], pty=True)
 for line in p.stdout:
     print(line, end='')
 p.wait()
-"
+" || session_exit=$?
+    SERVER_NAME="${MODAL_SANDBOX_ID:-}" _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 destroy_server() {

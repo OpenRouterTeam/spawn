@@ -173,6 +173,70 @@ describe("_show_post_session_summary", () => {
   });
 });
 
+// ── _show_exec_post_session_summary ─────────────────────────────────────────
+
+describe("_show_exec_post_session_summary", () => {
+  it("should warn that the service is still running", () => {
+    const { stderr } = runBash(
+      '_show_exec_post_session_summary'
+    );
+    expect(stderr).toContain("still running");
+    expect(stderr).toContain("Session ended");
+  });
+
+  it("should show service name when SERVER_NAME is set", () => {
+    const { stderr } = runBash(
+      'SERVER_NAME="my-app"\n_show_exec_post_session_summary'
+    );
+    expect(stderr).toContain("my-app");
+    expect(stderr).toContain("still running");
+  });
+
+  it("should show dashboard URL when SPAWN_DASHBOARD_URL is set", () => {
+    const { stderr } = runBash(
+      'SPAWN_DASHBOARD_URL="https://fly.io/dashboard"\n_show_exec_post_session_summary'
+    );
+    expect(stderr).toContain("https://fly.io/dashboard");
+    expect(stderr).toContain("dashboard");
+  });
+
+  it("should show generic message when SPAWN_DASHBOARD_URL is not set", () => {
+    const { stderr } = runBash(
+      'unset SPAWN_DASHBOARD_URL\n_show_exec_post_session_summary'
+    );
+    expect(stderr).toContain("cloud provider dashboard");
+  });
+
+  it("should show reconnect command when SPAWN_RECONNECT_CMD is set", () => {
+    const { stderr } = runBash(
+      'SPAWN_RECONNECT_CMD="fly ssh console -a my-app"\n_show_exec_post_session_summary'
+    );
+    expect(stderr).toContain("fly ssh console -a my-app");
+    expect(stderr).toContain("reconnect");
+  });
+
+  it("should not show reconnect section when SPAWN_RECONNECT_CMD is not set", () => {
+    const { stderr } = runBash(
+      'unset SPAWN_RECONNECT_CMD\n_show_exec_post_session_summary'
+    );
+    expect(stderr).not.toContain("reconnect");
+  });
+
+  it("should use 'service' instead of 'server' in messages", () => {
+    const { stderr } = runBash(
+      '_show_exec_post_session_summary'
+    );
+    expect(stderr).toContain("service");
+  });
+
+  it("should not crash with no env vars set", () => {
+    const { exitCode } = runBash(
+      'unset SPAWN_DASHBOARD_URL SERVER_NAME SPAWN_RECONNECT_CMD\n_show_exec_post_session_summary'
+    );
+    expect(exitCode).toBe(0);
+  });
+});
+
 // ── ssh_interactive_session with post-session summary ───────────────────────
 
 describe("ssh_interactive_session post-session integration", () => {
@@ -386,6 +450,50 @@ describe("custom interactive_session implementations", () => {
   }
 });
 
+// ── SPAWN_DASHBOARD_URL convention across exec-based clouds ─────────────────
+
+describe("SPAWN_DASHBOARD_URL convention for exec-based clouds", () => {
+  // Exec-based clouds that should have SPAWN_DASHBOARD_URL and call
+  // _show_exec_post_session_summary after session ends
+  const EXEC_CLOUDS_WITH_BILLING = [
+    "codesandbox",
+    "daytona",
+    "e2b",
+    "fly",
+    "github-codespaces",
+    "koyeb",
+    "modal",
+    "northflank",
+    "railway",
+    "render",
+  ];
+
+  for (const cloudName of EXEC_CLOUDS_WITH_BILLING) {
+    describe(cloudName, () => {
+      const libPath = join(REPO_ROOT, cloudName, "lib", "common.sh");
+      const content = existsSync(libPath)
+        ? readFileSync(libPath, "utf-8")
+        : "";
+
+      it("should set SPAWN_DASHBOARD_URL", () => {
+        expect(content).toContain("SPAWN_DASHBOARD_URL=");
+      });
+
+      it("should set SPAWN_DASHBOARD_URL to an HTTPS URL", () => {
+        const match = content.match(
+          /SPAWN_DASHBOARD_URL="(https?:\/\/[^"]+)"/
+        );
+        expect(match).not.toBeNull();
+        expect(match![1]).toMatch(/^https:\/\//);
+      });
+
+      it("should call _show_exec_post_session_summary", () => {
+        expect(content).toContain("_show_exec_post_session_summary");
+      });
+    });
+  }
+});
+
 // ── _show_post_session_summary does not use SPAWN_DASHBOARD_URL from function scope ─
 
 describe("_show_post_session_summary env var handling", () => {
@@ -426,6 +534,10 @@ describe("function definitions in shared/common.sh", () => {
 
   it("should define _show_post_session_summary", () => {
     expect(sharedContent).toContain("_show_post_session_summary()");
+  });
+
+  it("should define _show_exec_post_session_summary", () => {
+    expect(sharedContent).toContain("_show_exec_post_session_summary()");
   });
 
   it("should define ssh_interactive_session that calls _show_post_session_summary", () => {

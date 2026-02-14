@@ -25,6 +25,8 @@ fi
 # Northflank specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://app.northflank.com/"
+
 ensure_northflank_cli() {
     if ! command -v northflank &>/dev/null; then
         log_step "Installing Northflank CLI..."
@@ -206,10 +208,13 @@ interactive_session() {
     escaped_cmd=$(printf '%q' "${cmd}")
 
     # Use northflank exec for interactive shell
+    local session_exit=0
     northflank exec \
         --project "${project}" \
         --service "${service}" \
-        --command "bash -c ${escaped_cmd}"
+        --command "bash -c ${escaped_cmd}" || session_exit=$?
+    SERVER_NAME="${service}" _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 # Destroy a Northflank service

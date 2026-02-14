@@ -23,6 +23,8 @@ fi
 # GitHub Codespaces specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://github.com/codespaces"
+
 # Ensure gh CLI is installed
 ensure_gh_cli() {
     if command -v gh &>/dev/null; then
@@ -174,7 +176,11 @@ copy_to_codespace() {
 ssh_to_codespace() {
     local codespace="$1"
     log_step "Opening SSH session to codespace..."
-    gh codespace ssh --codespace "$codespace"
+    local session_exit=0
+    gh codespace ssh --codespace "$codespace" || session_exit=$?
+    SERVER_NAME="${codespace}" SPAWN_RECONNECT_CMD="gh codespace ssh --codespace ${codespace}" \
+        _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 # Delete a codespace

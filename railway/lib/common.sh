@@ -23,6 +23,8 @@ fi
 # Railway specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://railway.com/dashboard"
+
 # Ensure Railway CLI is installed
 ensure_railway_cli() {
     if command -v railway &>/dev/null; then
@@ -237,7 +239,10 @@ interactive_session() {
     log_step "Starting interactive session..."
 
     # Railway CLI has a shell command for interactive sessions
-    railway shell
+    local session_exit=0
+    railway shell || session_exit=$?
+    SERVER_NAME="${RAILWAY_SERVICE_NAME:-}" _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 # Cleanup: delete the project
