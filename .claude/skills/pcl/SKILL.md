@@ -1,5 +1,5 @@
 ---
-name: cleanup-branches
+name: pcl
 description: Delete stale git branches (local + remote) that have no open PR, and prune worktrees.
 argument-hint: "[--dry-run]"
 allowed-tools: Bash
