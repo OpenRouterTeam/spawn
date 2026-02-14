@@ -539,11 +539,15 @@ if [[ "${FAIL_COUNT:-0}" -eq 0 ]]; then
     log "Phase 3: No failures to fix"
 else
     # Collect failures grouped by cloud (one teammate per cloud, not per script)
+    # Results format: cloud/agent:fail[:reason] where reason is exit_code|missing_api_call|missing_env|no_fixture
     FAILURES=""
     FAILED_CLOUDS=""
+    FAILURE_DETAILS=""
     if [[ -f "${RESULTS_PHASE2}" ]]; then
-        FAILURES=$(grep ':fail$' "${RESULTS_PHASE2}" | sed 's/:fail$//' || true)
-        FAILED_CLOUDS=$(grep ':fail$' "${RESULTS_PHASE2}" | sed 's/:fail$//' | cut -d/ -f1 | sort -u || true)
+        FAILURES=$(grep ':fail' "${RESULTS_PHASE2}" | sed 's/:fail.*$//' || true)
+        FAILED_CLOUDS=$(grep ':fail' "${RESULTS_PHASE2}" | sed 's/:fail.*$//' | cut -d/ -f1 | sort -u || true)
+        # Keep full failure lines for structured context
+        FAILURE_DETAILS=$(grep ':fail' "${RESULTS_PHASE2}" || true)
     fi
 
     # Capture full mock test output per-cloud for richer agent context
@@ -572,10 +576,31 @@ else
         failing_scripts=$(printf '%s' "$failing_scripts" | sed 's/^ //')
         failing_agents=$(printf '%s' "$failing_agents" | sed 's/^ //')
 
-        # Use full mock test output as error context (not just 10 lines from log)
+        # Build structured failure summary for this cloud
+        structured_failures=""
+        for combo in $cloud_failures; do
+            agent=$(printf '%s' "$combo" | cut -d/ -f2)
+            reason=$(printf '%s\n' "$FAILURE_DETAILS" | grep "^${combo}:fail" | sed 's/.*:fail://' | sed 's/:fail$//' || true)
+            if [[ -z "$reason" ]]; then reason="unknown"; fi
+            structured_failures="${structured_failures}  - ${cloud}/${agent}.sh: ${reason}\n"
+        done
+
+        # Find a passing agent on the same cloud for comparison
+        passing_agent=""
+        if [[ -f "${RESULTS_PHASE2}" ]]; then
+            passing_agent=$(grep "^${cloud}/.*:pass$" "${RESULTS_PHASE2}" | head -1 | sed 's/:pass$//' | cut -d/ -f2 || true)
+        fi
+
+        # Extract only the assertion failure lines from mock output (not full log)
+        error_summary=""
+        if [[ -f "${MOCK_OUTPUT_DIR}/${cloud}.log" ]]; then
+            error_summary=$(grep -E '(✗|NO_FIXTURE:|BODY_ERROR:|--- output|exit code)' "${MOCK_OUTPUT_DIR}/${cloud}.log" | head -60 || true)
+        fi
+
+        # Keep full output available but prioritize the structured summary
         error_context=""
         if [[ -f "${MOCK_OUTPUT_DIR}/${cloud}.log" ]]; then
-            error_context=$(cat "${MOCK_OUTPUT_DIR}/${cloud}.log")
+            error_context=$(tail -200 "${MOCK_OUTPUT_DIR}/${cloud}.log")
         fi
 
         fail_count=$(printf '%s\n' $cloud_failures | wc -l | tr -d ' ')
@@ -590,56 +615,43 @@ else
         }
 
         # Spawn ONE Claude teammate per cloud to fix all its failing scripts (15 min timeout)
+        passing_ref=""
+        if [[ -n "${passing_agent}" ]]; then
+            passing_ref="
+## Reference: A PASSING agent on this cloud
+${cloud}/${passing_agent}.sh passes all tests. Compare it with the failing scripts to find what's different."
+        fi
+
         (
             cd "${worktree}"
             run_with_timeout 900 \
                 claude -p "Fix the failing mock tests for cloud '${cloud}' in the spawn codebase.
 
-Failing scripts: ${failing_scripts}
+## Failure Summary (structured)
+$(printf '%b' "${structured_failures}")
+## Assertion Failures & Warnings
+${error_summary}
+${passing_ref}
 
-Error context from test run:
+## Full test output (last 200 lines)
 ${error_context}
 
-## Investigation & Fix Process (be thorough):
+## Fix Process:
 
-1. **Understand the test infrastructure:**
-   - Read test/mock.sh to see how mocking works (curl interception, fixture matching)
-   - Read ${cloud}/lib/common.sh to understand the cloud's API primitives
-   - Check test/fixtures/${cloud}/ to see what API responses are mocked
+1. **Read the failure summary above first.** Each failure has a category:
+   - **exit_code** — script crashed or exited non-zero. Read the script and check what command fails.
+   - **missing_api_call** — script didn't call expected cloud API. Check if API endpoint URL changed.
+   - **missing_env** — OPENROUTER_API_KEY not injected. Check env var setup in the script.
+   - **no_fixture** — script calls an API endpoint with no test fixture. Add the fixture file.
+   - **missing_ssh** — script didn't use SSH. Check if connectivity section is missing.
 
-2. **For EACH failing script, investigate the root cause:**
-   - Read the failing script (${cloud}/<agent>.sh)
-   - Identify which API calls are being made
-   - Check if the script is making API calls that aren't mocked in test/fixtures/${cloud}/
-   - Look for missing fixtures, incorrect API endpoint URLs, or changed function signatures
+2. **For no_fixture failures:** Check test/fixtures/${cloud}/ for what fixtures exist. Add missing ones by copying the format from an existing fixture in the same directory.
 
-3. **Check the cloud provider's current API (if needed):**
-   - If the script seems correct but fixtures seem outdated, check the provider's API docs
-   - Compare fixture responses with current API documentation
-   - Look for API changes: new required parameters, different response formats, endpoint deprecations
+3. **For exit_code failures:** Read the failing script and the last 10 lines of its output. Compare with ${passing_agent:+the passing ${cloud}/${passing_agent}.sh}${passing_agent:-another agent script on this cloud}.
 
-4. **Common failure patterns to check:**
-   - Missing test fixtures (script calls an API that has no mock response)
-   - Wrong API endpoint format (e.g., /v2/servers vs /servers)
-   - Missing authentication setup (API token not set in mock environment)
-   - Incorrect assumptions about SSH connectivity in mock mode
-   - Scripts calling commands that don't work in mock mode (ssh, scp without proper mocking)
+4. **Test each fix:** Run: RESULTS_FILE=/tmp/fix-test.txt bash test/mock.sh ${cloud}
 
-5. **Fix the issues:**
-   - Update scripts to work properly with the mock infrastructure
-   - Add missing fixture files if needed (test/fixtures/${cloud}/<endpoint>.json)
-   - Fix API calls to match current provider API
-   - Ensure proper error handling for mock environment
-
-6. **Test each fix incrementally:**
-   - After fixing each script, run: RESULTS_FILE=/tmp/fix-test.txt bash test/mock.sh ${cloud}
-   - Verify the specific script now passes
-   - Check for regressions in other scripts
-
-7. **Syntax check and commit:**
-   - Run: bash -n on each modified script
-   - Test final state: RESULTS_FILE=/tmp/fix-test.txt bash test/mock.sh ${cloud}
-   - Commit all fixes with a message listing what was fixed and why
+5. **Syntax check and commit:** Run bash -n on each modified script before committing.
 
 You can modify: scripts in ${cloud}/, test/fixtures/${cloud}/, and test/mock.sh if infrastructure updates are needed." \
                 2>&1 | tee -a "${LOG_FILE}" || true
@@ -656,13 +668,33 @@ You can modify: scripts in ${cloud}/, test/fixtures/${cloud}/, and test/mock.sh 
             # Stage any uncommitted changes the teammate left behind
             if [[ "$syntax_ok" == "true" ]] && [[ -n "$(git status --porcelain)" ]]; then
                 git add ${failing_scripts} "${cloud}/lib/common.sh" "test/fixtures/${cloud}/" "test/mock.sh" 2>/dev/null || true
-                git commit -m "$(cat <<FIXEOF
+
+                # Verify the fix actually improves test results before committing
+                local verify_result=""
+                verify_result=$(RESULTS_FILE=/tmp/qa-verify-${cloud}.txt bash test/mock.sh "${cloud}" 2>&1 || true)
+                local verify_pass=0
+                local verify_fail=0
+                if [[ -f "/tmp/qa-verify-${cloud}.txt" ]]; then
+                    verify_pass=$(grep -c ':pass' "/tmp/qa-verify-${cloud}.txt" || true)
+                    verify_fail=$(grep -c ':fail' "/tmp/qa-verify-${cloud}.txt" || true)
+                fi
+                rm -f "/tmp/qa-verify-${cloud}.txt"
+
+                if [[ "$verify_fail" -lt "$fail_count" ]] || [[ "$verify_pass" -gt 0 ]]; then
+                    log "Phase 3: Fix verified for ${cloud} (${verify_pass} pass, ${verify_fail} fail, was ${fail_count} fail)"
+                    git commit -m "$(cat <<FIXEOF
 fix: Fix ${cloud} mock test failures (${fail_count} scripts)
+
+Verified: ${verify_pass} pass, ${verify_fail} fail after fix
 
 Agent: qa-fixer
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 FIXEOF
-                )" || true
+                    )" || true
+                else
+                    log "Phase 3: Fix did NOT improve results for ${cloud} (still ${verify_fail} fail) — discarding"
+                    git checkout -- . 2>/dev/null || true
+                fi
             fi
 
             # Push, PR, and merge with retry on stale main
@@ -687,6 +719,71 @@ FIXEOF
 
     # Clean up per-cloud mock output
     rm -rf "${MOCK_OUTPUT_DIR}" 2>/dev/null || true
+
+    # Track consecutive Phase 3 failures for escalation
+    MOCK_FAILURES_FILE="${REPO_ROOT}/.docs/qa-mock-failures.json"
+    if [[ -f "${RESULTS_PHASE2}" ]]; then
+        MOCK_FAILED_CLOUDS=$(grep ':fail' "${RESULTS_PHASE2}" | sed 's/:fail.*$//' | cut -d/ -f1 | sort -u || true)
+        MOCK_PASSED_CLOUDS=$(grep ':pass$' "${RESULTS_PHASE2}" | cut -d/ -f1 | sort -u || true)
+
+        # Initialize tracker if missing
+        if [[ ! -f "${MOCK_FAILURES_FILE}" ]]; then
+            printf '{}' > "${MOCK_FAILURES_FILE}"
+        fi
+
+        python3 -c "
+import json, sys
+
+tracker_path = sys.argv[1]
+failed = sys.argv[2].split() if sys.argv[2] else []
+succeeded = sys.argv[3].split() if sys.argv[3] else []
+
+try:
+    with open(tracker_path) as f:
+        tracker = json.load(f)
+except (json.JSONDecodeError, FileNotFoundError):
+    tracker = {}
+
+for cloud in failed:
+    tracker[cloud] = tracker.get(cloud, 0) + 1
+for cloud in succeeded:
+    tracker[cloud] = 0
+
+with open(tracker_path, 'w') as f:
+    json.dump(tracker, f, indent=2, sort_keys=True)
+
+escalate = [c for c, count in tracker.items() if count >= 3]
+if escalate:
+    print(' '.join(escalate))
+" "${MOCK_FAILURES_FILE}" "${MOCK_FAILED_CLOUDS}" "${MOCK_PASSED_CLOUDS}" > /tmp/spawn-qa-mock-escalate.txt 2>/dev/null || true
+
+        MOCK_ESCALATE=$(cat /tmp/spawn-qa-mock-escalate.txt 2>/dev/null || true)
+        rm -f /tmp/spawn-qa-mock-escalate.txt
+
+        if [[ -n "${MOCK_ESCALATE}" ]]; then
+            for cloud in ${MOCK_ESCALATE}; do
+                consecutive=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get(sys.argv[2], 0))" "${MOCK_FAILURES_FILE}" "${cloud}" 2>/dev/null || printf "3+")
+                log "Phase 3: ESCALATION — ${cloud} mock tests failing for ${consecutive} consecutive cycles"
+
+                existing_issue=$(gh issue list --repo OpenRouterTeam/spawn --state open \
+                    --search "mock tests failing ${cloud}" \
+                    --json number --jq '.[0].number' 2>/dev/null) || existing_issue=""
+
+                if [[ -z "${existing_issue}" ]]; then
+                    # Get failure categories for this cloud
+                    cloud_reasons=$(grep "^${cloud}/.*:fail" "${RESULTS_PHASE2}" | sed 's/.*:fail://' | sort | uniq -c | sort -rn || true)
+                    gh issue create --repo OpenRouterTeam/spawn \
+                        --title "QA: ${cloud} mock tests failing for ${consecutive} consecutive cycles" \
+                        --body "$(printf 'The automated QA cycle has detected that mock tests for **%s** have failed for **%s consecutive cycles**, despite automated fix attempts.\n\n## Failure breakdown\n```\n%s\n```\n\n## What to check\n- Run `bash test/mock.sh %s` locally to reproduce\n- Check `test/fixtures/%s/` for missing or outdated fixtures\n- Check `%s/lib/common.sh` for API changes\n- If failures are `no_fixture`, run `bash test/record.sh %s` to record fresh fixtures\n\n## Auto-generated\nThis issue was created automatically by the QA cycle (`qa-cycle.sh`).\n\n-- qa/cycle' "${cloud}" "${consecutive}" "${cloud_reasons}" "${cloud}" "${cloud}" "${cloud}" "${cloud}")" \
+                        --label "bug" \
+                        2>&1 | tee -a "${LOG_FILE}" || true
+                    log "Phase 3: Created GitHub issue for ${cloud} persistent mock test failure"
+                else
+                    log "Phase 3: Issue #${existing_issue} already open for ${cloud}, skipping"
+                fi
+            done
+        fi
+    fi
 
     log "Phase 3: Fix teammates complete"
 fi
