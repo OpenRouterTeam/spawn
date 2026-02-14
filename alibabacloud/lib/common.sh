@@ -245,6 +245,24 @@ except:
 " 2>/dev/null || echo ""
 }
 
+# Extract the first element from a nested list of primitives (strings/numbers).
+# Unlike _aliyun_json_field which expects a list of dicts, this handles flat lists.
+# Usage: _aliyun_json_list_first JSON_STRING OUTER_KEY INNER_KEY
+# Example: _aliyun_json_list_first "$response" "InstanceIdSets" "InstanceIdSet"
+_aliyun_json_list_first() {
+    local json="$1" outer="$2" inner="$3"
+    echo "$json" | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    items = data.get('$outer', {}).get('$inner', [])
+    if items:
+        print(items[0])
+except:
+    pass
+" 2>/dev/null || echo ""
+}
+
 # ============================================================
 # Network resource helpers
 # ============================================================
@@ -326,6 +344,32 @@ _ensure_vswitch() {
 # ============================================================
 # Instance lifecycle
 # ============================================================
+
+# Extract the first instance ID from a RunInstances response.
+# The ID is nested at InstanceIdSets.InstanceIdSet[0] (a flat string list).
+# Usage: id=$(_aliyun_extract_instance_id "$response")
+_aliyun_extract_instance_id() {
+    _aliyun_json_list_first "$1" "InstanceIdSets" "InstanceIdSet"
+}
+
+# Ensure VPC, vSwitch, and security group exist, printing their IDs.
+# Sets caller-visible variables via nameref-style printf.
+# Usage: read -r vpc_id vswitch_id sg_id < <(_ensure_network_infrastructure)
+_ensure_network_infrastructure() {
+    local vpc_id
+    vpc_id=$(_ensure_vpc) || return 1
+    log_info "Using VPC: $vpc_id"
+
+    local vswitch_id
+    vswitch_id=$(_ensure_vswitch "$vpc_id") || return 1
+    log_info "Using vSwitch: $vswitch_id"
+
+    local security_group_id
+    security_group_id=$(_ensure_security_group "$vpc_id") || return 1
+    log_info "Using security group: $security_group_id"
+
+    printf '%s\t%s\t%s' "$vpc_id" "$vswitch_id" "$security_group_id"
+}
 
 # Extract the first public IP from an Alibaba Cloud DescribeInstances response.
 # The IP is nested at Instances.Instance[0].PublicIpAddress.IpAddress[0].
@@ -446,18 +490,10 @@ create_server() {
     validate_region_name "$region" || { log_error "Invalid ALIYUN_REGION"; return 1; }
     validate_resource_name "$image_id" || { log_error "Invalid ALIYUN_IMAGE_ID"; return 1; }
 
-    # Ensure network infrastructure
-    local vpc_id
-    vpc_id=$(_ensure_vpc) || return 1
-    log_info "Using VPC: $vpc_id"
-
-    local vswitch_id
-    vswitch_id=$(_ensure_vswitch "$vpc_id") || return 1
-    log_info "Using vSwitch: $vswitch_id"
-
-    local security_group_id
-    security_group_id=$(_ensure_security_group "$vpc_id") || return 1
-    log_info "Using security group: $security_group_id"
+    # Ensure network infrastructure (VPC, vSwitch, security group)
+    local net_info vpc_id vswitch_id security_group_id
+    net_info=$(_ensure_network_infrastructure) || return 1
+    IFS=$'\t' read -r vpc_id vswitch_id security_group_id <<< "$net_info"
 
     # Prepare instance parameters
     local key_name="spawn-$(whoami)-$(hostname)"
@@ -485,28 +521,20 @@ create_server() {
         --SystemDisk.Size 20 \
         --output json 2>&1 || echo "")
 
-    # InstanceIdSet is a flat list of strings, not objects
     local instance_id
-    instance_id=$(echo "$create_response" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    ids = data.get('InstanceIdSets', {}).get('InstanceIdSet', [])
-    if ids:
-        print(ids[0])
-except:
-    pass
-" 2>/dev/null || echo "")
+    instance_id=$(_aliyun_extract_instance_id "$create_response")
 
     if [[ -z "$instance_id" ]]; then
-        log_error "Failed to create instance"
-        log_error "API Error: $create_response"
-        log_error ""
-        log_error "Common causes:"
-        log_error "  - Insufficient quota in region $region"
-        log_error "  - Invalid instance type: $instance_type"
-        log_error "  - Invalid image ID: $image_id"
-        log_error "  - Network configuration issue (VPC/vSwitch)"
+        _log_diagnostic \
+            "Failed to create Alibaba Cloud ECS instance" \
+            "Insufficient quota in region $region" \
+            "Invalid instance type: $instance_type" \
+            "Invalid image ID: $image_id" \
+            "Network configuration issue (VPC/vSwitch)" \
+            --- \
+            "Check your quotas in the Alibaba Cloud console" \
+            "Verify instance type availability in your region" \
+            "Review the API error: $create_response"
         return 1
     fi
 
