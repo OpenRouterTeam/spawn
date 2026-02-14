@@ -264,13 +264,21 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
 
     const availableClouds = getImplementedClouds(manifest, agent);
     if (availableClouds.length > 0) {
-      const examples = availableClouds.slice(0, 3).map((c) => `spawn ${agent} ${c}`);
+      // Prioritize clouds where the user already has credentials
+      const { sortedClouds, credCount } = prioritizeCloudsByCredentials(availableClouds, manifest);
+      const examples = sortedClouds.slice(0, 3).map((c) => {
+        const hasCredsMarker = hasCloudCredentials(manifest.clouds[c].auth) ? " (ready)" : "";
+        return `spawn ${agent} ${c}${hasCredsMarker}`;
+      });
       p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these instead:`);
       for (const cmd of examples) {
         p.log.info(`  ${pc.cyan(cmd)}`);
       }
       if (availableClouds.length > 3) {
         p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
+      }
+      if (credCount > 0) {
+        p.log.info(`${pc.green("ready")} = credentials already set`);
       }
     } else {
       p.log.info(`This agent has no implemented cloud providers yet.`);
