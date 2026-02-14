@@ -46,7 +46,7 @@ chmod 600 "${DOTENV_TEMP}"
 printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
 
 upload_file "${CLOUDSIGMA_SERVER_IP}" "${DOTENV_TEMP}" "/tmp/nanoclaw_env"
-run_server "${CLOUDSIGMA_SERVER_IP}" "mv /tmp/nanoclaw_env ~/nanoclaw/.env"
+run_server "${CLOUDSIGMA_SERVER_IP}" "chmod 600 /tmp/nanoclaw_env && mv /tmp/nanoclaw_env ~/nanoclaw/.env"
 
 echo ""
 log_info "CloudSigma instance setup completed successfully!"

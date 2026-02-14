@@ -55,7 +55,7 @@ trap 'rm -f "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
 printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
 
-sprite exec -s "${SPRITE_NAME}" -file "${DOTENV_TEMP}:/tmp/nanoclaw_env" -- bash -c "mv /tmp/nanoclaw_env ~/nanoclaw/.env"
+sprite exec -s "${SPRITE_NAME}" -file "${DOTENV_TEMP}:/tmp/nanoclaw_env" -- bash -c "chmod 600 /tmp/nanoclaw_env && mv /tmp/nanoclaw_env ~/nanoclaw/.env"
 
 echo ""
 log_info "Sprite setup completed successfully!"
