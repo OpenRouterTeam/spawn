@@ -80,9 +80,9 @@ fi
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 
 get_matrix_summary() {
-    python3 -c "
-import json
-m = json.load(open('${MANIFEST}'))
+    python3 - "${MANIFEST}" <<'PYEOF'
+import json, sys
+m = json.load(open(sys.argv[1]))
 agents = list(m['agents'].keys())
 clouds = list(m['clouds'].keys())
 gaps = [k for k, v in m.get('matrix', {}).items() if v == 'missing']
@@ -90,33 +90,28 @@ impl = sum(1 for v in m['matrix'].values() if v == 'implemented')
 total = len(agents) * len(clouds)
 print(f'Matrix: {len(agents)} agents x {len(clouds)} clouds = {impl}/{total} implemented')
 if gaps:
-    print(f'Gaps ({len(gaps)}): {\", \".join(gaps[:10])}')
+    print(f'Gaps ({len(gaps)}): {", ".join(gaps[:10])}')
 else:
     print('Matrix is full — ready for discovery')
-print(f'Agents: {\", \".join(agents)}')
-print(f'Clouds: {\", \".join(clouds)}')
-"
+print(f'Agents: {", ".join(agents)}')
+print(f'Clouds: {", ".join(clouds)}')
+PYEOF
 }
 
 count_gaps() {
-    python3 -c "
-import json
-m = json.load(open('${MANIFEST}'))
+    python3 - "${MANIFEST}" <<'PYEOF'
+import json, sys
+m = json.load(open(sys.argv[1]))
 print(sum(1 for v in m.get('matrix', {}).values() if v == 'missing'))
-"
+PYEOF
 }
 
 build_team_prompt() {
-    local summary
-    summary=$(get_matrix_summary)
-
     cat <<'PROMPT_EOF'
 You are the lead of the spawn discovery team. Read CLAUDE.md and manifest.json first.
 
 Current state:
-PROMPT_EOF
-    echo "${summary}"
-    cat <<'PROMPT_EOF'
+MATRIX_SUMMARY_PLACEHOLDER
 
 Your job: coordinate teammates to expand the spawn matrix. Delegate only — do NOT implement anything yourself.
 
@@ -277,24 +272,25 @@ PROMPT_EOF
 
 build_single_prompt() {
     local gap
-    gap=$(python3 -c "
-import json
-m = json.load(open('${MANIFEST}'))
+    gap=$(python3 - "${MANIFEST}" <<'PYEOF'
+import json, sys
+m = json.load(open(sys.argv[1]))
 for key, status in m.get('matrix', {}).items():
     if status == 'missing':
         print(key)
         break
-")
+PYEOF
+)
 
     if [[ -n "${gap}" ]]; then
         local cloud="${gap%%/*}"
         local agent="${gap##*/}"
-        cat <<EOF
-Read CLAUDE.md and manifest.json. Implement "${cloud}/${agent}.sh":
-1. Read ${cloud}/lib/common.sh for cloud primitives
-2. Read an existing ${agent}.sh on another cloud for the install pattern
-3. Write ${cloud}/${agent}.sh combining the two
-4. Update manifest.json to mark "${cloud}/${agent}" as "implemented"
+        printf 'Read CLAUDE.md and manifest.json. Implement "%s/%s.sh":\n' "${cloud}" "${agent}"
+        printf '1. Read %s/lib/common.sh for cloud primitives\n' "${cloud}"
+        printf '2. Read an existing %s.sh on another cloud for the install pattern\n' "${agent}"
+        printf '3. Write %s/%s.sh combining the two\n' "${cloud}" "${agent}"
+        printf '4. Update manifest.json to mark "%s/%s" as "implemented"\n' "${cloud}" "${agent}"
+        cat <<'EOF'
 5. Update the cloud's README.md
 6. bash -n syntax check
 7. Commit
@@ -389,6 +385,17 @@ run_team_cycle() {
     # Write prompt to temp file (from refactor.sh pattern)
     PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
     build_team_prompt > "${PROMPT_FILE}"
+
+    # Substitute MATRIX_SUMMARY_PLACEHOLDER with actual summary using python3
+    # (sed cannot safely handle multi-line replacements; python3 avoids shell expansion)
+    local summary
+    summary=$(get_matrix_summary)
+    python3 - "${PROMPT_FILE}" "${summary}" <<'PYEOF'
+import sys
+path, replacement = sys.argv[1], sys.argv[2]
+content = open(path).read()
+open(path, 'w').write(content.replace('MATRIX_SUMMARY_PLACEHOLDER', replacement))
+PYEOF
 
     # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"

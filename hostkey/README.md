@@ -16,6 +16,18 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/amazonq.sh)
 ```
 
+#### Open Interpreter
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/interpreter.sh)
+```
+
+#### gptme
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/hostkey/gptme.sh)
+```
+
 #### OpenClaw
 
 ```bash
