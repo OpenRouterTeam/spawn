@@ -44,3 +44,10 @@ jobs:
             echo '</details>' >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Check results
+        if: always()
+        run: |
+          if [[ "${{ steps.tests.outputs.exit_code }}" != "0" ]]; then
+            echo "Mock tests failed (exit code ${{ steps.tests.outputs.exit_code }})"
+            exit 1
+          fi
