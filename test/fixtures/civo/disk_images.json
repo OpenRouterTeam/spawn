@@ -1,0 +1,10 @@
+[
+  {
+    "id": "d2c2c728-512d-4087-906a-8486fcf4a1c7",
+    "name": "ubuntu-noble",
+    "label": "Ubuntu 24.04 LTS (Noble)",
+    "version": "24.04",
+    "state": "available",
+    "distribution": "ubuntu"
+  }
+]
