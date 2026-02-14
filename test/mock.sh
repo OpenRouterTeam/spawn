@@ -266,6 +266,7 @@ _strip_api_base() {
         https://invapi.hostkey.com*)        ENDPOINT="${URL#https://invapi.hostkey.com}" ;;
         https://*.cloudsigma.com/api/2.0*)  ENDPOINT=$(echo "$URL" | sed 's|https://[^/]*.cloudsigma.com/api/2.0||') ;;
         https://api.webdock.io/v1*)         ENDPOINT="${URL#https://api.webdock.io/v1}" ;;
+        https://api.serverspace.io/api/v1*) ENDPOINT="${URL#https://api.serverspace.io/api/v1}" ;;
     esac
     EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
 }
@@ -292,6 +293,7 @@ _validate_body() {
         linode)      case "$EP_CLEAN" in /linode/instances) _check_fields "label region type image" ;; esac ;;
         civo)        case "$EP_CLEAN" in /instances)        _check_fields "hostname size region" ;; esac ;;
         webdock)     case "$EP_CLEAN" in /servers)          _check_fields "name slug locationId profileSlug imageSlug" ;; esac ;;
+        serverspace) case "$EP_CLEAN" in /servers)          _check_fields "name location_id image_id cpu ram_mb" ;; esac ;;
     esac
 }
 
@@ -310,6 +312,7 @@ _synthetic_active_response() {
         lambda)       printf '{"data":{"id":"test-uuid-1234","name":"test-srv","status":"active","ip":"10.0.0.1"}}' ;;
         civo)         printf '{"id":"test-uuid-1234","hostname":"test-srv","status":"ACTIVE","public_ip":"10.0.0.1","size":"g4s.small"}' ;;
         scaleway)     printf '{"server":{"id":"test-uuid-1234","name":"test-srv","state":"running","public_ip":{"address":"10.0.0.1"},"public_ips":[{"address":"10.0.0.1"}]}}' ;;
+        serverspace)  printf '{"id":"test-uuid-1234","name":"test-srv","status":"Active","nics":[{"ip_address":"10.0.0.1"}]}' ;;
         *)            printf '{}' ;;
     esac
 }

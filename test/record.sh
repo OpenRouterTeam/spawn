@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma webdock"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma webdock serverspace"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
@@ -148,6 +148,14 @@ get_endpoints() {
                 "servers:/servers" \
                 "profiles:/profiles" \
                 "locations:/locations"
+            ;;
+        serverspace)
+            printf '%s\n' \
+                "project:/project" \
+                "servers:/servers" \
+                "ssh-keys:/ssh-keys" \
+                "locations:/locations" \
+                "images:/images"
             ;;
     esac
 }
@@ -268,6 +276,7 @@ get_auth_env_var() {
         hostkey)       printf "HOSTKEY_API_KEY" ;;
         cloudsigma)    printf "CLOUDSIGMA_EMAIL" ;;
         webdock)       printf "WEBDOCK_API_TOKEN" ;;
+        serverspace)   printf "SERVERSPACE_API_KEY" ;;
     esac
 }
 
@@ -417,6 +426,7 @@ call_api() {
         hostkey)       hostkey_api "$endpoint" ;;
         cloudsigma)    cloudsigma_api GET "$endpoint" ;;
         webdock)       webdock_api GET "$endpoint" ;;
+        serverspace)   serverspace_api GET "$endpoint" ;;
     esac
 }
 
@@ -465,6 +475,9 @@ elif cloud == 'cloudsigma':
 elif cloud == 'webdock':
     # Webdock returns error objects with 'message' field
     sys.exit(0 if 'message' in d and len(d) <= 3 and not any(k in d for k in ('slug','name','status','ipv4')) else 1)
+elif cloud == 'serverspace':
+    # ServerSpace returns error objects with 'error' field
+    sys.exit(0 if 'error' in d and d['error'] else 1)
 else:
     sys.exit(1)
 " "$cloud" 2>/dev/null
@@ -494,6 +507,7 @@ _record_live_cycle() {
         linode)        _live_linode "$fixture_dir" ;;
         civo)          _live_civo "$fixture_dir" ;;
         atlanticnet)   _live_atlanticnet "$fixture_dir" ;;
+        serverspace)   _live_serverspace "$fixture_dir" ;;
         *)  return 0 ;;  # No live cycle for this cloud yet
     esac
 }
@@ -846,6 +860,12 @@ _live_cloudsigma() {
 _live_webdock() {
     local fixture_dir="$1"
     printf '%b\n' "  ${YELLOW}skip${NC} Webdock live test (not implemented yet)" >&2
+    return 0
+}
+
+_live_serverspace() {
+    local fixture_dir="$1"
+    printf '%b\n' "  ${YELLOW}skip${NC} ServerSpace live test (async task-based creation, not implemented yet)" >&2
     return 0
 }
 

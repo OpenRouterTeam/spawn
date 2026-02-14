@@ -1,0 +1,8 @@
+{
+  "id": "test-uuid-1234",
+  "name": "test-srv",
+  "status": "Creating",
+  "cpu": 1,
+  "ram_mb": 1024,
+  "nics": []
+}
