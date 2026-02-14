@@ -299,9 +299,17 @@ _validate_body() {
         vultr)       case "$EP_CLEAN" in /instances)        _check_fields "label region plan os_id" ;; esac ;;
         linode)      case "$EP_CLEAN" in /linode/instances) _check_fields "label region type image" ;; esac ;;
         civo)        case "$EP_CLEAN" in /instances)        _check_fields "hostname size region" ;; esac ;;
+        binarylane)  case "$EP_CLEAN" in /servers)          _check_fields "name region plan os_id" ;; esac ;;
+        upcloud)     case "$EP_CLEAN" in /server)           _check_fields "server" ;; esac ;;
+        genesiscloud) case "$EP_CLEAN" in /instances)       _check_fields "name" ;; esac ;;
+        hyperstack)  case "$EP_CLEAN" in /servers)          _check_fields "name" ;; esac ;;
+        kamatera)    case "$EP_CLEAN" in /server/create)    _check_fields "datacenter" ;; esac ;;
+        latitude)    case "$EP_CLEAN" in /servers)          _check_fields "hostname site_id os_type" ;; esac ;;
+        ovh)         case "$EP_CLEAN" in */create)          _check_fields "name" ;; esac ;;
+        scaleway)    case "$EP_CLEAN" in /servers)          _check_fields "name" ;; esac ;;
         webdock)     case "$EP_CLEAN" in /servers)          _check_fields "name slug locationId profileSlug imageSlug" ;; esac ;;
         serverspace) case "$EP_CLEAN" in /servers)          _check_fields "name location_id image_id cpu ram_mb" ;; esac ;;
-        gcore)       case "$EP_CLEAN" in /instances) _check_fields "name flavor volumes interfaces" ;; esac !!
+        gcore)       case "$EP_CLEAN" in /instances) _check_fields "name flavor volumes interfaces" ;; esac ;;
     esac
 }
 
