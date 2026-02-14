@@ -101,7 +101,7 @@ ensure_in_path() {
         echo ""
         "${install_dir}/spawn" version
         echo ""
-        log_info "Run ${BOLD}spawn${NC}${GREEN} to get started${NC}"
+        printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
     else
         echo ""
         log_warn "${BOLD}${install_dir}${NC}${YELLOW} is not in your PATH${NC}"
