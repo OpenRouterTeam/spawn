@@ -413,20 +413,15 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" 2>&1 | tee -a "${LOG_
         fi
     fi
 
-    # Create checkpoint
-    log "Creating checkpoint..."
-    sprite-env checkpoint create --comment "${RUN_MODE} cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
+    # Note: checkpoint creation skipped (cloud-agnostic service)
 elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
     log "Cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
 
-    # Still checkpoint partial work
-    log "Creating checkpoint for partial work..."
-    sprite-env checkpoint create --comment "${RUN_MODE} cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
+    # Note: checkpoint creation skipped (cloud-agnostic service)
 elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     log "Cycle timed out after ${HARD_TIMEOUT}s — killed by hard timeout"
 
-    log "Creating checkpoint for partial work..."
-    sprite-env checkpoint create --comment "${RUN_MODE} cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
+    # Note: checkpoint creation skipped (cloud-agnostic service)
 else
     log "Cycle failed (exit_code=${CLAUDE_EXIT})"
 fi
