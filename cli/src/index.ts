@@ -209,6 +209,39 @@ function handlePromptFileError(promptFile: string, err: unknown): never {
   process.exit(1);
 }
 
+/** Read and validate a prompt file, exiting on any error */
+async function readPromptFile(promptFile: string): Promise<string> {
+  const { validatePromptFilePath, validatePromptFileStats } = await import("./security.js");
+  const { readFileSync, statSync } = await import("fs");
+
+  try {
+    validatePromptFilePath(promptFile);
+  } catch (err) {
+    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+    console.error(pc.red(msg));
+    process.exit(1);
+  }
+
+  try {
+    const stats = statSync(promptFile);
+    validatePromptFileStats(promptFile, stats);
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? err.code : "";
+    if (code === "ENOENT" || code === "EACCES" || code === "EISDIR") {
+      handlePromptFileError(promptFile, err);
+    }
+    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+    console.error(pc.red(msg));
+    process.exit(1);
+  }
+
+  try {
+    return readFileSync(promptFile, "utf-8");
+  } catch (err) {
+    handlePromptFileError(promptFile, err);
+  }
+}
+
 /** Parse --prompt / -p and --prompt-file flags, returning the resolved prompt text and remaining args */
 async function resolvePrompt(args: string[]): Promise<[string | undefined, string[]]> {
   let [prompt, filteredArgs] = extractFlagValue(
@@ -235,37 +268,7 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
   }
 
   if (promptFile) {
-    const { validatePromptFilePath, validatePromptFileStats } = await import("./security.js");
-    const { readFileSync, statSync } = await import("fs");
-
-    // SECURITY: Validate path before reading to prevent sensitive file exfiltration
-    try {
-      validatePromptFilePath(promptFile);
-    } catch (err) {
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-      console.error(pc.red(msg));
-      process.exit(1);
-    }
-
-    // Validate file metadata (regular file, size limits)
-    try {
-      const stats = statSync(promptFile);
-      validatePromptFileStats(promptFile, stats);
-    } catch (err) {
-      const code = err && typeof err === "object" && "code" in err ? err.code : "";
-      if (code === "ENOENT" || code === "EACCES" || code === "EISDIR") {
-        handlePromptFileError(promptFile, err);
-      }
-      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-      console.error(pc.red(msg));
-      process.exit(1);
-    }
-
-    try {
-      prompt = readFileSync(promptFile, "utf-8");
-    } catch (err) {
-      handlePromptFileError(promptFile, err);
-    }
+    prompt = await readPromptFile(promptFile);
   }
 
   return [prompt, filteredArgs];

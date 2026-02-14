@@ -436,30 +436,25 @@ function buildCloudLines(cloudInfo: { name: string; description: string; default
   return lines;
 }
 
+/** Format a single credential env var as a status line (green if set, red if missing) */
+export function formatCredStatusLine(varName: string, urlHint?: string): string {
+  if (process.env[varName]) {
+    return `  ${pc.green(varName)} ${pc.dim("-- set")}`;
+  }
+  const suffix = urlHint ? `  ${pc.dim(urlHint)}` : "";
+  return `  ${pc.red(varName)} ${pc.dim("-- not set")}${suffix}`;
+}
+
 /** Build credential status lines for dry-run preview showing which env vars are set/missing */
 function buildCredentialStatusLines(manifest: Manifest, cloud: string): string[] {
-  const lines: string[] = [];
   const cloudAuth = manifest.clouds[cloud].auth;
   const authVars = parseAuthEnvVars(cloudAuth);
   const cloudUrl = manifest.clouds[cloud].url;
 
-  // Always check OPENROUTER_API_KEY
-  const orSet = !!process.env.OPENROUTER_API_KEY;
-  lines.push(orSet
-    ? `  ${pc.green("OPENROUTER_API_KEY")} ${pc.dim("-- set")}`
-    : `  ${pc.red("OPENROUTER_API_KEY")} ${pc.dim("-- not set")}  ${pc.dim("https://openrouter.ai/settings/keys")}`);
+  const lines = [formatCredStatusLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys")];
 
-  // Check cloud-specific auth vars (show provider URL hint for missing vars)
   for (let i = 0; i < authVars.length; i++) {
-    const v = authVars[i];
-    const isSet = !!process.env[v];
-    if (isSet) {
-      lines.push(`  ${pc.green(v)} ${pc.dim("-- set")}`);
-    } else {
-      // Show the cloud provider URL on the first missing var to help users find their credentials
-      const urlHint = i === 0 && cloudUrl ? `  ${pc.dim(cloudUrl)}` : "";
-      lines.push(`  ${pc.red(v)} ${pc.dim("-- not set")}${urlHint}`);
-    }
+    lines.push(formatCredStatusLine(authVars[i], i === 0 ? cloudUrl : undefined));
   }
 
   return lines;

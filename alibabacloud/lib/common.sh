@@ -477,35 +477,18 @@ _ensure_security_group() {
     echo "$sg_id"
 }
 
-# Create Alibaba Cloud ECS instance
-# Sets: ALIYUN_INSTANCE_ID, ALIYUN_INSTANCE_IP
-create_server() {
-    local name="$1"
-    local region="${ALIYUN_REGION:-cn-hangzhou}"
-    local instance_type="${ALIYUN_INSTANCE_TYPE:-ecs.t5-lc1m2.small}"
-    local image_id="${ALIYUN_IMAGE_ID:-ubuntu_24_04_x64_20G_alibase_20240812.vhd}"
-
-    # Validate inputs to prevent injection
+# Validate Alibaba Cloud ECS instance parameters
+_aliyun_validate_create_params() {
+    local instance_type="$1" region="$2" image_id="$3"
     validate_resource_name "$instance_type" || { log_error "Invalid ALIYUN_INSTANCE_TYPE"; return 1; }
     validate_region_name "$region" || { log_error "Invalid ALIYUN_REGION"; return 1; }
     validate_resource_name "$image_id" || { log_error "Invalid ALIYUN_IMAGE_ID"; return 1; }
+}
 
-    # Ensure network infrastructure (VPC, vSwitch, security group)
-    local net_info vpc_id vswitch_id security_group_id
-    net_info=$(_ensure_network_infrastructure) || return 1
-    IFS=$'\t' read -r vpc_id vswitch_id security_group_id <<< "$net_info"
-
-    # Prepare instance parameters
-    local key_name="spawn-$(whoami)-$(hostname)"
-    local userdata
-    userdata=$(get_cloud_init_userdata)
-    local userdata_b64
-    userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
-
-    log_step "Creating Alibaba Cloud ECS instance '$name'..."
-    log_step "  Instance type: $instance_type"
-    log_step "  Region: $region"
-    log_step "  Image: $image_id"
+# Run the aliyun ecs RunInstances API call, returning the instance ID or failing
+_aliyun_run_instances() {
+    local name="$1" instance_type="$2" image_id="$3" region="$4"
+    local security_group_id="$5" vswitch_id="$6" key_name="$7" userdata_b64="$8"
 
     local create_response
     create_response=$(aliyun ecs RunInstances \
@@ -537,6 +520,40 @@ create_server() {
             "Review the API error: $create_response"
         return 1
     fi
+
+    echo "$instance_id"
+}
+
+# Create Alibaba Cloud ECS instance
+# Sets: ALIYUN_INSTANCE_ID, ALIYUN_INSTANCE_IP
+create_server() {
+    local name="$1"
+    local region="${ALIYUN_REGION:-cn-hangzhou}"
+    local instance_type="${ALIYUN_INSTANCE_TYPE:-ecs.t5-lc1m2.small}"
+    local image_id="${ALIYUN_IMAGE_ID:-ubuntu_24_04_x64_20G_alibase_20240812.vhd}"
+
+    _aliyun_validate_create_params "$instance_type" "$region" "$image_id" || return 1
+
+    # Ensure network infrastructure (VPC, vSwitch, security group)
+    local net_info vpc_id vswitch_id security_group_id
+    net_info=$(_ensure_network_infrastructure) || return 1
+    IFS=$'\t' read -r vpc_id vswitch_id security_group_id <<< "$net_info"
+
+    # Prepare instance parameters
+    local key_name="spawn-$(whoami)-$(hostname)"
+    local userdata
+    userdata=$(get_cloud_init_userdata)
+    local userdata_b64
+    userdata_b64=$(echo "$userdata" | base64 -w0 2>/dev/null || echo "$userdata" | base64)
+
+    log_step "Creating Alibaba Cloud ECS instance '$name'..."
+    log_step "  Instance type: $instance_type"
+    log_step "  Region: $region"
+    log_step "  Image: $image_id"
+
+    local instance_id
+    instance_id=$(_aliyun_run_instances "$name" "$instance_type" "$image_id" "$region" \
+        "$security_group_id" "$vswitch_id" "$key_name" "$userdata_b64") || return 1
 
     ALIYUN_INSTANCE_ID="$instance_id"
     export ALIYUN_INSTANCE_ID
