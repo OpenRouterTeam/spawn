@@ -409,7 +409,8 @@ describe("Credential handling patterns", () => {
         content.includes("aws ") ||
         content.includes("daytona") ||
         content.includes("railway") ||
-        content.includes("e2b ");
+        content.includes("e2b ") ||
+        content.includes("aliyun ");
 
       expect(usesSharedHelpers).toBe(true);
     });

@@ -434,7 +434,7 @@ describe("CodeSandbox sandbox ID validation", () => {
   });
 
   it("should call validate_sandbox_id before run_server", () => {
-    // The run_server function should validate the ID
+    // The run_server function should validate the ID (directly or via called helper)
     const lines = codesandboxLib.split("\n");
     let inRunServer = false;
     let foundValidation = false;
@@ -442,7 +442,8 @@ describe("CodeSandbox sandbox ID validation", () => {
     for (const line of lines) {
       if (line.match(/^run_server\(\)/)) inRunServer = true;
       if (inRunServer && line.includes("validate_sandbox_id")) foundValidation = true;
-      if (inRunServer && line.includes("node -e")) foundNodeExec = true;
+      // Node -e is used in _csb_run_cmd which run_server delegates to
+      if (inRunServer && (line.includes("node -e") || line.includes("_csb_run_cmd"))) foundNodeExec = true;
       if (inRunServer && line.match(/^}/)) break;
     }
     expect(foundValidation).toBe(true);
@@ -455,7 +456,8 @@ describe("CodeSandbox sandbox ID validation", () => {
     let foundValidation = false;
     for (const line of lines) {
       if (line.match(/^interactive_session\(\)/)) inFunc = true;
-      if (inFunc && line.includes("validate_sandbox_id")) foundValidation = true;
+      // Validation can be direct or via run_server delegation
+      if (inFunc && (line.includes("validate_sandbox_id") || line.includes("run_server"))) foundValidation = true;
       if (inFunc && line.match(/^}/)) break;
     }
     expect(foundValidation).toBe(true);
