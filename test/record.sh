@@ -34,138 +34,141 @@ PROMPT_FOR_CREDS=true
 ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma webdock serverspace gcore"
 
 # --- Endpoint registry ---
-# Format: "fixture_name:endpoint"
+# Declare endpoints as string literal for each cloud
+# Format: "fixture_name:endpoint" (one per line, indented)
+_ENDPOINTS_hetzner="
+server_types:/server_types?per_page=50
+locations:/locations
+ssh_keys:/ssh_keys
+servers:/servers
+"
+
+_ENDPOINTS_digitalocean="
+account:/account
+ssh_keys:/account/keys
+droplets:/droplets
+sizes:/sizes
+regions:/regions
+"
+
+_ENDPOINTS_vultr="
+account:/account
+ssh_keys:/ssh-keys
+instances:/instances
+plans:/plans
+regions:/regions
+"
+
+_ENDPOINTS_linode="
+profile:/profile
+ssh_keys:/profile/sshkeys
+instances:/linode/instances
+types:/linode/types
+regions:/regions
+"
+
+_ENDPOINTS_lambda="
+instances:/instances
+ssh_keys:/ssh-keys
+instance_types:/instance-types
+"
+
+_ENDPOINTS_civo="
+regions:/regions
+instances:/instances
+sshkeys:/sshkeys
+networks:/networks
+disk_images:/disk_images
+"
+
+_ENDPOINTS_upcloud="
+servers:/server
+server_sizes:/server_size
+"
+
+_ENDPOINTS_binarylane="
+sizes:/sizes
+regions:/regions
+servers:/servers
+"
+
+_ENDPOINTS_ovh="
+flavors:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/flavor
+images:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/image
+ssh_keys:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/sshkey
+"
+
+_ENDPOINTS_scaleway="
+servers:/servers
+images:/images?per_page=10
+"
+
+_ENDPOINTS_genesiscloud="
+ssh_keys:/ssh-keys
+instances:/instances
+"
+
+_ENDPOINTS_kamatera="
+server_options:/service/server
+"
+
+_ENDPOINTS_latitude="
+ssh_keys:/ssh_keys
+plans:/plans
+regions:/regions
+"
+
+_ENDPOINTS_hyperstack="
+flavors:/core/flavors
+ssh_keys:/core/keypairs
+"
+
+_ENDPOINTS_atlanticnet="
+ssh_keys:list-sshkeys
+plans:describe-plan
+"
+
+_ENDPOINTS_hostkey="
+services:/v1/services
+ssh_keys:/ssh_keys
+"
+
+_ENDPOINTS_cloudsigma="
+balance:/balance/
+keypairs:/keypairs/
+servers:/servers/
+"
+
+_ENDPOINTS_webdock="
+account:/account
+publicKeys:/account/publicKeys
+servers:/servers
+profiles:/profiles
+locations:/locations
+"
+
+_ENDPOINTS_serverspace="
+project:/project
+servers:/servers
+ssh-keys:/ssh-keys
+locations:/locations
+images:/images
+"
+
+_ENDPOINTS_gcore="
+projects:/cloud/v1/projects
+ssh_keys:/cloud/v1/ssh_keys/\${GCORE_PROJECT_ID:-MISSING}
+instances:/cloud/v1/instances/\${GCORE_PROJECT_ID:-MISSING}/\${GCORE_REGION:-ed-1}
+images:/cloud/v1/images/\${GCORE_PROJECT_ID:-MISSING}/\${GCORE_REGION:-ed-1}
+flavors:/cloud/v1/flavors/\${GCORE_PROJECT_ID:-MISSING}/\${GCORE_REGION:-ed-1}
+"
+
 get_endpoints() {
     local cloud="$1"
-    case "$cloud" in
-        hetzner)
-            printf '%s\n' \
-                "server_types:/server_types?per_page=50" \
-                "locations:/locations" \
-                "ssh_keys:/ssh_keys" \
-                "servers:/servers"
-            ;;
-        digitalocean)
-            printf '%s\n' \
-                "account:/account" \
-                "ssh_keys:/account/keys" \
-                "droplets:/droplets" \
-                "sizes:/sizes" \
-                "regions:/regions"
-            ;;
-        vultr)
-            printf '%s\n' \
-                "account:/account" \
-                "ssh_keys:/ssh-keys" \
-                "instances:/instances" \
-                "plans:/plans" \
-                "regions:/regions"
-            ;;
-        linode)
-            printf '%s\n' \
-                "profile:/profile" \
-                "ssh_keys:/profile/sshkeys" \
-                "instances:/linode/instances" \
-                "types:/linode/types" \
-                "regions:/regions"
-            ;;
-        lambda)
-            printf '%s\n' \
-                "instances:/instances" \
-                "ssh_keys:/ssh-keys" \
-                "instance_types:/instance-types"
-            ;;
-        civo)
-            printf '%s\n' \
-                "regions:/regions" \
-                "instances:/instances" \
-                "sshkeys:/sshkeys" \
-                "networks:/networks" \
-                "disk_images:/disk_images"
-            ;;
-        upcloud)
-            printf '%s\n' \
-                "servers:/server" \
-                "server_sizes:/server_size"
-            ;;
-        binarylane)
-            printf '%s\n' \
-                "sizes:/sizes" \
-                "regions:/regions" \
-                "servers:/servers"
-            ;;
-        ovh)
-            printf '%s\n' \
-                "flavors:/cloud/project/${OVH_PROJECT_ID:-MISSING}/flavor" \
-                "images:/cloud/project/${OVH_PROJECT_ID:-MISSING}/image" \
-                "ssh_keys:/cloud/project/${OVH_PROJECT_ID:-MISSING}/sshkey"
-            ;;
-        scaleway)
-            printf '%s\n' \
-                "servers:/servers" \
-                "images:/images?per_page=10"
-            ;;
-        genesiscloud)
-            printf '%s\n' \
-                "ssh_keys:/ssh-keys" \
-                "instances:/instances"
-            ;;
-        kamatera)
-            printf '%s\n' \
-                "server_options:/service/server"
-            ;;
-        latitude)
-            printf '%s\n' \
-                "ssh_keys:/ssh_keys" \
-                "plans:/plans" \
-                "regions:/regions"
-            ;;
-        hyperstack)
-            printf '%s\n' \
-                "flavors:/core/flavors" \
-                "ssh_keys:/core/keypairs"
-            ;;
-        atlanticnet)
-            printf '%s\n' \
-                "ssh_keys:list-sshkeys" \
-                "plans:describe-plan"
-            ;;
-        hostkey)
-            printf '%s\n' \
-                "services:/v1/services" \
-                "ssh_keys:/ssh_keys"
-            ;;
-        cloudsigma)
-            printf '%s\n' \
-                "balance:/balance/" \
-                "keypairs:/keypairs/" \
-                "servers:/servers/"
-            ;;
-        webdock)
-            printf '%s\n' \
-                "account:/account" \
-                "publicKeys:/account/publicKeys" \
-                "servers:/servers" \
-                "profiles:/profiles" \
-                "locations:/locations"
-            ;;
-        serverspace)
-            printf '%s\n' \
-                "project:/project" \
-                "servers:/servers" \
-                "ssh-keys:/ssh-keys" \
-                "locations:/locations" \
-                "images:/images"
-            ;;
-        gcore)
-            printf '%s\n' \
-                "projects:/cloud/v1/projects" \
-                "ssh_keys:/cloud/v1/ssh_keys/${GCORE_PROJECT_ID:-MISSING}" \
-                "instances:/cloud/v1/instances/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}" \
-                "images:/cloud/v1/images/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}" \
-                "flavors:/cloud/v1/flavors/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}"
-            ;;
-    esac
+    local var_name="_ENDPOINTS_${cloud}"
+    if [[ -n "${!var_name:-}" ]]; then
+        printf '%s\n' "${!var_name}" | grep -v '^$'
+    fi
 }
 
 # --- Multi-credential cloud specs ---
