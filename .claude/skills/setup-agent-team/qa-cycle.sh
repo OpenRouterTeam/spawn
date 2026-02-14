@@ -855,12 +855,12 @@ git fetch origin main 2>&1 | tee -a "${LOG_FILE}" || true
 git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
 rm -f "${RESULTS_PHASE4}"
-run_with_timeout 600 bash -c "RESULTS_FILE='${RESULTS_PHASE4}' bash test/mock.sh" 2>&1 | tee -a "${LOG_FILE}" || {
-    local exit_code=$?
-    if [[ "${exit_code}" -eq 124 ]]; then
-        log "Phase 4: Mock tests timed out after 600s"
-    fi
-}
+MOCK_EXIT=0
+run_with_timeout 600 bash -c "RESULTS_FILE='${RESULTS_PHASE4}' bash test/mock.sh" 2>&1 | tee -a "${LOG_FILE}" || MOCK_EXIT=$?
+
+if [[ "${MOCK_EXIT}" -eq 124 ]]; then
+    log "Phase 4: Mock tests timed out after 600s"
+fi
 
 if [[ -f "${RESULTS_PHASE4}" ]]; then
     RETRY_PASS=$(grep -c ':pass$' "${RESULTS_PHASE4}" || true)
