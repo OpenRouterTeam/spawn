@@ -590,6 +590,33 @@ _save_live_fixture() {
 #   BUILDER_FUNC             - Function that prints the JSON create body to stdout
 #   DELETE_DELAY             - Seconds to sleep before delete (default: 3)
 #   EMPTY_DELETE_FALLBACK    - JSON to use when DELETE returns empty body (optional)
+# Extract resource ID from API response using Python expression
+# Sets global resource_id; returns 0 on success, 1 on failure
+_extract_resource_id() {
+    local response="$1" id_py_expr="$2"
+
+    resource_id=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${id_py_expr})" 2>/dev/null) || true
+
+    if [[ -z "${resource_id:-}" ]]; then
+        printf '%b\n' "  ${RED}fail${NC} Could not extract resource ID from create response"
+        cloud_errors=$((cloud_errors + 1))
+        return 1
+    fi
+
+    return 0
+}
+
+# Handle delete response, using fallback if empty
+_handle_delete_response() {
+    local response="$1" empty_delete_fallback="$2"
+
+    if [[ -z "$response" && -n "$empty_delete_fallback" ]]; then
+        echo "$empty_delete_fallback"
+    else
+        echo "$response"
+    fi
+}
+
 _live_create_delete_cycle() {
     local fixture_dir="$1"
     local api_func="$2"
@@ -612,13 +639,7 @@ _live_create_delete_cycle() {
     }
 
     local resource_id
-    resource_id=$(echo "$create_response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${id_py_expr})" 2>/dev/null) || true
-
-    if [[ -z "${resource_id:-}" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} Could not extract resource ID from create response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
+    _extract_resource_id "$create_response" "$id_py_expr" || return 0
 
     printf '%b\n' "  ${CYAN}live${NC} Created (ID: ${resource_id}). Deleting..."
     sleep "$delete_delay"
@@ -627,9 +648,7 @@ _live_create_delete_cycle() {
     local delete_response
     delete_response=$("${api_func}" DELETE "${delete_endpoint}")
 
-    if [[ -z "$delete_response" && -n "$empty_delete_fallback" ]]; then
-        delete_response="$empty_delete_fallback"
-    fi
+    delete_response=$(_handle_delete_response "$delete_response" "$empty_delete_fallback")
 
     _save_live_fixture "$fixture_dir" "delete_server" "DELETE ${delete_endpoint_template}" "$delete_response"
     printf '%b\n' "  ${CYAN}live${NC} Resource ${resource_id} deleted"
@@ -971,6 +990,46 @@ _record_ensure_credentials() {
 
 # Record a single endpoint fixture; increments cloud_recorded/cloud_errors
 # Usage: _record_endpoint CLOUD FIXTURE_DIR FIXTURE_NAME ENDPOINT
+# Validate API response and report errors
+# Returns 0 if valid, 1 if invalid/error
+_validate_endpoint_response() {
+    local cloud="$1" fixture_name="$2" response="$3"
+
+    if [[ -z "$response" ]]; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — empty response"
+        cloud_errors=$((cloud_errors + 1))
+        return 1
+    fi
+
+    if ! echo "$response" | is_valid_json; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
+        cloud_errors=$((cloud_errors + 1))
+        return 1
+    fi
+
+    if has_api_error "$cloud" "$response"; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
+        cloud_errors=$((cloud_errors + 1))
+        return 1
+    fi
+
+    return 0
+}
+
+# Record endpoint response to fixture file and update metadata
+_save_endpoint_fixture() {
+    local fixture_dir="$1" fixture_name="$2" endpoint="$3" response="$4"
+
+    echo "$response" | pretty_json > "${fixture_dir}/${fixture_name}.json"
+    printf '%b\n' "  ${GREEN}  ok${NC} ${fixture_name} → fixtures/${cloud}/${fixture_name}.json"
+    cloud_recorded=$((cloud_recorded + 1))
+
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    metadata_entries="${metadata_entries}    \"${fixture_name}\": {\"endpoint\": \"${endpoint}\", \"recorded_at\": \"${timestamp}\"},
+"
+}
+
 _record_endpoint() {
     local cloud="$1" fixture_dir="$2" fixture_name="$3" endpoint="$4"
 
@@ -987,32 +1046,8 @@ _record_endpoint() {
     response=$(cat "$tmp_response")
     rm -f "$tmp_response"
 
-    if [[ -z "$response" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — empty response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    if ! echo "$response" | is_valid_json; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    if has_api_error "$cloud" "$response"; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    echo "$response" | pretty_json > "${fixture_dir}/${fixture_name}.json"
-    printf '%b\n' "  ${GREEN}  ok${NC} ${fixture_name} → fixtures/${cloud}/${fixture_name}.json"
-    cloud_recorded=$((cloud_recorded + 1))
-
-    local timestamp
-    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    metadata_entries="${metadata_entries}    \"${fixture_name}\": {\"endpoint\": \"${endpoint}\", \"recorded_at\": \"${timestamp}\"},
-"
+    _validate_endpoint_response "$cloud" "$fixture_name" "$response" || return 0
+    _save_endpoint_fixture "$fixture_dir" "$fixture_name" "$endpoint" "$response"
 }
 
 # Write the _metadata.json file for a cloud's fixtures
