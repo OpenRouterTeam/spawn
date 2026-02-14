@@ -92,8 +92,10 @@ For each linked PR: `gh pr view PR_NUM --repo OpenRouterTeam/spawn --comments`
 
 Read ALL comments — prior discussion contains decisions, rejected approaches, and scope changes.
 
-**DEDUP**: Check `--json comments --jq '.comments[] | "\(.author.login): \(.body[-40:])"'` — skip if `-- discovery/issue-responder` already exists.
-If actionable, implement and create PR (self-review + label, do NOT merge). If already implemented, close with comment.
+**STRICT DEDUP — MANDATORY**: Check `--json comments --jq '.comments[] | "\(.author.login): \(.body[-40:])"'`
+- If `-- discovery/issue-responder` already exists in ANY comment → **SKIP this issue entirely** unless you have a concrete PR link or fix to report
+- **NEVER** post acknowledgment-only comments on issues that have already been acknowledged by any team (check for any `-- ` sign-off pattern)
+If actionable AND not already claimed, implement and create PR (self-review + label, do NOT merge). If already implemented, close with comment.
 **SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`.
 
 ### Gap Filler (spawn remaining)
