@@ -139,7 +139,19 @@ _railway_wait_for_deployment() {
         fi
 
         if echo "$status" | grep -qi "failed\|error"; then
-            log_error "Service deployment failed"
+            log_error "Service deployment failed with status: $status"
+            log_error ""
+            log_error "Common causes:"
+            log_error "  - Build failure (check Docker image or buildpack configuration)"
+            log_error "  - Insufficient resources for the selected service plan"
+            log_error "  - Health check failure (service crashed on startup)"
+            log_error "  - Application error in startup command or missing dependencies"
+            log_error ""
+            log_error "Debugging steps:"
+            log_error "  1. View deployment logs at: https://railway.app/project/$PROJECT_ID"
+            log_error "  2. Check service configuration: railway status"
+            log_error "  3. Try a different region or service tier"
+            log_error "  4. Verify environment variables are set correctly"
             return 1
         fi
 
@@ -147,7 +159,12 @@ _railway_wait_for_deployment() {
         sleep 5
     done
 
-    log_error "Timeout waiting for service to be ready"
+    log_error "Timeout waiting for service to be ready after $max_attempts attempts"
+    log_error ""
+    log_error "The service may still be deploying. You can:"
+    log_error "  1. Check deployment status at: https://railway.app/"
+    log_error "  2. View real-time logs: railway logs"
+    log_error "  3. Re-run the spawn command to retry"
     return 1
 }
 
