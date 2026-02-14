@@ -263,6 +263,148 @@ setup_fake_home() {
 }
 
 # ============================================================
+# Cloud API helpers (for use by test infra tests)
+# ============================================================
+
+# Strip API base URL to get just the endpoint path.
+# Used by test/test-infra-sync.test.ts to validate cloud coverage.
+_strip_api_base() {
+    local url="$1"
+    local endpoint="$url"
+
+    case "$url" in
+        https://api.hetzner.cloud/v1*)     endpoint="${url#https://api.hetzner.cloud/v1}" ;;
+        https://api.digitalocean.com/v2*)   endpoint="${url#https://api.digitalocean.com/v2}" ;;
+        https://api.vultr.com/v2*)          endpoint="${url#https://api.vultr.com/v2}" ;;
+        https://api.linode.com/v4*)         endpoint="${url#https://api.linode.com/v4}" ;;
+        https://cloud.lambdalabs.com/api/v1*)  endpoint="${url#https://cloud.lambdalabs.com/api/v1}" ;;
+        https://api.civo.com/v2*)           endpoint="${url#https://api.civo.com/v2}" ;;
+        https://api.upcloud.com/1.3*)       endpoint="${url#https://api.upcloud.com/1.3}" ;;
+        https://api.binarylane.com.au/v2*)  endpoint="${url#https://api.binarylane.com.au/v2}" ;;
+        https://api.scaleway.com/instance/v1/zones/*) endpoint=$(echo "$url" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||') ;;
+        https://api.scaleway.com/account/v3*) endpoint="${url#https://api.scaleway.com/account/v3}" ;;
+        https://api.scaleway.com/*)         endpoint=$(echo "$url" | sed 's|https://api.scaleway.com/[^/]*/[^/]*/||') ;;
+        https://api.genesiscloud.com/compute/v1*) endpoint="${url#https://api.genesiscloud.com/compute/v1}" ;;
+        https://console.kamatera.com/svc*)  endpoint="${url#https://console.kamatera.com/svc}" ;;
+        https://api.latitude.sh*)           endpoint="${url#https://api.latitude.sh}" ;;
+        https://infrahub-api.nexgencloud.com/v1*) endpoint="${url#https://infrahub-api.nexgencloud.com/v1}" ;;
+        *eu.api.ovh.com*)                   endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
+        https://cloudapi.atlantic.net/*)    endpoint=$(echo "$url" | sed 's|https://cloudapi.atlantic.net/\?||') ;;
+        https://invapi.hostkey.com*)        endpoint="${url#https://invapi.hostkey.com}" ;;
+        https://*.cloudsigma.com/api/2.0*)  endpoint=$(echo "$url" | sed 's|https://[^/]*.cloudsigma.com/api/2.0||') ;;
+        https://api.webdock.io/v1*)         endpoint="${url#https://api.webdock.io/v1}" ;;
+        https://api.serverspace.io/api/v1*) endpoint="${url#https://api.serverspace.io/api/v1}" ;;
+        https://api.gcore.com/cloud/v*/instances/*/*/*) endpoint=$(echo "$url" | sed 's|.*/instances/[^/]*/[^/]*/|/instances/|') ;;
+        https://api.gcore.com/cloud/v*/instances/*/*) endpoint="/instances" ;;
+        https://api.gcore.com/cloud/v*/*/*/*/*) endpoint=$(echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*/[^/]*/|/\1/|') ;;
+        https://api.gcore.com/cloud/v*/*/*/*) endpoint=$(echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*/[^/]*$|/\1|') ;;
+        https://api.gcore.com/cloud/v*/*/*) endpoint=$(echo "$url" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*$|/\1|') ;;
+        https://api.gcore.com/cloud/v*/*) endpoint=$(echo "$url" | sed 's|.*/cloud/v[0-9]*/||; s|^|/|') ;;
+        https://api.gcore.com*)            endpoint="${url#https://api.gcore.com}" ;;
+    esac
+
+    echo "$endpoint" | sed 's|?.*||'
+}
+
+# Validate POST request body contains required fields for major clouds.
+# Used during mock script execution to catch invalid API requests.
+# Args: cloud method endpoint body
+_validate_body() {
+    local cloud="$1"
+    local method="$2"
+    local endpoint="$3"
+    local body="$4"
+
+    [[ "$method" != "POST" ]] && return 0
+    [[ -z "$body" ]] && return 0
+
+    local required_fields=""
+    case "$cloud" in
+        hetzner)
+            case "$endpoint" in
+                /servers) required_fields="name server_type image location" ;;
+            esac ;;
+        digitalocean)
+            case "$endpoint" in
+                /droplets) required_fields="name region size image" ;;
+            esac ;;
+        vultr)
+            case "$endpoint" in
+                /instances) required_fields="label region plan os_id" ;;
+            esac ;;
+        linode)
+            case "$endpoint" in
+                /linode/instances) required_fields="label region type image" ;;
+            esac ;;
+        civo)
+            case "$endpoint" in
+                /instances) required_fields="hostname size region" ;;
+            esac ;;
+        binarylane)
+            case "$endpoint" in
+                /servers) required_fields="name region plan os_id" ;;
+            esac ;;
+        upcloud)
+            case "$endpoint" in
+                /server) required_fields="server" ;;
+            esac ;;
+        genesiscloud)
+            case "$endpoint" in
+                /instances) required_fields="name" ;;
+            esac ;;
+        hyperstack)
+            case "$endpoint" in
+                /servers) required_fields="name" ;;
+            esac ;;
+        kamatera)
+            case "$endpoint" in
+                /server/create) required_fields="datacenter" ;;
+            esac ;;
+        latitude)
+            case "$endpoint" in
+                /servers) required_fields="hostname site_id os_type" ;;
+            esac ;;
+        ovh)
+            case "$endpoint" in
+                */create) required_fields="name" ;;
+            esac ;;
+        scaleway)
+            case "$endpoint" in
+                /servers) required_fields="name" ;;
+            esac ;;
+        webdock)
+            case "$endpoint" in
+                /servers) required_fields="name slug locationId profileSlug imageSlug" ;;
+            esac ;;
+        serverspace)
+            case "$endpoint" in
+                /servers) required_fields="name location_id image_id cpu ram_mb" ;;
+            esac ;;
+        gcore)
+            case "$endpoint" in
+                /instances) required_fields="name flavor volumes interfaces" ;;
+            esac ;;
+    esac
+
+    [[ -z "$required_fields" ]] && return 0
+
+    # Check if body is valid JSON
+    if ! printf '%s' "$body" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
+        echo "BODY_ERROR:invalid_json:${endpoint}" >> "${MOCK_LOG}"
+        return 1
+    fi
+
+    # Check for required fields
+    for field in $required_fields; do
+        if ! printf '%s' "$body" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
+            echo "BODY_ERROR:missing_field:${field}:${endpoint}" >> "${MOCK_LOG}"
+        fi
+    done
+
+    return 0
+}
+
+# ============================================================
 # Cloud-specific env var setup
 # ============================================================
 
