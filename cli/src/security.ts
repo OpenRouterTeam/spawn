@@ -28,15 +28,19 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
   // Allowlist validation: only safe characters
   if (!IDENTIFIER_PATTERN.test(identifier)) {
     throw new Error(
-      `${fieldName} "${identifier}" contains invalid characters.\n` +
-      `Only lowercase letters, numbers, hyphens, and underscores are allowed.\n` +
-      `Run 'spawn agents' or 'spawn clouds' to see valid names.`
+      `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
+      `Names can only contain lowercase letters, numbers, hyphens, and underscores.\n` +
+      `Run ${fieldName.toLowerCase().includes("agent") ? "'spawn agents'" : "'spawn clouds'"} to see available options.`
     );
   }
 
   // Prevent path traversal patterns (defense in depth)
   if (identifier.includes("..") || identifier.includes("/") || identifier.includes("\\")) {
-    throw new Error(`${fieldName} contains path traversal characters`);
+    throw new Error(
+      `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
+      `Special characters like '/', '\\', and '..' are not allowed.\n` +
+      `Run ${fieldName.toLowerCase().includes("agent") ? "'spawn agents'" : "'spawn clouds'"} to see available options.`
+    );
   }
 }
 
@@ -72,9 +76,15 @@ export function validateScriptContent(script: string): void {
   // Ensure script starts with shebang
   if (!script.trim().startsWith("#!")) {
     throw new Error(
-      "Script must start with a valid shebang (e.g., #!/bin/bash).\n" +
-      "This usually means the download returned an error page instead of a script.\n" +
-      "Try again, or check your internet connection."
+      "The downloaded file doesn't appear to be a valid script.\n\n" +
+      "This usually means:\n" +
+      "  • The server returned an error page instead of the script\n" +
+      "  • Your internet connection was interrupted\n" +
+      "  • The script hasn't been published yet\n\n" +
+      "How to fix:\n" +
+      "  1. Check your internet connection and try again\n" +
+      "  2. Verify the combination exists: spawn matrix\n" +
+      "  3. Try again in a few moments"
     );
   }
 }
@@ -120,10 +130,12 @@ export function validatePromptFilePath(filePath: string): void {
   for (const { pattern, description } of SENSITIVE_PATH_PATTERNS) {
     if (pattern.test(resolved)) {
       throw new Error(
-        `Refusing to read '${filePath}': ${description}.\n` +
-        `\n` +
-        `Prompt file contents are sent to remote agents and may be logged.\n` +
-        `Use a dedicated text file for your prompt instead.`
+        `Cannot use '${filePath}' as a prompt file.\n\n` +
+        `This path points to ${description}.\n` +
+        `Prompt contents are sent to the agent and may be logged remotely.\n\n` +
+        `How to fix:\n` +
+        `  1. Create a new text file: echo "Your prompt here" > prompt.txt\n` +
+        `  2. Use that file instead: spawn <agent> <cloud> --prompt-file prompt.txt`
       );
     }
   }
@@ -183,21 +195,21 @@ export function validatePrompt(prompt: string): void {
 
   // Check for obvious command injection patterns
   // These patterns would break out of the shell quoting used in bash scripts
-  const dangerousPatterns: Array<{ pattern: RegExp; description: string }> = [
-    { pattern: /\$\(.*\)/, description: "command substitution $()" },
-    { pattern: /`[^`]*`/, description: "command substitution backticks" },
-    { pattern: /;\s*rm\s+-rf/, description: "command chaining with rm -rf" },
-    { pattern: /\|\s*bash/, description: "piping to bash" },
-    { pattern: /\|\s*sh/, description: "piping to sh" },
+  const dangerousPatterns: Array<{ pattern: RegExp; description: string; suggestion: string }> = [
+    { pattern: /\$\(.*\)/, description: "command substitution $()", suggestion: 'Instead of "Fix $(ls)", try "Fix the output of ls command"' },
+    { pattern: /`[^`]*`/, description: "backtick command substitution", suggestion: "Rephrase to describe the command instead of using backticks" },
+    { pattern: /;\s*rm\s+-rf/, description: "dangerous command sequence", suggestion: "Describe the action you want without shell syntax" },
+    { pattern: /\|\s*bash/, description: "shell piping", suggestion: "Describe what you want to achieve instead" },
+    { pattern: /\|\s*sh/, description: "shell piping", suggestion: "Describe what you want to achieve instead" },
   ];
 
-  for (const { pattern, description } of dangerousPatterns) {
+  for (const { pattern, description, suggestion } of dangerousPatterns) {
     if (pattern.test(prompt)) {
       throw new Error(
-        `Prompt blocked: contains potentially dangerous pattern (${description}).\n` +
-        `\n` +
-        `If this is a false positive, try rephrasing to avoid shell-like syntax\n` +
-        `(e.g., describe the command instead of writing it literally).`
+        `Your prompt contains shell syntax that can't be safely processed (${description}).\n\n` +
+        `${suggestion}\n\n` +
+        `Tip: Describe what you want the agent to do in plain English, rather than\n` +
+        `using shell commands or special characters.`
       );
     }
   }
