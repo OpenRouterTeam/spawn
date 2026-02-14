@@ -58,9 +58,7 @@ log_step "Configuring nanoclaw..."
 DOTENV_TEMP=$(mktemp)
 track_temp_file "${DOTENV_TEMP}"
 chmod 600 "${DOTENV_TEMP}"
-cat > "${DOTENV_TEMP}" << EOF
-ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
-EOF
+printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
 
 upload_file "${LATITUDE_SERVER_IP}" "${DOTENV_TEMP}" "/root/nanoclaw/.env"
 

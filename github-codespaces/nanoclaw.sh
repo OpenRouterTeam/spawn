@@ -66,9 +66,7 @@ DOTENV_TEMP=$(mktemp)
 chmod 600 "${DOTENV_TEMP}"
 track_temp_file "${DOTENV_TEMP}"
 
-cat > "${DOTENV_TEMP}" << EOF
-ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
-EOF
+printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
 
 upload_file "${DOTENV_TEMP}" "/tmp/nanoclaw_env"
 run_server "mv /tmp/nanoclaw_env ~/nanoclaw/.env"
