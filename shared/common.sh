@@ -65,21 +65,28 @@ log_install_failed() {
     local install_cmd="${2:-}"
     local server_ip="${3:-}"
 
-    log_error "${agent_name} installation verification failed"
+    log_error "${agent_name} installation failed to complete successfully"
     log_error ""
-    log_error "Possible causes:"
-    log_error "  - Package manager timeout or network issue on the server"
+    log_error "The agent could not be installed or verified on the server."
+    log_error ""
+    log_error "Common causes:"
+    log_error "  - Network timeout downloading packages (npm, pip, etc.)"
     log_error "  - Insufficient disk space or memory on the server"
-    log_error "  - The install script requires a dependency not yet available"
+    log_error "  - Missing system dependencies for ${agent_name}"
+    log_error "  - Cloud provider's package mirror is temporarily unavailable"
     log_error ""
-    log_error "How to fix:"
+    log_error "Debugging steps:"
     if [[ -n "${server_ip}" ]]; then
-        log_error "  1. SSH into the server to debug:  ssh root@${server_ip}"
+        log_error "  1. SSH into the server and check logs:"
+        log_error "     ssh root@${server_ip}"
+        log_error "     Check: df -h  (disk space)"
+        log_error "     Check: free -h  (memory)"
     fi
     if [[ -n "${install_cmd}" ]]; then
-        log_error "  2. Re-run the install manually:  ${install_cmd}"
+        log_error "  2. Try the installation manually:"
+        log_error "     ${install_cmd}"
     fi
-    log_error "  3. Re-run this spawn command to try again on a fresh server"
+    log_error "  3. Re-run spawn to try on a fresh server (some failures are transient)"
 }
 
 # ============================================================
@@ -856,15 +863,18 @@ _await_oauth_callback() {
 
     if ! _wait_for_oauth "${code_file}"; then
         cleanup_oauth_session "${server_pid}" "${oauth_dir}"
-        log_warn "OAuth timed out after 120 seconds. Possible causes:"
-        log_warn "  - Browser did not open (try visiting the URL manually)"
-        log_warn "  - Authentication was not completed in the browser"
-        log_warn "  - Firewall or proxy blocked the local callback on port ${actual_port}"
-        log_warn ""
-        log_warn "How to fix:"
-        log_warn "  1. Re-run the command to try again"
-        log_warn "  2. Set the key manually: export OPENROUTER_API_KEY=sk-or-..."
-        log_warn "     (get a key at https://openrouter.ai/settings/keys)"
+        log_error "OAuth authentication timed out after 120 seconds"
+        log_error ""
+        log_error "The authentication flow was not completed in time."
+        log_error ""
+        log_error "Troubleshooting:"
+        log_error "  1. Check if your browser opened to openrouter.ai"
+        log_error "  2. Complete the authentication and allow the redirect"
+        log_error "  3. Ensure port ${actual_port} is not blocked by firewall/proxy"
+        log_error ""
+        log_error "Alternative: Use a manual API key instead"
+        log_error "  export OPENROUTER_API_KEY=sk-or-v1-..."
+        log_error "  Get a key at: https://openrouter.ai/settings/keys"
         return 1
     fi
 
@@ -1529,7 +1539,7 @@ generic_ssh_wait() {
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         # shellcheck disable=SC2086
         if ssh ${ssh_opts} "${username}@${ip}" "${test_cmd}" >/dev/null 2>&1; then
-            log_info "${description} ready (${elapsed_time}s)"
+            log_info "${description} ready (took ${elapsed_time}s)"
             return 0
         fi
 
@@ -1537,7 +1547,15 @@ generic_ssh_wait() {
         local jitter
         jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
 
-        log_step "Waiting for ${description}... (${elapsed_time}s elapsed)"
+        # Show contextual progress messages based on elapsed time
+        if [[ ${elapsed_time} -lt 60 ]]; then
+            log_step "Waiting for ${description}... (${elapsed_time}s elapsed, still within normal range)"
+        elif [[ ${elapsed_time} -lt 120 ]]; then
+            log_step "Waiting for ${description}... (${elapsed_time}s elapsed, taking longer than usual)"
+        else
+            log_warn "Still waiting for ${description}... (${elapsed_time}s elapsed, this is unusually slow)"
+        fi
+
         sleep "${jitter}"
 
         elapsed_time=$((elapsed_time + jitter))
@@ -1546,14 +1564,25 @@ generic_ssh_wait() {
     done
 
     log_error "${description} timed out after ${elapsed_time}s (server: ${ip})"
-    log_warn ""
-    log_warn "The server may still be booting or the connection may be blocked."
-    log_warn ""
-    log_warn "How to fix:"
-    log_warn "  1. Re-run the command to try again (the server may need more time)"
-    log_warn "  2. Check your cloud provider dashboard to verify the server is running"
-    log_warn "  3. Test SSH manually: ssh ${username}@${ip}"
-    log_warn "  4. Check that port 22 is open in the server's firewall/security group"
+    log_error ""
+    log_error "The server failed to become ready within the expected timeframe."
+    log_error ""
+    log_error "Common causes:"
+    log_error "  - Server is still booting (some cloud providers take 2-3 minutes)"
+    log_error "  - Cloud provider API delays or maintenance"
+    log_error "  - Firewall blocking SSH on port 22"
+    log_error "  - Network connectivity issues"
+    log_error ""
+    log_error "Troubleshooting steps:"
+    log_error "  1. Test SSH manually:  ssh ${username}@${ip}"
+    log_error "  2. Check firewall rules in your cloud provider dashboard"
+    if [[ -n "${SPAWN_DASHBOARD_URL:-}" ]]; then
+        log_error "     Dashboard: ${SPAWN_DASHBOARD_URL}"
+    fi
+    log_error "  3. Re-run this command to retry (the server may need more time)"
+    if [[ -n "${SPAWN_RETRY_CMD:-}" ]]; then
+        log_error "     ${SPAWN_RETRY_CMD}"
+    fi
     return 1
 }
 
@@ -1777,11 +1806,22 @@ _poll_instance_once() {
 # Report timeout when instance polling exhausts all attempts.
 _report_instance_timeout() {
     local description="${1}" target_status="${2}" total_time="${3}"
-    log_error "${description} did not become ${target_status} after ${total_time}s"
-    log_warn "The instance may still be provisioning. You can:"
-    log_warn "  1. Re-run the command to try again"
-    log_warn "  2. Check the instance status in your cloud provider dashboard"
-    log_warn "  3. Try a different region (some regions provision faster)"
+    log_error "${description} did not become ${target_status} within ${total_time}s"
+    log_error ""
+    log_error "The cloud provider API reported the instance is not yet ready."
+    log_error ""
+    log_error "This usually means:"
+    log_error "  - Cloud provider is experiencing delays (high load, maintenance)"
+    log_error "  - The region or instance type has limited capacity"
+    log_error "  - The instance failed to provision but the API hasn't reported it yet"
+    log_error ""
+    log_error "Next steps:"
+    log_error "  1. Check your cloud dashboard for instance status and error messages"
+    if [[ -n "${SPAWN_DASHBOARD_URL:-}" ]]; then
+        log_error "     ${SPAWN_DASHBOARD_URL}"
+    fi
+    log_error "  2. Wait 2-3 minutes and retry the spawn command"
+    log_error "  3. Try a different region or instance size if this persists"
 }
 
 generic_wait_for_instance() {
