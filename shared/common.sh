@@ -1521,6 +1521,49 @@ execute_agent_non_interactive() {
 # Usage: generic_ssh_wait USERNAME IP SSH_OPTS TEST_CMD DESCRIPTION MAX_ATTEMPTS [INITIAL_INTERVAL]
 # Implements exponential backoff: starts at INITIAL_INTERVAL (default 5s), doubles up to max 30s
 # Adds jitter (±20%) to prevent thundering herd when multiple instances retry simultaneously
+# Log progress message based on elapsed time
+_log_ssh_wait_progress() {
+    local description="${1}"
+    local elapsed_time="${2}"
+
+    if [[ ${elapsed_time} -lt 60 ]]; then
+        log_step "Waiting for ${description}... (${elapsed_time}s elapsed, still within normal range)"
+    elif [[ ${elapsed_time} -lt 120 ]]; then
+        log_step "Waiting for ${description}... (${elapsed_time}s elapsed, taking longer than usual)"
+    else
+        log_warn "Still waiting for ${description}... (${elapsed_time}s elapsed, this is unusually slow)"
+    fi
+}
+
+# Log timeout error message with troubleshooting steps
+_log_ssh_wait_timeout_error() {
+    local description="${1}"
+    local elapsed_time="${2}"
+    local username="${3}"
+    local ip="${4}"
+
+    log_error "${description} timed out after ${elapsed_time}s (server: ${ip})"
+    log_error ""
+    log_error "The server failed to become ready within the expected timeframe."
+    log_error ""
+    log_error "Common causes:"
+    log_error "  - Server is still booting (some cloud providers take 2-3 minutes)"
+    log_error "  - Cloud provider API delays or maintenance"
+    log_error "  - Firewall blocking SSH on port 22"
+    log_error "  - Network connectivity issues"
+    log_error ""
+    log_error "Troubleshooting steps:"
+    log_error "  1. Test SSH manually:  ssh ${username}@${ip}"
+    log_error "  2. Check firewall rules in your cloud provider dashboard"
+    if [[ -n "${SPAWN_DASHBOARD_URL:-}" ]]; then
+        log_error "     Dashboard: ${SPAWN_DASHBOARD_URL}"
+    fi
+    log_error "  3. Re-run this command to retry (the server may need more time)"
+    if [[ -n "${SPAWN_RETRY_CMD:-}" ]]; then
+        log_error "     ${SPAWN_RETRY_CMD}"
+    fi
+}
+
 generic_ssh_wait() {
     local username="${1}"
     local ip="${2}"
@@ -1543,19 +1586,10 @@ generic_ssh_wait() {
             return 0
         fi
 
-        # Calculate next interval with exponential backoff and jitter
         local jitter
         jitter=$(calculate_retry_backoff "${interval}" "${max_interval}")
 
-        # Show contextual progress messages based on elapsed time
-        if [[ ${elapsed_time} -lt 60 ]]; then
-            log_step "Waiting for ${description}... (${elapsed_time}s elapsed, still within normal range)"
-        elif [[ ${elapsed_time} -lt 120 ]]; then
-            log_step "Waiting for ${description}... (${elapsed_time}s elapsed, taking longer than usual)"
-        else
-            log_warn "Still waiting for ${description}... (${elapsed_time}s elapsed, this is unusually slow)"
-        fi
-
+        _log_ssh_wait_progress "${description}" "${elapsed_time}"
         sleep "${jitter}"
 
         elapsed_time=$((elapsed_time + jitter))
@@ -1563,26 +1597,7 @@ generic_ssh_wait() {
         attempt=$((attempt + 1))
     done
 
-    log_error "${description} timed out after ${elapsed_time}s (server: ${ip})"
-    log_error ""
-    log_error "The server failed to become ready within the expected timeframe."
-    log_error ""
-    log_error "Common causes:"
-    log_error "  - Server is still booting (some cloud providers take 2-3 minutes)"
-    log_error "  - Cloud provider API delays or maintenance"
-    log_error "  - Firewall blocking SSH on port 22"
-    log_error "  - Network connectivity issues"
-    log_error ""
-    log_error "Troubleshooting steps:"
-    log_error "  1. Test SSH manually:  ssh ${username}@${ip}"
-    log_error "  2. Check firewall rules in your cloud provider dashboard"
-    if [[ -n "${SPAWN_DASHBOARD_URL:-}" ]]; then
-        log_error "     Dashboard: ${SPAWN_DASHBOARD_URL}"
-    fi
-    log_error "  3. Re-run this command to retry (the server may need more time)"
-    if [[ -n "${SPAWN_RETRY_CMD:-}" ]]; then
-        log_error "     ${SPAWN_RETRY_CMD}"
-    fi
+    _log_ssh_wait_timeout_error "${description}" "${elapsed_time}" "${username}" "${ip}"
     return 1
 }
 
@@ -2327,27 +2342,17 @@ EOF
 #   setup_openclaw_config "$OPENROUTER_API_KEY" "$MODEL_ID" \
 #     "upload_file_sprite $SPRITE_NAME" \
 #     "run_sprite $SPRITE_NAME"
-setup_openclaw_config() {
+# Generate openclaw.json configuration with escaped credentials
+_generate_openclaw_json() {
     local openrouter_key="${1}"
     local model_id="${2}"
-    local upload_callback="${3}"
-    local run_callback="${4}"
+    local gateway_token="${3}"
 
-    log_step "Configuring openclaw..."
-
-    # Create ~/.openclaw directory
-    ${run_callback} "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
-
-    # Generate a random gateway token
-    local gateway_token
-    gateway_token=$(openssl rand -hex 16)
-
-    # Create openclaw.json config
     local escaped_key escaped_token
     escaped_key=$(json_escape "${openrouter_key}")
     escaped_token=$(json_escape "${gateway_token}")
-    local openclaw_json
-    openclaw_json=$(cat << EOF
+
+    cat << EOF
 {
   "env": {
     "OPENROUTER_API_KEY": ${escaped_key}
@@ -2367,7 +2372,26 @@ setup_openclaw_config() {
   }
 }
 EOF
-)
+}
+
+setup_openclaw_config() {
+    local openrouter_key="${1}"
+    local model_id="${2}"
+    local upload_callback="${3}"
+    local run_callback="${4}"
+
+    log_step "Configuring openclaw..."
+
+    # Create ~/.openclaw directory
+    ${run_callback} "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
+
+    # Generate a random gateway token
+    local gateway_token
+    gateway_token=$(openssl rand -hex 16)
+
+    # Create and upload openclaw.json config
+    local openclaw_json
+    openclaw_json=$(_generate_openclaw_json "${openrouter_key}" "${model_id}" "${gateway_token}")
     upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "~/.openclaw/openclaw.json"
 }
 
