@@ -661,6 +661,29 @@ record_test_result() {
 # Test runner
 # ============================================================
 
+# Run an assertion and store the number of new failures in _ASSERT_DELTA.
+# Usage: _tracked_assert <assertion_command> [args...]
+# The assertion runs in the current shell so PASSED/FAILED propagate.
+_tracked_assert() {
+    local _before=$FAILED
+    "$@"
+    _ASSERT_DELTA=$(( FAILED - _before ))
+}
+
+# Determine the primary failure reason from tracked failure counts.
+# Args: has_no_fixture exit_fails api_fails ssh_fails env_fails
+# Prints the reason string to stdout.
+_categorize_failure() {
+    local has_no_fixture="$1" exit_fails="$2" api_fails="$3" ssh_fails="$4" env_fails="$5"
+    if [[ "$has_no_fixture" -gt 0 ]]; then echo "no_fixture"
+    elif [[ "$exit_fails" -gt 0 ]]; then echo "exit_code"
+    elif [[ "$api_fails" -gt 0 ]]; then echo "missing_api_call"
+    elif [[ "$env_fails" -gt 0 ]]; then echo "missing_env"
+    elif [[ "$ssh_fails" -gt 0 ]]; then echo "missing_ssh"
+    else echo "unknown"
+    fi
+}
+
 run_test() {
     local cloud="$1"
     local agent="$2"
@@ -695,22 +718,21 @@ run_test() {
         return 0
     fi
 
-    # Normal mode: run standard assertions and track which ones fail
-    local _fail_before_exit=$FAILED
-    assert_exit_code "${exit_code}" 0 "exits successfully"
-    local _exit_failed=$(( FAILED - _fail_before_exit ))
+    # Normal mode: run standard assertions and track failures per category
+    local _ASSERT_DELTA=0
+    local _exit_failed _api_failed _ssh_failed _env_failed
 
-    local _fail_before_api=$FAILED
-    assert_cloud_api_calls "$cloud"
-    local _api_failed=$(( FAILED - _fail_before_api ))
+    _tracked_assert assert_exit_code "${exit_code}" 0 "exits successfully"
+    _exit_failed=$_ASSERT_DELTA
 
-    local _fail_before_ssh=$FAILED
-    assert_log_contains "ssh " "uses SSH"
-    local _ssh_failed=$(( FAILED - _fail_before_ssh ))
+    _tracked_assert assert_cloud_api_calls "$cloud"
+    _api_failed=$_ASSERT_DELTA
 
-    local _fail_before_env=$FAILED
-    assert_env_injected "OPENROUTER_API_KEY"
-    local _env_failed=$(( FAILED - _fail_before_env ))
+    _tracked_assert assert_log_contains "ssh " "uses SSH"
+    _ssh_failed=$_ASSERT_DELTA
+
+    _tracked_assert assert_env_injected "OPENROUTER_API_KEY"
+    _env_failed=$_ASSERT_DELTA
 
     if [[ "${MOCK_VALIDATE_BODY:-}" == "1" ]]; then
         assert_no_body_errors
@@ -728,19 +750,8 @@ run_test() {
     # Record result with failure category
     local pre_fail=$((FAILED - _pre_failed))
     if [[ "$pre_fail" -gt 0 ]]; then
-        # Determine primary failure reason (priority order)
-        local _reason="unknown"
-        if [[ "$_has_no_fixture" -gt 0 ]]; then
-            _reason="no_fixture"
-        elif [[ "$_exit_failed" -gt 0 ]]; then
-            _reason="exit_code"
-        elif [[ "$_api_failed" -gt 0 ]]; then
-            _reason="missing_api_call"
-        elif [[ "$_env_failed" -gt 0 ]]; then
-            _reason="missing_env"
-        elif [[ "$_ssh_failed" -gt 0 ]]; then
-            _reason="missing_ssh"
-        fi
+        local _reason
+        _reason=$(_categorize_failure "$_has_no_fixture" "$_exit_failed" "$_api_failed" "$_ssh_failed" "$_env_failed")
         record_test_result "${cloud}" "${agent}" "fail" "${_reason}"
     else
         record_test_result "${cloud}" "${agent}" "pass"

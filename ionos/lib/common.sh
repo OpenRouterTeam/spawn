@@ -354,6 +354,35 @@ _ionos_launch_and_attach() {
     log_info "Volume attached successfully"
 }
 
+# Validate IONOS server creation parameters
+# Args: name cores ram disk_size
+_ionos_validate_create_params() {
+    local name="$1" cores="$2" ram="$3" disk_size="$4"
+    validate_resource_name "$name" || { log_error "Invalid server name"; return 1; }
+    if [[ ! "$cores" =~ ^[0-9]+$ ]] || [[ ! "$ram" =~ ^[0-9]+$ ]] || [[ ! "$disk_size" =~ ^[0-9]+$ ]]; then
+        log_error "IONOS_CORES, IONOS_RAM, and IONOS_DISK_SIZE must be positive integers"
+        return 1
+    fi
+}
+
+# Find Ubuntu image or fail with actionable diagnostics
+# Prints image_id to stdout
+_ionos_require_ubuntu_image() {
+    local image_id
+    image_id=$(_ionos_find_ubuntu_image)
+    if [[ -z "$image_id" ]]; then
+        _log_diagnostic \
+            "Could not find Ubuntu 24.04 image" \
+            "The image may not be available in your datacenter region" \
+            --- \
+            "Try a different IONOS_LOCATION (e.g., us/las, de/fra, de/txl)" \
+            "Check available images at: https://dcd.ionos.com/"
+        return 1
+    fi
+    log_info "Using image ID: $image_id"
+    echo "$image_id"
+}
+
 # Create a IONOS server with cloud-init
 create_server() {
     local name="$1"
@@ -361,35 +390,15 @@ create_server() {
     local ram="${IONOS_RAM:-2048}"
     local disk_size="${IONOS_DISK_SIZE:-20}"
 
-    # Validate env var inputs
-    validate_resource_name "$name" || { log_error "Invalid server name"; return 1; }
-
-    # Validate numeric env vars to prevent injection in Python strings
-    if [[ ! "$cores" =~ ^[0-9]+$ ]] || [[ ! "$ram" =~ ^[0-9]+$ ]] || [[ ! "$disk_size" =~ ^[0-9]+$ ]]; then
-        log_error "IONOS_CORES, IONOS_RAM, and IONOS_DISK_SIZE must be positive integers"
-        return 1
-    fi
+    _ionos_validate_create_params "$name" "$cores" "$ram" "$disk_size" || return 1
 
     log_step "Creating IONOS server '$name' (cores: $cores, ram: ${ram}MB, disk: ${disk_size}GB)..."
 
-    # Ensure we have a datacenter
     ensure_datacenter || return 1
 
-    # Find Ubuntu image
     local image_id
-    image_id=$(_ionos_find_ubuntu_image)
-    if [[ -z "$image_id" ]]; then
-        log_error "Could not find Ubuntu 24.04 image"
-        log_error ""
-        log_error "How to fix:"
-        log_error "  - The image may not be available in your datacenter region"
-        log_error "  - Try a different IONOS_LOCATION (e.g., us/las, de/fra, de/txl)"
-        log_error "  - Check available images at: https://dcd.ionos.com/"
-        return 1
-    fi
-    log_info "Using image ID: $image_id"
+    image_id=$(_ionos_require_ubuntu_image) || return 1
 
-    # Create boot volume and wait for it
     local volume_id
     volume_id=$(_ionos_create_boot_volume "$name" "$disk_size" "$image_id") || return 1
 
@@ -399,10 +408,7 @@ create_server() {
     local pub_path="${key_path}.pub"
     ionos_register_ssh_key "spawn-key-$(date +%s)" "$pub_path" "${IONOS_DATACENTER_ID}" || log_warn "SSH key registration failed, continuing anyway..."
 
-    # Create server and attach volume
     _ionos_launch_and_attach "$volume_id" "$name" "$cores" "$ram" || return 1
-
-    # Wait for server IP
     _ionos_wait_for_server_ip || return 1
 
     log_info "Server created successfully: ID=$IONOS_SERVER_ID, IP=$IONOS_SERVER_IP"
