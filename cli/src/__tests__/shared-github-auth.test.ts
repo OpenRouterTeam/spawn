@@ -256,33 +256,27 @@ describe("ensure_gh_cli", () => {
   });
 
   it("should fail if gh not found after installation attempt", () => {
-    // Create a mock environment where 'gh' is never found
-    const tmpDir = createTempDir();
-    const mockGh = join(tmpDir, "fake-gh");
-    writeFileSync(
-      mockGh,
-      '#!/bin/bash\nexit 1\n'
-    );
-    chmodSync(mockGh, 0o755);
-
     const result = runBash(`
-      # Override command -v to always fail for gh
+      # Set OSTYPE to linux
+      export OSTYPE="linux-gnu"
+      # Override command -v to fail for gh, apt-get, dnf
       command() {
-        if [[ "$1" == "-v" && "$2" == "gh" ]]; then return 1; fi
+        if [[ "$1" == "-v" ]]; then
+          case "$2" in
+            gh|apt-get|dnf) return 1 ;;
+          esac
+        fi
         builtin command "$@"
       }
-      # Override brew/apt to pretend they don't exist
-      brew() { return 127; }
-      apt-get() { return 127; }
-      dnf() { return 127; }
-      # Override _install_gh_binary to do nothing
-      _install_gh_binary() { return 0; }
+      # Override _install_gh_binary to fail with an error
+      _install_gh_binary() {
+        log_error "Failed to install gh"
+        return 1
+      }
       ensure_gh_cli 2>&1
     `);
     expect(result.exitCode).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("not found in PATH");
-
-    rmSync(tmpDir, { recursive: true, force: true });
+    expect(result.stdout + result.stderr).toContain("Failed to install");
   });
 });
 

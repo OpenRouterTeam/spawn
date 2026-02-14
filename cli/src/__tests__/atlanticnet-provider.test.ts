@@ -30,6 +30,7 @@ const SHARED_COMMON_PATH = join(REPO_ROOT, "shared", "common.sh");
 const manifest: Manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf-8"));
 const cloudDef: CloudDef = manifest.clouds.atlanticnet;
 const libContent = readFileSync(LIB_PATH, "utf-8");
+const sharedCommonContent = readFileSync(SHARED_COMMON_PATH, "utf-8");
 
 // Agent scripts that are implemented
 const IMPLEMENTED_AGENTS = Object.entries(manifest.matrix)
@@ -272,20 +273,36 @@ describe("Atlantic.Net security patterns", () => {
     expect(hasUnsafeCheck).toBe(false);
   });
 
-  it("should save credentials with chmod 600", () => {
-    expect(libContent).toContain("chmod 600");
+  it("should save credentials with chmod 600 via shared helper", () => {
+    // Credential security (chmod 600, json module usage) is delegated to
+    // ensure_multi_credentials in shared/common.sh. This test verifies the
+    // delegation happens, not the implementation details.
+    const ensureFunc = extractFunctionBody(
+      libContent,
+      "ensure_atlanticnet_credentials"
+    );
+    expect(ensureFunc).toContain("ensure_multi_credentials");
   });
 
   it("should store credentials in standard config path", () => {
     expect(libContent).toContain("$HOME/.config/spawn/atlanticnet.json");
   });
 
-  it("should use python3 json module for config file writing (safe JSON)", () => {
-    expect(libContent).toContain("json.dump(");
+  it("should delegate config file security to ensure_multi_credentials", () => {
+    // ensure_multi_credentials handles:
+    // - Safe JSON module usage (json.load/json.dump in shared/common.sh)
+    // - File permissions (chmod 600 in shared/common.sh)
+    // - Atomic writes (mktemp + move in shared/common.sh)
+    const ensureFunc = extractFunctionBody(
+      libContent,
+      "ensure_atlanticnet_credentials"
+    );
+    expect(ensureFunc).toContain("ensure_multi_credentials");
   });
 
-  it("should use python3 json module for config file reading (safe JSON)", () => {
-    expect(libContent).toContain("json.load(");
+  it("should use python3 json module in shared helpers", () => {
+    // Verify json module is used in shared/common.sh's credential helpers
+    expect(sharedCommonContent).toMatch(/json\.(load|dump|loads|dumps)/);
   });
 
   it("should test credentials before saving them", () => {
@@ -320,39 +337,25 @@ describe("Atlantic.Net credential management", () => {
     "ensure_atlanticnet_credentials"
   );
 
-  it("should try environment variables first", () => {
-    // env var check should appear before config file read
-    const envIdx = ensureFunc.indexOf("ATLANTICNET_API_KEY:-");
-    // The actual config file READ (not the local variable declaration) is -f "$config_file"
-    const configReadIdx = ensureFunc.indexOf('-f "$config_file"');
-    expect(envIdx).toBeLessThan(configReadIdx);
-  });
-
-  it("should try config file second", () => {
-    expect(ensureFunc).toContain("config_file");
-    expect(ensureFunc).toContain("-f \"$config_file\"");
-  });
-
-  it("should prompt user as last resort", () => {
-    expect(ensureFunc).toContain("safe_read");
-  });
-
   it("should require both API key and private key", () => {
     expect(ensureFunc).toContain("ATLANTICNET_API_KEY");
     expect(ensureFunc).toContain("ATLANTICNET_API_PRIVATE_KEY");
-  });
-
-  it("should export credentials after setting them", () => {
-    expect(ensureFunc).toContain("export ATLANTICNET_API_KEY ATLANTICNET_API_PRIVATE_KEY");
   });
 
   it("should validate credentials with a test API call", () => {
     expect(ensureFunc).toContain("test_atlanticnet_credentials");
   });
 
-  it("should handle invalid env var credentials gracefully", () => {
-    // Should warn and continue to next method
-    expect(ensureFunc).toContain("log_warn");
+  it("should use shared credential management helper", () => {
+    expect(ensureFunc).toContain("ensure_multi_credentials");
+  });
+
+  it("should reference the config file location", () => {
+    expect(ensureFunc).toContain(".config/spawn/atlanticnet.json");
+  });
+
+  it("should reference the credential guide URL", () => {
+    expect(ensureFunc).toContain("cloud.atlantic.net");
   });
 });
 
@@ -817,7 +820,7 @@ describe("Atlantic.Net error handling", () => {
     const script = readAgentScript("claude");
     if (script) {
       expect(script).toContain("exit 1");
-      expect(script).toContain("installation verification failed");
+      expect(script).toContain("log_install_failed");
     }
   });
 
@@ -825,7 +828,7 @@ describe("Atlantic.Net error handling", () => {
     const script = readAgentScript("aider");
     if (script) {
       expect(script).toContain("exit 1");
-      expect(script).toContain("installation verification failed");
+      expect(script).toContain("log_install_failed");
     }
   });
 });

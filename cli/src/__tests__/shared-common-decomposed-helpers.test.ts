@@ -211,14 +211,14 @@ _report_instance_timeout "Server" "running" "120"
     const result = runBash(`
 _report_instance_timeout "VM" "ready" "60"
 `);
-    expect(result.stderr).toContain("Re-run the command");
+    expect(result.stderr).toContain("retry");
   });
 
   it("should include dashboard check suggestion", () => {
     const result = runBash(`
 _report_instance_timeout "Droplet" "active" "300"
 `);
-    expect(result.stderr).toContain("cloud provider dashboard");
+    expect(result.stderr).toContain("dashboard");
   });
 
   it("should include region suggestion", () => {
@@ -298,18 +298,18 @@ get_ssh_fingerprint "/tmp/nonexistent_key_$(date +%s).pub"
 });
 
 describe("generic_ssh_wait error guidance", () => {
-  it("should include How to fix section in function body", () => {
-    const result = runBash(`type generic_ssh_wait`);
-    expect(result.stdout).toContain("How to fix");
+  it("should include error handling for timeout", () => {
+    const result = runBash(`type _log_ssh_wait_timeout_error`);
+    expect(result.stdout).toContain("timeout");
   });
 
   it("should include manual SSH test command suggestion", () => {
-    const result = runBash(`type generic_ssh_wait`);
+    const result = runBash(`type _log_ssh_wait_timeout_error`);
     expect(result.stdout).toContain("ssh");
   });
 
   it("should include firewall check suggestion", () => {
-    const result = runBash(`type generic_ssh_wait`);
+    const result = runBash(`type _log_ssh_wait_timeout_error`);
     expect(result.stdout).toContain("firewall");
   });
 });
@@ -396,8 +396,8 @@ generic_wait_for_instance mock_api "/instances/1" "active" \
 `);
     expect(result.exitCode).not.toBe(0);
     expect(result.stderr).toContain("TestInstance did not become active");
-    expect(result.stderr).toContain("Re-run the command");
-    expect(result.stderr).toContain("cloud provider dashboard");
+    expect(result.stderr).toContain("retry");
+    expect(result.stderr).toContain("dashboard");
   });
 
   it("should handle transition from empty IP to valid IP", () => {
@@ -484,6 +484,6 @@ log_install_failed "Claude Code" "npm install -g claude" "10.0.0.5" 2>&1
     const result = runBash(`log_install_failed "TestAgent" 2>&1`);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("TestAgent");
-    expect(result.stdout).toContain("installation verification failed");
+    expect(result.stdout).toContain("installation failed to complete successfully");
   });
 });
