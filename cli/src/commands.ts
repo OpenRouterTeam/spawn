@@ -333,11 +333,8 @@ export function buildAgentPickerHints(manifest: Manifest): Record<string, string
   return hints;
 }
 
-export async function cmdInteractive(): Promise<void> {
-  p.intro(pc.inverse(` spawn v${VERSION} `));
-
-  const manifest = await loadManifestWithSpinner();
-
+// Prompt user to select an agent with hints
+async function selectAgent(manifest: Manifest): Promise<string> {
   const agents = agentKeys(manifest);
   const agentHints = buildAgentPickerHints(manifest);
   const agentChoice = await p.select({
@@ -345,27 +342,49 @@ export async function cmdInteractive(): Promise<void> {
     options: mapToSelectOptions(agents, manifest.agents, agentHints),
   });
   if (p.isCancel(agentChoice)) handleCancel();
+  return agentChoice;
+}
 
-  const clouds = getImplementedClouds(manifest, agentChoice);
+// Validate that agent has available clouds and return sorted cloud list with priority hints
+function getAndValidateCloudChoices(
+  manifest: Manifest,
+  agent: string
+): { clouds: string[]; hintOverrides: Record<string, string>; credCount: number } {
+  const clouds = getImplementedClouds(manifest, agent);
 
   if (clouds.length === 0) {
-    p.log.error(`No clouds available for ${manifest.agents[agentChoice].name}`);
+    p.log.error(`No clouds available for ${manifest.agents[agent].name}`);
     p.log.info(`This agent has no implemented cloud providers yet.`);
     p.log.info(`Run ${pc.cyan("spawn matrix")} to see the full availability matrix.`);
     process.exit(1);
   }
 
   const { sortedClouds, hintOverrides, credCount } = prioritizeCloudsByCredentials(clouds, manifest);
-
   if (credCount > 0) {
     p.log.info(`${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected (shown first)`);
   }
 
+  return { clouds: sortedClouds, hintOverrides, credCount };
+}
+
+// Prompt user to select a cloud from the sorted list
+async function selectCloud(manifest: Manifest, cloudList: string[], hintOverrides: Record<string, string>): Promise<string> {
   const cloudChoice = await p.select({
     message: "Select a cloud provider",
-    options: mapToSelectOptions(sortedClouds, manifest.clouds, hintOverrides),
+    options: mapToSelectOptions(cloudList, manifest.clouds, hintOverrides),
   });
   if (p.isCancel(cloudChoice)) handleCancel();
+  return cloudChoice;
+}
+
+export async function cmdInteractive(): Promise<void> {
+  p.intro(pc.inverse(` spawn v${VERSION} `));
+
+  const manifest = await loadManifestWithSpinner();
+  const agentChoice = await selectAgent(manifest);
+
+  const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, agentChoice);
+  const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
 
   await preflightCredentialCheck(manifest, cloudChoice);
 
@@ -642,32 +661,84 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
   }
 }
 
+// Report 404 errors (script not found)
+function report404Failure(): void {
+  p.log.error("Script not found (HTTP 404)");
+  console.error("\nThe spawn script doesn't exist at the expected location.");
+  console.error("\nThis usually means:");
+  console.error("  • The agent + cloud combination hasn't been implemented yet");
+  console.error("  • The script is currently being deployed (rare)");
+  console.error("  • There's a temporary issue with the file server");
+  console.error(`\n${pc.bold("Next steps:")}`);
+  console.error(`  1. Verify it's implemented: ${pc.cyan("spawn matrix")}`);
+  console.error(`  2. If the matrix shows ✓, wait 1-2 minutes and retry`);
+  console.error(`  3. Still broken? Report it: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
+}
+
+// Report HTTP errors (non-404)
+function reportHTTPFailure(primaryStatus: number, fallbackStatus: number): void {
+  const hasServerError = primaryStatus >= 500 || fallbackStatus >= 500;
+  p.log.error(`Script download failed`);
+  console.error(`\nCouldn't download the spawn script (HTTP ${primaryStatus} from primary, ${fallbackStatus} from fallback).`);
+  if (hasServerError) {
+    console.error("\nThe servers are experiencing issues or temporarily unavailable.");
+  }
+  console.error(`\n${pc.bold("Next steps:")}`);
+  console.error(`  1. Check your internet connection`);
+  console.error(`  2. Wait a moment and try again`);
+  console.error(`  3. Check GitHub's status: ${pc.cyan("https://www.githubstatus.com")}`);
+  if (hasServerError) {
+    console.error(`  4. If GitHub is down, retry when it's back up`);
+  }
+}
+
 function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryStatus: number, fallbackStatus: number): void {
   if (primaryStatus === 404 && fallbackStatus === 404) {
-    p.log.error("Script not found (HTTP 404)");
-    console.error("\nThe spawn script doesn't exist at the expected location.");
-    console.error("\nThis usually means:");
-    console.error("  • The agent + cloud combination hasn't been implemented yet");
-    console.error("  • The script is currently being deployed (rare)");
-    console.error("  • There's a temporary issue with the file server");
-    console.error(`\n${pc.bold("Next steps:")}`);
-    console.error(`  1. Verify it's implemented: ${pc.cyan("spawn matrix")}`);
-    console.error(`  2. If the matrix shows ✓, wait 1-2 minutes and retry`);
-    console.error(`  3. Still broken? Report it: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
+    report404Failure();
   } else {
-    p.log.error(`Script download failed`);
-    console.error(`\nCouldn't download the spawn script (HTTP ${primaryStatus} from primary, ${fallbackStatus} from fallback).`);
-    if (primaryStatus >= 500 || fallbackStatus >= 500) {
-      console.error("\nThe servers are experiencing issues or temporarily unavailable.");
-    }
-    console.error(`\n${pc.bold("Next steps:")}`);
-    console.error(`  1. Check your internet connection`);
-    console.error(`  2. Wait a moment and try again`);
-    console.error(`  3. Check GitHub's status: ${pc.cyan("https://www.githubstatus.com")}`);
-    if (primaryStatus >= 500 || fallbackStatus >= 500) {
-      console.error(`  4. If GitHub is down, retry when it's back up`);
-    }
+    reportHTTPFailure(primaryStatus, fallbackStatus);
   }
+}
+
+// Detect error type from error message
+function classifyNetworkError(errMsg: string): "timeout" | "connection" | "unknown" {
+  if (errMsg.toLowerCase().includes("timeout")) return "timeout";
+  if (errMsg.toLowerCase().includes("connect") || errMsg.toLowerCase().includes("enotfound")) return "connection";
+  return "unknown";
+}
+
+// Show causes for timeout errors
+function showTimeoutCauses(): void {
+  console.error("  • Slow or unstable internet connection");
+  console.error("  • Download server not responding (possibly overloaded)");
+  console.error("  • Firewall blocking or slowing the connection");
+}
+
+// Show causes for connection errors
+function showConnectionCauses(): void {
+  console.error("  • No internet connection");
+  console.error("  • Firewall or proxy blocking GitHub access");
+  console.error("  • DNS not resolving GitHub's domain");
+}
+
+// Show causes for unknown errors
+function showUnknownCauses(): void {
+  console.error("  • Internet connection issue");
+  console.error("  • GitHub's servers temporarily down");
+}
+
+// Show recovery steps for connection errors
+function showConnectionSteps(): void {
+  console.error("  2. Test github.com access in your browser");
+  console.error("  3. Check firewall/VPN settings");
+  console.error("  4. Try disabling proxy temporarily");
+}
+
+// Show recovery steps for other errors
+function showOtherSteps(ghUrl: string): void {
+  console.error(`  2. Verify combination exists: ${pc.cyan("spawn matrix")}`);
+  console.error("  3. Wait a moment and retry");
+  console.error(`  4. Test URL directly: ${pc.dim(ghUrl)}`);
 }
 
 function reportDownloadError(ghUrl: string, err: unknown): never {
@@ -675,33 +746,25 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   const errMsg = getErrorMessage(err);
   console.error("\nNetwork error:", errMsg);
 
-  const isTimeout = errMsg.toLowerCase().includes("timeout");
-  const isConnection = errMsg.toLowerCase().includes("connect") || errMsg.toLowerCase().includes("enotfound");
-
+  const errorType = classifyNetworkError(errMsg);
   console.error(`\n${pc.bold("Possible causes:")}`);
-  if (isTimeout) {
-    console.error("  • Slow or unstable internet connection");
-    console.error("  • Download server not responding (possibly overloaded)");
-    console.error("  • Firewall blocking or slowing the connection");
-  } else if (isConnection) {
-    console.error("  • No internet connection");
-    console.error("  • Firewall or proxy blocking GitHub access");
-    console.error("  • DNS not resolving GitHub's domain");
-  } else {
-    console.error("  • Internet connection issue");
-    console.error("  • GitHub's servers temporarily down");
+  switch (errorType) {
+    case "timeout":
+      showTimeoutCauses();
+      break;
+    case "connection":
+      showConnectionCauses();
+      break;
+    default:
+      showUnknownCauses();
   }
 
   console.error(`\n${pc.bold("Next steps:")}`);
   console.error("  1. Check your internet connection");
-  if (isConnection) {
-    console.error("  2. Test github.com access in your browser");
-    console.error("  3. Check firewall/VPN settings");
-    console.error("  4. Try disabling proxy temporarily");
+  if (errorType === "connection") {
+    showConnectionSteps();
   } else {
-    console.error(`  2. Verify combination exists: ${pc.cyan("spawn matrix")}`);
-    console.error("  3. Wait a moment and retry");
-    console.error(`  4. Test URL directly: ${pc.dim(ghUrl)}`);
+    showOtherSteps(ghUrl);
   }
   process.exit(1);
 }
