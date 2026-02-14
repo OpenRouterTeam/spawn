@@ -324,7 +324,7 @@ describe("_multi_creds_validate", () => {
       _multi_creds_validate test_fail "UpCloud" MY_VAR 2>&1
     `);
     expect(result.stdout).toContain("expired");
-    expect(result.stdout).toContain("re-run");
+    expect(result.stdout).toContain("Re-run");
   });
 
   it("should show testing message during validation", () => {
