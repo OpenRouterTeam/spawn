@@ -842,6 +842,22 @@
         "location": "nl1"
       },
       "notes": "Global cloud provider with locations in EU, US, and Asia. Simple X-API-KEY auth. Async server creation with task polling. Requires SERVERSPACE_API_KEY from https://my.serverspace.io/project/api"
+    },
+    "gcore": {
+      "name": "Gcore",
+      "description": "Gcore Cloud instances via REST API",
+      "url": "https://gcore.com/cloud",
+      "type": "api",
+      "auth": "GCORE_API_TOKEN",
+      "provision_method": "POST /cloud/v2/instances/{project_id}/{region_id}",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "flavor": "g1-standard-1-2",
+        "region": "ed-1",
+        "image": "Ubuntu 24.04"
+      },
+      "notes": "Global edge cloud with 180+ PoPs, hourly billing. Requires project_id in API paths."
     }
   },
   "matrix": {
@@ -1429,6 +1445,21 @@
     "serverspace/opencode": "missing",
     "serverspace/plandex": "missing",
     "serverspace/kilocode": "missing",
-    "serverspace/continue": "missing"
+    "serverspace/continue": "missing",
+    "gcore/claude": "implemented",
+    "gcore/aider": "implemented",
+    "gcore/goose": "implemented",
+    "gcore/openclaw": "missing",
+    "gcore/nanoclaw": "missing",
+    "gcore/codex": "missing",
+    "gcore/interpreter": "missing",
+    "gcore/gemini": "missing",
+    "gcore/amazonq": "missing",
+    "gcore/cline": "missing",
+    "gcore/gptme": "missing",
+    "gcore/opencode": "missing",
+    "gcore/plandex": "missing",
+    "gcore/kilocode": "missing",
+    "gcore/continue": "missing"
   }
 }
