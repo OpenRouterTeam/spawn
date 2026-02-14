@@ -701,45 +701,65 @@ function buildDashboardHint(dashboardUrl?: string): string {
     : "  - Check your cloud provider dashboard to stop or delete any unused servers";
 }
 
+interface SignalEntry {
+  header: string;
+  causes: string[];
+  includeDashboard: boolean;
+}
+
+const SIGNAL_GUIDANCE: Record<string, SignalEntry> = {
+  SIGKILL: {
+    header: "Script was forcibly killed (SIGKILL). Common causes:",
+    causes: [
+      "  - Out of memory (OOM killer terminated the process)",
+      "  - The server may not have enough RAM for this agent",
+      "  - Try a larger instance size or a different cloud provider",
+    ],
+    includeDashboard: true,
+  },
+  SIGTERM: {
+    header: "Script was terminated (SIGTERM). Common causes:",
+    causes: [
+      "  - The process was stopped by the system or a supervisor",
+      "  - Server shutdown or reboot in progress",
+      "  - Cloud provider terminated the instance (spot/preemptible instance or billing issue)",
+    ],
+    includeDashboard: true,
+  },
+  SIGINT: {
+    header: "Script was interrupted (Ctrl+C).",
+    causes: [
+      "Note: If a server was already created, it may still be running.",
+    ],
+    includeDashboard: true,
+  },
+  SIGHUP: {
+    header: "Script lost its terminal connection (SIGHUP). Common causes:",
+    causes: [
+      "  - SSH session disconnected or timed out",
+      "  - Terminal window was closed during execution",
+      "  - Try using a more stable connection or a terminal multiplexer (tmux/screen)",
+    ],
+    includeDashboard: false,
+  },
+};
+
 export function getSignalGuidance(signal: string, dashboardUrl?: string): string[] {
-  const dashboardHint = buildDashboardHint(dashboardUrl);
-  switch (signal) {
-    case "SIGKILL":
-      return [
-        "Script was forcibly killed (SIGKILL). Common causes:",
-        "  - Out of memory (OOM killer terminated the process)",
-        "  - The server may not have enough RAM for this agent",
-        "  - Try a larger instance size or a different cloud provider",
-        dashboardHint,
-      ];
-    case "SIGTERM":
-      return [
-        "Script was terminated (SIGTERM). Common causes:",
-        "  - The process was stopped by the system or a supervisor",
-        "  - Server shutdown or reboot in progress",
-        "  - Cloud provider terminated the instance (spot/preemptible instance or billing issue)",
-        dashboardHint,
-      ];
-    case "SIGINT":
-      return [
-        "Script was interrupted (Ctrl+C).",
-        "Note: If a server was already created, it may still be running.",
-        dashboardHint,
-      ];
-    case "SIGHUP":
-      return [
-        "Script lost its terminal connection (SIGHUP). Common causes:",
-        "  - SSH session disconnected or timed out",
-        "  - Terminal window was closed during execution",
-        "  - Try using a more stable connection or a terminal multiplexer (tmux/screen)",
-      ];
-    default:
-      return [
-        `Script was killed by signal ${signal}.`,
-        "  - The process was terminated by the system or another process",
-        dashboardHint,
-      ];
+  const entry = SIGNAL_GUIDANCE[signal];
+  if (entry) {
+    const lines = [entry.header, ...entry.causes];
+    if (entry.includeDashboard) lines.push(buildDashboardHint(dashboardUrl));
+    return lines;
   }
+  return [
+    `Script was killed by signal ${signal}.`,
+    "  - The process was terminated by the system or another process",
+    buildDashboardHint(dashboardUrl),
+  ];
+}
+
+function optionalDashboardLine(dashboardUrl?: string): string[] {
+  return dashboardUrl ? [`  - Check your dashboard: ${pc.cyan(dashboardUrl)}`] : [];
 }
 
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string, dashboardUrl?: string): string[] {
@@ -789,7 +809,7 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         ...credentialHints(cloud, authHint),
         "  - Cloud provider API error (quota, rate limit, or region issue)",
         "  - Server provisioning failed (try again or pick a different region)",
-        ...(dashboardUrl ? [`  - Check your dashboard: ${pc.cyan(dashboardUrl)}`] : []),
+        ...optionalDashboardLine(dashboardUrl),
       ];
     default:
       return [
@@ -797,7 +817,7 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
         ...credentialHints(cloud, authHint, "Missing"),
         "  - Cloud provider API rate limit or quota exceeded",
         "  - Missing local dependencies (SSH, curl, jq)",
-        ...(dashboardUrl ? [`  - Check your dashboard: ${pc.cyan(dashboardUrl)}`] : []),
+        ...optionalDashboardLine(dashboardUrl),
       ];
   }
 }
@@ -1379,6 +1399,14 @@ export async function cmdAgents(): Promise<void> {
 
 // ── Clouds ─────────────────────────────────────────────────────────────────────
 
+/** Format credential status indicator for a cloud in the list view */
+function formatCredentialIndicator(auth: string): string {
+  if (auth.toLowerCase() === "none") return "";
+  return hasCloudCredentials(auth)
+    ? `  ${pc.green("ready")}`
+    : `  ${pc.yellow("needs")} ${pc.dim(auth)}`;
+}
+
 export async function cmdClouds(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
@@ -1398,13 +1426,8 @@ export async function cmdClouds(): Promise<void> {
       const c = manifest.clouds[key];
       const implCount = getImplementedAgents(manifest, key).length;
       const countStr = `${implCount}/${allAgents.length}`;
-      const hasCreds = hasCloudCredentials(c.auth);
-      if (hasCreds) credCount++;
-      const credIndicator = c.auth.toLowerCase() === "none"
-        ? ""
-        : hasCreds
-          ? `  ${pc.green("ready")}`
-          : `  ${pc.yellow("needs")} ${pc.dim(c.auth)}`;
+      if (hasCloudCredentials(c.auth)) credCount++;
+      const credIndicator = formatCredentialIndicator(c.auth);
       console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator}`);
     }
   }
