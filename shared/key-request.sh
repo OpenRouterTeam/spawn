@@ -29,7 +29,7 @@ m = json.load(open(sys.argv[1]))
 auth = m.get('clouds', {}).get(sys.argv[2], {}).get('auth', '')
 if re.search(r'\b(login|configure|setup)\b', auth, re.I):
     sys.exit(0)
-for var in re.split(r'\s*\+\s*', auth):
+for var in re.split(r'\s*[+,]\s*', auth):
     v = var.strip()
     if v:
         print(v)
@@ -91,7 +91,7 @@ _load_cloud_credentials() {
     local auth_string="${2}"
 
     local env_vars
-    env_vars=$(printf '%s' "${auth_string}" | tr '+,' '\n' | sed 's/^ *//;s/ *$//')
+    env_vars=$(printf '%s' "${auth_string}" | sed 's/[+,]/\n/g' | sed 's/^ *//;s/ *$//')
 
     local config_file="${HOME}/.config/spawn/${cloud_key}.json"
     local all_loaded=true
