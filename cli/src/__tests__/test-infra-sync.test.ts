@@ -74,6 +74,20 @@ function getCloudsInCase(content: string, funcName: string): string[] {
       }
     }
   }
+
+  // For get_endpoints, also check for _ENDPOINTS_* variable declarations
+  if (funcName === "get_endpoints") {
+    const varMatches = content.match(/_ENDPOINTS_([a-z][a-z0-9_-]*)\s*="/g);
+    if (varMatches) {
+      varMatches.forEach((match) => {
+        const cloudName = match.match(/_ENDPOINTS_([a-z][a-z0-9_-]*)/)?.[1];
+        if (cloudName && !clouds.includes(cloudName)) {
+          clouds.push(cloudName);
+        }
+      });
+    }
+  }
+
   return clouds;
 }
 
@@ -110,6 +124,9 @@ function getCloudsInStripApiBase(): string[] {
         "cloudapi.atlantic.net": "atlanticnet",
         "invapi.hostkey.com": "hostkey",
         "cloudsigma.com": "cloudsigma",
+        "api.webdock.io": "webdock",
+        "api.serverspace.io": "serverspace",
+        "api.gcore.com": "gcore",
       };
       for (const [domain, cloud] of Object.entries(urlPatterns)) {
         if (trimmed.includes(domain)) {
