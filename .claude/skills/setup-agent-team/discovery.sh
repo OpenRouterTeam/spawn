@@ -107,16 +107,11 @@ print(sum(1 for v in m.get('matrix', {}).values() if v == 'missing'))
 }
 
 build_team_prompt() {
-    local summary
-    summary=$(get_matrix_summary)
-
     cat <<'PROMPT_EOF'
 You are the lead of the spawn discovery team. Read CLAUDE.md and manifest.json first.
 
 Current state:
-PROMPT_EOF
-    echo "${summary}"
-    cat <<'PROMPT_EOF'
+MATRIX_SUMMARY_PLACEHOLDER
 
 Your job: coordinate teammates to expand the spawn matrix. Delegate only — do NOT implement anything yourself.
 
@@ -390,7 +385,11 @@ run_team_cycle() {
     PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
     build_team_prompt > "${PROMPT_FILE}"
 
-    # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
+    # Substitute placeholders with actual values (safe: sed operates on file, not shell expansion)
+    local summary
+    summary=$(get_matrix_summary)
+    # Use awk for safe substitution — avoids sed delimiter issues with special chars in summary
+    awk -v replacement="${summary}" '{gsub(/MATRIX_SUMMARY_PLACEHOLDER/, replacement); print}' "${PROMPT_FILE}" > "${PROMPT_FILE}.tmp" && mv "${PROMPT_FILE}.tmp" "${PROMPT_FILE}"
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
 
     log_info "Launching spawn team..."
