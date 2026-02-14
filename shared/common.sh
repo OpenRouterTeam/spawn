@@ -1098,10 +1098,35 @@ register_cleanup_trap() {
 # SSH configuration
 # ============================================================
 
+# Validate SSH_OPTS to prevent command injection
+# Only allow safe SSH option patterns (dash-prefixed flags and values)
+_validate_ssh_opts() {
+    local opts="${1}"
+    # Allow empty
+    if [[ -z "${opts}" ]]; then
+        return 0
+    fi
+    # Pattern: SSH opts must start with dash and contain only safe characters
+    # Allows: -o Option=value -i /path/to/key -p 22 etc.
+    # Blocks: semicolons, pipes, backticks, $() and other shell metacharacters
+    if [[ "${opts}" =~ [\;\|\&\`\$\(\)\<\>] ]]; then
+        log_error "SECURITY: SSH_OPTS contains shell metacharacters"
+        log_error "Rejected value: ${opts}"
+        return 1
+    fi
+    return 0
+}
+
 # Default SSH options for all cloud providers
 # Clouds can override this if they need provider-specific settings
 if [[ -z "${SSH_OPTS:-}" ]]; then
     SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i ${HOME}/.ssh/id_ed25519"
+else
+    # Validate user-provided SSH_OPTS for security
+    if ! _validate_ssh_opts "${SSH_OPTS}"; then
+        log_error "Invalid SSH_OPTS provided. Using secure defaults."
+        SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i ${HOME}/.ssh/id_ed25519"
+    fi
 fi
 
 # ============================================================
