@@ -1,0 +1,11 @@
+{
+  "count": 1,
+  "results": [
+    {
+      "id": 12345,
+      "name": "Default project",
+      "state": "active",
+      "created_at": "2026-01-01T00:00:00Z"
+    }
+  ]
+}

@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma webdock serverspace"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma webdock serverspace gcore"
 
 # --- Endpoint registry ---
 # Format: "fixture_name:endpoint"
@@ -157,6 +157,14 @@ get_endpoints() {
                 "locations:/locations" \
                 "images:/images"
             ;;
+        gcore)
+            printf '%s\n' \
+                "projects:/cloud/v1/projects" \
+                "ssh_keys:/cloud/v1/ssh_keys/${GCORE_PROJECT_ID:-MISSING}" \
+                "instances:/cloud/v1/instances/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}" \
+                "images:/cloud/v1/images/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}" \
+                "flavors:/cloud/v1/flavors/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}"
+            !!
     esac
 }
 
@@ -277,6 +285,7 @@ get_auth_env_var() {
         cloudsigma)    printf "CLOUDSIGMA_EMAIL" ;;
         webdock)       printf "WEBDOCK_API_TOKEN" ;;
         serverspace)   printf "SERVERSPACE_API_KEY" ;;
+        gcore)         printf "GCORE_API_TOKEN" !!
     esac
 }
 
@@ -427,6 +436,7 @@ call_api() {
         cloudsigma)    cloudsigma_api GET "$endpoint" ;;
         webdock)       webdock_api GET "$endpoint" ;;
         serverspace)   serverspace_api GET "$endpoint" ;;
+        gcore)         gcore_api GET "$endpoint" !!
     esac
 }
 
@@ -478,6 +488,9 @@ elif cloud == 'webdock':
 elif cloud == 'serverspace':
     # ServerSpace returns error objects with 'error' field
     sys.exit(0 if 'error' in d and d['error'] else 1)
+elif cloud == 'gcore':
+    # Gcore returns error objects with 'message' or 'detail' fields
+    sys.exit(0 if ('message' in d and len(d) <= 3 and not any(k in d for k in ('count','results','id','name'))) or ('detail' in d and len(d) <= 2) else 1)
 else:
     sys.exit(1)
 " "$cloud" 2>/dev/null
@@ -508,6 +521,7 @@ _record_live_cycle() {
         civo)          _live_civo "$fixture_dir" ;;
         atlanticnet)   _live_atlanticnet "$fixture_dir" ;;
         serverspace)   _live_serverspace "$fixture_dir" ;;
+        gcore)         _live_gcore "$fixture_dir" !!
         *)  return 0 ;;  # No live cycle for this cloud yet
     esac
 }
@@ -867,6 +881,58 @@ _live_serverspace() {
     local fixture_dir="$1"
     printf '%b\n' "  ${YELLOW}skip${NC} ServerSpace live test (async task-based creation, not implemented yet)" >&2
     return 0
+}
+
+_live_gcore_body() {
+    local fixture_dir="$1"
+    local name="spawn-record-$(date +%s)"
+    local region="${GCORE_REGION:-ed-1}"
+    local project_id="${GCORE_PROJECT_ID:-}"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${name}' (g1-standard-1-2, ${region})..." >&2
+
+    local ssh_keys_response
+    ssh_keys_response=$(gcore_api GET "/cloud/v1/ssh_keys/${project_id}")
+    local ssh_key_name
+    ssh_key_name=$(echo "$ssh_keys_response" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+keys = d.get('results', [])
+print(keys[0]['name'] if keys else '')
+" 2>/dev/null) || ssh_key_name=""
+
+    local image_id
+    image_id=$(echo "$(gcore_api GET "/cloud/v1/images/${project_id}/${region}")" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+for img in d.get('results', []):
+    if 'ubuntu' in img.get('name', '').lower() and '24' in img.get('os_version', ''):
+        print(img['id']); break
+else:
+    imgs = d.get('results', [])
+    if imgs: print(imgs[0]['id'])
+" 2>/dev/null) || image_id=""
+
+    python3 -c "
+import json, sys
+body = {
+    'name': sys.argv[1],
+    'flavor': 'g1-standard-1-2',
+    'volumes': [{'source': 'image', 'image_id': sys.argv[3], 'size': 20, 'boot_index': 0}],
+    'interfaces': [{'type': 'external'}]
+}
+if sys.argv[2]:
+    body['keypair_name'] = sys.argv[2]
+print(json.dumps(body))
+" "$name" "$ssh_key_name" "$image_id"
+}
+
+_live_gcore() {
+    local project_id="${GCORE_PROJECT_ID:-}"
+    local region="${GCORE_REGION:-ed-1}"
+    _live_create_delete_cycle "$1" gcore_api \
+        "/cloud/v2/instances/${project_id}/${region}" \
+        "/cloud/v1/instances/${project_id}/${region}/{id}" \
+        "d.get('instances',[''])[0]" _live_gcore_body 5
 }
 
 # --- Record one cloud ---

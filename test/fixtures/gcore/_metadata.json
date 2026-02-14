@@ -1,0 +1,11 @@
+{
+  "cloud": "gcore",
+  "recorded_at": "2026-02-14T00:00:00Z",
+  "fixtures": {
+    "projects": {"endpoint": "/cloud/v1/projects", "recorded_at": "2026-02-14T00:00:00Z"},
+    "ssh_keys": {"endpoint": "/cloud/v1/ssh_keys/12345", "recorded_at": "2026-02-14T00:00:00Z"},
+    "instances": {"endpoint": "/cloud/v1/instances/12345/ed-1", "recorded_at": "2026-02-14T00:00:00Z"},
+    "images": {"endpoint": "/cloud/v1/images/12345/ed-1", "recorded_at": "2026-02-14T00:00:00Z"},
+    "flavors": {"endpoint": "/cloud/v1/flavors/12345/ed-1", "recorded_at": "2026-02-14T00:00:00Z"}
+  }
+}
