@@ -607,7 +607,7 @@ generic_wait_for_instance mock_api "/instances/1" "active" \\
 `);
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toContain("MyInstance did not become active");
-      expect(result.stderr).toContain("Re-run the command");
+      expect(result.stderr).toContain("retry");
     });
   });
 });
