@@ -51,9 +51,7 @@ inject_env_vars \
 
 # 8. Create NanoClaw .env file
 log_step "Configuring NanoClaw..."
-run_server "cat > ~/nanoclaw/.env << 'EOF'
-ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}
-EOF"
+run_server "printf 'ANTHROPIC_API_KEY=%s\n' '${OPENROUTER_API_KEY}' > ~/nanoclaw/.env"
 
 echo ""
 log_info "Koyeb service setup completed successfully!"

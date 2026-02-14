@@ -65,12 +65,7 @@ CONFIG_TEMP=$(mktemp)
 chmod 600 "${CONFIG_TEMP}"
 track_temp_file "${CONFIG_TEMP}"
 
-cat > "${CONFIG_TEMP}" << EOF
-{
-  "modelId": "${MODEL_ID}",
-  "provider": "anthropic"
-}
-EOF
+printf '{\n  "modelId": "%s",\n  "provider": "anthropic"\n}\n' "${MODEL_ID}" > "${CONFIG_TEMP}"
 
 upload_file "${CONFIG_TEMP}" "/tmp/openclaw_config.json"
 run_server "mkdir -p ~/.config/openclaw && mv /tmp/openclaw_config.json ~/.config/openclaw/config.json"

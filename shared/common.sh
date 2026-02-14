@@ -2095,7 +2095,7 @@ upload_config_file() {
 
     local temp_remote="/tmp/spawn_config_${RANDOM}_${RANDOM}_$(basename "${remote_path}")"
     ${upload_callback} "${temp_file}" "${temp_remote}"
-    ${run_callback} "mv ${temp_remote} ${remote_path}"
+    ${run_callback} "mv '${temp_remote}' '${remote_path}'"
 }
 
 # ============================================================
