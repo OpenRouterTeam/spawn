@@ -536,6 +536,52 @@ _record_live_cycle() {
     esac
 }
 
+# Validate response is not empty
+_validate_response_not_empty() {
+    local fixture_name="$1"
+    local response="$2"
+    if [[ -z "$response" ]]; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — empty response"
+        cloud_errors=$((cloud_errors + 1))
+        return 1
+    fi
+    return 0
+}
+
+# Validate response is valid JSON
+_validate_response_json() {
+    local fixture_name="$1"
+    local response="$2"
+    if ! echo "$response" | is_valid_json; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
+        cloud_errors=$((cloud_errors + 1))
+        return 1
+    fi
+    return 0
+}
+
+# Validate response is not an API error
+_validate_response_no_error() {
+    local fixture_name="$1"
+    local response="$2"
+    if has_api_error "$cloud" "$response"; then
+        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
+        cloud_errors=$((cloud_errors + 1))
+        return 1
+    fi
+    return 0
+}
+
+# Record fixture metadata entry
+_record_fixture_metadata() {
+    local fixture_name="$1"
+    local endpoint="$2"
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    metadata_entries="${metadata_entries}    \"${fixture_name}\": {\"endpoint\": \"${endpoint}\", \"type\": \"live\", \"recorded_at\": \"${ts}\"},
+"
+}
+
 # Save a live fixture and update the caller's counters/metadata
 _save_live_fixture() {
     local fixture_dir="$1"
@@ -543,32 +589,14 @@ _save_live_fixture() {
     local endpoint="$3"
     local response="$4"
 
-    if [[ -z "$response" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — empty response"
-        cloud_errors=$((cloud_errors + 1))
-        return 1
-    fi
-
-    if ! echo "$response" | is_valid_json; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — invalid JSON"
-        cloud_errors=$((cloud_errors + 1))
-        return 1
-    fi
-
-    # Check for API error responses (cloud var is available via dynamic scoping)
-    if has_api_error "$cloud" "$response"; then
-        printf '%b\n' "  ${RED}fail${NC} ${fixture_name} — API error response"
-        cloud_errors=$((cloud_errors + 1))
-        return 1
-    fi
+    _validate_response_not_empty "$fixture_name" "$response" || return 1
+    _validate_response_json "$fixture_name" "$response" || return 1
+    _validate_response_no_error "$fixture_name" "$response" || return 1
 
     echo "$response" | pretty_json > "${fixture_dir}/${fixture_name}.json"
     printf '%b\n' "  ${GREEN}  ok${NC} ${fixture_name} (live)"
 
-    local ts
-    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    metadata_entries="${metadata_entries}    \"${fixture_name}\": {\"endpoint\": \"${endpoint}\", \"type\": \"live\", \"recorded_at\": \"${ts}\"},
-"
+    _record_fixture_metadata "$fixture_name" "$endpoint"
     cloud_recorded=$((cloud_recorded + 1))
     return 0
 }

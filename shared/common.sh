@@ -1482,6 +1482,42 @@ generic_cloud_api_custom_auth() {
 # Agent verification helpers
 # ============================================================
 
+# Check if agent command exists in PATH
+_check_agent_in_path() {
+    local agent_cmd="$1"
+    local agent_name="$2"
+    if ! command -v "${agent_cmd}" &> /dev/null; then
+        _log_diagnostic \
+            "${agent_name} installation failed: command '${agent_cmd}' not found in PATH" \
+            "The installation script encountered an error (check logs above)" \
+            "The binary was installed to a directory not in PATH" \
+            "Network issues prevented the download from completing" \
+            --- \
+            "Re-run the script to retry the installation" \
+            "Install ${agent_name} manually and ensure it is in PATH"
+        return 1
+    fi
+    return 0
+}
+
+# Check if agent command executes without error
+_check_agent_runs() {
+    local agent_cmd="$1"
+    local verify_arg="$2"
+    local agent_name="$3"
+    if ! "${agent_cmd}" "${verify_arg}" &> /dev/null; then
+        _log_diagnostic \
+            "${agent_name} verification failed: '${agent_cmd} ${verify_arg}' returned an error" \
+            "Missing runtime dependencies (Python, Node.js, etc.)" \
+            "Incompatible system architecture or OS version" \
+            --- \
+            "Check ${agent_name}'s installation docs for prerequisites" \
+            "Run '${agent_cmd} ${verify_arg}' manually to see the error"
+        return 1
+    fi
+    return 0
+}
+
 # Verify that an agent is properly installed by checking if its command exists
 # Usage: verify_agent_installed AGENT_COMMAND [VERIFICATION_ARG] [ERROR_MESSAGE]
 # Examples:
@@ -1496,28 +1532,8 @@ verify_agent_installed() {
 
     log_step "Verifying ${agent_name} installation..."
 
-    if ! command -v "${agent_cmd}" &> /dev/null; then
-        _log_diagnostic \
-            "${agent_name} installation failed: command '${agent_cmd}' not found in PATH" \
-            "The installation script encountered an error (check logs above)" \
-            "The binary was installed to a directory not in PATH" \
-            "Network issues prevented the download from completing" \
-            --- \
-            "Re-run the script to retry the installation" \
-            "Install ${agent_name} manually and ensure it is in PATH"
-        return 1
-    fi
-
-    if ! "${agent_cmd}" "${verify_arg}" &> /dev/null; then
-        _log_diagnostic \
-            "${agent_name} verification failed: '${agent_cmd} ${verify_arg}' returned an error" \
-            "Missing runtime dependencies (Python, Node.js, etc.)" \
-            "Incompatible system architecture or OS version" \
-            --- \
-            "Check ${agent_name}'s installation docs for prerequisites" \
-            "Run '${agent_cmd} ${verify_arg}' manually to see the error"
-        return 1
-    fi
+    _check_agent_in_path "${agent_cmd}" "${agent_name}" || return 1
+    _check_agent_runs "${agent_cmd}" "${verify_arg}" "${agent_name}" || return 1
 
     log_info "${agent_name} installation verified successfully"
     return 0

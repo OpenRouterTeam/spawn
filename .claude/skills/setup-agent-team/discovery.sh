@@ -329,22 +329,55 @@ cleanup_between_cycles() {
     log_info "Cleanup complete"
 }
 
-run_team_cycle() {
-    # Always start fresh from latest main, prune stale remote-tracking refs
+# Sync with remote and prepare for discovery cycle
+_sync_and_setup() {
     cd "${REPO_ROOT}"
     git checkout main 2>/dev/null || true
     git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
 
-    # Cleanup stale artifacts
     _cleanup_stale_artifacts
-
-    # Set up worktree directory for parallel teammate work
     mkdir -p "${WORKTREE_BASE}"
 
-    # Prepare prompt file with manifest summary interpolated
     PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
     _prepare_prompt_file "${PROMPT_FILE}"
+}
+
+# Launch claude process and return pipes/PIDs
+_launch_claude() {
+    local CLAUDE_PID_FILE
+    CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
+
+    ( claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
+        --output-format stream-json --verbose &
+      echo $! > "${CLAUDE_PID_FILE}"
+      wait
+    ) 2>&1 | tee -a "${LOG_FILE}" &
+
+    echo "${CLAUDE_PID_FILE}"
+}
+
+# Check if session completed successfully
+_session_completed() {
+    local log_start_size="$1"
+    if tail -c +"$((log_start_size + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
+        return 0
+    fi
+    return 1
+}
+
+# Cleanup temporary files after cycle
+_cleanup_cycle_files() {
+    local claude_pid_file="$1"
+    rm -f "${claude_pid_file}" 2>/dev/null || true
+    rm -f "${PROMPT_FILE}" 2>/dev/null || true
+    PROMPT_FILE=""
+    git worktree prune 2>/dev/null || true
+    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+}
+
+run_team_cycle() {
+    _sync_and_setup
 
     log_info "Launching spawn team..."
     log_info "Worktree base: ${WORKTREE_BASE}"
@@ -360,15 +393,8 @@ run_team_cycle() {
 
     log_info "Idle timeout: ${IDLE_TIMEOUT}s, Hard timeout: ${HARD_TIMEOUT}s"
 
-    # Run claude in background so we can monitor output activity.
-    # Capture claude's actual PID via wrapper — $! gives tee's PID, not claude's.
     local CLAUDE_PID_FILE
-    CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
-    ( claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
-        --output-format stream-json --verbose &
-      echo $! > "${CLAUDE_PID_FILE}"
-      wait
-    ) 2>&1 | tee -a "${LOG_FILE}" &
+    CLAUDE_PID_FILE=$(_launch_claude)
     local PIPE_PID=$!
     sleep 2  # let claude start and write its PID
 
@@ -379,25 +405,16 @@ run_team_cycle() {
     _run_watchdog_loop "${PIPE_PID}" "${IDLE_TIMEOUT}" "${HARD_TIMEOUT}" "${CLAUDE_PID_FILE}" "${LOG_START_SIZE}"
     local CLAUDE_EXIT=$?
 
-    # Determine if session ended by checking for "result" in recent log
+    # Determine if session ended successfully
     local SESSION_ENDED=false
-    if tail -c +"$((LOG_START_SIZE + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
+    if _session_completed "${LOG_START_SIZE}"; then
         SESSION_ENDED=true
     fi
 
     # Handle completion and checkpointing
     _handle_cycle_completion "${CLAUDE_EXIT}" "0" "${IDLE_TIMEOUT}" "${SESSION_ENDED}"
 
-    # Clean up PID file
-    rm -f "${CLAUDE_PID_FILE}" 2>/dev/null || true
-
-    # Clean up prompt file
-    rm -f "${PROMPT_FILE}" 2>/dev/null || true
-    PROMPT_FILE=""
-
-    # Clean up worktrees after cycle
-    git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    _cleanup_cycle_files "${CLAUDE_PID_FILE}"
 
     return $CLAUDE_EXIT
 }
