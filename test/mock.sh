@@ -311,6 +311,31 @@ _strip_api_base() {
     echo "$endpoint" | sed 's|?.*||'
 }
 
+# Get required POST body fields for a cloud endpoint.
+_get_required_fields() {
+    local cloud="$1"
+    local endpoint="$2"
+
+    case "${cloud}:${endpoint}" in
+        hetzner:/servers) echo "name server_type image location" ;;
+        digitalocean:/droplets) echo "name region size image" ;;
+        vultr:/instances) echo "label region plan os_id" ;;
+        linode:/linode/instances) echo "label region type image" ;;
+        civo:/instances) echo "hostname size region" ;;
+        binarylane:/servers) echo "name region plan os_id" ;;
+        upcloud:/server) echo "server" ;;
+        genesiscloud:/instances) echo "name" ;;
+        hyperstack:/servers) echo "name" ;;
+        kamatera:/server/create) echo "datacenter" ;;
+        latitude:/servers) echo "hostname site_id os_type" ;;
+        ovh:*/create) echo "name" ;;
+        scaleway:/servers) echo "name" ;;
+        webdock:/servers) echo "name slug locationId profileSlug imageSlug" ;;
+        serverspace:/servers) echo "name location_id image_id cpu ram_mb" ;;
+        gcore:/instances) echo "name flavor volumes interfaces" ;;
+    esac
+}
+
 # Validate POST request body contains required fields for major clouds.
 # Used during mock script execution to catch invalid API requests.
 # Args: cloud method endpoint body
@@ -323,74 +348,8 @@ _validate_body() {
     [[ "$method" != "POST" ]] && return 0
     [[ -z "$body" ]] && return 0
 
-    local required_fields=""
-    case "$cloud" in
-        hetzner)
-            case "$endpoint" in
-                /servers) required_fields="name server_type image location" ;;
-            esac ;;
-        digitalocean)
-            case "$endpoint" in
-                /droplets) required_fields="name region size image" ;;
-            esac ;;
-        vultr)
-            case "$endpoint" in
-                /instances) required_fields="label region plan os_id" ;;
-            esac ;;
-        linode)
-            case "$endpoint" in
-                /linode/instances) required_fields="label region type image" ;;
-            esac ;;
-        civo)
-            case "$endpoint" in
-                /instances) required_fields="hostname size region" ;;
-            esac ;;
-        binarylane)
-            case "$endpoint" in
-                /servers) required_fields="name region plan os_id" ;;
-            esac ;;
-        upcloud)
-            case "$endpoint" in
-                /server) required_fields="server" ;;
-            esac ;;
-        genesiscloud)
-            case "$endpoint" in
-                /instances) required_fields="name" ;;
-            esac ;;
-        hyperstack)
-            case "$endpoint" in
-                /servers) required_fields="name" ;;
-            esac ;;
-        kamatera)
-            case "$endpoint" in
-                /server/create) required_fields="datacenter" ;;
-            esac ;;
-        latitude)
-            case "$endpoint" in
-                /servers) required_fields="hostname site_id os_type" ;;
-            esac ;;
-        ovh)
-            case "$endpoint" in
-                */create) required_fields="name" ;;
-            esac ;;
-        scaleway)
-            case "$endpoint" in
-                /servers) required_fields="name" ;;
-            esac ;;
-        webdock)
-            case "$endpoint" in
-                /servers) required_fields="name slug locationId profileSlug imageSlug" ;;
-            esac ;;
-        serverspace)
-            case "$endpoint" in
-                /servers) required_fields="name location_id image_id cpu ram_mb" ;;
-            esac ;;
-        gcore)
-            case "$endpoint" in
-                /instances) required_fields="name flavor volumes interfaces" ;;
-            esac ;;
-    esac
-
+    local required_fields
+    required_fields=$(_get_required_fields "$cloud" "$endpoint")
     [[ -z "$required_fields" ]] && return 0
 
     # Check if body is valid JSON
