@@ -316,7 +316,7 @@ describe("Download and Failure Pipeline", () => {
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("HTTP 404");
       // 500 from fallback should mention server issues
-      expect(errorOutput).toContain("recovering");
+      expect(errorOutput).toContain("temporarily unavailable");
     });
   });
 
@@ -352,7 +352,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("What to do");
+      expect(errorOutput).toContain("Next steps");
       expect(errorOutput).toContain("internet connection");
     });
 

@@ -178,7 +178,7 @@ describe("index.ts main() routing", () => {
       // When stdin is not a TTY (piped), and no args, it shows the non-TTY hint
       const result = runCli([]);
       const output = result.stdout + result.stderr;
-      expect(output).toContain("No interactive terminal detected");
+      expect(output).toContain("Cannot run interactive picker: not a terminal");
     });
   });
 });
