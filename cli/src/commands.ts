@@ -553,11 +553,21 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
 
   const cloudName = manifest.clouds[cloud].name;
   p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
-  p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
+
+  // Give context-specific guidance
+  const onlyOpenRouter = missing.length === 1 && missing[0] === "OPENROUTER_API_KEY";
+  if (onlyOpenRouter) {
+    p.log.info(`The script will open your browser to authenticate with OpenRouter.`);
+  } else {
+    p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
+  }
 
   if (isInteractiveTTY()) {
+    const confirmMsg = onlyOpenRouter
+      ? "Continue? You'll authenticate via browser."
+      : "Continue anyway? The script will prompt for missing credentials.";
     const shouldContinue = await p.confirm({
-      message: "Continue anyway? The script will prompt you to authenticate.",
+      message: confirmMsg,
       initialValue: true,
     });
     if (p.isCancel(shouldContinue) || !shouldContinue) {
@@ -1011,21 +1021,31 @@ export function getMissingClouds(manifest: Manifest, agent: string, clouds: stri
   return clouds.filter((c) => matrixStatus(manifest, c, agent) !== "implemented");
 }
 
+const COMPACT_READY_WIDTH = 10;
+
 function renderCompactList(manifest: Manifest, agents: string[], clouds: string[]): void {
   const totalClouds = clouds.length;
 
   console.log();
-  console.log(pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) + pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) + pc.bold("Not yet available"));
-  console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + 30)));
+  console.log(
+    pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) +
+    pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) +
+    pc.bold("Ready".padEnd(COMPACT_READY_WIDTH)) +
+    pc.bold("Not yet available")
+  );
+  console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + COMPACT_READY_WIDTH + 30)));
 
   for (const a of agents) {
-    const implCount = getImplementedClouds(manifest, a).length;
+    const implClouds = getImplementedClouds(manifest, a);
     const missing = getMissingClouds(manifest, a, clouds);
-    const countStr = `${implCount}/${totalClouds}`;
-    const colorFn = implCount === totalClouds ? pc.green : pc.yellow;
+    const countStr = `${implClouds.length}/${totalClouds}`;
+    const colorFn = implClouds.length === totalClouds ? pc.green : pc.yellow;
+    const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+    const readyStr = readyCount > 0 ? pc.green(`${readyCount}`) : pc.dim("0");
 
     let line = pc.bold(manifest.agents[a].name.padEnd(COMPACT_NAME_WIDTH));
     line += colorFn(countStr.padEnd(COMPACT_COUNT_WIDTH));
+    line += readyStr + " ".repeat(COMPACT_READY_WIDTH - String(readyCount).length);
 
     if (missing.length === 0) {
       line += pc.green("-- all clouds supported");
@@ -1043,6 +1063,7 @@ function renderMatrixFooter(manifest: Manifest, agents: string[], clouds: string
   console.log();
   if (isCompact) {
     console.log(`${pc.green("green")} = all clouds supported  ${pc.yellow("yellow")} = some clouds not yet available`);
+    console.log(`${pc.bold("Ready")} = clouds where your credentials are detected`);
   } else {
     console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   }
@@ -1379,15 +1400,23 @@ export async function cmdAgents(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   const allAgents = agentKeys(manifest);
+  let totalReady = 0;
   console.log();
   console.log(pc.bold("Agents") + pc.dim(` (${allAgents.length} total)`));
   console.log();
   for (const key of allAgents) {
     const a = manifest.agents[key];
-    const implCount = getImplementedClouds(manifest, key).length;
-    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${implCount} cloud${implCount !== 1 ? "s" : ""}  ${a.description}`)}`);
+    const implClouds = getImplementedClouds(manifest, key);
+    const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+    if (readyCount > 0) totalReady++;
+    const cloudStr = `${implClouds.length} cloud${implClouds.length !== 1 ? "s" : ""}`;
+    const readyStr = readyCount > 0 ? `  ${pc.green(`${readyCount} ready`)}` : "";
+    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${cloudStr}  ${a.description}`)}${readyStr}`);
   }
   console.log();
+  if (totalReady > 0) {
+    console.log(pc.dim(`  ${pc.green("ready")} = credentials detected for at least one cloud`));
+  }
   console.log(pc.dim(`  Run ${pc.cyan("spawn <agent>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
   console.log();
 }
