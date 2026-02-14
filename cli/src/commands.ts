@@ -487,6 +487,24 @@ function buildCredentialStatusLines(manifest: Manifest, cloud: string): string[]
   return lines;
 }
 
+function buildEnvironmentLines(manifest: Manifest, agent: string): string[] | null {
+  const env = manifest.agents[agent].env;
+  if (!env) return null;
+  return Object.entries(env).map(([k, v]) => {
+    const display = v.includes("OPENROUTER_API_KEY") ? "(from OpenRouter)" : v;
+    return `  ${k}=${display}`;
+  });
+}
+
+function buildPromptLines(prompt: string): string[] {
+  const preview = prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt;
+  const lines = [`  ${preview}`];
+  if (prompt.length > 100) {
+    lines.push(pc.dim(`  (${prompt.length} characters total)`));
+  }
+  return lines;
+}
+
 function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, prompt?: string): void {
   p.log.info(pc.bold("Dry run -- no resources will be provisioned\n"));
 
@@ -494,12 +512,8 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   printDryRunSection("Cloud", buildCloudLines(manifest.clouds[cloud]));
   printDryRunSection("Script", [`  URL: ${RAW_BASE}/${cloud}/${agent}.sh`]);
 
-  const env = manifest.agents[agent].env;
-  if (env) {
-    const envLines = Object.entries(env).map(([k, v]) => {
-      const display = v.includes("OPENROUTER_API_KEY") ? "(from OpenRouter)" : v;
-      return `  ${k}=${display}`;
-    });
+  const envLines = buildEnvironmentLines(manifest, agent);
+  if (envLines) {
     printDryRunSection("Environment variables", envLines);
   }
 
@@ -514,12 +528,7 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   }
 
   if (prompt) {
-    const preview = prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt;
-    const lines = [`  ${preview}`];
-    if (prompt.length > 100) {
-      lines.push(pc.dim(`  (${prompt.length} characters total)`));
-    }
-    printDryRunSection("Prompt", lines);
+    printDryRunSection("Prompt", buildPromptLines(prompt));
   }
 
   p.log.success("Dry run complete -- no resources were provisioned");
@@ -819,6 +828,7 @@ interface ExitCodeEntry {
   header: string;
   lines: string[];
   includeDashboard: boolean;
+  specialHandling?: (cloud: string, authHint?: string, dashboardUrl?: string) => string[];
 }
 
 const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
@@ -848,6 +858,7 @@ const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
     header: "A required command was not found. Check that these are installed:",
     lines: ["  - bash, curl, ssh, jq"],
     includeDashboard: false,
+    specialHandling: (cloud) => [`  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`],
   },
   126: {
     header: "A command was found but could not be executed (permission denied).",
@@ -867,6 +878,11 @@ const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
     header: "Common causes:",
     lines: [],
     includeDashboard: true,
+    specialHandling: (cloud, authHint) => [
+      ...credentialHints(cloud, authHint),
+      "  - Cloud provider API error (quota, rate limit, or region issue)",
+      "  - Server provisioning failed (try again or pick a different region)",
+    ],
   },
 };
 
@@ -941,16 +957,9 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
 
   const lines = [pc.bold(entry.header), ...entry.lines];
 
-  // Special handling for exit code 127 (missing command)
-  if (exitCode === 127) {
-    lines.push(`  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`);
-  }
-
-  // Special handling for exit code 1 (general error)
-  if (exitCode === 1) {
-    lines.push(...credentialHints(cloud, authHint));
-    lines.push("  - Cloud provider API error (quota, rate limit, or region issue)");
-    lines.push("  - Server provisioning failed (try again or pick a different region)");
+  // Apply special handling if defined for this exit code
+  if (entry.specialHandling) {
+    lines.push(...entry.specialHandling(cloud, authHint, dashboardUrl));
   }
 
   if (entry.includeDashboard) {
@@ -1342,17 +1351,25 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
   }
 }
 
-function showListFooter(records: SpawnRecord[], agentFilter?: string, cloudFilter?: string): void {
+function buildListFooterLines(records: SpawnRecord[], agentFilter?: string, cloudFilter?: string): string[] {
+  const lines: string[] = [];
   const latest = records[0];
-  console.log(`Rerun last: ${pc.cyan(buildRetryCommand(latest.agent, latest.cloud, latest.prompt))}`);
+  lines.push(`Rerun last: ${pc.cyan(buildRetryCommand(latest.agent, latest.cloud, latest.prompt))}`);
 
   if (agentFilter || cloudFilter) {
     const totalRecords = filterHistory();
-    console.log(pc.dim(`Showing ${records.length} of ${totalRecords.length} spawn${totalRecords.length !== 1 ? "s" : ""}`));
-    console.log(pc.dim(`Clear filter: ${pc.cyan("spawn list")}`));
+    lines.push(pc.dim(`Showing ${records.length} of ${totalRecords.length} spawn${totalRecords.length !== 1 ? "s" : ""}`));
+    lines.push(pc.dim(`Clear filter: ${pc.cyan("spawn list")}`));
   } else {
-    console.log(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
-    console.log(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`));
+    lines.push(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
+    lines.push(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`));
+  }
+  return lines;
+}
+
+function showListFooter(records: SpawnRecord[], agentFilter?: string, cloudFilter?: string): void {
+  for (const line of buildListFooterLines(records, agentFilter, cloudFilter)) {
+    console.log(line);
   }
   console.log();
 }
