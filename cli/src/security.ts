@@ -17,29 +17,40 @@ const IDENTIFIER_PATTERN = /^[a-z0-9_-]+$/;
  */
 export function validateIdentifier(identifier: string, fieldName: string): void {
   if (!identifier || identifier.trim() === "") {
-    throw new Error(`${fieldName} cannot be empty`);
+    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
+    throw new Error(
+      `${fieldName} is required but was not provided.\n\n` +
+      `Run '${listCmd}' to see all available options.`
+    );
   }
 
   // Check length constraints (prevent DoS via extremely long identifiers)
   if (identifier.length > 64) {
-    throw new Error(`${fieldName} exceeds maximum length of 64 characters`);
+    throw new Error(
+      `${fieldName} is too long (${identifier.length} characters, maximum is 64).\n\n` +
+      `This looks unusual. Check that you're using the correct name.`
+    );
   }
 
   // Allowlist validation: only safe characters
   if (!IDENTIFIER_PATTERN.test(identifier)) {
+    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
       `Names can only contain lowercase letters, numbers, hyphens, and underscores.\n` +
-      `Run ${fieldName.toLowerCase().includes("agent") ? "'spawn agents'" : "'spawn clouds'"} to see available options.`
+      `Examples: claude, github-codespaces, e2b\n\n` +
+      `Run '${listCmd}' to see all available options.`
     );
   }
 
   // Prevent path traversal patterns (defense in depth)
   if (identifier.includes("..") || identifier.includes("/") || identifier.includes("\\")) {
+    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
-      `Special characters like '/', '\\', and '..' are not allowed.\n` +
-      `Run ${fieldName.toLowerCase().includes("agent") ? "'spawn agents'" : "'spawn clouds'"} to see available options.`
+      `The name contains special characters that aren't allowed.\n` +
+      `Path-like characters ('/', '\\', '..') cannot be used.\n\n` +
+      `Run '${listCmd}' to see valid names.`
     );
   }
 }
@@ -54,7 +65,14 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 export function validateScriptContent(script: string): void {
   // Ensure script is not empty
   if (!script || script.trim() === "") {
-    throw new Error("Script content is empty");
+    throw new Error(
+      "The downloaded script is empty.\n\n" +
+      "This usually means the server returned an error instead of the script.\n\n" +
+      "How to fix:\n" +
+      "  1. Check your internet connection\n" +
+      "  2. Verify the combination exists: spawn matrix\n" +
+      "  3. Wait a moment and try again (the server may be temporarily unavailable)"
+    );
   }
 
   // Check for obviously malicious patterns
@@ -68,7 +86,10 @@ export function validateScriptContent(script: string): void {
   for (const { pattern, description } of dangerousPatterns) {
     if (pattern.test(script)) {
       throw new Error(
-        `Script blocked: contains potentially dangerous pattern (${description})`
+        `Security check failed: the downloaded script contains a dangerous pattern.\n\n` +
+        `Pattern detected: ${description}\n\n` +
+        `This is unexpected and may indicate the file was tampered with or corrupted.\n` +
+        `Please report this at: https://github.com/OpenRouterTeam/spawn/issues`
       );
     }
   }
@@ -76,15 +97,16 @@ export function validateScriptContent(script: string): void {
   // Ensure script starts with shebang
   if (!script.trim().startsWith("#!")) {
     throw new Error(
-      "The downloaded file doesn't appear to be a valid script.\n\n" +
-      "This usually means:\n" +
-      "  • The server returned an error page instead of the script\n" +
-      "  • Your internet connection was interrupted\n" +
-      "  • The script hasn't been published yet\n\n" +
+      "The downloaded file doesn't appear to be a valid bash script.\n\n" +
+      "Common causes:\n" +
+      "  • The server returned an error page (404, 500, etc.) instead of the script\n" +
+      "  • Network connection was interrupted during download\n" +
+      "  • The script file hasn't been published yet (even though it appears in the matrix)\n\n" +
       "How to fix:\n" +
       "  1. Check your internet connection and try again\n" +
-      "  2. Verify the combination exists: spawn matrix\n" +
-      "  3. Try again in a few moments"
+      "  2. Run 'spawn matrix' to verify the combination is marked as implemented\n" +
+      "  3. Wait a few moments (the script may be deploying) and retry\n" +
+      "  4. If the issue persists, report it: https://github.com/OpenRouterTeam/spawn/issues"
     );
   }
 }
@@ -119,7 +141,11 @@ const MAX_PROMPT_FILE_SIZE = 1024 * 1024;
  */
 export function validatePromptFilePath(filePath: string): void {
   if (!filePath || filePath.trim() === "") {
-    throw new Error("Prompt file path cannot be empty");
+    throw new Error(
+      "Prompt file path is required when using --prompt-file.\n\n" +
+      "Example:\n" +
+      "  spawn <agent> <cloud> --prompt-file instructions.txt"
+    );
   }
 
   // Normalize the path to resolve .. and symlink-like textual tricks
@@ -130,12 +156,12 @@ export function validatePromptFilePath(filePath: string): void {
   for (const { pattern, description } of SENSITIVE_PATH_PATTERNS) {
     if (pattern.test(resolved)) {
       throw new Error(
-        `Cannot use '${filePath}' as a prompt file.\n\n` +
+        `Security check failed: cannot use '${filePath}' as a prompt file.\n\n` +
         `This path points to ${description}.\n` +
-        `Prompt contents are sent to the agent and may be logged remotely.\n\n` +
-        `How to fix:\n` +
-        `  1. Create a new text file: echo "Your prompt here" > prompt.txt\n` +
-        `  2. Use that file instead: spawn <agent> <cloud> --prompt-file prompt.txt`
+        `Prompt contents are sent to the agent and may be logged or stored remotely.\n\n` +
+        `For security, use a plain text file instead:\n` +
+        `  1. Create a new file: echo "Your instructions here" > prompt.txt\n` +
+        `  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt`
       );
     }
   }
@@ -151,7 +177,8 @@ export function validatePromptFilePath(filePath: string): void {
 export function validatePromptFileStats(filePath: string, stats: { isFile: () => boolean; size: number }): void {
   if (!stats.isFile()) {
     throw new Error(
-      `'${filePath}' is not a regular file.\n` +
+      `Cannot read prompt: '${filePath}' is not a regular file.\n\n` +
+      `The path points to a directory, device, or other non-file object.\n` +
       `Provide a path to a text file containing your prompt.`
     );
   }
@@ -159,15 +186,19 @@ export function validatePromptFileStats(filePath: string, stats: { isFile: () =>
   if (stats.size > MAX_PROMPT_FILE_SIZE) {
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
     throw new Error(
-      `Prompt file is too large (${sizeMB}MB). Maximum size is 1MB.\n` +
-      `Use a shorter prompt or split it across multiple runs.`
+      `Prompt file is too large: ${sizeMB}MB (maximum is 1MB).\n\n` +
+      `How to fix:\n` +
+      `  • Use a shorter, more focused prompt\n` +
+      `  • Break the work into multiple smaller tasks\n` +
+      `  • Remove unnecessary context or examples`
     );
   }
 
   if (stats.size === 0) {
     throw new Error(
-      `Prompt file is empty: ${filePath}\n` +
-      `The file exists but contains no text. Add your prompt to the file and try again.`
+      `Prompt file is empty: ${filePath}\n\n` +
+      `The file exists but contains no text.\n` +
+      `Add your instructions to the file and try again.`
     );
   }
 }
@@ -181,35 +212,44 @@ export function validatePromptFileStats(filePath: string, stats: { isFile: () =>
  */
 export function validatePrompt(prompt: string): void {
   if (!prompt || prompt.trim() === "") {
-    throw new Error("Prompt cannot be empty");
+    throw new Error(
+      "Prompt is required but was not provided.\n\n" +
+      "Provide a prompt with --prompt:\n" +
+      "  spawn <agent> <cloud> --prompt \"Your task here\"\n\n" +
+      "Or use a file:\n" +
+      "  spawn <agent> <cloud> --prompt-file prompt.txt"
+    );
   }
 
   // Check length constraints (10KB max to prevent DoS)
   const MAX_PROMPT_LENGTH = 10 * 1024;
   if (prompt.length > MAX_PROMPT_LENGTH) {
+    const lengthKB = (prompt.length / 1024).toFixed(1);
     throw new Error(
-      `Prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters (${prompt.length} given).\n` +
-      `For longer prompts, use --prompt-file to read from a file instead.`
+      `Prompt is too long (${lengthKB}KB, maximum is 10KB).\n\n` +
+      `For longer prompts, use a file instead:\n` +
+      `  spawn <agent> <cloud> --prompt-file instructions.txt`
     );
   }
 
   // Check for obvious command injection patterns
   // These patterns would break out of the shell quoting used in bash scripts
   const dangerousPatterns: Array<{ pattern: RegExp; description: string; suggestion: string }> = [
-    { pattern: /\$\(.*\)/, description: "command substitution $()", suggestion: 'Instead of "Fix $(ls)", try "Fix the output of ls command"' },
-    { pattern: /`[^`]*`/, description: "backtick command substitution", suggestion: "Rephrase to describe the command instead of using backticks" },
-    { pattern: /;\s*rm\s+-rf/, description: "dangerous command sequence", suggestion: "Describe the action you want without shell syntax" },
-    { pattern: /\|\s*bash/, description: "shell piping", suggestion: "Describe what you want to achieve instead" },
-    { pattern: /\|\s*sh/, description: "shell piping", suggestion: "Describe what you want to achieve instead" },
+    { pattern: /\$\(.*\)/, description: "command substitution $()", suggestion: 'Instead of "Fix $(ls)", try "Fix the output from ls"' },
+    { pattern: /`[^`]*`/, description: "backtick command substitution", suggestion: "Describe the command output instead of using backticks" },
+    { pattern: /;\s*rm\s+-rf/, description: "dangerous command sequence", suggestion: "Describe what you want the agent to do without using shell syntax" },
+    { pattern: /\|\s*bash/, description: "shell piping to bash", suggestion: "Describe the desired outcome instead" },
+    { pattern: /\|\s*sh/, description: "shell piping to sh", suggestion: "Describe the desired outcome instead" },
   ];
 
   for (const { pattern, description, suggestion } of dangerousPatterns) {
     if (pattern.test(prompt)) {
       throw new Error(
-        `Your prompt contains shell syntax that can't be safely processed (${description}).\n\n` +
-        `${suggestion}\n\n` +
-        `Tip: Describe what you want the agent to do in plain English, rather than\n` +
-        `using shell commands or special characters.`
+        `Your prompt contains shell syntax that can't be safely processed.\n\n` +
+        `Issue: ${description}\n` +
+        `Suggestion: ${suggestion}\n\n` +
+        `Remember: Describe what you want the agent to do in plain language.\n` +
+        `The agent will write the actual shell commands for you.`
       );
     }
   }

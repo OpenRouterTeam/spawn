@@ -55,8 +55,8 @@ export async function loadManifestWithSpinner(): Promise<Manifest> {
 
 function validateNonEmptyString(value: string, fieldName: string, helpCommand: string): void {
   if (!value || value.trim() === "") {
-    p.log.error(`${fieldName} is required but was not provided`);
-    p.log.info(`Run ${pc.cyan(helpCommand)} to see all available ${fieldName.toLowerCase()}s.`);
+    p.log.error(`${fieldName} is required but was not provided.`);
+    p.log.info(`Run ${pc.cyan(helpCommand)} to see all available options.`);
     process.exit(1);
   }
 }
@@ -636,33 +636,57 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
 
 function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryStatus: number, fallbackStatus: number): void {
   if (primaryStatus === 404 && fallbackStatus === 404) {
-    p.log.error("Script download failed (HTTP 404: not found)");
-    console.error("\nThe script file could not be found.");
-    console.error("This usually means the combination hasn't been published yet,");
-    console.error("even though it may appear in the matrix.");
+    p.log.error("Script not found (HTTP 404)");
+    console.error("\nThe script file doesn't exist on the server.");
+    console.error("\nCommon causes:");
+    console.error("  • The combination hasn't been implemented yet (check the matrix)");
+    console.error("  • The script is being deployed (try again in a moment)");
+    console.error("  • The file was removed or renamed");
     console.error(`\nHow to fix:`);
-    console.error(`  1. Verify the combination is implemented: ${pc.cyan("spawn matrix")}`);
-    console.error(`  2. Try again later (the script may be deploying)`);
-    console.error(`  3. Report the issue: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
+    console.error(`  1. Verify it's implemented: ${pc.cyan("spawn matrix")}`);
+    console.error(`  2. Wait 1-2 minutes and try again`);
+    console.error(`  3. If it persists, report: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
   } else {
     p.log.error(`Script download failed`);
-    console.error(`\nBoth download sources returned errors (HTTP ${primaryStatus} and ${fallbackStatus}).`);
+    console.error(`\nBoth download attempts failed (HTTP ${primaryStatus} and ${fallbackStatus}).`);
     if (primaryStatus >= 500 || fallbackStatus >= 500) {
-      console.error("The server may be experiencing temporary issues.");
+      console.error("\nThe server may be temporarily unavailable or experiencing issues.");
     }
     console.error(`\nHow to fix:`);
-    console.error(`  1. Wait a moment and try again`);
-    console.error(`  2. Check GitHub status: ${pc.cyan("https://www.githubstatus.com")}`);
+    console.error(`  1. Check your internet connection`);
+    console.error(`  2. Wait a moment and try again (servers may be recovering)`);
+    console.error(`  3. Check GitHub status: ${pc.cyan("https://www.githubstatus.com")}`);
   }
 }
 
 function reportDownloadError(ghUrl: string, err: unknown): never {
-  p.log.error("Script download failed (network error)");
-  console.error("\nError:", getErrorMessage(err));
+  p.log.error("Script download failed");
+  const errMsg = getErrorMessage(err);
+  console.error("\nNetwork error:", errMsg);
+
+  const isTimeout = errMsg.toLowerCase().includes("timeout");
+  const isConnection = errMsg.toLowerCase().includes("connect") || errMsg.toLowerCase().includes("enotfound");
+
+  console.error("\nCommon causes:");
+  if (isTimeout) {
+    console.error("  • Slow or unstable internet connection");
+    console.error("  • Server is not responding (possibly overloaded)");
+  } else if (isConnection) {
+    console.error("  • No internet connection");
+    console.error("  • Firewall or proxy blocking the connection");
+    console.error("  • DNS resolution failure");
+  } else {
+    console.error("  • Internet connection problem");
+    console.error("  • The GitHub servers may be temporarily unavailable");
+  }
+
   console.error("\nHow to fix:");
   console.error("  1. Check your internet connection");
-  console.error(`  2. Verify this combination exists: ${pc.cyan("spawn matrix")}`);
-  console.error(`  3. Try accessing the script directly: ${ghUrl}`);
+  console.error(`  2. Verify the combination exists: ${pc.cyan("spawn matrix")}`);
+  console.error("  3. Wait a moment and try again");
+  if (!isConnection) {
+    console.error(`  4. Try accessing directly: ${pc.dim(ghUrl)}`);
+  }
   process.exit(1);
 }
 
