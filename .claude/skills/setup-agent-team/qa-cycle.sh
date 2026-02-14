@@ -81,12 +81,53 @@ check_timeout() {
     return 0
 }
 
+# Validate a branch name to prevent command injection.
+# Only allows: alphanumeric, hyphens, underscores, dots, and forward slashes.
+# Rejects empty strings, names starting/ending with dots or slashes, and double dots.
+validate_branch_name() {
+    local name="$1"
+    if [[ -z "$name" ]]; then
+        log "ERROR: Branch name is empty"
+        return 1
+    fi
+    if [[ ! "$name" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+        log "ERROR: Branch name contains invalid characters: ${name}"
+        return 1
+    fi
+    if [[ "$name" == *..* ]]; then
+        log "ERROR: Branch name contains '..': ${name}"
+        return 1
+    fi
+    if [[ "$name" == .* ]] || [[ "$name" == */ ]] || [[ "$name" == /* ]]; then
+        log "ERROR: Branch name has invalid start/end: ${name}"
+        return 1
+    fi
+    return 0
+}
+
+# Validate a cloud name parsed from external output.
+# Cloud names should only contain alphanumeric characters and hyphens.
+validate_cloud_name() {
+    local name="$1"
+    if [[ -z "$name" ]]; then
+        return 1
+    fi
+    if [[ ! "$name" =~ ^[a-zA-Z0-9-]+$ ]]; then
+        log "WARNING: Skipping invalid cloud name: ${name}"
+        return 1
+    fi
+    return 0
+}
+
 # Push → PR → self-review (NO merging — merging is handled externally)
 # Usage: push_and_create_pr BRANCH_NAME PR_TITLE PR_BODY
 push_and_create_pr() {
     local branch_name="$1"
     local pr_title="$2"
     local pr_body="$3"
+
+    # Validate branch name before using in git/gh commands
+    validate_branch_name "${branch_name}" || return 1
 
     # Check there are actual commits to push
     if [[ -z "$(git log origin/main..HEAD --oneline 2>/dev/null)" ]]; then
@@ -248,6 +289,8 @@ else
         case "$clean" in
             *"Recording "*" ━━━"*)
                 current_cloud=$(printf '%s' "$clean" | sed 's/.*Recording //; s/ ━━━.*//')
+                # Validate cloud name parsed from output
+                validate_cloud_name "${current_cloud}" || current_cloud=""
                 ;;
             *"fail "*)
                 if [[ -n "${current_cloud}" ]]; then
@@ -296,6 +339,9 @@ else
         RECORD_FIX_PIDS=""
         for cloud in ${NON_AUTH_FAILED_CLOUDS}; do
             check_timeout || break
+
+            # Validate cloud name before using in branch names and paths
+            validate_cloud_name "${cloud}" || continue
 
             # Extract error context for this cloud
             error_lines=$(sed -n "/Recording ${cloud}/,/Recording \|━━━ \|Results:/p" "${RECORD_OUTPUT}" | head -30 || true)
@@ -428,6 +474,8 @@ if [[ -f "${RECORD_OUTPUT}" ]]; then
                     fi
                 fi
                 _current_cloud=$(printf '%s' "$clean" | sed 's/.*Recording //; s/ ━━━.*//')
+                # Validate cloud name parsed from output
+                validate_cloud_name "${_current_cloud}" || _current_cloud=""
                 _cloud_had_error=""
                 ;;
             *"fail "*)
@@ -558,6 +606,9 @@ else
     AGENT_PIDS=""
     for cloud in $FAILED_CLOUDS; do
         check_timeout || break
+
+        # Validate cloud name before using in branch names and paths
+        validate_cloud_name "${cloud}" || continue
 
         # Collect all failing scripts for this cloud
         cloud_failures=$(printf '%s\n' $FAILURES | grep "^${cloud}/" || true)
