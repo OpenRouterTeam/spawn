@@ -29,14 +29,18 @@ const COMMON_SH = resolve(REPO_ROOT, "shared/common.sh");
 /**
  * Run a bash snippet that sources shared/common.sh first.
  * Returns { exitCode, stdout, stderr }.
+ *
+ * Note: Scripts run in a bash subprocess, so template variables must be
+ * properly escaped or injected via environment variables.
  */
-function runBash(script: string): { exitCode: number; stdout: string; stderr: string } {
+function runBash(script: string, env?: Record<string, string>): { exitCode: number; stdout: string; stderr: string } {
   const fullScript = `source "${COMMON_SH}"\n${script}`;
   const { spawnSync } = require("child_process");
   const result = spawnSync("bash", ["-c", fullScript], {
     encoding: "utf-8",
     timeout: 10000,
     stdio: ["pipe", "pipe", "pipe"],
+    env: { ...process.env, ...env },
   });
   return {
     exitCode: result.status ?? 1,
@@ -53,6 +57,7 @@ function createTempDir(): string {
   mkdirSync(dir, { recursive: true });
   return dir;
 }
+
 
 // ── verify_agent_installed ──────────────────────────────────────────────────
 
@@ -293,24 +298,56 @@ describe("setup_claude_code_config", () => {
     });
 
     it("should produce valid .claude.json with onboarding completed", () => {
-      const result = runBash(`
-        mock_upload() { if [[ "$2" == *".claude.json" ]]; then cat "$1"; fi; }
-        mock_run() { :; }
-        setup_claude_code_config "key" "mock_upload" "mock_run"
-      `);
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("hasCompletedOnboarding");
+      const tempDir = createTempDir();
+      try {
+        const result = runBash(`
+          mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+          mock_run() {
+            # Replace /tmp/spawn_config_* with $TEMP_DIR/spawn_config_*
+            local cmd="$1"
+            cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+            # Also replace ~/ with $TEMP_DIR/
+            cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+            mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
+            eval "$cmd"
+          }
+          setup_claude_code_config "key" "mock_upload" "mock_run"
+        `, { TEMP_DIR: tempDir });
+        expect(result.exitCode).toBe(0);
+        // List all files recursively to find .claude.json
+        const output = execSync(`find "${tempDir}" -type f 2>/dev/null`, { encoding: "utf-8" }).trim();
+        const files = output.split("\n").filter(f => f);
+        const claudeFile = files.find(f => f.includes(".claude.json"));
+        expect(claudeFile).toBeDefined();
+        const content = readFileSync(claudeFile!, "utf-8");
+        const parsed = JSON.parse(content);
+        expect(parsed.hasCompletedOnboarding).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
     });
 
     it("should create both settings.json and .claude.json files", () => {
-      const result = runBash(`
-        mock_upload() { echo "FILE: $2"; }
-        mock_run() { :; }
-        setup_claude_code_config "key" "mock_upload" "mock_run"
-      `);
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("settings.json");
-      expect(result.stdout).toContain(".claude.json");
+      const tempDir = createTempDir();
+      try {
+        const result = runBash(`
+          mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+          mock_run() {
+            local cmd="$1"
+            cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+            cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+            mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
+            eval "$cmd"
+          }
+          setup_claude_code_config "key" "mock_upload" "mock_run"
+        `, { TEMP_DIR: tempDir });
+        expect(result.exitCode).toBe(0);
+        const files = execSync(`find "${tempDir}" -type f`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+        expect(files.some(f => f.includes("settings.json"))).toBe(true);
+        expect(files.some(f => f.includes(".claude.json"))).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
     });
 
     it("should invoke run callback to create .claude directory", () => {
@@ -339,14 +376,21 @@ describe("setup_claude_code_config", () => {
       const tempDir = createTempDir();
       try {
         const result = runBash(`
-          mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-          mock_run() { :; }
+          mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+          mock_run() {
+            local cmd="$1"
+            cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+            cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+            mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
+            eval "$cmd"
+          }
           setup_claude_code_config 'key-with-"quotes"-inside' "mock_upload" "mock_run"
-        `);
+        `, { TEMP_DIR: tempDir });
         expect(result.exitCode).toBe(0);
-        const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-        const settingsFile = files.find(f => f.includes("settings.json"));
-        const content = readFileSync(join(tempDir, settingsFile!), "utf-8");
+        const files = execSync(`find "${tempDir}" -name "*settings.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+        const settingsFile = files[0];
+        expect(settingsFile).toBeDefined();
+        const content = readFileSync(settingsFile, "utf-8");
         // Should be valid JSON even with quotes in the key
         const parsed = JSON.parse(content);
         expect(parsed.env.ANTHROPIC_AUTH_TOKEN).toContain("quotes");
@@ -359,14 +403,21 @@ describe("setup_claude_code_config", () => {
       const tempDir = createTempDir();
       try {
         const result = runBash(`
-          mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-          mock_run() { :; }
-          setup_claude_code_config 'key\\with\\backslashes' "mock_upload" "mock_run"
-        `);
+          mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+          mock_run() {
+            local cmd="$1"
+            cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+            cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+            mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
+            eval "$cmd"
+          }
+          setup_claude_code_config 'key\\\\with\\\\backslashes' "mock_upload" "mock_run"
+        `, { TEMP_DIR: tempDir });
         expect(result.exitCode).toBe(0);
-        const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-        const settingsFile = files.find(f => f.includes("settings.json"));
-        const content = readFileSync(join(tempDir, settingsFile!), "utf-8");
+        const files = execSync(`find "${tempDir}" -name "*settings.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+        const settingsFile = files[0];
+        expect(settingsFile).toBeDefined();
+        const content = readFileSync(settingsFile, "utf-8");
         const parsed = JSON.parse(content);
         expect(parsed.env.ANTHROPIC_AUTH_TOKEN).toBeDefined();
       } finally {
@@ -383,15 +434,21 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_openclaw_config "sk-or-v1-test-key" "openrouter/auto" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const opClawFile = files.find(f => f.includes("openclaw.json"));
+      const files = execSync(`find "${tempDir}" -name "*openclaw.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const opClawFile = files[0];
       expect(opClawFile).toBeDefined();
-      const content = readFileSync(join(tempDir, opClawFile!), "utf-8");
+      const content = readFileSync(opClawFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed).toBeDefined();
     } finally {
@@ -403,14 +460,21 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_openclaw_config "my-api-key-123" "openrouter/auto" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const opClawFile = files.find(f => f.includes("openclaw.json"));
-      const content = readFileSync(join(tempDir, opClawFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*openclaw.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const opClawFile = files[0];
+      expect(opClawFile).toBeDefined();
+      const content = readFileSync(opClawFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed.env.OPENROUTER_API_KEY).toBe("my-api-key-123");
     } finally {
@@ -422,14 +486,21 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_openclaw_config "key" "anthropic/claude-3.5-sonnet" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const opClawFile = files.find(f => f.includes("openclaw.json"));
-      const content = readFileSync(join(tempDir, opClawFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*openclaw.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const opClawFile = files[0];
+      expect(opClawFile).toBeDefined();
+      const content = readFileSync(opClawFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed.agents.defaults.model.primary).toBe("openrouter/anthropic/claude-3.5-sonnet");
     } finally {
@@ -441,14 +512,21 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_openclaw_config "key" "auto" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const opClawFile = files.find(f => f.includes("openclaw.json"));
-      const content = readFileSync(join(tempDir, opClawFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*openclaw.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const opClawFile = files[0];
+      expect(opClawFile).toBeDefined();
+      const content = readFileSync(opClawFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed.gateway.mode).toBe("local");
     } finally {
@@ -460,14 +538,21 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_openclaw_config "key" "auto" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const opClawFile = files.find(f => f.includes("openclaw.json"));
-      const content = readFileSync(join(tempDir, opClawFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*openclaw.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const opClawFile = files[0];
+      expect(opClawFile).toBeDefined();
+      const content = readFileSync(opClawFile, "utf-8");
       const parsed = JSON.parse(content);
       // Gateway token should be a 32-char hex string (openssl rand -hex 16)
       expect(parsed.gateway.auth.token).toBeDefined();
@@ -497,15 +582,21 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_continue_config "sk-or-v1-test-key" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const configFile = files.find(f => f.includes("config.json"));
+      const files = execSync(`find "${tempDir}" -name "*config.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const configFile = files[0];
       expect(configFile).toBeDefined();
-      const content = readFileSync(join(tempDir, configFile!), "utf-8");
+      const content = readFileSync(configFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed).toBeDefined();
     } finally {
@@ -517,14 +608,21 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_continue_config "test-key" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const configFile = files.find(f => f.includes("config.json"));
-      const content = readFileSync(join(tempDir, configFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*config.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const configFile = files[0];
+      expect(configFile).toBeDefined();
+      const content = readFileSync(configFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed.models).toBeArray();
       expect(parsed.models.length).toBeGreaterThan(0);
@@ -539,14 +637,21 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_continue_config "my-continue-api-key" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const configFile = files.find(f => f.includes("config.json"));
-      const content = readFileSync(join(tempDir, configFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*config.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const configFile = files[0];
+      expect(configFile).toBeDefined();
+      const content = readFileSync(configFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed.models[0].apiKey).toBe("my-continue-api-key");
     } finally {
@@ -558,14 +663,21 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_continue_config "key" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const configFile = files.find(f => f.includes("config.json"));
-      const content = readFileSync(join(tempDir, configFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*config.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const configFile = files[0];
+      expect(configFile).toBeDefined();
+      const content = readFileSync(configFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed.models[0].apiBase).toBe("https://openrouter.ai/api/v1");
     } finally {
@@ -577,14 +689,21 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_continue_config "key" "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const configFile = files.find(f => f.includes("config.json"));
-      const content = readFileSync(join(tempDir, configFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*config.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const configFile = files[0];
+      expect(configFile).toBeDefined();
+      const content = readFileSync(configFile, "utf-8");
       const parsed = JSON.parse(content);
       expect(parsed.models[0].title).toBe("OpenRouter");
     } finally {
@@ -606,14 +725,21 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "${tempDir}/$(basename "$2")"; }
-        mock_run() { :; }
+        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+        mock_run() {
+          local cmd="$1"
+          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
+          eval "$cmd"
+        }
         setup_continue_config 'key-with-"quotes"-and\\backslash' "mock_upload" "mock_run"
-      `);
+      `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
-      const files = execSync(`ls "${tempDir}"`, { encoding: "utf-8" }).trim().split("\n");
-      const configFile = files.find(f => f.includes("config.json"));
-      const content = readFileSync(join(tempDir, configFile!), "utf-8");
+      const files = execSync(`find "${tempDir}" -name "*config.json"`, { encoding: "utf-8" }).trim().split("\n").filter(f => f);
+      const configFile = files[0];
+      expect(configFile).toBeDefined();
+      const content = readFileSync(configFile, "utf-8");
       // Must be valid JSON even with special characters
       const parsed = JSON.parse(content);
       expect(parsed.models[0].apiKey).toContain("quotes");
