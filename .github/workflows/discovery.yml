@@ -2,7 +2,7 @@ name: Trigger Discovery
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 0 */3 * *'
   issues:
     types: [opened, reopened, labeled]
   workflow_dispatch:
