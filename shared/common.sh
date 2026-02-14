@@ -2301,7 +2301,8 @@ upload_config_file() {
     rand_suffix=$(basename "${temp_file}")
     local temp_remote="/tmp/spawn_config_${rand_suffix}"
     ${upload_callback} "${temp_file}" "${temp_remote}"
-    ${run_callback} "chmod 600 '${temp_remote}' && mv '${temp_remote}' '${remote_path}'"
+    # NOTE: remote_path must NOT be single-quoted — tilde (~) only expands when unquoted
+    ${run_callback} "mkdir -p \$(dirname ${remote_path}) && chmod 600 '${temp_remote}' && mv '${temp_remote}' ${remote_path}"
 }
 
 # ============================================================
