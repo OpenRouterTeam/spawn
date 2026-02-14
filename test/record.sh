@@ -164,7 +164,7 @@ get_endpoints() {
                 "instances:/cloud/v1/instances/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}" \
                 "images:/cloud/v1/images/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}" \
                 "flavors:/cloud/v1/flavors/${GCORE_PROJECT_ID:-MISSING}/${GCORE_REGION:-ed-1}"
-            !!
+            ;;
     esac
 }
 
@@ -292,7 +292,7 @@ get_auth_env_var() {
         cloudsigma)    printf "CLOUDSIGMA_EMAIL" ;;
         webdock)       printf "WEBDOCK_API_TOKEN" ;;
         serverspace)   printf "SERVERSPACE_API_KEY" ;;
-        gcore)         printf "GCORE_API_TOKEN" !!
+        gcore)         printf "GCORE_API_TOKEN" ;;
     esac
 }
 
@@ -453,7 +453,7 @@ call_api() {
         cloudsigma)    cloudsigma_api GET "$endpoint" ;;
         webdock)       webdock_api GET "$endpoint" ;;
         serverspace)   serverspace_api GET "$endpoint" ;;
-        gcore)         gcore_api GET "$endpoint" !!
+        gcore)         gcore_api GET "$endpoint" ;;
     esac
 }
 
@@ -538,7 +538,7 @@ _record_live_cycle() {
         civo)          _live_civo "$fixture_dir" ;;
         atlanticnet)   _live_atlanticnet "$fixture_dir" ;;
         serverspace)   _live_serverspace "$fixture_dir" ;;
-        gcore)         _live_gcore "$fixture_dir" !!
+        gcore)         _live_gcore "$fixture_dir" ;;
         *)  return 0 ;;  # No live cycle for this cloud yet
     esac
 }
