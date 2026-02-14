@@ -637,25 +637,26 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
 function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryStatus: number, fallbackStatus: number): void {
   if (primaryStatus === 404 && fallbackStatus === 404) {
     p.log.error("Script not found (HTTP 404)");
-    console.error("\nThe script file doesn't exist on the server.");
-    console.error("\nCommon causes:");
-    console.error("  • The combination hasn't been implemented yet (check the matrix)");
-    console.error("  • The script is being deployed (try again in a moment)");
-    console.error("  • The file was removed or renamed");
-    console.error(`\nHow to fix:`);
-    console.error(`  1. Verify it's implemented: ${pc.cyan("spawn matrix")}`);
-    console.error(`  2. Wait 1-2 minutes and try again`);
-    console.error(`  3. If it persists, report: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
+    console.error("\nThe spawn script doesn't exist at the expected location.");
+    console.error("\nThis usually means:");
+    console.error("  • The agent + cloud combination hasn't been implemented yet");
+    console.error("  • The script is currently being deployed (rare, but possible)");
+    console.error("  • There's a temporary issue with the file server");
+    console.error(`\nWhat to do:`);
+    console.error(`  1. Check if it's marked as implemented: ${pc.cyan("spawn matrix")}`);
+    console.error(`  2. If the matrix shows it's available, wait 1-2 minutes and retry`);
+    console.error(`  3. Still not working? Report it: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
   } else {
     p.log.error(`Script download failed`);
-    console.error(`\nBoth download attempts failed (HTTP ${primaryStatus} and ${fallbackStatus}).`);
+    console.error(`\nCouldn't download the spawn script (HTTP ${primaryStatus} from primary, ${fallbackStatus} from fallback).`);
     if (primaryStatus >= 500 || fallbackStatus >= 500) {
-      console.error("\nThe server may be temporarily unavailable or experiencing issues.");
+      console.error("\nThe servers are experiencing issues or are temporarily unavailable.");
     }
-    console.error(`\nHow to fix:`);
-    console.error(`  1. Check your internet connection`);
-    console.error(`  2. Wait a moment and try again (servers may be recovering)`);
-    console.error(`  3. Check GitHub status: ${pc.cyan("https://www.githubstatus.com")}`);
+    console.error(`\nWhat to do:`);
+    console.error(`  1. Verify your internet connection is working`);
+    console.error(`  2. Wait a minute and try again (servers may be recovering)`);
+    console.error(`  3. Check GitHub's status page: ${pc.cyan("https://www.githubstatus.com")}`);
+    console.error(`  4. If GitHub is down, wait and retry when it's back up`);
   }
 }
 
@@ -667,25 +668,30 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   const isTimeout = errMsg.toLowerCase().includes("timeout");
   const isConnection = errMsg.toLowerCase().includes("connect") || errMsg.toLowerCase().includes("enotfound");
 
-  console.error("\nCommon causes:");
+  console.error("\nWhat's wrong:");
   if (isTimeout) {
-    console.error("  • Slow or unstable internet connection");
-    console.error("  • Server is not responding (possibly overloaded)");
+    console.error("  • Your internet connection is slow or unstable");
+    console.error("  • The download server isn't responding (possibly overloaded)");
+    console.error("  • A firewall may be slowing the connection");
   } else if (isConnection) {
-    console.error("  • No internet connection");
-    console.error("  • Firewall or proxy blocking the connection");
-    console.error("  • DNS resolution failure");
+    console.error("  • No internet connection detected");
+    console.error("  • A firewall or proxy is blocking GitHub access");
+    console.error("  • DNS isn't resolving GitHub's domain (check your DNS settings)");
   } else {
-    console.error("  • Internet connection problem");
-    console.error("  • The GitHub servers may be temporarily unavailable");
+    console.error("  • There's an issue with your internet connection");
+    console.error("  • GitHub's servers may be temporarily down");
   }
 
-  console.error("\nHow to fix:");
-  console.error("  1. Check your internet connection");
-  console.error(`  2. Verify the combination exists: ${pc.cyan("spawn matrix")}`);
-  console.error("  3. Wait a moment and try again");
-  if (!isConnection) {
-    console.error(`  4. Try accessing directly: ${pc.dim(ghUrl)}`);
+  console.error("\nWhat to do:");
+  console.error("  1. Check that your internet connection is working");
+  if (isConnection) {
+    console.error("  2. Test accessing github.com in your browser");
+    console.error("  3. Check if a firewall or VPN is blocking access");
+    console.error("  4. Try disabling any proxy settings temporarily");
+  } else {
+    console.error(`  2. Verify this combination exists: ${pc.cyan("spawn matrix")}`);
+    console.error("  3. Wait a minute and try again");
+    console.error(`  4. Test accessing the URL directly: ${pc.dim(ghUrl)}`);
   }
   process.exit(1);
 }

@@ -26,31 +26,46 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 
   // Check length constraints (prevent DoS via extremely long identifiers)
   if (identifier.length > 64) {
+    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
+    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `${fieldName} is too long (${identifier.length} characters, maximum is 64).\n\n` +
-      `This looks unusual. Check that you're using the correct name.`
+      `This looks unusual. ${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names are typically short identifiers.\n\n` +
+      `Did you accidentally paste something else? Check that you're using the correct ${entityType} name.\n\n` +
+      `To see all available ${entityType}s, run: ${listCmd}`
     );
   }
 
   // Allowlist validation: only safe characters
   if (!IDENTIFIER_PATTERN.test(identifier)) {
     const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
+    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
-      `Names can only contain lowercase letters, numbers, hyphens, and underscores.\n` +
-      `Examples: claude, github-codespaces, e2b\n\n` +
-      `Run '${listCmd}' to see all available options.`
+      `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names can only contain:\n` +
+      `  • Lowercase letters (a-z)\n` +
+      `  • Numbers (0-9)\n` +
+      `  • Hyphens (-) and underscores (_)\n\n` +
+      `Examples of valid names:\n` +
+      `  • claude\n` +
+      `  • github-codespaces\n` +
+      `  • e2b\n\n` +
+      `To see all available ${entityType}s, run: ${listCmd}`
     );
   }
 
   // Prevent path traversal patterns (defense in depth)
   if (identifier.includes("..") || identifier.includes("/") || identifier.includes("\\")) {
     const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
+    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
-      `The name contains special characters that aren't allowed.\n` +
-      `Path-like characters ('/', '\\', '..') cannot be used.\n\n` +
-      `Run '${listCmd}' to see valid names.`
+      `The name contains path-like characters that aren't allowed:\n` +
+      `  • Forward slashes (/)\n` +
+      `  • Backslashes (\\)\n` +
+      `  • Parent directory references (..)\n\n` +
+      `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names must be simple identifiers without paths.\n\n` +
+      `To see all available ${entityType}s, run: ${listCmd}`
     );
   }
 }
@@ -226,9 +241,11 @@ export function validatePrompt(prompt: string): void {
   if (prompt.length > MAX_PROMPT_LENGTH) {
     const lengthKB = (prompt.length / 1024).toFixed(1);
     throw new Error(
-      `Prompt is too long (${lengthKB}KB, maximum is 10KB).\n\n` +
-      `For longer prompts, use a file instead:\n` +
-      `  spawn <agent> <cloud> --prompt-file instructions.txt`
+      `Your prompt is too long (${lengthKB}KB, maximum is 10KB).\n\n` +
+      `For longer instructions, save them to a file instead:\n\n` +
+      `  1. Save your prompt: echo "Your long instructions..." > instructions.txt\n` +
+      `  2. Use the file: spawn <agent> <cloud> --prompt-file instructions.txt\n\n` +
+      `This also makes it easier to edit and reuse your prompts.`
     );
   }
 
@@ -245,11 +262,14 @@ export function validatePrompt(prompt: string): void {
   for (const { pattern, description, suggestion } of dangerousPatterns) {
     if (pattern.test(prompt)) {
       throw new Error(
-        `Your prompt contains shell syntax that can't be safely processed.\n\n` +
-        `Issue: ${description}\n` +
-        `Suggestion: ${suggestion}\n\n` +
-        `Remember: Describe what you want the agent to do in plain language.\n` +
-        `The agent will write the actual shell commands for you.`
+        `Your prompt contains shell syntax that can't be safely passed to the agent.\n\n` +
+        `Issue: ${description}\n\n` +
+        `${suggestion}\n\n` +
+        `Important: You don't need to write shell commands in your prompt!\n` +
+        `Just describe what you want in plain English, and the agent will write the code for you.\n\n` +
+        `Example:\n` +
+        `  Instead of: "Fix $(ls -la)"\n` +
+        `  Write: "Fix the directory listing issues"`
       );
     }
   }
