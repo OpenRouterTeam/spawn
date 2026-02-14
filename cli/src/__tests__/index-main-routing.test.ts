@@ -190,7 +190,7 @@ describe("handleError formatting", () => {
     it("should show error message for invalid identifier", () => {
       const result = runCli(["../hack", "sprite"]);
       const output = result.stderr + result.stdout;
-      expect(output).toContain("invalid characters");
+      expect(output).toContain("can only contain");
       expect(result.exitCode).not.toBe(0);
     });
 

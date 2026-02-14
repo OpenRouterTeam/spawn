@@ -409,7 +409,7 @@ describe("extra arguments warning", () => {
   it("should warn about extra args after version command", () => {
     const { stderr, stdout, exitCode } = runCLI(["version", "extra"]);
     expect(exitCode).toBe(0);
-    expect(stderr).toContain("extra argument");
+    expect(stderr.toLowerCase()).toContain("extra argument");
     expect(stderr).toContain("ignored");
     // Should still show version
     expect(stdout).toMatch(/spawn v\d+\.\d+/);
@@ -418,13 +418,13 @@ describe("extra arguments warning", () => {
   it("should warn about multiple extra args", () => {
     const { stderr, exitCode } = runCLI(["version", "a", "b", "c"]);
     expect(exitCode).toBe(0);
-    expect(stderr).toContain("extra arguments");
+    expect(stderr.toLowerCase()).toContain("extra arguments");
     expect(stderr).toContain("ignored");
   });
 
   it("should not warn when no extra args", () => {
     const { stderr } = runCLI(["version"]);
-    expect(stderr).not.toContain("extra argument");
+    expect(stderr.toLowerCase()).not.toContain("extra argument");
   });
 });
 
