@@ -323,8 +323,12 @@ _respond_get() {
     elif [ "$HAS_ID_SUFFIX" = "false" ]; then
         local FIXTURE_NAME_BASE
         FIXTURE_NAME_BASE=$(echo "$FIXTURE_NAME" | sed 's|_[0-9a-f-]*$||')
-        _try_fixture "$FIXTURE_NAME_BASE" || printf '{}'
+        if ! _try_fixture "$FIXTURE_NAME_BASE"; then
+            echo "NO_FIXTURE:GET:${EP_CLEAN}:${FIXTURE_NAME}" >> "${MOCK_LOG}"
+            printf '{}'
+        fi
     else
+        # ID-suffixed GET (e.g., /servers/12345) — use synthetic for status polling
         _synthetic_active_response
     fi
 }
@@ -338,6 +342,7 @@ _respond_post() {
             if _try_fixture "create_server"; then
                 :
             else
+                echo "NO_FIXTURE:POST:${EP_CLEAN}:create_server" >> "${MOCK_LOG}"
                 case "$MOCK_CLOUD" in
                     hetzner)      printf '{"server":{"id":99999,"name":"test-srv","public_net":{"ipv4":{"ip":"10.0.0.1"}}},"action":{"id":1,"status":"running"}}' ;;
                     digitalocean) printf '{"droplet":{"id":12345678,"name":"test-srv","status":"new","networks":{"v4":[{"ip_address":"10.0.0.1","type":"public"}]}}}' ;;
@@ -632,13 +637,20 @@ assert_cloud_api_calls() {
 }
 
 # Write pass/fail result to RESULTS_FILE if set.
-# Args: cloud agent result ("pass" or "fail", or "auto" to compute from _pre_failed)
+# Args: cloud agent result [reason]
+# Result format: cloud/agent:pass or cloud/agent:fail[:reason]
+# Reasons: exit_code, missing_api_call, missing_env, no_fixture
 record_test_result() {
     local cloud="$1"
     local agent="$2"
     local result="$3"
+    local reason="${4:-}"
     [[ -n "${RESULTS_FILE:-}" ]] || return 0
-    printf '%s/%s:%s\n' "${cloud}" "${agent}" "${result}" >> "${RESULTS_FILE}"
+    if [[ -n "$reason" ]]; then
+        printf '%s/%s:%s:%s\n' "${cloud}" "${agent}" "${result}" "${reason}" >> "${RESULTS_FILE}"
+    else
+        printf '%s/%s:%s\n' "${cloud}" "${agent}" "${result}" >> "${RESULTS_FILE}"
+    fi
 }
 
 # ============================================================
@@ -679,11 +691,22 @@ run_test() {
         return 0
     fi
 
-    # Normal mode: run standard assertions
+    # Normal mode: run standard assertions and track which ones fail
+    local _fail_before_exit=$FAILED
     assert_exit_code "${exit_code}" 0 "exits successfully"
+    local _exit_failed=$(( FAILED - _fail_before_exit ))
+
+    local _fail_before_api=$FAILED
     assert_cloud_api_calls "$cloud"
+    local _api_failed=$(( FAILED - _fail_before_api ))
+
+    local _fail_before_ssh=$FAILED
     assert_log_contains "ssh " "uses SSH"
+    local _ssh_failed=$(( FAILED - _fail_before_ssh ))
+
+    local _fail_before_env=$FAILED
     assert_env_injected "OPENROUTER_API_KEY"
+    local _env_failed=$(( FAILED - _fail_before_env ))
 
     if [[ "${MOCK_VALIDATE_BODY:-}" == "1" ]]; then
         assert_no_body_errors
@@ -692,10 +715,29 @@ run_test() {
         assert_server_cleaned_up "${state_file}"
     fi
 
-    # Record result
+    # Check for missing fixtures
+    local _has_no_fixture=0
+    if grep -q "NO_FIXTURE:" "${MOCK_LOG}" 2>/dev/null; then
+        _has_no_fixture=1
+    fi
+
+    # Record result with failure category
     local pre_fail=$((FAILED - _pre_failed))
     if [[ "$pre_fail" -gt 0 ]]; then
-        record_test_result "${cloud}" "${agent}" "fail"
+        # Determine primary failure reason (priority order)
+        local _reason="unknown"
+        if [[ "$_has_no_fixture" -gt 0 ]]; then
+            _reason="no_fixture"
+        elif [[ "$_exit_failed" -gt 0 ]]; then
+            _reason="exit_code"
+        elif [[ "$_api_failed" -gt 0 ]]; then
+            _reason="missing_api_call"
+        elif [[ "$_env_failed" -gt 0 ]]; then
+            _reason="missing_env"
+        elif [[ "$_ssh_failed" -gt 0 ]]; then
+            _reason="missing_ssh"
+        fi
+        record_test_result "${cloud}" "${agent}" "fail" "${_reason}"
     else
         record_test_result "${cloud}" "${agent}" "pass"
     fi
