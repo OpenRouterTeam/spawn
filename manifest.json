@@ -1348,7 +1348,7 @@
     "hostkey/gemini-cli": "missing",
     "hostkey/amazonq": "missing",
     "hostkey/cline": "implemented",
-    "hostkey/gptme": "missing",
+    "hostkey/gptme": "implemented",
     "hostkey/opencode": "missing",
     "hostkey/plandex": "missing",
     "hostkey/kilo": "missing",
