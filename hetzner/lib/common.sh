@@ -320,6 +320,26 @@ _hetzner_check_create_error() {
     return 1
 }
 
+# Helper: Log validation error details
+_hetzner_log_validation_error() {
+    local err_info="$1" server_type="$2" location="$3"
+    if echo "$err_info" | grep -q "unknown_type"; then
+        log_error "Server type '$server_type' does not exist"
+    else
+        log_error "Server type '$server_type' is not available in '$location' and no compatible alternative was found"
+    fi
+    log_error "Run without HETZNER_SERVER_TYPE to see available types for this location"
+}
+
+# Helper: Handle fallback type swap logging
+_hetzner_log_type_change() {
+    local fallback_info="$1" server_type="$2" location="$3" validated_type="$4"
+    if echo "$fallback_info" | grep -q "^FALLBACK:"; then
+        log_warn "'$server_type' is not available in '$location'"
+        log_warn "Using compatible alternative: $validated_type"
+    fi
+}
+
 # Validate server type at location, handling errors and fallback logging.
 # On success, prints the (possibly replaced) server type name.
 # On failure, logs user-friendly errors and returns 1.
@@ -332,21 +352,13 @@ _hetzner_resolve_server_type() {
         local err_info
         err_info=$(cat "$stderr_output")
         rm -f "$stderr_output"
-        if echo "$err_info" | grep -q "unknown_type"; then
-            log_error "Server type '$server_type' does not exist"
-        else
-            log_error "Server type '$server_type' is not available in '$location' and no compatible alternative was found"
-        fi
-        log_error "Run without HETZNER_SERVER_TYPE to see available types for this location"
+        _hetzner_log_validation_error "$err_info" "$server_type" "$location"
         return 1
     }
     local fallback_info
     fallback_info=$(cat "$stderr_output")
     rm -f "$stderr_output"
-    if echo "$fallback_info" | grep -q "^FALLBACK:"; then
-        log_warn "'$server_type' is not available in '$location'"
-        log_warn "Using compatible alternative: $validated_type"
-    fi
+    _hetzner_log_type_change "$fallback_info" "$server_type" "$location" "$validated_type"
     printf '%s' "$validated_type"
 }
 

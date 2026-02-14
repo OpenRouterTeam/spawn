@@ -908,22 +908,15 @@ _await_oauth_callback() {
     cat "${code_file}"
 }
 
-try_oauth_flow() {
-    local callback_port=${1:-5180}
-
-    log_step "Attempting OAuth authentication..."
-
-    if ! _check_oauth_prerequisites; then
-        return 1
-    fi
+# Helper: Start OAuth server and get session details
+# Returns: "port|pid|oauth_dir" on success, "" on failure
+_start_oauth_session_with_server() {
+    local callback_port="${1}"
 
     local oauth_dir
     oauth_dir=$(_init_oauth_session)
     local code_file="${oauth_dir}/code"
-    local csrf_state
-    csrf_state=$(cat "${oauth_dir}/state")
 
-    # Start server
     local actual_port
     actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${oauth_dir}/port" "${oauth_dir}/state") || {
         cleanup_oauth_session "" "${oauth_dir}"
@@ -933,9 +926,30 @@ try_oauth_flow() {
     local server_pid
     server_pid=$(pgrep -f "start_oauth_server" | tail -1)
 
+    echo "${actual_port}|${server_pid}|${oauth_dir}"
+}
+
+try_oauth_flow() {
+    local callback_port=${1:-5180}
+
+    log_step "Attempting OAuth authentication..."
+
+    if ! _check_oauth_prerequisites; then
+        return 1
+    fi
+
+    local session_info
+    session_info=$(_start_oauth_session_with_server "${callback_port}") || return 1
+
+    local actual_port server_pid oauth_dir
+    IFS='|' read -r actual_port server_pid oauth_dir <<< "${session_info}"
+
+    local csrf_state
+    csrf_state=$(cat "${oauth_dir}/state")
+
     # Open browser and wait for callback
     local oauth_code
-    oauth_code=$(_await_oauth_callback "${code_file}" "${server_pid}" "${oauth_dir}" "${actual_port}" "${csrf_state}") || return 1
+    oauth_code=$(_await_oauth_callback "${oauth_dir}/code" "${server_pid}" "${oauth_dir}" "${actual_port}" "${csrf_state}") || return 1
     cleanup_oauth_session "${server_pid}" "${oauth_dir}"
 
     # Exchange code for API key
