@@ -820,8 +820,9 @@ _generate_csrf_state() {
     elif [[ -r /dev/urandom ]]; then
         od -An -N16 -tx1 /dev/urandom | tr -d ' \n'
     else
-        # Fallback: use timestamp + random
-        printf '%s%04x%04x' "$(date +%s)" $RANDOM $RANDOM
+        log_error "Cannot generate secure CSRF token: neither openssl nor /dev/urandom available"
+        log_error "Install openssl or ensure /dev/urandom is readable"
+        return 1
     fi
 }
 
@@ -2120,9 +2121,12 @@ upload_config_file() {
 
     printf '%s\n' "${content}" > "${temp_file}"
 
-    local temp_remote="/tmp/spawn_config_${RANDOM}_${RANDOM}_$(basename "${remote_path}")"
+    # Use mktemp-derived randomness for the remote temp path to avoid predictable names
+    local rand_suffix
+    rand_suffix=$(basename "${temp_file}")
+    local temp_remote="/tmp/spawn_config_${rand_suffix}"
     ${upload_callback} "${temp_file}" "${temp_remote}"
-    ${run_callback} "mv '${temp_remote}' '${remote_path}'"
+    ${run_callback} "chmod 600 '${temp_remote}' && mv '${temp_remote}' '${remote_path}'"
 }
 
 # ============================================================

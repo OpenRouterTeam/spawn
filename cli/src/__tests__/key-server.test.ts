@@ -25,13 +25,16 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 // ── Replicated logic from key-server.ts ──────────────────────────────────────
 
-/** Exact replica of validKeyVal from key-server.ts (lines 303-310) */
+/** Exact replica of validKeyVal from key-server.ts (lines 303-312) */
 function validKeyVal(v: string): boolean {
-  if (v.length === 0 || v.length > 4096) return false;
+  // Enforce reasonable length: API keys are typically 20-200 chars
+  if (v.length < 8 || v.length > 512) return false;
   // Block control characters (U+0000-U+001F, U+007F-U+009F)
   if (/[\x00-\x1f\x7f-\x9f]/.test(v)) return false;
   // Block shell metacharacters
   if (/[;&'"<>|$`\\(){}]/.test(v)) return false;
+  // Must be printable ASCII only (API keys don't contain non-ASCII)
+  if (!/^[\x20-\x7e]+$/.test(v)) return false;
   return true;
 }
 
@@ -160,16 +163,20 @@ describe("validKeyVal - API key value validation", () => {
     expect(validKeyVal("")).toBe(false);
   });
 
-  it("should reject strings exceeding 4096 bytes", () => {
-    expect(validKeyVal("a".repeat(4097))).toBe(false);
+  it("should reject strings exceeding 512 bytes", () => {
+    expect(validKeyVal("a".repeat(513))).toBe(false);
   });
 
-  it("should accept string at exactly 4096 bytes", () => {
-    expect(validKeyVal("a".repeat(4096))).toBe(true);
+  it("should accept string at exactly 512 bytes", () => {
+    expect(validKeyVal("a".repeat(512))).toBe(true);
   });
 
-  it("should accept single character", () => {
-    expect(validKeyVal("a")).toBe(true);
+  it("should reject strings shorter than 8 characters", () => {
+    expect(validKeyVal("short")).toBe(false);
+  });
+
+  it("should accept string at exactly 8 characters", () => {
+    expect(validKeyVal("abcd1234")).toBe(true);
   });
 
   // Control character tests
@@ -209,8 +216,8 @@ describe("validKeyVal - API key value validation", () => {
     expect(validKeyVal("key\x9fvalue")).toBe(false);
   });
 
-  it("should accept U+00A0 (non-breaking space, first non-control after C1)", () => {
-    expect(validKeyVal("key\xa0value")).toBe(true);
+  it("should reject U+00A0 (non-ASCII, API keys must be printable ASCII only)", () => {
+    expect(validKeyVal("key\xa0value")).toBe(false);
   });
 
   // Shell metacharacter tests
@@ -292,7 +299,7 @@ describe("validKeyVal - API key value validation", () => {
   });
 
   it("should accept keys with hash (not a shell metachar in values)", () => {
-    expect(validKeyVal("key#tag")).toBe(true);
+    expect(validKeyVal("apikey#tag123")).toBe(true);
   });
 });
 
