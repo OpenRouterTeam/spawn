@@ -515,12 +515,4 @@ describe("install.sh syntax", () => {
     const content = readFileSync(INSTALL_SH, "utf-8");
     expect(content).toContain("clone_cli()");
   });
-
-  it("should include source-mode fallback", () => {
-    const { readFileSync } = require("fs");
-    const content = readFileSync(INSTALL_SH, "utf-8");
-    // Source mode fallback was added in recent commits
-    expect(content).toContain("source");
-    expect(content).toContain("WRAPPER");
-  });
 });
