@@ -1,0 +1,10 @@
+[
+  {
+    "id": "1773d9a7-fec1-4478-b45a-665e39528c79",
+    "name": "Default (lon1)",
+    "default": true,
+    "region": "lon1",
+    "label": "default",
+    "status": "Active"
+  }
+]

@@ -254,7 +254,9 @@ _strip_api_base() {
         https://api.civo.com/v2*)           ENDPOINT="${URL#https://api.civo.com/v2}" ;;
         https://api.upcloud.com/1.3*)       ENDPOINT="${URL#https://api.upcloud.com/1.3}" ;;
         https://api.binarylane.com.au/v2*)  ENDPOINT="${URL#https://api.binarylane.com.au/v2}" ;;
-        https://api.scaleway.com/*)         ENDPOINT=$(echo "$URL" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||') ;;
+        https://api.scaleway.com/instance/v1/zones/*) ENDPOINT=$(echo "$URL" | sed 's|https://api.scaleway.com/instance/v1/zones/[^/]*/||') ;;
+        https://api.scaleway.com/account/v3*) ENDPOINT="${URL#https://api.scaleway.com/account/v3}" ;;
+        https://api.scaleway.com/*)         ENDPOINT=$(echo "$URL" | sed 's|https://api.scaleway.com/[^/]*/[^/]*/||') ;;
         https://api.genesiscloud.com/compute/v1*) ENDPOINT="${URL#https://api.genesiscloud.com/compute/v1}" ;;
         https://console.kamatera.com/svc*)  ENDPOINT="${URL#https://console.kamatera.com/svc}" ;;
         https://api.latitude.sh*)           ENDPOINT="${URL#https://api.latitude.sh}" ;;
@@ -306,6 +308,8 @@ _synthetic_active_response() {
         linode)       printf '{"id":12345678,"label":"test-srv","status":"running","ipv4":["10.0.0.1"]}' ;;
         hetzner)      printf '{"server":{"id":99999,"name":"test-srv","status":"running","public_net":{"ipv4":{"ip":"10.0.0.1"}}}}' ;;
         lambda)       printf '{"data":{"id":"test-uuid-1234","name":"test-srv","status":"active","ip":"10.0.0.1"}}' ;;
+        civo)         printf '{"id":"test-uuid-1234","hostname":"test-srv","status":"ACTIVE","public_ip":"10.0.0.1","size":"g4s.small"}' ;;
+        scaleway)     printf '{"server":{"id":"test-uuid-1234","name":"test-srv","state":"running","public_ip":{"address":"10.0.0.1"},"public_ips":[{"address":"10.0.0.1"}]}}' ;;
         *)            printf '{}' ;;
     esac
 }
