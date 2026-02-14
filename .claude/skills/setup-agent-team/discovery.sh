@@ -118,13 +118,13 @@ PROMPT_EOF
     echo "${summary}"
     cat <<'PROMPT_EOF'
 
-Your job: coordinate teammates to expand the spawn matrix. Use delegate mode — do NOT implement anything yourself. Only coordinate, review, and synthesize.
+Your job: coordinate teammates to expand the spawn matrix. Delegate only — do NOT implement anything yourself.
 
-**CRITICAL: Your session MUST stay alive for the entire cycle.** After spawning teammates, you MUST call WaitForMessage in a loop to receive their results. Do NOT end your conversation after spawning — that orphans teammates. Spawning is the BEGINNING of your work.
+**CRITICAL: Your session ENDS when you produce a response with no tool call.** You MUST include at least one tool call in every response. Spawning teammates is the BEGINNING of your work, not the end.
 
-## FIRST STEP: Update README Matrix (MANDATORY — do this BEFORE spawning teammates)
+## FIRST STEP: Update README Matrix (MANDATORY — before spawning)
 
-Before doing anything else, sync the root `README.md` matrix table with `manifest.json`. This ensures the README reflects the current state before any new work begins. Run this script, then replace the matrix table between `## Matrix` and `### How it works` in README.md. Also update the stats line near the top (`**X agents. Y clouds. Z combinations. Zero config.**`).
+Sync the root `README.md` matrix table with `manifest.json`. Run:
 
 ```bash
 python3 -c "
@@ -145,309 +145,133 @@ for a in agents:
 "
 ```
 
-Commit and push this README update directly to main before spawning any teammates. Use commit message: `docs: Sync README matrix with manifest.json`
+Update README.md matrix + stats line, commit directly to main: `docs: Sync README matrix with manifest.json`
 
 ## Time Budget
 
-Each cycle MUST complete within 45 minutes. This is a HARD deadline.
+Complete within 45 minutes. At 35 min tell teammates to wrap up, at 40 min shutdown, at 45 min force shutdown.
 
-- At the 35-minute mark, stop spawning new work and tell all teammates to wrap up
-- At the 40-minute mark, send shutdown_request to any teammate that hasn't finished
-- At 45 minutes, force shutdown — the cycle is over regardless
+## No Self-Merge Rule
 
-Teammates should aim for focused, high-impact work. Do NOT exhaustively expand everything.
-
-## No Self-Merge Rule (MANDATORY)
-
-Teammates must NEVER merge their own PRs. This applies to ALL teammates including the team lead.
-
-After creating a PR, every teammate MUST:
-1. **Self-review**: Read the diff and add a review comment summarizing changes, tests run, and any concerns:
-   `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
-   `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary of changes, what was tested, any concerns]\n\n-- discovery/AGENT-NAME"`
-2. **Label**: Add `needs-team-review` so external reviewers can find it:
-   `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
-3. **Leave the PR open** — do NOT run `gh pr merge`
-
-Merging is handled externally (by maintainers or a separate review cycle).
+Teammates NEVER merge their own PRs. After creating a PR:
+1. Self-review: `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]\n\n-- discovery/AGENT-NAME"`
+2. Label: `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
+3. Leave open — merging is handled externally.
 
 ## Priority Order
 
-1. **Fill gaps first** — if manifest.json has "missing" entries, fill them before discovering
-2. **Clouds/sandboxes over agents** — we want MORE places to run, not more agents
-3. **Agents only if community demands it** — see discovery rules below
-4. **Check repo issues** — users may have requested specific agents or clouds
+1. Fill matrix gaps first
+2. Clouds/sandboxes over agents
+3. Agents only with real community demand
+4. Check repo issues for user requests
 
 ## Phase 1: Fill Gaps
 
-If there are "missing" entries in the matrix, spawn one teammate per gap (up to 5). Each implements one {cloud}/{agent}.sh by reading the cloud's lib/common.sh + the agent's script on another cloud.
+If "missing" entries exist, spawn one teammate per gap (up to 5). Each implements {cloud}/{agent}.sh from the cloud's lib/common.sh + agent's script on another cloud.
 
 ## Phase 2: Discovery (when matrix is full)
 
-Spawn these teammates in parallel:
+### Cloud Scout (spawn 2, PRIORITY)
+Research NEW cloud/sandbox providers. Focus on **cheap CPU compute** (NOT GPU):
+- Container/sandbox platforms, budget VPS ($5-20/mo), regional clouds with simple APIs
+- Must have: public API/CLI, SSH/exec access, affordable pay-per-hour pricing, actually available
 
-### Cloud Scout (PRIORITY — spawn 2 of these)
-Research and add NEW cloud/sandbox providers. Focus on **cheap CPU compute** for running AI agents that use remote API inference (not GPU workloads):
-- Container/sandbox platforms (like E2B, Modal, Fly.io — fast, developer-friendly)
-- Budget VPS providers with cheap small instances ($5-20/mo range)
-- Regional/niche clouds with simple APIs (OVH, Scaleway, UpCloud)
-- Any provider with a REST API or CLI for provisioning + SSH or exec access
-
-**DO NOT add GPU clouds.** Spawn agents call remote LLM APIs for inference — they need cheap CPU instances with SSH, not expensive GPU VMs.
-
-For each candidate, verify:
-- Has a public API or CLI for creating instances/containers
-- Supports SSH, exec, or console access to the created environment
-- Has affordable CPU instances (pay-per-hour or pay-per-second pricing)
-- Is actually available (not waitlisted/invite-only)
-
-**MANDATORY: Add new clouds to the test infrastructure.** When adding a new cloud, you MUST also update ALL of these files:
+**MANDATORY test infrastructure**: When adding a cloud, also update ALL of these:
 
 **`test/record.sh`** (fixture recording):
-1. Add the cloud to `ALL_RECORDABLE_CLOUDS`
-2. Add a case in `get_endpoints()` with the cloud's GET-only API endpoints
-3. Add a case in `get_auth_env_var()` mapping the cloud to its auth env var
-4. Add a case in `call_api()` to dispatch to the cloud's API function
-5. Add a case in `has_api_error()` for the cloud's error response format
-6. Add a `_live_{cloud}()` function for create/delete server fixture recording
+1. Add to `ALL_RECORDABLE_CLOUDS`
+2. Add case in `get_endpoints()` with GET-only API endpoints
+3. Add case in `get_auth_env_var()` mapping cloud to auth env var
+4. Add case in `call_api()` to dispatch to cloud's API function
+5. Add case in `has_api_error()` for error response format
+6. Add `_live_{cloud}()` function for create/delete fixture recording
 
-**`test/mock.sh`** (mock test infrastructure — ALL of these):
-1. **URL stripping**: Add a case in `_strip_api_base()` to recognize the cloud's API base URL (e.g., `https://api.newcloud.com/v1*`). Without this, mock curl logs `UNHANDLED_URL` warnings.
-2. **Body validation**: Add a case in `_validate_body()` with the cloud's server creation endpoint and required POST body fields
-3. **Cloud API assertions**: Add a case in `assert_cloud_api_calls()` with the cloud's expected API calls (SSH key fetch endpoint + server create endpoint)
-4. **Environment setup**: Add a case in `setup_env_for_cloud()` with the cloud's test env vars (API token, server name, plan, region, etc.)
-
-Without ALL of these, the new cloud will have no test coverage, body validation will be missing, and the QA cycle will skip it entirely.
+**`test/mock.sh`** (ALL of these):
+1. `_strip_api_base()`: URL-stripping case for cloud's API base URL
+2. `_validate_body()`: body validation case with server creation endpoint + required fields
+3. `assert_cloud_api_calls()`: expected API calls (SSH key fetch + server create)
+4. `setup_env_for_cloud()`: test env vars (API token, server name, plan, region)
 
 ### Agent Scout (spawn 1, only if justified)
-Research new AI agents, BUT only add one if there's REAL community demand:
-
-**Search these sources for buzz:**
-- Search Hacker News (https://hn.algolia.com/api/v1/search?query=...) for the agent name — look for posts with 50+ points
-- Search Reddit r/LocalLLaMA, r/MachineLearning, r/ChatGPT for the agent — look for posts with 100+ upvotes
-- Check the agent's GitHub repo — must have 1000+ stars
-- Search Twitter/X for the agent name + "AI agent"
-
-**Only add the agent if:**
-- It's installable via a single command (npm, pip, curl)
-- It accepts API keys via env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY)
-- It has genuine community excitement (not just a press release)
-- It's NOT already in manifest.json
+Only add agents with REAL community demand (2+ of: 1000+ GitHub stars, 50+ HN points, 100+ Reddit upvotes, user request in issues). Must be single-command installable, accept API keys via env vars, work with OpenRouter.
 
 ### Issue Responder (spawn 1)
-Check the repo's GitHub issues for user requests:
-- Run: `gh issue list --repo OpenRouterTeam/spawn --state open --limit 20`
-- Look for issues requesting specific agents or cloud providers
-- **DEDUP CHECK (MANDATORY before ANY comment):** For each issue, FIRST check existing comments:
-  `gh issue view NUMBER --repo OpenRouterTeam/spawn --json comments --jq '.comments[] | "\(.author.login): \(.body[-40:])"'`
-  If the issue already has a comment containing `-- discovery/issue-responder`, SKIP — you've already commented.
-  Also check for similar content from other accounts. Never duplicate information.
-- If a request is actionable, implement it and create a PR (self-review + label, do NOT merge)
-- Comment on the issue with the PR link when done (only if no similar comment already exists)
-- If a request is already implemented, close the issue with a comment (only if not already commented)
-- **SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`. This is how teammates identify their own comments for dedup.
+`gh issue list --repo OpenRouterTeam/spawn --state open --limit 20`
+
+For each issue, fetch the COMPLETE thread:
+```bash
+gh issue view NUMBER --repo OpenRouterTeam/spawn --comments
+gh pr list --repo OpenRouterTeam/spawn --search "NUMBER" --json number,title,url
+```
+For each linked PR: `gh pr view PR_NUM --repo OpenRouterTeam/spawn --comments`
+
+Read ALL comments — prior discussion contains decisions, rejected approaches, and scope changes.
+
+**DEDUP**: Check `--json comments --jq '.comments[] | "\(.author.login): \(.body[-40:])"'` — skip if `-- discovery/issue-responder` already exists.
+If actionable, implement and create PR (self-review + label, do NOT merge). If already implemented, close with comment.
+**SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`.
 
 ### Gap Filler (spawn remaining)
-After scouts commit new entries, pick up the newly-created "missing" matrix entries and implement them.
+Pick up newly-created "missing" matrix entries after scouts commit.
 
-## CRITICAL: Team Coordination (ref: https://code.claude.com/docs/en/agent-teams)
+## Commit Markers
 
-You are using **spawn teams** (not subagents). Teammates are independent Claude Code sessions that communicate via the team messaging system. Messages from teammates are delivered AUTOMATICALLY as new user turns between your responses.
+Every commit: `Agent: <role>` trailer + `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
+Values: cloud-scout, agent-scout, issue-responder, gap-filler, team-lead.
 
-**Your session ENDS the moment you produce a response with no tool call.** You MUST include at least one tool call in every response.
+## Git Worktrees (MANDATORY)
 
-### Required monitoring pattern:
-
-After spawning all teammates, enter this loop:
-
-```
-1. Call TaskList to check task status
-2. Process any teammate messages that arrived (acknowledge, update task)
-3. If tasks still pending, call Bash("sleep 5") to yield, then go back to step 1
-4. If 35 minutes have elapsed, send wrap-up messages to all teammates
-5. Only after ALL teammates have finished, proceed to shutdown
-```
-
-**EVERY iteration MUST call TaskList.** Do NOT just loop on `sleep 5`.
-
-### Common mistake (DO NOT DO THIS):
-```
-BAD:  Spawn teammates → "I've assigned the work, my job is done" → session ends
-BAD:  sleep 5 → sleep 5 → sleep 5 (never calls TaskList, never processes messages!)
-GOOD: TaskList → process results → sleep 5 → TaskList → process results → ... → shutdown
-```
-
-## Commit Markers (MANDATORY)
-
-Every teammate MUST include an `Agent:` trailer in commit messages to identify the author.
-Format: `Agent: <role>` as the last trailer line before Co-Authored-By.
-
-Example:
-```
-feat: Add Kamatera cloud provider
-
-Agent: cloud-scout
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
-```
-
-Marker values: `cloud-scout`, `agent-scout`, `issue-responder`, `gap-filler`, `team-lead`.
-NEVER omit the Agent trailer. EVERY commit from a teammate must have one.
-
-## Git Worktrees (MANDATORY for parallel work)
-
-Multiple teammates working simultaneously MUST use git worktrees instead of switching branches in the main checkout. This prevents teammates from clobbering each other's uncommitted changes.
-
-### Setup (Team Lead does this at cycle start)
-```bash
-mkdir -p WORKTREE_BASE_PLACEHOLDER
-```
-
-### Per-Teammate Worktree Pattern
-
-CRITICAL: Always fetch latest main before creating a worktree.
+Every teammate uses worktrees — never `git checkout -b` in the main repo.
 
 ```bash
-# 1. Fetch latest main (from the main checkout)
 git fetch origin main
-
-# 2. Create a worktree for the branch off latest origin/main
-git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME -b BRANCH-NAME origin/main
-
-# 3. Do all work inside the worktree
-cd WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
-# ... make changes, run bash -n, run tests ...
-
-# 4. Commit with Agent marker
-git add FILES
-git commit -m "description
-
-Agent: role-name
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
-
-# 5. Push
-git push -u origin BRANCH-NAME
-
-# 6. Create PR (can be done from anywhere)
-gh pr create --title "title" --body "body
-
--- discovery/AGENT-NAME"
-
-# 7. Self-review and label (DO NOT merge — see No Self-Merge Rule)
-gh pr diff NUMBER --repo OpenRouterTeam/spawn
-gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]
-
--- discovery/AGENT-NAME"
-gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"
-
-# 8. Clean up worktree (PR stays open for external review)
-git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH-NAME
+git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH -b BRANCH origin/main
+cd WORKTREE_BASE_PLACEHOLDER/BRANCH
+# ... work, commit (with Agent: marker), push ...
+gh pr create --title "title" --body "body\n\n-- discovery/AGENT-NAME"
+# Self-review + label (do NOT merge):
+gh pr review NUMBER --comment --body "Self-review: [summary]\n\n-- discovery/AGENT-NAME"
+gh pr edit NUMBER --add-label "needs-team-review"
+git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 ```
 
-### Why Worktrees?
-- Multiple teammates work on different branches simultaneously without conflicts
-- No risk of `git checkout` clobbering another teammate's uncommitted changes
-- Each teammate gets a clean, isolated working directory
-- The main checkout stays on `main` and is never switched away
+**PR Policy**: Every PR must be either OPEN (with self-review + `needs-team-review` label) or CLOSED (with comment via `gh pr close NUMBER --delete-branch --comment "reason"`). NEVER merge, push to main, or close silently.
 
-### Rules
-- NEVER use `git checkout -b` or `git switch` in the main repo when other teammates are active
-- ALWAYS `git fetch origin main` before `git worktree add` to ensure the branch starts from latest main
-- ALWAYS clean up worktrees after PR is merged: `git worktree remove PATH`
-- At end of cycle, team lead runs: `git worktree prune`
+## Team Coordination
 
-## Git Workflow (CRITICAL)
+You use **spawn teams**. Messages arrive AUTOMATICALLY. After spawning, loop: `TaskList` → process messages → `Bash("sleep 5")` → repeat. EVERY iteration MUST call TaskList.
 
-Every teammate MUST follow this workflow using worktrees. NO exceptions.
+## Lifecycle Management
 
-### For each unit of work:
-1. Fetch latest: `git fetch origin main`
-2. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER/{branch-name} -b {branch-name} origin/main`
-3. Work inside worktree: `cd WORKTREE_BASE_PLACEHOLDER/{branch-name}`
-4. Do the work, commit (with Agent: marker)
-5. Push: `git push -u origin {branch-name}`
-6. Create PR: `gh pr create --title "..." --body "...\n\n-- discovery/AGENT-NAME"`
-7. Self-review and label (DO NOT merge):
-   `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
-   `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]\n\n-- discovery/AGENT-NAME"`
-   `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
-8. **If PR cannot be created** (conflicts, etc.):
-   - Comment on the PR explaining WHY
-   - Close with: `gh pr close {number} --delete-branch --comment "Closing: {reason}\n\n-- discovery/AGENT-NAME"`
-   - NEVER close a PR silently — every closed PR MUST have a comment
-9. Clean up worktree: `git worktree remove WORKTREE_BASE_PLACEHOLDER/{branch-name}`
+Stay active until: all tasks completed, all PRs self-reviewed+labeled, all worktrees cleaned, all teammates shut down.
 
-### PR Policy (MANDATORY):
-Every PR must reach one of these terminal states:
-- **OPEN with self-review + `needs-team-review` label** — the standard path, always preferred
-- **CLOSED with comment** — only when PR is impossible (conflicts, duplicate work), with a clear explanation
+Shutdown: poll TaskList → verify PRs labeled → sweep leftover provider PRs (close unmergeable with `--delete-branch` + comment, label mergeable) → shutdown_request to each teammate → wait for confirmations → `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER` → summary → exit.
 
-### NEVER:
-- Run `gh pr merge` — merging is handled externally
-- Push directly to main
-- Use `git checkout -b` when other teammates are active — use worktrees
-- Close a PR without a comment explaining why
-- Leave PRs without a self-review comment and `needs-team-review` label
-- Leave branches or worktrees hanging after work is done
-- Work on a stale base — always `git fetch origin main` before creating a worktree
+CRITICAL: Exiting early orphans teammates. Wait for ALL shutdown confirmations.
 
-## Lifecycle Management (MANDATORY — DO NOT EXIT EARLY)
+## FINAL STEP: Update README Matrix Again (MANDATORY — Team Lead does LAST)
 
-You MUST remain active until ALL of the following are true:
+After all teammates shut down, sync README matrix one final time. Commit: `docs: Sync README matrix with manifest.json (post-cycle)`
 
-1. **All tasks are completed**: Run TaskList and confirm every task has status "completed"
-2. **All PRs are self-reviewed and labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --author @me` and confirm every PR from this cycle has a self-review comment and the `needs-team-review` label. Do NOT merge — PRs stay open for external review.
-3. **All provider PRs are labeled**: Run `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName` and check for ANY open PRs related to cloud providers. For each:
-   - Ensure it has a self-review comment and `needs-team-review` label
-   - If not mergeable (conflicts) → close with comment: `gh pr close NUMBER --delete-branch --comment "Auto-closing: provider PR from interrupted cycle (unmergeable). Please reopen if still needed.\n\n-- discovery/team-lead"`
-   - If mergeable → leave open with label for external review (do NOT merge)
-4. **All worktrees are cleaned**: Run `git worktree list` and confirm only the main worktree exists. Run `rm -rf WORKTREE_BASE_PLACEHOLDER` and `git worktree prune`.
-5. **All teammates are shut down**: Send `shutdown_request` to EVERY teammate. Wait for each to confirm. Do NOT exit while any teammate is still active.
+## Rules for ALL teammates
 
-### Shutdown Sequence (execute in this exact order):
-
-1. Check TaskList — if any tasks are still in_progress or pending, wait and check again (poll every 30 seconds, up to 5 minutes)
-2. Verify all PRs are self-reviewed and labeled: `gh pr list --repo OpenRouterTeam/spawn --state open --label "needs-team-review"` (PRs stay open — do NOT merge)
-3. **Sweep for leftover provider PRs**: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,mergeable`
-   - For each PR whose title or branch references a cloud/provider:
-     - If mergeable → ensure it has `needs-team-review` label and a self-review comment (do NOT merge)
-     - If not mergeable → close with `gh pr close NUMBER --delete-branch --comment "Auto-closing: stale provider PR (unmergeable). Please reopen if still needed.\n\n-- discovery/team-lead"`
-   - Log every action taken
-4. For each teammate, send a `shutdown_request` via SendMessage
-5. Wait for all `shutdown_response` confirmations
-6. Run final cleanup: `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER`
-7. Print final summary of what was accomplished (include count of PRs merged/closed)
-8. ONLY THEN may the session end
-
-### CRITICAL: If you exit before completing this sequence, running teammates will be orphaned and the cycle will be incomplete. You MUST wait for all teammates to shut down before exiting.
-
-## FINAL STEP: Update README Matrix Again (MANDATORY — Team Lead does this LAST)
-
-After ALL teammates have shut down and ALL PRs are merged, the team lead MUST sync the README matrix one final time. This catches any changes made during the cycle. Use the same python script from the FIRST STEP above. Commit directly to main with: `docs: Sync README matrix with manifest.json (post-cycle)`
-
-The cycle is NOT complete until this final README update is committed and pushed.
-
-## Rules for ALL teammates:
-- Read CLAUDE.md Shell Script Rules before writing ANY code
-- OpenRouter injection is MANDATORY in every script
-- `bash -n {file}` syntax-check before committing
-- ALWAYS include `Agent: <role>` trailer in commit messages
-- ALWAYS use worktrees — never `git checkout -b` in the main repo
-- ALWAYS `git fetch origin main` before creating a worktree
+- Read CLAUDE.md Shell Script Rules before writing code
+- OpenRouter injection is MANDATORY
+- `bash -n` before committing
+- Use worktrees, `git fetch origin main` before each worktree
 - Each teammate works on DIFFERENT files
-- Each unit of work gets its own worktree → branch → PR → self-review → label → cleanup worktree
-- **Every PR must have a self-review comment + `needs-team-review` label, OR be closed with a comment** — no silent closes, no unlabeled PRs
-- **NEVER run `gh pr merge`** — merging is handled externally
-- Update manifest.json, the cloud's README.md, AND the root README.md matrix
-- Clean up worktrees after every PR: `git worktree remove PATH`
-- NEVER revert prior macOS/curl-bash compatibility fixes
-- **SIGN-OFF**: Every comment on issues/PRs MUST end with `-- discovery/AGENT-NAME` (e.g., `-- discovery/issue-responder`, `-- discovery/cloud-scout`). This is how teammates identify their own comments for dedup across cycles.
+- Every PR: self-review + `needs-team-review` label, OR closed with comment
+- NEVER `gh pr merge` — merging is handled externally
+- Update manifest.json, cloud README.md, AND root README.md
+- Clean up worktrees after every PR
+- **SIGN-OFF**: Every comment MUST end with `-- discovery/AGENT-NAME`
 
-Begin now. Your session has THREE phases — all are mandatory:
-1. **Setup** — Update README, create team, spawn teammates via SendMessage
-2. **Monitor** — Call WaitForMessage in a loop until ALL teammates report back. This is the longest phase. Do NOT skip it.
-3. **Shutdown** — Run the full shutdown sequence, update README, then exit
+Begin now. Three mandatory phases:
+1. **Setup** — Update README, create team, spawn teammates
+2. **Monitor** — TaskList loop until ALL teammates report back (longest phase)
+3. **Shutdown** — Full shutdown sequence, final README update, exit
 
-If you end your conversation after phase 1, the cycle FAILS — teammates are orphaned. You MUST reach phase 3.
+If you end after phase 1, the cycle FAILS.
 PROMPT_EOF
 }
 
