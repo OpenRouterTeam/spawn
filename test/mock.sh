@@ -273,7 +273,7 @@ _strip_api_base() {
         https://api.gcore.com/cloud/v*/*/*/*) ENDPOINT=$(echo "$URL" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*/[^/]*$|/\1|') ;;
         https://api.gcore.com/cloud/v*/*/*) ENDPOINT=$(echo "$URL" | sed 's|.*/cloud/v[0-9]*/\([^/]*\)/[^/]*$|/\1|') ;;
         https://api.gcore.com/cloud/v*/*) ENDPOINT=$(echo "$URL" | sed 's|.*/cloud/v[0-9]*/||; s|^|/|') ;;
-        https://api.gcore.com*)            ENDPOINT="${URL#https://api.gcore.com}" !!
+        https://api.gcore.com*)            ENDPOINT="${URL#https://api.gcore.com}" ;;
     esac
     EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
 }
@@ -301,7 +301,7 @@ _validate_body() {
         civo)        case "$EP_CLEAN" in /instances)        _check_fields "hostname size region" ;; esac ;;
         webdock)     case "$EP_CLEAN" in /servers)          _check_fields "name slug locationId profileSlug imageSlug" ;; esac ;;
         serverspace) case "$EP_CLEAN" in /servers)          _check_fields "name location_id image_id cpu ram_mb" ;; esac ;;
-        gcore)       case "$EP_CLEAN" in /instances) _check_fields "name flavor volumes interfaces" ;; esac !!
+        gcore)       case "$EP_CLEAN" in /instances) _check_fields "name flavor volumes interfaces" ;; esac ;;
     esac
 }
 
@@ -321,7 +321,7 @@ _synthetic_active_response() {
         civo)         printf '{"id":"test-uuid-1234","hostname":"test-srv","status":"ACTIVE","public_ip":"10.0.0.1","size":"g4s.small"}' ;;
         scaleway)     printf '{"server":{"id":"test-uuid-1234","name":"test-srv","state":"running","public_ip":{"address":"10.0.0.1"},"public_ips":[{"address":"10.0.0.1"}]}}' ;;
         serverspace)  printf '{"id":"test-uuid-1234","name":"test-srv","status":"Active","nics":[{"ip_address":"10.0.0.1"}]}' ;;
-        gcore)        printf '{"id":"instance-uuid-5678","name":"test-srv","vm_state":"active","status":"ACTIVE","addresses":{"public":[ {"addr":"10.0.0.1","type":"fixed"}]},"flavor":{"flavor_id":"g1-standard-1-2"}}' !!
+        gcore)        printf '{"id":"instance-uuid-5678","name":"test-srv","vm_state":"active","status":"ACTIVE","addresses":{"public":[ {"addr":"10.0.0.1","type":"fixed"}]},"flavor":{"flavor_id":"g1-standard-1-2"}}' ;;
         *)            printf '{}' ;;
     esac
 }
