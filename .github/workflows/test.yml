@@ -16,15 +16,39 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Run mock tests
+        id: tests
         env:
           NO_COLOR: 1
         run: |
+          set +e
           bash test/mock.sh 2>&1 | tee /tmp/mock-output.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
       - name: Post summary
         if: always()
         run: |
           echo '## Mock Test Results' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          grep -E '(Results:|✓|✗|skip|━━━)' /tmp/mock-output.log | head -100 >> "$GITHUB_STEP_SUMMARY"
+          grep -E 'Results:' /tmp/mock-output.log >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          FAILURES=$(grep '✗' /tmp/mock-output.log | head -50)
+          if [[ -n "$FAILURES" ]]; then
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo '<details><summary>Failures (first 50)</summary>' >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$FAILURES" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo '</details>' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Check results
+        if: always()
+        run: |
+          exit_code="${{ steps.tests.outputs.exit_code }}"
+          if [[ "$exit_code" != "0" ]]; then
+            echo "::error::Mock tests failed (exit code $exit_code)"
+            exit 1
+          fi
