@@ -32,6 +32,7 @@ Get your credentials at: [CloudSigma Cloud Portal](https://zrh.cloudsigma.com/) 
 
 - `cloudsigma/claude` — Claude Code (Anthropic's CLI agent)
 - `cloudsigma/aider` — Aider (AI pair programming)
+- `cloudsigma/amazonq` — Amazon Q CLI (AWS's AI coding assistant)
 
 More coming soon! See `manifest.json` for the full matrix.
 
