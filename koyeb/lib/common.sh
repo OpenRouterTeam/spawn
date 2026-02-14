@@ -23,6 +23,8 @@ fi
 # Koyeb specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://app.koyeb.com/"
+
 # Detect OS name for binary downloads (darwin or linux)
 # Outputs the OS name to stdout; returns 1 on unsupported OS
 _koyeb_detect_os() {
@@ -329,7 +331,10 @@ interactive_session() {
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$launch_cmd")
-    koyeb instances exec "$KOYEB_INSTANCE_ID" -- bash -c "$escaped_cmd"
+    local session_exit=0
+    koyeb instances exec "$KOYEB_INSTANCE_ID" -- bash -c "$escaped_cmd" || session_exit=$?
+    SERVER_NAME="${KOYEB_SERVICE_NAME:-}" _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 # Cleanup: delete the service and app

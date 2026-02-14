@@ -1626,6 +1626,39 @@ _show_post_session_summary() {
     log_info "  ssh ${SSH_USER:-root}@${ip}"
 }
 
+# Show a post-session summary for exec-based (non-SSH) cloud providers.
+# These use CLI exec commands instead of direct SSH, so the reconnect
+# hint differs from the SSH variant.
+# Uses optional env vars for richer output:
+#   SPAWN_DASHBOARD_URL  - Cloud provider dashboard URL for managing services
+#   SERVER_NAME          - Service/sandbox name
+#   SPAWN_RECONNECT_CMD  - CLI command to reconnect (shown as reconnect hint)
+_show_exec_post_session_summary() {
+    local dashboard_url="${SPAWN_DASHBOARD_URL:-}"
+    local server_name="${SERVER_NAME:-}"
+    local reconnect_cmd="${SPAWN_RECONNECT_CMD:-}"
+
+    printf '\n'
+    if [[ -n "${server_name}" ]]; then
+        log_warn "Session ended. Your service '${server_name}' is still running."
+    else
+        log_warn "Session ended. Your service is still running."
+    fi
+    log_warn "Remember to delete it when you're done to avoid ongoing charges."
+    log_warn ""
+    if [[ -n "${dashboard_url}" ]]; then
+        log_warn "Manage or delete it in your dashboard:"
+        log_warn "  ${dashboard_url}"
+    else
+        log_warn "Check your cloud provider dashboard to stop or delete the service."
+    fi
+    if [[ -n "${reconnect_cmd}" ]]; then
+        log_warn ""
+        log_info "To reconnect:"
+        log_info "  ${reconnect_cmd}"
+    fi
+}
+
 # Start an interactive SSH session
 # Usage: ssh_interactive_session IP COMMAND
 # Requires: SSH_USER (default: root), SSH_OPTS

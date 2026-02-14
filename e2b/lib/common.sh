@@ -25,6 +25,8 @@ fi
 # E2B specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://e2b.dev/dashboard"
+
 ensure_e2b_cli() {
     if ! command -v e2b &>/dev/null; then
         log_step "Installing E2B CLI..."
@@ -142,7 +144,10 @@ interactive_session() {
     local cmd="${1}"
     local escaped_cmd
     escaped_cmd=$(printf '%q' "${cmd}")
-    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "${escaped_cmd}"
+    local session_exit=0
+    e2b sandbox exec "${E2B_SANDBOX_ID}" -- bash -c "${escaped_cmd}" || session_exit=$?
+    SERVER_NAME="${E2B_SANDBOX_ID:-}" _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 destroy_server() {

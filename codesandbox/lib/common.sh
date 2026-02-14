@@ -25,6 +25,8 @@ fi
 # CodeSandbox specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://codesandbox.io/dashboard"
+
 ensure_codesandbox_cli() {
     if ! command -v node &>/dev/null; then
         log_step "Installing Node.js..."
@@ -226,7 +228,10 @@ upload_file() {
 interactive_session() {
     log_info "Starting interactive session..."
     log_step "For a full terminal, open your sandbox at: https://codesandbox.io/dashboard"
-    run_server "$1"
+    local session_exit=0
+    run_server "$1" || session_exit=$?
+    SERVER_NAME="${CODESANDBOX_SANDBOX_ID:-}" _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 destroy_server() {

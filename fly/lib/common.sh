@@ -24,6 +24,7 @@ fi
 # ============================================================
 
 readonly FLY_API_BASE="https://api.machines.dev/v1"
+SPAWN_DASHBOARD_URL="https://fly.io/dashboard"
 
 # Centralized curl wrapper for Fly.io Machines API
 fly_api() {
@@ -328,7 +329,11 @@ interactive_session() {
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$cmd")
-    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd"
+    local session_exit=0
+    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" || session_exit=$?
+    SERVER_NAME="${FLY_APP_NAME:-}" SPAWN_RECONNECT_CMD="fly ssh console -a ${FLY_APP_NAME:-}" \
+        _show_exec_post_session_summary
+    return "${session_exit}"
 }
 
 # Destroy a Fly.io machine and app
