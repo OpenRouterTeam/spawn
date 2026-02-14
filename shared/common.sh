@@ -1599,24 +1599,30 @@ ssh_upload_file() {
 # Called automatically by ssh_interactive_session after the SSH session ends.
 # Uses optional env vars for richer output:
 #   SPAWN_DASHBOARD_URL - Cloud provider dashboard URL for managing servers
+#   SERVER_NAME         - Server name (set by individual cloud scripts)
 # Arguments: IP
 _show_post_session_summary() {
     local ip="${1}"
     local dashboard_url="${SPAWN_DASHBOARD_URL:-}"
+    local server_name="${SERVER_NAME:-}"
 
     printf '\n'
-    log_warn "Session ended. Your server is still running at ${ip}."
+    if [[ -n "${server_name}" ]]; then
+        log_warn "Session ended. Your server '${server_name}' is still running at ${ip}."
+    else
+        log_warn "Session ended. Your server is still running at ${ip}."
+    fi
+    log_warn "Remember to delete it when you're done to avoid ongoing charges."
     log_warn ""
     if [[ -n "${dashboard_url}" ]]; then
-        log_warn "To manage or delete it, visit your dashboard:"
+        log_warn "Manage or delete it in your dashboard:"
         log_warn "  ${dashboard_url}"
     else
-        log_warn "Check your cloud provider dashboard to stop or delete the server"
-        log_warn "if you no longer need it."
+        log_warn "Check your cloud provider dashboard to stop or delete the server."
     fi
     log_warn ""
-    log_warn "To reconnect:"
-    log_warn "  ssh ${SSH_USER:-root}@${ip}"
+    log_info "To reconnect:"
+    log_info "  ssh ${SSH_USER:-root}@${ip}"
 }
 
 # Start an interactive SSH session
