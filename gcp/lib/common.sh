@@ -25,6 +25,9 @@ fi
 
 # Cache username to avoid repeated subprocess calls
 GCP_USERNAME=$(whoami)
+SSH_USER="${GCP_USERNAME}"
+
+SPAWN_DASHBOARD_URL="https://console.cloud.google.com/compute/instances"
 
 # SSH_OPTS is now defined in shared/common.sh
 
@@ -192,41 +195,23 @@ create_server() {
     log_info "Instance created: IP=${GCP_SERVER_IP}"
 }
 
-verify_server_connectivity() {
-    local ip="${1}" max_attempts=${2:-30}
-    # Use shared generic_ssh_wait with exponential backoff
-    # shellcheck disable=SC2086,SC2154
-    generic_ssh_wait "${GCP_USERNAME}" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" "${max_attempts}"
-}
+verify_server_connectivity() { ssh_verify_connectivity "$@"; }
 
 wait_for_cloud_init() {
     local ip="${1}" max_attempts=${2:-60}
 
-    # First establish SSH connectivity using generic_ssh_wait
-    generic_ssh_wait "${GCP_USERNAME}" "${ip}" "${SSH_OPTS}" "echo ok" "SSH connectivity" 30 5
+    # First establish SSH connectivity
+    ssh_verify_connectivity "${ip}" 30 5
 
-    # Then wait for cloud-init completion marker
-    generic_ssh_wait "${GCP_USERNAME}" "${ip}" "${SSH_OPTS}" "test -f /tmp/.cloud-init-complete" "startup script completion" "${max_attempts}" 5
+    # Then wait for startup script completion marker
+    generic_ssh_wait "${SSH_USER}" "${ip}" "$SSH_OPTS -o ConnectTimeout=5" "test -f /tmp/.cloud-init-complete" "startup script completion" "${max_attempts}" 5
 }
 
-# GCP uses current username
-run_server() {
-    local ip="${1}" cmd="${2}"
-    # shellcheck disable=SC2086
-    ssh ${SSH_OPTS} "${GCP_USERNAME}@${ip}" "${cmd}"
-}
-
-upload_file() {
-    local ip="${1}" local_path="${2}" remote_path="${3}"
-    # shellcheck disable=SC2086
-    scp ${SSH_OPTS} "${local_path}" "${GCP_USERNAME}@${ip}:${remote_path}"
-}
-
-interactive_session() {
-    local ip="${1}" cmd="${2}"
-    # shellcheck disable=SC2086
-    ssh -t ${SSH_OPTS} "${GCP_USERNAME}@${ip}" "${cmd}"
-}
+# Standard SSH operations (delegates to shared helpers in shared/common.sh)
+# GCP uses current username via SSH_USER set above
+run_server() { ssh_run_server "$@"; }
+upload_file() { ssh_upload_file "$@"; }
+interactive_session() { ssh_interactive_session "$@"; }
 
 destroy_server() {
     local name="${1}"

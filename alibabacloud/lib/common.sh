@@ -22,6 +22,8 @@ fi
 # Alibaba Cloud specific functions
 # ============================================================
 
+SPAWN_DASHBOARD_URL="https://ecs.console.aliyun.com/"
+
 # Configurable timeout/delay constants
 INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}  # Delay between instance status checks
 
@@ -550,32 +552,8 @@ create_server() {
     _wait_for_aliyun_instance "$instance_id" 60
 }
 
-# Upload file to instance
-# Usage: upload_file SERVER_IP LOCAL_PATH REMOTE_PATH
-upload_file() {
-    local server_ip="$1"
-    local local_path="$2"
-    local remote_path="$3"
-    # shellcheck disable=SC2086
-    scp $SSH_OPTS "$local_path" "root@${server_ip}:${remote_path}"
-}
-
-# Run command on instance
-# Usage: run_server SERVER_IP COMMAND
-run_server() {
-    local server_ip="$1"
-    shift
-    # shellcheck disable=SC2086
-    ssh $SSH_OPTS "root@${server_ip}" "$@"
-}
-
-# Start interactive session
-# Usage: interactive_session SERVER_IP [COMMAND]
-interactive_session() {
-    local server_ip="$1"
-    local command="${2:-bash}"
-    # shellcheck disable=SC2086
-    ssh $SSH_OPTS -t "root@${server_ip}" "$command"
-}
-
+# Standard SSH operations (delegates to shared helpers in shared/common.sh)
+run_server() { ssh_run_server "$@"; }
+upload_file() { ssh_upload_file "$@"; }
+interactive_session() { ssh_interactive_session "$@"; }
 verify_server_connectivity() { ssh_verify_connectivity "$@"; }
