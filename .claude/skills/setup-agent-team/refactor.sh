@@ -119,21 +119,21 @@ PROMPT_FILE=$(mktemp /tmp/refactor-prompt-XXXXXX.md)
 
 if [[ "${RUN_MODE}" == "issue" ]]; then
     # --- Issue mode: lightweight 2-teammate fix ---
-    cat > "${PROMPT_FILE}" << ISSUE_PROMPT_EOF
+    cat > "${PROMPT_FILE}" << 'ISSUE_PROMPT_EOF'
 You are the Team Lead for a focused issue-fix cycle on the spawn codebase.
 
 ## Target Issue
 
-Fix GitHub issue #${SPAWN_ISSUE}.
+Fix GitHub issue #SPAWN_ISSUE_PLACEHOLDER.
 
 ## Context Gathering (MANDATORY)
 
 Fetch the COMPLETE issue thread before starting:
-\`\`\`bash
-gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --comments
-gh pr list --repo OpenRouterTeam/spawn --search "${SPAWN_ISSUE}" --json number,title,url
-\`\`\`
-For each linked PR: \`gh pr view PR_NUM --repo OpenRouterTeam/spawn --comments\`
+```bash
+gh issue view SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --comments
+gh pr list --repo OpenRouterTeam/spawn --search "SPAWN_ISSUE_PLACEHOLDER" --json number,title,url
+```
+For each linked PR: `gh pr view PR_NUM --repo OpenRouterTeam/spawn --comments`
 
 Read ALL comments — prior discussion contains decisions, rejected approaches, and scope changes.
 
@@ -143,37 +143,41 @@ Complete within 10 minutes. At 7 min stop new work, at 9 min shutdown teammates,
 
 ## Team Structure
 
-1. **issue-fixer** (Sonnet) — Diagnose root cause, implement fix in worktree, run tests, create PR with \`Fixes #${SPAWN_ISSUE}\`
-2. **issue-tester** (Haiku) — Review fix for correctness/edge cases, run \`bun test\` + \`bash -n\` on modified .sh files, report results
+1. **issue-fixer** (Sonnet) — Diagnose root cause, implement fix in worktree, run tests, create PR with `Fixes #SPAWN_ISSUE_PLACEHOLDER`
+2. **issue-tester** (Haiku) — Review fix for correctness/edge cases, run `bun test` + `bash -n` on modified .sh files, report results
 
 ## Label Management
 
-Track lifecycle: "pending-review" → "under-review" → "in-progress". Check labels first: \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name'\`
-- Start: \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --add-label "in-progress"\`
-- After merge: \`gh issue edit ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --remove-label "in-progress"\`
+Track lifecycle: "pending-review" → "under-review" → "in-progress". Check labels first: `gh issue view SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name'`
+- Start: `gh issue edit SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --add-label "in-progress"`
+- After merge: `gh issue edit SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --remove-label "in-progress"`
 
 ## Workflow
 
 1. Create team, fetch issue, transition label to "in-progress"
-2. DEDUP: \`gh issue view ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'\` — only post acknowledgment if no automated comments exist
-3. Post acknowledgment (if needed): \`gh issue comment ${SPAWN_ISSUE} --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now.\n\n-- refactor/issue-fixer"\`
-4. Create worktree: \`git worktree add ${WORKTREE_BASE} -b fix/issue-${SPAWN_ISSUE} origin/main\`
+2. DEDUP: `gh issue view SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --json comments --jq '.comments[].author.login'` — only post acknowledgment if no automated comments exist
+3. Post acknowledgment (if needed): `gh issue comment SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now.\n\n-- refactor/issue-fixer"`
+4. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER -b fix/issue-SPAWN_ISSUE_PLACEHOLDER origin/main`
 5. Spawn issue-fixer + issue-tester
-6. When fix is ready: push, create PR with \`Fixes #${SPAWN_ISSUE}\` in body, post update comment linking PR
-7. Do NOT close the issue — \`Fixes #${SPAWN_ISSUE}\` auto-closes on merge
-8. Clean up: \`git worktree remove ${WORKTREE_BASE}\`, shutdown teammates
+6. When fix is ready: push, create PR with `Fixes #SPAWN_ISSUE_PLACEHOLDER` in body, post update comment linking PR
+7. Do NOT close the issue — `Fixes #SPAWN_ISSUE_PLACEHOLDER` auto-closes on merge
+8. Clean up: `git worktree remove WORKTREE_BASE_PLACEHOLDER`, shutdown teammates
 
 ## Commit Markers
 
-Every commit: \`Agent: issue-fixer\` + \`Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\`
+Every commit: `Agent: issue-fixer` + `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
 
 ## Safety
 
 - Run tests after every change
 - If fix is not straightforward (>10 min), comment on issue explaining complexity and exit
 
-Begin now. Fix issue #${SPAWN_ISSUE}.
+Begin now. Fix issue #SPAWN_ISSUE_PLACEHOLDER.
 ISSUE_PROMPT_EOF
+
+    # Substitute placeholders with validated values (safe — no shell expansion)
+    sed -i "s|SPAWN_ISSUE_PLACEHOLDER|${SPAWN_ISSUE}|g" "${PROMPT_FILE}"
+    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
 
 else
     # --- Refactor mode: full 6-teammate team ---
