@@ -1343,7 +1343,7 @@
     "hostkey/nanoclaw": "implemented",
     "hostkey/aider": "implemented",
     "hostkey/goose": "implemented",
-    "hostkey/codex-cli": "missing",
+    "hostkey/codex-cli": "implemented",
     "hostkey/open-interpreter": "missing",
     "hostkey/gemini-cli": "missing",
     "hostkey/amazonq": "missing",
