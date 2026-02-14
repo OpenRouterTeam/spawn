@@ -197,8 +197,9 @@ describe("upload_config_file", () => {
       upload_config_file "mock_upload" "mock_run" "test" "~/.config/test.json"
     `);
     expect(result.exitCode).toBe(0);
-    // Should run mv to move temp file to final path
-    expect(result.stdout).toContain("RUN:mv");
+    // Should run chmod and mv to move temp file to final path
+    expect(result.stdout).toContain("RUN:chmod");
+    expect(result.stdout).toContain("mv");
     expect(result.stdout).toContain("~/.config/test.json");
   });
 

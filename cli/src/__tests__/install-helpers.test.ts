@@ -521,6 +521,6 @@ describe("install.sh syntax", () => {
     const content = readFileSync(INSTALL_SH, "utf-8");
     // Source mode fallback was added in recent commits
     expect(content).toContain("source");
-    expect(content).toContain("WRAPPER");
+    expect(content).toContain("eval");
   });
 });
