@@ -784,7 +784,7 @@
       "description": "Flexible cloud compute with API-first architecture",
       "url": "https://www.cloudsigma.com/",
       "type": "api",
-      "auth": "CLOUDSIGMA_EMAIL and CLOUDSIGMA_PASSWORD (HTTP Basic Auth)",
+      "auth": "CLOUDSIGMA_EMAIL + CLOUDSIGMA_PASSWORD",
       "provision_method": "POST /api/2.0/servers/ with drives and SSH keys",
       "exec_method": "ssh cloudsigma@IP",
       "interactive_method": "ssh -t cloudsigma@IP",
