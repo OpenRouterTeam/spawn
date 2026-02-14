@@ -127,7 +127,9 @@ generate_server_password() {
     elif [[ -r /dev/urandom ]]; then
         password="Sp$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')1"
     else
-        password="Sp$(date +%s)Rn1"
+        log_error "Cannot generate secure password: neither openssl nor /dev/urandom available"
+        log_error "Install openssl or ensure /dev/urandom is readable"
+        return 1
     fi
     printf '%s' "$password"
 }

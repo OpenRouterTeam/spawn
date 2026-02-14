@@ -301,11 +301,14 @@ function saveKeys(provider: string, vars: Record<string, string>) {
 }
 
 function validKeyVal(v: string) {
-  if (v.length === 0 || v.length > 4096) return false;
+  // Enforce reasonable length: API keys are typically 20-200 chars
+  if (v.length < 8 || v.length > 512) return false;
   // Block control characters (U+0000–U+001F, U+007F–U+009F)
   if (/[\x00-\x1f\x7f-\x9f]/.test(v)) return false;
   // Block shell metacharacters
   if (/[;&'"<>|$`\\(){}]/.test(v)) return false;
+  // Must be printable ASCII only (API keys don't contain non-ASCII)
+  if (!/^[\x20-\x7e]+$/.test(v)) return false;
   return true;
 }
 
