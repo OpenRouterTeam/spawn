@@ -192,13 +192,18 @@ _koyeb_wait_for_service() {
         fi
 
         if [[ "$status" == "error" || "$status" == "failed" ]]; then
-            log_error "Service deployment failed (status: $status)"
+            log_error "Service deployment failed with status: $status"
             log_error ""
             log_error "Common causes:"
-            log_error "  - Docker image pull failure"
+            log_error "  - Docker image pull failure (check image name and registry access)"
             log_error "  - Insufficient resources for the selected instance type"
             log_error "  - Health check failure (service crashed on startup)"
-            log_error "View deployment logs: https://app.koyeb.com/"
+            log_error "  - Application error in startup command"
+            log_error ""
+            log_error "Debugging steps:"
+            log_error "  1. View deployment logs at: https://app.koyeb.com/"
+            log_error "  2. Check service details: koyeb service get $service_id"
+            log_error "  3. Try a different region or instance type"
             return 1
         fi
 

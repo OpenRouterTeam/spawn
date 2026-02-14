@@ -91,12 +91,19 @@ _northflank_wait_for_service() {
         attempt=$((attempt + 1))
     done
 
-    log_error "Service did not start after ${max_attempts} attempts"
+    log_error "Service did not reach 'running' status after ${max_attempts} attempts"
     log_error ""
-    log_error "The service may still be starting. You can:"
+    log_error "Last status: ${status:-unknown}"
+    log_error ""
+    log_error "Possible causes:"
+    log_error "  - Container image pull is taking longer than expected"
+    log_error "  - Application failing to start (check startup command)"
+    log_error "  - Resource limits preventing container from starting"
+    log_error ""
+    log_error "Debugging steps:"
     log_error "  1. Check service status: northflank get service --name ${name} --project ${project_name}"
     log_error "  2. View logs in the dashboard: https://app.northflank.com/"
-    log_error "  3. Re-run the command to try again"
+    log_error "  3. Service may still be starting - check dashboard before retrying"
     return 1
 }
 
