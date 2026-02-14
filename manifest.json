@@ -1357,7 +1357,7 @@
     "cloudsigma/openclaw": "implemented",
     "cloudsigma/nanoclaw": "implemented",
     "cloudsigma/aider": "implemented",
-    "cloudsigma/goose": "missing",
+    "cloudsigma/goose": "implemented",
     "cloudsigma/codex": "implemented",
     "cloudsigma/interpreter": "implemented",
     "cloudsigma/gemini": "implemented",
