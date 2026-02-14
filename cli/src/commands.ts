@@ -712,6 +712,61 @@ interface SignalEntry {
   includeDashboard: boolean;
 }
 
+interface ExitCodeEntry {
+  header: string;
+  lines: string[];
+  includeDashboard: boolean;
+}
+
+const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
+  130: {
+    header: "Script was interrupted (Ctrl+C).",
+    lines: ["Note: If a server was already created, it may still be running."],
+    includeDashboard: true,
+  },
+  137: {
+    header: "Script was killed (likely by the system due to timeout or out of memory).",
+    lines: [
+      "  - The server may not have enough RAM for this agent",
+      "  - Try a larger instance size or a different cloud provider",
+    ],
+    includeDashboard: true,
+  },
+  255: {
+    header: "SSH connection failed. Common causes:",
+    lines: [
+      "  - Server is still booting (wait a moment and retry)",
+      "  - Firewall blocking SSH port 22",
+      "  - Server was terminated before the session started",
+    ],
+    includeDashboard: false,
+  },
+  127: {
+    header: "A required command was not found. Check that these are installed:",
+    lines: ["  - bash, curl, ssh, jq"],
+    includeDashboard: false,
+  },
+  126: {
+    header: "A command was found but could not be executed (permission denied).",
+    lines: [
+      "  - A downloaded binary may lack execute permissions",
+      "  - The script may require root/sudo access",
+      `  - Report it if this persists: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
+    ],
+    includeDashboard: false,
+  },
+  2: {
+    header: "Shell syntax or argument error. This is likely a bug in the script.",
+    lines: [`  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`],
+    includeDashboard: false,
+  },
+  1: {
+    header: "Common causes:",
+    lines: [],
+    includeDashboard: true,
+  },
+};
+
 const SIGNAL_GUIDANCE: Record<string, SignalEntry> = {
   SIGKILL: {
     header: "Script was forcibly killed (SIGKILL). Common causes:",
@@ -768,63 +823,38 @@ function optionalDashboardLine(dashboardUrl?: string): string[] {
 }
 
 export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string, dashboardUrl?: string): string[] {
-  const dashboardHint = buildDashboardHint(dashboardUrl);
-  switch (exitCode) {
-    case 130:
-      return [
-        "Script was interrupted (Ctrl+C).",
-        "Note: If a server was already created, it may still be running.",
-        dashboardHint,
-      ];
-    case 137:
-      return [
-        "Script was killed (likely by the system due to timeout or out of memory).",
-        "  - The server may not have enough RAM for this agent",
-        "  - Try a larger instance size or a different cloud provider",
-        dashboardHint,
-      ];
-    case 255:
-      return [
-        "SSH connection failed. Common causes:",
-        "  - Server is still booting (wait a moment and retry)",
-        "  - Firewall blocking SSH port 22",
-        "  - Server was terminated before the session started",
-      ];
-    case 127:
-      return [
-        "A required command was not found. Check that these are installed:",
-        "  - bash, curl, ssh, jq",
-        `  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`,
-      ];
-    case 126:
-      return [
-        "A command was found but could not be executed (permission denied).",
-        "  - A downloaded binary may lack execute permissions",
-        "  - The script may require root/sudo access",
-        `  - Report it if this persists: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
-      ];
-    case 2:
-      return [
-        "Shell syntax or argument error. This is likely a bug in the script.",
-        `  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
-      ];
-    case 1:
-      return [
-        "Common causes:",
-        ...credentialHints(cloud, authHint),
-        "  - Cloud provider API error (quota, rate limit, or region issue)",
-        "  - Server provisioning failed (try again or pick a different region)",
-        ...optionalDashboardLine(dashboardUrl),
-      ];
-    default:
-      return [
-        "Common causes:",
-        ...credentialHints(cloud, authHint, "Missing"),
-        "  - Cloud provider API rate limit or quota exceeded",
-        "  - Missing local dependencies (SSH, curl, jq)",
-        ...optionalDashboardLine(dashboardUrl),
-      ];
+  const entry = exitCode !== null ? EXIT_CODE_GUIDANCE[exitCode] : null;
+
+  if (!entry) {
+    // Default/unknown exit code
+    return [
+      "Common causes:",
+      ...credentialHints(cloud, authHint, "Missing"),
+      "  - Cloud provider API rate limit or quota exceeded",
+      "  - Missing local dependencies (SSH, curl, jq)",
+      ...optionalDashboardLine(dashboardUrl),
+    ];
   }
+
+  const lines = [entry.header, ...entry.lines];
+
+  // Special handling for exit code 127 (missing command)
+  if (exitCode === 127) {
+    lines.push(`  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`);
+  }
+
+  // Special handling for exit code 1 (general error)
+  if (exitCode === 1) {
+    lines.push(...credentialHints(cloud, authHint));
+    lines.push("  - Cloud provider API error (quota, rate limit, or region issue)");
+    lines.push("  - Server provisioning failed (try again or pick a different region)");
+  }
+
+  if (entry.includeDashboard) {
+    lines.push(buildDashboardHint(dashboardUrl));
+  }
+
+  return lines;
 }
 
 export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
@@ -1023,37 +1053,47 @@ export function getMissingClouds(manifest: Manifest, agent: string, clouds: stri
 
 const COMPACT_READY_WIDTH = 10;
 
-function renderCompactList(manifest: Manifest, agents: string[], clouds: string[]): void {
-  const totalClouds = clouds.length;
-
-  console.log();
-  console.log(
+function buildCompactListHeader(): string {
+  return (
     pc.bold("Agent".padEnd(COMPACT_NAME_WIDTH)) +
     pc.bold("Clouds".padEnd(COMPACT_COUNT_WIDTH)) +
     pc.bold("Ready".padEnd(COMPACT_READY_WIDTH)) +
     pc.bold("Not yet available")
   );
-  console.log(pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + COMPACT_READY_WIDTH + 30)));
+}
+
+function buildCompactListSeparator(): string {
+  return pc.dim("-".repeat(COMPACT_NAME_WIDTH + COMPACT_COUNT_WIDTH + COMPACT_READY_WIDTH + 30));
+}
+
+function buildCompactListRow(manifest: Manifest, agent: string, clouds: string[]): string {
+  const implClouds = getImplementedClouds(manifest, agent);
+  const missing = getMissingClouds(manifest, agent, clouds);
+  const countStr = `${implClouds.length}/${clouds.length}`;
+  const colorFn = implClouds.length === clouds.length ? pc.green : pc.yellow;
+  const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+  const readyStr = readyCount > 0 ? pc.green(`${readyCount}`) : pc.dim("0");
+
+  let line = pc.bold(manifest.agents[agent].name.padEnd(COMPACT_NAME_WIDTH));
+  line += colorFn(countStr.padEnd(COMPACT_COUNT_WIDTH));
+  line += readyStr + " ".repeat(COMPACT_READY_WIDTH - String(readyCount).length);
+
+  if (missing.length === 0) {
+    line += pc.green("-- all clouds supported");
+  } else {
+    line += pc.dim(missing.map((c) => manifest.clouds[c].name).join(", "));
+  }
+
+  return line;
+}
+
+function renderCompactList(manifest: Manifest, agents: string[], clouds: string[]): void {
+  console.log();
+  console.log(buildCompactListHeader());
+  console.log(buildCompactListSeparator());
 
   for (const a of agents) {
-    const implClouds = getImplementedClouds(manifest, a);
-    const missing = getMissingClouds(manifest, a, clouds);
-    const countStr = `${implClouds.length}/${totalClouds}`;
-    const colorFn = implClouds.length === totalClouds ? pc.green : pc.yellow;
-    const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
-    const readyStr = readyCount > 0 ? pc.green(`${readyCount}`) : pc.dim("0");
-
-    let line = pc.bold(manifest.agents[a].name.padEnd(COMPACT_NAME_WIDTH));
-    line += colorFn(countStr.padEnd(COMPACT_COUNT_WIDTH));
-    line += readyStr + " ".repeat(COMPACT_READY_WIDTH - String(readyCount).length);
-
-    if (missing.length === 0) {
-      line += pc.green("-- all clouds supported");
-    } else {
-      line += pc.dim(missing.map((c) => manifest.clouds[c].name).join(", "));
-    }
-
-    console.log(line);
+    console.log(buildCompactListRow(manifest, a, clouds));
   }
 }
 
