@@ -648,23 +648,25 @@ function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryS
     console.error("\nThe spawn script doesn't exist at the expected location.");
     console.error("\nThis usually means:");
     console.error("  • The agent + cloud combination hasn't been implemented yet");
-    console.error("  • The script is currently being deployed (rare, but possible)");
+    console.error("  • The script is currently being deployed (rare)");
     console.error("  • There's a temporary issue with the file server");
-    console.error(`\nWhat to do:`);
-    console.error(`  1. Check if it's marked as implemented: ${pc.cyan("spawn matrix")}`);
-    console.error(`  2. If the matrix shows it's available, wait 1-2 minutes and retry`);
-    console.error(`  3. Still not working? Report it: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
+    console.error(`\n${pc.bold("Next steps:")}`);
+    console.error(`  1. Verify it's implemented: ${pc.cyan("spawn matrix")}`);
+    console.error(`  2. If the matrix shows ✓, wait 1-2 minutes and retry`);
+    console.error(`  3. Still broken? Report it: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
   } else {
     p.log.error(`Script download failed`);
     console.error(`\nCouldn't download the spawn script (HTTP ${primaryStatus} from primary, ${fallbackStatus} from fallback).`);
     if (primaryStatus >= 500 || fallbackStatus >= 500) {
-      console.error("\nThe servers are experiencing issues or are temporarily unavailable.");
+      console.error("\nThe servers are experiencing issues or temporarily unavailable.");
     }
-    console.error(`\nWhat to do:`);
-    console.error(`  1. Verify your internet connection is working`);
-    console.error(`  2. Wait a minute and try again (servers may be recovering)`);
-    console.error(`  3. Check GitHub's status page: ${pc.cyan("https://www.githubstatus.com")}`);
-    console.error(`  4. If GitHub is down, wait and retry when it's back up`);
+    console.error(`\n${pc.bold("Next steps:")}`);
+    console.error(`  1. Check your internet connection`);
+    console.error(`  2. Wait a moment and try again`);
+    console.error(`  3. Check GitHub's status: ${pc.cyan("https://www.githubstatus.com")}`);
+    if (primaryStatus >= 500 || fallbackStatus >= 500) {
+      console.error(`  4. If GitHub is down, retry when it's back up`);
+    }
   }
 }
 
@@ -676,30 +678,30 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   const isTimeout = errMsg.toLowerCase().includes("timeout");
   const isConnection = errMsg.toLowerCase().includes("connect") || errMsg.toLowerCase().includes("enotfound");
 
-  console.error("\nWhat's wrong:");
+  console.error(`\n${pc.bold("Possible causes:")}`);
   if (isTimeout) {
-    console.error("  • Your internet connection is slow or unstable");
-    console.error("  • The download server isn't responding (possibly overloaded)");
-    console.error("  • A firewall may be slowing the connection");
+    console.error("  • Slow or unstable internet connection");
+    console.error("  • Download server not responding (possibly overloaded)");
+    console.error("  • Firewall blocking or slowing the connection");
   } else if (isConnection) {
-    console.error("  • No internet connection detected");
-    console.error("  • A firewall or proxy is blocking GitHub access");
-    console.error("  • DNS isn't resolving GitHub's domain (check your DNS settings)");
+    console.error("  • No internet connection");
+    console.error("  • Firewall or proxy blocking GitHub access");
+    console.error("  • DNS not resolving GitHub's domain");
   } else {
-    console.error("  • There's an issue with your internet connection");
-    console.error("  • GitHub's servers may be temporarily down");
+    console.error("  • Internet connection issue");
+    console.error("  • GitHub's servers temporarily down");
   }
 
-  console.error("\nWhat to do:");
-  console.error("  1. Check that your internet connection is working");
+  console.error(`\n${pc.bold("Next steps:")}`);
+  console.error("  1. Check your internet connection");
   if (isConnection) {
-    console.error("  2. Test accessing github.com in your browser");
-    console.error("  3. Check if a firewall or VPN is blocking access");
-    console.error("  4. Try disabling any proxy settings temporarily");
+    console.error("  2. Test github.com access in your browser");
+    console.error("  3. Check firewall/VPN settings");
+    console.error("  4. Try disabling proxy temporarily");
   } else {
-    console.error(`  2. Verify this combination exists: ${pc.cyan("spawn matrix")}`);
-    console.error("  3. Wait a minute and try again");
-    console.error(`  4. Test accessing the URL directly: ${pc.dim(ghUrl)}`);
+    console.error(`  2. Verify combination exists: ${pc.cyan("spawn matrix")}`);
+    console.error("  3. Wait a moment and retry");
+    console.error(`  4. Test URL directly: ${pc.dim(ghUrl)}`);
   }
   process.exit(1);
 }
@@ -866,7 +868,7 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
   if (!entry) {
     // Default/unknown exit code
     return [
-      "Common causes:",
+      `${pc.bold("Common causes:")}`,
       ...credentialHints(cloud, authHint, "Missing"),
       "  - Cloud provider API rate limit or quota exceeded",
       "  - Missing local dependencies (SSH, curl, jq)",
@@ -874,7 +876,7 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
     ];
   }
 
-  const lines = [entry.header, ...entry.lines];
+  const lines = [pc.bold(entry.header), ...entry.lines];
 
   // Special handling for exit code 127 (missing command)
   if (exitCode === 127) {

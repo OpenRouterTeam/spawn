@@ -67,28 +67,29 @@ log_install_failed() {
     local install_cmd="${2:-}"
     local server_ip="${3:-}"
 
-    log_error "${agent_name} installation failed to complete successfully"
+    log_error "${agent_name} installation failed"
     log_error ""
     log_error "The agent could not be installed or verified on the server."
     log_error ""
-    log_error "Common causes:"
-    log_error "  - Network timeout downloading packages (npm, pip, etc.)"
-    log_error "  - Insufficient disk space or memory on the server"
-    log_error "  - Missing system dependencies for ${agent_name}"
-    log_error "  - Cloud provider's package mirror is temporarily unavailable"
+    printf '%b\n' "${YELLOW}Common causes:${NC}" >&2
+    log_error "  • Network timeout downloading packages (npm, pip, etc.)"
+    log_error "  • Insufficient disk space or memory on the server"
+    log_error "  • Missing system dependencies for ${agent_name}"
+    log_error "  • Cloud provider's package mirror temporarily unavailable"
     log_error ""
-    log_error "Debugging steps:"
+    printf '%b\n' "${YELLOW}Next steps:${NC}" >&2
     if [[ -n "${server_ip}" ]]; then
-        log_error "  1. SSH into the server and check logs:"
-        log_error "     ssh root@${server_ip}"
-        log_error "     Check: df -h  (disk space)"
-        log_error "     Check: free -h  (memory)"
+        log_error "  1. SSH into the server to investigate:"
+        log_error "     ${CYAN}ssh root@${server_ip}${NC}"
+        log_error "     ${CYAN}df -h${NC}   # Check disk space"
+        log_error "     ${CYAN}free -h${NC}  # Check memory"
     fi
     if [[ -n "${install_cmd}" ]]; then
-        log_error "  2. Try the installation manually:"
-        log_error "     ${install_cmd}"
+        log_error "  2. Try manual installation:"
+        log_error "     ${CYAN}${install_cmd}${NC}"
     fi
-    log_error "  3. Re-run spawn to try on a fresh server (some failures are transient)"
+    log_error "  3. Retry with a fresh server (many failures are transient)"
+    log_error "     ${CYAN}spawn <agent> <cloud>${NC}"
 }
 
 # ============================================================
@@ -110,11 +111,18 @@ check_python_available() {
         log_error ""
         log_error "Spawn uses Python 3 for JSON parsing and API interactions."
         log_error ""
-        log_error "Install Python 3:"
-        log_error "  Ubuntu/Debian:  sudo apt-get update && sudo apt-get install -y python3"
-        log_error "  Fedora/RHEL:    sudo dnf install -y python3"
-        log_error "  macOS:          brew install python3"
-        log_error "  Arch Linux:     sudo pacman -S python"
+        printf '%b\n' "${YELLOW}Install Python 3:${NC}" >&2
+        log_error "  ${CYAN}# Ubuntu/Debian${NC}"
+        log_error "  sudo apt-get update && sudo apt-get install -y python3"
+        log_error ""
+        log_error "  ${CYAN}# Fedora/RHEL${NC}"
+        log_error "  sudo dnf install -y python3"
+        log_error ""
+        log_error "  ${CYAN}# macOS${NC}"
+        log_error "  brew install python3"
+        log_error ""
+        log_error "  ${CYAN}# Arch Linux${NC}"
+        log_error "  sudo pacman -S python"
         log_error ""
         return 1
     fi
@@ -158,11 +166,18 @@ _install_jq_apk() {
 _report_jq_not_found() {
     log_error "jq is required but not installed"
     log_error ""
-    log_error "Install jq for your system:"
-    log_error "  Ubuntu/Debian:  sudo apt-get install -y jq"
-    log_error "  Fedora/RHEL:    sudo dnf install -y jq"
-    log_error "  macOS:          brew install jq"
-    log_error "  Other:          https://jqlang.github.io/jq/download/"
+    printf '%b\n' "${YELLOW}Install jq for your system:${NC}" >&2
+    log_error "  ${CYAN}# Ubuntu/Debian${NC}"
+    log_error "  sudo apt-get install -y jq"
+    log_error ""
+    log_error "  ${CYAN}# Fedora/RHEL${NC}"
+    log_error "  sudo dnf install -y jq"
+    log_error ""
+    log_error "  ${CYAN}# macOS${NC}"
+    log_error "  brew install jq"
+    log_error ""
+    log_error "  ${CYAN}# Other systems${NC}"
+    log_error "  https://jqlang.github.io/jq/download/"
 }
 
 ensure_jq() {
