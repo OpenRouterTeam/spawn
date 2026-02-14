@@ -289,7 +289,8 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
   if (isInteractiveTTY()) {
     await cmdInteractive();
   } else {
-    console.error(pc.yellow("No interactive terminal detected."));
+    console.error(pc.yellow("Cannot run interactive picker: not a terminal"));
+    console.error(pc.dim("  (stdin/stdout is piped or redirected)"));
     console.error();
     console.error(`  Launch directly:  ${pc.cyan("spawn <agent> <cloud>")}`);
     console.error(`  Rerun previous:   ${pc.cyan("spawn list")}`);
