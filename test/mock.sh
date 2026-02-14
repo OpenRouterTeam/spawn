@@ -696,6 +696,37 @@ _categorize_failure() {
     fi
 }
 
+# Run assertions for a script and track which categories failed.
+# Outputs: _exit_failed, _api_failed, _ssh_failed, _env_failed (as 0/1)
+_run_assertions_and_track() {
+    local exit_code="$1" cloud="$2"
+    local _ASSERT_DELTA=0
+
+    _tracked_assert assert_exit_code "${exit_code}" 0 "exits successfully"
+    _exit_failed=$_ASSERT_DELTA
+
+    _tracked_assert assert_cloud_api_calls "$cloud"
+    _api_failed=$_ASSERT_DELTA
+
+    _tracked_assert assert_log_contains "ssh " "uses SSH"
+    _ssh_failed=$_ASSERT_DELTA
+
+    _tracked_assert assert_env_injected "OPENROUTER_API_KEY"
+    _env_failed=$_ASSERT_DELTA
+
+    if [[ "${MOCK_VALIDATE_BODY:-}" == "1" ]]; then
+        assert_no_body_errors
+    fi
+    if [[ "${MOCK_TRACK_STATE:-}" == "1" ]]; then
+        assert_server_cleaned_up "$3"
+    fi
+}
+
+# Check for missing fixtures in the mock log.
+_has_missing_fixture() {
+    grep -q "NO_FIXTURE:" "${MOCK_LOG}" 2>/dev/null && echo 1 || echo 0
+}
+
 run_test() {
     local cloud="$1"
     local agent="$2"
@@ -731,37 +762,13 @@ run_test() {
     fi
 
     # Normal mode: run standard assertions and track failures per category
-    local _ASSERT_DELTA=0
-    local _exit_failed _api_failed _ssh_failed _env_failed
-
-    _tracked_assert assert_exit_code "${exit_code}" 0 "exits successfully"
-    _exit_failed=$_ASSERT_DELTA
-
-    _tracked_assert assert_cloud_api_calls "$cloud"
-    _api_failed=$_ASSERT_DELTA
-
-    _tracked_assert assert_log_contains "ssh " "uses SSH"
-    _ssh_failed=$_ASSERT_DELTA
-
-    _tracked_assert assert_env_injected "OPENROUTER_API_KEY"
-    _env_failed=$_ASSERT_DELTA
-
-    if [[ "${MOCK_VALIDATE_BODY:-}" == "1" ]]; then
-        assert_no_body_errors
-    fi
-    if [[ "${MOCK_TRACK_STATE:-}" == "1" ]]; then
-        assert_server_cleaned_up "${state_file}"
-    fi
-
-    # Check for missing fixtures
-    local _has_no_fixture=0
-    if grep -q "NO_FIXTURE:" "${MOCK_LOG}" 2>/dev/null; then
-        _has_no_fixture=1
-    fi
+    _run_assertions_and_track "${exit_code}" "${cloud}" "${state_file}"
 
     # Record result with failure category
     local pre_fail=$((FAILED - _pre_failed))
     if [[ "$pre_fail" -gt 0 ]]; then
+        local _has_no_fixture
+        _has_no_fixture=$(_has_missing_fixture)
         local _reason
         _reason=$(_categorize_failure "$_has_no_fixture" "$_exit_failed" "$_api_failed" "$_ssh_failed" "$_env_failed")
         record_test_result "${cloud}" "${agent}" "fail" "${_reason}"
