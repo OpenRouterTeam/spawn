@@ -210,17 +210,8 @@ MOCK
     done
 }
 
-setup_mock_agents() {
-    # Agent binaries
-    _create_logging_mock claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q
-
-    # Tools used during agent install
-    _create_logging_mock pip pip3 npm npx bun node openssl shred cargo go git
-
-    # Silent mocks (no logging needed)
-    _create_silent_mock clear sleep
-
-    # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
+# Create the ssh-keygen mock script
+_create_ssh_keygen_mock() {
     cat > "${TEST_DIR}/ssh-keygen" << 'MOCK'
 #!/bin/bash
 echo "ssh-keygen $*" >> "${MOCK_LOG}"
@@ -247,6 +238,20 @@ fi
 exit 0
 MOCK
     chmod +x "${TEST_DIR}/ssh-keygen"
+}
+
+setup_mock_agents() {
+    # Agent binaries
+    _create_logging_mock claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q
+
+    # Tools used during agent install
+    _create_logging_mock pip pip3 npm npx bun node openssl shred cargo go git
+
+    # Silent mocks (no logging needed)
+    _create_silent_mock clear sleep
+
+    # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
+    _create_ssh_keygen_mock
 }
 
 setup_fake_home() {
