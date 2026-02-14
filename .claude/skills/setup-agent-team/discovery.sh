@@ -557,30 +557,15 @@ run_team_cycle() {
     return $CLAUDE_EXIT
 }
 
-run_single_cycle() {
-    cd "${REPO_ROOT}"
-    git checkout main 2>/dev/null || true
-    git fetch --prune origin 2>/dev/null || true
-    git pull --rebase origin main 2>/dev/null || true
-
-    PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
-    build_single_prompt > "${PROMPT_FILE}"
-
-    log_info "Launching single agent..."
-    echo ""
-
-    local IDLE_TIMEOUT=600  # 10 minutes of silence = hung
-    local HARD_TIMEOUT=2100 # 35 min wall-clock for single agent
-
-    log_info "Idle timeout: ${IDLE_TIMEOUT}s, Hard timeout: ${HARD_TIMEOUT}s"
-
-    claude --print -p "$(cat "${PROMPT_FILE}")" --model sonnet \
-        2>&1 | tee -a "${LOG_FILE}" &
-    local PIPE_PID=$!
+# Monitor process activity and timeout. Sets EXIT_CODE and IDLE_SECONDS globally.
+_monitor_process() {
+    local PIPE_PID=$1
+    local IDLE_TIMEOUT=$2
+    local HARD_TIMEOUT=$3
 
     local LAST_SIZE
     LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
-    local IDLE_SECONDS=0
+    IDLE_SECONDS=0
     local WALL_START
     WALL_START=$(date +%s)
 
@@ -612,7 +597,32 @@ run_single_cycle() {
     done
 
     wait "${PIPE_PID}" 2>/dev/null
-    local CLAUDE_EXIT=$?
+    EXIT_CODE=$?
+}
+
+run_single_cycle() {
+    cd "${REPO_ROOT}"
+    git checkout main 2>/dev/null || true
+    git fetch --prune origin 2>/dev/null || true
+    git pull --rebase origin main 2>/dev/null || true
+
+    PROMPT_FILE=$(mktemp /tmp/discovery-prompt-XXXXXX.md)
+    build_single_prompt > "${PROMPT_FILE}"
+
+    log_info "Launching single agent..."
+    echo ""
+
+    local IDLE_TIMEOUT=600  # 10 minutes of silence = hung
+    local HARD_TIMEOUT=2100 # 35 min wall-clock for single agent
+
+    log_info "Idle timeout: ${IDLE_TIMEOUT}s, Hard timeout: ${HARD_TIMEOUT}s"
+
+    claude --print -p "$(cat "${PROMPT_FILE}")" --model sonnet \
+        2>&1 | tee -a "${LOG_FILE}" &
+    local PIPE_PID=$!
+
+    _monitor_process "${PIPE_PID}" "${IDLE_TIMEOUT}" "${HARD_TIMEOUT}"
+    local CLAUDE_EXIT=$EXIT_CODE
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Single cycle completed successfully"

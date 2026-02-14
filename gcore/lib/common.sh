@@ -61,26 +61,24 @@ test_gcore_token() {
 }
 
 # Ensure project ID is set (required for all Gcore cloud API calls)
-ensure_gcore_project() {
-    if [[ -n "${GCORE_PROJECT_ID:-}" ]]; then
-        log_info "Using Gcore project ID from environment"
+_load_gcore_project_from_config() {
+    local config_file="$HOME/.config/spawn/gcore.json"
+    if [[ ! -f "$config_file" ]]; then
+        return 1
+    fi
+
+    local saved_project
+    saved_project=$(python3 -c "import json; d=json.load(open('$config_file')); print(d.get('project_id',''))" 2>/dev/null || true)
+    if [[ -n "$saved_project" ]]; then
+        GCORE_PROJECT_ID="$saved_project"
+        export GCORE_PROJECT_ID
+        log_info "Using Gcore project ID from config"
         return 0
     fi
+    return 1
+}
 
-    # Try loading from config
-    local config_file="$HOME/.config/spawn/gcore.json"
-    if [[ -f "$config_file" ]]; then
-        local saved_project
-        saved_project=$(python3 -c "import json; d=json.load(open('$config_file')); print(d.get('project_id',''))" 2>/dev/null || true)
-        if [[ -n "$saved_project" ]]; then
-            GCORE_PROJECT_ID="$saved_project"
-            export GCORE_PROJECT_ID
-            log_info "Using Gcore project ID from config"
-            return 0
-        fi
-    fi
-
-    # Auto-detect: use the first available project
+_auto_detect_gcore_project() {
     local response
     response=$(gcore_api GET "/cloud/v1/projects")
     local project_id
@@ -101,8 +99,12 @@ if projects:
     GCORE_PROJECT_ID="$project_id"
     export GCORE_PROJECT_ID
     log_info "Auto-detected Gcore project: $GCORE_PROJECT_ID"
+    return 0
+}
 
-    # Save to config
+_save_gcore_project_to_config() {
+    local project_id=$1
+    local config_file="$HOME/.config/spawn/gcore.json"
     if [[ -f "$config_file" ]]; then
         python3 -c "
 import json
@@ -113,6 +115,18 @@ with open('$config_file', 'r+') as f:
     json.dump(d, f, indent=2)
 " 2>/dev/null || true
     fi
+}
+
+ensure_gcore_project() {
+    if [[ -n "${GCORE_PROJECT_ID:-}" ]]; then
+        log_info "Using Gcore project ID from environment"
+        return 0
+    fi
+
+    _load_gcore_project_from_config && return 0
+    _auto_detect_gcore_project || return 1
+    _save_gcore_project_to_config "${GCORE_PROJECT_ID}"
+    return 0
 }
 
 # Check if SSH key is registered with Gcore
