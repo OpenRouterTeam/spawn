@@ -83,7 +83,10 @@ v = data.get(sys.argv[2], '') or data.get('api_key', '') or data.get('token', ''
 print(v)
 " "${config_file}" "${var_name}" 2>/dev/null)
         if [[ -n "${val}" ]]; then
-            export "${var_name}=${val}"
+            # SECURITY: Use printf to safely assign value without command injection risk
+            # Direct export with = operator doesn't quote the value, allowing injection via $()
+            printf -v "${var_name}" '%s' "${val}"
+            export "${var_name}"
             return 0
         fi
     fi
