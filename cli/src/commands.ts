@@ -1571,6 +1571,29 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
   showListFooter(records, agentFilter, cloudFilter);
 }
 
+export async function cmdLast(): Promise<void> {
+  const records = filterHistory();
+
+  if (records.length === 0) {
+    p.log.info("No spawn history found.");
+    p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to create your first spawn.`);
+    return;
+  }
+
+  const latest = records[0];
+  let manifest: Manifest | null = null;
+  try {
+    manifest = await loadManifest();
+  } catch {
+    // Manifest unavailable -- show raw keys
+  }
+
+  const label = buildRecordLabel(latest, manifest);
+  const hint = buildRecordHint(latest);
+  p.log.step(`Rerunning last spawn: ${pc.bold(label)} ${pc.dim(hint)}`);
+  await cmdRun(latest.agent, latest.cloud, latest.prompt);
+}
+
 // ── Agents ─────────────────────────────────────────────────────────────────────
 
 export function getImplementedAgents(manifest: Manifest, cloud: string): string[] {
@@ -1930,6 +1953,7 @@ function getHelpUsageSection(): string {
   spawn list -a <agent>              Filter spawn history by agent (or --agent)
   spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
   spawn list --clear                 Clear all spawn history
+  spawn last                         Instantly rerun the most recent spawn (alias: rerun)
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
@@ -1954,6 +1978,7 @@ function getHelpExamplesSection(): string {
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
   spawn list aider                   ${pc.dim("# Filter history by agent name")}
+  spawn last                         ${pc.dim("# Instantly rerun the most recent spawn")}
   spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}`;
 }
 
