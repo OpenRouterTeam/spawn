@@ -192,6 +192,59 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 /**
+ * Create a safe enqueue function that gracefully handles client disconnect.
+ */
+function createEnqueuer(encoder: TextEncoder): {
+  enqueue: (controller: ReadableStreamDefaultController, chunk: Uint8Array) => void;
+  isConnected: () => boolean;
+  setDisconnected: () => void;
+} {
+  let clientConnected = true;
+
+  return {
+    enqueue(controller: ReadableStreamDefaultController, chunk: Uint8Array) {
+      if (!clientConnected) return;
+      try {
+        controller.enqueue(chunk);
+      } catch {
+        clientConnected = false;
+      }
+    },
+    isConnected() {
+      return clientConnected;
+    },
+    setDisconnected() {
+      clientConnected = false;
+    },
+  };
+}
+
+/**
+ * Drain a readable stream, logging to console and enqueuing to HTTP response.
+ */
+async function drainStreamOutput(
+  src: ReadableStream<Uint8Array> | null,
+  enqueue: (chunk: Uint8Array) => void,
+  onActivity: () => void
+): Promise<void> {
+  if (!src) return;
+  const reader = src.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      // Always log locally
+      process.stdout.write(value);
+      // Stream to HTTP client if still connected
+      onActivity();
+      enqueue(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/**
  * Spawn the target script and return a streaming Response.
  *
  * stdout/stderr are piped back as chunked text/plain. A heartbeat line
@@ -238,49 +291,37 @@ function startStreamingRun(reason: string, issue: string): Response {
     });
 
   const encoder = new TextEncoder();
-  let clientConnected = true;
+  const enqueuer = createEnqueuer(encoder);
 
   const stream = new ReadableStream({
     async start(controller) {
       // --- Header ---
       const header = `[trigger] Run #${id} started (reason=${reason}${issue ? `, issue=#${issue}` : ""}, concurrent=${runs.size}/${MAX_CONCURRENT})\n`;
-      enqueue(controller, encoder.encode(header));
+      enqueuer.enqueue(controller, encoder.encode(header));
 
       // --- Heartbeat: emit every 15s of silence to keep connection alive ---
       // Must fire well before Bun's idleTimeout (255s) and any proxy timeouts.
       let lastActivity = Date.now();
       const heartbeat = setInterval(() => {
-        if (!clientConnected) return;
+        if (!enqueuer.isConnected()) return;
         const silentMs = Date.now() - lastActivity;
         if (silentMs >= 14_000) {
           const elapsed = Math.round((Date.now() - startedAt) / 1000);
           const msg = `[heartbeat] Run #${id} active (${elapsed}s elapsed)\n`;
-          enqueue(controller, encoder.encode(msg));
+          enqueuer.enqueue(controller, encoder.encode(msg));
           lastActivity = Date.now();
         }
       }, 15_000);
 
-      // --- Drain stdout + stderr concurrently ---
-      async function drain(src: ReadableStream<Uint8Array> | null) {
-        if (!src) return;
-        const reader = src.getReader();
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            // Always log locally
-            process.stdout.write(value);
-            // Stream to HTTP client if still connected
-            lastActivity = Date.now();
-            enqueue(controller, value);
-          }
-        } finally {
-          reader.releaseLock();
-        }
-      }
-
       try {
-        await Promise.all([drain(proc.stdout), drain(proc.stderr)]);
+        await Promise.all([
+          drainStreamOutput(proc.stdout, (chunk) => enqueuer.enqueue(controller, chunk), () => {
+            lastActivity = Date.now();
+          }),
+          drainStreamOutput(proc.stderr, (chunk) => enqueuer.enqueue(controller, chunk), () => {
+            lastActivity = Date.now();
+          }),
+        ]);
 
         // --- Wait for exit ---
         const exitCode = await proc.exited;
@@ -288,12 +329,12 @@ function startStreamingRun(reason: string, issue: string): Response {
         const elapsed = Math.round((Date.now() - startedAt) / 1000);
         const footer = `\n[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size}/${MAX_CONCURRENT})\n`;
         console.log(footer.trim());
-        enqueue(controller, encoder.encode(footer));
+        enqueuer.enqueue(controller, encoder.encode(footer));
       } catch (err) {
         const elapsed = Math.round((Date.now() - startedAt) / 1000);
         const errMsg = `\n[trigger] Run #${id} stream error after ${elapsed}s: ${err}\n`;
         console.error(errMsg.trim());
-        enqueue(controller, encoder.encode(errMsg));
+        enqueuer.enqueue(controller, encoder.encode(errMsg));
       } finally {
         runs.delete(id);
         clearInterval(heartbeat);
@@ -305,25 +346,12 @@ function startStreamingRun(reason: string, issue: string): Response {
 
     cancel() {
       // Called when the HTTP client disconnects
-      clientConnected = false;
+      enqueuer.setDisconnected();
       console.log(
         `[trigger] Client disconnected from run #${id} stream (process continues running)`
       );
     },
   });
-
-  /** Safely enqueue data — swallow errors from client disconnect */
-  function enqueue(
-    controller: ReadableStreamDefaultController,
-    chunk: Uint8Array
-  ) {
-    if (!clientConnected) return;
-    try {
-      controller.enqueue(chunk);
-    } catch {
-      clientConnected = false;
-    }
-  }
 
   return new Response(stream, {
     headers: {
