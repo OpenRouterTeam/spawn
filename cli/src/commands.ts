@@ -603,13 +603,8 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
 
 /** Check for missing credentials before running a script and warn the user.
  *  In interactive mode, asks for confirmation. In non-interactive mode, just warns. */
-export async function preflightCredentialCheck(manifest: Manifest, cloud: string): Promise<void> {
-  const cloudAuth = manifest.clouds[cloud].auth;
-  if (cloudAuth.toLowerCase() === "none") return;
-
-  const authVars = parseAuthEnvVars(cloudAuth);
+function collectMissingCredentials(authVars: string[]): string[] {
   const missing: string[] = [];
-
   if (!process.env.OPENROUTER_API_KEY) {
     missing.push("OPENROUTER_API_KEY");
   }
@@ -618,29 +613,44 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
       missing.push(v);
     }
   }
+  return missing;
+}
 
+function getCredentialGuidance(cloud: string, onlyOpenRouter: boolean): string {
+  if (onlyOpenRouter) {
+    return "The script will open your browser to authenticate with OpenRouter.";
+  }
+  return `Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`;
+}
+
+async function confirmContinueWithMissingCreds(onlyOpenRouter: boolean): Promise<boolean> {
+  const confirmMsg = onlyOpenRouter
+    ? "Continue? You'll authenticate via browser."
+    : "Continue anyway? The script will prompt for missing credentials.";
+  const shouldContinue = await p.confirm({
+    message: confirmMsg,
+    initialValue: true,
+  });
+  return !p.isCancel(shouldContinue) && shouldContinue;
+}
+
+export async function preflightCredentialCheck(manifest: Manifest, cloud: string): Promise<void> {
+  const cloudAuth = manifest.clouds[cloud].auth;
+  if (cloudAuth.toLowerCase() === "none") return;
+
+  const authVars = parseAuthEnvVars(cloudAuth);
+  const missing = collectMissingCredentials(authVars);
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
   p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
 
-  // Give context-specific guidance
   const onlyOpenRouter = missing.length === 1 && missing[0] === "OPENROUTER_API_KEY";
-  if (onlyOpenRouter) {
-    p.log.info(`The script will open your browser to authenticate with OpenRouter.`);
-  } else {
-    p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
-  }
+  p.log.info(getCredentialGuidance(cloud, onlyOpenRouter));
 
   if (isInteractiveTTY()) {
-    const confirmMsg = onlyOpenRouter
-      ? "Continue? You'll authenticate via browser."
-      : "Continue anyway? The script will prompt for missing credentials.";
-    const shouldContinue = await p.confirm({
-      message: confirmMsg,
-      initialValue: true,
-    });
-    if (p.isCancel(shouldContinue) || !shouldContinue) {
+    const shouldContinue = await confirmContinueWithMissingCreds(onlyOpenRouter);
+    if (!shouldContinue) {
       handleCancel();
     }
   }
