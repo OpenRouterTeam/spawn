@@ -2432,21 +2432,13 @@ upload_config_file() {
 #   setup_claude_code_config "$OPENROUTER_API_KEY" \
 #     "upload_file_sprite $SPRITE_NAME" \
 #     "run_sprite $SPRITE_NAME"
-setup_claude_code_config() {
+
+# Generate Claude Code settings.json with API key
+_generate_claude_code_settings() {
     local openrouter_key="${1}"
-    local upload_callback="${2}"
-    local run_callback="${3}"
-
-    log_step "Configuring Claude Code..."
-
-    # Create ~/.claude directory
-    ${run_callback} "mkdir -p ~/.claude"
-
-    # Create settings.json
     local escaped_key
     escaped_key=$(json_escape "${openrouter_key}")
-    local settings_json
-    settings_json=$(cat << EOF
+    cat << EOF
 {
   "theme": "dark",
   "editor": "vim",
@@ -2461,18 +2453,36 @@ setup_claude_code_config() {
   }
 }
 EOF
-)
-    upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "\$HOME/.claude/settings.json"
+}
 
-    # Create .claude.json global state
-    local global_state_json
-    global_state_json=$(cat << EOF
+# Generate Claude Code global state JSON
+_generate_claude_code_state() {
+    cat << EOF
 {
   "hasCompletedOnboarding": true,
   "bypassPermissionsModeAccepted": true
 }
 EOF
-)
+}
+
+setup_claude_code_config() {
+    local openrouter_key="${1}"
+    local upload_callback="${2}"
+    local run_callback="${3}"
+
+    log_step "Configuring Claude Code..."
+
+    # Create ~/.claude directory
+    ${run_callback} "mkdir -p ~/.claude"
+
+    # Create settings.json
+    local settings_json
+    settings_json=$(_generate_claude_code_settings "${openrouter_key}")
+    upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "\$HOME/.claude/settings.json"
+
+    # Create .claude.json global state
+    local global_state_json
+    global_state_json=$(_generate_claude_code_state)
     upload_config_file "${upload_callback}" "${run_callback}" "${global_state_json}" "\$HOME/.claude.json"
 
     # Create empty CLAUDE.md

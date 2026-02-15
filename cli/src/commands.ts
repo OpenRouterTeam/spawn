@@ -1523,6 +1523,45 @@ async function resolveListFilters(
   return { manifest, agentFilter, cloudFilter };
 }
 
+/** Handle reconnect or rerun action for a selected spawn record */
+async function handleRecordAction(
+  selected: SpawnRecord,
+  manifest: Manifest | null
+): Promise<void> {
+  if (!selected.connection) {
+    // No connection info -- just rerun
+    p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
+    await cmdRun(selected.agent, selected.cloud, selected.prompt);
+    return;
+  }
+
+  const action = await p.select({
+    message: "What would you like to do?",
+    options: [
+      { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${selected.connection.user}@${selected.connection.ip}` },
+      { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
+    ],
+  });
+
+  if (p.isCancel(action)) {
+    handleCancel();
+  }
+
+  if (action === "reconnect") {
+    try {
+      await cmdConnect(selected.connection);
+    } catch (err) {
+      p.log.error(`Connection failed: ${getErrorMessage(err)}`);
+      p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
+    }
+    return;
+  }
+
+  // Rerun (create new spawn)
+  p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
+  await cmdRun(selected.agent, selected.cloud, selected.prompt);
+}
+
 /** Show interactive picker to select and reconnect/rerun a previous spawn */
 async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
   p.log.info(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")} or ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`));
@@ -1542,35 +1581,7 @@ async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest 
   }
 
   const selected = records[choice];
-
-  // If there's connection info, offer to reconnect or rerun
-  if (selected.connection) {
-    const action = await p.select({
-      message: "What would you like to do?",
-      options: [
-        { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${selected.connection.user}@${selected.connection.ip}` },
-        { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
-      ],
-    });
-
-    if (p.isCancel(action)) {
-      handleCancel();
-    }
-
-    if (action === "reconnect") {
-      try {
-        await cmdConnect(selected.connection);
-      } catch (err) {
-        p.log.error(`Connection failed: ${getErrorMessage(err)}`);
-        p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
-      }
-      return;
-    }
-  }
-
-  // Rerun (create new spawn)
-  p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
-  await cmdRun(selected.agent, selected.cloud, selected.prompt);
+  await handleRecordAction(selected, manifest);
 }
 
 export async function cmdListClear(): Promise<void> {
@@ -1641,60 +1652,55 @@ export async function cmdLast(): Promise<void> {
 
 // ── Connect ────────────────────────────────────────────────────────────────────
 
-/** Connect to an existing VM via SSH */
-async function cmdConnect(connection: VMConnection): Promise<void> {
-  // Handle Sprite console connections
-  if (connection.ip === "sprite-console" && connection.server_name) {
-    p.log.step(`Connecting to sprite ${pc.bold(connection.server_name)}...`);
-
-    return new Promise<void>((resolve, reject) => {
-      const child = spawn("sprite", ["console", "-s", connection.server_name], {
-        stdio: "inherit",
-      });
-
-      child.on("close", (code: number | null) => {
-        if (code === 0 || code === null) {
-          resolve();
-        } else {
-          reject(new Error(`Sprite console connection failed with exit code ${code}`));
-        }
-      });
-
-      child.on("error", (err) => {
-        p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
-        p.log.info(`Try manually: ${pc.cyan(`sprite console -s ${connection.server_name}`)}`);
-        reject(err);
-      });
-    });
-  }
-
-  // Handle SSH connections
-  p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
-
-  const sshCmd = `ssh -o StrictHostKeyChecking=accept-new ${connection.user}@${connection.ip}`;
-
+/** Execute a shell command and resolve/reject on process close/error */
+function runInteractiveCommand(
+  cmd: string,
+  args: string[],
+  failureMsg: string,
+  manualCmd: string
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn("ssh", [
-      "-o", "StrictHostKeyChecking=accept-new",
-      `${connection.user}@${connection.ip}`
-    ], {
-      stdio: "inherit",
-    });
+    const child = spawn(cmd, args, { stdio: "inherit" });
 
     child.on("close", (code: number | null) => {
       if (code === 0 || code === null) {
         resolve();
       } else {
-        reject(new Error(`SSH connection failed with exit code ${code}`));
+        reject(new Error(`${failureMsg} with exit code ${code}`));
       }
     });
 
     child.on("error", (err) => {
       p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
-      p.log.info(`Try manually: ${pc.cyan(sshCmd)}`);
+      p.log.info(`Try manually: ${pc.cyan(manualCmd)}`);
       reject(err);
     });
   });
+}
+
+/** Connect to an existing VM via SSH */
+async function cmdConnect(connection: VMConnection): Promise<void> {
+  // Handle Sprite console connections
+  if (connection.ip === "sprite-console" && connection.server_name) {
+    p.log.step(`Connecting to sprite ${pc.bold(connection.server_name)}...`);
+    return runInteractiveCommand(
+      "sprite",
+      ["console", "-s", connection.server_name],
+      "Sprite console connection failed",
+      `sprite console -s ${connection.server_name}`
+    );
+  }
+
+  // Handle SSH connections
+  p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
+  const sshCmd = `ssh -o StrictHostKeyChecking=accept-new ${connection.user}@${connection.ip}`;
+
+  return runInteractiveCommand(
+    "ssh",
+    ["-o", "StrictHostKeyChecking=accept-new", `${connection.user}@${connection.ip}`],
+    "SSH connection failed",
+    sshCmd
+  );
 }
 
 // ── Agents ─────────────────────────────────────────────────────────────────────
