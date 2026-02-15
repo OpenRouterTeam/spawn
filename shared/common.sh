@@ -2637,6 +2637,59 @@ EOF
 # LIST_CALLBACK must output pipe-delimited lines where the first field is the selectable ID.
 # Example output: "fsn1|Falkenstein|DE" or "cpx11|2 vCPU|4 GB RAM|40 GB disk"
 #
+# Ensure fzf is installed for interactive filtering
+# Auto-installs via package manager if missing
+ensure_fzf() {
+    # Already installed?
+    if command -v fzf >/dev/null 2>&1; then
+        return 0
+    fi
+
+    log_info "Installing fzf for interactive picker..."
+
+    # Detect package manager and install
+    if command -v apt-get >/dev/null 2>&1; then
+        # Debian/Ubuntu
+        sudo apt-get update -qq && sudo apt-get install -y fzf >/dev/null 2>&1
+    elif command -v dnf >/dev/null 2>&1; then
+        # Fedora/RHEL 8+
+        sudo dnf install -y fzf >/dev/null 2>&1
+    elif command -v yum >/dev/null 2>&1; then
+        # RHEL/CentOS 7
+        sudo yum install -y fzf >/dev/null 2>&1
+    elif command -v pacman >/dev/null 2>&1; then
+        # Arch Linux
+        sudo pacman -S --noconfirm fzf >/dev/null 2>&1
+    elif command -v apk >/dev/null 2>&1; then
+        # Alpine Linux
+        sudo apk add --no-cache fzf >/dev/null 2>&1
+    elif command -v brew >/dev/null 2>&1; then
+        # macOS with Homebrew
+        brew install fzf >/dev/null 2>&1
+    else
+        # Fallback: direct binary install to user's bin
+        log_warn "No package manager found, installing fzf manually..."
+        local install_dir="${HOME}/.local/bin"
+        mkdir -p "${install_dir}"
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsSL https://github.com/junegunn/fzf/releases/download/v0.56.3/fzf-0.56.3-linux_amd64.tar.gz | tar -xz -C "${install_dir}" fzf 2>/dev/null
+            export PATH="${install_dir}:${PATH}"
+        else
+            log_warn "Could not install fzf automatically. Falling back to numbered list."
+            return 1
+        fi
+    fi
+
+    # Verify installation
+    if command -v fzf >/dev/null 2>&1; then
+        log_info "fzf installed successfully"
+        return 0
+    else
+        log_warn "fzf installation failed. Falling back to numbered list."
+        return 1
+    fi
+}
+
 # Display a numbered list and read user selection
 # Pipe-delimited items: "id|label". Returns selected id via stdout.
 # Usage: _display_and_select PROMPT_TEXT DEFAULT_VALUE DEFAULT_ID <<< "$items"
@@ -2742,11 +2795,19 @@ _display_and_select() {
         return
     fi
 
-    # Try to use fzf for interactive filtering if available and stdin is a TTY
-    if command -v fzf >/dev/null 2>&1 && [[ -t 0 ]]; then
-        _prepare_fzf_input "${default_id}" "${items_array[@]}"
-        _fzf_select "${prompt_text}" "${default_value}" "${default_id}" "${FZF_INPUT}" "${FZF_DEFAULT_LINE}"
-        return
+    # Try to use fzf for interactive filtering if stdin is a TTY
+    if [[ -t 0 ]]; then
+        # Install fzf if not available
+        if ! command -v fzf >/dev/null 2>&1; then
+            ensure_fzf || true  # Continue even if installation fails
+        fi
+
+        # Use fzf if now available
+        if command -v fzf >/dev/null 2>&1; then
+            _prepare_fzf_input "${default_id}" "${items_array[@]}"
+            _fzf_select "${prompt_text}" "${default_value}" "${default_id}" "${FZF_INPUT}" "${FZF_DEFAULT_LINE}"
+            return
+        fi
     fi
 
     # Fallback to numbered list when fzf is not available
