@@ -56,7 +56,7 @@ If "missing" entries exist, spawn one teammate per gap (up to 5). Each implement
 
 ## Phase 2: Discovery (when matrix is full)
 
-### Cloud Scout (spawn 2, PRIORITY)
+### Cloud Scout (spawn 2, PRIORITY) (HEAVY_MODEL_TAG)
 Research NEW cloud/sandbox providers. Focus on **cheap CPU compute** (NOT GPU):
 - Container/sandbox platforms, budget VPS ($5-20/mo), regional clouds with simple APIs
 - Must have: public API/CLI, SSH/exec access, affordable pay-per-hour pricing, actually available
@@ -77,10 +77,10 @@ Research NEW cloud/sandbox providers. Focus on **cheap CPU compute** (NOT GPU):
 3. `assert_cloud_api_calls()`: expected API calls (SSH key fetch + server create)
 4. `setup_env_for_cloud()`: test env vars (API token, server name, plan, region)
 
-### Agent Scout (spawn 1, only if justified)
+### Agent Scout (spawn 1, only if justified) (LIGHT_MODEL_TAG)
 Only add agents with REAL community demand (2+ of: 1000+ GitHub stars, 50+ HN points, 100+ Reddit upvotes, user request in issues). Must be single-command installable, accept API keys via env vars, work with OpenRouter.
 
-### Issue Responder (spawn 1)
+### Issue Responder (spawn 1) (HEAVY_MODEL_TAG)
 `gh issue list --repo OpenRouterTeam/spawn --state open --limit 20`
 
 For each issue, fetch the COMPLETE thread:
@@ -98,12 +98,12 @@ Read ALL comments — prior discussion contains decisions, rejected approaches, 
 If actionable AND not already claimed, implement and create PR (self-review + label, do NOT merge). If already implemented, close with comment.
 **SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`.
 
-### Gap Filler (spawn remaining)
+### Gap Filler (spawn remaining) (LIGHT_MODEL_TAG)
 Pick up newly-created "missing" matrix entries after scouts commit.
 
 ## Commit Markers
 
-Every commit: `Agent: <role>` trailer + `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
+Every commit: `Agent: <role>` trailer + `Co-Authored-By: COAUTHOR_TAG <noreply@anthropic.com>`
 Values: cloud-scout, agent-scout, issue-responder, gap-filler, team-lead.
 
 ## Git Worktrees (MANDATORY)
@@ -115,12 +115,14 @@ git fetch origin main
 git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH -b BRANCH origin/main
 cd WORKTREE_BASE_PLACEHOLDER/BRANCH
 # ... work, commit (with Agent: marker), push ...
-gh pr create --title "title" --body "body\n\n-- discovery/AGENT-NAME"
+gh pr create --title "title" --body "body\n\n-- discovery/AGENT-NAME" --label "model:YOUR_MODEL"
 # Self-review + label (do NOT merge):
 gh pr review NUMBER --comment --body "Self-review: [summary]\n\n-- discovery/AGENT-NAME"
 gh pr edit NUMBER --add-label "needs-team-review"
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 ```
+
+**PR Model Labels (MANDATORY)**: When creating a PR, always add `--label "model:YOUR_MODEL"` where YOUR_MODEL is the model in parentheses next to your role (e.g., if you are `(sonnet)`, use `--label "model:sonnet"`). This enables QA to review PRs with a different model than the author.
 
 **PR Policy**: Every PR must be either OPEN (with self-review + `needs-team-review` label) or CLOSED (with comment via `gh pr close NUMBER --delete-branch --comment "reason"`). NEVER merge, push to main, or close silently.
 
