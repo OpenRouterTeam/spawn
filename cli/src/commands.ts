@@ -1558,7 +1558,12 @@ async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest 
     }
 
     if (action === "reconnect") {
-      await cmdConnect(selected.connection);
+      try {
+        await cmdConnect(selected.connection);
+      } catch (err) {
+        p.log.error(`Connection failed: ${getErrorMessage(err)}`);
+        p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
+      }
       return;
     }
   }
