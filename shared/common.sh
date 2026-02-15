@@ -1279,12 +1279,14 @@ packages:
   - unzip
   - git
   - zsh
+  - nodejs
+  - npm
 
 runcmd:
   # Install Bun
   - su - root -c 'curl -fsSL https://bun.sh/install | bash'
-  # Install Claude Code
-  - su - root -c 'curl -fsSL https://claude.ai/install.sh | bash'
+  # Install Claude Code (npm fallback if install script returns 403 from datacenter IPs)
+  - su - root -c 'curl -fsSL https://claude.ai/install.sh | bash || npm install -g @anthropic-ai/claude-code'
   # Mark as sandbox environment (disposable cloud VM)
   - echo 'export IS_SANDBOX=1' >> /root/.bashrc
   - echo 'export IS_SANDBOX=1' >> /root/.zshrc

@@ -31,7 +31,7 @@ wait_for_cloud_init "${HETZNER_SERVER_IP}" 60
 log_step "Verifying Claude Code installation..."
 if ! run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
     log_step "Claude Code not found, installing manually..."
-    run_server "${HETZNER_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
+    run_server "${HETZNER_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash || npm install -g @anthropic-ai/claude-code"
 fi
 
 # Verify installation succeeded
