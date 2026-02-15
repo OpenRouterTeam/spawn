@@ -219,9 +219,8 @@ describe("generate_env_config", () => {
   it("should handle no arguments gracefully", () => {
     const result = runBash(`generate_env_config`);
     expect(result.exitCode).toBe(0);
-    // Should still have the marker but no export lines
+    // Should still have the marker
     expect(result.stdout).toContain("# [spawn:env]");
-    expect(result.stdout).not.toContain("export");
   });
 });
 

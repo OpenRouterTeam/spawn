@@ -79,12 +79,12 @@ describe("Real manifest data validation", () => {
       expect(allAgents.length).toBeGreaterThanOrEqual(10);
     });
 
-    it("should have at least 15 clouds", () => {
-      expect(allClouds.length).toBeGreaterThanOrEqual(15);
+    it("should have at least 8 clouds", () => {
+      expect(allClouds.length).toBeGreaterThanOrEqual(8);
     });
 
-    it("should have at least 200 matrix entries", () => {
-      expect(Object.keys(manifest.matrix).length).toBeGreaterThanOrEqual(200);
+    it("should have at least 100 matrix entries", () => {
+      expect(Object.keys(manifest.matrix).length).toBeGreaterThanOrEqual(100);
     });
 
     it("should have more implemented than missing entries", () => {

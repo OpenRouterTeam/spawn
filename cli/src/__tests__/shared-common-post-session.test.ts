@@ -315,8 +315,8 @@ describe("ssh_interactive_session post-session integration", () => {
 describe("SPAWN_DASHBOARD_URL convention", () => {
   const sshClouds = discoverSSHClouds();
 
-  it("should find at least 20 SSH-based clouds", () => {
-    expect(sshClouds.length).toBeGreaterThanOrEqual(20);
+  it("should find at least 4 SSH-based clouds", () => {
+    expect(sshClouds.length).toBeGreaterThanOrEqual(4);
   });
 
   for (const cloud of sshClouds) {
@@ -456,16 +456,8 @@ describe("SPAWN_DASHBOARD_URL convention for exec-based clouds", () => {
   // Exec-based clouds that should have SPAWN_DASHBOARD_URL and call
   // _show_exec_post_session_summary after session ends
   const EXEC_CLOUDS_WITH_BILLING = [
-    "codesandbox",
     "daytona",
-    "e2b",
     "fly",
-    "github-codespaces",
-    "koyeb",
-    "modal",
-    "northflank",
-    "railway",
-    "render",
   ];
 
   for (const cloudName of EXEC_CLOUDS_WITH_BILLING) {

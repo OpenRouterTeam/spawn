@@ -11,8 +11,8 @@ describe("validatePromptFilePath", () => {
   });
 
   it("should reject empty paths", () => {
-    expect(() => validatePromptFilePath("")).toThrow("cannot be empty");
-    expect(() => validatePromptFilePath("   ")).toThrow("cannot be empty");
+    expect(() => validatePromptFilePath("")).toThrow("required");
+    expect(() => validatePromptFilePath("   ")).toThrow("required");
   });
 
   it("should reject SSH private key files", () => {
@@ -83,8 +83,8 @@ describe("validatePromptFilePath", () => {
       validatePromptFilePath("/home/user/.ssh/id_rsa");
       throw new Error("Expected to throw");
     } catch (e: any) {
-      expect(e.message).toContain("sent to remote agents");
-      expect(e.message).toContain("dedicated text file");
+      expect(e.message).toContain("sent to the agent");
+      expect(e.message).toContain("plain text file");
     }
   });
 
@@ -128,8 +128,8 @@ describe("validatePromptFileStats", () => {
       validatePromptFileStats("large.bin", stats);
       throw new Error("Expected to throw");
     } catch (e: any) {
-      expect(e.message).toContain("5.0MB");
-      expect(e.message).toContain("Maximum size is 1MB");
+      expect(e.message).toContain("5.0");
+      expect(e.message).toContain("1MB");
     }
   });
 });

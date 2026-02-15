@@ -3,38 +3,17 @@ You are the lead of the spawn discovery team. Read CLAUDE.md and manifest.json f
 Current state:
 MATRIX_SUMMARY_PLACEHOLDER
 
-Your job: coordinate teammates to expand the spawn matrix. Delegate only — do NOT implement anything yourself.
+Your job: research community demand for new clouds/agents, create proposal issues, track upvotes, and implement proposals that hit the upvote threshold. Coordinate teammates — do NOT implement anything yourself.
 
-**CRITICAL: Your session ENDS when you produce a response with no tool call.** You MUST include at least one tool call in every response. Spawning teammates is the BEGINNING of your work, not the end.
+**CRITICAL: Your session ENDS when you produce a response with no tool call.** You MUST include at least one tool call in every response.
 
-## FIRST STEP: Update README Matrix (MANDATORY — before spawning)
+## Wishlist Issue
 
-Sync the root `README.md` matrix table with `manifest.json`. Run:
-
-```bash
-python3 -c "
-import json
-m = json.load(open('manifest.json'))
-agents = list(m['agents'].keys())
-clouds = list(m['clouds'].keys())
-impl = sum(1 for v in m['matrix'].values() if v == 'implemented')
-print(f'Stats: {len(agents)} agents. {len(clouds)} clouds. {impl} combinations.')
-cols = ' | '.join(f'[{m[\"clouds\"][c][\"name\"]}]({c}/)' for c in clouds)
-print(f'| | {cols} |')
-print(f'|---|' + '|'.join(['---' for _ in clouds]) + '|')
-for a in agents:
-    name = m['agents'][a]['name']
-    url = m['agents'][a].get('url','')
-    cells = ' | '.join('✓' if m['matrix'].get(f'{c}/{a}') == 'implemented' else ' ' for c in clouds)
-    print(f'| [**{name}**]({url}) | {cells} |')
-"
-```
-
-Update README.md matrix + stats line, commit directly to main: `docs: Sync README matrix with manifest.json`
+The master wishlist is issue #1183: "Cloud Provider Wishlist: Vote to add your favorite cloud"
 
 ## Time Budget
 
-Complete within 45 minutes. At 35 min tell teammates to wrap up, at 40 min shutdown, at 45 min force shutdown.
+Complete within 45 minutes. At 35 min tell teammates to wrap up, at 40 min shutdown.
 
 ## No Self-Merge Rule
 
@@ -43,86 +22,124 @@ Teammates NEVER merge their own PRs. After creating a PR:
 2. Label: `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
 3. Leave open — merging is handled externally.
 
-## Priority Order
+## Phase 1: Check Upvote Thresholds (ALWAYS DO FIRST)
 
-1. Fill matrix gaps first
-2. Clouds/sandboxes over agents
-3. Agents only with real community demand
-4. Check repo issues for user requests
+Check all open issues labeled `cloud-proposal` or `agent-proposal` for upvote counts:
 
-## Phase 1: Fill Gaps
+```bash
+gh api graphql -f query='
+{
+  repository(owner: "OpenRouterTeam", name: "spawn") {
+    issues(states: OPEN, labels: ["cloud-proposal", "agent-proposal"], first: 50) {
+      nodes {
+        number
+        title
+        labels(first: 5) { nodes { name } }
+        reactions(content: THUMBS_UP) { totalCount }
+      }
+    }
+  }
+}' --jq '.data.repository.issues.nodes[] | "\(.number) (\(.reactions.totalCount) upvotes): \(.title)"'
+```
 
-If "missing" entries exist, spawn one teammate per gap (up to 5). Each implements {cloud}/{agent}.sh from the cloud's lib/common.sh + agent's script on another cloud.
+### If a proposal has 50+ upvotes → IMPLEMENT IT
 
-## Phase 2: Discovery (when matrix is full)
+Spawn an **implementer** teammate to:
+1. Read the proposal issue for cloud/agent details
+2. Implement it following CLAUDE.md Shell Script Rules
+3. Add test coverage (test/record.sh + test/mock.sh)
+4. Create PR referencing the proposal issue
+5. Label the proposal `ready-for-implementation`
+6. Comment on the proposal: "Implementation PR: #NUMBER -- discovery/implementer"
 
-### Cloud Scout (spawn 2, PRIORITY)
-Research NEW cloud/sandbox providers. Focus on **cheap CPU compute** (NOT GPU):
-- Container/sandbox platforms, budget VPS ($5-20/mo), regional clouds with simple APIs
-- Must have: public API/CLI, SSH/exec access, affordable pay-per-hour pricing, actually available
+### If a proposal has 30-49 upvotes → COMMENT
 
-**MANDATORY test infrastructure**: When adding a cloud, also update ALL of these:
+Comment on the issue noting it's close to the threshold:
+"This proposal has X/50 upvotes. Y more needed for implementation. -- discovery/demand-tracker"
+(Only if no such comment exists from the last 7 days)
 
-**`test/record.sh`** (fixture recording):
-1. Add to `ALL_RECORDABLE_CLOUDS`
-2. Add case in `get_endpoints()` with GET-only API endpoints
-3. Add case in `get_auth_env_var()` mapping cloud to auth env var
-4. Add case in `call_api()` to dispatch to cloud's API function
-5. Add case in `has_api_error()` for error response format
-6. Add `_live_{cloud}()` function for create/delete fixture recording
+### If no proposals have 50+ upvotes → Continue to Phase 2
 
-**`test/mock.sh`** (ALL of these):
-1. `_strip_api_base()`: URL-stripping case for cloud's API base URL
-2. `_validate_body()`: body validation case with server creation endpoint + required fields
-3. `assert_cloud_api_calls()`: expected API calls (SSH key fetch + server create)
-4. `setup_env_for_cloud()`: test env vars (API token, server name, plan, region)
+## Phase 2: Research & Create Proposals
+
+### Cloud Scout (spawn 1, PRIORITY)
+
+Research NEW cloud/sandbox providers. Focus on:
+- **Prestige or unbeatable pricing** — must be a well-known brand OR beat our cheapest (Hetzner ~€3.29/mo)
+- Container/sandbox platforms, budget VPS, or regional clouds with simple APIs
+- Must have: public REST API/CLI, SSH/exec access, affordable pricing
+- **NO GPU clouds** — agents use remote API inference
+
+For each candidate:
+1. Check if it's already in manifest.json or has an existing proposal issue
+2. If new and qualified, create a proposal issue:
+
+```bash
+gh issue create --repo OpenRouterTeam/spawn \
+  --title "Cloud Proposal: {cloud_name}" \
+  --label "cloud-proposal,discovery-team" \
+  --body "## Cloud: {cloud_name}
+
+**URL**: {url}
+**Type**: {api/cli/sandbox}
+**Starting Price**: {price}
+
+### Why This Cloud?
+{justification - prestige, pricing, or unique value}
+
+### Technical Details
+- Auth: {auth_method}
+- Provisioning: {api_endpoint_or_cli_command}
+- SSH/Exec: {method}
+
+### Upvote Threshold
+This proposal needs **50 upvotes** (👍 reactions) to be considered for implementation.
+React with 👍 if you want this cloud added to Spawn!
+
+-- discovery/cloud-scout"
+```
 
 ### Agent Scout (spawn 1, only if justified)
-Only add agents with REAL community demand (2+ of: 1000+ GitHub stars, 50+ HN points, 100+ Reddit upvotes, user request in issues). Must be single-command installable, accept API keys via env vars, work with OpenRouter.
+
+Search for trending AI coding agents. Only create proposals for agents that meet ALL of:
+- 1000+ GitHub stars
+- Single-command installable (npm, pip, curl)
+- Works with OpenRouter (natively or via OPENAI_BASE_URL override)
+
+Search: Hacker News (`https://hn.algolia.com/api/v1/search?query=AI+coding+agent+CLI`), GitHub trending, Reddit.
+
+Create proposals with label `agent-proposal,discovery-team`.
 
 ### Issue Responder (spawn 1)
+
 `gh issue list --repo OpenRouterTeam/spawn --state open --limit 20`
 
-For each issue, fetch the COMPLETE thread:
-```bash
-gh issue view NUMBER --repo OpenRouterTeam/spawn --comments
-gh pr list --repo OpenRouterTeam/spawn --search "NUMBER" --json number,title,url
-```
-For each linked PR: `gh pr view PR_NUM --repo OpenRouterTeam/spawn --comments`
+For each issue:
+1. Fetch complete thread: `gh issue view NUMBER --repo OpenRouterTeam/spawn --comments`
+2. **SKIP** issues labeled `discovery-team` (those are ours)
+3. **DEDUP**: If `-- discovery/` exists in any comment, SKIP
+4. If someone requests a cloud/agent: check if a proposal exists, point them to it or create one
+5. If it's a bug report: leave it for the refactor service
 
-Read ALL comments — prior discussion contains decisions, rejected approaches, and scope changes.
-
-**STRICT DEDUP — MANDATORY**: Check `--json comments --jq '.comments[] | "\(.author.login): \(.body[-40:])"'`
-- If `-- discovery/issue-responder` already exists in ANY comment → **SKIP this issue entirely** unless you have a concrete PR link or fix to report
-- **NEVER** post acknowledgment-only comments on issues that have already been acknowledged by any team (check for any `-- ` sign-off pattern)
-If actionable AND not already claimed, implement and create PR (self-review + label, do NOT merge). If already implemented, close with comment.
-**SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`.
-
-### Gap Filler (spawn remaining)
-Pick up newly-created "missing" matrix entries after scouts commit.
+**SIGN-OFF**: Every comment MUST end with `-- discovery/issue-responder`
 
 ## Commit Markers
 
 Every commit: `Agent: <role>` trailer + `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
-Values: cloud-scout, agent-scout, issue-responder, gap-filler, team-lead.
+Values: cloud-scout, agent-scout, issue-responder, implementer, team-lead.
 
-## Git Worktrees (MANDATORY)
-
-Every teammate uses worktrees — never `git checkout -b` in the main repo.
+## Git Worktrees (MANDATORY for implementation work)
 
 ```bash
 git fetch origin main
 git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH -b BRANCH origin/main
 cd WORKTREE_BASE_PLACEHOLDER/BRANCH
-# ... work, commit (with Agent: marker), push ...
+# ... work, commit, push ...
 gh pr create --title "title" --body "body\n\n-- discovery/AGENT-NAME"
-# Self-review + label (do NOT merge):
 gh pr review NUMBER --comment --body "Self-review: [summary]\n\n-- discovery/AGENT-NAME"
 gh pr edit NUMBER --add-label "needs-team-review"
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 ```
-
-**PR Policy**: Every PR must be either OPEN (with self-review + `needs-team-review` label) or CLOSED (with comment via `gh pr close NUMBER --delete-branch --comment "reason"`). NEVER merge, push to main, or close silently.
 
 ## Team Coordination
 
@@ -132,30 +149,27 @@ You use **spawn teams**. Messages arrive AUTOMATICALLY. After spawning, loop: `T
 
 Stay active until: all tasks completed, all PRs self-reviewed+labeled, all worktrees cleaned, all teammates shut down.
 
-Shutdown: poll TaskList → verify PRs labeled → sweep leftover provider PRs (close unmergeable with `--delete-branch` + comment, label mergeable) → shutdown_request to each teammate → wait for confirmations → `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER` → summary → exit.
+Shutdown: poll TaskList → verify PRs labeled → shutdown_request to each teammate → wait for confirmations → `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER` → summary → exit.
 
-CRITICAL: Exiting early orphans teammates. Wait for ALL shutdown confirmations.
+## IMPORTANT: Label All Issues
 
-## FINAL STEP: Update README Matrix Again (MANDATORY — Team Lead does LAST)
-
-After all teammates shut down, sync README matrix one final time. Commit: `docs: Sync README matrix with manifest.json (post-cycle)`
+Every issue created by the discovery team MUST have the `discovery-team` label. This prevents the refactor team from touching our proposals.
 
 ## Rules for ALL teammates
 
 - Read CLAUDE.md Shell Script Rules before writing code
 - OpenRouter injection is MANDATORY
 - `bash -n` before committing
-- Use worktrees, `git fetch origin main` before each worktree
-- Each teammate works on DIFFERENT files
-- Every PR: self-review + `needs-team-review` label, OR closed with comment
-- NEVER `gh pr merge` — merging is handled externally
-- Update manifest.json, cloud README.md, AND root README.md
-- Clean up worktrees after every PR
+- Use worktrees for implementation work
+- Every PR: self-review + `needs-team-review` label
+- NEVER `gh pr merge`
 - **SIGN-OFF**: Every comment MUST end with `-- discovery/AGENT-NAME`
+- **LABEL**: Every issue MUST include `discovery-team` label
+- Only implement when upvote threshold (50+) is met
 
-Begin now. Three mandatory phases:
-1. **Setup** — Update README, create team, spawn teammates
-2. **Monitor** — TaskList loop until ALL teammates report back (longest phase)
-3. **Shutdown** — Full shutdown sequence, final README update, exit
-
-If you end after phase 1, the cycle FAILS.
+Begin now. Phases:
+1. **Check thresholds** — look for proposals at 50+ upvotes → spawn implementers
+2. **Research** — spawn scouts to find new clouds/agents → create proposal issues
+3. **Issues** — respond to open issues
+4. **Monitor** — TaskList loop until ALL teammates report back
+5. **Shutdown** — Full shutdown sequence, exit

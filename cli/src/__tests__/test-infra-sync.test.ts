@@ -166,8 +166,8 @@ describe("Test Infrastructure Sync", () => {
       expect(recordableClouds.length).toBeGreaterThan(0);
     });
 
-    it("should have at least 10 recordable clouds", () => {
-      expect(recordableClouds.length).toBeGreaterThanOrEqual(10);
+    it("should have at least 3 recordable clouds", () => {
+      expect(recordableClouds.length).toBeGreaterThanOrEqual(3);
     });
 
     it("should not have duplicate entries in ALL_RECORDABLE_CLOUDS", () => {
@@ -302,7 +302,7 @@ describe("Test Infrastructure Sync", () => {
   describe("test/mock.sh: _validate_body() coverage", () => {
     it("should validate POST body for major clouds", () => {
       // _validate_body has explicit field checks for major REST API clouds
-      const majorClouds = ["hetzner", "digitalocean", "vultr", "linode"];
+      const majorClouds = ["hetzner", "digitalocean"];
       for (const cloud of majorClouds) {
         expect(mockShContent).toContain(cloud);
       }

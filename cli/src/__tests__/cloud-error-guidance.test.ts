@@ -71,35 +71,14 @@ const allClouds = discoverCloudLibs();
 
 // Providers known to have destroy_server with proper error handling (upgraded in PRs #957-962)
 const UPGRADED_DESTROY_PROVIDERS = [
-  "hetzner", "upcloud", "contabo", "netcup", "ramnode",
-  "hostinger", "hostkey", "latitude",
+  "hetzner",
 ];
 
 // Known dashboard URLs per provider
 const DASHBOARD_URLS: Record<string, string> = {
   "hetzner": "console.hetzner.cloud",
   "digitalocean": "cloud.digitalocean.com",
-  "vultr": "my.vultr.com",
-  "linode": "cloud.linode.com",
-  "upcloud": "hub.upcloud.com",
-  "contabo": "my.contabo.com",
-  "civo": "dashboard.civo.com",
-  "exoscale": "portal.exoscale.com",
-  "scaleway": "console.scaleway.com",
   "fly": "fly.io/dashboard",
-  "latitude": "latitude.sh",
-  "kamatera": "console.kamatera.com",
-  "binarylane": "home.binarylane.com.au",
-  "genesiscloud": "console.genesiscloud.com",
-  "hostinger": "hpanel.hostinger.com",
-  "ionos": "dcd.ionos.com",
-  "northflank": "app.northflank.com",
-  "render": "dashboard.render.com",
-  "koyeb": "app.koyeb.com",
-  "e2b": "e2b.dev/dashboard",
-  "cherry": "portal.cherryservers.com",
-  "netcup": "ccp.netcup.net",
-  "ramnode": "ramnode.com",
 };
 
 // ── Upgraded destroy_server providers ───────────────────────────────────────
@@ -151,8 +130,8 @@ describe("create_server error handling", () => {
     c.content.includes("create_server()")
   );
 
-  it("should find at least 10 clouds with create_server", () => {
-    expect(cloudsWithCreate.length).toBeGreaterThanOrEqual(10);
+  it("should find at least 6 clouds with create_server", () => {
+    expect(cloudsWithCreate.length).toBeGreaterThanOrEqual(6);
   });
 
   for (const cloud of cloudsWithCreate) {
@@ -239,46 +218,54 @@ describe("shared timeout function guidance", () => {
 
   describe("generic_wait_for_instance", () => {
     const body = extractFunctionBody(sharedContent, "generic_wait_for_instance");
+    // The timeout reporting is delegated to _report_instance_timeout
+    const helperBody = extractFunctionBody(sharedContent, "_report_instance_timeout");
 
     it("should exist", () => {
       expect(body).not.toBeNull();
     });
 
-    it("should log error on timeout", () => {
-      expect(body!).toContain("log_error");
+    it("should log error on timeout (via helper)", () => {
+      expect(helperBody!).toContain("log_error");
     });
 
-    it("should suggest retry or manual check", () => {
+    it("should suggest retry or manual check (via helper)", () => {
       const hasGuidance =
-        body!.includes("Re-run") ||
-        body!.includes("re-run") ||
-        body!.includes("try again") ||
-        body!.includes("dashboard") ||
-        body!.includes("check");
+        helperBody!.includes("Re-run") ||
+        helperBody!.includes("re-run") ||
+        helperBody!.includes("try again") ||
+        helperBody!.includes("dashboard") ||
+        helperBody!.includes("check");
       expect(hasGuidance).toBe(true);
     });
 
-    it("should mention the instance may still be provisioning", () => {
-      expect(body!).toContain("provisioning");
+    it("should mention the instance may still be provisioning (via helper)", () => {
+      const hasProvisioningRef =
+        helperBody!.includes("provisioning") ||
+        helperBody!.includes("provision") ||
+        helperBody!.includes("not yet ready");
+      expect(hasProvisioningRef).toBe(true);
     });
   });
 
   describe("generic_ssh_wait", () => {
     const body = extractFunctionBody(sharedContent, "generic_ssh_wait");
+    // The timeout reporting is delegated to _log_ssh_wait_timeout_error
+    const helperBody = extractFunctionBody(sharedContent, "_log_ssh_wait_timeout_error");
 
     it("should exist", () => {
       expect(body).not.toBeNull();
     });
 
-    it("should log error on timeout", () => {
-      expect(body!).toContain("log_error");
+    it("should log error on timeout (via helper)", () => {
+      expect(helperBody!).toContain("log_error");
     });
 
-    it("should suggest that the server may still be booting", () => {
+    it("should suggest that the server may still be booting (via helper)", () => {
       const hasGuidance =
-        body!.includes("booting") ||
-        body!.includes("try again") ||
-        body!.includes("dashboard");
+        helperBody!.includes("booting") ||
+        helperBody!.includes("try again") ||
+        helperBody!.includes("dashboard");
       expect(hasGuidance).toBe(true);
     });
   });

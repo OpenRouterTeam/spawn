@@ -40,30 +40,37 @@ Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 - Set provider-specific env vars (e.g., `ANTHROPIC_BASE_URL=https://openrouter.ai/api`)
 - These come from the agent's `env` field in `manifest.json`
 
-### 2. Add a new cloud provider (PRIORITY)
+### 2. Add a new cloud provider (HIGH BAR)
 
-We bias heavily toward adding more clouds/sandboxes over more agents. To add one:
+We are currently shipping with **9 curated clouds** (sorted by price):
+1. **local** — free (no provisioning)
+2. **oracle** — free tier (Always Free ARM instances)
+3. **hetzner** — ~€3.29/mo (CX22)
+4. **ovh** — ~€3.50/mo (d2-2)
+5. **fly** — free tier (3 shared-cpu VMs)
+6. **aws-lightsail** — $3.50/mo (nano)
+7. **daytona** — pay-per-second sandboxes
+8. **digitalocean** — $4/mo (Basic droplet)
+9. **gcp** — $7.11/mo (e2-micro)
+10. **sprite** — Fly.io managed VMs
 
-1. Create `{cloud}/lib/common.sh` with the provider's primitives:
-   - Auth/token management (env var → config file → prompt)
-   - Server/container creation (API call or CLI)
-   - SSH/exec connectivity
-   - File upload
-   - Interactive session
-   - Server destruction
+**Do NOT add clouds speculatively.** Every cloud must be manually tested and verified end-to-end before shipping. Adding a cloud that can't be tested is worse than not having it.
+
+**Requirements to add a new cloud:**
+- **Prestige or unbeatable pricing** — must be a well-known brand OR beat our cheapest options
+- **Must be manually testable** — you need an account and can verify scripts work
+- **REST API or CLI with SSH/exec** — no proprietary-only access methods
+- **Test coverage is mandatory** (see "Mock Test Infrastructure" section below)
+
+Steps to add one:
+1. Create `{cloud}/lib/common.sh` with the provider's primitives
 2. Add an entry to `manifest.json` → `clouds`
 3. Add `"missing"` entries to the matrix for every existing agent
 4. Implement at least 2-3 agent scripts to prove the lib works
 5. Update the cloud's `README.md`
-6. **Add test coverage** (mandatory — see "Mock Test Infrastructure" section below for full details):
+6. **Add test coverage** (mandatory):
    - `test/record.sh` — add to `ALL_RECORDABLE_CLOUDS`, add cases in `get_endpoints()`, `get_auth_env_var()`, `call_api()`, `has_api_error()`, and add a `_live_{cloud}()` function
    - `test/mock.sh` — add cases in `_strip_api_base()`, `_validate_body()`, `assert_cloud_api_calls()`, and `setup_env_for_cloud()`
-
-**Good candidate clouds (cheap CPU compute for agents using remote API inference):**
-- Container/sandbox platforms (fast spin-up, developer-friendly)
-- Budget VPS providers with cheap small instances ($5-20/mo range)
-- Regional providers with simple APIs (OVH, Scaleway, UpCloud)
-- Any provider with REST API or CLI + SSH/exec + affordable pay-per-hour pricing
 
 **DO NOT add GPU clouds** (CoreWeave, RunPod, etc.). Spawn agents call remote LLM APIs for inference — they need cheap CPU instances with SSH, not expensive GPU VMs.
 

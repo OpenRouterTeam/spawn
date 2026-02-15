@@ -135,12 +135,12 @@ describe("upload_file() Security Patterns", () => {
       }
     });
 
-    it("should have at least 5 exec-based upload_file implementations to test", () => {
-      expect(execBasedClouds.length).toBeGreaterThanOrEqual(5);
+    it("should have at least 2 exec-based upload_file implementations to test", () => {
+      expect(execBasedClouds.length).toBeGreaterThanOrEqual(2);
     });
 
-    it("should check at least 15 clouds total", () => {
-      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(15);
+    it("should check at least 8 clouds total", () => {
+      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(8);
     });
   });
 

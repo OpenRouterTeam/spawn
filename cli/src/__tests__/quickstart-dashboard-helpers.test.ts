@@ -244,12 +244,12 @@ describe("buildDashboardHint edge cases via getScriptFailureGuidance", () => {
     expect(joined).toContain("https://sprite.sh");
   });
 
-  it("should omit dashboard line for exit code 1 when URL is empty string", () => {
+  it("should omit specific dashboard URL for exit code 1 when URL is empty string", () => {
     const lines = getScriptFailureGuidance(1, "sprite", undefined, "");
     const joined = lines.join("\n");
-    // Empty string is falsy -- no dashboard line is added at all for exit code 1
-    // (exit code 1 uses inline ternary, not buildDashboardHint)
-    expect(joined).not.toContain("dashboard");
+    // Empty string is falsy -- no specific dashboard URL line is added for exit code 1
+    // (generic "cloud provider dashboard" hint may still appear in guidance text)
+    expect(joined).not.toContain("https://");
   });
 
   it("should consistently use 'Check your dashboard' wording with URL", () => {

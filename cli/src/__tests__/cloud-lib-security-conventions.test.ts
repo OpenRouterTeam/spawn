@@ -421,7 +421,7 @@ describe("Credential handling patterns", () => {
 
 describe("coverage stats", () => {
   it("should check all implemented clouds", () => {
-    expect(cloudsWithImpls.size).toBeGreaterThan(10);
+    expect(cloudsWithImpls.size).toBeGreaterThanOrEqual(8);
   });
 
   it("should have lib/common.sh for every implemented cloud", () => {
