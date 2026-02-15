@@ -250,9 +250,8 @@ build_team_prompt() {
     cat "$prompt_template"
 }
 
-build_single_prompt() {
-    local gap
-    gap=$(python3 - "${MANIFEST}" <<'PYEOF'
+_find_first_gap() {
+    python3 - "${MANIFEST}" <<'PYEOF'
 import json, sys
 m = json.load(open(sys.argv[1]))
 for key, status in m.get('matrix', {}).items():
@@ -260,24 +259,26 @@ for key, status in m.get('matrix', {}).items():
         print(key)
         break
 PYEOF
-)
+}
 
-    if [[ -n "${gap}" ]]; then
-        local cloud="${gap%%/*}"
-        local agent="${gap##*/}"
-        printf 'Read CLAUDE.md and manifest.json. Implement "%s/%s.sh":\n' "${cloud}" "${agent}"
-        printf '1. Read %s/lib/common.sh for cloud primitives\n' "${cloud}"
-        printf '2. Read an existing %s.sh on another cloud for the install pattern\n' "${agent}"
-        printf '3. Write %s/%s.sh combining the two\n' "${cloud}" "${agent}"
-        printf '4. Update manifest.json to mark "%s/%s" as "implemented"\n' "${cloud}" "${agent}"
-        cat <<'EOF'
+_print_gap_implementation_steps() {
+    local cloud="$1"
+    local agent="$2"
+    printf 'Read CLAUDE.md and manifest.json. Implement "%s/%s.sh":\n' "${cloud}" "${agent}"
+    printf '1. Read %s/lib/common.sh for cloud primitives\n' "${cloud}"
+    printf '2. Read an existing %s.sh on another cloud for the install pattern\n' "${agent}"
+    printf '3. Write %s/%s.sh combining the two\n' "${cloud}" "${agent}"
+    printf '4. Update manifest.json to mark "%s/%s" as "implemented"\n' "${cloud}" "${agent}"
+    cat <<'EOF'
 5. Update the cloud's README.md
 6. bash -n syntax check
 7. Commit
 OpenRouter injection is mandatory. Follow CLAUDE.md Shell Script Rules.
 EOF
-    else
-        cat <<'EOF'
+}
+
+_print_matrix_full_guidance() {
+    cat <<'EOF'
 Read CLAUDE.md and manifest.json. The matrix is full.
 
 Your priority: find a NEW cloud/sandbox provider to add. Search for cheap CPU compute
@@ -302,6 +303,18 @@ Also check `gh issue list --repo OpenRouterTeam/spawn --state open` for user req
 
 Follow CLAUDE.md Shell Script Rules. Commit when done.
 EOF
+}
+
+build_single_prompt() {
+    local gap
+    gap=$(_find_first_gap)
+
+    if [[ -n "${gap}" ]]; then
+        local cloud="${gap%%/*}"
+        local agent="${gap##*/}"
+        _print_gap_implementation_steps "${cloud}" "${agent}"
+    else
+        _print_matrix_full_guidance
     fi
 }
 
