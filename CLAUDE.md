@@ -285,6 +285,7 @@ Without these, the cloud has **no test coverage**, body validation is missing, m
   - **Major** (X.0.0 → X+1.0.0): Breaking changes
 - The CLI has auto-update enabled — users get new versions immediately on next run
 - Version bumps ensure users always have the latest fixes and features
+- **NEVER commit `cli/cli.js`** — it is a build artifact (already in `.gitignore`). It is produced during releases, not checked into the repo. Do NOT use `git add -f cli/cli.js`.
 
 ## Autonomous Loops
 

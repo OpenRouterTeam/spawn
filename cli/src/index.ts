@@ -65,6 +65,7 @@ const KNOWN_FLAGS = new Set([
   "--version", "-v", "-V",
   "--prompt", "-p", "--prompt-file", "-f",
   "--dry-run", "-n",
+  "--debug",
   "-a", "-c", "--agent", "--cloud",
   "--clear",
 ]);
@@ -93,6 +94,7 @@ function checkUnknownFlags(args: string[]): void {
       console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
       console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
       console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
+      console.error(`    ${pc.cyan("--debug")}             Show all commands being executed`);
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
       console.error();
@@ -143,13 +145,13 @@ async function showInfoOrError(name: string): Promise<void> {
   showUnknownCommandError(name, manifest);
 }
 
-async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean): Promise<void> {
+async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean, debug?: boolean): Promise<void> {
   if (cloud && HELP_FLAGS.includes(cloud)) {
     await showInfoOrError(agent);
     return;
   }
   if (cloud) {
-    await cmdRun(agent, cloud, prompt, dryRun);
+    await cmdRun(agent, cloud, prompt, dryRun, debug);
     return;
   }
   if (dryRun) {
@@ -428,11 +430,11 @@ async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<
 }
 
 /** Handle verb aliases like "spawn run claude sprite" -> "spawn claude sprite" */
-async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
+async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, debug: boolean): Promise<void> {
   if (filteredArgs.length > 1) {
     const remaining = filteredArgs.slice(1);
     warnExtraArgs(remaining, 2);
-    await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun);
+    await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun, debug);
     return;
   }
   console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent and cloud`));
@@ -442,19 +444,19 @@ async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: st
 }
 
 /** Handle slash notation: "spawn claude/hetzner" -> "spawn claude hetzner" */
-async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean): Promise<boolean> {
+async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean, debug: boolean): Promise<boolean> {
   const parts = cmd.split("/");
   if (parts.length === 2 && parts[0] && parts[1]) {
     console.error(pc.dim(`Tip: use a space instead of slash: ${pc.cyan(`spawn ${parts[0]} ${parts[1]}`)}`));
     console.error();
-    await handleDefaultCommand(parts[0], parts[1], prompt, dryRun);
+    await handleDefaultCommand(parts[0], parts[1], prompt, dryRun, debug);
     return true;
   }
   return false;
 }
 
 /** Dispatch a named command or fall through to agent/cloud handling */
-async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
+async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, debug: boolean): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
     warnExtraArgs(filteredArgs, 1);
     IMMEDIATE_COMMANDS[cmd]();
@@ -463,14 +465,14 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
 
   if (LIST_COMMANDS.has(cmd)) { await dispatchListCommand(filteredArgs); return; }
   if (SUBCOMMANDS[cmd]) { await dispatchSubcommand(cmd, filteredArgs); return; }
-  if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun); return; }
+  if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun, debug); return; }
 
   if (filteredArgs.length === 1 && cmd.includes("/")) {
-    if (await dispatchSlashNotation(cmd, prompt, dryRun)) return;
+    if (await dispatchSlashNotation(cmd, prompt, dryRun, debug)) return;
   }
 
   warnExtraArgs(filteredArgs, 2);
-  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt, dryRun);
+  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt, dryRun, debug);
 }
 
 async function main(): Promise<void> {
@@ -485,6 +487,11 @@ async function main(): Promise<void> {
   const dryRun = dryRunIdx !== -1;
   if (dryRun) filteredArgs.splice(dryRunIdx, 1);
 
+  // Extract --debug boolean flag
+  const debugIdx = filteredArgs.findIndex(a => a === "--debug");
+  const debug = debugIdx !== -1;
+  if (debug) filteredArgs.splice(debugIdx, 1);
+
   checkUnknownFlags(filteredArgs);
 
   const cmd = filteredArgs[0];
@@ -493,7 +500,7 @@ async function main(): Promise<void> {
     if (!cmd) {
       await handleNoCommand(prompt, dryRun);
     } else {
-      await dispatchCommand(cmd, filteredArgs, prompt, dryRun);
+      await dispatchCommand(cmd, filteredArgs, prompt, dryRun, debug);
     }
   } catch (err) {
     handleError(err);

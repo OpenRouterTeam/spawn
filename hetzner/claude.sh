@@ -27,15 +27,18 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${HETZNER_SERVER_IP}"
 wait_for_cloud_init "${HETZNER_SERVER_IP}" 60
 
-# 5. Verify Claude Code is installed (fallback to manual install)
+# 5. Verify Claude Code is installed (try curl first, then bun fallback)
 log_step "Verifying Claude Code installation..."
-if ! run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
-    run_server "${HETZNER_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
+if ! run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
+    log_step "Claude Code not found, installing..."
+    if ! run_server "${HETZNER_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"; then
+        log_warn "curl install failed, falling back to bun..."
+        run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH && bun add -g @anthropic-ai/claude-code && claude install"
+    fi
 fi
 
 # Verify installation succeeded
-if ! run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
+if ! run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
     log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash" "${HETZNER_SERVER_IP}"
     exit 1
 fi
