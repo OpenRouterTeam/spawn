@@ -192,13 +192,18 @@ Complete within 12 minutes. At 9 min wrap up, at 11 min shutdown, at 12 min forc
    `gh issue edit ISSUE_NUM_PLACEHOLDER --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --add-label "in-progress"`
 2. Set up worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER -b team-building/issue-ISSUE_NUM_PLACEHOLDER origin/main`
 3. Spawn implementer (opus) → spawn reviewer (opus)
-4. Monitor: `TaskList` → `Bash("sleep 5")` → repeat. EVERY iteration MUST call TaskList.
+4. **Monitor Loop (CRITICAL)**: After spawning teammates, enter an infinite monitoring loop:
+   - Call \`TaskList\` to check task status
+   - Process any completed tasks or teammate messages
+   - Call \`Bash("sleep 15")\` to wait before next check
+   - **REPEAT** until both teammates report done or time budget reached (9/11/12 min)
+   - **The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include: \`TaskList\` + \`Bash("sleep 15")\`
 5. When both report: if merged, close issue; if issues found, comment on issue
 6. Shutdown teammates, clean up worktree, TeamDelete, exit
 
 ## Team Coordination
 
-**Session ENDS when you produce a response with no tool call.** Always include at least one tool call. Loop: TaskList → process messages → sleep 5 → repeat.
+Messages arrive AUTOMATICALLY. Keep looping with tool calls until work is complete.
 
 ## Safety
 
@@ -414,13 +419,25 @@ Skip if >5 open PRs. Otherwise spawn in parallel:
 2. **code-scanner** (Sonnet) — Same for .ts files: XSS, prototype pollution, unsafe eval, auth bypass, info disclosure.
    File CRITICAL/HIGH as individual issues (dedup first). Report findings.
 
-## Step 5 — Monitor
+## Step 5 — Monitor Loop (CRITICAL)
 
-Poll TaskList every 15 seconds. Record: PR verdicts, branches deleted, issues re-flagged, scan findings.
+**CRITICAL**: After spawning all teammates, you MUST enter an infinite monitoring loop.
+
+**Example monitoring loop structure**:
+1. Call \`TaskList\` to check task status
+2. Process any completed tasks or teammate messages
+3. Call \`Bash("sleep 15")\` to wait before next check
+4. **REPEAT** steps 1-3 until all teammates report done
+
+**The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include at minimum: \`TaskList\` + \`Bash("sleep 15")\`.
+
+Keep looping until:
+- All tasks are completed OR
+- Time budget is reached (see timeout warnings at 25/29/30 min)
 
 ## Step 6 — Summary + Slack
 
-Compile summary. If SLACK_WEBHOOK set:
+After all teammates finish, compile summary. If SLACK_WEBHOOK set:
 \`\`\`bash
 SLACK_WEBHOOK="${SLACK_WEBHOOK:-NOT_SET}"
 if [ -n "\${SLACK_WEBHOOK}" ] && [ "\${SLACK_WEBHOOK}" != "NOT_SET" ]; then
@@ -432,9 +449,7 @@ fi
 
 ## Team Coordination
 
-You use **spawn teams**. Messages arrive AUTOMATICALLY. **Session ENDS when you produce a response with no tool call.**
-
-Loop: \`TaskList\` → process messages → \`Bash("sleep 5")\` → repeat. EVERY iteration MUST call TaskList.
+You use **spawn teams**. Messages arrive AUTOMATICALLY.
 
 ## Safety
 
@@ -480,9 +495,16 @@ CRITICAL/HIGH → individual issues:
 
 MEDIUM/LOW → single batch issue with severity/file/description table.
 
-## Team Coordination
+## Monitor Loop (CRITICAL)
 
-**Session ENDS when you produce a response with no tool call.** Loop: TaskList → process → sleep 5 → repeat.
+**CRITICAL**: After spawning all teammates, enter an infinite monitoring loop:
+
+1. Call \`TaskList\` to check task status
+2. Process any completed tasks or teammate messages
+3. Call \`Bash("sleep 15")\` to wait before next check
+4. **REPEAT** until all teammates report done or time budget reached (12/14/15 min)
+
+**The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include: \`TaskList\` + \`Bash("sleep 15")\`.
 
 ## Slack Notification
 
