@@ -190,6 +190,65 @@ function suggestTypoCorrection(
   return findClosestKeyByNameOrKey(value, keys, (k) => collection[k].name);
 }
 
+/** Check if user provided an entity of the wrong kind and suggest correction */
+function checkWrongKind(
+  value: string,
+  kind: "agent" | "cloud",
+  manifest: Manifest,
+  def: EntityDef
+): boolean {
+  const oppositeKind = kind === "agent" ? "cloud" : "agent";
+  const oppositeCollection = getEntityCollection(manifest, oppositeKind);
+
+  if (oppositeCollection[value]) {
+    const kindLabel = kind === "agent" ? "a cloud provider" : "an agent";
+    const wrongLabel = kind === "agent" ? "an agent" : "a cloud provider";
+    p.log.info(`"${value}" is ${kindLabel}, not ${wrongLabel}.`);
+    p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
+    p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
+    return true;
+  }
+  return false;
+}
+
+/** Check for typo in same kind and suggest correction */
+function checkSameKindTypo(
+  value: string,
+  kind: "agent" | "cloud",
+  manifest: Manifest,
+  def: EntityDef,
+  collection: Record<string, { name: string }>
+): boolean {
+  const match = suggestTypoCorrection(value, manifest, kind);
+  if (match) {
+    p.log.info(`Did you mean ${pc.cyan(match)} (${collection[match].name})?`);
+    p.log.info(`  ${pc.cyan(`spawn ${match}`)}`);
+    p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
+    return true;
+  }
+  return false;
+}
+
+/** Check for typo in opposite kind (swapped arguments) and suggest correction */
+function checkOppositeKindTypo(
+  value: string,
+  kind: "agent" | "cloud",
+  manifest: Manifest
+): boolean {
+  const oppositeKind = kind === "agent" ? "cloud" : "agent";
+  const oppositeMatch = suggestTypoCorrection(value, manifest, oppositeKind);
+
+  if (oppositeMatch) {
+    const oppositeDef = ENTITY_DEFS[oppositeKind];
+    const oppositeCollection = getEntityCollection(manifest, oppositeKind);
+    p.log.info(`"${pc.bold(value)}" looks like ${oppositeDef.label} ${pc.cyan(oppositeMatch)} (${oppositeCollection[oppositeMatch].name}).`);
+    p.log.info(`Did you swap the agent and cloud arguments?`);
+    p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
+    return true;
+  }
+  return false;
+}
+
 /** Report validation error for an entity and return false, or return true if valid */
 export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "cloud"): boolean {
   const def = ENTITY_DEFS[kind];
@@ -198,35 +257,10 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
 
   p.log.error(`Unknown ${def.label}: ${pc.bold(value)}`);
 
-  const oppositeKind = kind === "agent" ? "cloud" : "agent";
-  const oppositeDef = ENTITY_DEFS[oppositeKind];
-  const oppositeCollection = getEntityCollection(manifest, oppositeKind);
-
-  // Check if user provided an entity of the wrong kind
-  if (oppositeCollection[value]) {
-    p.log.info(`"${value}" is ${kind === "agent" ? "a cloud provider" : "an agent"}, not ${kind === "agent" ? "an agent" : "a cloud provider"}.`);
-    p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
-    p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
-    return false;
-  }
-
-  // Check for typo matches in the same kind
-  const match = suggestTypoCorrection(value, manifest, kind);
-  if (match) {
-    p.log.info(`Did you mean ${pc.cyan(match)} (${collection[match].name})?`);
-    p.log.info(`  ${pc.cyan(`spawn ${match}`)}`);
-    p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
-    return false;
-  }
-
-  // Check for typo matches in the opposite kind (swapped arguments with typo)
-  const oppositeMatch = suggestTypoCorrection(value, manifest, oppositeKind);
-  if (oppositeMatch) {
-    p.log.info(`"${pc.bold(value)}" looks like ${oppositeDef.label} ${pc.cyan(oppositeMatch)} (${oppositeCollection[oppositeMatch].name}).`);
-    p.log.info(`Did you swap the agent and cloud arguments?`);
-    p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
-    return false;
-  }
+  // Try different correction strategies
+  if (checkWrongKind(value, kind, manifest, def)) return false;
+  if (checkSameKindTypo(value, kind, manifest, def, collection)) return false;
+  if (checkOppositeKindTypo(value, kind, manifest)) return false;
 
   p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
   return false;
@@ -716,39 +750,48 @@ function classifyNetworkError(errMsg: string): "timeout" | "connection" | "unkno
   return "unknown";
 }
 
-// Show causes for timeout errors
-function showTimeoutCauses(): void {
-  console.error("  • Slow or unstable internet connection");
-  console.error("  • Download server not responding (possibly overloaded)");
-  console.error("  • Firewall blocking or slowing the connection");
+interface ErrorGuidance {
+  causes: string[];
+  steps: (ghUrl: string) => string[];
 }
 
-// Show causes for connection errors
-function showConnectionCauses(): void {
-  console.error("  • No internet connection");
-  console.error("  • Firewall or proxy blocking GitHub access");
-  console.error("  • DNS not resolving GitHub's domain");
-}
-
-// Show causes for unknown errors
-function showUnknownCauses(): void {
-  console.error("  • Internet connection issue");
-  console.error("  • GitHub's servers temporarily down");
-}
-
-// Show recovery steps for connection errors
-function showConnectionSteps(): void {
-  console.error("  2. Test github.com access in your browser");
-  console.error("  3. Check firewall/VPN settings");
-  console.error("  4. Try disabling proxy temporarily");
-}
-
-// Show recovery steps for other errors
-function showOtherSteps(ghUrl: string): void {
-  console.error(`  2. Verify combination exists: ${pc.cyan("spawn matrix")}`);
-  console.error("  3. Wait a moment and retry");
-  console.error(`  4. Test URL directly: ${pc.dim(ghUrl)}`);
-}
+const NETWORK_ERROR_GUIDANCE: Record<"timeout" | "connection" | "unknown", ErrorGuidance> = {
+  timeout: {
+    causes: [
+      "  • Slow or unstable internet connection",
+      "  • Download server not responding (possibly overloaded)",
+      "  • Firewall blocking or slowing the connection",
+    ],
+    steps: (ghUrl) => [
+      "  2. Verify combination exists: " + pc.cyan("spawn matrix"),
+      "  3. Wait a moment and retry",
+      "  4. Test URL directly: " + pc.dim(ghUrl),
+    ],
+  },
+  connection: {
+    causes: [
+      "  • No internet connection",
+      "  • Firewall or proxy blocking GitHub access",
+      "  • DNS not resolving GitHub's domain",
+    ],
+    steps: () => [
+      "  2. Test github.com access in your browser",
+      "  3. Check firewall/VPN settings",
+      "  4. Try disabling proxy temporarily",
+    ],
+  },
+  unknown: {
+    causes: [
+      "  • Internet connection issue",
+      "  • GitHub's servers temporarily down",
+    ],
+    steps: (ghUrl) => [
+      "  2. Verify combination exists: " + pc.cyan("spawn matrix"),
+      "  3. Wait a moment and retry",
+      "  4. Test URL directly: " + pc.dim(ghUrl),
+    ],
+  },
+};
 
 function reportDownloadError(ghUrl: string, err: unknown): never {
   p.log.error("Script download failed");
@@ -756,24 +799,17 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   console.error("\nNetwork error:", errMsg);
 
   const errorType = classifyNetworkError(errMsg);
+  const guidance = NETWORK_ERROR_GUIDANCE[errorType];
+
   console.error(`\n${pc.bold("Possible causes:")}`);
-  switch (errorType) {
-    case "timeout":
-      showTimeoutCauses();
-      break;
-    case "connection":
-      showConnectionCauses();
-      break;
-    default:
-      showUnknownCauses();
+  for (const cause of guidance.causes) {
+    console.error(cause);
   }
 
   console.error(`\n${pc.bold("Next steps:")}`);
   console.error("  1. Check your internet connection");
-  if (errorType === "connection") {
-    showConnectionSteps();
-  } else {
-    showOtherSteps(ghUrl);
+  for (const step of guidance.steps(ghUrl)) {
+    console.error(step);
   }
   process.exit(1);
 }
