@@ -268,16 +268,11 @@ describe("Webdock server lifecycle", () => {
   });
 
   it("should validate env vars with validate_resource_name before server creation", () => {
-    const createLines = webdockLib.split("\n");
-    let inCreate = false;
-    let validations = 0;
-    for (const line of createLines) {
-      if (line.match(/^create_server\(\)/)) inCreate = true;
-      if (inCreate && line.includes("validate_resource_name")) validations++;
-      if (inCreate && line.match(/^}/)) break;
-    }
-    // Should validate location_id, profile_slug, image_slug, and slug
-    expect(validations).toBeGreaterThanOrEqual(3);
+    // Webdock uses _webdock_validate_inputs for validation
+    expect(webdockLib).toContain("_webdock_validate_inputs");
+    // Should be called early in create_server
+    const createServerBody = webdockLib.split("\ncreate_server()")[1]?.split("\n}")[0] || "";
+    expect(createServerBody).toContain("_webdock_validate_inputs");
   });
 
   it("should show helpful error messages on server creation failure", () => {

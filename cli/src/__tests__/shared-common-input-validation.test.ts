@@ -547,7 +547,8 @@ describe("show_server_name_requirements", () => {
 
   it("should mention alphanumeric characters", () => {
     const result = runBashCapture("show_server_name_requirements");
-    expect(result.stderr).toContain("alphanumeric");
+    expect(result.stderr).toContain("letters");
+    expect(result.stderr).toContain("numbers");
   });
 
   it("should mention dash restriction", () => {
