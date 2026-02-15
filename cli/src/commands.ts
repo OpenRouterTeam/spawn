@@ -431,6 +431,37 @@ export async function cmdInteractive(): Promise<void> {
   await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url);
 }
 
+/** Interactive cloud selection for a specific agent (e.g., "spawn claude") */
+export async function cmdInteractiveWithAgent(agent: string, prompt?: string, dryRun?: boolean): Promise<void> {
+  const manifest = await loadManifestWithSpinner();
+
+  // Resolve agent key (case-insensitive, display name support)
+  const resolvedAgent = resolveAgentKey(manifest, agent);
+  if (!resolvedAgent) {
+    p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+    p.log.info(`Run ${pc.cyan("spawn agents")} to see all available agents.`);
+    process.exit(1);
+  }
+
+  const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, resolvedAgent);
+  const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
+
+  // Now proceed with the selected cloud
+  if (dryRun) {
+    showDryRunPreview(manifest, resolvedAgent, cloudChoice, prompt);
+    return;
+  }
+
+  await preflightCredentialCheck(manifest, cloudChoice);
+
+  const agentName = manifest.agents[resolvedAgent].name;
+  const cloudName = manifest.clouds[cloudChoice].name;
+  const suffix = prompt ? " with prompt..." : "...";
+  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
+
+  await execScript(cloudChoice, resolvedAgent, prompt, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url);
+}
+
 // ── Run ────────────────────────────────────────────────────────────────────────
 
 /** Resolve display names / casing and log if resolved to a different key */

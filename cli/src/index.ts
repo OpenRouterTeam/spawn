@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import {
   cmdInteractive,
+  cmdInteractiveWithAgent,
   cmdRun,
   cmdList,
   cmdListClear,
@@ -152,6 +153,12 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
     await cmdRun(agent, cloud, prompt, dryRun);
     return;
   }
+  // If no cloud specified, show interactive cloud selection in TTY mode
+  if (isInteractiveTTY()) {
+    await cmdInteractiveWithAgent(agent, prompt, dryRun);
+    return;
+  }
+  // Non-interactive fallback: show error messages
   if (dryRun) {
     console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
     console.error(`\nUsage: ${pc.cyan(`spawn <agent> <cloud> --dry-run`)}`);
