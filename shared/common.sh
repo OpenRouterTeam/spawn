@@ -713,10 +713,18 @@ exchange_oauth_code() {
     local escaped_code
     escaped_code=$(json_escape "${oauth_code}")
 
-    local key_response
+    local key_response curl_exit
     key_response=$(curl -s --max-time 30 -X POST "https://openrouter.ai/api/v1/auth/keys" \
         -H "Content-Type: application/json" \
-        -d "{\"code\": ${escaped_code}}")
+        -d "{\"code\": ${escaped_code}}" 2>&1)
+    curl_exit=$?
+
+    if [[ ${curl_exit} -ne 0 ]]; then
+        log_error "Failed to contact OpenRouter API (curl exit code: ${curl_exit})"
+        log_warn "This may indicate a network issue or temporary service outage"
+        log_warn "Please check your internet connection and try again"
+        return 1
+    fi
 
     local api_key
     api_key=$(echo "${key_response}" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
@@ -836,10 +844,16 @@ _setup_oauth_server() {
     local code_file="${2}"
     local port_file="${3}"
     local state_file="${4}"
+    local pid_file="${5}"
 
     log_step "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
     local server_pid
     server_pid=$(start_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}")
+
+    # Persist server PID to file for reliable retrieval
+    if [[ -n "${pid_file}" && -n "${server_pid}" ]]; then
+        printf '%s' "${server_pid}" > "${pid_file}"
+    fi
 
     local actual_port
     actual_port=$(start_and_verify_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}" "${server_pid}")
@@ -934,15 +948,21 @@ _start_oauth_session_with_server() {
     local oauth_dir
     oauth_dir=$(_init_oauth_session)
     local code_file="${oauth_dir}/code"
+    local pid_file="${oauth_dir}/server_pid"
 
     local actual_port
-    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${oauth_dir}/port" "${oauth_dir}/state") || {
+    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${oauth_dir}/port" "${oauth_dir}/state" "${pid_file}") || {
         cleanup_oauth_session "" "${oauth_dir}"
         return 1
     }
 
     local server_pid
-    server_pid=$(pgrep -f "start_oauth_server" | tail -1)
+    server_pid=$(cat "${pid_file}" 2>/dev/null || echo "")
+    if [[ -z "${server_pid}" ]]; then
+        log_error "Failed to retrieve OAuth server PID"
+        cleanup_oauth_session "" "${oauth_dir}"
+        return 1
+    fi
 
     echo "${actual_port}|${server_pid}|${oauth_dir}"
 }

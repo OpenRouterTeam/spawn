@@ -1101,6 +1101,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     scriptContent = await downloadScriptWithFallback(url, ghUrl);
   } catch (err) {
     reportDownloadError(ghUrl, err);
+    return; // Exit early - cannot proceed without script content
   }
 
   // Record the spawn before execution (so it's logged even if the script fails midway)
