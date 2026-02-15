@@ -217,7 +217,17 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 3. **complexity-hunter** (Haiku) — Find functions >50 lines (bash) / >80 lines (ts). Pick top 2-3, ONE PR. Run tests after refactoring.
 4. **test-engineer** (Haiku) — ONE test PR max. Add missing tests, verify shellcheck, run `bun test`, fix failures.
 
-5. **pr-maintainer** (Sonnet)
+5. **code-health** (Sonnet) — Proactive codebase health scan. ONE PR max.
+   Scan for:
+   - **Reliability**: unhandled error paths, missing exit code checks, race conditions, unchecked return values
+   - **Maintainability**: duplicated logic that should be extracted, inconsistent patterns across similar files, dead code, unclear variable names
+   - **Readability**: overly nested conditionals, magic numbers/strings, missing or misleading comments on non-obvious logic
+   - **Testability**: tightly coupled code that's hard to mock, functions with too many side effects, untestable global state
+   - **Scalability**: hardcoded limits, O(n²) patterns, blocking operations that could be async
+   - **Best practices**: shellcheck violations (bash), type-safety gaps (ts), deprecated API usage, inconsistent error handling patterns
+   Pick the **highest-impact** findings (max 3), fix them in ONE PR. Run tests after every change. Focus on fixes that prevent real bugs or meaningfully improve developer experience — skip cosmetic-only changes.
+
+6. **pr-maintainer** (Sonnet)
    Role: Keep PRs healthy and mergeable. Do NOT review/approve/merge — security team handles that.
 
    First: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision`
@@ -276,7 +286,7 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 ## Commit Markers
 
 Every commit: `Agent: <agent-name>` trailer + `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
-Values: security-auditor, ux-engineer, complexity-hunter, test-engineer, pr-maintainer, community-coordinator, team-lead.
+Values: security-auditor, ux-engineer, complexity-hunter, test-engineer, code-health, pr-maintainer, community-coordinator, team-lead.
 
 ## Git Worktrees (MANDATORY)
 
