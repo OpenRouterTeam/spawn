@@ -714,18 +714,28 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
   }
 }
 
+/** Print error section header and lines */
+function printErrorSection(header: string, lines: string[]): void {
+  console.error(`\n${pc.bold(header)}`);
+  for (const line of lines) {
+    console.error(line);
+  }
+}
+
 // Report 404 errors (script not found)
 function report404Failure(): void {
   p.log.error("Script not found (HTTP 404)");
   console.error("\nThe spawn script doesn't exist at the expected location.");
-  console.error("\nThis usually means:");
-  console.error("  • The agent + cloud combination hasn't been implemented yet");
-  console.error("  • The script is currently being deployed (rare)");
-  console.error("  • There's a temporary issue with the file server");
-  console.error(`\n${pc.bold("Next steps:")}`);
-  console.error(`  1. Verify it's implemented: ${pc.cyan("spawn matrix")}`);
-  console.error(`  2. If the matrix shows ✓, wait 1-2 minutes and retry`);
-  console.error(`  3. Still broken? Report it: ${pc.cyan(`https://github.com/${REPO}/issues`)}`);
+  printErrorSection("This usually means:", [
+    "  • The agent + cloud combination hasn't been implemented yet",
+    "  • The script is currently being deployed (rare)",
+    "  • There's a temporary issue with the file server",
+  ]);
+  printErrorSection("Next steps:", [
+    `  1. Verify it's implemented: ${pc.cyan("spawn matrix")}`,
+    `  2. If the matrix shows ✓, wait 1-2 minutes and retry`,
+    `  3. Still broken? Report it: ${pc.cyan(`https://github.com/${REPO}/issues`)}`,
+  ]);
 }
 
 // Report HTTP errors (non-404)
@@ -736,13 +746,15 @@ function reportHTTPFailure(primaryStatus: number, fallbackStatus: number): void 
   if (hasServerError) {
     console.error("\nThe servers are experiencing issues or temporarily unavailable.");
   }
-  console.error(`\n${pc.bold("Next steps:")}`);
-  console.error(`  1. Check your internet connection`);
-  console.error(`  2. Wait a moment and try again`);
-  console.error(`  3. Check GitHub's status: ${pc.cyan("https://www.githubstatus.com")}`);
+  const steps = [
+    `  1. Check your internet connection`,
+    `  2. Wait a moment and try again`,
+    `  3. Check GitHub's status: ${pc.cyan("https://www.githubstatus.com")}`,
+  ];
   if (hasServerError) {
-    console.error(`  4. If GitHub is down, retry when it's back up`);
+    steps.push(`  4. If GitHub is down, retry when it's back up`);
   }
+  printErrorSection("Next steps:", steps);
 }
 
 function reportDownloadFailure(primaryUrl: string, fallbackUrl: string, primaryStatus: number, fallbackStatus: number): void {
@@ -811,16 +823,11 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
   const errorType = classifyNetworkError(errMsg);
   const guidance = NETWORK_ERROR_GUIDANCE[errorType];
 
-  console.error(`\n${pc.bold("Possible causes:")}`);
-  for (const cause of guidance.causes) {
-    console.error(cause);
-  }
+  printErrorSection("Possible causes:", guidance.causes);
 
-  console.error(`\n${pc.bold("Next steps:")}`);
-  console.error("  1. Check your internet connection");
-  for (const step of guidance.steps(ghUrl)) {
-    console.error(step);
-  }
+  const steps = ["  1. Check your internet connection", ...guidance.steps(ghUrl)];
+  printErrorSection("Next steps:", steps);
+
   process.exit(1);
 }
 

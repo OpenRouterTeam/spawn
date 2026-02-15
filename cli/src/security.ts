@@ -7,6 +7,21 @@
 // Only lowercase alphanumeric, hyphens, and underscores allowed
 const IDENTIFIER_PATTERN = /^[a-z0-9_-]+$/;
 
+/** Extract entity type (agent or cloud) from field name */
+function getEntityType(fieldName: string): string {
+  return fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
+}
+
+/** Get the list command for a given field name */
+function getListCommand(fieldName: string): string {
+  return fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
+}
+
+/** Capitalize entity type string */
+function capitalizeEntity(type: string): string {
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 /**
  * Validates an identifier (agent or cloud name) against security constraints.
  * SECURITY-CRITICAL: Prevents path traversal, command injection, and URL injection.
@@ -17,7 +32,7 @@ const IDENTIFIER_PATTERN = /^[a-z0-9_-]+$/;
  */
 export function validateIdentifier(identifier: string, fieldName: string): void {
   if (!identifier || identifier.trim() === "") {
-    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
+    const listCmd = getListCommand(fieldName);
     throw new Error(
       `${fieldName} is required but was not provided.\n\n` +
       `Run '${listCmd}' to see all available options.`
@@ -26,11 +41,11 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 
   // Check length constraints (prevent DoS via extremely long identifiers)
   if (identifier.length > 64) {
-    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
-    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
+    const listCmd = getListCommand(fieldName);
+    const entityType = getEntityType(fieldName);
     throw new Error(
       `${fieldName} is too long (${identifier.length} characters, maximum is 64).\n\n` +
-      `This looks unusual. ${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names are typically short identifiers.\n\n` +
+      `This looks unusual. ${capitalizeEntity(entityType)} names are typically short identifiers.\n\n` +
       `Did you accidentally paste something else? Check that you're using the correct ${entityType} name.\n\n` +
       `To see all available ${entityType}s, run: ${listCmd}`
     );
@@ -38,11 +53,11 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 
   // Allowlist validation: only safe characters
   if (!IDENTIFIER_PATTERN.test(identifier)) {
-    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
-    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
+    const listCmd = getListCommand(fieldName);
+    const entityType = getEntityType(fieldName);
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
-      `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names can only contain:\n` +
+      `${capitalizeEntity(entityType)} names can only contain:\n` +
       `  • Lowercase letters (a-z)\n` +
       `  • Numbers (0-9)\n` +
       `  • Hyphens (-) and underscores (_)\n\n` +
@@ -56,15 +71,15 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 
   // Prevent path traversal patterns (defense in depth)
   if (identifier.includes("..") || identifier.includes("/") || identifier.includes("\\")) {
-    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
-    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
+    const listCmd = getListCommand(fieldName);
+    const entityType = getEntityType(fieldName);
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
       `The name contains path-like characters that aren't allowed:\n` +
       `  • Forward slashes (/)\n` +
       `  • Backslashes (\\)\n` +
       `  • Parent directory references (..)\n\n` +
-      `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names must be simple identifiers without paths.\n\n` +
+      `${capitalizeEntity(entityType)} names must be simple identifiers without paths.\n\n` +
       `To see all available ${entityType}s, run: ${listCmd}`
     );
   }
