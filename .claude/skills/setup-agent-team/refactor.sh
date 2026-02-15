@@ -231,7 +231,7 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
    NEVER review or approve PRs. But if already approved, DO merge.
    Run again at cycle end to catch new PRs. GOAL: approved PRs merged, conflicts resolved, feedback addressed.
 
-6. **community-coordinator** (Sonnet)
+6. **community-coordinator** (moonshotai/kimi-k2.5)
    First: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
 
    For EACH issue, fetch full context:
