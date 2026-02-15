@@ -306,8 +306,9 @@ describe("setup_claude_code_config", () => {
             # Replace /tmp/spawn_config_* with $TEMP_DIR/spawn_config_*
             local cmd="$1"
             cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-            # Also replace ~/ with $TEMP_DIR/
+            # Also replace ~/.* and $HOME with $TEMP_DIR
             cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+            cmd=\$(echo "$cmd" | sed "s|\\\$HOME|\$TEMP_DIR|g")
             mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
             eval "$cmd"
           }
@@ -336,6 +337,7 @@ describe("setup_claude_code_config", () => {
             local cmd="$1"
             cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
             cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+            cmd=\$(echo "$cmd" | sed "s|\\\$HOME|\$TEMP_DIR|g")
             mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
             eval "$cmd"
           }
@@ -381,6 +383,7 @@ describe("setup_claude_code_config", () => {
             local cmd="$1"
             cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
             cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+            cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
             mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
             eval "$cmd"
           }
@@ -408,6 +411,7 @@ describe("setup_claude_code_config", () => {
             local cmd="$1"
             cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
             cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+            cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
             mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
             eval "$cmd"
           }
@@ -439,6 +443,7 @@ describe("setup_openclaw_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -465,6 +470,7 @@ describe("setup_openclaw_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -491,6 +497,7 @@ describe("setup_openclaw_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -517,6 +524,7 @@ describe("setup_openclaw_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -543,6 +551,7 @@ describe("setup_openclaw_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -587,6 +596,7 @@ describe("setup_continue_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -613,6 +623,7 @@ describe("setup_continue_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -642,6 +653,7 @@ describe("setup_continue_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -668,6 +680,7 @@ describe("setup_continue_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -694,6 +707,7 @@ describe("setup_continue_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
           eval "$cmd"
         }
@@ -730,6 +744,7 @@ describe("setup_continue_config", () => {
           local cmd="$1"
           cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
           cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
+          cmd=$(echo "$cmd" | sed "s|\\$HOME|$TEMP_DIR|g")
           mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
           eval "$cmd"
         }
