@@ -199,6 +199,8 @@ describe("cmdCloudInfo - Quick start with multi-auth", () => {
   let consoleErrSpy: ReturnType<typeof spyOn>;
   let originalFetch: typeof global.fetch;
   let processExitSpy: ReturnType<typeof spyOn>;
+  let savedORKey: string | undefined;
+  let savedEnvVars: Record<string, string | undefined>;
 
   function setupManifest(manifest: Manifest) {
     global.fetch = mock(async () => ({
@@ -227,6 +229,15 @@ describe("cmdCloudInfo - Quick start with multi-auth", () => {
       throw new Error("process.exit");
     }) as any);
 
+    savedORKey = process.env.OPENROUTER_API_KEY;
+    savedEnvVars = {
+      UPCLOUD_USERNAME: process.env.UPCLOUD_USERNAME,
+      UPCLOUD_PASSWORD: process.env.UPCLOUD_PASSWORD,
+    };
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.UPCLOUD_USERNAME;
+    delete process.env.UPCLOUD_PASSWORD;
+
     originalFetch = global.fetch;
     await setupManifest(multiAuthManifest);
   });
@@ -236,6 +247,18 @@ describe("cmdCloudInfo - Quick start with multi-auth", () => {
     processExitSpy.mockRestore();
     consoleSpy.mockRestore();
     consoleErrSpy.mockRestore();
+    if (savedORKey !== undefined) {
+      process.env.OPENROUTER_API_KEY = savedORKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
+    for (const [key, value] of Object.entries(savedEnvVars)) {
+      if (value !== undefined) {
+        process.env[key] = value;
+      } else {
+        delete process.env[key];
+      }
+    }
   });
 
   // ── Multi-auth env vars ──────────────────────────────────────────────
@@ -509,6 +532,8 @@ describe("cmdAgentInfo - Quick start auth patterns", () => {
   let consoleErrSpy: ReturnType<typeof spyOn>;
   let originalFetch: typeof global.fetch;
   let processExitSpy: ReturnType<typeof spyOn>;
+  let savedORKey: string | undefined;
+  let savedEnvVars: Record<string, string | undefined>;
 
   function setupManifest(manifest: Manifest) {
     global.fetch = mock(async () => ({
@@ -537,6 +562,15 @@ describe("cmdAgentInfo - Quick start auth patterns", () => {
       throw new Error("process.exit");
     }) as any);
 
+    savedORKey = process.env.OPENROUTER_API_KEY;
+    savedEnvVars = {
+      UPCLOUD_USERNAME: process.env.UPCLOUD_USERNAME,
+      UPCLOUD_PASSWORD: process.env.UPCLOUD_PASSWORD,
+    };
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.UPCLOUD_USERNAME;
+    delete process.env.UPCLOUD_PASSWORD;
+
     originalFetch = global.fetch;
   });
 
@@ -545,6 +579,18 @@ describe("cmdAgentInfo - Quick start auth patterns", () => {
     processExitSpy.mockRestore();
     consoleSpy.mockRestore();
     consoleErrSpy.mockRestore();
+    if (savedORKey !== undefined) {
+      process.env.OPENROUTER_API_KEY = savedORKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
+    for (const [key, value] of Object.entries(savedEnvVars)) {
+      if (value !== undefined) {
+        process.env[key] = value;
+      } else {
+        delete process.env[key];
+      }
+    }
   });
 
   describe("agent where first cloud has multi-auth", () => {
@@ -774,6 +820,11 @@ describe("Quick start credential status indicators", () => {
       UPCLOUD_PASSWORD: process.env.UPCLOUD_PASSWORD,
       EMPTY_TOKEN: process.env.EMPTY_TOKEN,
     };
+    // Clear all so each test starts clean and sets only what it needs
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.UPCLOUD_USERNAME;
+    delete process.env.UPCLOUD_PASSWORD;
+    delete process.env.EMPTY_TOKEN;
   });
 
   afterEach(() => {

@@ -112,6 +112,7 @@ describe("cmdCloudInfo", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
   let originalFetch: typeof global.fetch;
   let processExitSpy: ReturnType<typeof spyOn>;
+  let savedORKey: string | undefined;
 
   beforeEach(async () => {
     consoleMocks = createConsoleMocks();
@@ -124,6 +125,9 @@ describe("cmdCloudInfo", () => {
     processExitSpy = spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit");
     }) as any);
+
+    savedORKey = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
 
     originalFetch = global.fetch;
     global.fetch = mock(async () => ({
@@ -139,6 +143,11 @@ describe("cmdCloudInfo", () => {
     global.fetch = originalFetch;
     processExitSpy.mockRestore();
     restoreMocks(consoleMocks.log, consoleMocks.error);
+    if (savedORKey !== undefined) {
+      process.env.OPENROUTER_API_KEY = savedORKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
   });
 
   // ── Happy path ──────────────────────────────────────────────────────────

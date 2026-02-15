@@ -6,7 +6,7 @@
 #
 # Usage:
 #   bash test/record.sh hetzner          # Record one cloud
-#   bash test/record.sh hetzner vultr    # Record multiple
+#   bash test/record.sh hetzner digitalocean  # Record multiple
 #   bash test/record.sh all              # All clouds with available credentials
 #   bash test/record.sh --list           # Show recordable clouds + credential status
 
@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean vultr linode lambda civo upcloud binarylane ovh scaleway genesiscloud kamatera latitude hyperstack atlanticnet hostkey cloudsigma webdock serverspace gcore"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean ovh"
 
 # --- Endpoint registry ---
 # Declare endpoints as string literal for each cloud
@@ -51,46 +51,6 @@ sizes:/sizes
 regions:/regions
 "
 
-_ENDPOINTS_vultr="
-account:/account
-ssh_keys:/ssh-keys
-instances:/instances
-plans:/plans
-regions:/regions
-"
-
-_ENDPOINTS_linode="
-profile:/profile
-ssh_keys:/profile/sshkeys
-instances:/linode/instances
-types:/linode/types
-regions:/regions
-"
-
-_ENDPOINTS_lambda="
-instances:/instances
-ssh_keys:/ssh-keys
-instance_types:/instance-types
-"
-
-_ENDPOINTS_civo="
-regions:/regions
-instances:/instances
-sshkeys:/sshkeys
-networks:/networks
-disk_images:/disk_images
-"
-
-_ENDPOINTS_upcloud="
-servers:/server
-server_sizes:/server_size
-"
-
-_ENDPOINTS_binarylane="
-sizes:/sizes
-regions:/regions
-servers:/servers
-"
 
 _ENDPOINTS_ovh="
 flavors:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/flavor
@@ -98,70 +58,6 @@ images:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/image
 ssh_keys:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/sshkey
 "
 
-_ENDPOINTS_scaleway="
-servers:/servers
-images:/images?per_page=10
-"
-
-_ENDPOINTS_genesiscloud="
-ssh_keys:/ssh-keys
-instances:/instances
-"
-
-_ENDPOINTS_kamatera="
-server_options:/service/server
-"
-
-_ENDPOINTS_latitude="
-ssh_keys:/ssh_keys
-plans:/plans
-regions:/regions
-"
-
-_ENDPOINTS_hyperstack="
-flavors:/core/flavors
-ssh_keys:/core/keypairs
-"
-
-_ENDPOINTS_atlanticnet="
-ssh_keys:list-sshkeys
-plans:describe-plan
-"
-
-_ENDPOINTS_hostkey="
-services:/v1/services
-ssh_keys:/ssh_keys
-"
-
-_ENDPOINTS_cloudsigma="
-balance:/balance/
-keypairs:/keypairs/
-servers:/servers/
-"
-
-_ENDPOINTS_webdock="
-account:/account
-publicKeys:/account/publicKeys
-servers:/servers
-profiles:/profiles
-locations:/locations
-"
-
-_ENDPOINTS_serverspace="
-project:/project
-servers:/servers
-ssh-keys:/ssh-keys
-locations:/locations
-images:/images
-"
-
-_ENDPOINTS_gcore="
-projects:/cloud/v1/projects
-ssh_keys:/cloud/v1/ssh_keys/\${GCORE_PROJECT_ID:-MISSING}
-instances:/cloud/v1/instances/\${GCORE_PROJECT_ID:-MISSING}/\${GCORE_REGION:-ed-1}
-images:/cloud/v1/images/\${GCORE_PROJECT_ID:-MISSING}/\${GCORE_REGION:-ed-1}
-flavors:/cloud/v1/flavors/\${GCORE_PROJECT_ID:-MISSING}/\${GCORE_REGION:-ed-1}
-"
 
 get_endpoints() {
     local cloud="$1"
@@ -183,26 +79,6 @@ _get_multi_cred_spec() {
                 "application_secret:OVH_APPLICATION_SECRET" \
                 "consumer_key:OVH_CONSUMER_KEY" \
                 "project_id:OVH_PROJECT_ID"
-            ;;
-        upcloud)
-            printf '%s\n' \
-                "username:UPCLOUD_USERNAME" \
-                "password:UPCLOUD_PASSWORD"
-            ;;
-        kamatera)
-            printf '%s\n' \
-                "client_id:KAMATERA_API_CLIENT_ID" \
-                "secret:KAMATERA_API_SECRET"
-            ;;
-        atlanticnet)
-            printf '%s\n' \
-                "api_key:ATLANTICNET_API_KEY" \
-                "api_private_key:ATLANTICNET_API_PRIVATE_KEY"
-            ;;
-        cloudsigma)
-            printf '%s\n' \
-                "email:CLOUDSIGMA_EMAIL" \
-                "password:CLOUDSIGMA_PASSWORD"
             ;;
     esac
 }
@@ -278,24 +154,7 @@ get_auth_env_var() {
     case "$cloud" in
         hetzner)       printf "HCLOUD_TOKEN" ;;
         digitalocean)  printf "DO_API_TOKEN" ;;
-        vultr)         printf "VULTR_API_KEY" ;;
-        linode)        printf "LINODE_API_TOKEN" ;;
-        lambda)        printf "LAMBDA_API_KEY" ;;
-        civo)          printf "CIVO_API_TOKEN" ;;
-        upcloud)       printf "UPCLOUD_USERNAME" ;;
-        binarylane)    printf "BINARYLANE_API_TOKEN" ;;
         ovh)           printf "OVH_APPLICATION_KEY" ;;
-        scaleway)      printf "SCW_SECRET_KEY" ;;
-        genesiscloud)  printf "GENESIS_API_KEY" ;;
-        kamatera)      printf "KAMATERA_API_CLIENT_ID" ;;
-        latitude)      printf "LATITUDE_API_KEY" ;;
-        hyperstack)    printf "HYPERSTACK_API_KEY" ;;
-        atlanticnet)   printf "ATLANTICNET_API_KEY" ;;
-        hostkey)       printf "HOSTKEY_API_KEY" ;;
-        cloudsigma)    printf "CLOUDSIGMA_EMAIL" ;;
-        webdock)       printf "WEBDOCK_API_TOKEN" ;;
-        serverspace)   printf "SERVERSPACE_API_KEY" ;;
-        gcore)         printf "GCORE_API_TOKEN" ;;
     esac
 }
 
@@ -313,7 +172,7 @@ try_load_config() {
 
     local config_file="$HOME/.config/spawn/${cloud}.json"
 
-    # Multi-credential clouds (OVH, AtlanticNet, CloudSigma, etc.)
+    # Multi-credential clouds (OVH, etc.)
     local specs
     specs=$(_get_multi_cred_spec "$cloud")
     if [[ -n "$specs" ]]; then
@@ -439,24 +298,7 @@ call_api() {
     case "$cloud" in
         hetzner)       hetzner_api GET "$endpoint" ;;
         digitalocean)  do_api GET "$endpoint" ;;
-        vultr)         vultr_api GET "$endpoint" ;;
-        linode)        linode_api GET "$endpoint" ;;
-        lambda)        lambda_api GET "$endpoint" "" ;;
-        civo)          civo_api GET "$endpoint" ;;
-        upcloud)       upcloud_api GET "$endpoint" ;;
-        binarylane)    binarylane_api GET "$endpoint" ;;
         ovh)           ovh_api_call GET "$endpoint" ;;
-        scaleway)      scaleway_instance_api GET "$endpoint" ;;
-        genesiscloud)  genesis_api GET "$endpoint" ;;
-        kamatera)      kamatera_api GET "$endpoint" ;;
-        latitude)      latitude_api GET "$endpoint" ;;
-        hyperstack)    hyperstack_api GET "$endpoint" ;;
-        atlanticnet)   atlanticnet_api "$endpoint" ;;
-        hostkey)       hostkey_api "$endpoint" ;;
-        cloudsigma)    cloudsigma_api GET "$endpoint" ;;
-        webdock)       webdock_api GET "$endpoint" ;;
-        serverspace)   serverspace_api GET "$endpoint" ;;
-        gcore)         gcore_api GET "$endpoint" ;;
     esac
 }
 
@@ -480,23 +322,7 @@ success_keys = {'servers','images','ssh_keys','flavors','sizes','regions','count
 error_checks = {
     'hetzner': lambda d: d.get('error') and isinstance(d.get('error'), dict),
     'digitalocean': lambda d: 'id' in d and isinstance(d.get('id'), str) and 'message' in d,
-    'vultr': lambda d: 'error' in d and d['error'],
-    'genesiscloud': lambda d: 'error' in d and d['error'],
-    'hyperstack': lambda d: 'error' in d and d['error'],
-    'linode': lambda d: 'errors' in d and d['errors'],
     'ovh': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
-    'scaleway': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
-    'binarylane': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
-    'civo': lambda d: 'reason' in d and 'result' in d and d['result'] == 'failed',
-    'lambda': lambda d: d.get('error') and isinstance(d.get('error'), dict),
-    'kamatera': lambda d: d.get('status') == 'error',
-    'latitude': lambda d: 'error' in d or ('errors' in d and d['errors']),
-    'atlanticnet': lambda d: 'error' in d and d['error'],
-    'hostkey': lambda d: 'error' in d and d['error'],
-    'cloudsigma': lambda d: 'error_message' in d or 'error_type' in d,
-    'webdock': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
-    'serverspace': lambda d: 'error' in d and d['error'],
-    'gcore': lambda d: ('message' in d and len(d) <= 3 and not any(k in d for k in success_keys)) or ('detail' in d and len(d) <= 2),
 }
 
 if cloud in error_checks:
@@ -526,12 +352,6 @@ _record_live_cycle() {
     case "$cloud" in
         hetzner)       _live_hetzner "$fixture_dir" ;;
         digitalocean)  _live_digitalocean "$fixture_dir" ;;
-        vultr)         _live_vultr "$fixture_dir" ;;
-        linode)        _live_linode "$fixture_dir" ;;
-        civo)          _live_civo "$fixture_dir" ;;
-        atlanticnet)   _live_atlanticnet "$fixture_dir" ;;
-        serverspace)   _live_serverspace "$fixture_dir" ;;
-        gcore)         _live_gcore "$fixture_dir" ;;
         *)  return 0 ;;  # No live cycle for this cloud yet
     esac
 }
@@ -743,254 +563,6 @@ _live_digitalocean() {
         '{"status":"deleted","http_code":204}'
 }
 
-_live_vultr_body() {
-    local fixture_dir="$1"
-    local name="spawn-record-$(date +%s)"
-    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${name}' (vc2-1c-1gb, ewr)..." >&2
-
-    local ssh_keys_response
-    ssh_keys_response=$(vultr_api GET "/ssh-keys")
-    local ssh_key_id
-    ssh_key_id=$(echo "$ssh_keys_response" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-keys = d.get('ssh_keys', [])
-print(keys[0]['id'] if keys else '')
-" 2>/dev/null) || ssh_key_id=""
-
-    python3 -c "
-import json, sys
-body = {'label': sys.argv[1], 'region': 'ewr', 'plan': 'vc2-1c-1gb', 'os_id': 2284}
-if sys.argv[2]:
-    body['sshkey_id'] = [sys.argv[2]]
-print(json.dumps(body))
-" "$name" "$ssh_key_id"
-}
-
-_live_vultr() {
-    _live_create_delete_cycle "$1" vultr_api "/instances" "/instances/{id}" \
-        "d['instance']['id']" _live_vultr_body 5
-}
-
-_live_linode_body() {
-    local fixture_dir="$1"
-    local name="spawn-record-$(date +%s)"
-    printf '%b\n' "  ${CYAN}live${NC} Creating test linode '${name}' (g6-nanode-1, us-east)..." >&2
-
-    local ssh_keys_response
-    ssh_keys_response=$(linode_api GET "/profile/sshkeys")
-    local ssh_keys_json
-    ssh_keys_json=$(echo "$ssh_keys_response" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-print(json.dumps([k['ssh_key'] for k in d.get('data', [])]))
-" 2>/dev/null) || ssh_keys_json="[]"
-
-    local root_pass
-    root_pass=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits+'!@#') for _ in range(24)))")
-
-    python3 -c "
-import json, sys
-print(json.dumps({
-    'label': sys.argv[1], 'region': 'us-east', 'type': 'g6-nanode-1',
-    'image': 'linode/ubuntu24.04', 'root_pass': sys.argv[2],
-    'authorized_keys': json.loads(sys.argv[3])
-}))
-" "$name" "$root_pass" "$ssh_keys_json"
-}
-
-_live_linode() {
-    _live_create_delete_cycle "$1" linode_api "/linode/instances" "/linode/instances/{id}" \
-        "d['id']" _live_linode_body 3
-}
-
-_live_civo_body() {
-    local fixture_dir="$1"
-    local name="spawn-record-$(date +%s)"
-    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${name}' (g3.xsmall, nyc1)..." >&2
-
-    local networks_response
-    networks_response=$(civo_api GET "/networks")
-    local network_id
-    network_id=$(echo "$networks_response" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-nets = d if isinstance(d, list) else d.get('items', d.get('networks', []))
-for n in nets:
-    if n.get('default', False):
-        print(n['id']); break
-else:
-    if nets: print(nets[0]['id'])
-" 2>/dev/null) || network_id=""
-
-    local disk_images_response
-    disk_images_response=$(civo_api GET "/disk_images")
-    local template_id
-    template_id=$(echo "$disk_images_response" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-imgs = d if isinstance(d, list) else d.get('items', d.get('disk_images', []))
-for img in imgs:
-    name = img.get('name', '').lower()
-    if 'ubuntu' in name and ('24' in name or '22' in name):
-        print(img['id']); break
-else:
-    if imgs: print(imgs[0]['id'])
-" 2>/dev/null) || template_id=""
-
-    python3 -c "
-import json, sys
-body = {'hostname': sys.argv[1], 'size': 'g3.xsmall', 'region': 'nyc1'}
-if sys.argv[2]: body['network_id'] = sys.argv[2]
-if sys.argv[3]: body['template_id'] = sys.argv[3]
-print(json.dumps(body))
-" "$name" "$network_id" "$template_id"
-}
-
-_live_civo() {
-    _live_create_delete_cycle "$1" civo_api "/instances" "/instances/{id}" \
-        "d['id']" _live_civo_body 3
-}
-
-_live_atlanticnet_body() {
-    local fixture_dir="$1"
-    local name="spawn-record-$(date +%s)"
-    printf '%b\n' "  ${CYAN}live${NC} Creating test server '${name}' (G2.2GB, USEAST2)..." >&2
-
-    local ssh_keys_response
-    ssh_keys_response=$(atlanticnet_api list-sshkeys)
-    local ssh_key_name
-    ssh_key_name=$(echo "$ssh_keys_response" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-items = d.get('list-sshkeysresponse', {}).get('sshkeylist', {}).get('item', [])
-if isinstance(items, dict): items = [items]
-for k in items:
-    name = k.get('ssh_key_name', '')
-    if 'spawn' in name.lower():
-        print(name); break
-else:
-    if items: print(items[0].get('ssh_key_name', ''))
-" 2>/dev/null) || ssh_key_name=""
-
-    # Atlantic.Net uses query params, not JSON body
-    # We need to output parameters for atlanticnet_api to use
-    echo "server_name:$name planname:G2.2GB imageid:ubuntu-24.04_64bit vm_location:USEAST2 ServerQty:1 key_id:$ssh_key_name"
-}
-
-_live_atlanticnet() {
-    local fixture_dir="$1"
-    local params
-    params=$(_live_atlanticnet_body "$fixture_dir") || return 0
-
-    # Parse params and create server
-    local create_response
-    create_response=$(atlanticnet_api run-instance $params)
-
-    _save_live_fixture "$fixture_dir" "create_server" "run-instance" "$create_response" || {
-        printf '%b\n' "  ${RED}fail${NC} Could not create — skipping delete fixture"
-        return 0
-    }
-
-    local instance_id
-    instance_id=$(echo "$create_response" | python3 -c "
-import json,sys
-d = json.loads(sys.stdin.read())
-print(d.get('run-instanceresponse',{}).get('instancesSet',{}).get('item',{}).get('instanceid',''))
-" 2>/dev/null) || instance_id=""
-
-    if [[ -z "${instance_id:-}" ]]; then
-        printf '%b\n' "  ${RED}fail${NC} Could not extract instance ID from create response"
-        cloud_errors=$((cloud_errors + 1))
-        return 0
-    fi
-
-    printf '%b\n' "  ${CYAN}live${NC} Created (ID: ${instance_id}). Deleting..."
-    sleep 3
-
-    local delete_response
-    delete_response=$(atlanticnet_api terminate-instance instanceid "$instance_id")
-
-    _save_live_fixture "$fixture_dir" "delete_server" "terminate-instance" "$delete_response"
-    printf '%b\n' "  ${CYAN}live${NC} Instance ${instance_id} deleted"
-}
-
-_live_hostkey() {
-    local fixture_dir="$1"
-    # HOSTKEY live testing not implemented yet - requires instance creation via eq/order_instance
-    # Skipping live fixtures for now
-    return 0
-}
-
-_live_cloudsigma() {
-    local fixture_dir="$1"
-    printf '%b\n' "  ${YELLOW}skip${NC} CloudSigma live test (requires drive cloning, complex multi-step process)" >&2
-    return 0
-}
-
-_live_webdock() {
-    local fixture_dir="$1"
-    printf '%b\n' "  ${YELLOW}skip${NC} Webdock live test (not implemented yet)" >&2
-    return 0
-}
-
-_live_serverspace() {
-    local fixture_dir="$1"
-    printf '%b\n' "  ${YELLOW}skip${NC} ServerSpace live test (async task-based creation, not implemented yet)" >&2
-    return 0
-}
-
-_live_gcore_body() {
-    local fixture_dir="$1"
-    local name="spawn-record-$(date +%s)"
-    local region="${GCORE_REGION:-ed-1}"
-    local project_id="${GCORE_PROJECT_ID:-}"
-    printf '%b\n' "  ${CYAN}live${NC} Creating test instance '${name}' (g1-standard-1-2, ${region})..." >&2
-
-    local ssh_keys_response
-    ssh_keys_response=$(gcore_api GET "/cloud/v1/ssh_keys/${project_id}")
-    local ssh_key_name
-    ssh_key_name=$(echo "$ssh_keys_response" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-keys = d.get('results', [])
-print(keys[0]['name'] if keys else '')
-" 2>/dev/null) || ssh_key_name=""
-
-    local image_id
-    image_id=$(echo "$(gcore_api GET "/cloud/v1/images/${project_id}/${region}")" | python3 -c "
-import json, sys
-d = json.loads(sys.stdin.read())
-for img in d.get('results', []):
-    if 'ubuntu' in img.get('name', '').lower() and '24' in img.get('os_version', ''):
-        print(img['id']); break
-else:
-    imgs = d.get('results', [])
-    if imgs: print(imgs[0]['id'])
-" 2>/dev/null) || image_id=""
-
-    python3 -c "
-import json, sys
-body = {
-    'name': sys.argv[1],
-    'flavor': 'g1-standard-1-2',
-    'volumes': [{'source': 'image', 'image_id': sys.argv[3], 'size': 20, 'boot_index': 0}],
-    'interfaces': [{'type': 'external'}]
-}
-if sys.argv[2]:
-    body['keypair_name'] = sys.argv[2]
-print(json.dumps(body))
-" "$name" "$ssh_key_name" "$image_id"
-}
-
-_live_gcore() {
-    local project_id="${GCORE_PROJECT_ID:-}"
-    local region="${GCORE_REGION:-ed-1}"
-    _live_create_delete_cycle "$1" gcore_api \
-        "/cloud/v2/instances/${project_id}/${region}" \
-        "/cloud/v1/instances/${project_id}/${region}/{id}" \
-        "d.get('instances',[''])[0]" _live_gcore_body 5
-}
 
 # --- Record one cloud ---
 # Check credentials and prompt if needed; returns 1 to skip this cloud
@@ -1189,7 +761,7 @@ list_clouds() {
     total_count=$(echo "$ALL_RECORDABLE_CLOUDS" | wc -w | tr -d ' ')
     printf '%b\n' "  ${ready_count}/${total_count} clouds have credentials set"
     printf '\n'
-    printf "  CLI-based clouds (not recordable): sprite, gcp, codesandbox, e2b, modal, fly, daytona, northflank, runpod, vastai, koyeb\n"
+    printf "  CLI-based clouds (not recordable): sprite, gcp, fly, daytona, aws-lightsail, oracle, local\n"
 }
 
 # --- Main ---

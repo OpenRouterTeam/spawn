@@ -71,35 +71,14 @@ const allClouds = discoverCloudLibs();
 
 // Providers known to have destroy_server with proper error handling (upgraded in PRs #957-962)
 const UPGRADED_DESTROY_PROVIDERS = [
-  "hetzner", "upcloud", "contabo", "netcup", "ramnode",
-  "hostinger", "hostkey", "latitude",
+  "hetzner",
 ];
 
 // Known dashboard URLs per provider
 const DASHBOARD_URLS: Record<string, string> = {
   "hetzner": "console.hetzner.cloud",
   "digitalocean": "cloud.digitalocean.com",
-  "vultr": "my.vultr.com",
-  "linode": "cloud.linode.com",
-  "upcloud": "hub.upcloud.com",
-  "contabo": "my.contabo.com",
-  "civo": "dashboard.civo.com",
-  "exoscale": "portal.exoscale.com",
-  "scaleway": "console.scaleway.com",
   "fly": "fly.io/dashboard",
-  "latitude": "latitude.sh",
-  "kamatera": "console.kamatera.com",
-  "binarylane": "home.binarylane.com.au",
-  "genesiscloud": "console.genesiscloud.com",
-  "hostinger": "hpanel.hostinger.com",
-  "ionos": "dcd.ionos.com",
-  "northflank": "app.northflank.com",
-  "render": "dashboard.render.com",
-  "koyeb": "app.koyeb.com",
-  "e2b": "e2b.dev/dashboard",
-  "cherry": "portal.cherryservers.com",
-  "netcup": "ccp.netcup.net",
-  "ramnode": "ramnode.com",
 };
 
 // ── Upgraded destroy_server providers ───────────────────────────────────────
@@ -151,8 +130,8 @@ describe("create_server error handling", () => {
     c.content.includes("create_server()")
   );
 
-  it("should find at least 10 clouds with create_server", () => {
-    expect(cloudsWithCreate.length).toBeGreaterThanOrEqual(10);
+  it("should find at least 6 clouds with create_server", () => {
+    expect(cloudsWithCreate.length).toBeGreaterThanOrEqual(6);
   });
 
   for (const cloud of cloudsWithCreate) {
@@ -353,7 +332,7 @@ describe("destroy_server returns non-zero on failure", () => {
 
     // Skip simple destroy functions (local, containers, CLI-based providers)
     // These rely on set -e or CLI error handling, not explicit return 1
-    const skipProviders = ["local", "fly", "e2b", "daytona", "kamatera", "northflank", "scaleway", "modal", "github-codespaces"];
+    const skipProviders = ["local", "fly", "daytona"];
     if (skipProviders.includes(cloud.name)) continue;
     // Skip providers with no error path (they rely on set -e)
     if (!destroyBody.includes("if ") && !destroyBody.includes("|| ")) continue;
