@@ -307,7 +307,7 @@ describe("Script download and execution", () => {
     }
 
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    expect(errorOutput).toContain("What to do");
+    expect(errorOutput).toContain("Next steps");
   });
 
   it("should use fallback URL when primary returns non-OK status", async () => {
