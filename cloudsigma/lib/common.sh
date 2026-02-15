@@ -263,7 +263,7 @@ if ssh_key_uuid:
     body['pubkeys'] = [{'uuid': ssh_key_uuid}]
 
 print(json.dumps(body))
-" "$name" "$cpu_mhz" "$mem_bytes" "$drive_uuid" "$ssh_key_uuid" "$(openssl rand -hex 8)"
+" "$name" "$cpu_mhz" "$mem_bytes" "$drive_uuid" "$ssh_key_uuid" "$(openssl rand -hex 16)"
 }
 
 # Resolve a CloudSigma IP reference (may be a UUID) to an actual IP address
