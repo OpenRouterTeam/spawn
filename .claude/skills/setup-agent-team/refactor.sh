@@ -39,9 +39,37 @@ PROMPT_FILE=""
 # Ensure .docs directory exists
 mkdir -p "$(dirname "${LOG_FILE}")"
 
+# --- Model cycling ---
+# Rotate models each cycle so no single model's blind spots dominate
+CYCLE_FILE="${REPO_ROOT}/.docs/.refactor-cycle-count"
+CYCLE_NUM=$(cat "$CYCLE_FILE" 2>/dev/null || echo 0)
+echo $((CYCLE_NUM + 1)) > "$CYCLE_FILE"
+
+# Model pools per task complexity tier (bash 3.x compatible indexing)
+LEAD_MODELS=("opus" "sonnet")
+HEAVY_MODELS=("sonnet" "opus")
+LIGHT_MODELS=("haiku" "sonnet")
+MEDIUM_MODELS=("sonnet" "haiku")
+
+# Pick models for this cycle based on rotation index
+LEAD_MODEL="${LEAD_MODELS[$((CYCLE_NUM % ${#LEAD_MODELS[@]}))]}"
+HEAVY_MODEL="${HEAVY_MODELS[$((CYCLE_NUM % ${#HEAVY_MODELS[@]}))]}"
+LIGHT_MODEL="${LIGHT_MODELS[$((CYCLE_NUM % ${#LIGHT_MODELS[@]}))]}"
+MEDIUM_MODEL="${MEDIUM_MODELS[$((CYCLE_NUM % ${#MEDIUM_MODELS[@]}))]}"
+
+# Map lead model to display name for Co-Authored-By
+case "${LEAD_MODEL}" in
+    opus)   COAUTHOR_NAME="Claude Opus 4.6" ;;
+    sonnet) COAUTHOR_NAME="Claude Sonnet 4.5" ;;
+    haiku)  COAUTHOR_NAME="Claude Haiku 4.5" ;;
+    *)      COAUTHOR_NAME="Claude Sonnet 4.5" ;;
+esac
+
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] [${RUN_MODE}] $*" | tee -a "${LOG_FILE}"
 }
+
+log "Cycle #${CYCLE_NUM} — Lead: ${LEAD_MODEL}, Heavy: ${HEAVY_MODEL}, Light: ${LIGHT_MODEL}, Medium: ${MEDIUM_MODEL}"
 
 # Cleanup function — runs on normal exit, SIGTERM, and SIGINT
 cleanup() {
@@ -151,8 +179,8 @@ Complete within 10 minutes. At 7 min stop new work, at 9 min shutdown teammates,
 
 ## Team Structure
 
-1. **issue-fixer** (Sonnet) — Diagnose root cause, implement fix in worktree, run tests, create PR with `Fixes #SPAWN_ISSUE_PLACEHOLDER`
-2. **issue-tester** (Haiku) — Review fix for correctness/edge cases, run `bun test` + `bash -n` on modified .sh files, report results
+1. **issue-fixer** (HEAVY_MODEL_TAG) — Diagnose root cause, implement fix in worktree, run tests, create PR with `Fixes #SPAWN_ISSUE_PLACEHOLDER`
+2. **issue-tester** (LIGHT_MODEL_TAG) — Review fix for correctness/edge cases, run `bun test` + `bash -n` on modified .sh files, report results
 
 ## Label Management
 
@@ -173,7 +201,7 @@ Track lifecycle: "pending-review" → "under-review" → "in-progress". Check la
 
 ## Commit Markers
 
-Every commit: `Agent: issue-fixer` + `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
+Every commit: `Agent: issue-fixer` + `Co-Authored-By: COAUTHOR_TAG <noreply@anthropic.com>`
 
 ## Safety
 
@@ -186,6 +214,9 @@ ISSUE_PROMPT_EOF
     # Substitute placeholders with validated values (safe — no shell expansion)
     sed -i "s|SPAWN_ISSUE_PLACEHOLDER|${SPAWN_ISSUE}|g" "${PROMPT_FILE}"
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    sed -i "s|HEAVY_MODEL_TAG|${HEAVY_MODEL}|g" "${PROMPT_FILE}"
+    sed -i "s|LIGHT_MODEL_TAG|${LIGHT_MODEL}|g" "${PROMPT_FILE}"
+    sed -i "s|COAUTHOR_TAG|${COAUTHOR_NAME}|g" "${PROMPT_FILE}"
 
 else
     # --- Refactor mode: full 6-teammate team ---
@@ -220,12 +251,12 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 
 ## Team Structure
 
-1. **security-auditor** (Sonnet) — Scan .sh for injection/path traversal/credential leaks, .ts for XSS/prototype pollution. Fix HIGH/CRITICAL only, document medium/low.
-2. **ux-engineer** (Sonnet) — Test e2e flows, improve error messages, fix UX papercuts, verify README examples.
-3. **complexity-hunter** (Haiku) — Find functions >50 lines (bash) / >80 lines (ts). Pick top 2-3, ONE PR. Run tests after refactoring.
-4. **test-engineer** (Haiku) — ONE test PR max. Add missing tests, verify shellcheck, run `bun test`, fix failures.
+1. **security-auditor** (HEAVY_MODEL_TAG) — Scan .sh for injection/path traversal/credential leaks, .ts for XSS/prototype pollution. Fix HIGH/CRITICAL only, document medium/low.
+2. **ux-engineer** (HEAVY_MODEL_TAG) — Test e2e flows, improve error messages, fix UX papercuts, verify README examples.
+3. **complexity-hunter** (LIGHT_MODEL_TAG) — Find functions >50 lines (bash) / >80 lines (ts). Pick top 2-3, ONE PR. Run tests after refactoring.
+4. **test-engineer** (LIGHT_MODEL_TAG) — ONE test PR max. Add missing tests, verify shellcheck, run `bun test`, fix failures.
 
-5. **code-health** (Sonnet) — Proactive codebase health scan. ONE PR max.
+5. **code-health** (HEAVY_MODEL_TAG) — Proactive codebase health scan. ONE PR max.
    Scan for:
    - **Reliability**: unhandled error paths, missing exit code checks, race conditions, unchecked return values
    - **Maintainability**: duplicated logic that should be extracted, inconsistent patterns across similar files, dead code, unclear variable names
@@ -235,7 +266,7 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
    - **Best practices**: shellcheck violations (bash), type-safety gaps (ts), deprecated API usage, inconsistent error handling patterns
    Pick the **highest-impact** findings (max 3), fix them in ONE PR. Run tests after every change. Focus on fixes that prevent real bugs or meaningfully improve developer experience — skip cosmetic-only changes.
 
-6. **pr-maintainer** (Sonnet)
+6. **pr-maintainer** (HEAVY_MODEL_TAG)
    Role: Keep PRs healthy and mergeable. Do NOT review/approve/merge — security team handles that.
 
    First: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision`
@@ -260,7 +291,7 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
    NEVER review or approve PRs. But if already approved, DO merge.
    Run again at cycle end to catch new PRs. GOAL: approved PRs merged, conflicts resolved, feedback addressed.
 
-6. **community-coordinator** (moonshotai/kimi-k2.5)
+6. **community-coordinator** (MEDIUM_MODEL_TAG)
    First: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
 
    **COMPLETELY IGNORE issues labeled `discovery-team`, `cloud-proposal`, or `agent-proposal`** — those are managed by the discovery team. Do NOT comment on them, do NOT change labels, do NOT interact in any way. Filter them out:
@@ -296,7 +327,7 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 
 ## Commit Markers
 
-Every commit: `Agent: <agent-name>` trailer + `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
+Every commit: `Agent: <agent-name>` trailer + `Co-Authored-By: COAUTHOR_TAG <noreply@anthropic.com>`
 Values: security-auditor, ux-engineer, complexity-hunter, test-engineer, code-health, pr-maintainer, community-coordinator, team-lead.
 
 ## Git Worktrees (MANDATORY)
@@ -307,9 +338,11 @@ Every teammate uses worktrees — never `git checkout -b` in the main repo.
 git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH -b BRANCH origin/main
 cd WORKTREE_BASE_PLACEHOLDER/BRANCH
 # ... work, commit, push ...
-gh pr create --title "title" --body "body\n\n-- refactor/AGENT-NAME"
+gh pr create --title "title" --body "body\n\n-- refactor/AGENT-NAME" --label "model:YOUR_MODEL"
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 ```
+
+**PR Model Labels (MANDATORY)**: When creating a PR, always add `--label "model:YOUR_MODEL"` where YOUR_MODEL is the model in parentheses next to your role (e.g., if you are `(sonnet)`, use `--label "model:sonnet"`). This enables QA to review PRs with a different model than the author.
 
 Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cycle end.
 
@@ -338,6 +371,10 @@ PROMPT_EOF
 
     # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    sed -i "s|HEAVY_MODEL_TAG|${HEAVY_MODEL}|g" "${PROMPT_FILE}"
+    sed -i "s|LIGHT_MODEL_TAG|${LIGHT_MODEL}|g" "${PROMPT_FILE}"
+    sed -i "s|MEDIUM_MODEL_TAG|${MEDIUM_MODEL}|g" "${PROMPT_FILE}"
+    sed -i "s|COAUTHOR_TAG|${COAUTHOR_NAME}|g" "${PROMPT_FILE}"
 fi
 
 # Add grace period: issue=5min, refactor=10min beyond the prompt timeout
@@ -362,7 +399,7 @@ IDLE_TIMEOUT=600  # 10 minutes of silence = hung
 # Run claude in background so we can monitor output activity.
 # Capture claude's actual PID via wrapper — $! gives tee's PID, not claude's.
 CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
-( claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose &
+( claude -p "$(cat "${PROMPT_FILE}")" --model "${LEAD_MODEL}" --output-format stream-json --verbose &
   echo $! > "${CLAUDE_PID_FILE}"
   wait
 ) 2>&1 | tee -a "${LOG_FILE}" &
@@ -440,7 +477,7 @@ if [[ "${CLAUDE_EXIT}" -eq 0 ]] || [[ "${SESSION_ENDED}" = true ]]; then
             git add -A
             git commit -m "refactor: Automated improvements
 
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" 2>&1 | tee -a "${LOG_FILE}" || true
+Co-Authored-By: ${COAUTHOR_NAME} <noreply@anthropic.com>" 2>&1 | tee -a "${LOG_FILE}" || true
 
             # Push to main
             git push origin main 2>&1 | tee -a "${LOG_FILE}" || true

@@ -232,6 +232,128 @@ git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 log "Pre-cycle cleanup complete"
 
 # ============================================================
+# PR Review Mode (early exit — skips test fixture phases)
+# ============================================================
+if [[ "${SPAWN_REASON}" == "pr_review" ]]; then
+    log "=== PR Review Mode ==="
+
+    PROMPT_FILE=$(mktemp /tmp/qa-pr-review-XXXXXX.md)
+    cat > "${PROMPT_FILE}" << 'PR_REVIEW_EOF'
+You are a QA reviewer for the spawn repository (OpenRouterTeam/spawn).
+
+## Mission
+
+Review every open PR. Close unnecessary ones, approve good ones. Your role is to catch changes that are redundant, ineffective, or hallucinated — a different model reviewing work prevents shared blind spots.
+
+## Step 1: List Open PRs
+
+```bash
+gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,labels,headRefName,updatedAt
+```
+
+If zero PRs, report "No open PRs to review" and exit.
+
+## Step 2: Filter Already-Reviewed PRs
+
+For each PR, check labels. **Skip** if it has `qa:approved` or `qa:rejected`, UNLESS there are new commits since the last QA review:
+
+```bash
+# Check for new commits since last QA review
+LAST_QA=$(gh api repos/OpenRouterTeam/spawn/issues/NUMBER/comments \
+    --jq '[.[] | select(.body | contains("-- qa/reviewer"))] | last | .created_at // empty')
+if [[ -n "$LAST_QA" ]]; then
+    LAST_PUSH=$(gh pr view NUMBER --repo OpenRouterTeam/spawn --json updatedAt --jq '.updatedAt')
+    # If PR updated after last QA comment, remove old label and re-review
+    # Otherwise skip
+fi
+```
+
+## Step 3: Review Each Remaining PR
+
+For each PR:
+
+1. **Read the full diff**: `gh pr diff NUMBER --repo OpenRouterTeam/spawn`
+2. **Read PR body and all comments**:
+   ```bash
+   gh pr view NUMBER --repo OpenRouterTeam/spawn --comments
+   gh api repos/OpenRouterTeam/spawn/pulls/NUMBER/comments --jq '.[] | "\(.user.login): \(.body)"'
+   ```
+3. **Ask: "Is this change actually necessary and effective?"**
+
+## CLOSE if ANY of these are true:
+
+- **Redundant changes**: reformatting, renaming that doesn't improve clarity, moving code with no functional difference
+- **Unnecessary additions**: comments, docstrings, type annotations added to code that wasn't otherwise changed
+- **Scope creep**: PR touches files unrelated to its stated purpose
+- **Ineffective fixes**: the "fix" doesn't actually address the problem, or introduces new issues
+- **Over-engineering**: adding abstractions, helpers, or config for things that don't need them
+- **Hallucinated problems**: the PR claims to fix something that wasn't broken
+
+## What NOT to check (handled by security bot):
+
+- Security vulnerabilities
+- Test pass/fail
+- Shell compatibility
+- Merge conflicts
+- **Style differences are NOT grounds for closing**
+
+## Actions
+
+### CLOSE (unnecessary/ineffective):
+```bash
+gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "qa:rejected"
+gh pr close NUMBER --repo OpenRouterTeam/spawn --delete-branch --comment "QA: Closing — [specific reason why this change is unnecessary or ineffective].
+
+-- qa/reviewer"
+```
+
+### APPROVE (meaningful and correct):
+```bash
+gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "qa:approved"
+gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "QA approved — change is necessary and well-scoped.
+
+-- qa/reviewer"
+```
+
+### COMMENT (salvageable but has issues):
+```bash
+gh pr comment NUMBER --repo OpenRouterTeam/spawn --body "QA feedback: [specific issues that need addressing].
+
+-- qa/reviewer"
+```
+(No label change — will re-review next cycle after fixes.)
+
+## Rules
+
+- Review EVERY open PR, don't stop after the first few
+- Be conservative — only close PRs that are clearly unnecessary. When in doubt, approve.
+- Always explain the specific reason for closing
+- **SIGN-OFF**: Every comment MUST end with `-- qa/reviewer`
+
+Begin now. Review all open PRs.
+PR_REVIEW_EOF
+
+    log "Launching PR review (15 min timeout)..."
+
+    PR_REVIEW_EXIT=0
+    run_with_timeout 900 \
+        claude -p "$(cat "${PROMPT_FILE}")" --model sonnet \
+        2>&1 | tee -a "${LOG_FILE}" || PR_REVIEW_EXIT=$?
+
+    if [[ "${PR_REVIEW_EXIT}" -eq 0 ]]; then
+        log "PR review completed successfully"
+    elif [[ "${PR_REVIEW_EXIT}" -eq 124 ]]; then
+        log "PR review timed out"
+    else
+        log "PR review failed (exit_code=${PR_REVIEW_EXIT})"
+    fi
+
+    rm -f "${PROMPT_FILE}" 2>/dev/null || true
+    log "=== PR Review Complete ==="
+    exit 0
+fi
+
+# ============================================================
 # Phase 0: Key Preflight
 # ============================================================
 log "=== Phase 0: Key Preflight ==="

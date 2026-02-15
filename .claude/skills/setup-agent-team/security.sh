@@ -369,8 +369,11 @@ Each pr-reviewer MUST:
 6. **Test** (in worktree): \`bash -n\` on .sh files, \`bun test\` for .ts files, verify source fallback pattern
 
 7. **Decision**:
+   - If PR has \`qa:rejected\` label → skip (QA already closed or will close it)
    - CRITICAL/HIGH found → \`gh pr review NUMBER --request-changes\` + label \`security-review-required\`
-   - MEDIUM/LOW or clean → \`gh pr review NUMBER --approve\` + label \`security-approved\` + \`gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch\`
+   - MEDIUM/LOW or clean → \`gh pr review NUMBER --approve\` + label \`security-approved\`
+     + If PR also has label \`qa:approved\` → merge: \`gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch\`
+     + If PR does NOT have \`qa:approved\` → do NOT merge. Comment: "Security approved. Waiting for QA approval before merge.\n\n-- security/pr-reviewer"
 
 8. **Clean up**: \`cd ${REPO_ROOT} && git worktree remove ${WORKTREE_BASE}/pr-NUMBER --force\`
 

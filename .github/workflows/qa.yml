@@ -1,8 +1,9 @@
-name: Daily QA
+name: QA
 on:
   schedule:
-    - cron: '0 6 * * *'
-  workflow_dispatch:
+    - cron: '0 6 * * *'         # Daily test fixture + mock cycle
+    - cron: '15,45 * * * *'     # PR review every 30 min (offset from security's */30)
+  workflow_dispatch: {}
 concurrency:
   group: qa-sprite-trigger
   cancel-in-progress: false
@@ -11,11 +12,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      - name: Determine mode
+        id: mode
+        run: |
+          if [[ "${{ github.event.schedule }}" == "0 6 * * *" ]]; then
+            echo "reason=schedule" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ github.event.schedule }}" ]]; then
+            echo "reason=pr_review" >> "$GITHUB_OUTPUT"
+          else
+            echo "reason=${{ github.event_name }}" >> "$GITHUB_OUTPUT"
+          fi
       - name: Trigger QA cycle on Sprite
         env:
           SPRITE_URL: ${{ secrets.QA_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.QA_TRIGGER_SECRET }}
         run: |
           curl -sSN --fail-with-body --max-time 5400 -X POST \
-            "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            "${SPRITE_URL}/trigger?reason=${{ steps.mode.outputs.reason }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"

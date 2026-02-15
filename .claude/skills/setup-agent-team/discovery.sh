@@ -25,6 +25,30 @@ PROMPT_FILE=""
 # Ensure .docs directory exists
 mkdir -p "$(dirname "${LOG_FILE}")"
 
+# --- Model cycling ---
+# Rotate models each cycle so no single model's blind spots dominate
+CYCLE_FILE="${REPO_ROOT}/.docs/.discovery-cycle-count"
+CYCLE_NUM=$(cat "$CYCLE_FILE" 2>/dev/null || echo 0)
+echo $((CYCLE_NUM + 1)) > "$CYCLE_FILE"
+
+# Model pools per task complexity tier (bash 3.x compatible indexing)
+LEAD_MODELS=("sonnet" "opus")
+HEAVY_MODELS=("sonnet" "opus")
+LIGHT_MODELS=("haiku" "sonnet")
+
+# Pick models for this cycle based on rotation index
+LEAD_MODEL="${LEAD_MODELS[$((CYCLE_NUM % ${#LEAD_MODELS[@]}))]}"
+HEAVY_MODEL="${HEAVY_MODELS[$((CYCLE_NUM % ${#HEAVY_MODELS[@]}))]}"
+LIGHT_MODEL="${LIGHT_MODELS[$((CYCLE_NUM % ${#LIGHT_MODELS[@]}))]}"
+
+# Map lead model to display name for Co-Authored-By
+case "${LEAD_MODEL}" in
+    opus)   COAUTHOR_NAME="Claude Opus 4.6" ;;
+    sonnet) COAUTHOR_NAME="Claude Sonnet 4.5" ;;
+    haiku)  COAUTHOR_NAME="Claude Haiku 4.5" ;;
+    *)      COAUTHOR_NAME="Claude Sonnet 4.5" ;;
+esac
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -33,6 +57,8 @@ NC='\033[0m'
 log_info()  { printf "${GREEN}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] $1" >> "${LOG_FILE}"; }
 log_warn()  { printf "${YELLOW}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] WARN: $1" >> "${LOG_FILE}"; }
 log_error() { printf "${RED}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] ERROR: $1" >> "${LOG_FILE}"; }
+
+log_info "Cycle #${CYCLE_NUM} — Lead: ${LEAD_MODEL}, Heavy: ${HEAVY_MODEL}, Light: ${LIGHT_MODEL}"
 
 # --- Cleanup trap ---
 cleanup() {
@@ -125,6 +151,9 @@ open(path, 'w').write(content.replace('MATRIX_SUMMARY_PLACEHOLDER', replacement)
 PYEOF
 
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${output_file}"
+    sed -i "s|HEAVY_MODEL_TAG|${HEAVY_MODEL}|g" "${output_file}"
+    sed -i "s|LIGHT_MODEL_TAG|${LIGHT_MODEL}|g" "${output_file}"
+    sed -i "s|COAUTHOR_TAG|${COAUTHOR_NAME}|g" "${output_file}"
 }
 
 # Kill claude process and its full process tree
@@ -224,7 +253,7 @@ run_team_cycle() {
     local CLAUDE_PID_FILE
     CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
 
-    ( claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
+    ( claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model "${LEAD_MODEL}" \
         --output-format stream-json --verbose &
       echo $! > "${CLAUDE_PID_FILE}"
       wait
