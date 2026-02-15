@@ -41,7 +41,7 @@ do_api() {
 test_do_token() {
     local response
     response=$(do_api GET "/account")
-    if echo "$response" | grep -q '"id"'; then
+    if [[ "$response" == *'"id"'* ]]; then
         log_info "API token validated"
         return 0
     else
@@ -82,7 +82,7 @@ do_register_ssh_key() {
     local register_response
     register_response=$(do_api POST "/account/keys" "$register_body")
 
-    if echo "$register_response" | grep -q '"id"'; then
+    if [[ "$register_response" == *'"id"'* ]]; then
         return 0
     else
         log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
@@ -147,7 +147,7 @@ _wait_for_droplet_active() {
 _do_check_create_error() {
     local response="$1"
 
-    if echo "$response" | grep -q '"id"' && echo "$response" | grep -q '"droplet"'; then
+    if [[ "$response" == *'"id"'* ]] && [[ "$response" == *'"droplet"'* ]]; then
         return 1  # No error
     fi
 
