@@ -58,6 +58,26 @@ function createTempDir(): string {
   return dir;
 }
 
+/**
+ * Create a bash script that sets up mock_upload and mock_run callbacks
+ * that redirect to a temp directory instead of the user's home directory.
+ * This allows tests to verify file creation without affecting the real filesystem.
+ */
+function createMockSetup(tempDir: string, configDir: string): string {
+  return `
+    mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
+    mock_run() {
+      local cmd="$1"
+      # Replace $HOME with $TEMP_DIR
+      cmd=\$(echo "$cmd" | sed "s|\\\$HOME|$TEMP_DIR|g")
+      # Replace /tmp/spawn_config_* with $TEMP_DIR/spawn_config_*
+      cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
+      eval "$cmd"
+    }
+    HOME="$TEMP_DIR"
+  `;
+}
+
 
 // ── verify_agent_installed ──────────────────────────────────────────────────
 
@@ -303,14 +323,14 @@ describe("setup_claude_code_config", () => {
         const result = runBash(`
           mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
           mock_run() {
-            # Replace /tmp/spawn_config_* with $TEMP_DIR/spawn_config_*
             local cmd="$1"
+            # Replace $HOME with $TEMP_DIR
+            cmd=\$(echo "$cmd" | sed "s|\\\$HOME|$TEMP_DIR|g")
+            # Replace /tmp/spawn_config_* with $TEMP_DIR/spawn_config_*
             cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-            # Also replace ~/ with $TEMP_DIR/
-            cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-            mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
             eval "$cmd"
           }
+          HOME="$TEMP_DIR"
           setup_claude_code_config "key" "mock_upload" "mock_run"
         `, { TEMP_DIR: tempDir });
         expect(result.exitCode).toBe(0);
@@ -334,11 +354,13 @@ describe("setup_claude_code_config", () => {
           mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
           mock_run() {
             local cmd="$1"
+            # Replace $HOME with $TEMP_DIR
+            cmd=\$(echo "$cmd" | sed "s|\\\$HOME|$TEMP_DIR|g")
+            # Replace /tmp/spawn_config_* with $TEMP_DIR/spawn_config_*
             cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-            cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-            mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
             eval "$cmd"
           }
+          HOME="$TEMP_DIR"
           setup_claude_code_config "key" "mock_upload" "mock_run"
         `, { TEMP_DIR: tempDir });
         expect(result.exitCode).toBe(0);
@@ -379,11 +401,13 @@ describe("setup_claude_code_config", () => {
           mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
           mock_run() {
             local cmd="$1"
+            # Replace $HOME with $TEMP_DIR
+            cmd=\$(echo "$cmd" | sed "s|\\\$HOME|$TEMP_DIR|g")
+            # Replace /tmp/spawn_config_* with $TEMP_DIR/spawn_config_*
             cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-            cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-            mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
             eval "$cmd"
           }
+          HOME="$TEMP_DIR"
           setup_claude_code_config 'key-with-"quotes"-inside' "mock_upload" "mock_run"
         `, { TEMP_DIR: tempDir });
         expect(result.exitCode).toBe(0);
@@ -406,11 +430,13 @@ describe("setup_claude_code_config", () => {
           mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
           mock_run() {
             local cmd="$1"
+            # Replace $HOME with $TEMP_DIR
+            cmd=\$(echo "$cmd" | sed "s|\\\$HOME|$TEMP_DIR|g")
+            # Replace /tmp/spawn_config_* with $TEMP_DIR/spawn_config_*
             cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-            cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-            mkdir -p "\$(dirname "\$TEMP_DIR/.claude")" 2>/dev/null || true
             eval "$cmd"
           }
+          HOME="$TEMP_DIR"
           setup_claude_code_config 'key\\\\with\\\\backslashes' "mock_upload" "mock_run"
         `, { TEMP_DIR: tempDir });
         expect(result.exitCode).toBe(0);
@@ -434,14 +460,7 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".openclaw")}
         setup_openclaw_config "sk-or-v1-test-key" "openrouter/auto" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -460,14 +479,7 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".openclaw")}
         setup_openclaw_config "my-api-key-123" "openrouter/auto" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -486,14 +498,7 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".openclaw")}
         setup_openclaw_config "key" "anthropic/claude-3.5-sonnet" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -512,14 +517,7 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".openclaw")}
         setup_openclaw_config "key" "auto" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -538,14 +536,7 @@ describe("setup_openclaw_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.openclaw")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".openclaw")}
         setup_openclaw_config "key" "auto" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -582,14 +573,7 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".continue")}
         setup_continue_config "sk-or-v1-test-key" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -608,14 +592,7 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".continue")}
         setup_continue_config "test-key" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -637,14 +614,7 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".continue")}
         setup_continue_config "my-continue-api-key" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -663,14 +633,7 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".continue")}
         setup_continue_config "key" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -689,14 +652,7 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".continue")}
         setup_continue_config "key" "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
@@ -725,14 +681,7 @@ describe("setup_continue_config", () => {
     const tempDir = createTempDir();
     try {
       const result = runBash(`
-        mock_upload() { cp "$1" "$TEMP_DIR/\$(basename "$2")"; }
-        mock_run() {
-          local cmd="$1"
-          cmd=\$(echo "$cmd" | sed "s|/tmp/spawn_config_|$TEMP_DIR/spawn_config_|g")
-          cmd=\$(echo "$cmd" | sed "s|~/|\$TEMP_DIR/|g")
-          mkdir -p "\$(dirname "\$TEMP_DIR/.continue")" 2>/dev/null || true
-          eval "$cmd"
-        }
+        ${createMockSetup(tempDir, ".continue")}
         setup_continue_config 'key-with-"quotes"-and\\backslash' "mock_upload" "mock_run"
       `, { TEMP_DIR: tempDir });
       expect(result.exitCode).toBe(0);
