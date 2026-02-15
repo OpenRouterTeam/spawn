@@ -1663,6 +1663,38 @@ function printGroupedList(
 
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
+function printAgentCloudsList(
+  sortedClouds: string[],
+  manifest: Manifest,
+  agentKey: string,
+  allClouds: string[],
+  credCount: number
+): void {
+  console.log();
+  console.log(pc.bold(`Available clouds:`) + pc.dim(` ${sortedClouds.length} of ${allClouds.length}`));
+  if (credCount > 0) {
+    console.log(pc.dim(`  ${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected (shown first)`));
+  }
+  console.log();
+
+  if (sortedClouds.length === 0) {
+    console.log(pc.dim("  No implemented clouds yet."));
+    console.log();
+    return;
+  }
+
+  const byType = groupByType(sortedClouds, (c) => manifest.clouds[c].type);
+  printGroupedList(
+    byType,
+    (c) => manifest.clouds[c].name,
+    (c) => {
+      const hint = `spawn ${agentKey} ${c}`;
+      return hasCloudCredentials(manifest.clouds[c].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
+    }
+  );
+  console.log();
+}
+
 export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest): Promise<void> {
   const [manifest, agentKey] = preloadedManifest
     ? [preloadedManifest, agent]
@@ -1691,29 +1723,7 @@ export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest):
     });
   }
 
-  console.log();
-  console.log(pc.bold(`Available clouds:`) + pc.dim(` ${sortedClouds.length} of ${allClouds.length}`));
-  if (credCount > 0) {
-    console.log(pc.dim(`  ${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected (shown first)`));
-  }
-  console.log();
-
-  if (sortedClouds.length === 0) {
-    console.log(pc.dim("  No implemented clouds yet."));
-    console.log();
-    return;
-  }
-
-  const byType = groupByType(sortedClouds, (c) => manifest.clouds[c].type);
-  printGroupedList(
-    byType,
-    (c) => manifest.clouds[c].name,
-    (c) => {
-      const hint = `spawn ${agentKey} ${c}`;
-      return hasCloudCredentials(manifest.clouds[c].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
-    }
-  );
-  console.log();
+  printAgentCloudsList(sortedClouds, manifest, agentKey, allClouds, credCount);
 }
 
 /** Print quick-start instructions showing credential status and example spawn command */
@@ -1859,11 +1869,8 @@ export async function cmdUpdate(): Promise<void> {
 
 // ── Help ───────────────────────────────────────────────────────────────────────
 
-export function cmdHelp(): void {
-  console.log(`
-${pc.bold("spawn")} -- Launch any AI coding agent on any cloud
-
-${pc.bold("USAGE")}
+function getHelpUsageSection(): string {
+  return `${pc.bold("USAGE")}
   spawn                              Interactive agent + cloud picker
   spawn <agent> <cloud>              Launch agent on cloud directly
   spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
@@ -1883,9 +1890,11 @@ ${pc.bold("USAGE")}
   spawn clouds                       List all cloud providers
   spawn update                       Check for CLI updates
   spawn version                      Show version (or --version, -v)
-  spawn help                         Show this help message (or --help, -h)
+  spawn help                         Show this help message (or --help, -h)`;
+}
 
-${pc.bold("EXAMPLES")}
+function getHelpExamplesSection(): string {
+  return `${pc.bold("EXAMPLES")}
   spawn                              ${pc.dim("# Pick interactively")}
   spawn claude sprite                ${pc.dim("# Launch Claude Code on Sprite")}
   spawn aider hetzner                ${pc.dim("# Launch Aider on Hetzner Cloud")}
@@ -1899,9 +1908,11 @@ ${pc.bold("EXAMPLES")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
   spawn list claude                  ${pc.dim("# Filter history by agent name")}
-  spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}
+  spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}`;
+}
 
-${pc.bold("AUTHENTICATION")}
+function getHelpAuthSection(): string {
+  return `${pc.bold("AUTHENTICATION")}
   All agents use OpenRouter for LLM access. Get your API key at:
   ${pc.cyan("https://openrouter.ai/settings/keys")}
 
@@ -1909,29 +1920,58 @@ ${pc.bold("AUTHENTICATION")}
   ${pc.dim("OPENROUTER_API_KEY")}=sk-or-v1-... spawn claude sprite
 
   Each cloud provider has its own auth requirements.
-  Run ${pc.cyan("spawn <cloud>")} to see setup instructions for a specific provider.
+  Run ${pc.cyan("spawn <cloud>")} to see setup instructions for a specific provider.`;
+}
 
-${pc.bold("INSTALL")}
-  curl -fsSL ${RAW_BASE}/cli/install.sh | bash
+function getHelpInstallSection(): string {
+  return `${pc.bold("INSTALL")}
+  curl -fsSL ${RAW_BASE}/cli/install.sh | bash`;
+}
 
-${pc.bold("TROUBLESHOOTING")}
+function getHelpTroubleshootingSection(): string {
+  return `${pc.bold("TROUBLESHOOTING")}
   ${pc.dim("*")} Script not found: Run ${pc.cyan("spawn matrix")} to verify the combination exists
   ${pc.dim("*")} Missing credentials: Run ${pc.cyan("spawn <cloud>")} to see setup instructions
   ${pc.dim("*")} Update issues: Try ${pc.cyan("spawn update")} or reinstall manually
   ${pc.dim("*")} Garbled unicode: Set ${pc.cyan("SPAWN_NO_UNICODE=1")} for ASCII-only output
   ${pc.dim("*")} Missing unicode over SSH: Set ${pc.cyan("SPAWN_UNICODE=1")} to force unicode on
-  ${pc.dim("*")} Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update
+  ${pc.dim("*")} Slow startup: Set ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")} to skip auto-update`;
+}
 
-${pc.bold("ENVIRONMENT VARIABLES")}
+function getHelpEnvVarsSection(): string {
+  return `${pc.bold("ENVIRONMENT VARIABLES")}
   ${pc.cyan("OPENROUTER_API_KEY")}        OpenRouter API key (all agents require this)
   ${pc.cyan("SPAWN_NO_UPDATE_CHECK=1")}   Skip auto-update check on startup
   ${pc.cyan("SPAWN_NO_UNICODE=1")}        Force ASCII output (no unicode symbols)
   ${pc.cyan("SPAWN_UNICODE=1")}           Force Unicode output (override auto-detection)
   ${pc.cyan("SPAWN_HOME")}                Override spawn data directory (default: ~/.spawn)
-  ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)
+  ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)`;
+}
 
-${pc.bold("MORE INFO")}
+function getHelpFooterSection(): string {
+  return `${pc.bold("MORE INFO")}
   Repository:  https://github.com/${REPO}
-  OpenRouter:  https://openrouter.ai
-`);
+  OpenRouter:  https://openrouter.ai`;
+}
+
+export function cmdHelp(): void {
+  const sections = [
+    "",
+    `${pc.bold("spawn")} -- Launch any AI coding agent on any cloud`,
+    "",
+    getHelpUsageSection(),
+    "",
+    getHelpExamplesSection(),
+    "",
+    getHelpAuthSection(),
+    "",
+    getHelpInstallSection(),
+    "",
+    getHelpTroubleshootingSection(),
+    "",
+    getHelpEnvVarsSection(),
+    "",
+    getHelpFooterSection(),
+  ];
+  console.log(sections.join("\n"));
 }
