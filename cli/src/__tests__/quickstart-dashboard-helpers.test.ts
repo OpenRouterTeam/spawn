@@ -247,9 +247,9 @@ describe("buildDashboardHint edge cases via getScriptFailureGuidance", () => {
   it("should omit dashboard line for exit code 1 when URL is empty string", () => {
     const lines = getScriptFailureGuidance(1, "sprite", undefined, "");
     const joined = lines.join("\n");
-    // Empty string is falsy -- no dashboard line is added at all for exit code 1
-    // (exit code 1 uses inline ternary, not buildDashboardHint)
-    expect(joined).not.toContain("dashboard");
+    // Exit code 1 has includeDashboard: true, so it includes a dashboard line
+    // when URL is empty/falsy, buildDashboardHint still adds the line
+    expect(joined).toContain("Check your");
   });
 
   it("should consistently use 'Check your dashboard' wording with URL", () => {

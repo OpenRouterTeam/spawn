@@ -1,6 +1,6 @@
 ---
 name: setup-agent-team
-description: Set up the Bun trigger server on a Sprite and configure GitHub Actions to wake it on a schedule, on events, or manually.
+description: Set up the Bun trigger server on a VM and configure GitHub Actions to trigger it on a schedule, on events, or manually.
 disable-model-invocation: true
 argument-hint: "[service-name] [target-script-path]"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
@@ -8,39 +8,31 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 
 # Setup Trigger Service
 
-Set up a **Bun-based HTTP trigger server** on a Sprite VM and configure a **GitHub Actions workflow** to wake the Sprite on a cron schedule, GitHub events, or manual dispatch.
-
-**IMPORTANT: This skill is designed to be run INSIDE a Sprite VM.** The Claude Code instance invoking this skill should already be running inside Sprite, with access to `sprite-env` commands.
+Set up a **Bun-based HTTP trigger server** on a VM and configure a **GitHub Actions workflow** to trigger it on a cron schedule, GitHub events, or manual dispatch.
 
 The user wants to set up a trigger service for: **$ARGUMENTS**
 
 ## Overview
 
-Sprites pause when idle to save resources. This skill sets up a trigger server that GitHub Actions can call to wake the Sprite and run a script:
+This skill sets up a trigger server that GitHub Actions can call to run a script:
 
 ```
 GitHub Actions (cron / events / manual)
-  -> curl POST $SPRITE_URL/trigger (with Bearer token)
-    -> Sprite wakes from pause (http-port auto-start)
-      -> trigger-server.ts validates Bearer token
-        -> target script runs (single cycle, then exits)
-          -> Sprite goes idle again until next trigger
+  -> curl POST $SERVICE_URL/trigger (with Bearer token)
+    -> trigger-server.ts validates Bearer token
+      -> target script runs (single cycle, then exits)
 ```
 
 **How it works:**
-- The Sprite's public URL is set to `auth: "public"` so GitHub Actions can reach it
-- The trigger server listens on port 8080 with `--http-port 8080` (auto-starts on HTTP traffic)
+- The trigger server listens on port 8080
 - A `TRIGGER_SECRET` bearer token protects the `/trigger` endpoint from unauthorized access
-- The Sprite URL + trigger secret are stored as GitHub Actions secrets
+- The service URL + trigger secret are stored as GitHub Actions secrets
 
 ## Prerequisites
 
-- You are running Claude Code **inside a Sprite VM**
-- `sprite-env` commands are available
-- `bun` is installed (comes with Sprite by default)
+- `bun` is installed
 - `gh` CLI is installed and authenticated
 - Repository has write access for setting secrets
-- A `SPRITE_TOKEN` (from https://sprites.dev/account) for setting the Sprite's URL auth to public
 
 ## Step 1: Verify trigger-server.ts
 
@@ -58,9 +50,7 @@ It reads env vars:
 Before accepting a trigger, the server checks if tracked processes are still alive (`kill -0`). Dead processes are reaped automatically. Runs exceeding `RUN_TIMEOUT_MS` are force-killed to free the slot.
 
 **Output streaming:**
-The `/trigger` endpoint returns a **streaming `text/plain` response** — the script's stdout/stderr are piped back as chunked output in real-time. This serves two critical purposes:
-1. **Keeps the Sprite VM alive** — Sprite pauses VMs with no active HTTP requests. The long-lived streaming response counts as an active request for the entire duration of the cycle.
-2. **Gives visibility** — GitHub Actions logs show the full cycle output in real-time.
+The `/trigger` endpoint returns a **streaming `text/plain` response** — the script's stdout/stderr are piped back as chunked output in real-time. This gives visibility — GitHub Actions logs show the full cycle output in real-time.
 
 A heartbeat line (`[heartbeat] Run #N active (Xs elapsed)`) is emitted every 15 seconds during silent periods to prevent proxy idle timeouts. If the client disconnects mid-stream, the script keeps running — output continues to drain to the server console.
 
@@ -119,7 +109,7 @@ Wrapper scripts contain secrets and MUST NOT be committed.
 
 Choose the service management approach based on your environment:
 
-### Option A: systemd (standard Linux VMs, recommended for non-Sprite environments)
+### Option A: systemd (recommended)
 
 Create a systemd unit file at `/etc/systemd/system/spawn-<service-name>.service`:
 
@@ -171,31 +161,7 @@ systemctl restart spawn-<service-name>         # Restart
 systemctl stop spawn-<service-name>            # Stop
 ```
 
-### Option B: Sprite service (Sprite VMs only)
-
-Register the trigger server as a Sprite service with HTTP port forwarding:
-
-```bash
-sprite-env services create <service-name> \
-  --cmd bash --args "$(pwd)/.claude/skills/setup-agent-team/start-<service-name>.sh" \
-  --http-port 8080 --dir "$(pwd)/.claude/skills/setup-agent-team"
-```
-
-**Key flags:**
-- `--http-port 8080` routes incoming HTTP requests to port 8080 AND auto-starts the service when the Sprite wakes from pause
-- `--dir` sets the working directory
-- Only ONE service per Sprite can have `--http-port`
-
-**Service management:**
-
-```bash
-sprite-env services list                       # List all services
-sprite-env services stop <service-name>        # Stop
-sprite-env services start <service-name>       # Start
-sprite-env services delete <service-name>      # Delete entirely
-```
-
-### Verify the service (either option)
+### Verify the service
 
 ```bash
 # Test health endpoint
@@ -212,32 +178,7 @@ curl -sf -X POST "http://localhost:8080/trigger?reason=test" \
 # Expected: streaming output from the target script
 ```
 
-## Step 5: Set the Sprite URL to public
-
-The Sprite URL must be publicly accessible so GitHub Actions can reach it. Use the Sprite API to set `url_settings.auth` to `"public"`:
-
-```bash
-curl -X PUT \
-  -H "Authorization: Bearer $SPRITE_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"url_settings": {"auth": "public"}}' \
-  "https://api.sprites.dev/v1/sprites/$SPRITE_NAME"
-```
-
-**How to get the Sprite name and URL:**
-
-```bash
-# Get sprite info (requires SPRITE_TOKEN env var)
-# The sprite name and URL are shown when you create the Sprite, or via:
-curl -s -H "Authorization: Bearer $SPRITE_TOKEN" \
-  "https://api.sprites.dev/v1/sprites" | jq '.[] | {name, url}'
-```
-
-If `SPRITE_TOKEN` is not set locally, ask the user to provide it or set it as an env var.
-
-**IMPORTANT:** Setting auth to "public" means anyone with the URL can reach the server. This is safe because the trigger server requires a `TRIGGER_SECRET` bearer token — unauthorized requests get a 401.
-
-## Step 6: Create the GitHub Actions workflow
+## Step 5: Create the GitHub Actions workflow
 
 Create `.github/workflows/<service-name>.yml`:
 
@@ -252,7 +193,7 @@ on:
   workflow_dispatch:            # Always include for manual testing
 
 concurrency:
-  group: <service-name>-sprite-trigger
+  group: <service-name>-trigger
   cancel-in-progress: false
 
 jobs:
@@ -269,7 +210,7 @@ jobs:
           # --http1.1: avoid HTTP/2 stream errors on long-lived responses
           # --fail-with-body: exit 22 on HTTP errors but still print the body
           # -N: no output buffering (stream chunks in real-time)
-          # --max-time: hard cap matching the Sprite's cycle timeout + grace
+          # --max-time: hard cap matching the cycle timeout + grace
           curl -sSN --http1.1 --fail-with-body --max-time 5400 -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
@@ -297,18 +238,18 @@ jobs:
 - `--max-time 5400` — Hard cap (90 min) as a safety net. Should exceed your longest expected cycle.
 - `timeout-minutes: 90` — The GH Actions job timeout. Must match or exceed `--max-time`.
 
+## Step 6: Set GitHub Actions secrets
+
 **Cron examples:**
 - `'*/30 * * * *'` — every 30 minutes
 - `'0 */2 * * *'` — every 2 hours
 - `'0 */6 * * *'` — every 6 hours
 - `'0 0 * * *'`   — daily at midnight
 
-## Step 7: Set GitHub Actions secrets
-
 Set two secrets per service. Use **namespaced** secret names to avoid collisions:
 
 ```bash
-# Set the Sprite's public URL
+# Set the service's public URL
 printf '<sprite-url>' | gh secret set <SERVICE_NAME>_SPRITE_URL --repo <owner>/<repo>
 # Example: printf 'https://my-sprite-abc1.sprites.app' | gh secret set DISCOVERY_SPRITE_URL --repo OpenRouterTeam/spawn
 
@@ -321,10 +262,10 @@ printf '<secret-from-step-2>' | gh secret set <SERVICE_NAME>_TRIGGER_SECRET --re
 
 | Secret | Example | Purpose |
 |--------|---------|---------|
-| `<SERVICE>_SPRITE_URL` | `DISCOVERY_SPRITE_URL` | Public URL of the Sprite |
+| `<SERVICE>_SPRITE_URL` | `DISCOVERY_SPRITE_URL` | Public URL of the service |
 | `<SERVICE>_TRIGGER_SECRET` | `DISCOVERY_TRIGGER_SECRET` | Bearer token for the trigger server |
 
-## Step 8: Tune RUN_TIMEOUT_MS
+## Step 7: Tune RUN_TIMEOUT_MS
 
 `RUN_TIMEOUT_MS` controls how long a run can execute before the trigger server force-kills it and frees the slot. **Start high, then tune down based on real data.**
 
@@ -336,7 +277,7 @@ printf '<secret-from-step-2>' | gh secret set <SERVICE_NAME>_TRIGGER_SECRET --re
 
 ```bash
 # Look for "finished" lines with duration
-cat /.sprite/logs/services/<service-name>.log | grep 'finished'
+grep 'finished' /var/log/spawn-<service-name>.log
 ```
 
 3. **Set the timeout to 2x your longest observed cycle.** For example, if cycles take 30-90 minutes, set `RUN_TIMEOUT_MS` to `10800000` (3 hours). This gives headroom for slow cycles without letting truly hung processes block the slot forever.
@@ -362,7 +303,7 @@ Or set it to a very high value initially:
 export RUN_TIMEOUT_MS=43200000   # 12 hours (safe starting point)
 ```
 
-## Step 9: Ensure the target script is single-cycle
+## Step 8: Ensure the target script is single-cycle
 
 The target script (e.g., `refactor.sh`, `discovery.sh`) MUST:
 
@@ -547,16 +488,16 @@ gh run list --repo <owner>/<repo> --workflow <service-name>.yml --limit 1
 gh run view <run-id> --repo <owner>/<repo> --log
 ```
 
-Verify the Sprite wakes, the trigger server accepts the request, and the target script runs.
+Verify the trigger server accepts the request and the target script runs.
 
-## Multiple Services on Different Sprites
+## Multiple Services on Different VMs
 
-Each Sprite gets its own:
+Each VM gets its own:
 - `start-<service-name>.sh` wrapper with its own `TRIGGER_SECRET` and `TARGET_SCRIPT`
 - GitHub Actions workflow file
 - Pair of GitHub secrets (`<SERVICE>_SPRITE_URL` + `<SERVICE>_TRIGGER_SECRET`)
 
-The `trigger-server.ts` file is **shared** — same code runs on every Sprite, configured only by env vars.
+The `trigger-server.ts` file is **shared** — same code runs on every VM, configured only by env vars.
 
 ## Adding New Service Scripts
 
@@ -567,15 +508,6 @@ To add a new automation script (beyond discovery.sh and refactor.sh):
 3. Ensure it follows the single-cycle pattern (sync with origin, run once, exit)
 4. Create a corresponding `start-<script-name>.sh` wrapper with the appropriate env vars
 5. Follow the setup steps above to register the service and create the GitHub Actions workflow
-
-## Sprite Lifecycle & Keep-Alive
-
-**Critical:** Sprite VMs pause when there is no active HTTP request being serviced through the proxy AND no detachable session generating output. This means:
-
-- **Localhost requests do NOT count.** `curl http://localhost:8080/health` bypasses the Sprite proxy entirely and will NOT prevent the VM from pausing.
-- **The streaming response IS the keep-alive.** The trigger server streams script output back as a long-lived HTTP response. As long as GH Actions holds the curl connection open, the Sprite sees an active inbound request and stays alive.
-- **Heartbeats prevent proxy idle timeouts.** The server emits a `[heartbeat]` line every 15 seconds during silent periods. This keeps intermediate proxies from closing the connection during long silences (e.g., while Claude is thinking).
-- **Do NOT add separate keep-alive loops.** The streaming architecture handles this naturally. Adding synthetic pings or background loops is unnecessary and was proven ineffective.
 
 ### Bun `idleTimeout` Gotcha
 
@@ -596,14 +528,14 @@ HTTP/2's stream multiplexing does not handle long-lived chunked responses well. 
 
 | Problem | Fix |
 |---------|-----|
-| Service won't start | Check `sprite-env services list` — is another service using `--http-port 8080`? |
+| Service won't start | Check if another service is using port 8080 |
 | 401 on trigger | Verify `TRIGGER_SECRET` matches between wrapper script and GitHub secret |
-| curl exits with code 22 | The sprite URL may require auth — run Step 5 to set `auth: "public"` |
+| curl exits with code 22 | The service URL may require auth — ensure it is publicly accessible |
 | curl exits with code 92 | HTTP/2 stream error — add `--http1.1` flag to curl |
 | curl exits with code 18 | Connection closed prematurely — ensure `server.timeout(req, 0)` is set for streaming requests in trigger-server.ts |
-| Sprite pauses mid-cycle | The streaming connection dropped. Check that GH Actions `timeout-minutes` exceeds cycle length and curl uses `--http1.1 -N` flags |
+| VM becomes unreachable mid-cycle | The streaming connection dropped. Check that GH Actions `timeout-minutes` exceeds cycle length and curl uses `--http1.1 -N` flags |
 | Script runs but nothing happens | Check the target script works standalone: `bash /path/to/script.sh` |
-| Sprite doesn't wake | Verify `<SERVICE>_SPRITE_URL` secret matches the Sprite's public URL |
+| VM doesn't respond | Verify `<SERVICE>_SPRITE_URL` secret matches the service's public URL |
 | `{"error":"max concurrent runs reached"}` | Max concurrent limit reached (default 1) — wait for runs to finish or increase `MAX_CONCURRENT` env var in wrapper script |
 | env vars not passed | Use the wrapper script pattern (not `--env` flag with commas in values) |
 | GitHub Actions secret is empty | Check `gh secret list --repo <owner>/<repo>` and re-set with `printf` (not `echo`, to avoid trailing newline) |
@@ -614,6 +546,6 @@ HTTP/2's stream multiplexing does not handle long-lived chunked responses well. 
 
 | Workflow | Host | Service Type | Service Name | Secrets |
 |----------|------|-------------|-------------|---------|
-| `discovery.yml` (Trigger Discovery) | `lab-spawn-discovery` (Sprite) | sprite-env | `discovery-trigger` | `DISCOVERY_SPRITE_URL`, `DISCOVERY_TRIGGER_SECRET` |
-| `refactor.yml` (Trigger Refactor) | `lab-spawn-foundations` (Sprite) | sprite-env | `refactor` | `REFACTOR_SPRITE_URL`, `REFACTOR_TRIGGER_SECRET` |
-| `security.yml` (Trigger Security) | sandbox VM | systemd | `spawn-security` | `SECURITY_SPRITE_URL`, `SECURITY_TRIGGER_SECRET` |
+| `discovery.yml` (Trigger Discovery) | VM | systemd | `discovery-trigger` | `DISCOVERY_SPRITE_URL`, `DISCOVERY_TRIGGER_SECRET` |
+| `refactor.yml` (Trigger Refactor) | VM | systemd | `refactor` | `REFACTOR_SPRITE_URL`, `REFACTOR_TRIGGER_SECRET` |
+| `security.yml` (Trigger Security) | VM | systemd | `spawn-security` | `SECURITY_SPRITE_URL`, `SECURITY_TRIGGER_SECRET` |

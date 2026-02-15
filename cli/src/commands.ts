@@ -16,7 +16,7 @@ import {
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
-import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord } from "./history.js";
+import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord, type VMConnection } from "./history.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -603,13 +603,8 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
 
 /** Check for missing credentials before running a script and warn the user.
  *  In interactive mode, asks for confirmation. In non-interactive mode, just warns. */
-export async function preflightCredentialCheck(manifest: Manifest, cloud: string): Promise<void> {
-  const cloudAuth = manifest.clouds[cloud].auth;
-  if (cloudAuth.toLowerCase() === "none") return;
-
-  const authVars = parseAuthEnvVars(cloudAuth);
+function collectMissingCredentials(authVars: string[]): string[] {
   const missing: string[] = [];
-
   if (!process.env.OPENROUTER_API_KEY) {
     missing.push("OPENROUTER_API_KEY");
   }
@@ -618,29 +613,44 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
       missing.push(v);
     }
   }
+  return missing;
+}
 
+function getCredentialGuidance(cloud: string, onlyOpenRouter: boolean): string {
+  if (onlyOpenRouter) {
+    return "The script will open your browser to authenticate with OpenRouter.";
+  }
+  return `Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`;
+}
+
+async function confirmContinueWithMissingCreds(onlyOpenRouter: boolean): Promise<boolean> {
+  const confirmMsg = onlyOpenRouter
+    ? "Continue? You'll authenticate via browser."
+    : "Continue anyway? The script will prompt for missing credentials.";
+  const shouldContinue = await p.confirm({
+    message: confirmMsg,
+    initialValue: true,
+  });
+  return !p.isCancel(shouldContinue) && shouldContinue;
+}
+
+export async function preflightCredentialCheck(manifest: Manifest, cloud: string): Promise<void> {
+  const cloudAuth = manifest.clouds[cloud].auth;
+  if (cloudAuth.toLowerCase() === "none") return;
+
+  const authVars = parseAuthEnvVars(cloudAuth);
+  const missing = collectMissingCredentials(authVars);
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
   p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
 
-  // Give context-specific guidance
   const onlyOpenRouter = missing.length === 1 && missing[0] === "OPENROUTER_API_KEY";
-  if (onlyOpenRouter) {
-    p.log.info(`The script will open your browser to authenticate with OpenRouter.`);
-  } else {
-    p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
-  }
+  p.log.info(getCredentialGuidance(cloud, onlyOpenRouter));
 
   if (isInteractiveTTY()) {
-    const confirmMsg = onlyOpenRouter
-      ? "Continue? You'll authenticate via browser."
-      : "Continue anyway? The script will prompt for missing credentials.";
-    const shouldContinue = await p.confirm({
-      message: confirmMsg,
-      initialValue: true,
-    });
-    if (p.isCancel(shouldContinue) || !shouldContinue) {
+    const shouldContinue = await confirmContinueWithMissingCreds(onlyOpenRouter);
+    if (!shouldContinue) {
       handleCancel();
     }
   }
@@ -1091,6 +1101,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     scriptContent = await downloadScriptWithFallback(url, ghUrl);
   } catch (err) {
     reportDownloadError(ghUrl, err);
+    return; // Exit early - cannot proceed without script content
   }
 
   // Record the spawn before execution (so it's logged even if the script fails midway)
@@ -1430,6 +1441,13 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
       pc.green(agentDisplay.padEnd(20)) +
       cloudDisplay.padEnd(20) +
       pc.dim(relative);
+    if (r.connection) {
+      if (r.connection.ip === "sprite-console" && r.connection.server_name) {
+        line += pc.green(`  sprite console -s ${r.connection.server_name}`);
+      } else {
+        line += pc.green(`  ssh ${r.connection.user}@${r.connection.ip}`);
+      }
+    }
     if (r.prompt) {
       const preview = r.prompt.length > 40 ? r.prompt.slice(0, 40) + "..." : r.prompt;
       line += pc.dim(`  --prompt "${preview}"`);
@@ -1450,14 +1468,25 @@ export function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): str
   return `${agentDisplay} on ${cloudDisplay}`;
 }
 
-/** Build a hint string (relative timestamp + optional prompt preview) for the interactive picker */
+/** Build a hint string (relative timestamp + connection status + optional prompt preview) for the interactive picker */
 export function buildRecordHint(r: SpawnRecord): string {
   const relative = formatRelativeTime(r.timestamp);
+  const parts: string[] = [relative];
+
+  if (r.connection) {
+    if (r.connection.ip === "sprite-console" && r.connection.server_name) {
+      parts.push(pc.green(`sprite console -s ${r.connection.server_name}`));
+    } else {
+      parts.push(pc.green(`ssh ${r.connection.user}@${r.connection.ip}`));
+    }
+  }
+
   if (r.prompt) {
     const preview = r.prompt.length > 30 ? r.prompt.slice(0, 30) + "..." : r.prompt;
-    return `${relative}  --prompt "${preview}"`;
+    parts.push(`--prompt "${preview}"`);
   }
-  return relative;
+
+  return parts.join("  ");
 }
 
 /** Try to load manifest and resolve filter display names to keys.
@@ -1494,7 +1523,7 @@ async function resolveListFilters(
   return { manifest, agentFilter, cloudFilter };
 }
 
-/** Show interactive picker to select and rerun a previous spawn */
+/** Show interactive picker to select and reconnect/rerun a previous spawn */
 async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
   p.log.info(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")} or ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`));
 
@@ -1505,7 +1534,7 @@ async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest 
   }));
 
   const choice = await p.select({
-    message: `Select a spawn to rerun (${records.length} recorded)`,
+    message: `Select a spawn (${records.length} recorded)`,
     options,
   });
   if (p.isCancel(choice)) {
@@ -1513,7 +1542,34 @@ async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest 
   }
 
   const selected = records[choice];
-  p.log.step(`Rerunning ${pc.bold(buildRecordLabel(selected, manifest))}`);
+
+  // If there's connection info, offer to reconnect or rerun
+  if (selected.connection) {
+    const action = await p.select({
+      message: "What would you like to do?",
+      options: [
+        { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${selected.connection.user}@${selected.connection.ip}` },
+        { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
+      ],
+    });
+
+    if (p.isCancel(action)) {
+      handleCancel();
+    }
+
+    if (action === "reconnect") {
+      try {
+        await cmdConnect(selected.connection);
+      } catch (err) {
+        p.log.error(`Connection failed: ${getErrorMessage(err)}`);
+        p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
+      }
+      return;
+    }
+  }
+
+  // Rerun (create new spawn)
+  p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
 
@@ -1558,6 +1614,87 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
 
   renderListTable(records, manifest);
   showListFooter(records, agentFilter, cloudFilter);
+}
+
+export async function cmdLast(): Promise<void> {
+  const records = filterHistory();
+
+  if (records.length === 0) {
+    p.log.info("No spawn history found.");
+    p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to create your first spawn.`);
+    return;
+  }
+
+  const latest = records[0];
+  let manifest: Manifest | null = null;
+  try {
+    manifest = await loadManifest();
+  } catch {
+    // Manifest unavailable -- show raw keys
+  }
+
+  const label = buildRecordLabel(latest, manifest);
+  const hint = buildRecordHint(latest);
+  p.log.step(`Rerunning last spawn: ${pc.bold(label)} ${pc.dim(hint)}`);
+  await cmdRun(latest.agent, latest.cloud, latest.prompt);
+}
+
+// ── Connect ────────────────────────────────────────────────────────────────────
+
+/** Connect to an existing VM via SSH */
+async function cmdConnect(connection: VMConnection): Promise<void> {
+  // Handle Sprite console connections
+  if (connection.ip === "sprite-console" && connection.server_name) {
+    p.log.step(`Connecting to sprite ${pc.bold(connection.server_name)}...`);
+
+    return new Promise<void>((resolve, reject) => {
+      const child = spawn("sprite", ["console", "-s", connection.server_name], {
+        stdio: "inherit",
+      });
+
+      child.on("close", (code: number | null) => {
+        if (code === 0 || code === null) {
+          resolve();
+        } else {
+          reject(new Error(`Sprite console connection failed with exit code ${code}`));
+        }
+      });
+
+      child.on("error", (err) => {
+        p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
+        p.log.info(`Try manually: ${pc.cyan(`sprite console -s ${connection.server_name}`)}`);
+        reject(err);
+      });
+    });
+  }
+
+  // Handle SSH connections
+  p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
+
+  const sshCmd = `ssh -o StrictHostKeyChecking=accept-new ${connection.user}@${connection.ip}`;
+
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn("ssh", [
+      "-o", "StrictHostKeyChecking=accept-new",
+      `${connection.user}@${connection.ip}`
+    ], {
+      stdio: "inherit",
+    });
+
+    child.on("close", (code: number | null) => {
+      if (code === 0 || code === null) {
+        resolve();
+      } else {
+        reject(new Error(`SSH connection failed with exit code ${code}`));
+      }
+    });
+
+    child.on("error", (err) => {
+      p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
+      p.log.info(`Try manually: ${pc.cyan(sshCmd)}`);
+      reject(err);
+    });
+  });
 }
 
 // ── Agents ─────────────────────────────────────────────────────────────────────
@@ -1786,8 +1923,6 @@ function printQuickStart(opts: {
     for (let i = 0; i < opts.authVars.length; i++) {
       console.log(formatAuthVarLine(opts.authVars[i], i === 0 ? opts.cloudUrl : undefined));
     }
-  } else if (opts.auth.toLowerCase() !== "none") {
-    console.log(`  ${pc.dim(`Auth: ${opts.auth}`)}`);
   }
   if (opts.spawnCmd) {
     console.log(`  ${pc.cyan(opts.spawnCmd)}`);
@@ -1921,6 +2056,7 @@ function getHelpUsageSection(): string {
   spawn list -a <agent>              Filter spawn history by agent (or --agent)
   spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
   spawn list --clear                 Clear all spawn history
+  spawn last                         Instantly rerun the most recent spawn (alias: rerun)
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions
   spawn clouds                       List all cloud providers
@@ -1932,18 +2068,20 @@ function getHelpUsageSection(): string {
 function getHelpExamplesSection(): string {
   return `${pc.bold("EXAMPLES")}
   spawn                              ${pc.dim("# Pick interactively")}
-  spawn claude sprite                ${pc.dim("# Launch Claude Code on Sprite")}
+  spawn openclaw sprite              ${pc.dim("# Launch OpenClaw on Sprite")}
   spawn aider hetzner                ${pc.dim("# Launch Aider on Hetzner Cloud")}
+  spawn goose digitalocean           ${pc.dim("# Launch Goose on DigitalOcean")}
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
   spawn aider sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
-  spawn claude sprite -f instructions.txt
+  spawn openclaw vultr -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
-  spawn claude sprite --dry-run      ${pc.dim("# Preview without provisioning")}
+  spawn interpreter linode --dry-run ${pc.dim("# Preview without provisioning")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
-  spawn list claude                  ${pc.dim("# Filter history by agent name")}
+  spawn list aider                   ${pc.dim("# Filter history by agent name")}
+  spawn last                         ${pc.dim("# Instantly rerun the most recent spawn")}
   spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}`;
 }
 

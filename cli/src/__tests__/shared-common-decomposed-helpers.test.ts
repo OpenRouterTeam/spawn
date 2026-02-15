@@ -484,6 +484,6 @@ log_install_failed "Claude Code" "npm install -g claude" "10.0.0.5" 2>&1
     const result = runBash(`log_install_failed "TestAgent" 2>&1`);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("TestAgent");
-    expect(result.stdout).toContain("installation failed to complete successfully");
+    expect(result.stdout).toContain("The agent could not be installed or verified");
   });
 });

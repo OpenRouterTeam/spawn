@@ -72,6 +72,9 @@ log_info "DigitalOcean droplet setup completed successfully!"
 log_info "Droplet: ${DROPLET_NAME} (ID: ${DO_DROPLET_ID}, IP: ${DO_SERVER_IP})"
 echo ""
 
+# Save connection info for spawn list
+save_vm_connection "${DO_SERVER_IP}" "root" "${DO_DROPLET_ID}" "${DROPLET_NAME}"
+
 # 9. Start Claude Code interactively
 log_step "Starting Claude Code..."
 sleep 1

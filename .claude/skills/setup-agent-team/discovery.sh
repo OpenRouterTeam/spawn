@@ -263,12 +263,8 @@ _handle_cycle_completion() {
 
     if [[ "${exit_code}" -eq 0 ]] || [[ "${session_ended}" = true ]]; then
         log_info "Cycle completed successfully"
-        log_info "Creating checkpoint..."
-        sprite-env checkpoint create --comment "discovery cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
     elif [[ "${idle_seconds}" -ge "${idle_timeout}" ]]; then
         log_warn "Cycle killed by activity watchdog (no output for ${idle_timeout}s)"
-        log_info "Creating checkpoint for partial work..."
-        sprite-env checkpoint create --comment "discovery cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Cycle failed (exit_code=${exit_code})"
     fi
@@ -283,9 +279,8 @@ build_team_prompt() {
     cat "$prompt_template"
 }
 
-build_single_prompt() {
-    local gap
-    gap=$(python3 - "${MANIFEST}" <<'PYEOF'
+_find_first_gap() {
+    python3 - "${MANIFEST}" <<'PYEOF'
 import json, sys
 m = json.load(open(sys.argv[1]))
 for key, status in m.get('matrix', {}).items():
@@ -293,24 +288,26 @@ for key, status in m.get('matrix', {}).items():
         print(key)
         break
 PYEOF
-)
+}
 
-    if [[ -n "${gap}" ]]; then
-        local cloud="${gap%%/*}"
-        local agent="${gap##*/}"
-        printf 'Read CLAUDE.md and manifest.json. Implement "%s/%s.sh":\n' "${cloud}" "${agent}"
-        printf '1. Read %s/lib/common.sh for cloud primitives\n' "${cloud}"
-        printf '2. Read an existing %s.sh on another cloud for the install pattern\n' "${agent}"
-        printf '3. Write %s/%s.sh combining the two\n' "${cloud}" "${agent}"
-        printf '4. Update manifest.json to mark "%s/%s" as "implemented"\n' "${cloud}" "${agent}"
-        cat <<'EOF'
+_print_gap_implementation_steps() {
+    local cloud="$1"
+    local agent="$2"
+    printf 'Read CLAUDE.md and manifest.json. Implement "%s/%s.sh":\n' "${cloud}" "${agent}"
+    printf '1. Read %s/lib/common.sh for cloud primitives\n' "${cloud}"
+    printf '2. Read an existing %s.sh on another cloud for the install pattern\n' "${agent}"
+    printf '3. Write %s/%s.sh combining the two\n' "${cloud}" "${agent}"
+    printf '4. Update manifest.json to mark "%s/%s" as "implemented"\n' "${cloud}" "${agent}"
+    cat <<'EOF'
 5. Update the cloud's README.md
 6. bash -n syntax check
 7. Commit
 OpenRouter injection is mandatory. Follow CLAUDE.md Shell Script Rules.
 EOF
-    else
-        cat <<'EOF'
+}
+
+_print_matrix_full_guidance() {
+    cat <<'EOF'
 Read CLAUDE.md and manifest.json. The matrix is full.
 
 Your priority: find a NEW cloud/sandbox provider to add. Search for cheap CPU compute
@@ -335,6 +332,18 @@ Also check `gh issue list --repo OpenRouterTeam/spawn --state open` for user req
 
 Follow CLAUDE.md Shell Script Rules. Commit when done.
 EOF
+}
+
+build_single_prompt() {
+    local gap
+    gap=$(_find_first_gap)
+
+    if [[ -n "${gap}" ]]; then
+        local cloud="${gap%%/*}"
+        local agent="${gap##*/}"
+        _print_gap_implementation_steps "${cloud}" "${agent}"
+    else
+        _print_matrix_full_guidance
     fi
 }
 
@@ -517,10 +526,8 @@ run_single_cycle() {
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Single cycle completed successfully"
-        sprite-env checkpoint create --comment "discovery single cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
     elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
         log_warn "Single cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
-        sprite-env checkpoint create --comment "discovery single cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Single cycle failed (exit_code=${CLAUDE_EXIT})"
     fi

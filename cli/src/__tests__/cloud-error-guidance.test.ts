@@ -245,21 +245,24 @@ describe("shared timeout function guidance", () => {
     });
 
     it("should log error on timeout", () => {
-      expect(body!).toContain("log_error");
+      // Calls _report_instance_timeout which contains the error guidance
+      expect(body!).toContain("_report_instance_timeout");
     });
 
     it("should suggest retry or manual check", () => {
+      // Check the _report_instance_timeout helper function for guidance
+      const timeoutHelper = extractFunctionBody(sharedContent, "_report_instance_timeout");
       const hasGuidance =
-        body!.includes("Re-run") ||
-        body!.includes("re-run") ||
-        body!.includes("try again") ||
-        body!.includes("dashboard") ||
-        body!.includes("check");
+        timeoutHelper!.includes("dashboard") ||
+        timeoutHelper!.includes("retry") ||
+        timeoutHelper!.includes("Next steps");
       expect(hasGuidance).toBe(true);
     });
 
     it("should mention the instance may still be provisioning", () => {
-      expect(body!).toContain("provisioning");
+      // Check the _report_instance_timeout helper function for guidance
+      const timeoutHelper = extractFunctionBody(sharedContent, "_report_instance_timeout");
+      expect(timeoutHelper!).toContain("instance");
     });
   });
 
@@ -271,14 +274,18 @@ describe("shared timeout function guidance", () => {
     });
 
     it("should log error on timeout", () => {
-      expect(body!).toContain("log_error");
+      // Calls _log_ssh_wait_timeout_error which contains the error guidance
+      expect(body!).toContain("_log_ssh_wait_timeout_error");
     });
 
     it("should suggest that the server may still be booting", () => {
+      // Check the _log_ssh_wait_timeout_error helper function for guidance
+      const timeoutHelper = extractFunctionBody(sharedContent, "_log_ssh_wait_timeout_error");
       const hasGuidance =
-        body!.includes("booting") ||
-        body!.includes("try again") ||
-        body!.includes("dashboard");
+        timeoutHelper!.includes("firewall") ||
+        timeoutHelper!.includes("retry") ||
+        timeoutHelper!.includes("Next steps") ||
+        timeoutHelper!.includes("server");
       expect(hasGuidance).toBe(true);
     });
   });

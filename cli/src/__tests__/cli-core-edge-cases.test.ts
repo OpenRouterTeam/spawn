@@ -246,23 +246,23 @@ describe("validateIdentifier additional edge cases", () => {
   });
 
   it("should reject identifier starting with uppercase", () => {
-    expect(() => validateIdentifier("Claude", "test")).toThrow("invalid characters");
+    expect(() => validateIdentifier("Claude", "test")).toThrow("can only contain");
   });
 
   it("should reject identifier with period", () => {
-    expect(() => validateIdentifier("cloud.io", "test")).toThrow("invalid characters");
+    expect(() => validateIdentifier("cloud.io", "test")).toThrow("can only contain");
   });
 
   it("should reject identifier with space", () => {
-    expect(() => validateIdentifier("cloud io", "test")).toThrow("invalid characters");
+    expect(() => validateIdentifier("cloud io", "test")).toThrow("can only contain");
   });
 
   it("should reject identifier with newline", () => {
-    expect(() => validateIdentifier("cloud\nio", "test")).toThrow("invalid characters");
+    expect(() => validateIdentifier("cloud\nio", "test")).toThrow("can only contain");
   });
 
   it("should reject identifier with tab", () => {
-    expect(() => validateIdentifier("cloud\tio", "test")).toThrow("invalid characters");
+    expect(() => validateIdentifier("cloud\tio", "test")).toThrow("can only contain");
   });
 
   it("should include field name in error message", () => {
@@ -275,7 +275,7 @@ describe("validateIdentifier additional edge cases", () => {
 
   it("should reject exactly 65 characters", () => {
     const id = "a".repeat(65);
-    expect(() => validateIdentifier(id, "test")).toThrow("exceeds maximum length");
+    expect(() => validateIdentifier(id, "test")).toThrow("too long");
   });
 
   it("should accept exactly 64 characters", () => {
@@ -284,7 +284,7 @@ describe("validateIdentifier additional edge cases", () => {
   });
 
   it("should reject whitespace-only identifier", () => {
-    expect(() => validateIdentifier("   ", "test")).toThrow("cannot be empty");
+    expect(() => validateIdentifier("   ", "test")).toThrow("is required");
   });
 });
 
@@ -305,11 +305,11 @@ describe("validateScriptContent additional edge cases", () => {
   });
 
   it("should reject a script without shebang", () => {
-    expect(() => validateScriptContent("echo hello")).toThrow("shebang");
+    expect(() => validateScriptContent("echo hello")).toThrow("doesn't appear to be a valid bash script");
   });
 
   it("should reject an HTML error page", () => {
-    expect(() => validateScriptContent("<html><body>404 Not Found</body></html>")).toThrow("shebang");
+    expect(() => validateScriptContent("<html><body>404 Not Found</body></html>")).toThrow("doesn't appear to be a valid bash script");
   });
 
   it("should reject fork bomb (compact form)", () => {
@@ -317,7 +317,7 @@ describe("validateScriptContent additional edge cases", () => {
   });
 
   it("should reject rm -rf /", () => {
-    expect(() => validateScriptContent("#!/bin/bash\nrm -rf /")).toThrow("destructive");
+    expect(() => validateScriptContent("#!/bin/bash\nrm -rf /")).toThrow("destructive filesystem operation");
   });
 
   it("should accept rm -rf /tmp/something (path has word char after /)", () => {
@@ -367,12 +367,12 @@ describe("validatePrompt additional edge cases", () => {
   });
 
   it("should reject prompt with rm -rf chaining", () => {
-    expect(() => validatePrompt("fix bugs; rm -rf /")).toThrow("rm -rf");
+    expect(() => validatePrompt("fix bugs; rm -rf /")).toThrow("dangerous command sequence");
   });
 
   it("should reject prompt at exactly MAX_PROMPT_LENGTH + 1 (10241 chars)", () => {
     const prompt = "a".repeat(10 * 1024 + 1);
-    expect(() => validatePrompt(prompt)).toThrow("exceeds maximum length");
+    expect(() => validatePrompt(prompt)).toThrow("too long");
   });
 
   it("should accept prompt at exactly MAX_PROMPT_LENGTH (10240 chars)", () => {
@@ -381,16 +381,16 @@ describe("validatePrompt additional edge cases", () => {
   });
 
   it("should reject empty prompt", () => {
-    expect(() => validatePrompt("")).toThrow("cannot be empty");
+    expect(() => validatePrompt("")).toThrow("is required");
   });
 
   it("should reject whitespace-only prompt", () => {
-    expect(() => validatePrompt("   \n\t  ")).toThrow("cannot be empty");
+    expect(() => validatePrompt("   \n\t  ")).toThrow("is required");
   });
 
   it("should include character count in too-long error", () => {
     const prompt = "a".repeat(20000);
-    expect(() => validatePrompt(prompt)).toThrow("20000 given");
+    expect(() => validatePrompt(prompt)).toThrow("19.5KB");
   });
 });
 

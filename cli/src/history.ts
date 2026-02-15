@@ -2,11 +2,19 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "
 import { join, resolve, isAbsolute } from "path";
 import { homedir } from "os";
 
+export interface VMConnection {
+  ip: string;
+  user: string;
+  server_id?: string;
+  server_name?: string;
+}
+
 export interface SpawnRecord {
   agent: string;
   cloud: string;
   timestamp: string;
   prompt?: string;
+  connection?: VMConnection;
 }
 
 /** Returns the directory for spawn data, respecting SPAWN_HOME env var.
@@ -28,6 +36,10 @@ export function getSpawnDir(): string {
 
 export function getHistoryPath(): string {
   return join(getSpawnDir(), "history.json");
+}
+
+export function getConnectionPath(): string {
+  return join(getSpawnDir(), "last-connection.json");
 }
 
 export function loadHistory(): SpawnRecord[] {
@@ -68,10 +80,41 @@ export function clearHistory(): number {
   return count;
 }
 
+/** Check for pending connection data and merge it into the last history entry.
+ *  Bash scripts write connection info to last-connection.json after successful spawn.
+ *  This function merges that data into the history and persists it. */
+export function mergeLastConnection(): void {
+  const connPath = getConnectionPath();
+  if (!existsSync(connPath)) return;
+
+  try {
+    const connData = JSON.parse(readFileSync(connPath, "utf-8")) as VMConnection;
+    const history = loadHistory();
+
+    if (history.length > 0) {
+      // Update the most recent entry with connection info
+      const latest = history[history.length - 1];
+      if (!latest.connection) {
+        latest.connection = connData;
+        // Save updated history
+        writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
+      }
+    }
+
+    // Clean up the connection file after merging
+    unlinkSync(connPath);
+  } catch {
+    // Ignore errors - connection data is optional
+  }
+}
+
 export function filterHistory(
   agentFilter?: string,
   cloudFilter?: string
 ): SpawnRecord[] {
+  // Merge any pending connection data before filtering
+  mergeLastConnection();
+
   let records = loadHistory();
   if (agentFilter) {
     const lower = agentFilter.toLowerCase();
@@ -83,5 +126,6 @@ export function filterHistory(
   }
   // Show newest first (reverse chronological order)
   records.reverse();
+
   return records;
 }

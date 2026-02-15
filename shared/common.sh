@@ -699,7 +699,9 @@ wait_for_oauth_code() {
     log_step "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
-        elapsed=$((elapsed + POLL_INTERVAL))
+        # Use python3 for float addition since bash arithmetic only handles integers
+        # If POLL_INTERVAL is 0.5, bash $(( )) would fail. Fallback keeps timeout working.
+        elapsed=$(python3 -c "print(int(${elapsed} + ${POLL_INTERVAL}))" 2>/dev/null || echo "$((elapsed + 1))")
     done
 
     [[ -f "${code_file}" ]]
@@ -713,10 +715,18 @@ exchange_oauth_code() {
     local escaped_code
     escaped_code=$(json_escape "${oauth_code}")
 
-    local key_response
+    local key_response curl_exit
     key_response=$(curl -s --max-time 30 -X POST "https://openrouter.ai/api/v1/auth/keys" \
         -H "Content-Type: application/json" \
-        -d "{\"code\": ${escaped_code}}")
+        -d "{\"code\": ${escaped_code}}" 2>&1)
+    curl_exit=$?
+
+    if [[ ${curl_exit} -ne 0 ]]; then
+        log_error "Failed to contact OpenRouter API (curl exit code: ${curl_exit})"
+        log_warn "This may indicate a network issue or temporary service outage"
+        log_warn "Please check your internet connection and try again"
+        return 1
+    fi
 
     local api_key
     api_key=$(echo "${key_response}" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
@@ -836,10 +846,16 @@ _setup_oauth_server() {
     local code_file="${2}"
     local port_file="${3}"
     local state_file="${4}"
+    local pid_file="${5}"
 
     log_step "Starting local OAuth server (trying ports ${callback_port}-$((callback_port + 10)))..."
     local server_pid
     server_pid=$(start_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}")
+
+    # Persist server PID to file for reliable retrieval
+    if [[ -n "${pid_file}" && -n "${server_pid}" ]]; then
+        printf '%s' "${server_pid}" > "${pid_file}"
+    fi
 
     local actual_port
     actual_port=$(start_and_verify_oauth_server "${callback_port}" "${code_file}" "${port_file}" "${state_file}" "${server_pid}")
@@ -934,15 +950,21 @@ _start_oauth_session_with_server() {
     local oauth_dir
     oauth_dir=$(_init_oauth_session)
     local code_file="${oauth_dir}/code"
+    local pid_file="${oauth_dir}/server_pid"
 
     local actual_port
-    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${oauth_dir}/port" "${oauth_dir}/state") || {
+    actual_port=$(_setup_oauth_server "${callback_port}" "${code_file}" "${oauth_dir}/port" "${oauth_dir}/state" "${pid_file}") || {
         cleanup_oauth_session "" "${oauth_dir}"
         return 1
     }
 
     local server_pid
-    server_pid=$(pgrep -f "start_oauth_server" | tail -1)
+    server_pid=$(cat "${pid_file}" 2>/dev/null || echo "")
+    if [[ -z "${server_pid}" ]]; then
+        log_error "Failed to retrieve OAuth server PID"
+        cleanup_oauth_session "" "${oauth_dir}"
+        return 1
+    fi
 
     echo "${actual_port}|${server_pid}|${oauth_dir}"
 }
@@ -1234,7 +1256,11 @@ import json, sys
 data = json.loads(sys.stdin.read())
 ids = [k['id'] for k in data.get('${key_field}', [])]
 print(json.dumps(ids))
-" <<< "${api_response}"
+" <<< "${api_response}" 2>/dev/null || {
+        log_error "Failed to parse SSH key IDs from API response"
+        log_error "The API response may be malformed or python3 is unavailable"
+        return 1
+    }
 }
 
 # ============================================================
@@ -1282,6 +1308,12 @@ calculate_retry_backoff() {
     local interval="${1}"
     local max_interval="${2}"
 
+    # Validate inputs to prevent empty or invalid intervals
+    if [[ -z "${interval}" ]] || [[ "${interval}" -lt 1 ]]; then
+        echo "1"
+        return 0
+    fi
+
     # Calculate next interval with exponential backoff
     local next_interval=$((interval * 2))
     if [[ "${next_interval}" -gt "${max_interval}" ]]; then
@@ -1289,7 +1321,8 @@ calculate_retry_backoff() {
     fi
 
     # Add jitter: ±20% randomization to prevent thundering herd
-    python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}"
+    # Fallback to no-jitter interval if python3 is unavailable
+    python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || printf '%s' "${interval}"
 }
 
 # Handle API retry decision with backoff - extracted to reduce duplication across API wrappers
@@ -2353,7 +2386,7 @@ ensure_multi_credentials() {
 
 # Helper to create, upload, and install a config file from a heredoc or string
 # Usage: upload_config_file UPLOAD_CALLBACK RUN_CALLBACK CONTENT REMOTE_PATH
-# Example: upload_config_file "$upload_func" "$run_func" "$json_content" "~/.config/app.json"
+# Example: upload_config_file "$upload_func" "$run_func" "$json_content" "\$HOME/.config/app.json"
 upload_config_file() {
     local upload_callback="${1}"
     local run_callback="${2}"
@@ -2372,8 +2405,9 @@ upload_config_file() {
     rand_suffix=$(basename "${temp_file}")
     local temp_remote="/tmp/spawn_config_${rand_suffix}"
     ${upload_callback} "${temp_file}" "${temp_remote}"
-    # NOTE: remote_path must NOT be single-quoted — tilde (~) only expands when unquoted
-    ${run_callback} "mkdir -p \$(dirname ${remote_path}) && chmod 600 '${temp_remote}' && mv '${temp_remote}' ${remote_path}"
+    # SECURITY: remote_path must be double-quoted to prevent injection via spaces/metacharacters
+    # Note: Callers should use $HOME instead of ~ since tilde does not expand inside double quotes
+    ${run_callback} "mkdir -p \$(dirname \"${remote_path}\") && chmod 600 '${temp_remote}' && mv '${temp_remote}' \"${remote_path}\""
 }
 
 # ============================================================
@@ -2428,7 +2462,7 @@ setup_claude_code_config() {
 }
 EOF
 )
-    upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "~/.claude/settings.json"
+    upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "\$HOME/.claude/settings.json"
 
     # Create .claude.json global state
     local global_state_json
@@ -2439,7 +2473,7 @@ EOF
 }
 EOF
 )
-    upload_config_file "${upload_callback}" "${run_callback}" "${global_state_json}" "~/.claude.json"
+    upload_config_file "${upload_callback}" "${run_callback}" "${global_state_json}" "\$HOME/.claude.json"
 
     # Create empty CLAUDE.md
     ${run_callback} "touch ~/.claude/CLAUDE.md"
@@ -2518,7 +2552,7 @@ setup_openclaw_config() {
     # Create and upload openclaw.json config
     local openclaw_json
     openclaw_json=$(_generate_openclaw_json "${openrouter_key}" "${model_id}" "${gateway_token}")
-    upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "~/.openclaw/openclaw.json"
+    upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "\$HOME/.openclaw/openclaw.json"
 }
 
 # ============================================================
@@ -2571,7 +2605,7 @@ setup_continue_config() {
 }
 EOF
 )
-    upload_config_file "${upload_callback}" "${run_callback}" "${continue_json}" "~/.continue/config.json"
+    upload_config_file "${upload_callback}" "${run_callback}" "${continue_json}" "\$HOME/.continue/config.json"
 }
 
 # ============================================================
@@ -2596,62 +2630,64 @@ EOF
 # Display a numbered list and read user selection
 # Pipe-delimited items: "id|label". Returns selected id via stdout.
 # Usage: _display_and_select PROMPT_TEXT DEFAULT_VALUE DEFAULT_ID <<< "$items"
-_display_and_select() {
+_fzf_select() {
     local prompt_text="${1}"
     local default_value="${2}"
-    local default_id="${3:-}"
+    local default_id="${3}"
+    local fzf_input="${4}"
+    local default_line="${5}"
 
-    # Read all items into array
-    local items_array=()
-    while IFS= read -r line; do
-        items_array+=("${line}")
-    done
+    log_step "Select ${prompt_text%s} (type to filter):"
 
-    if [[ "${#items_array[@]}" -eq 0 ]]; then
-        log_warn "No ${prompt_text} available, using default: ${default_value}"
+    # Run fzf with default selection
+    local selected
+    if [[ -n "${default_line}" ]]; then
+        selected=$(printf '%s' "${fzf_input}" | fzf --height=~50% --reverse --prompt="Select > " --query="" --select-1 --exit-0 --header="Press ESC to use default (${default_id})" --print-query --query="${default_line%%$'\t'*}" | tail -1)
+    else
+        selected=$(printf '%s' "${fzf_input}" | fzf --height=~50% --reverse --prompt="Select > " --select-1 --exit-0)
+    fi
+
+    # If fzf was cancelled or returned nothing, use default
+    if [[ -z "${selected}" ]]; then
+        log_info "Using default: ${default_value}"
         echo "${default_value}"
         return
     fi
 
-    # Try to use fzf for interactive filtering if available and stdin is a TTY
-    if command -v fzf >/dev/null 2>&1 && [[ -t 0 ]]; then
-        log_step "Select ${prompt_text%s} (type to filter):"
+    # Extract ID from selected line
+    local selected_id="${selected%%$'\t'*}"
+    echo "${selected_id}"
+}
 
-        # Prepare fzf input with formatted display
-        local fzf_input=""
-        local default_line=""
-        for line in "${items_array[@]}"; do
-            local id="${line%%|*}"
-            local display
-            display=$(echo "${line}" | tr '|' '\t')
-            fzf_input+="${display}"$'\n'
-            if [[ -n "${default_id}" && "${id}" == "${default_id}" ]]; then
-                default_line="${display}"
-            fi
-        done
+_prepare_fzf_input() {
+    local default_id="${1}"
+    shift
+    local items_array=("$@")
 
-        # Run fzf with default selection
-        local selected
-        if [[ -n "${default_line}" ]]; then
-            selected=$(printf '%s' "${fzf_input}" | fzf --height=~50% --reverse --prompt="Select > " --query="" --select-1 --exit-0 --header="Press ESC to use default (${default_id})" --print-query --query="${default_line%%$'\t'*}" | tail -1)
-        else
-            selected=$(printf '%s' "${fzf_input}" | fzf --height=~50% --reverse --prompt="Select > " --select-1 --exit-0)
+    local fzf_input=""
+    local default_line=""
+    for line in "${items_array[@]}"; do
+        local id="${line%%|*}"
+        local display
+        display=$(echo "${line}" | tr '|' '\t')
+        fzf_input+="${display}"$'\n'
+        if [[ -n "${default_id}" && "${id}" == "${default_id}" ]]; then
+            default_line="${display}"
         fi
+    done
 
-        # If fzf was cancelled or returned nothing, use default
-        if [[ -z "${selected}" ]]; then
-            log_info "Using default: ${default_value}"
-            echo "${default_value}"
-            return
-        fi
+    # Return via globals (bash doesn't have good multi-value returns)
+    FZF_INPUT="${fzf_input}"
+    FZF_DEFAULT_LINE="${default_line}"
+}
 
-        # Extract ID from selected line
-        local selected_id="${selected%%$'\t'*}"
-        echo "${selected_id}"
-        return
-    fi
+_numbered_list_select() {
+    local prompt_text="${1}"
+    local default_value="${2}"
+    local default_id="${3}"
+    shift 3
+    local items_array=("$@")
 
-    # Fallback to numbered list when fzf is not available
     log_step "Available ${prompt_text}:"
     local i=1
     local ids=()
@@ -2677,6 +2713,34 @@ _display_and_select() {
         log_warn "Invalid selection '${choice}' (enter a number between 1 and ${#ids[@]}). Using default: ${default_value}"
         echo "${default_value}"
     fi
+}
+
+_display_and_select() {
+    local prompt_text="${1}"
+    local default_value="${2}"
+    local default_id="${3:-}"
+
+    # Read all items into array
+    local items_array=()
+    while IFS= read -r line; do
+        items_array+=("${line}")
+    done
+
+    if [[ "${#items_array[@]}" -eq 0 ]]; then
+        log_warn "No ${prompt_text} available, using default: ${default_value}"
+        echo "${default_value}"
+        return
+    fi
+
+    # Try to use fzf for interactive filtering if available and stdin is a TTY
+    if command -v fzf >/dev/null 2>&1 && [[ -t 0 ]]; then
+        _prepare_fzf_input "${default_id}" "${items_array[@]}"
+        _fzf_select "${prompt_text}" "${default_value}" "${default_id}" "${FZF_INPUT}" "${FZF_DEFAULT_LINE}"
+        return
+    fi
+
+    # Fallback to numbered list when fzf is not available
+    _numbered_list_select "${prompt_text}" "${default_value}" "${default_id}" "${items_array[@]}"
 }
 
 # Returns: selected ID via stdout
@@ -2800,6 +2864,38 @@ ensure_ssh_key_with_provider() {
 # environments.
 opencode_install_cmd() {
     printf '%s' 'OC_ARCH=$(uname -m); if [ "$OC_ARCH" = "aarch64" ]; then OC_ARCH=arm64; fi; OC_OS=$(uname -s | tr A-Z a-z); if [ "$OC_OS" = "darwin" ]; then OC_OS=mac; fi; mkdir -p /tmp/opencode-install "$HOME/.opencode/bin" && curl -fsSL -o /tmp/opencode-install/oc.tar.gz "https://github.com/opencode-ai/opencode/releases/latest/download/opencode-${OC_OS}-${OC_ARCH}.tar.gz" && tar xzf /tmp/opencode-install/oc.tar.gz -C /tmp/opencode-install && mv /tmp/opencode-install/opencode "$HOME/.opencode/bin/" && rm -rf /tmp/opencode-install && grep -q ".opencode/bin" "$HOME/.bashrc" 2>/dev/null || echo '"'"'export PATH="$HOME/.opencode/bin:$PATH"'"'"' >> "$HOME/.bashrc"; grep -q ".opencode/bin" "$HOME/.zshrc" 2>/dev/null || echo '"'"'export PATH="$HOME/.opencode/bin:$PATH"'"'"' >> "$HOME/.zshrc" 2>/dev/null; export PATH="$HOME/.opencode/bin:$PATH"'
+}
+
+# ============================================================
+# VM Connection Tracking
+# ============================================================
+
+# Save VM connection info for spawn list reconnect functionality.
+# This allows users to reconnect to previously spawned VMs via `spawn list`.
+# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME]
+# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME"
+save_vm_connection() {
+    local ip="${1}"
+    local user="${2}"
+    local server_id="${3:-}"
+    local server_name="${4:-}"
+
+    local spawn_dir="${HOME}/.spawn"
+    mkdir -p "${spawn_dir}"
+
+    local conn_file="${spawn_dir}/last-connection.json"
+
+    # Build JSON (handle optional fields)
+    local json="{\"ip\":\"${ip}\",\"user\":\"${user}\""
+    if [[ -n "${server_id}" ]]; then
+        json="${json},\"server_id\":\"${server_id}\""
+    fi
+    if [[ -n "${server_name}" ]]; then
+        json="${json},\"server_name\":\"${server_name}\""
+    fi
+    json="${json}}"
+
+    printf '%s\n' "${json}" > "${conn_file}"
 }
 
 # ============================================================
