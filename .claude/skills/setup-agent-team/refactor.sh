@@ -126,6 +126,14 @@ You are the Team Lead for a focused issue-fix cycle on the spawn codebase.
 
 Fix GitHub issue #SPAWN_ISSUE_PLACEHOLDER.
 
+## Guard: Skip Discovery Team Issues
+
+FIRST, check if this issue is owned by the discovery team:
+```bash
+gh issue view SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --json labels --jq '.labels[].name'
+```
+If the issue has ANY of these labels: `discovery-team`, `cloud-proposal`, `agent-proposal` → **DO NOT TOUCH IT AT ALL**. Do NOT comment, do NOT change labels, do NOT interact with it in any way. Simply exit immediately and report "Skipped: issue is managed by the discovery team."
+
 ## Context Gathering (MANDATORY)
 
 Fetch the COMPLETE issue thread before starting:
@@ -255,7 +263,10 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 6. **community-coordinator** (moonshotai/kimi-k2.5)
    First: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
 
-   For EACH issue, fetch full context:
+   **COMPLETELY IGNORE issues labeled `discovery-team`, `cloud-proposal`, or `agent-proposal`** — those are managed by the discovery team. Do NOT comment on them, do NOT change labels, do NOT interact in any way. Filter them out:
+   `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels --jq '[.[] | select(.labels | map(.name) | (index("discovery-team") or index("cloud-proposal") or index("agent-proposal")) | not)]'`
+
+   For EACH remaining issue, fetch full context:
    ```
    gh issue view NUMBER --repo OpenRouterTeam/spawn --comments
    gh pr list --repo OpenRouterTeam/spawn --search "NUMBER" --json number,title,url

@@ -493,6 +493,7 @@ describe("cmdCloudInfo - missing agents display", () => {
 describe("cmdAgentInfo - URL and count details", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
   let originalFetch: typeof global.fetch;
+  let savedORKey: string | undefined;
 
   function setManifest(manifest: any) {
     global.fetch = mock(async () => ({
@@ -514,6 +515,9 @@ describe("cmdAgentInfo - URL and count details", () => {
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
+    savedORKey = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+
     originalFetch = global.fetch;
     await setManifest(mockManifest);
   });
@@ -521,6 +525,11 @@ describe("cmdAgentInfo - URL and count details", () => {
   afterEach(() => {
     global.fetch = originalFetch;
     restoreMocks(consoleMocks.log, consoleMocks.error);
+    if (savedORKey !== undefined) {
+      process.env.OPENROUTER_API_KEY = savedORKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
   });
 
   // ── Agent URL display ────────────────────────────────────────────

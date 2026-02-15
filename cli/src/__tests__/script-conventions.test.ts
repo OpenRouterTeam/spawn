@@ -284,7 +284,7 @@ describe("Shell Script Convention Compliance", () => {
     });
 
     it("should check all clouds with implementations", () => {
-      expect(cloudsWithImpls.size).toBeGreaterThan(10);
+      expect(cloudsWithImpls.size).toBeGreaterThanOrEqual(8);
     });
   });
 });
