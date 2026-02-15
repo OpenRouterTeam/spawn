@@ -34,12 +34,38 @@ SPAWN_DASHBOARD_URL="https://console.cloud.google.com/compute/instances"
 # Verify gcloud CLI is installed
 _gcp_check_cli_installed() {
     if ! command -v gcloud &>/dev/null; then
-        _log_diagnostic \
-            "Google Cloud SDK (gcloud) is required but not installed" \
-            "gcloud CLI has not been installed on this machine" \
-            --- \
-            "Install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install" \
-            "Or on macOS: brew install google-cloud-sdk"
+        log_error "Google Cloud SDK (gcloud) is required but not installed"
+        log_error ""
+        log_error "Possible causes:"
+        log_error "  - gcloud CLI has not been installed on this machine"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Install gcloud CLI for your platform:"
+        log_error ""
+        log_error "     ${CYAN}macOS (Homebrew)${NC}"
+        log_error "     brew install google-cloud-sdk"
+        log_error ""
+        log_error "     ${CYAN}Ubuntu/Debian${NC}"
+        log_error "     curl https://sdk.cloud.google.com | bash"
+        log_error "     exec -l \$SHELL  # Restart shell"
+        log_error ""
+        log_error "     ${CYAN}Fedora/RHEL${NC}"
+        log_error "     sudo tee -a /etc/yum.repos.d/google-cloud-sdk.repo << EOM"
+        log_error "     [google-cloud-cli]"
+        log_error "     name=Google Cloud CLI"
+        log_error "     baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64"
+        log_error "     enabled=1"
+        log_error "     gpgcheck=1"
+        log_error "     repo_gpgcheck=0"
+        log_error "     gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
+        log_error "     EOM"
+        log_error "     sudo dnf install google-cloud-cli"
+        log_error ""
+        log_error "  2. Full installation guide: ${CYAN}https://cloud.google.com/sdk/docs/install${NC}"
+        log_error ""
+        log_error "  3. After installation, authenticate:"
+        log_error "     gcloud auth login"
+        log_error "     gcloud config set project YOUR_PROJECT_ID"
         return 1
     fi
 }
@@ -62,13 +88,27 @@ _gcp_check_auth() {
 _gcp_resolve_project() {
     local project="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
     if [[ -z "${project}" || "${project}" == "(unset)" ]]; then
-        _log_diagnostic \
-            "No GCP project configured" \
-            "No project is set in gcloud config or GCP_PROJECT env var" \
-            --- \
-            "Set via environment: export GCP_PROJECT=your-project-id" \
-            "Or via gcloud: gcloud config set project YOUR_PROJECT" \
-            "List your projects: gcloud projects list"
+        log_error "No GCP project configured"
+        log_error ""
+        log_error "Possible causes:"
+        log_error "  - No project is set in gcloud config or GCP_PROJECT env var"
+        log_error "  - You haven't created a GCP project yet"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. List your existing projects:"
+        log_error "     ${CYAN}gcloud projects list${NC}"
+        log_error ""
+        log_error "  2. Set a project via environment variable:"
+        log_error "     ${CYAN}export GCP_PROJECT=your-project-id${NC}"
+        log_error ""
+        log_error "  3. Or set via gcloud config:"
+        log_error "     ${CYAN}gcloud config set project YOUR_PROJECT_ID${NC}"
+        log_error ""
+        log_error "  4. Don't have a project? Create one:"
+        log_error "     ${CYAN}https://console.cloud.google.com/projectcreate${NC}"
+        log_error ""
+        log_error "  5. Enable Compute Engine API for your project:"
+        log_error "     ${CYAN}https://console.cloud.google.com/apis/library/compute.googleapis.com${NC}"
         return 1
     fi
     export GCP_PROJECT="${project}"
