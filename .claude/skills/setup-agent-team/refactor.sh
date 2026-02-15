@@ -319,7 +319,6 @@ CRITICAL: Exiting early orphans teammates. Wait for ALL shutdown confirmations.
 ## Safety
 
 - NEVER close a PR — rebase, fix, or comment instead
-- Checkpoint before risky changes: `sprite-env checkpoint create --comment 'Description'`
 - Run tests after every change. If 3 consecutive failures, pause and investigate.
 - **SIGN-OFF**: Every comment MUST end with `-- refactor/AGENT-NAME`
 
@@ -340,7 +339,7 @@ fi
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
 # NOTE: VM keep-alive is handled by the trigger server streaming output back
-# to the GitHub Actions runner. The long-lived HTTP response keeps Sprite alive.
+# to the GitHub Actions runner via a long-lived HTTP response.
 
 # Activity watchdog: kill claude if no output for IDLE_TIMEOUT seconds.
 # This catches hung API calls (pre-flight check hangs, network issues) much

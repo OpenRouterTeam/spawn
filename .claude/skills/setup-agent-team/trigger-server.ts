@@ -1,5 +1,5 @@
 /**
- * Generic HTTP trigger server for Sprite services.
+ * Generic HTTP trigger server for automation services.
  *
  * Reads config from env vars:
  *   TRIGGER_SECRET  — Bearer token for auth (required)
@@ -12,10 +12,9 @@
  *   POST /trigger → validates auth, runs TARGET_SCRIPT, streams output back
  *
  * The /trigger endpoint returns a streaming text/plain response with the
- * script's stdout/stderr. The long-lived HTTP connection keeps the Sprite
- * VM alive for the entire duration of the cycle (Sprite pauses VMs with
- * no active HTTP requests). A heartbeat line is emitted every 30s during
- * silent periods to prevent proxy idle timeouts.
+ * script's stdout/stderr. The long-lived HTTP connection keeps the VM
+ * alive for the entire duration of the cycle. A heartbeat line is emitted
+ * every 30s during silent periods to prevent proxy idle timeouts.
  *
  * If the client disconnects mid-stream, the script keeps running — output
  * continues to drain to the server console.
@@ -195,8 +194,8 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
  * Spawn the target script and return a streaming Response.
  *
  * stdout/stderr are piped back as chunked text/plain. A heartbeat line
- * is injected every 30 seconds of silence so the Sprite proxy (and any
- * intermediaries) keep the connection alive.
+ * is injected every 30 seconds of silence so intermediary proxies
+ * keep the connection alive.
  *
  * If the HTTP client disconnects, the process keeps running — we just
  * stop writing to the response stream and continue draining to console.
@@ -449,7 +448,6 @@ const server = Bun.serve({
       server.timeout(req, 0);
 
       // Stream the script output back as the response body.
-      // The long-lived HTTP connection keeps the Sprite VM alive.
       return startStreamingRun(reason, issue);
     }
 

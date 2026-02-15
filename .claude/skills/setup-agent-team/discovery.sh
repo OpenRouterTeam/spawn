@@ -234,12 +234,8 @@ _handle_cycle_completion() {
 
     if [[ "${exit_code}" -eq 0 ]] || [[ "${session_ended}" = true ]]; then
         log_info "Cycle completed successfully"
-        log_info "Creating checkpoint..."
-        sprite-env checkpoint create --comment "discovery cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
     elif [[ "${idle_seconds}" -ge "${idle_timeout}" ]]; then
         log_warn "Cycle killed by activity watchdog (no output for ${idle_timeout}s)"
-        log_info "Creating checkpoint for partial work..."
-        sprite-env checkpoint create --comment "discovery cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Cycle failed (exit_code=${exit_code})"
     fi
@@ -488,10 +484,8 @@ run_single_cycle() {
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
         log_info "Single cycle completed successfully"
-        sprite-env checkpoint create --comment "discovery single cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
     elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
         log_warn "Single cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
-        sprite-env checkpoint create --comment "discovery single cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
     else
         log_error "Single cycle failed (exit_code=${CLAUDE_EXIT})"
     fi
