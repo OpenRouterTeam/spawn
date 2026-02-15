@@ -2372,8 +2372,9 @@ upload_config_file() {
     rand_suffix=$(basename "${temp_file}")
     local temp_remote="/tmp/spawn_config_${rand_suffix}"
     ${upload_callback} "${temp_file}" "${temp_remote}"
-    # NOTE: remote_path must NOT be single-quoted — tilde (~) only expands when unquoted
-    ${run_callback} "mkdir -p \$(dirname ${remote_path}) && chmod 600 '${temp_remote}' && mv '${temp_remote}' ${remote_path}"
+    # SECURITY: remote_path must be double-quoted to prevent injection via spaces/metacharacters
+    # Tilde expansion works in double quotes when used at the start of a path
+    ${run_callback} "mkdir -p \$(dirname \"${remote_path}\") && chmod 600 '${temp_remote}' && mv '${temp_remote}' \"${remote_path}\""
 }
 
 # ============================================================
