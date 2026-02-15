@@ -9,6 +9,9 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/local/lib/common.sh)"
 fi
 
+# Register cleanup trap for temporary files
+register_cleanup_trap
+
 log_info "NanoClaw on local machine"
 echo ""
 

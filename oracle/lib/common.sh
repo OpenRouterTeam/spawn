@@ -465,3 +465,11 @@ list_servers() {
         --query 'data[?("lifecycle-state"!=`TERMINATED`)].{"Name":"display-name","State":"lifecycle-state","Shape":"shape","Created":"time-created"}' \
         --output table 2>/dev/null
 }
+
+# ============================================================
+# Auto-initialization
+# ============================================================
+
+# Register cleanup trap for temporary files used by this provider
+# This ensures temp files created by track_temp_file() are cleaned up on exit
+register_cleanup_trap

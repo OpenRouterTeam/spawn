@@ -2912,5 +2912,7 @@ save_vm_connection() {
 # Auto-initialization
 # ============================================================
 
-# Auto-register cleanup trap when this file is sourced
-register_cleanup_trap
+# NOTE: register_cleanup_trap() is available but NOT called automatically
+# This prevents overwriting traps in scripts that source this file.
+# Scripts that use track_temp_file() should explicitly call register_cleanup_trap()
+# at the start of their main execution flow.

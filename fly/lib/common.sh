@@ -407,3 +407,11 @@ for a in apps:
     print(f'{name:<25} {aid:<20} {status:<12} {network:<20}')
 " <<< "$response"
 }
+
+# ============================================================
+# Auto-initialization
+# ============================================================
+
+# Register cleanup trap for temporary files used by this provider
+# This ensures temp files created by track_temp_file() are cleaned up on exit
+register_cleanup_trap

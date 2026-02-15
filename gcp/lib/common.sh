@@ -264,3 +264,11 @@ destroy_server() {
 list_servers() {
     gcloud compute instances list --project="${GCP_PROJECT}" --format='table(name,zone,status,networkInterfaces[0].accessConfigs[0].natIP:label=EXTERNAL_IP,machineType.basename())'
 }
+
+# ============================================================
+# Auto-initialization
+# ============================================================
+
+# Register cleanup trap for temporary files used by this provider
+# This ensures temp files created by track_temp_file() are cleaned up on exit
+register_cleanup_trap
