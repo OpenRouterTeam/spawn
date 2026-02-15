@@ -20,27 +20,44 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const sender = context.payload.sender.login;
-            const org = context.repo.owner;
+            const { owner, repo } = context.repo;
 
             // Check if user is an org member
             let isMember = false;
             try {
               const { status } = await github.rest.orgs.checkMembershipForUser({
-                org,
+                org: owner,
                 username: sender,
               });
               isMember = status === 204 || status === 302;
             } catch (e) {
-              // 404 = not a member, anything else = treat as non-member
               isMember = false;
             }
 
             if (isMember) {
-              console.log(`${sender} is a member of ${org}, allowing.`);
+              console.log(`${sender} is an org member of ${owner}, allowing.`);
               return;
             }
 
-            console.log(`${sender} is NOT a member of ${org}, closing.`);
+            // Check if user is a repo collaborator
+            let isCollaborator = false;
+            try {
+              const { status } = await github.rest.repos.checkCollaborator({
+                owner,
+                repo,
+                username: sender,
+              });
+              isCollaborator = status === 204;
+            } catch (e) {
+              isCollaborator = false;
+            }
+
+            if (isCollaborator) {
+              console.log(`${sender} is a collaborator on ${owner}/${repo}, allowing.`);
+              return;
+            }
+
+            console.log(`${sender} is NOT a member or collaborator, closing.`);
 
             if (context.payload.issue) {
               await github.rest.issues.update({
@@ -51,7 +68,7 @@ jobs:
               await github.rest.issues.createComment({
                 ...context.repo,
                 issue_number: context.payload.issue.number,
-                body: 'This repository only accepts issues from organization members. Your issue has been closed automatically.',
+                body: 'This repository only accepts issues from organization members and collaborators. Your issue has been closed automatically.',
               });
             } else if (context.payload.pull_request) {
               await github.rest.pulls.update({
@@ -62,6 +79,6 @@ jobs:
               await github.rest.issues.createComment({
                 ...context.repo,
                 issue_number: context.payload.pull_request.number,
-                body: 'This repository only accepts pull requests from organization members. Your PR has been closed automatically.',
+                body: 'This repository only accepts pull requests from organization members and collaborators. Your PR has been closed automatically.',
               });
             }
