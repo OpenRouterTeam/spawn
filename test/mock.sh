@@ -240,6 +240,128 @@ MOCK
     chmod +x "${TEST_DIR}/ssh-keygen"
 }
 
+# Create the jq wrapper (uses python3 jq implementation for mocking)
+_create_jq_mock() {
+    cat > "${TEST_DIR}/jq_impl.py" << 'PYTHON_SCRIPT'
+#!/usr/bin/env python3
+import sys
+import json
+import re
+
+def parse_args():
+    """Parse jq command-line arguments."""
+    filter_expr = '.'
+    args_dict = {}
+    input_mode = 'json'
+    output_mode = 'json'
+
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg == '-r' or arg == '--raw-output':
+            output_mode = 'raw'
+        elif arg == '-s' or arg == '--slurp':
+            input_mode = 'slurp'
+        elif arg == '-e' or arg == '--exit-status':
+            output_mode = 'exit'
+        elif arg == '-n' or arg == '--null-input':
+            input_mode = 'null'
+        elif arg == '-c' or arg == '--compact-output':
+            output_mode = 'compact'
+        elif arg == '--arg':
+            i += 1
+            if i < len(sys.argv) - 1:
+                key = sys.argv[i]
+                i += 1
+                value = sys.argv[i]
+                args_dict[key] = value
+        elif arg == '--argjson':
+            i += 1
+            if i < len(sys.argv) - 1:
+                key = sys.argv[i]
+                i += 1
+                try:
+                    args_dict[key] = json.loads(sys.argv[i])
+                except json.JSONDecodeError:
+                    sys.stderr.write(f'jq: invalid JSON in --argjson {key}\n')
+                    sys.exit(1)
+        elif not arg.startswith('-'):
+            filter_expr = arg
+        i += 1
+
+    return filter_expr, args_dict, input_mode, output_mode
+
+def apply_filter(data, filter_expr, args_dict):
+    """Apply a simplified jq filter expression."""
+    # Handle special cases
+    if filter_expr == '.':
+        return data
+
+    # Handle simple . expressions like .servers, .datacenters, etc.
+    if filter_expr.startswith('.') and '[' not in filter_expr and '|' not in filter_expr:
+        parts = filter_expr[1:].split('.')
+        result = data
+        for part in parts:
+            if part and result is not None:
+                result = result.get(part) if isinstance(result, dict) else None
+        return result
+
+    # Handle array access like .[0]
+    if filter_expr.startswith('.[') and ']' in filter_expr:
+        idx_str = filter_expr[2:filter_expr.index(']')]
+        try:
+            idx = int(idx_str)
+            result = data[idx] if isinstance(data, list) else None
+            return result
+        except (ValueError, IndexError, TypeError):
+            return None
+
+    # Handle more complex expressions with piping, selects, etc.
+    # For now, just return None for unsupported syntax
+    return None
+
+# Main
+try:
+    filter_expr, args_dict, input_mode, output_mode = parse_args()
+
+    # Read input
+    if input_mode == 'null':
+        data = None
+    else:
+        try:
+            if input_mode == 'slurp':
+                data = [json.loads(line) for line in sys.stdin if line.strip()]
+            else:
+                content = sys.stdin.read()
+                data = json.loads(content) if content.strip() else None
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f'jq: parse error: {e}\n')
+            sys.exit(1)
+
+    # Apply filter
+    result = apply_filter(data, filter_expr, args_dict)
+
+    # Output result
+    if output_mode == 'raw' and isinstance(result, str):
+        print(result, end='')
+    elif output_mode == 'compact':
+        print(json.dumps(result, separators=(',', ':')))
+    else:
+        print(json.dumps(result))
+
+except Exception as e:
+    sys.stderr.write(f'jq: error: {e}\n')
+    sys.exit(1)
+PYTHON_SCRIPT
+
+    cat > "${TEST_DIR}/jq" << 'MOCK'
+#!/bin/bash
+# Mock jq implementation using python3
+python3 "$(dirname "$0")/jq_impl.py" "$@"
+MOCK
+    chmod +x "${TEST_DIR}/jq" "${TEST_DIR}/jq_impl.py"
+}
+
 setup_mock_agents() {
     # Agent binaries
     _create_logging_mock claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q
@@ -252,6 +374,9 @@ setup_mock_agents() {
 
     # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
     _create_ssh_keygen_mock
+
+    # Mock 'jq' — try system jq, fallback to python3 implementation
+    _create_jq_mock
 }
 
 setup_fake_home() {
