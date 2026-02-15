@@ -2601,11 +2601,62 @@ _display_and_select() {
     local default_value="${2}"
     local default_id="${3:-}"
 
+    # Read all items into array
+    local items_array=()
+    while IFS= read -r line; do
+        items_array+=("${line}")
+    done
+
+    if [[ "${#items_array[@]}" -eq 0 ]]; then
+        log_warn "No ${prompt_text} available, using default: ${default_value}"
+        echo "${default_value}"
+        return
+    fi
+
+    # Try to use fzf for interactive filtering if available and stdin is a TTY
+    if command -v fzf >/dev/null 2>&1 && [[ -t 0 ]]; then
+        log_step "Select ${prompt_text%s} (type to filter):"
+
+        # Prepare fzf input with formatted display
+        local fzf_input=""
+        local default_line=""
+        for line in "${items_array[@]}"; do
+            local id="${line%%|*}"
+            local display
+            display=$(echo "${line}" | tr '|' '\t')
+            fzf_input+="${display}"$'\n'
+            if [[ -n "${default_id}" && "${id}" == "${default_id}" ]]; then
+                default_line="${display}"
+            fi
+        done
+
+        # Run fzf with default selection
+        local selected
+        if [[ -n "${default_line}" ]]; then
+            selected=$(printf '%s' "${fzf_input}" | fzf --height=~50% --reverse --prompt="Select > " --query="" --select-1 --exit-0 --header="Press ESC to use default (${default_id})" --print-query --query="${default_line%%$'\t'*}" | tail -1)
+        else
+            selected=$(printf '%s' "${fzf_input}" | fzf --height=~50% --reverse --prompt="Select > " --select-1 --exit-0)
+        fi
+
+        # If fzf was cancelled or returned nothing, use default
+        if [[ -z "${selected}" ]]; then
+            log_info "Using default: ${default_value}"
+            echo "${default_value}"
+            return
+        fi
+
+        # Extract ID from selected line
+        local selected_id="${selected%%$'\t'*}"
+        echo "${selected_id}"
+        return
+    fi
+
+    # Fallback to numbered list when fzf is not available
     log_step "Available ${prompt_text}:"
     local i=1
     local ids=()
     local default_idx=1
-    while IFS= read -r line; do
+    for line in "${items_array[@]}"; do
         local id="${line%%|*}"
         printf "  %2d) %s\n" "${i}" "$(echo "${line}" | tr '|' '\t')" >&2
         ids+=("${id}")
