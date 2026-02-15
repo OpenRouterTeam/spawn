@@ -4,6 +4,7 @@ import {
   cmdRun,
   cmdList,
   cmdListClear,
+  cmdLast,
   cmdMatrix,
   cmdAgents,
   cmdClouds,
@@ -336,6 +337,7 @@ const SUBCOMMANDS: Record<string, () => Promise<void>> = {
   "agents": cmdAgents,
   "clouds": cmdClouds,
   "update": cmdUpdate,
+  "last": cmdLast, "rerun": cmdLast,
 };
 
 // list/ls/history handled separately for -a/-c flag parsing
