@@ -62,6 +62,9 @@ echo ""
 log_info "Sprite setup completed successfully!"
 echo ""
 
+# Save sprite connection info for spawn list
+save_vm_connection "sprite-console" "${USER:-root}" "" "${SPRITE_NAME}"
+
 # Check if running in non-interactive mode
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     # Non-interactive mode: execute prompt and exit

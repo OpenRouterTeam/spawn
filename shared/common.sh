@@ -2867,6 +2867,38 @@ opencode_install_cmd() {
 }
 
 # ============================================================
+# VM Connection Tracking
+# ============================================================
+
+# Save VM connection info for spawn list reconnect functionality.
+# This allows users to reconnect to previously spawned VMs via `spawn list`.
+# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME]
+# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME"
+save_vm_connection() {
+    local ip="${1}"
+    local user="${2}"
+    local server_id="${3:-}"
+    local server_name="${4:-}"
+
+    local spawn_dir="${HOME}/.spawn"
+    mkdir -p "${spawn_dir}"
+
+    local conn_file="${spawn_dir}/last-connection.json"
+
+    # Build JSON (handle optional fields)
+    local json="{\"ip\":\"${ip}\",\"user\":\"${user}\""
+    if [[ -n "${server_id}" ]]; then
+        json="${json},\"server_id\":\"${server_id}\""
+    fi
+    if [[ -n "${server_name}" ]]; then
+        json="${json},\"server_name\":\"${server_name}\""
+    fi
+    json="${json}}"
+
+    printf '%s\n' "${json}" > "${conn_file}"
+}
+
+# ============================================================
 # Auto-initialization
 # ============================================================
 
