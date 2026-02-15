@@ -617,4 +617,43 @@ describe("Dry-run preview (showDryRunPreview via cmdRun)", () => {
       expect(envIdx).toBeLessThan(promptIdx);
     });
   });
+
+  describe("multiline prompt display in dry-run", () => {
+    it("should show first 3 lines of multiline prompt", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      const multilinePrompt = "Line 1: Fix bugs\nLine 2: Add tests\nLine 3: Refactor code\nLine 4: Write docs";
+      await cmdRun("claude", "sprite", multilinePrompt, true);
+
+      const logText = getLogText();
+      expect(logText).toContain("Line 1: Fix bugs");
+      expect(logText).toContain("Line 2: Add tests");
+      expect(logText).toContain("Line 3: Refactor code");
+      expect(logText).toContain("4 lines total");
+    });
+
+    it("should show total line/char count for prompts with >3 lines", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      const manyLines = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`).join("\n");
+      await cmdRun("claude", "sprite", manyLines, true);
+
+      const logText = getLogText();
+      expect(logText).toContain("10 lines total");
+    });
+
+    it("should show all lines when multiline prompt has <=3 lines", async () => {
+      setupManifest(standardManifest);
+      await loadManifest(true);
+      const threeLines = "First line\nSecond line\nThird line";
+      await cmdRun("claude", "sprite", threeLines, true);
+
+      const logText = getLogText();
+      expect(logText).toContain("First line");
+      expect(logText).toContain("Second line");
+      expect(logText).toContain("Third line");
+      // Should NOT show "lines total" when exactly 3 lines
+      expect(logText).not.toContain("lines total");
+    });
+  });
 });
