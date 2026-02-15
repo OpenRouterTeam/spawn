@@ -2353,7 +2353,7 @@ ensure_multi_credentials() {
 
 # Helper to create, upload, and install a config file from a heredoc or string
 # Usage: upload_config_file UPLOAD_CALLBACK RUN_CALLBACK CONTENT REMOTE_PATH
-# Example: upload_config_file "$upload_func" "$run_func" "$json_content" "~/.config/app.json"
+# Example: upload_config_file "$upload_func" "$run_func" "$json_content" "\$HOME/.config/app.json"
 upload_config_file() {
     local upload_callback="${1}"
     local run_callback="${2}"
@@ -2373,7 +2373,7 @@ upload_config_file() {
     local temp_remote="/tmp/spawn_config_${rand_suffix}"
     ${upload_callback} "${temp_file}" "${temp_remote}"
     # SECURITY: remote_path must be double-quoted to prevent injection via spaces/metacharacters
-    # Tilde expansion works in double quotes when used at the start of a path
+    # Note: Callers should use $HOME instead of ~ since tilde does not expand inside double quotes
     ${run_callback} "mkdir -p \$(dirname \"${remote_path}\") && chmod 600 '${temp_remote}' && mv '${temp_remote}' \"${remote_path}\""
 }
 
@@ -2429,7 +2429,7 @@ setup_claude_code_config() {
 }
 EOF
 )
-    upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "~/.claude/settings.json"
+    upload_config_file "${upload_callback}" "${run_callback}" "${settings_json}" "\$HOME/.claude/settings.json"
 
     # Create .claude.json global state
     local global_state_json
@@ -2440,7 +2440,7 @@ EOF
 }
 EOF
 )
-    upload_config_file "${upload_callback}" "${run_callback}" "${global_state_json}" "~/.claude.json"
+    upload_config_file "${upload_callback}" "${run_callback}" "${global_state_json}" "\$HOME/.claude.json"
 
     # Create empty CLAUDE.md
     ${run_callback} "touch ~/.claude/CLAUDE.md"
@@ -2519,7 +2519,7 @@ setup_openclaw_config() {
     # Create and upload openclaw.json config
     local openclaw_json
     openclaw_json=$(_generate_openclaw_json "${openrouter_key}" "${model_id}" "${gateway_token}")
-    upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "~/.openclaw/openclaw.json"
+    upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "\$HOME/.openclaw/openclaw.json"
 }
 
 # ============================================================
@@ -2572,7 +2572,7 @@ setup_continue_config() {
 }
 EOF
 )
-    upload_config_file "${upload_callback}" "${run_callback}" "${continue_json}" "~/.continue/config.json"
+    upload_config_file "${upload_callback}" "${run_callback}" "${continue_json}" "\$HOME/.continue/config.json"
 }
 
 # ============================================================
