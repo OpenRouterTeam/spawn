@@ -67,14 +67,14 @@ export const createEmptyManifest = (): Manifest => ({
 
 // ── Console Mocks ──────────────────────────────────────────────────────────────
 
-export function createConsoleMocks() {
+export function createConsoleMocks(): { log: ReturnType<typeof spyOn>; error: ReturnType<typeof spyOn> } {
   return {
     log: spyOn(console, "log").mockImplementation(() => {}),
     error: spyOn(console, "error").mockImplementation(() => {}),
   };
 }
 
-export function createProcessExitMock() {
+export function createProcessExitMock(): ReturnType<typeof spyOn> {
   return spyOn(process, "exit").mockImplementation((() => {
     throw new Error("process.exit");
   }) as any);
@@ -86,18 +86,18 @@ export function restoreMocks(...mocks: Array<{ mockRestore?: () => void } | unde
 
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────
 
-export function mockSuccessfulFetch(data: any) {
+export function mockSuccessfulFetch(data: any): ReturnType<typeof mock> {
   return mock(() => Promise.resolve({
     ok: true,
     json: async () => data,
   }) as any);
 }
 
-export function mockFailedFetch(error: string = "Network error") {
+export function mockFailedFetch(error: string = "Network error"): ReturnType<typeof mock> {
   return mock(() => Promise.reject(new Error(error)));
 }
 
-export function mockFetchWithStatus(status: number, data?: any) {
+export function mockFetchWithStatus(status: number, data?: any): ReturnType<typeof mock> {
   return mock(() => Promise.resolve({
     ok: status >= 200 && status < 300,
     status,
@@ -137,7 +137,7 @@ export function setupTestEnvironment(): TestEnvironment {
   };
 }
 
-export function teardownTestEnvironment(env: TestEnvironment) {
+export function teardownTestEnvironment(env: TestEnvironment): void {
   process.env = env.originalEnv;
   global.fetch = env.originalFetch;
 

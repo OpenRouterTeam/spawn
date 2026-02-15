@@ -32,7 +32,8 @@ async function fetchLatestVersion(): Promise<string | null> {
 
     const pkg = (await res.json()) as { version: string };
     return pkg.version;
-  } catch {
+  } catch (err) {
+    // Network timeout or JSON parse error - non-critical, return null to use cached manifest
     return null;
   }
 }
@@ -118,7 +119,7 @@ function performAutoUpdate(latestVersion: string): void {
     console.error();
     console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
     reExecWithArgs();
-  } catch {
+  } catch (err) {
     console.error();
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
     console.error(pc.dim("  Please update manually:"));
@@ -155,7 +156,8 @@ export async function checkForUpdates(): Promise<void> {
     if (compareVersions(VERSION, latestVersion)) {
       performAutoUpdate(latestVersion);
     }
-  } catch {
+  } catch (err) {
     // Silently fail - update check is non-critical
+    // Possible errors: network timeout, fetch failure, version comparison errors
   }
 }

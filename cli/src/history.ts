@@ -48,7 +48,8 @@ export function loadHistory(): SpawnRecord[] {
   try {
     const data = JSON.parse(readFileSync(path, "utf-8"));
     return Array.isArray(data) ? data : [];
-  } catch {
+  } catch (err) {
+    // File corrupted or JSON parse error - return empty history
     return [];
   }
 }
@@ -103,8 +104,8 @@ export function mergeLastConnection(): void {
 
     // Clean up the connection file after merging
     unlinkSync(connPath);
-  } catch {
-    // Ignore errors - connection data is optional
+  } catch (err) {
+    // Ignore errors - connection data is optional (JSON parse, file read, or unlink failure)
   }
 }
 
