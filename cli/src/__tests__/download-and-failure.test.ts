@@ -368,7 +368,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("firewall or proxy");
+      expect(errorOutput).toContain("Firewall or proxy");
     });
 
     it("should show the GitHub raw URL for manual access on network error", async () => {
