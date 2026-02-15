@@ -66,6 +66,8 @@ const KNOWN_FLAGS = new Set([
   "--version", "-v", "-V",
   "--prompt", "-p", "--prompt-file", "-f",
   "--dry-run", "-n",
+  "--headless",
+  "--output",
   "-a", "-c", "--agent", "--cloud",
   "--clear",
 ]);
@@ -94,6 +96,8 @@ function checkUnknownFlags(args: string[]): void {
       console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
       console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
       console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
+      console.error(`    ${pc.cyan("--headless")}          Run in non-interactive headless mode`);
+      console.error(`    ${pc.cyan("--output <format>")}   Output format for headless mode (json)`);
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
       console.error();
@@ -144,14 +148,20 @@ async function showInfoOrError(name: string): Promise<void> {
   showUnknownCommandError(name, manifest);
 }
 
-async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean): Promise<void> {
+async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean, headless?: boolean, outputFormat?: string): Promise<void> {
   if (cloud && HELP_FLAGS.includes(cloud)) {
     await showInfoOrError(agent);
     return;
   }
   if (cloud) {
-    await cmdRun(agent, cloud, prompt, dryRun);
+    await cmdRun(agent, cloud, prompt, dryRun, headless, outputFormat);
     return;
+  }
+  // Headless mode requires explicit cloud
+  if (headless) {
+    console.error(pc.red("Error: --headless requires both <agent> and <cloud>"));
+    console.error(`\nUsage: ${pc.cyan(`spawn <agent> <cloud> --headless --output json`)}`);
+    process.exit(1);
   }
   // If no cloud specified, show interactive cloud selection in TTY mode
   if (isInteractiveTTY()) {
@@ -283,7 +293,12 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
 }
 
 /** Handle the case when no command is given (interactive mode or help) */
-async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Promise<void> {
+async function handleNoCommand(prompt: string | undefined, dryRun?: boolean, headless?: boolean): Promise<void> {
+  if (headless) {
+    console.error(pc.red("Error: --headless requires both <agent> and <cloud>"));
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
+    process.exit(1);
+  }
   if (dryRun) {
     console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
     console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --dry-run")}`);
@@ -435,11 +450,11 @@ async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<
 }
 
 /** Handle verb aliases like "spawn run claude sprite" -> "spawn claude sprite" */
-async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
+async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, headless?: boolean, outputFormat?: string): Promise<void> {
   if (filteredArgs.length > 1) {
     const remaining = filteredArgs.slice(1);
     warnExtraArgs(remaining, 2);
-    await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun);
+    await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun, headless, outputFormat);
     return;
   }
   console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent and cloud`));
@@ -449,19 +464,22 @@ async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: st
 }
 
 /** Handle slash notation: "spawn claude/hetzner" -> "spawn claude hetzner" */
-async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean): Promise<boolean> {
+async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean, headless?: boolean, outputFormat?: string): Promise<boolean> {
   const parts = cmd.split("/");
   if (parts.length === 2 && parts[0] && parts[1]) {
-    console.error(pc.dim(`Tip: use a space instead of slash: ${pc.cyan(`spawn ${parts[0]} ${parts[1]}`)}`));
-    console.error();
-    await handleDefaultCommand(parts[0], parts[1], prompt, dryRun);
+    // Don't show tips in headless mode
+    if (!headless) {
+      console.error(pc.dim(`Tip: use a space instead of slash: ${pc.cyan(`spawn ${parts[0]} ${parts[1]}`)}`));
+      console.error();
+    }
+    await handleDefaultCommand(parts[0], parts[1], prompt, dryRun, headless, outputFormat);
     return true;
   }
   return false;
 }
 
 /** Dispatch a named command or fall through to agent/cloud handling */
-async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean): Promise<void> {
+async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, headless?: boolean, outputFormat?: string): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
     warnExtraArgs(filteredArgs, 1);
     IMMEDIATE_COMMANDS[cmd]();
@@ -470,14 +488,14 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
 
   if (LIST_COMMANDS.has(cmd)) { await dispatchListCommand(filteredArgs); return; }
   if (SUBCOMMANDS[cmd]) { await dispatchSubcommand(cmd, filteredArgs); return; }
-  if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun); return; }
+  if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun, headless, outputFormat); return; }
 
   if (filteredArgs.length === 1 && cmd.includes("/")) {
-    if (await dispatchSlashNotation(cmd, prompt, dryRun)) return;
+    if (await dispatchSlashNotation(cmd, prompt, dryRun, headless, outputFormat)) return;
   }
 
   warnExtraArgs(filteredArgs, 2);
-  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt, dryRun);
+  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt, dryRun, headless, outputFormat);
 }
 
 async function main(): Promise<void> {
@@ -492,15 +510,48 @@ async function main(): Promise<void> {
   const dryRun = dryRunIdx !== -1;
   if (dryRun) filteredArgs.splice(dryRunIdx, 1);
 
-  checkUnknownFlags(filteredArgs);
+  // Extract --headless boolean flag
+  const headlessIdx = filteredArgs.findIndex(a => a === "--headless");
+  const headless = headlessIdx !== -1;
+  if (headless) filteredArgs.splice(headlessIdx, 1);
 
-  const cmd = filteredArgs[0];
+  // Extract --output <format> flag
+  const [outputFormat, argsAfterOutput] = extractFlagValue(
+    filteredArgs,
+    ["--output"],
+    "output format",
+    "spawn <agent> <cloud> --headless --output json"
+  );
+  const finalArgs = argsAfterOutput;
+
+  // Validate headless mode requirements
+  if (headless) {
+    // Headless requires non-interactive execution - TTY is irrelevant
+    if (!outputFormat) {
+      console.error(pc.red("Error: --headless requires --output <format>"));
+      console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
+      process.exit(1);
+    }
+    if (outputFormat !== "json") {
+      console.error(pc.red(`Error: unknown output format: ${pc.bold(outputFormat)}`));
+      console.error(`\nSupported formats: ${pc.cyan("json")}`);
+      process.exit(1);
+    }
+  } else if (outputFormat) {
+    console.error(pc.red("Error: --output requires --headless"));
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
+    process.exit(1);
+  }
+
+  checkUnknownFlags(finalArgs);
+
+  const cmd = finalArgs[0];
 
   try {
     if (!cmd) {
-      await handleNoCommand(prompt, dryRun);
+      await handleNoCommand(prompt, dryRun, headless);
     } else {
-      await dispatchCommand(cmd, filteredArgs, prompt, dryRun);
+      await dispatchCommand(cmd, finalArgs, prompt, dryRun, headless, outputFormat);
     }
   } catch (err) {
     handleError(err);

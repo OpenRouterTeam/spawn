@@ -700,7 +700,7 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   }
 }
 
-export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean): Promise<void> {
+export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean, headless?: boolean, outputFormat?: string): Promise<void> {
   const manifest = await loadManifestWithSpinner();
   ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
 
@@ -717,6 +717,13 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
+
+  // Headless mode: output JSON only, suppress all interactive UI
+  if (headless && outputFormat === "json") {
+    await execScriptHeadless(cloud, agent, prompt, manifest);
+    return;
+  }
+
   const suffix = prompt ? " with prompt..." : "...";
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
@@ -1134,6 +1141,132 @@ async function runWithRetries(script: string, prompt?: string, dashboardUrl?: st
     }
   }
   return "Script failed after all retries";
+}
+
+async function execScriptHeadless(cloud: string, agent: string, prompt: string | undefined, manifest: Manifest): Promise<void> {
+  const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
+  const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
+
+  let scriptContent: string;
+  try {
+    // Download script without spinner in headless mode
+    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+    if (res.ok) {
+      scriptContent = await res.text();
+    } else {
+      // Try fallback
+      const ghRes = await fetch(ghUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+      if (!ghRes.ok) {
+        const output = {
+          success: false,
+          error: "Script download failed",
+          agent: manifest.agents[agent].name,
+          cloud: manifest.clouds[cloud].name,
+        };
+        console.log(JSON.stringify(output));
+        process.exit(2); // Exit code 2: download failure
+      }
+      scriptContent = await ghRes.text();
+    }
+  } catch (err) {
+    const output = {
+      success: false,
+      error: `Script download error: ${getErrorMessage(err)}`,
+      agent: manifest.agents[agent].name,
+      cloud: manifest.clouds[cloud].name,
+    };
+    console.log(JSON.stringify(output));
+    process.exit(2); // Exit code 2: download failure
+  }
+
+  // Validate script security
+  try {
+    validateScriptContent(scriptContent);
+  } catch (err) {
+    const output = {
+      success: false,
+      error: `Script validation failed: ${getErrorMessage(err)}`,
+      agent: manifest.agents[agent].name,
+      cloud: manifest.clouds[cloud].name,
+    };
+    console.log(JSON.stringify(output));
+    process.exit(3); // Exit code 3: security validation failure
+  }
+
+  // Record the spawn before execution
+  const timestamp = new Date().toISOString();
+  try {
+    saveSpawnRecord({
+      agent,
+      cloud,
+      timestamp,
+      ...(prompt ? { prompt } : {}),
+    });
+  } catch {
+    // Non-fatal: don't block the spawn if history write fails
+  }
+
+  // Execute script and capture output
+  const env = { ...process.env };
+  if (prompt) {
+    env.SPAWN_PROMPT = prompt;
+    env.SPAWN_MODE = "non-interactive";
+  }
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("bash", ["-c", scriptContent], {
+        stdio: "inherit",
+        env,
+      });
+      child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
+        if (code === 0) resolve();
+        else if (code !== null) {
+          reject(new Error(`Script exited with code ${code}`));
+        } else {
+          reject(new Error(`Script killed by ${signal ?? "unknown signal"}`));
+        }
+      });
+      child.on("error", reject);
+    });
+
+    // Success: try to get connection info from history
+    const { filterHistory } = await import("./history.js");
+    const records = filterHistory(agent, cloud);
+    const latestRecord = records.find(r => r.timestamp === timestamp) || records[0];
+
+    const output = {
+      success: true,
+      agent: manifest.agents[agent].name,
+      cloud: manifest.clouds[cloud].name,
+      timestamp,
+      ...(latestRecord?.connection
+        ? {
+            connection: {
+              ip: latestRecord.connection.ip,
+              user: latestRecord.connection.user,
+              ...(latestRecord.connection.server_id ? { server_id: latestRecord.connection.server_id } : {}),
+              ...(latestRecord.connection.server_name ? { server_name: latestRecord.connection.server_name } : {}),
+            },
+          }
+        : {}),
+      ...(prompt ? { prompt } : {}),
+    };
+
+    console.log(JSON.stringify(output));
+    process.exit(0); // Exit code 0: success
+  } catch (err) {
+    const output = {
+      success: false,
+      error: getErrorMessage(err),
+      agent: manifest.agents[agent].name,
+      cloud: manifest.clouds[cloud].name,
+      timestamp,
+      ...(prompt ? { prompt } : {}),
+    };
+    console.log(JSON.stringify(output));
+    process.exit(1); // Exit code 1: script execution failure
+  }
 }
 
 async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, dashboardUrl?: string): Promise<void> {
