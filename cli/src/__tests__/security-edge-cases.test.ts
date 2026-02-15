@@ -16,7 +16,7 @@ describe("Security Edge Cases", () => {
 
     it("should reject identifier at 65 characters", () => {
       const id = "a".repeat(65);
-      expect(() => validateIdentifier(id, "Test")).toThrow("exceeds maximum length");
+      expect(() => validateIdentifier(id, "Test")).toThrow("too long");
     });
 
     it("should accept single character identifiers", () => {
@@ -34,19 +34,19 @@ describe("Security Edge Cases", () => {
     });
 
     it("should reject identifiers with dots", () => {
-      expect(() => validateIdentifier("my.agent", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("my.agent", "Test")).toThrow("can only contain");
     });
 
     it("should reject identifiers with spaces", () => {
-      expect(() => validateIdentifier("my agent", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("my agent", "Test")).toThrow("can only contain");
     });
 
     it("should reject tab characters", () => {
-      expect(() => validateIdentifier("my\tagent", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("my\tagent", "Test")).toThrow("can only contain");
     });
 
     it("should reject newlines", () => {
-      expect(() => validateIdentifier("my\nagent", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("my\nagent", "Test")).toThrow("can only contain");
     });
 
     it("should use custom field name in error messages", () => {
@@ -66,14 +66,14 @@ describe("Security Edge Cases", () => {
     });
 
     it("should reject URL-like identifiers", () => {
-      expect(() => validateIdentifier("http://evil.com", "Test")).toThrow("invalid characters");
-      expect(() => validateIdentifier("https://evil.com", "Test")).toThrow("invalid characters");
+      expect(() => validateIdentifier("http://evil.com", "Test")).toThrow("can only contain");
+      expect(() => validateIdentifier("https://evil.com", "Test")).toThrow("can only contain");
     });
 
     it("should reject shell metacharacters individually", () => {
       const shellChars = ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "=", "+", "{", "}", "[", "]", "<", ">", "?", "~", "`", "'", "\"", ";", ",", "."];
       for (const char of shellChars) {
-        expect(() => validateIdentifier(`test${char}name`, "Test")).toThrow("invalid characters");
+        expect(() => validateIdentifier(`test${char}name`, "Test")).toThrow("can only contain");
       }
     });
   });
@@ -91,7 +91,7 @@ describe("Security Edge Cases", () => {
     });
 
     it("should reject scripts with only whitespace", () => {
-      expect(() => validateScriptContent("   \n\t\n  ")).toThrow("Script content is empty");
+      expect(() => validateScriptContent("   \n\t\n  ")).toThrow("is empty");
     });
 
     it("should accept rm -rf with specific directories (not root)", () => {
@@ -165,7 +165,7 @@ dd if=/dev/urandom of=/tmp/random.bin bs=1M count=1
     });
 
     it("should reject backtick with complex commands", () => {
-      expect(() => validatePrompt("Run `cat /etc/shadow`")).toThrow("command substitution backticks");
+      expect(() => validatePrompt("Run `cat /etc/shadow`")).toThrow("backtick");
     });
 
     it("should accept prompts with pipe to non-shell commands", () => {
@@ -181,7 +181,7 @@ dd if=/dev/urandom of=/tmp/random.bin bs=1M count=1
 
     it("should reject prompts one byte over the max length", () => {
       const overPrompt = "x".repeat(10 * 1024 + 1);
-      expect(() => validatePrompt(overPrompt)).toThrow("exceeds maximum length");
+      expect(() => validatePrompt(overPrompt)).toThrow("too long");
     });
 
     it("should accept prompts with semicolons not followed by rm", () => {

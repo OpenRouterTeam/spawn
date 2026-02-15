@@ -219,9 +219,9 @@ describe("generate_env_config", () => {
   it("should handle no arguments gracefully", () => {
     const result = runBash(`generate_env_config`);
     expect(result.exitCode).toBe(0);
-    // Should still have the marker but no export lines
+    // Should have the marker and always include IS_SANDBOX
     expect(result.stdout).toContain("# [spawn:env]");
-    expect(result.stdout).not.toContain("export");
+    expect(result.stdout).toContain("export IS_SANDBOX='1'");
   });
 });
 
