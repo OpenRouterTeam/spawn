@@ -329,7 +329,7 @@ If zero PRs, skip to Step 3.
 
 1. TeamCreate (team_name="${TEAM_NAME}")
 2. TaskCreate per PR
-3. Spawn **pr-reviewer** (model=opus) per PR, named pr-reviewer-NUMBER
+3. Spawn **pr-reviewer** (model=sonnet) per PR, named pr-reviewer-NUMBER
    **CRITICAL: Copy the COMPLETE review protocol below into every reviewer's prompt.**
 4. Spawn **branch-cleaner** (model=haiku) — see Step 3
 
@@ -392,7 +392,7 @@ Spawn **branch-cleaner** (model=haiku):
 
 ## Step 4 — Stale Issue Re-triage
 
-Spawn **issue-checker** (model=haiku):
+Spawn **issue-checker** (model=sonnet):
 - \`gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels,updatedAt,comments\`
 - For each issue, fetch full context: \`gh issue view NUMBER --repo OpenRouterTeam/spawn --comments\`
 - **STRICT DEDUP — MANDATORY**: Check comments for \`-- security/issue-checker\` OR \`-- security/triage\`. If EITHER sign-off already exists in ANY comment on the issue → **SKIP this issue entirely** (do NOT comment again) UNLESS there are new human comments posted AFTER the last security sign-off comment
@@ -516,8 +516,14 @@ log "Hard timeout: ${HARD_TIMEOUT}s"
 IDLE_TIMEOUT=600  # 10 minutes of silence = hung
 
 # Run claude in background so we can monitor output activity.
+# Triage uses Sonnet (lightweight safety check); other modes use default (Opus) for team lead.
+CLAUDE_MODEL_FLAG=""
+if [[ "${RUN_MODE}" == "triage" ]]; then
+    CLAUDE_MODEL_FLAG="--model sonnet"
+fi
+
 CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
-( claude -p "$(cat "${PROMPT_FILE}")" --output-format stream-json --verbose &
+( claude -p "$(cat "${PROMPT_FILE}")" ${CLAUDE_MODEL_FLAG} --output-format stream-json --verbose &
   echo $! > "${CLAUDE_PID_FILE}"
   wait
 ) 2>&1 | tee -a "${LOG_FILE}" &
