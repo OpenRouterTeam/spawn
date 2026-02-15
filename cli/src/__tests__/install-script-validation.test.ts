@@ -249,44 +249,38 @@ describe("install.sh validation", () => {
     });
   });
 
-  // ── Source-mode fallback (PR #707, #710) ────────────────────────────
+  // ── Build fallback (binary download) ────────────────────────────────
 
-  describe("source-mode fallback wrapper", () => {
-    it("should fall back to source mode when bundled build fails", () => {
-      // The script should have a fallback path when build_ok is not 1
-      expect(content).toContain("source");
-      expect(content).toContain("Bundled build");
+  describe("build fallback and binary download", () => {
+    it("should attempt local build first via bun run build", () => {
+      expect(content).toContain("bun run build");
     });
 
-    it("should install source files to ~/.spawn", () => {
-      expect(content).toContain('${HOME}/.spawn');
+    it("should fall back to downloading pre-built binary if build fails", () => {
+      expect(content).toContain("log_warn");
+      expect(content).toContain("downloading pre-built binary");
     });
 
-    it("should copy node_modules, src, and package.json to spawn lib dir", () => {
-      expect(content).toContain("node_modules");
-      expect(content).toContain("package.json");
+    it("should download from GitHub releases with cli-latest tag", () => {
+      expect(content).toContain("github.com");
+      expect(content).toContain("releases/download");
+      expect(content).toContain("cli-latest");
+      expect(content).toContain("cli.js");
     });
 
-    it("should create a wrapper script that changes to ~/.spawn before exec", () => {
-      // PR #710: the wrapper must cd into ~/.spawn for package resolution
-      expect(content).toContain('cd "$HOME/.spawn"');
+    it("should validate that downloaded binary is not empty", () => {
+      expect(content).toContain("[ ! -s cli.js ]");
     });
 
-    it("should use exec bun in the source-mode wrapper", () => {
-      expect(content).toContain("exec bun");
+    it("should copy built or downloaded cli.js to install directory", () => {
+      expect(content).toContain('cp cli.js "${INSTALL_DIR}/spawn"');
     });
 
-    it("should use bash shebang in the wrapper (not /usr/bin/env bun)", () => {
-      // The wrapper script itself should use bash, not bun directly
-      expect(content).toContain("#!/usr/bin/env bash");
-    });
-
-    it('should pass "$@" to forward arguments', () => {
-      expect(content).toContain('"$@"');
-    });
-
-    it("should try forced reinstall if first build fails", () => {
-      expect(content).toContain("bun install --force");
+    it("should show helpful message after installation", () => {
+      const fnStart = content.indexOf("ensure_in_path()");
+      const fnBody = content.slice(fnStart);
+      expect(fnBody).toContain("spawn\" version");
+      expect(fnBody).toContain("to get started");
     });
   });
 
