@@ -236,8 +236,9 @@ gh issue view ${ISSUE_NUM} --repo OpenRouterTeam/spawn --comments
 gh issue view ${ISSUE_NUM} --repo OpenRouterTeam/spawn --json labels,comments --jq '{labels: [.labels[].name], commentCount: (.comments | length), lastComment: (.comments[-1].body // "none")[:100]}'
 \`\`\`
 - If issue has \`safe-to-work\`, \`malicious\`, or \`needs-human-review\` label → STOP (already triaged)
-- If a comment contains "-- security/triage" → STOP
-- Only proceed if NO triage label and NO triage comment
+- If a comment contains \`-- security/triage\` OR \`-- security/issue-checker\` → STOP (already triaged by another agent)
+- If a comment contains \`-- refactor/community-coordinator\` → issue is already acknowledged; only proceed with safety triage if no security sign-off exists
+- Only proceed if NO triage label and NO security triage comment
 
 ## What to Check
 
@@ -394,9 +395,11 @@ Spawn **branch-cleaner** (model=haiku):
 Spawn **issue-checker** (model=haiku):
 - \`gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels,updatedAt,comments\`
 - For each issue, fetch full context: \`gh issue view NUMBER --repo OpenRouterTeam/spawn --comments\`
-- **STRICT DEDUP — MANDATORY**: Check comments for \`-- security/issue-checker\`. If that sign-off already exists in ANY comment on the issue → **SKIP this issue entirely** (do NOT comment again) UNLESS there are new human comments posted AFTER the last \`-- security/issue-checker\` comment
-- **NEVER** post "status update", "re-triage", "triage update", or "status check" comments that restate existing information
-- For issues with no status label: silently add \`pending-review\` (no comment needed)
+- **STRICT DEDUP — MANDATORY**: Check comments for \`-- security/issue-checker\` OR \`-- security/triage\`. If EITHER sign-off already exists in ANY comment on the issue → **SKIP this issue entirely** (do NOT comment again) UNLESS there are new human comments posted AFTER the last security sign-off comment
+- **NEVER** post "status update", "re-triage", "triage update", "triage assessment", "re-triage status check", or "status check" comments. ONE triage comment per issue, EVER. If a triage comment exists, the issue is DONE — move on.
+- **Label progression**: Issues that have been triaged/assessed should progress their labels:
+  - If issue has \`under-review\` and a triage comment already exists → transition to \`safe-to-work\`: \`gh issue edit NUMBER --repo OpenRouterTeam/spawn --remove-label "under-review" --remove-label "pending-review" --add-label "safe-to-work"\` (NO comment needed, just fix the label silently)
+  - If issue has no status label → silently add \`pending-review\` (no comment needed)
 - Verify label consistency silently: every issue needs exactly ONE status label — fix labels without commenting
 - **SIGN-OFF**: \`-- security/issue-checker\`
 
