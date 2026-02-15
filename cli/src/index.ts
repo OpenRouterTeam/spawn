@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import {
   cmdInteractive,
+  cmdInteractiveCloudPicker,
   cmdRun,
   cmdList,
   cmdListClear,
@@ -163,7 +164,12 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
     await suggestCloudsForPrompt(agent);
     process.exit(1);
   }
-  await showInfoOrError(agent);
+  // If in interactive TTY, show cloud picker instead of just agent info
+  if (isInteractiveTTY()) {
+    await cmdInteractiveCloudPicker(agent);
+  } else {
+    await showInfoOrError(agent);
+  }
 }
 
 /** Show "prompt requires cloud" error and suggest available clouds for the agent */
