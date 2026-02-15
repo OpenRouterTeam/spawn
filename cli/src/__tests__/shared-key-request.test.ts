@@ -595,7 +595,7 @@ describe("invalidate_cloud_key", () => {
     expect(result.stdout).toContain("invalid provider name");
   });
 
-  it("should accept valid provider names with dots, hyphens, underscores", () => {
+  it("should accept valid provider names with hyphens and underscores", () => {
     const configDir = join(testDir, ".config", "spawn");
     mkdirSync(configDir, { recursive: true });
     const configFile = join(configDir, "my-cloud_v2.json");
@@ -604,6 +604,18 @@ describe("invalidate_cloud_key", () => {
     const result = runBash(`invalidate_cloud_key "my-cloud_v2" 2>&1`);
     expect(result.exitCode).toBe(0);
     expect(existsSync(configFile)).toBe(false);
+  });
+
+  it("should reject provider names with dots to prevent path traversal", () => {
+    const result = runBash(`invalidate_cloud_key "foo..bar" 2>&1`);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("invalid provider name");
+  });
+
+  it("should reject provider names with single dots", () => {
+    const result = runBash(`invalidate_cloud_key "foo.bar" 2>&1`);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("invalid provider name");
   });
 
   it("should accept exactly 64-character provider names", () => {
