@@ -1,0 +1,63 @@
+name: Gate
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+jobs:
+  check-membership:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check org membership and close if external
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const sender = context.payload.sender.login;
+            const org = context.repo.owner;
+
+            // Check if user is an org member
+            let isMember = false;
+            try {
+              const { status } = await github.rest.orgs.checkMembershipForUser({
+                org,
+                username: sender,
+              });
+              isMember = status === 204 || status === 302;
+            } catch (e) {
+              // 404 = not a member, anything else = treat as non-member
+              isMember = false;
+            }
+
+            if (isMember) {
+              console.log(`${sender} is a member of ${org}, allowing.`);
+              return;
+            }
+
+            console.log(`${sender} is NOT a member of ${org}, closing.`);
+
+            if (context.payload.issue) {
+              await github.rest.issues.update({
+                ...context.repo,
+                issue_number: context.payload.issue.number,
+                state: 'closed',
+              });
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.payload.issue.number,
+                body: 'This repository only accepts issues from organization members. Your issue has been closed automatically.',
+              });
+            } else if (context.payload.pull_request) {
+              await github.rest.pulls.update({
+                ...context.repo,
+                pull_number: context.payload.pull_request.number,
+                state: 'closed',
+              });
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.payload.pull_request.number,
+                body: 'This repository only accepts pull requests from organization members. Your PR has been closed automatically.',
+              });
+            }
