@@ -699,7 +699,9 @@ wait_for_oauth_code() {
     log_step "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
-        elapsed=$((elapsed + POLL_INTERVAL))
+        # Use python3 for float addition since bash arithmetic only handles integers
+        # If POLL_INTERVAL is 0.5, bash $(( )) would fail. Fallback keeps timeout working.
+        elapsed=$(python3 -c "print(int(${elapsed} + ${POLL_INTERVAL}))" 2>/dev/null || echo "$((elapsed + 1))")
     done
 
     [[ -f "${code_file}" ]]
@@ -1254,7 +1256,11 @@ import json, sys
 data = json.loads(sys.stdin.read())
 ids = [k['id'] for k in data.get('${key_field}', [])]
 print(json.dumps(ids))
-" <<< "${api_response}"
+" <<< "${api_response}" 2>/dev/null || {
+        log_error "Failed to parse SSH key IDs from API response"
+        log_error "The API response may be malformed or python3 is unavailable"
+        return 1
+    }
 }
 
 # ============================================================
@@ -1302,6 +1308,12 @@ calculate_retry_backoff() {
     local interval="${1}"
     local max_interval="${2}"
 
+    # Validate inputs to prevent empty or invalid intervals
+    if [[ -z "${interval}" ]] || [[ "${interval}" -lt 1 ]]; then
+        echo "1"
+        return 0
+    fi
+
     # Calculate next interval with exponential backoff
     local next_interval=$((interval * 2))
     if [[ "${next_interval}" -gt "${max_interval}" ]]; then
@@ -1309,7 +1321,8 @@ calculate_retry_backoff() {
     fi
 
     # Add jitter: ±20% randomization to prevent thundering herd
-    python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || echo "${interval}"
+    # Fallback to no-jitter interval if python3 is unavailable
+    python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || printf '%s' "${interval}"
 }
 
 # Handle API retry decision with backoff - extracted to reduce duplication across API wrappers
