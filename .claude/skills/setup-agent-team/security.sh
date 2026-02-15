@@ -582,20 +582,10 @@ CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 0 ]] || [[ "${SESSION_ENDED}" = true ]]; then
     log "Cycle completed successfully"
-
-    # Create checkpoint
-    log "Creating checkpoint..."
-    sprite-env checkpoint create --comment "security ${RUN_MODE} cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
 elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
     log "Cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
-
-    log "Creating checkpoint for partial work..."
-    sprite-env checkpoint create --comment "security ${RUN_MODE} cycle hung (watchdog kill)" 2>&1 | tee -a "${LOG_FILE}" || true
 elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     log "Cycle timed out after ${HARD_TIMEOUT}s — killed by hard timeout"
-
-    log "Creating checkpoint for partial work..."
-    sprite-env checkpoint create --comment "security ${RUN_MODE} cycle timed out (partial)" 2>&1 | tee -a "${LOG_FILE}" || true
 else
     log "Cycle failed (exit_code=${CLAUDE_EXIT})"
 fi

@@ -912,7 +912,4 @@ if [[ "${FAIL_COUNT:-0}" -gt 0 ]] && [[ "${RETRY_FAIL:-0}" -lt "${FAIL_COUNT:-0}
     log "Fixed ${FIXED} failure(s) this cycle"
 fi
 
-# Create checkpoint if available
-sprite-env checkpoint create --comment "QA cycle complete" 2>&1 | tee -a "${LOG_FILE}" || true
-
 log "=== QA Cycle Complete ==="
