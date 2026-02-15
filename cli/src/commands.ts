@@ -1786,8 +1786,6 @@ function printQuickStart(opts: {
     for (let i = 0; i < opts.authVars.length; i++) {
       console.log(formatAuthVarLine(opts.authVars[i], i === 0 ? opts.cloudUrl : undefined));
     }
-  } else if (opts.auth.toLowerCase() !== "none") {
-    console.log(`  ${pc.dim(`Auth: ${opts.auth}`)}`);
   }
   if (opts.spawnCmd) {
     console.log(`  ${pc.cyan(opts.spawnCmd)}`);
@@ -1932,18 +1930,19 @@ function getHelpUsageSection(): string {
 function getHelpExamplesSection(): string {
   return `${pc.bold("EXAMPLES")}
   spawn                              ${pc.dim("# Pick interactively")}
-  spawn claude sprite                ${pc.dim("# Launch Claude Code on Sprite")}
+  spawn openclaw sprite              ${pc.dim("# Launch OpenClaw on Sprite")}
   spawn aider hetzner                ${pc.dim("# Launch Aider on Hetzner Cloud")}
+  spawn goose digitalocean           ${pc.dim("# Launch Goose on DigitalOcean")}
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
   spawn aider sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
-  spawn claude sprite -f instructions.txt
+  spawn openclaw vultr -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
-  spawn claude sprite --dry-run      ${pc.dim("# Preview without provisioning")}
+  spawn interpreter linode --dry-run ${pc.dim("# Preview without provisioning")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
-  spawn list claude                  ${pc.dim("# Filter history by agent name")}
+  spawn list aider                   ${pc.dim("# Filter history by agent name")}
   spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}`;
 }
 

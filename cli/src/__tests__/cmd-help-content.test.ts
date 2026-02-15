@@ -143,7 +143,7 @@ describe("cmdHelp - content completeness", () => {
 
     it("should show direct launch example with agent and cloud", () => {
       const output = getHelpOutput();
-      expect(output).toContain("spawn claude sprite");
+      expect(output).toContain("spawn openclaw sprite");
     });
 
     it("should show --prompt example", () => {
