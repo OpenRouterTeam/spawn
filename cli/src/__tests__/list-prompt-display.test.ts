@@ -582,4 +582,68 @@ describe("cmdList prompt display", () => {
       expect(rerunLines[0]).not.toContain("--prompt");
     });
   });
+
+  describe("multiline prompt handling", () => {
+    it("should show first line with [+] indicator for multiline prompts", async () => {
+      const multilinePrompt = "Line 1: Fix all linter errors\nLine 2: Add unit tests\nLine 3: Refactor auth module";
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify([{
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-02-11T10:00:00Z",
+          prompt: multilinePrompt,
+        }])
+      );
+      const { cmdList } = await import("../commands.js");
+      await cmdList();
+      const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+      // Should show first line content
+      expect(allOutput).toContain("Line 1: Fix all linter errors");
+      // Should show multiline indicator
+      expect(allOutput).toContain("[+]");
+    });
+
+    it("should truncate first line if too long in multiline prompt", async () => {
+      const longFirstLine = "A".repeat(50) + "\nLine 2";
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify([{
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-02-11T10:00:00Z",
+          prompt: longFirstLine,
+        }])
+      );
+      const { cmdList } = await import("../commands.js");
+      await cmdList();
+      const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+      // Should truncate with ... and still show [+]
+      expect(allOutput).toContain("...");
+      expect(allOutput).toContain("[+]");
+    });
+
+    it("should not show [+] for single-line prompts", async () => {
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify([{
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-02-11T10:00:00Z",
+          prompt: "Just a single line prompt",
+        }])
+      );
+      const { cmdList } = await import("../commands.js");
+      await cmdList();
+      const allOutput = consoleMocks.log.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+      expect(allOutput).toContain("Just a single line prompt");
+      // No [+] indicator for single-line
+      const promptLines = consoleMocks.log.mock.calls
+        .map(c => String(c[0] ?? ""))
+        .filter(l => l.includes("--prompt"));
+      for (const line of promptLines) {
+        expect(line).not.toContain("[+]");
+      }
+    });
+  });
 });

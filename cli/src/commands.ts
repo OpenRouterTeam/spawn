@@ -562,10 +562,23 @@ function buildEnvironmentLines(manifest: Manifest, agent: string): string[] | nu
 }
 
 function buildPromptLines(prompt: string): string[] {
-  const preview = prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt;
-  const lines = [`  ${preview}`];
-  if (prompt.length > 100) {
-    lines.push(pc.dim(`  (${prompt.length} characters total)`));
+  const lines: string[] = [];
+  const promptLines = prompt.split('\n');
+
+  if (promptLines.length > 1) {
+    // Multiline prompt: show first few lines
+    const displayLines = promptLines.slice(0, 3);
+    lines.push(...displayLines.map(l => `  ${l}`));
+    if (promptLines.length > 3) {
+      lines.push(pc.dim(`  ... (${promptLines.length} lines total, ${prompt.length} characters)`));
+    }
+  } else {
+    // Single line: truncate if too long
+    const preview = prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt;
+    lines.push(`  ${preview}`);
+    if (prompt.length > 100) {
+      lines.push(pc.dim(`  (${prompt.length} characters total)`));
+    }
   }
   return lines;
 }
@@ -1483,7 +1496,7 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
       }
     }
     if (r.prompt) {
-      const preview = r.prompt.length > 40 ? r.prompt.slice(0, 40) + "..." : r.prompt;
+      const preview = formatPromptForDisplay(r.prompt, 40);
       line += pc.dim(`  --prompt "${preview}"`);
     }
     console.log(line);
@@ -1502,6 +1515,18 @@ export function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): str
   return `${agentDisplay} on ${cloudDisplay}`;
 }
 
+/** Format a prompt for display, handling multiline prompts gracefully */
+function formatPromptForDisplay(prompt: string, maxLength: number): string {
+  // If the prompt contains newlines, show first line + indicator
+  const firstLine = prompt.split('\n')[0];
+  if (prompt.includes('\n')) {
+    const truncated = firstLine.length > maxLength ? firstLine.slice(0, maxLength - 5) + "..." : firstLine;
+    return truncated + " [+]";
+  }
+  // Single-line prompt: truncate if needed
+  return prompt.length > maxLength ? prompt.slice(0, maxLength) + "..." : prompt;
+}
+
 /** Build a hint string (relative timestamp + connection status + optional prompt preview) for the interactive picker */
 export function buildRecordHint(r: SpawnRecord): string {
   const relative = formatRelativeTime(r.timestamp);
@@ -1516,7 +1541,7 @@ export function buildRecordHint(r: SpawnRecord): string {
   }
 
   if (r.prompt) {
-    const preview = r.prompt.length > 30 ? r.prompt.slice(0, 30) + "..." : r.prompt;
+    const preview = formatPromptForDisplay(r.prompt, 30);
     parts.push(`--prompt "${preview}"`);
   }
 
