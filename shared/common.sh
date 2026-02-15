@@ -1878,12 +1878,14 @@ ssh_verify_connectivity() {
 # Usage: _extract_json_field JSON_STRING PYTHON_EXPR [DEFAULT]
 # The Python expression receives 'd' as the parsed JSON dict.
 # Returns DEFAULT (or empty string) on parse failure.
+# SECURITY: Python expression is passed via sys.argv instead of string interpolation
+# to prevent code injection if this pattern is ever extended to user-controlled input.
 _extract_json_field() {
     local json="${1}"
     local py_expr="${2}"
     local default="${3:-}"
 
-    printf '%s' "${json}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${py_expr})" 2>/dev/null || echo "${default}"
+    printf '%s' "${json}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(eval(sys.argv[1]))" "${py_expr}" 2>/dev/null || echo "${default}"
 }
 
 # Extract an error message from a JSON API response.
