@@ -70,11 +70,11 @@ if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
 
     # Execute without -tty flag
-    sprite exec -s "${SPRITE_NAME}" -- bash -c "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; claude -p ${escaped_prompt}"
+    sprite exec -s "${SPRITE_NAME}" -- bash -c "source ~/.bashrc 2>/dev/null; export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; claude -p ${escaped_prompt}"
 else
     # Interactive mode: start Claude Code normally
     log_step "Starting Claude Code..."
     sleep 1
     clear 2>/dev/null || true
-    sprite exec -s "${SPRITE_NAME}" -tty -- bash -c 'export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
+    sprite exec -s "${SPRITE_NAME}" -tty -- bash -c 'source ~/.bashrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
 fi
