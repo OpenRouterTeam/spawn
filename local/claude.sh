@@ -61,14 +61,16 @@ echo ""
 # 6. Start Claude Code
 if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     log_step "Executing Claude Code with prompt..."
-    export PATH="${HOME}/.local/bin:${PATH}"
+    export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"
+    source ~/.bashrc 2>/dev/null || true
     source ~/.zshrc 2>/dev/null || true
     claude -p "${SPAWN_PROMPT}"
 else
     log_step "Starting Claude Code..."
     sleep 1
     clear 2>/dev/null || true
-    export PATH="${HOME}/.local/bin:${PATH}"
+    export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"
+    source ~/.bashrc 2>/dev/null || true
     source ~/.zshrc 2>/dev/null || true
     exec claude
 fi
