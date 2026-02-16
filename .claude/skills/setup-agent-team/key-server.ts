@@ -372,6 +372,13 @@ const server = Bun.serve({
       const skipped: string[] = [];
 
       for (const pk of body.providers as string[]) {
+        // SECURITY: Validate provider name to prevent path traversal attacks
+        // (CWE-22). Provider names must match the safe pattern before being
+        // used in filesystem operations via saveKeys().
+        if (!SAFE_PROVIDER_RE.test(pk)) {
+          continue; // Skip invalid provider names silently
+        }
+
         if (
           d.batches.some(
             (b) =>
