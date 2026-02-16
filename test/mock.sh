@@ -240,6 +240,155 @@ MOCK
     chmod +x "${TEST_DIR}/ssh-keygen"
 }
 
+# Create the jq mock script (python3-based for compatibility)
+_create_jq_mock() {
+    cat > "${TEST_DIR}/jq_impl.py" << 'PYTHON_SCRIPT'
+#!/usr/bin/env python3
+import sys
+import json
+import re
+
+def parse_args():
+    """Parse jq command-line arguments."""
+    filter_expr = '.'
+    args_dict = {}
+    input_mode = 'json'
+    output_mode = 'json'
+
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg == '-r' or arg == '--raw-output':
+            output_mode = 'raw'
+        elif arg == '-s' or arg == '--slurp':
+            input_mode = 'slurp'
+        elif arg == '-e' or arg == '--exit-status':
+            output_mode = 'exit'
+        elif arg == '-n' or arg == '--null-input':
+            input_mode = 'null'
+        elif arg == '-c' or arg == '--compact-output':
+            output_mode = 'compact'
+        elif arg == '--arg':
+            i += 1
+            if i < len(sys.argv) - 1:
+                key = sys.argv[i]
+                i += 1
+                value = sys.argv[i]
+                args_dict[key] = value
+        elif arg == '--argjson':
+            i += 1
+            if i < len(sys.argv) - 1:
+                key = sys.argv[i]
+                i += 1
+                try:
+                    args_dict[key] = json.loads(sys.argv[i])
+                except json.JSONDecodeError:
+                    sys.stderr.write(f'jq: invalid JSON in --argjson {key}\n')
+                    sys.exit(1)
+        elif not arg.startswith('-'):
+            filter_expr = arg
+        i += 1
+
+    return filter_expr, args_dict, input_mode, output_mode
+
+def apply_filter(data, filter_expr, args_dict):
+    """Apply a simplified jq filter expression."""
+    # Handle special cases
+    if filter_expr == '.':
+        return data
+
+    # Handle chained filters like .[0].id
+    # Parse the filter into parts
+    result = data
+    remaining = filter_expr
+
+    while remaining:
+        if remaining == '.':
+            break
+        elif remaining.startswith('.'):
+            # Remove the dot
+            remaining = remaining[1:]
+
+            # Check if next part is an array access
+            if remaining.startswith('['):
+                # Array access like [0]
+                close_bracket = remaining.index(']')
+                idx_str = remaining[1:close_bracket]
+                try:
+                    idx = int(idx_str)
+                    result = result[idx] if isinstance(result, list) else None
+                except (ValueError, IndexError, TypeError):
+                    return None
+                remaining = remaining[close_bracket+1:]
+            else:
+                # Property access like .name or .user
+                # Find the next delimiter (. or [ or end of string)
+                next_dot = remaining.find('.')
+                next_bracket = remaining.find('[')
+
+                if next_dot == -1 and next_bracket == -1:
+                    # Last property
+                    part = remaining
+                    remaining = ''
+                elif next_dot != -1 and (next_bracket == -1 or next_dot < next_bracket):
+                    part = remaining[:next_dot]
+                    remaining = '.' + remaining[next_dot+1:]
+                elif next_bracket != -1:
+                    part = remaining[:next_bracket]
+                    remaining = remaining[next_bracket:]
+                else:
+                    part = remaining
+                    remaining = ''
+
+                if part and result is not None:
+                    result = result.get(part) if isinstance(result, dict) else None
+        else:
+            break
+
+    return result
+
+# Main
+try:
+    filter_expr, args_dict, input_mode, output_mode = parse_args()
+
+    # Read input
+    if input_mode == 'null':
+        data = None
+    else:
+        try:
+            if input_mode == 'slurp':
+                data = [json.loads(line) for line in sys.stdin if line.strip()]
+            else:
+                content = sys.stdin.read()
+                data = json.loads(content) if content.strip() else None
+        except json.JSONDecodeError as e:
+            sys.stderr.write(f'jq: parse error: {e}\n')
+            sys.exit(1)
+
+    # Apply filter
+    result = apply_filter(data, filter_expr, args_dict)
+
+    # Output result
+    if output_mode == 'raw' and isinstance(result, str):
+        print(result, end='')
+    elif output_mode == 'compact':
+        print(json.dumps(result, separators=(',', ':')))
+    else:
+        print(json.dumps(result, separators=(',', ':')))
+
+except Exception as e:
+    sys.stderr.write(f'jq: error: {e}\n')
+    sys.exit(1)
+PYTHON_SCRIPT
+
+    cat > "${TEST_DIR}/jq" << 'MOCK'
+#!/bin/bash
+# Mock jq implementation using python3
+python3 "$(dirname "$0")/jq_impl.py" "$@"
+MOCK
+    chmod +x "${TEST_DIR}/jq" "${TEST_DIR}/jq_impl.py"
+}
+
 setup_mock_agents() {
     # Agent binaries
     _create_logging_mock claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q
@@ -252,6 +401,9 @@ setup_mock_agents() {
 
     # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
     _create_ssh_keygen_mock
+
+    # Mock 'jq' — python3-based implementation for cloud API testing
+    _create_jq_mock
 }
 
 setup_fake_home() {
