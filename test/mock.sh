@@ -20,6 +20,10 @@ FIXTURES_DIR="${REPO_ROOT}/test/fixtures"
 TEST_DIR=$(mktemp -d)
 MOCK_LOG="${TEST_DIR}/mock_calls.log"
 
+# Source shared mock infrastructure functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/mock-shared.sh"
+
 # Colors (respect NO_COLOR standard: https://no-color.org/)
 if [[ -n "${NO_COLOR:-}" ]]; then
     RED='' GREEN='' YELLOW='' CYAN='' NC=''
@@ -271,8 +275,11 @@ setup_fake_home() {
 # Cloud API helpers (for use by test infra tests)
 # ============================================================
 
-# Strip API base URL to get just the endpoint path.
-# Used by test/test-infra-sync.test.ts to validate cloud coverage.
+# Note: _strip_api_base, _get_required_fields, and _validate_body
+# are now sourced from mock-shared.sh
+
+# Strip API base URL using simple pattern replacement
+# Used by test/test-infra-sync.test.ts to validate cloud coverage
 _strip_simple_base() {
     local url="$1" pattern="$2"
     echo "$url" | sed "s|${pattern}||"
@@ -281,67 +288,6 @@ _strip_simple_base() {
 _strip_pattern_base() {
     local url="$1" sed_pattern="$2"
     echo "$url" | sed "$sed_pattern"
-}
-
-
-_strip_api_base() {
-    local url="$1"
-    local endpoint="$url"
-
-    case "$url" in
-        https://api.hetzner.cloud/v1*)
-            endpoint="${url#https://api.hetzner.cloud/v1}" ;;
-        https://api.digitalocean.com/v2*)
-            endpoint="${url#https://api.digitalocean.com/v2}" ;;
-        *eu.api.ovh.com*)
-            endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
-    esac
-
-    echo "$endpoint" | sed 's|?.*||'
-}
-
-# Get required POST body fields for a cloud endpoint.
-_get_required_fields() {
-    local cloud="$1"
-    local endpoint="$2"
-
-    case "${cloud}:${endpoint}" in
-        hetzner:/servers) echo "name server_type image location" ;;
-        digitalocean:/droplets) echo "name region size image" ;;
-        ovh:*/create) echo "name" ;;
-    esac
-}
-
-# Validate POST request body contains required fields for major clouds.
-# Used during mock script execution to catch invalid API requests.
-# Args: cloud method endpoint body
-_validate_body() {
-    local cloud="$1"
-    local method="$2"
-    local endpoint="$3"
-    local body="$4"
-
-    [[ "$method" != "POST" ]] && return 0
-    [[ -z "$body" ]] && return 0
-
-    local required_fields
-    required_fields=$(_get_required_fields "$cloud" "$endpoint")
-    [[ -z "$required_fields" ]] && return 0
-
-    # Check if body is valid JSON
-    if ! printf '%s' "$body" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
-        echo "BODY_ERROR:invalid_json:${endpoint}" >> "${MOCK_LOG}"
-        return 1
-    fi
-
-    # Check for required fields
-    for field in $required_fields; do
-        if ! printf '%s' "$body" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
-            echo "BODY_ERROR:missing_field:${field}:${endpoint}" >> "${MOCK_LOG}"
-        fi
-    done
-
-    return 0
 }
 
 # ============================================================
@@ -637,6 +583,16 @@ printf '%b\n' "${CYAN}===============================${NC}"
 printf '%b\n' "${CYAN} Spawn Mock Test Suite${NC}"
 printf '%b\n' "${CYAN}===============================${NC}"
 printf '\n'
+
+# Check Python 3 availability (required for JSON validation)
+if ! command -v python3 &>/dev/null; then
+    printf '%b\n' "${RED}ERROR: Python 3 is required for mock tests${NC}"
+    printf '%b\n' "${YELLOW}Install Python 3:${NC}"
+    printf '  Ubuntu/Debian: sudo apt-get install -y python3\n'
+    printf '  Fedora/RHEL:   sudo dnf install -y python3\n'
+    printf '  macOS:         brew install python3\n'
+    exit 1
+fi
 
 # Parse arguments
 FILTER_CLOUD="${1:-}"

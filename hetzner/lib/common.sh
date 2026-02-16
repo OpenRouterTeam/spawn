@@ -1,6 +1,10 @@
 #!/bin/bash
 set -eo pipefail
 # Common bash functions for Hetzner Cloud spawn scripts
+#
+# Dependencies:
+#   - jq: Required for JSON parsing (auto-installed via ensure_jq from shared/common.sh)
+#   - All functions that parse JSON call ensure_jq before using jq
 
 # ============================================================
 # Provider-agnostic functions
