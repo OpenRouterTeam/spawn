@@ -22,7 +22,7 @@ function detectTerm(env: Record<string, string>): string {
   `;
   const result = execSync(`bun -e '${script}'`, {
     cwd: CLI_DIR,
-    env: { ...env, PATH: process.env.PATH, HOME: process.env.HOME },
+    env: { ...env, PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
     encoding: "utf-8",
     timeout: 5000,
   });
@@ -104,7 +104,7 @@ describe("unicode-detect", () => {
       `;
       const result = execSync(`bun -e '${script}'`, {
         cwd: CLI_DIR,
-        env: { TERM: "xterm-256color", PATH: process.env.PATH, HOME: process.env.HOME },
+        env: { TERM: "xterm-256color", PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
         encoding: "utf-8",
         timeout: 5000,
       });
@@ -118,7 +118,7 @@ describe("unicode-detect", () => {
       `;
       const result = execSync(`bun -e '${script}'`, {
         cwd: CLI_DIR,
-        env: { TERM: "xterm-256color", LANG: "fr_FR.UTF-8", PATH: process.env.PATH, HOME: process.env.HOME },
+        env: { TERM: "xterm-256color", LANG: "fr_FR.UTF-8", PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
         encoding: "utf-8",
         timeout: 5000,
       });
@@ -132,7 +132,7 @@ describe("unicode-detect", () => {
       `;
       const result = execSync(`bun -e '${script}'`, {
         cwd: CLI_DIR,
-        env: { TERM: "xterm-256color", LANG: "C", PATH: process.env.PATH, HOME: process.env.HOME },
+        env: { TERM: "xterm-256color", LANG: "C", PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
         encoding: "utf-8",
         timeout: 5000,
       });
@@ -151,7 +151,7 @@ describe("unicode-detect", () => {
         env: {
           TERM: "xterm-256color",
           SPAWN_DEBUG: "1",
-          PATH: process.env.PATH,
+          PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`,
           HOME: process.env.HOME,
         },
         encoding: "utf-8",
@@ -170,7 +170,7 @@ describe("unicode-detect", () => {
       // Capture both stdout and stderr
       const result = execSync(`bun -e '${script}' 2>&1`, {
         cwd: CLI_DIR,
-        env: { TERM: "xterm-256color", PATH: process.env.PATH, HOME: process.env.HOME },
+        env: { TERM: "xterm-256color", PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
         encoding: "utf-8",
         timeout: 5000,
       });

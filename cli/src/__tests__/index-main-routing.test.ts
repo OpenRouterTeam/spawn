@@ -36,6 +36,8 @@ function runCli(
         // Prevent local manifest.json from being used
         NODE_ENV: "test",
         BUN_ENV: "test",
+        // Ensure bun is available in PATH for subprocess
+        PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`,
       },
       encoding: "utf-8",
       timeout: 15000,
