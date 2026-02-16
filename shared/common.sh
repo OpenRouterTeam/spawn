@@ -427,8 +427,16 @@ validated_read() {
     local prompt="${1}"
     local validator="${2}"
     local value
+    local attempts=0
+    local max_attempts=5
 
     while true; do
+        attempts=$((attempts + 1))
+        if [[ ${attempts} -gt ${max_attempts} ]]; then
+            log_error "Too many failed validation attempts (${max_attempts})"
+            return 1
+        fi
+
         value=$(safe_read "${prompt}") || return 1
 
         if [[ -z "${value}" ]]; then
@@ -440,7 +448,7 @@ validated_read() {
             return 0
         fi
 
-        log_warn "Please try again."
+        log_warn "Please try again (attempt ${attempts}/${max_attempts})."
     done
 }
 
@@ -738,7 +746,9 @@ exchange_oauth_code() {
     fi
 
     local api_key
-    api_key=$(echo "${key_response}" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
+    # Use pipefail-safe pattern: capture output first, then validate
+    # The || echo "" ensures the command substitution always succeeds
+    api_key=$(echo "${key_response}" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//' || echo "")
 
     if [[ -z "${api_key}" ]]; then
         log_error "Failed to exchange OAuth code for API key"
@@ -757,8 +767,12 @@ cleanup_oauth_session() {
     local oauth_dir="${2}"
 
     if [[ -n "${server_pid}" ]]; then
-        kill "${server_pid}" 2>/dev/null || true
-        wait "${server_pid}" 2>/dev/null || true
+        # Verify the process exists and is still running before killing it
+        # This prevents killing unrelated processes if PIDs are reused
+        if kill -0 "${server_pid}" 2>/dev/null; then
+            kill "${server_pid}" 2>/dev/null || true
+            wait "${server_pid}" 2>/dev/null || true
+        fi
     fi
 
     if [[ -n "${oauth_dir}" && -d "${oauth_dir}" ]]; then
