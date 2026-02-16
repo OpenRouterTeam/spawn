@@ -2089,10 +2089,22 @@ ssh_verify_connectivity() {
 # Usage: _extract_json_field JSON_STRING PYTHON_EXPR [DEFAULT]
 # The Python expression receives 'd' as the parsed JSON dict.
 # Returns DEFAULT (or empty string) on parse failure.
+#
+# SECURITY: This function executes the provided Python expression via string interpolation.
+# It is currently only called with hardcoded expressions from trusted code, but includes
+# basic validation as defense-in-depth against accidental misuse.
 _extract_json_field() {
     local json="${1}"
     local py_expr="${2}"
     local default="${3:-}"
+
+    # SECURITY: Block obviously malicious patterns
+    # Note: This is defense-in-depth, not a comprehensive sandbox. All call sites should use hardcoded expressions.
+    if [[ "${py_expr}" =~ (os\.|sys\.|subprocess|__import__|exec|eval|compile|open\(|popen) ]]; then
+        log_error "SECURITY: Rejected potentially malicious Python expression in _extract_json_field"
+        echo "${default}"
+        return 1
+    fi
 
     printf '%s' "${json}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${py_expr})" 2>/dev/null || echo "${default}"
 }
@@ -2657,6 +2669,11 @@ upload_config_file() {
 #     "run_sprite $SPRITE_NAME"
 
 # Generate Claude Code settings.json with API key
+#
+# SECURITY NOTE: This configuration includes "dangerouslySkipPermissions": true, which bypasses
+# permission prompts and allows Claude Code to run any command without user approval. This is
+# INTENTIONAL for Spawn's use case (ephemeral cloud VMs with disposable credentials and no
+# sensitive data). DO NOT use this setting on personal workstations or production environments.
 _generate_claude_code_settings() {
     local openrouter_key="${1}"
     local escaped_key
