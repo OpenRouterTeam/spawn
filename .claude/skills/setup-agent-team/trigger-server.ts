@@ -244,6 +244,51 @@ async function drainStreamOutput(
 }
 
 /**
+ * Validate the reason query parameter against allowed values.
+ * Returns [isValid, errorMessage].
+ */
+function validateReason(reason: string): [boolean, string?] {
+  if (!VALID_REASONS.has(reason)) {
+    return [false, `invalid reason`];
+  }
+  return [true];
+}
+
+/**
+ * Validate the issue query parameter (must be positive integer, max 10 digits).
+ * Returns [isValid, errorMessage].
+ */
+function validateIssue(issue: string): [boolean, string?] {
+  if (issue && (!/^\d+$/.test(issue) || issue.length > 10)) {
+    return [false, "issue must be a positive integer (max 10 digits)"];
+  }
+  return [true];
+}
+
+/**
+ * Check if a run for the same issue is already in progress.
+ * Returns the duplicate RunEntry if found, undefined otherwise.
+ */
+function findDuplicateIssueRun(issue: string): RunEntry | undefined {
+  if (!issue) return undefined;
+  for (const [, run] of runs) {
+    if (run.issue === issue) return run;
+  }
+  return undefined;
+}
+
+/**
+ * Check if a non-issue run with the same reason is already in progress.
+ * Returns the duplicate RunEntry if found, undefined otherwise.
+ */
+function findDuplicateReasonRun(reason: string): RunEntry | undefined {
+  for (const [, run] of runs) {
+    if (!run.issue && run.reason === reason) return run;
+  }
+  return undefined;
+}
+
+/**
  * Spawn the target script and return a streaming Response.
  *
  * stdout/stderr are piped back as chunked text/plain. A heartbeat line
@@ -421,54 +466,44 @@ const server = Bun.serve({
       }
 
       const reason = url.searchParams.get("reason") ?? "manual";
-      if (!VALID_REASONS.has(reason)) {
+      const [reasonValid, reasonErr] = validateReason(reason);
+      if (!reasonValid) {
         return Response.json(
-          { error: "invalid reason", allowed: Array.from(VALID_REASONS) },
+          { error: reasonErr, allowed: Array.from(VALID_REASONS) },
           { status: 400 }
         );
       }
-      const issue = url.searchParams.get("issue") ?? "";
 
-      // Validate issue is a positive integer with reasonable bounds (prevents injection
-      // into shell commands and path traversal via absurdly long numbers in worktree paths).
-      // Digits-only regex is the primary defense; length cap is defense-in-depth.
-      if (issue && (!/^\d+$/.test(issue) || issue.length > 10)) {
-        return Response.json(
-          { error: "issue must be a positive integer (max 10 digits)" },
-          { status: 400 }
-        );
+      const issue = url.searchParams.get("issue") ?? "";
+      const [issueValid, issueErr] = validateIssue(issue);
+      if (!issueValid) {
+        return Response.json({ error: issueErr }, { status: 400 });
       }
 
       // Dedup: reject if a run for the same issue is already in progress
-      if (issue) {
-        for (const [, run] of runs) {
-          if (run.issue === issue) {
-            return Response.json(
-              {
-                error: "run for this issue already in progress",
-                issue,
-                running: runs.size,
-              },
-              { status: 409 }
-            );
-          }
-        }
+      const duplicateIssue = findDuplicateIssueRun(issue);
+      if (duplicateIssue) {
+        return Response.json(
+          {
+            error: "run for this issue already in progress",
+            issue,
+            running: runs.size,
+          },
+          { status: 409 }
+        );
       }
 
       // Dedup: reject if a non-issue run with the same reason is already in progress
-      if (!issue) {
-        for (const [, run] of runs) {
-          if (!run.issue && run.reason === reason) {
-            return Response.json(
-              {
-                error: "run with this reason already in progress",
-                reason,
-                running: runs.size,
-              },
-              { status: 409 }
-            );
-          }
-        }
+      const duplicateReason = findDuplicateReasonRun(reason);
+      if (duplicateReason) {
+        return Response.json(
+          {
+            error: "run with this reason already in progress",
+            reason,
+            running: runs.size,
+          },
+          { status: 409 }
+        );
       }
 
       // Disable idle timeout for this request — the stream may be silent for
