@@ -289,6 +289,24 @@ async function validateAndGetEntity(value: string, kind: "agent" | "cloud"): Pro
   return [manifest, value];
 }
 
+function logAlternativeCloudSuggestions(agent: string, agentName: string, availableClouds: string[], manifest: Manifest): void {
+  const { sortedClouds, credCount } = prioritizeCloudsByCredentials(availableClouds, manifest);
+  const examples = sortedClouds.slice(0, 3).map((c) => {
+    const hasCredsMarker = hasCloudCredentials(manifest.clouds[c].auth) ? " (ready)" : "";
+    return `spawn ${agent} ${c}${hasCredsMarker}`;
+  });
+  p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these instead:`);
+  for (const cmd of examples) {
+    p.log.info(`  ${pc.cyan(cmd)}`);
+  }
+  if (availableClouds.length > 3) {
+    p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
+  }
+  if (credCount > 0) {
+    p.log.info(`${pc.green("ready")} = credentials already set`);
+  }
+}
+
 function validateImplementation(manifest: Manifest, cloud: string, agent: string): void {
   const status = matrixStatus(manifest, cloud, agent);
   if (status !== "implemented") {
@@ -298,22 +316,7 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
 
     const availableClouds = getImplementedClouds(manifest, agent);
     if (availableClouds.length > 0) {
-      // Prioritize clouds where the user already has credentials
-      const { sortedClouds, credCount } = prioritizeCloudsByCredentials(availableClouds, manifest);
-      const examples = sortedClouds.slice(0, 3).map((c) => {
-        const hasCredsMarker = hasCloudCredentials(manifest.clouds[c].auth) ? " (ready)" : "";
-        return `spawn ${agent} ${c}${hasCredsMarker}`;
-      });
-      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these instead:`);
-      for (const cmd of examples) {
-        p.log.info(`  ${pc.cyan(cmd)}`);
-      }
-      if (availableClouds.length > 3) {
-        p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
-      }
-      if (credCount > 0) {
-        p.log.info(`${pc.green("ready")} = credentials already set`);
-      }
+      logAlternativeCloudSuggestions(agent, agentName, availableClouds, manifest);
     } else {
       p.log.info(`This agent has no implemented cloud providers yet.`);
       p.log.info(`Run ${pc.cyan("spawn matrix")} to see the full availability matrix.`);
@@ -858,19 +861,14 @@ function reportDownloadError(ghUrl: string, err: unknown): never {
 /** Check which required env vars are set vs missing and return specific hints */
 export function credentialHints(cloud: string, authHint?: string, verb = "Missing or invalid"): string[] {
   if (!authHint) {
-    return [
-      `  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`,
-    ];
+    return [`  - ${verb} credentials (run ${pc.cyan(`spawn ${cloud}`)} for setup)`];
   }
 
-  // Parse individual env var names from the auth hint (e.g. "HCLOUD_TOKEN" or "UPCLOUD_USERNAME + UPCLOUD_PASSWORD")
   const authVars = authHint.split(/\s*\+\s*/).map(s => s.trim()).filter(Boolean);
   const allVars = [...authVars, "OPENROUTER_API_KEY"];
-
   const missing = allVars.filter(v => !process.env[v]);
 
   if (missing.length === 0) {
-    // All credentials are set -- the issue is likely something else
     return [
       `  - Credentials appear to be set (${allVars.map(v => pc.cyan(v)).join(", ")})`,
       `    The error may be due to invalid or expired credentials`,
@@ -878,15 +876,11 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
     ];
   }
 
-  // Show which specific vars are missing
-  const lines: string[] = [];
-  lines.push(`  - Missing credentials:`);
-  for (const v of missing) {
-    lines.push(`      ${pc.cyan(v)} -- not set`);
-  }
-  lines.push(`    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`);
-
-  return lines;
+  return [
+    `  - Missing credentials:`,
+    ...missing.map(v => `      ${pc.cyan(v)} -- not set`),
+    `    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`,
+  ];
 }
 
 function buildDashboardHint(dashboardUrl?: string): string {
@@ -1262,22 +1256,16 @@ function buildCompactListSeparator(): string {
 function buildCompactListRow(manifest: Manifest, agent: string, clouds: string[]): string {
   const implClouds = getImplementedClouds(manifest, agent);
   const missing = getMissingClouds(manifest, agent, clouds);
+  const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+
+  const agentName = pc.bold(manifest.agents[agent].name.padEnd(COMPACT_NAME_WIDTH));
   const countStr = `${implClouds.length}/${clouds.length}`;
   const colorFn = implClouds.length === clouds.length ? pc.green : pc.yellow;
-  const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
-  const readyStr = readyCount > 0 ? pc.green(`${readyCount}`) : pc.dim("0");
+  const countDisplay = colorFn(countStr.padEnd(COMPACT_COUNT_WIDTH));
+  const readyDisplay = (readyCount > 0 ? pc.green(`${readyCount}`) : pc.dim("0")) + " ".repeat(COMPACT_READY_WIDTH - String(readyCount).length);
+  const statusDisplay = missing.length === 0 ? pc.green("-- all clouds supported") : pc.dim(missing.map((c) => manifest.clouds[c].name).join(", "));
 
-  let line = pc.bold(manifest.agents[agent].name.padEnd(COMPACT_NAME_WIDTH));
-  line += colorFn(countStr.padEnd(COMPACT_COUNT_WIDTH));
-  line += readyStr + " ".repeat(COMPACT_READY_WIDTH - String(readyCount).length);
-
-  if (missing.length === 0) {
-    line += pc.green("-- all clouds supported");
-  } else {
-    line += pc.dim(missing.map((c) => manifest.clouds[c].name).join(", "));
-  }
-
-  return line;
+  return agentName + countDisplay + readyDisplay + statusDisplay;
 }
 
 function renderCompactList(manifest: Manifest, agents: string[], clouds: string[]): void {
