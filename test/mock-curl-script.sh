@@ -2,6 +2,13 @@
 # Mock curl — returns fixture data based on URL
 # Env vars from parent: MOCK_LOG, MOCK_FIXTURE_DIR, MOCK_CLOUD
 
+# Check for python3 availability (required for JSON validation)
+if ! command -v python3 &>/dev/null; then
+    echo "ERROR: python3 is required for mock tests but not found in PATH" >&2
+    echo "Install python3 and try again" >&2
+    exit 127
+fi
+
 # --- Helper functions ---
 
 _parse_args() {
