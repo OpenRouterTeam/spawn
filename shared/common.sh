@@ -2907,13 +2907,22 @@ save_vm_connection() {
 
     local conn_file="${spawn_dir}/last-connection.json"
 
+    # SECURITY: Use json_escape to prevent JSON injection attacks.
+    # Even though upstream validation restricts server_name to alphanumeric+dash,
+    # defense-in-depth requires proper escaping at the point of JSON construction.
+    local escaped_ip escaped_user escaped_server_id escaped_server_name
+    escaped_ip=$(json_escape "${ip}")
+    escaped_user=$(json_escape "${user}")
+
     # Build JSON (handle optional fields)
-    local json="{\"ip\":\"${ip}\",\"user\":\"${user}\""
+    local json="{\"ip\":${escaped_ip},\"user\":${escaped_user}"
     if [[ -n "${server_id}" ]]; then
-        json="${json},\"server_id\":\"${server_id}\""
+        escaped_server_id=$(json_escape "${server_id}")
+        json="${json},\"server_id\":${escaped_server_id}"
     fi
     if [[ -n "${server_name}" ]]; then
-        json="${json},\"server_name\":\"${server_name}\""
+        escaped_server_name=$(json_escape "${server_name}")
+        json="${json},\"server_name\":${escaped_server_name}"
     fi
     json="${json}}"
 
