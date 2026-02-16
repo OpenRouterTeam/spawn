@@ -16,8 +16,12 @@ const IDENTIFIER_PATTERN = /^[a-z0-9_-]+$/;
  * @throws Error if validation fails
  */
 export function validateIdentifier(identifier: string, fieldName: string): void {
+  const isAgent = fieldName.toLowerCase().includes("agent");
+  const listCmd = isAgent ? "spawn agents" : "spawn clouds";
+  const entityType = isAgent ? "agent" : "cloud provider";
+  const capitalizedType = entityType.charAt(0).toUpperCase() + entityType.slice(1);
+
   if (!identifier || identifier.trim() === "") {
-    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
     throw new Error(
       `${fieldName} is required but was not provided.\n\n` +
       `Run '${listCmd}' to see all available options.`
@@ -26,11 +30,9 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 
   // Check length constraints (prevent DoS via extremely long identifiers)
   if (identifier.length > 64) {
-    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
-    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `${fieldName} is too long (${identifier.length} characters, maximum is 64).\n\n` +
-      `This looks unusual. ${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names are typically short identifiers.\n\n` +
+      `This looks unusual. ${capitalizedType} names are typically short identifiers.\n\n` +
       `Did you accidentally paste something else? Check that you're using the correct ${entityType} name.\n\n` +
       `To see all available ${entityType}s, run: ${listCmd}`
     );
@@ -38,11 +40,9 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 
   // Allowlist validation: only safe characters
   if (!IDENTIFIER_PATTERN.test(identifier)) {
-    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
-    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
-      `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names can only contain:\n` +
+      `${capitalizedType} names can only contain:\n` +
       `  • Lowercase letters (a-z)\n` +
       `  • Numbers (0-9)\n` +
       `  • Hyphens (-) and underscores (_)\n\n` +
@@ -56,15 +56,13 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
 
   // Prevent path traversal patterns (defense in depth)
   if (identifier.includes("..") || identifier.includes("/") || identifier.includes("\\")) {
-    const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
-    const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
       `The name contains path-like characters that aren't allowed:\n` +
       `  • Forward slashes (/)\n` +
       `  • Backslashes (\\)\n` +
       `  • Parent directory references (..)\n\n` +
-      `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names must be simple identifiers without paths.\n\n` +
+      `${capitalizedType} names must be simple identifiers without paths.\n\n` +
       `To see all available ${entityType}s, run: ${listCmd}`
     );
   }
