@@ -1258,87 +1258,113 @@ verify_agent() {
 # The curl installer bundles its own runtime. npm/bun install a Node.js package
 # whose shebang needs 'node', so we ensure a node runtime exists after those.
 # Usage: install_claude_code RUN_CB
-install_claude_code() {
+_finalize_claude_install() {
     local run_cb="$1"
-    # Include fnm paths so node is found even in non-interactive SSH sessions
-    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/fnm:$PATH; if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi'
+    local claude_path="$2"
+    log_step "Setting up Claude Code shell integration..."
+    ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
+    # Write claude PATH to .bashrc and .zshrc
+    ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
+    # Ensure fnm bootstrap is in shell configs so new shells can find node
+    ${run_cb} "if command -v fnm >/dev/null 2>&1 || test -d \$HOME/.local/share/fnm; then for rc in ~/.bashrc ~/.zshrc; do grep -q 'fnm env' \"\$rc\" 2>/dev/null || printf '\\n# fnm (node version manager)\\nexport PATH=\"\$HOME/.local/share/fnm:\$PATH\"\\nif command -v fnm >/dev/null 2>&1; then eval \"\\\$(fnm env)\"; fi\\n' >> \"\$rc\"; done; fi" >/dev/null 2>&1 || true
+}
 
-    # Finalize: set up shell integration and persist PATH to .bashrc/.zshrc.
-    # Do NOT write to ~/.profile or ~/.bash_profile — it breaks shell init on Ubuntu.
-    _finalize_claude_install() {
-        log_step "Setting up Claude Code shell integration..."
-        ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
-        # Write claude PATH to .bashrc and .zshrc
-        ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
-        # Ensure fnm bootstrap is in shell configs so new shells can find node
-        ${run_cb} "if command -v fnm >/dev/null 2>&1 || test -d \$HOME/.local/share/fnm; then for rc in ~/.bashrc ~/.zshrc; do grep -q 'fnm env' \"\$rc\" 2>/dev/null || printf '\\n# fnm (node version manager)\\nexport PATH=\"\$HOME/.local/share/fnm:\$PATH\"\\nif command -v fnm >/dev/null 2>&1; then eval \"\\\$(fnm env)\"; fi\\n' >> \"\$rc\"; done; fi" >/dev/null 2>&1 || true
-    }
-
-    # Already installed?
-    if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
-        log_info "Claude Code already installed"
-        _finalize_claude_install
+_ensure_node_runtime() {
+    local run_cb="$1"
+    local claude_path="$2"
+    if ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
         return 0
     fi
+    log_step "Installing Node.js (required by Claude Code npm package)..."
+    if ${run_cb} "curl -fsSL https://fnm.vercel.app/install | bash && export PATH=\$HOME/.local/share/fnm:\$PATH && eval \"\$(fnm env)\" && fnm install --lts && fnm default lts-latest" 2>&1; then
+        log_info "Node.js installed via fnm"
+    elif ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" 2>&1; then
+        log_info "Node.js installed via nodesource"
+    else
+        log_warn "Could not install Node.js automatically"
+    fi
+}
 
-    # Method 1: official curl installer (standalone binary, no node needed)
+_try_curl_installer() {
+    local run_cb="$1"
+    local claude_path="$2"
     log_step "Installing Claude Code (method 1/3: curl installer)..."
     if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via curl installer"
-            _finalize_claude_install
+            _finalize_claude_install "$run_cb" "$claude_path"
             return 0
         fi
         log_warn "curl installer exited 0 but claude not found on PATH"
     else
         log_warn "curl installer failed (site may be temporarily unavailable)"
     fi
+    return 1
+}
 
-    # npm/bun installs produce a Node.js package — ensure 'node' exists BEFORE
-    # installing, since the claude binary is a Node.js script that needs 'node'.
-    # Tries fnm (platform-agnostic) first, falls back to nodesource (Debian/Ubuntu).
-    _ensure_node_runtime() {
-        if ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
-            return 0
-        fi
-        log_step "Installing Node.js (required by Claude Code npm package)..."
-        if ${run_cb} "curl -fsSL https://fnm.vercel.app/install | bash && export PATH=\$HOME/.local/share/fnm:\$PATH && eval \"\$(fnm env)\" && fnm install --lts && fnm default lts-latest" 2>&1; then
-            log_info "Node.js installed via fnm"
-        elif ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" 2>&1; then
-            log_info "Node.js installed via nodesource"
-        else
-            log_warn "Could not install Node.js automatically"
-        fi
-    }
-
-    # Ensure node is available before bun/npm methods
-    _ensure_node_runtime
-
-    # Method 2: bun (faster than npm, often pre-installed)
+_try_bun_installer() {
+    local run_cb="$1"
+    local claude_path="$2"
     log_step "Installing Claude Code (method 2/3: bun)..."
     if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via bun"
-            _finalize_claude_install
+            _finalize_claude_install "$run_cb" "$claude_path"
             return 0
         fi
         log_warn "bun install exited 0 but claude binary not working"
     else
         log_warn "bun install failed"
     fi
+    return 1
+}
 
-    # Method 3: npm
+_try_npm_installer() {
+    local run_cb="$1"
+    local claude_path="$2"
     log_step "Installing Claude Code (method 3/3: npm)..."
     if ${run_cb} "${claude_path} && npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via npm"
-            _finalize_claude_install
+            _finalize_claude_install "$run_cb" "$claude_path"
             return 0
         fi
         log_warn "npm install exited 0 but claude binary not working"
     else
         log_warn "npm install failed"
     fi
+    return 1
+}
+
+_is_claude_installed() {
+    local run_cb="$1"
+    local claude_path="$2"
+    ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1
+}
+
+install_claude_code() {
+    local run_cb="$1"
+    # Include fnm paths so node is found even in non-interactive SSH sessions
+    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/fnm:$PATH; if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi'
+
+    # Already installed?
+    if _is_claude_installed "$run_cb" "$claude_path"; then
+        log_info "Claude Code already installed"
+        _finalize_claude_install "$run_cb" "$claude_path"
+        return 0
+    fi
+
+    # Try method 1: official curl installer (standalone binary, no node needed)
+    _try_curl_installer "$run_cb" "$claude_path" && return 0
+
+    # Ensure node is available before bun/npm methods
+    _ensure_node_runtime "$run_cb" "$claude_path"
+
+    # Try method 2: bun (faster than npm, often pre-installed)
+    _try_bun_installer "$run_cb" "$claude_path" && return 0
+
+    # Try method 3: npm
+    _try_npm_installer "$run_cb" "$claude_path" && return 0
 
     # All methods failed
     log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash"
