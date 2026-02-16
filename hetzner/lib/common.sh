@@ -403,6 +403,16 @@ create_server() {
     # Extract server ID and IP
     HETZNER_SERVER_ID=$(printf '%s' "$response" | jq -r '.server.id')
     HETZNER_SERVER_IP=$(printf '%s' "$response" | jq -r '.server.public_net.ipv4.ip')
+    if [[ -z "$HETZNER_SERVER_ID" || "$HETZNER_SERVER_ID" == "null" ]]; then
+        log_error "Failed to extract server ID from API response"
+        log_error "Response: $response"
+        return 1
+    fi
+    if [[ -z "$HETZNER_SERVER_IP" || "$HETZNER_SERVER_IP" == "null" ]]; then
+        log_error "Failed to extract server IP from API response"
+        log_error "Response: $response"
+        return 1
+    fi
     export HETZNER_SERVER_ID HETZNER_SERVER_IP
 
     log_info "Server created: ID=$HETZNER_SERVER_ID, IP=$HETZNER_SERVER_IP"

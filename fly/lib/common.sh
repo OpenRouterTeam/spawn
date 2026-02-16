@@ -233,6 +233,11 @@ _fly_create_machine() {
     fi
 
     FLY_MACHINE_ID=$(_extract_json_field "$response" "d['id']")
+    if [[ -z "$FLY_MACHINE_ID" ]]; then
+        log_error "Failed to extract machine ID from API response"
+        log_error "Response: $response"
+        return 1
+    fi
     export FLY_MACHINE_ID FLY_APP_NAME="$name"
     log_info "Machine created: ID=$FLY_MACHINE_ID, App=$name"
 }
