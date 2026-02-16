@@ -1254,7 +1254,7 @@ verify_agent() {
 }
 
 # Install Claude Code with multi-method fallback and detailed error reporting.
-# Tries: 1) curl installer (standalone binary)  2) npm  3) bun
+# Tries: 1) curl installer (standalone binary)  2) bun  3) npm
 # The curl installer bundles its own runtime. npm/bun install a Node.js package
 # whose shebang needs 'node', so we ensure a node runtime exists after those.
 # Usage: install_claude_code RUN_CB
@@ -1263,6 +1263,11 @@ install_claude_code() {
     # Include fnm paths so node is found even in non-interactive SSH sessions
     local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/fnm:$PATH; if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi'
 
+    # Clean up ~/.bash_profile if it was created by a previous broken deployment.
+    # On Ubuntu, ~/.bash_profile doesn't exist by default. If present, bash -l
+    # sources it INSTEAD of ~/.profile, breaking the standard PATH setup.
+    ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
+
     # Finalize: set up shell integration and persist PATH to .bashrc/.zshrc.
     # Do NOT write to ~/.profile or ~/.bash_profile — it breaks shell init on Ubuntu.
     _finalize_claude_install() {
@@ -1270,8 +1275,6 @@ install_claude_code() {
         ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
         # Write claude PATH to .bashrc and .zshrc
         ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
-        # Ensure fnm bootstrap is in shell configs so new shells can find node
-        ${run_cb} "if command -v fnm >/dev/null 2>&1 || test -d \$HOME/.local/share/fnm; then for rc in ~/.bashrc ~/.zshrc; do grep -q 'fnm env' \"\$rc\" 2>/dev/null || printf '\\n# fnm (node version manager)\\nexport PATH=\"\$HOME/.local/share/fnm:\$PATH\"\\nif command -v fnm >/dev/null 2>&1; then eval \"\\\$(fnm env)\"; fi\\n' >> \"\$rc\"; done; fi" >/dev/null 2>&1 || true
     }
 
     # Already installed?
@@ -1311,10 +1314,7 @@ install_claude_code() {
         fi
     }
 
-    # Ensure node is available before bun/npm methods
-    _ensure_node_runtime
-
-    # Method 2: bun (faster than npm, often pre-installed)
+    # Method 2: bun (faster than npm, no node dependency)
     log_step "Installing Claude Code (method 2/3: bun)..."
     if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
@@ -1326,6 +1326,9 @@ install_claude_code() {
     else
         log_warn "bun install failed"
     fi
+
+    # Ensure node is available before npm method (bun doesn't need it)
+    _ensure_node_runtime
 
     # Method 3: npm
     log_step "Installing Claude Code (method 3/3: npm)..."
@@ -1534,10 +1537,9 @@ runcmd:
   # Mark as sandbox environment (disposable cloud VM)
   - echo 'export IS_SANDBOX=1' >> /root/.bashrc
   - echo 'export IS_SANDBOX=1' >> /root/.zshrc
-  # Configure PATH in .bashrc
-  - echo 'export PATH="${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
-  # Configure PATH in .zshrc
-  - echo 'export PATH="${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
+  # Configure PATH in .bashrc and .zshrc (include claude installer path)
+  - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
+  - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
   # Signal completion
   - touch /root/.cloud-init-complete
 CLOUD_INIT_EOF
