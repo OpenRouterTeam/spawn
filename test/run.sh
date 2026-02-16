@@ -213,7 +213,7 @@ _assert_agent_specific() {
     local script_name="$1"
     case "${script_name}" in
         claude)
-            assert_contains "${MOCK_LOG}" "sprite exec.*claude.*install" "Installs Claude Code"
+            assert_contains "${MOCK_LOG}" "sprite exec.*command -v claude" "Checks Claude Code installation"
             assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/.*spawn_config" "Uploads Claude config file"
             assert_contains "${MOCK_LOG}" "sprite exec.*mv.*settings.json" "Moves settings.json to final path"
             assert_contains "${MOCK_LOG}" "sprite exec.*mv.*\.claude\.json" "Moves .claude.json to final path"

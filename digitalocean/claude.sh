@@ -30,19 +30,9 @@ create_server "${DROPLET_NAME}"
 verify_server_connectivity "${DO_SERVER_IP}"
 wait_for_cloud_init "${DO_SERVER_IP}" 60
 
-# 5. Verify Claude Code is installed (fallback to manual install)
-log_step "Verifying Claude Code installation..."
-if ! run_server "${DO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
-    run_server "${DO_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
-fi
-
-# Verify installation succeeded
-if ! run_server "${DO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
-    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash" "${DO_SERVER_IP}"
-    exit 1
-fi
-log_info "Claude Code installation verified successfully"
+# 5. Install Claude Code (tries curl → npm → bun with clear logging)
+RUN="run_server ${DO_SERVER_IP}"
+install_claude_code "$RUN"
 
 # 6. Get OpenRouter API key
 echo ""

@@ -1230,7 +1230,8 @@ verify_agent() {
 # Usage: install_claude_code RUN_CB
 install_claude_code() {
     local run_cb="$1"
-    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+    # Include fnm paths so node is found even in non-interactive SSH sessions
+    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/fnm:$PATH; if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi'
 
     # Already installed?
     if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
@@ -1250,10 +1251,11 @@ install_claude_code() {
         log_warn "curl installer failed (site may be temporarily unavailable)"
     fi
 
-    # npm/bun installs produce a Node.js package — ensure 'node' exists.
+    # npm/bun installs produce a Node.js package — ensure 'node' exists BEFORE
+    # installing, since the claude binary is a Node.js script that needs 'node'.
     # Tries fnm (platform-agnostic) first, falls back to nodesource (Debian/Ubuntu).
     _ensure_node_runtime() {
-        if ${run_cb} "command -v node" >/dev/null 2>&1; then
+        if ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
             return 0
         fi
         log_step "Installing Node.js (required by Claude Code npm package)..."
@@ -1266,10 +1268,12 @@ install_claude_code() {
         fi
     }
 
+    # Ensure node is available before npm/bun methods
+    _ensure_node_runtime
+
     # Method 2: npm
     log_step "Installing Claude Code (method 2/3: npm)..."
-    if ${run_cb} "npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        _ensure_node_runtime
+    if ${run_cb} "${claude_path} && npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via npm"
             return 0
@@ -1282,7 +1286,6 @@ install_claude_code() {
     # Method 3: bun
     log_step "Installing Claude Code (method 3/3: bun)..."
     if ${run_cb} "${claude_path} && bun add -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        _ensure_node_runtime
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via bun"
             return 0
