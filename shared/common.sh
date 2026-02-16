@@ -1258,6 +1258,51 @@ verify_agent() {
 # The curl installer bundles its own runtime. npm/bun install a Node.js package
 # whose shebang needs 'node', so we ensure a node runtime exists after those.
 # Usage: install_claude_code RUN_CB
+# Finalize Claude Code installation (setup shell integration)
+_finalize_claude_install() {
+    local run_cb="$1"
+    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+    log_step "Setting up Claude Code shell integration..."
+    ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
+    ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
+}
+
+# Try installing Claude Code via curl
+_install_claude_curl() {
+    local run_cb="$1"
+    local claude_path="$2"
+    log_step "Installing Claude Code (method 1/2: curl installer)..."
+    if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
+        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
+            log_info "Claude Code installed via curl installer"
+            _finalize_claude_install "$run_cb"
+            return 0
+        fi
+        log_warn "curl installer exited 0 but claude not found on PATH"
+    else
+        log_warn "curl installer failed (site may be temporarily unavailable)"
+    fi
+    return 1
+}
+
+# Try installing Claude Code via bun
+_install_claude_bun() {
+    local run_cb="$1"
+    local claude_path="$2"
+    log_step "Installing Claude Code (method 2/2: bun)..."
+    if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
+        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
+            log_info "Claude Code installed via bun"
+            _finalize_claude_install "$run_cb"
+            return 0
+        fi
+        log_warn "bun install exited 0 but claude binary not found"
+    else
+        log_warn "bun install failed"
+    fi
+    return 1
+}
+
 install_claude_code() {
     local run_cb="$1"
     local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
@@ -1265,34 +1310,17 @@ install_claude_code() {
     # Clean up ~/.bash_profile if it was created by a previous broken deployment.
     ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
 
-    _finalize_claude_install() {
-        log_step "Setting up Claude Code shell integration..."
-        ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
-        # Write claude PATH to .bashrc and .zshrc
-        ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
-    }
-
     # Already installed?
     if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
         log_info "Claude Code already installed"
-        _finalize_claude_install
+        _finalize_claude_install "$run_cb"
         return 0
     fi
 
-    # Method 1: official curl installer (standalone binary, no node needed)
-    log_step "Installing Claude Code (method 1/2: curl installer)..."
-    if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
-            log_info "Claude Code installed via curl installer"
-            _finalize_claude_install
-            return 0
-        fi
-        log_warn "curl installer exited 0 but claude not found on PATH"
-    else
-        log_warn "curl installer failed (site may be temporarily unavailable)"
-    fi
+    # Try curl installer (no node needed)
+    _install_claude_curl "$run_cb" "$claude_path" && return 0
 
-    # Ensure Node.js runtime for bun-installed package (it's a Node.js script)
+    # Ensure Node.js runtime for bun-installed package
     if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
         log_step "Installing Node.js runtime (required for claude package)..."
         if ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" >/dev/null 2>&1; then
@@ -1302,18 +1330,8 @@ install_claude_code() {
         fi
     fi
 
-    # Method 2: bun
-    log_step "Installing Claude Code (method 2/2: bun)..."
-    if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
-            log_info "Claude Code installed via bun"
-            _finalize_claude_install
-            return 0
-        fi
-        log_warn "bun install exited 0 but claude binary not found"
-    else
-        log_warn "bun install failed"
-    fi
+    # Try bun installer
+    _install_claude_bun "$run_cb" "$claude_path" && return 0
 
     # All methods failed
     log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash"
@@ -2541,6 +2559,33 @@ _multi_creds_validate() {
         return 1
     fi
     return 0
+}
+
+# Parse credential specs into parallel arrays
+# Each spec is "ENV_VAR:config_key:Label"
+_parse_credential_specs() {
+    local -a env_vars config_keys labels
+    local spec
+    for spec in "$@"; do
+        env_vars+=("${spec%%:*}")
+        local rest="${spec#*:}"
+        config_keys+=("${rest%%:*}")
+        labels+=("${rest#*:}")
+    done
+    # Return arrays by printing them
+    printf '%s\n' "${env_vars[@]}"
+    printf '%s\n' "${config_keys[@]}"
+    printf '%s\n' "${labels[@]}"
+}
+
+# Build save arguments for config from env vars
+_build_cred_save_args() {
+    local -n cred_keys=$1
+    local -n cred_vars=$2
+    local idx
+    for idx in $(seq 0 $((${#cred_keys[@]} - 1))); do
+        printf '%s\0' "${cred_keys[$idx]}" "${!cred_vars[$idx]}"
+    done
 }
 
 # Generic multi-credential ensure function
