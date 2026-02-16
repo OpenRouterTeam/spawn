@@ -31,10 +31,11 @@ function runCli(
     .join(" ");
   const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
   try {
+    const home = process.env.HOME || "";
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,
       env: {
-        PATH: process.env.PATH,
+        PATH: `${home}/.bun/bin:${process.env.PATH}`,
         HOME: process.env.HOME,
         SHELL: process.env.SHELL,
         TERM: process.env.TERM || "xterm",

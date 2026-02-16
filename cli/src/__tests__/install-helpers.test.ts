@@ -113,8 +113,9 @@ ensure_in_path() {
 ${script}
 `;
 
+  const home = process.env.HOME || "";
   const defaultEnv: Record<string, string> = {
-    PATH: process.env.PATH || "/usr/bin:/bin",
+    PATH: `${home}/.bun/bin:${process.env.PATH || "/usr/bin:/bin"}`,
     HOME: env?.HOME || "/tmp/test-home",
     SHELL: env?.SHELL || "/bin/bash",
   };

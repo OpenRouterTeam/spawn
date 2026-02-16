@@ -20,9 +20,10 @@ function detectTerm(env: Record<string, string>): string {
     import "./src/unicode-detect.ts";
     console.log(process.env.TERM);
   `;
+  const home = process.env.HOME || "";
   const result = execSync(`bun -e '${script}'`, {
     cwd: CLI_DIR,
-    env: { ...env, PATH: process.env.PATH, HOME: process.env.HOME },
+    env: { ...env, PATH: `${home}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
     encoding: "utf-8",
     timeout: 5000,
   });
@@ -102,9 +103,10 @@ describe("unicode-detect", () => {
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG ?? "undefined");
       `;
+      const home = process.env.HOME || "";
       const result = execSync(`bun -e '${script}'`, {
         cwd: CLI_DIR,
-        env: { TERM: "xterm-256color", PATH: process.env.PATH, HOME: process.env.HOME },
+        env: { TERM: "xterm-256color", PATH: `${home}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
         encoding: "utf-8",
         timeout: 5000,
       });
@@ -116,9 +118,10 @@ describe("unicode-detect", () => {
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG);
       `;
+      const home = process.env.HOME || "";
       const result = execSync(`bun -e '${script}'`, {
         cwd: CLI_DIR,
-        env: { TERM: "xterm-256color", LANG: "fr_FR.UTF-8", PATH: process.env.PATH, HOME: process.env.HOME },
+        env: { TERM: "xterm-256color", LANG: "fr_FR.UTF-8", PATH: `${home}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
         encoding: "utf-8",
         timeout: 5000,
       });
@@ -130,9 +133,10 @@ describe("unicode-detect", () => {
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG);
       `;
+      const home = process.env.HOME || "";
       const result = execSync(`bun -e '${script}'`, {
         cwd: CLI_DIR,
-        env: { TERM: "xterm-256color", LANG: "C", PATH: process.env.PATH, HOME: process.env.HOME },
+        env: { TERM: "xterm-256color", LANG: "C", PATH: `${home}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
         encoding: "utf-8",
         timeout: 5000,
       });
@@ -146,12 +150,13 @@ describe("unicode-detect", () => {
         import "./src/unicode-detect.ts";
       `;
       // Debug output goes to console.error (stderr), so redirect stderr to stdout
+      const home = process.env.HOME || "";
       const result = execSync(`bun -e '${script}' 2>&1`, {
         cwd: CLI_DIR,
         env: {
           TERM: "xterm-256color",
           SPAWN_DEBUG: "1",
-          PATH: process.env.PATH,
+          PATH: `${home}/.bun/bin:${process.env.PATH}`,
           HOME: process.env.HOME,
         },
         encoding: "utf-8",
@@ -168,9 +173,10 @@ describe("unicode-detect", () => {
         console.log("done");
       `;
       // Capture both stdout and stderr
+      const home = process.env.HOME || "";
       const result = execSync(`bun -e '${script}' 2>&1`, {
         cwd: CLI_DIR,
-        env: { TERM: "xterm-256color", PATH: process.env.PATH, HOME: process.env.HOME },
+        env: { TERM: "xterm-256color", PATH: `${home}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
         encoding: "utf-8",
         timeout: 5000,
       });

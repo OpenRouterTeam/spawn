@@ -33,11 +33,12 @@ function runCli(
   const quotedArgs = args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
   const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
   try {
+    const home = process.env.HOME || "";
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,
       env: {
         // Start with clean env to avoid bun test's NODE_ENV=test leaking
-        PATH: process.env.PATH,
+        PATH: `${home}/.bun/bin:${process.env.PATH}`,
         HOME: process.env.HOME,
         SHELL: process.env.SHELL,
         TERM: process.env.TERM || "xterm",

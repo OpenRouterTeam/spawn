@@ -26,11 +26,13 @@ function runCli(
 ): { stdout: string; stderr: string; exitCode: number } {
   const cmd = `bun run src/index.ts ${args.join(" ")}`;
   try {
+    const home = process.env.HOME || "";
     const stdout = execSync(cmd, {
       cwd: CLI_DIR,
       env: {
         ...process.env,
         ...env,
+        PATH: `${home}/.bun/bin:${process.env.PATH}`,
         // Prevent auto-update from running during tests
         SPAWN_NO_UPDATE_CHECK: "1",
         // Prevent local manifest.json from being used
