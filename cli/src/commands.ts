@@ -16,7 +16,9 @@ import {
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
-import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord, type VMConnection } from "./history.js";
+import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord, type VMConnection, getSpawnDir } from "./history.js";
+import { existsSync } from "fs";
+import { join } from "path";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -529,9 +531,12 @@ function buildCloudLines(cloudInfo: { name: string; description: string; default
 }
 
 /** Format a single credential env var as a status line (green if set, red if missing) */
-export function formatCredStatusLine(varName: string, urlHint?: string): string {
+export function formatCredStatusLine(varName: string, urlHint?: string, hasSavedConfigFile = false): string {
   if (process.env[varName]) {
     return `  ${pc.green(varName)} ${pc.dim("-- set")}`;
+  }
+  if (hasSavedConfigFile) {
+    return `  ${pc.green(varName)} ${pc.dim("-- saved in config")}`;
   }
   const suffix = urlHint ? `  ${pc.dim(urlHint)}` : "";
   return `  ${pc.red(varName)} ${pc.dim("-- not set")}${suffix}`;
@@ -542,11 +547,12 @@ function buildCredentialStatusLines(manifest: Manifest, cloud: string): string[]
   const cloudAuth = manifest.clouds[cloud].auth;
   const authVars = parseAuthEnvVars(cloudAuth);
   const cloudUrl = manifest.clouds[cloud].url;
+  const hasConfig = hasSavedConfig(cloud);
 
   const lines = [formatCredStatusLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys")];
 
   for (let i = 0; i < authVars.length; i++) {
-    lines.push(formatCredStatusLine(authVars[i], i === 0 ? cloudUrl : undefined));
+    lines.push(formatCredStatusLine(authVars[i], i === 0 ? cloudUrl : undefined, hasConfig));
   }
 
   return lines;
@@ -632,13 +638,32 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
   return authVars.length > 0 ? authVars.join(" + ") : undefined;
 }
 
+/** Check if a cloud provider has a saved config file in ~/.config/spawn/ or $SPAWN_HOME/.config/spawn/ */
+function hasSavedConfig(cloud: string): boolean {
+  try {
+    const configDir = join(getSpawnDir(), ".config", "spawn");
+    const configFile = join(configDir, `${cloud}.json`);
+    return existsSync(configFile);
+  } catch {
+    return false;
+  }
+}
+
 /** Check for missing credentials before running a script and warn the user.
- *  In interactive mode, asks for confirmation. In non-interactive mode, just warns. */
-function collectMissingCredentials(authVars: string[]): string[] {
+ *  In interactive mode, asks for confirmation. In non-interactive mode, just warns.
+ *  This checks both environment variables AND saved config files. */
+function collectMissingCredentials(authVars: string[], cloud: string): string[] {
   const missing: string[] = [];
   if (!process.env.OPENROUTER_API_KEY) {
     missing.push("OPENROUTER_API_KEY");
   }
+
+  // Skip cloud-specific vars if there's a saved config file
+  // The bash scripts check for config files before prompting
+  if (hasSavedConfig(cloud)) {
+    return missing; // Only return OPENROUTER_API_KEY if missing
+  }
+
   for (const v of authVars) {
     if (!process.env[v]) {
       missing.push(v);
@@ -670,7 +695,7 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   if (cloudAuth.toLowerCase() === "none") return;
 
   const authVars = parseAuthEnvVars(cloudAuth);
-  const missing = collectMissingCredentials(authVars);
+  const missing = collectMissingCredentials(authVars, cloud);
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
