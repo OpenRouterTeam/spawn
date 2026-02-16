@@ -139,7 +139,10 @@ clone_cli() {
         git sparse-checkout set cli 2>/dev/null
         mv cli "${dest}/cli"
         cd "${dest}"
-        rm -rf "${dest}/repo"
+        # Safety check: only delete if path contains 'repo' and is within dest directory
+        if [[ "${dest}/repo" == "${dest}/"* ]] && [[ -d "${dest}/repo" ]]; then
+            rm -rf "${dest}/repo"
+        fi
     else
         log_step "Downloading CLI source..."
         mkdir -p "${dest}/cli/src"
