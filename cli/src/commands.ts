@@ -634,13 +634,29 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
 
 /** Check for missing credentials before running a script and warn the user.
  *  In interactive mode, asks for confirmation. In non-interactive mode, just warns. */
-function collectMissingCredentials(authVars: string[]): string[] {
+/** Check if a cloud-specific config file exists at ~/.config/spawn/{cloud}.json */
+function hasCloudConfigFile(cloud: string): boolean {
+  try {
+    const { existsSync } = require("fs");
+    const { homedir } = require("os");
+    const { join } = require("path");
+    const configPath = join(homedir(), ".config", "spawn", `${cloud}.json`);
+    return existsSync(configPath);
+  } catch {
+    return false;
+  }
+}
+
+function collectMissingCredentials(authVars: string[], cloud: string): string[] {
   const missing: string[] = [];
   if (!process.env.OPENROUTER_API_KEY) {
     missing.push("OPENROUTER_API_KEY");
   }
+
+  // Check if cloud-specific credentials are available via env var or saved config
+  const hasCloudConfig = hasCloudConfigFile(cloud);
   for (const v of authVars) {
-    if (!process.env[v]) {
+    if (!process.env[v] && !hasCloudConfig) {
       missing.push(v);
     }
   }
@@ -670,7 +686,7 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   if (cloudAuth.toLowerCase() === "none") return;
 
   const authVars = parseAuthEnvVars(cloudAuth);
-  const missing = collectMissingCredentials(authVars);
+  const missing = collectMissingCredentials(authVars, cloud);
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
