@@ -121,6 +121,51 @@ validate_cloud_name() {
 
 # Push → PR → self-review (NO merging — merging is handled externally)
 # Usage: push_and_create_pr BRANCH_NAME PR_TITLE PR_BODY
+# Push branch to remote (prerequisite: branch must exist and have commits)
+_push_branch() {
+    local branch_name="$1"
+    git push -u origin "${branch_name}" 2>&1 | tee -a "${LOG_FILE}" || {
+        log "_push_branch: Push failed for ${branch_name}"
+        return 1
+    }
+    return 0
+}
+
+# Create PR and return its URL
+_create_pr() {
+    local branch_name="$1"
+    local pr_title="$2"
+    local pr_body="$3"
+
+    gh pr create \
+        --title "${pr_title}" \
+        --body "${pr_body}" \
+        --base main --head "${branch_name}" 2>/dev/null || true
+}
+
+# Extract PR number from the PR URL (expects URL like https://github.com/owner/repo/pull/123)
+_extract_pr_number() {
+    local pr_url="$1"
+    printf '%s' "${pr_url}" | grep -oE '[0-9]+$' || true
+}
+
+# Add self-review comment and label to the PR
+_add_pr_review_metadata() {
+    local pr_number="$1"
+    local pr_title="$2"
+
+    # Self-review: add a comment summarizing the changes
+    gh pr review "${pr_number}" --repo OpenRouterTeam/spawn --comment \
+        --body "Self-review by QA cycle: ${pr_title}. Automated change -- tests were run before submission.\n\n-- qa/cycle" \
+        2>&1 | tee -a "${LOG_FILE}" || true
+
+    # Label for external review
+    gh pr edit "${pr_number}" --repo OpenRouterTeam/spawn --add-label "needs-team-review" \
+        2>&1 | tee -a "${LOG_FILE}" || true
+
+    log "_add_pr_review_metadata: Self-reviewed and labeled PR #${pr_number} (not merging — awaiting external review)"
+}
+
 push_and_create_pr() {
     local branch_name="$1"
     local pr_title="$2"
@@ -135,16 +180,10 @@ push_and_create_pr() {
         return 0
     fi
 
-    git push -u origin "${branch_name}" 2>&1 | tee -a "${LOG_FILE}" || {
-        log "push_and_create_pr: Push failed for ${branch_name}"
-        return 1
-    }
+    _push_branch "${branch_name}" || return 1
 
-    local pr_url=""
-    pr_url=$(gh pr create \
-        --title "${pr_title}" \
-        --body "${pr_body}" \
-        --base main --head "${branch_name}" 2>/dev/null) || true
+    local pr_url
+    pr_url=$(_create_pr "${branch_name}" "${pr_title}" "${pr_body}")
 
     if [[ -z "${pr_url:-}" ]]; then
         log "push_and_create_pr: PR creation failed for ${branch_name}"
@@ -153,21 +192,12 @@ push_and_create_pr() {
 
     log "push_and_create_pr: PR created: ${pr_url}"
 
-    # Extract PR number from URL
-    local pr_number=""
-    pr_number=$(printf '%s' "${pr_url}" | grep -oE '[0-9]+$') || true
+    # Extract PR number and add review metadata
+    local pr_number
+    pr_number=$(_extract_pr_number "${pr_url}")
 
     if [[ -n "${pr_number}" ]]; then
-        # Self-review: add a comment summarizing the changes
-        gh pr review "${pr_number}" --repo OpenRouterTeam/spawn --comment \
-            --body "Self-review by QA cycle: ${pr_title}. Automated change -- tests were run before submission.\n\n-- qa/cycle" \
-            2>&1 | tee -a "${LOG_FILE}" || true
-
-        # Label for external review
-        gh pr edit "${pr_number}" --repo OpenRouterTeam/spawn --add-label "needs-team-review" \
-            2>&1 | tee -a "${LOG_FILE}" || true
-
-        log "push_and_create_pr: Self-reviewed and labeled PR #${pr_number} (not merging — awaiting external review)"
+        _add_pr_review_metadata "${pr_number}" "${pr_title}"
     fi
 
     return 0
