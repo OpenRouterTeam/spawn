@@ -11,6 +11,9 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/daytona/lib/common.sh)"
 fi
 
+# Register cleanup trap handler for temp files
+register_cleanup_trap
+
 log_info "gptme on Daytona"
 echo ""
 

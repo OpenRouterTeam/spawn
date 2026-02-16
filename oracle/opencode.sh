@@ -10,6 +10,9 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/oracle/lib/common.sh)"
 fi
 
+# Register cleanup trap handler for temp files
+register_cleanup_trap
+
 # Variables exported by create_server() in lib/common.sh
 # shellcheck disable=SC2154
 : "${OCI_SERVER_IP:?}" "${OCI_INSTANCE_NAME_ACTUAL:?}"
