@@ -738,7 +738,16 @@ exchange_oauth_code() {
     fi
 
     local api_key
-    api_key=$(echo "${key_response}" | grep -o '"key":"[^"]*"' | sed 's/"key":"//;s/"$//')
+    # Use command substitution with explicit check for pipeline failures
+    # grep -o returns 1 if no match found, which is a valid parsing scenario
+    local grep_output
+    grep_output=$(echo "${key_response}" | grep -o '"key":"[^"]*"') || grep_output=""
+
+    if [[ -n "${grep_output}" ]]; then
+        api_key=$(echo "${grep_output}" | sed 's/"key":"//;s/"$//')
+    else
+        api_key=""
+    fi
 
     if [[ -z "${api_key}" ]]; then
         log_error "Failed to exchange OAuth code for API key"
@@ -752,6 +761,7 @@ exchange_oauth_code() {
 }
 
 # Clean up OAuth session resources
+# SECURITY: Only removes directories under /tmp or system temp directory
 cleanup_oauth_session() {
     local server_pid="${1}"
     local oauth_dir="${2}"
@@ -761,8 +771,18 @@ cleanup_oauth_session() {
         wait "${server_pid}" 2>/dev/null || true
     fi
 
+    # Validate that oauth_dir is a safe temporary directory before deletion
+    # Only delete if under /tmp, /var/tmp, or $TMPDIR (standard temp locations)
     if [[ -n "${oauth_dir}" && -d "${oauth_dir}" ]]; then
-        rm -rf "${oauth_dir}"
+        local tmpdir="${TMPDIR:-/tmp}"
+        case "${oauth_dir}" in
+            /tmp/*|/var/tmp/*|"${tmpdir}"/*)
+                rm -rf "${oauth_dir}"
+                ;;
+            *)
+                log_warn "Refusing to delete directory outside temp locations: ${oauth_dir}"
+                ;;
+        esac
     fi
 }
 
