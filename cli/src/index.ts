@@ -67,6 +67,7 @@ const KNOWN_FLAGS = new Set([
   "--prompt", "-p", "--prompt-file", "-f",
   "--dry-run", "-n",
   "--debug",
+  "--headless", "--output",
   "-a", "-c", "--agent", "--cloud",
   "--clear",
 ]);
@@ -96,6 +97,8 @@ function checkUnknownFlags(args: string[]): void {
       console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
       console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
       console.error(`    ${pc.cyan("--debug")}             Show all commands being executed`);
+      console.error(`    ${pc.cyan("--headless")}          Run without user interaction (requires --output)`);
+      console.error(`    ${pc.cyan("--output")}            Output format for headless mode (json)`);
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
       console.error();
@@ -146,18 +149,23 @@ async function showInfoOrError(name: string): Promise<void> {
   showUnknownCommandError(name, manifest);
 }
 
-async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean, debug?: boolean): Promise<void> {
+async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean, debug?: boolean, headless?: boolean, outputFormat?: string): Promise<void> {
   if (cloud && HELP_FLAGS.includes(cloud)) {
     await showInfoOrError(agent);
     return;
   }
   if (cloud) {
-    await cmdRun(agent, cloud, prompt, dryRun, debug);
+    await cmdRun(agent, cloud, prompt, dryRun, debug, headless, outputFormat);
     return;
   }
   if (dryRun) {
     console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
     console.error(`\nUsage: ${pc.cyan(`spawn <agent> <cloud> --dry-run`)}`);
+    process.exit(1);
+  }
+  if (headless) {
+    console.error(pc.red("Error: --headless requires both <agent> and <cloud>"));
+    console.error(`\nUsage: ${pc.cyan(`spawn <agent> <cloud> --headless --output json`)}`);
     process.exit(1);
   }
   if (prompt) {
@@ -286,10 +294,15 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
 }
 
 /** Handle the case when no command is given (interactive mode or help) */
-async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Promise<void> {
+async function handleNoCommand(prompt: string | undefined, dryRun?: boolean, headless?: boolean): Promise<void> {
   if (dryRun) {
     console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
     console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --dry-run")}`);
+    process.exit(1);
+  }
+  if (headless) {
+    console.error(pc.red("Error: --headless requires both <agent> and <cloud>"));
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
     process.exit(1);
   }
   if (prompt) {
@@ -438,11 +451,11 @@ async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<
 }
 
 /** Handle verb aliases like "spawn run claude sprite" -> "spawn claude sprite" */
-async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, debug: boolean): Promise<void> {
+async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, debug: boolean, headless: boolean, outputFormat: string | undefined): Promise<void> {
   if (filteredArgs.length > 1) {
     const remaining = filteredArgs.slice(1);
     warnExtraArgs(remaining, 2);
-    await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun, debug);
+    await handleDefaultCommand(remaining[0], remaining[1], prompt, dryRun, debug, headless, outputFormat);
     return;
   }
   console.error(pc.red(`Error: ${pc.bold(cmd)} requires an agent and cloud`));
@@ -452,19 +465,19 @@ async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: st
 }
 
 /** Handle slash notation: "spawn claude/hetzner" -> "spawn claude hetzner" */
-async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean, debug: boolean): Promise<boolean> {
+async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean, debug: boolean, headless: boolean, outputFormat: string | undefined): Promise<boolean> {
   const parts = cmd.split("/");
   if (parts.length === 2 && parts[0] && parts[1]) {
     console.error(pc.dim(`Tip: use a space instead of slash: ${pc.cyan(`spawn ${parts[0]} ${parts[1]}`)}`));
     console.error();
-    await handleDefaultCommand(parts[0], parts[1], prompt, dryRun, debug);
+    await handleDefaultCommand(parts[0], parts[1], prompt, dryRun, debug, headless, outputFormat);
     return true;
   }
   return false;
 }
 
 /** Dispatch a named command or fall through to agent/cloud handling */
-async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, debug: boolean): Promise<void> {
+async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, debug: boolean, headless: boolean, outputFormat: string | undefined): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
     warnExtraArgs(filteredArgs, 1);
     IMMEDIATE_COMMANDS[cmd]();
@@ -473,14 +486,14 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
 
   if (LIST_COMMANDS.has(cmd)) { await dispatchListCommand(filteredArgs); return; }
   if (SUBCOMMANDS[cmd]) { await dispatchSubcommand(cmd, filteredArgs); return; }
-  if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun, debug); return; }
+  if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun, debug, headless, outputFormat); return; }
 
   if (filteredArgs.length === 1 && cmd.includes("/")) {
-    if (await dispatchSlashNotation(cmd, prompt, dryRun, debug)) return;
+    if (await dispatchSlashNotation(cmd, prompt, dryRun, debug, headless, outputFormat)) return;
   }
 
   warnExtraArgs(filteredArgs, 2);
-  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt, dryRun, debug);
+  await handleDefaultCommand(filteredArgs[0], filteredArgs[1], prompt, dryRun, debug, headless, outputFormat);
 }
 
 async function main(): Promise<void> {
@@ -500,15 +513,46 @@ async function main(): Promise<void> {
   const debug = debugIdx !== -1;
   if (debug) filteredArgs.splice(debugIdx, 1);
 
-  checkUnknownFlags(filteredArgs);
+  // Extract --headless boolean flag
+  const headlessIdx = filteredArgs.findIndex(a => a === "--headless");
+  const headless = headlessIdx !== -1;
+  if (headless) filteredArgs.splice(headlessIdx, 1);
 
-  const cmd = filteredArgs[0];
+  // Extract --output flag with value
+  const [outputFormat, finalArgs] = extractFlagValue(
+    filteredArgs,
+    ["--output"],
+    "output format",
+    "spawn <agent> <cloud> --headless --output json"
+  );
+  const filteredArgsAfterOutput = finalArgs;
+
+  // Validate --headless and --output combination
+  if (headless && !outputFormat) {
+    console.error(pc.red("Error: --headless requires --output json"));
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
+    process.exit(1);
+  }
+  if (outputFormat && outputFormat !== "json") {
+    console.error(pc.red(`Error: unsupported output format "${outputFormat}"`));
+    console.error(`\nSupported formats: ${pc.cyan("json")}`);
+    process.exit(1);
+  }
+  if (outputFormat && !headless) {
+    console.error(pc.red("Error: --output requires --headless"));
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
+    process.exit(1);
+  }
+
+  checkUnknownFlags(filteredArgsAfterOutput);
+
+  const cmd = filteredArgsAfterOutput[0];
 
   try {
     if (!cmd) {
-      await handleNoCommand(prompt, dryRun);
+      await handleNoCommand(prompt, dryRun, headless);
     } else {
-      await dispatchCommand(cmd, filteredArgs, prompt, dryRun, debug);
+      await dispatchCommand(cmd, filteredArgsAfterOutput, prompt, dryRun, debug, headless, outputFormat);
     }
   } catch (err) {
     handleError(err);
