@@ -368,6 +368,14 @@ _test_json_escape() {
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && json_escape "test\"quote"' 2>/dev/null)
     # json_escape should produce escaped quotes (\\") in the output
     assert_match "${result}" '*\\"*' "json_escape handles special characters"
+
+    # Test newline handling (regression test for fallback path)
+    result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && json_escape "test
+with newline"' 2>/dev/null)
+    # Should NOT have literal newline in output (would break JSON)
+    local has_literal_newline="no"
+    [[ "${result}" == *$'\n'* ]] && has_literal_newline="yes"
+    assert_equals "${has_literal_newline}" "no" "json_escape strips trailing newlines"
 }
 
 _test_ssh_key_utils() {

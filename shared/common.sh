@@ -1248,6 +1248,8 @@ json_escape() {
     local string="${1}"
     python3 -c "import json, sys; print(json.dumps(sys.stdin.read().rstrip('\n')))" <<< "${string}" 2>/dev/null || {
         # Fallback: manually escape quotes and backslashes
+        # Strip trailing newline to match Python path behavior
+        string="${string%$'\n'}"
         local escaped="${string//\\/\\\\}"
         escaped="${escaped//\"/\\\"}"
         echo "\"${escaped}\""
