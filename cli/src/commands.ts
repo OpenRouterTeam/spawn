@@ -632,15 +632,36 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
   return authVars.length > 0 ? authVars.join(" + ") : undefined;
 }
 
+/** Check if a config file exists and has a token/api_key field */
+function hasConfigFile(cloudKey: string): boolean {
+  try {
+    const fs = require("fs");
+    const os = require("os");
+    const path = require("path");
+    const configPath = path.join(os.homedir(), ".config", "spawn", `${cloudKey}.json`);
+
+    if (!fs.existsSync(configPath)) {
+      return false;
+    }
+
+    const content = fs.readFileSync(configPath, "utf-8");
+    const data = JSON.parse(content);
+    return !!(data.api_key || data.token);
+  } catch {
+    return false;
+  }
+}
+
 /** Check for missing credentials before running a script and warn the user.
  *  In interactive mode, asks for confirmation. In non-interactive mode, just warns. */
-function collectMissingCredentials(authVars: string[]): string[] {
+function collectMissingCredentials(authVars: string[], cloudKey: string): string[] {
   const missing: string[] = [];
   if (!process.env.OPENROUTER_API_KEY) {
     missing.push("OPENROUTER_API_KEY");
   }
+  // Only mark cloud credentials as missing if they're not in env vars AND not in config file
   for (const v of authVars) {
-    if (!process.env[v]) {
+    if (!process.env[v] && !hasConfigFile(cloudKey)) {
       missing.push(v);
     }
   }
@@ -670,13 +691,17 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   if (cloudAuth.toLowerCase() === "none") return;
 
   const authVars = parseAuthEnvVars(cloudAuth);
-  const missing = collectMissingCredentials(authVars);
+  const missing = collectMissingCredentials(authVars, cloud);
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
-  p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
-
   const onlyOpenRouter = missing.length === 1 && missing[0] === "OPENROUTER_API_KEY";
+
+  if (onlyOpenRouter) {
+    p.log.info(`${cloudName}: Will authenticate via browser for OpenRouter.`);
+  } else {
+    p.log.info(`${cloudName}: Will prompt for ${missing.map(v => pc.cyan(v)).join(", ")}.`);
+  }
   p.log.info(getCredentialGuidance(cloud, onlyOpenRouter));
 
   if (isInteractiveTTY()) {
