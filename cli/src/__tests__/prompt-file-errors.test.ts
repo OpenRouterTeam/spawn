@@ -34,7 +34,8 @@ function runCli(
   env: Record<string, string> = {}
 ): { stdout: string; stderr: string; exitCode: number } {
   const quotedArgs = args.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-  const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
+  const bunPath = process.env.BUN_PATH || `${process.env.HOME}/.bun/bin`;
+  const cmd = `${bunPath}/bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
   try {
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,

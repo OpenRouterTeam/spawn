@@ -24,7 +24,9 @@ function runCli(
   args: string[],
   env: Record<string, string> = {}
 ): { stdout: string; stderr: string; exitCode: number } {
-  const cmd = `bun run src/index.ts ${args.join(" ")}`;
+  // Use full bun path to ensure subprocess can find it
+  const bunPath = process.env.BUN_PATH || `${process.env.HOME}/.bun/bin`;
+  const cmd = `${bunPath}/bun run src/index.ts ${args.join(" ")}`;
   try {
     const stdout = execSync(cmd, {
       cwd: CLI_DIR,

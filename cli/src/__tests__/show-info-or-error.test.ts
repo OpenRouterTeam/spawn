@@ -31,7 +31,8 @@ function runCli(
 ): { stdout: string; stderr: string; exitCode: number } {
   // Quote each arg to handle spaces properly
   const quotedArgs = args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-  const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
+  const bunPath = process.env.BUN_PATH || `${process.env.HOME}/.bun/bin`;
+  const cmd = `${bunPath}/bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
   try {
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,

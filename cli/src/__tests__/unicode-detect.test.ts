@@ -20,7 +20,8 @@ function detectTerm(env: Record<string, string>): string {
     import "./src/unicode-detect.ts";
     console.log(process.env.TERM);
   `;
-  const result = execSync(`bun -e '${script}'`, {
+  const bunPath = process.env.BUN_PATH || `${process.env.HOME}/.bun/bin`;
+  const result = execSync(`${bunPath}/bun -e '${script}'`, {
     cwd: CLI_DIR,
     env: { ...env, PATH: process.env.PATH, HOME: process.env.HOME },
     encoding: "utf-8",
