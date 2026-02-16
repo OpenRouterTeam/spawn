@@ -372,6 +372,11 @@ const server = Bun.serve({
       const skipped: string[] = [];
 
       for (const pk of body.providers as string[]) {
+        // SECURITY: Validate provider name to prevent path traversal
+        if (!SAFE_PROVIDER_RE.test(pk)) {
+          console.warn(`[key-server] Rejected invalid provider name: ${pk}`);
+          continue;
+        }
         if (
           d.batches.some(
             (b) =>
