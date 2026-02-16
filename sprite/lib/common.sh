@@ -240,3 +240,30 @@ upload_file_sprite() {
 }
 
 # Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers, validate_model_id) are now in shared/common.sh
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+# Wrapper for spawn_agent compatibility (sprite uses get_sprite_name)
+get_server_name() { get_sprite_name; }
+
+cloud_authenticate() { ensure_sprite_installed; ensure_sprite_authenticated; }
+cloud_provision() {
+    SPRITE_NAME="$1"
+    ensure_sprite_exists "${SPRITE_NAME}"
+    verify_sprite_connectivity "${SPRITE_NAME}"
+    setup_shell_environment "${SPRITE_NAME}"
+}
+cloud_wait_ready() { :; }
+cloud_run() { run_sprite "${SPRITE_NAME}" "$1"; }
+cloud_upload() { upload_file_sprite "${SPRITE_NAME}" "$1" "$2"; }
+cloud_interactive() {
+    local cmd="$1"
+    if [[ -n "${SPAWN_PROMPT:-}" ]]; then
+        sprite exec -s "${SPRITE_NAME}" -- bash -c "${cmd}"
+    else
+        sprite exec -s "${SPRITE_NAME}" -tty -- bash -c "${cmd}"
+    fi
+}
+cloud_label() { echo "Sprite"; }

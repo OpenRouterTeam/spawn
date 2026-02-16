@@ -13,45 +13,15 @@ fi
 log_info "Goose on DigitalOcean"
 echo ""
 
-# 1. Resolve DigitalOcean API token
-ensure_do_token
+agent_install() {
+    install_agent "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" cloud_run
+    verify_agent "Goose" "command -v goose && goose --version" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" cloud_run
+}
+agent_env_vars() {
+    generate_env_config \
+        "GOOSE_PROVIDER=openrouter" \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
+agent_launch_cmd() { echo 'source ~/.zshrc && goose'; }
 
-# 2. Generate + register SSH key
-ensure_ssh_key
-
-# 3. Get droplet name and create droplet
-DROPLET_NAME=$(get_server_name)
-create_server "${DROPLET_NAME}"
-
-# 4. Wait for SSH and cloud-init
-verify_server_connectivity "${DO_SERVER_IP}"
-wait_for_cloud_init "${DO_SERVER_IP}" 60
-
-# 5. Install Goose
-log_step "Installing Goose..."
-run_server "${DO_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
-log_info "Goose installed"
-
-# 6. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_ssh "${DO_SERVER_IP}" upload_file run_server \
-    "GOOSE_PROVIDER=openrouter" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "DigitalOcean droplet setup completed successfully!"
-log_info "Droplet: ${DROPLET_NAME} (ID: ${DO_DROPLET_ID}, IP: ${DO_SERVER_IP})"
-echo ""
-
-# 8. Start Goose interactively
-log_step "Starting Goose..."
-sleep 1
-clear
-interactive_session "${DO_SERVER_IP}" "source ~/.zshrc && goose"
+spawn_agent "Goose"

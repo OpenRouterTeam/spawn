@@ -12,53 +12,26 @@ fi
 log_info "Aider on local machine"
 echo ""
 
-# 1. Ensure local prerequisites
-ensure_local_ready
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
 
-# 2. Install Aider if not already installed
-if command -v aider &>/dev/null; then
-    log_info "Aider already installed"
-else
-    log_step "Installing Aider..."
-    pip install aider-chat 2>/dev/null || pip3 install aider-chat
-fi
+agent_install() {
+    install_agent "Aider" "pip install aider-chat 2>/dev/null || pip3 install aider-chat" cloud_run
+    verify_agent "Aider" "command -v aider && aider --version" "pip install aider-chat" cloud_run
+}
 
-# Verify installation
-if ! command -v aider &>/dev/null || ! aider --version &>/dev/null; then
-    log_install_failed "Aider" "pip install aider-chat"
-    exit 1
-fi
-log_info "Aider installation verified"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-# 3. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
+agent_launch_cmd() {
+    if [[ -n "${SPAWN_PROMPT:-}" ]]; then
+        local escaped; escaped=$(printf '%q' "${SPAWN_PROMPT}")
+        printf 'source ~/.zshrc 2>/dev/null; aider --model openrouter/%s -m %s' "${MODEL_ID}" "${escaped}"
+    else
+        printf 'source ~/.zshrc 2>/dev/null; aider --model openrouter/%s' "${MODEL_ID}"
+    fi
+}
 
-# 4. Get model preference
-MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
-
-# 5. Inject environment variables
-log_step "Setting up environment variables..."
-inject_env_vars_local upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Local setup completed successfully!"
-echo ""
-
-# 6. Start Aider
-if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_step "Executing Aider with prompt..."
-    source ~/.zshrc 2>/dev/null || true
-    aider --model "openrouter/${MODEL_ID}" -m "${SPAWN_PROMPT}"
-else
-    log_step "Starting Aider..."
-    sleep 1
-    clear 2>/dev/null || true
-    source ~/.zshrc 2>/dev/null || true
-    exec aider --model "openrouter/${MODEL_ID}"
-fi
+spawn_agent "Aider"

@@ -12,46 +12,19 @@ fi
 log_info "Cline on Fly.io"
 echo ""
 
-# 1. Ensure flyctl CLI and API token
-ensure_fly_cli
-ensure_fly_token
+agent_install() {
+    install_agent "Cline" "npm install -g cline" cloud_run
+}
 
-# 2. Get app name and create machine
-SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+}
 
-# 3. Install base tools
-wait_for_cloud_init
+agent_launch_cmd() {
+    echo 'source ~/.zshrc && cline'
+}
 
-# 4. Install Cline
-log_step "Installing Cline..."
-run_server "npm install -g cline"
-log_info "Cline installed"
-
-# 5. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 6. Inject environment variables into ~/.bashrc and ~/.zshrc
-log_step "Setting up environment variables..."
-
-inject_env_vars_fly \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_BASE_URL=https://openrouter.ai/api/v1" \
-    "PATH=\$HOME/.bun/bin:\$PATH"
-
-echo ""
-log_info "Fly.io machine setup completed successfully!"
-log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
-echo ""
-
-# 7. Start Cline interactively
-log_step "Starting Cline..."
-sleep 1
-clear
-interactive_session "source ~/.bashrc && cline"
+spawn_agent "Cline"

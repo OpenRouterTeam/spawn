@@ -13,24 +13,13 @@ fi
 log_info "Kilo Code on Hetzner Cloud"
 echo ""
 
-# Provision server
-ensure_hcloud_token
-ensure_ssh_key
-SERVER_NAME=$(get_server_name)
-create_server "${SERVER_NAME}"
-verify_server_connectivity "${HETZNER_SERVER_IP}"
-wait_for_cloud_init "${HETZNER_SERVER_IP}" 60
+agent_install() { install_agent "Kilo Code" "npm install -g @kilocode/cli" cloud_run; }
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "KILO_PROVIDER_TYPE=openrouter" \
+        "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
+agent_launch_cmd() { echo 'source ~/.zshrc && kilocode'; }
 
-# Set up callbacks
-RUN="run_server ${HETZNER_SERVER_IP}"
-UPLOAD="upload_file ${HETZNER_SERVER_IP}"
-SESSION="interactive_session ${HETZNER_SERVER_IP}"
-
-# Install, configure, launch
-install_agent "Kilo Code" "npm install -g @kilocode/cli" "$RUN"
-get_or_prompt_api_key
-inject_env_vars_cb "$RUN" "$UPLOAD" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "KILO_PROVIDER_TYPE=openrouter" \
-    "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
-launch_session "Hetzner server" "$SESSION" "source ~/.zshrc && kilocode"
+spawn_agent "Kilo Code"

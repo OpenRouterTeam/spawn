@@ -1,10 +1,8 @@
 #!/bin/bash
-# shellcheck disable=SC2154
 set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-# shellcheck source=daytona/lib/common.sh
 if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
     source "${SCRIPT_DIR}/lib/common.sh"
 else
@@ -14,43 +12,18 @@ fi
 log_info "Plandex on Daytona"
 echo ""
 
-# 1. Ensure Daytona CLI and API token
-ensure_daytona_cli
-ensure_daytona_token
+agent_install() {
+    install_agent "Plandex" "curl -sL https://plandex.ai/install.sh | bash" cloud_run
+    verify_agent "Plandex" "command -v plandex && plandex version" "curl -sL https://plandex.ai/install.sh | bash" cloud_run
+}
 
-# 2. Get sandbox name and create sandbox
-SERVER_NAME=$(get_server_name)
-create_server "${SERVER_NAME}"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-# 3. Wait for base tools
-wait_for_cloud_init
+agent_launch_cmd() {
+    echo 'source ~/.zshrc && plandex'
+}
 
-# 4. Install Plandex
-log_step "Installing Plandex..."
-run_server "curl -sL https://plandex.ai/install.sh | bash"
-log_info "Plandex installed"
-
-# 5. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 6. Inject environment variables into ~/.zshrc
-log_step "Setting up environment variables..."
-
-inject_env_vars_local upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Daytona sandbox setup completed successfully!"
-log_info "Sandbox: ${SERVER_NAME} (ID: ${DAYTONA_SANDBOX_ID})"
-echo ""
-
-# 7. Start Plandex interactively
-log_step "Starting Plandex..."
-sleep 1
-clear
-interactive_session "source ~/.zshrc && plandex"
+spawn_agent "Plandex"
