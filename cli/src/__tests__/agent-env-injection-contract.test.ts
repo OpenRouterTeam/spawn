@@ -203,10 +203,12 @@ describe("Agent Environment Variable Injection Contract", () => {
         // 2. OAuth flow: get_openrouter_api_key_oauth
         // 3. Manual prompt: get_openrouter_api_key_manual
         // 4. try_oauth_flow
+        // 5. Shared helper: get_or_prompt_api_key (wraps env check + OAuth)
         const hasEnvCheck = code.includes("OPENROUTER_API_KEY:-") || code.includes("OPENROUTER_API_KEY:=");
         const hasOAuth = code.includes("get_openrouter_api_key_oauth") || code.includes("try_oauth_flow");
         const hasManual = code.includes("get_openrouter_api_key_manual");
-        const hasAnyAcquisition = hasEnvCheck || hasOAuth || hasManual;
+        const hasSharedHelper = code.includes("get_or_prompt_api_key");
+        const hasAnyAcquisition = hasEnvCheck || hasOAuth || hasManual || hasSharedHelper;
 
         if (!hasAnyAcquisition) {
           failures.push(key + ".sh");

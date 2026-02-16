@@ -13,47 +13,32 @@ fi
 log_info "Claude Code on Hetzner Cloud"
 echo ""
 
-# 1. Resolve Hetzner API token
+# Provision server
 ensure_hcloud_token
-
-# 2. Generate + register SSH key
 ensure_ssh_key
-
-# 3. Get server name and create server
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
-
-# 4. Wait for SSH and cloud-init
 verify_server_connectivity "${HETZNER_SERVER_IP}"
 wait_for_cloud_init "${HETZNER_SERVER_IP}" 60
 
-# 5. Verify Claude Code is installed (try curl first, then bun fallback)
+# Set up callbacks
+RUN="run_server ${HETZNER_SERVER_IP}"
+UPLOAD="upload_file ${HETZNER_SERVER_IP}"
+SESSION="interactive_session ${HETZNER_SERVER_IP}"
+
+# Claude-specific install: try curl first, fall back to bun
 log_step "Verifying Claude Code installation..."
-if ! run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
+if ! ${RUN} "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
     log_step "Claude Code not found, installing..."
-    if ! run_server "${HETZNER_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"; then
+    if ! ${RUN} "curl -fsSL https://claude.ai/install.sh | bash"; then
         log_warn "curl install failed, falling back to bun..."
-        run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH && bun add -g @anthropic-ai/claude-code && claude install"
+        ${RUN} "export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH && bun add -g @anthropic-ai/claude-code && claude install"
     fi
 fi
+verify_agent "Claude Code" "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$PATH && command -v claude && claude --version" "curl -fsSL https://claude.ai/install.sh | bash" "$RUN"
 
-# Verify installation succeeded
-if ! run_server "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
-    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash" "${HETZNER_SERVER_IP}"
-    exit 1
-fi
-log_info "Claude Code installation verified successfully"
-
-# 6. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_ssh "${HETZNER_SERVER_IP}" upload_file run_server \
+get_or_prompt_api_key
+inject_env_vars_cb "$RUN" "$UPLOAD" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
     "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
     "ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}" \
@@ -61,18 +46,7 @@ inject_env_vars_ssh "${HETZNER_SERVER_IP}" upload_file run_server \
     "CLAUDE_CODE_SKIP_ONBOARDING=1" \
     "CLAUDE_CODE_ENABLE_TELEMETRY=0"
 
-# 8. Configure Claude Code settings
-setup_claude_code_config "${OPENROUTER_API_KEY}" \
-    "upload_file ${HETZNER_SERVER_IP}" \
-    "run_server ${HETZNER_SERVER_IP}"
+# Claude-specific config
+setup_claude_code_config "${OPENROUTER_API_KEY}" "$UPLOAD" "$RUN"
 
-echo ""
-log_info "Hetzner server setup completed successfully!"
-log_info "Server: ${SERVER_NAME} (ID: ${HETZNER_SERVER_ID}, IP: ${HETZNER_SERVER_IP})"
-echo ""
-
-# 9. Start Claude Code interactively
-log_step "Starting Claude Code..."
-sleep 1
-clear
-interactive_session "${HETZNER_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
+launch_session "Hetzner server" "$SESSION" "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
