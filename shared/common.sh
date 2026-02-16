@@ -8,6 +8,15 @@
 # by the scripts that source this file.
 
 # ============================================================
+# Debug mode
+# ============================================================
+
+# Enable debug output if SPAWN_DEBUG is set
+if [[ -n "${SPAWN_DEBUG:-}" ]]; then
+    set -x
+fi
+
+# ============================================================
 # Color definitions and logging
 # ============================================================
 
@@ -1081,9 +1090,9 @@ inject_env_vars_ssh() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to .zshrc
+    # Upload and append to both .bashrc and .zshrc
     "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 }
@@ -1106,9 +1115,9 @@ inject_env_vars_local() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to .zshrc
+    # Upload and append to both .bashrc and .zshrc
     "${upload_func}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${run_func}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 }
@@ -1289,9 +1298,9 @@ runcmd:
   - echo 'export IS_SANDBOX=1' >> /root/.bashrc
   - echo 'export IS_SANDBOX=1' >> /root/.zshrc
   # Configure PATH in .bashrc
-  - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
+  - echo 'export PATH="${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
   # Configure PATH in .zshrc
-  - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
+  - echo 'export PATH="${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
   # Signal completion
   - touch /root/.cloud-init-complete
 CLOUD_INIT_EOF
@@ -1759,6 +1768,9 @@ wait_for_cloud_init() {
 ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
+    if [[ -n "${SPAWN_DEBUG:-}" ]]; then
+        cmd="set -x; ${cmd}"
+    fi
     # shellcheck disable=SC2086
     ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}"
 }
