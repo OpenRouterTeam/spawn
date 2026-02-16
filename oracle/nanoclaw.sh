@@ -59,8 +59,8 @@ inject_env_vars_ssh "${OCI_SERVER_IP}" upload_file run_server \
 log_step "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
-trap 'rm -f "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
+track_temp_file "${DOTENV_TEMP}"
 printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
 
 upload_file "${OCI_SERVER_IP}" "${DOTENV_TEMP}" "/home/ubuntu/nanoclaw/.env"

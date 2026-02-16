@@ -348,16 +348,15 @@ _hetzner_resolve_server_type() {
 
     local stderr_output validated_type
     stderr_output=$(mktemp)
+    track_temp_file "$stderr_output"
     validated_type=$(_validate_server_type_for_location "$server_type" "$location" 2>"$stderr_output") || {
         local err_info
         err_info=$(cat "$stderr_output")
-        rm -f "$stderr_output"
         _hetzner_log_validation_error "$err_info" "$server_type" "$location"
         return 1
     }
     local fallback_info
     fallback_info=$(cat "$stderr_output")
-    rm -f "$stderr_output"
     _hetzner_log_type_change "$fallback_info" "$server_type" "$location" "$validated_type"
     printf '%s' "$validated_type"
 }

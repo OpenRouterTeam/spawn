@@ -41,8 +41,8 @@ inject_env_vars_cb "$RUN" "$UPLOAD" \
 # NanoClaw-specific .env file
 log_step "Configuring nanoclaw..."
 DOTENV_TEMP=$(mktemp)
-trap 'rm -f "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
+track_temp_file "${DOTENV_TEMP}"
 printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
 ${UPLOAD} "${DOTENV_TEMP}" "/root/nanoclaw/.env"
 

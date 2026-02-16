@@ -58,8 +58,8 @@ inject_env_vars_ovh "${OVH_SERVER_IP}" \
 log_step "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
-trap 'rm -f "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
+track_temp_file "${DOTENV_TEMP}"
 printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
 
 upload_file_ovh "${OVH_SERVER_IP}" "${DOTENV_TEMP}" "/home/ubuntu/nanoclaw/.env"

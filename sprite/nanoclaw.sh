@@ -51,8 +51,8 @@ inject_env_vars_sprite "${SPRITE_NAME}" \
 log_step "Configuring nanoclaw..."
 
 DOTENV_TEMP=$(mktemp)
-trap 'rm -f "${DOTENV_TEMP}"' EXIT
 chmod 600 "${DOTENV_TEMP}"
+track_temp_file "${DOTENV_TEMP}"
 printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
 
 sprite exec -s "${SPRITE_NAME}" -file "${DOTENV_TEMP}:/tmp/nanoclaw_env" -- bash -c "chmod 600 /tmp/nanoclaw_env && mv /tmp/nanoclaw_env ~/nanoclaw/.env"

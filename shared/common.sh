@@ -8,6 +8,14 @@
 # by the scripts that source this file.
 
 # ============================================================
+# Temp file cleanup tracking
+# ============================================================
+
+# Global array to track temporary files for cleanup on exit
+# Initialize early to avoid undefined behavior when += is used
+declare -a CLEANUP_TEMP_FILES=()
+
+# ============================================================
 # Debug mode
 # ============================================================
 
