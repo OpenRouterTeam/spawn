@@ -206,7 +206,7 @@ function getLines(consoleMocks: ReturnType<typeof createConsoleMocks>): string[]
 describe("cmdMatrix - grid view rendering", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
   let originalFetch: typeof global.fetch;
-  let originalColumns: number | undefined;
+  let originalDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(async () => {
     consoleMocks = createConsoleMocks();
@@ -214,19 +214,29 @@ describe("cmdMatrix - grid view rendering", () => {
     mockSpinnerStop.mockClear();
 
     originalFetch = global.fetch;
-    originalColumns = process.stdout.columns;
+    originalDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "columns");
 
     // Force wide terminal for grid view
-    process.stdout.columns = 200;
+    setTerminalWidth(200);
 
     await setManifest(mockManifest);
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    process.stdout.columns = originalColumns!;
+    if (originalDescriptor) {
+      Object.defineProperty(process.stdout, "columns", originalDescriptor);
+    }
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
+
+  function setTerminalWidth(width: number | undefined) {
+    Object.defineProperty(process.stdout, "columns", {
+      configurable: true,
+      writable: true,
+      value: width,
+    });
+  }
 
   // ── Grid header ────────────────────────────────────────────────────
 

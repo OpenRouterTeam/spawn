@@ -150,38 +150,48 @@ describe("Command Utility Functions", () => {
   // ── getTerminalWidth ──────────────────────────────────────────────
 
   describe("getTerminalWidth", () => {
-    let originalColumns: number | undefined;
+    let originalDescriptor: PropertyDescriptor | undefined;
 
     beforeEach(() => {
-      originalColumns = process.stdout.columns;
+      originalDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "columns");
     });
 
     afterEach(() => {
-      process.stdout.columns = originalColumns!;
+      if (originalDescriptor) {
+        Object.defineProperty(process.stdout, "columns", originalDescriptor);
+      }
     });
 
+    function setTerminalWidth(width: number | undefined) {
+      Object.defineProperty(process.stdout, "columns", {
+        configurable: true,
+        writable: true,
+        value: width,
+      });
+    }
+
     it("should return process.stdout.columns when defined", () => {
-      process.stdout.columns = 120;
+      setTerminalWidth(120);
       expect(getTerminalWidth()).toBe(120);
     });
 
     it("should return 80 when process.stdout.columns is undefined", () => {
-      (process.stdout as any).columns = undefined;
+      setTerminalWidth(undefined);
       expect(getTerminalWidth()).toBe(80);
     });
 
     it("should return 80 when process.stdout.columns is 0", () => {
-      (process.stdout as any).columns = 0;
+      setTerminalWidth(0);
       expect(getTerminalWidth()).toBe(80);
     });
 
     it("should return the exact column count for narrow terminals", () => {
-      process.stdout.columns = 40;
+      setTerminalWidth(40);
       expect(getTerminalWidth()).toBe(40);
     });
 
     it("should return the exact column count for very wide terminals", () => {
-      process.stdout.columns = 300;
+      setTerminalWidth(300);
       expect(getTerminalWidth()).toBe(300);
     });
   });
