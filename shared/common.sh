@@ -107,7 +107,12 @@ log_install_failed() {
 
 # Polling interval for OAuth code waiting and other wait loops
 # Set SPAWN_POLL_INTERVAL=0.1 for faster testing, or higher for slow networks
+# SECURITY: Validate to prevent code injection (value is interpolated into python3 -c)
 POLL_INTERVAL="${SPAWN_POLL_INTERVAL:-1}"
+if [[ ! "${POLL_INTERVAL}" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+    echo "ERROR: SPAWN_POLL_INTERVAL must be a number (got: '${POLL_INTERVAL}')" >&2
+    POLL_INTERVAL=1
+fi
 
 # ============================================================
 # Dependency checks
@@ -1260,12 +1265,13 @@ json_escape() {
 extract_ssh_key_ids() {
     local api_response="${1}"
     local key_field="${2:-ssh_keys}"
+    # SECURITY: Pass key_field via sys.argv to prevent Python code injection
     python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
-ids = [k['id'] for k in data.get('${key_field}', [])]
+ids = [k['id'] for k in data.get(sys.argv[1], [])]
 print(json.dumps(ids))
-" <<< "${api_response}" 2>/dev/null || {
+" "${key_field}" <<< "${api_response}" 2>/dev/null || {
         log_error "Failed to parse SSH key IDs from API response"
         log_error "The API response may be malformed or python3 is unavailable"
         return 1
