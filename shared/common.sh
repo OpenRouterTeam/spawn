@@ -454,7 +454,10 @@ get_resource_name() {
     local resource_value="${!env_var_name}"
 
     if [[ -n "${resource_value}" ]]; then
-        log_info "Using ${prompt_text%:*} from environment: ${resource_value}"
+        # Extract the label from prompt text, removing "Enter " prefix and trailing ":"
+        local label="${prompt_text#Enter }"
+        label="${label%:*}"
+        log_info "Using ${label} from environment: ${resource_value}"
         echo "${resource_value}"
         return 0
     fi
@@ -462,7 +465,10 @@ get_resource_name() {
     local name
     name=$(safe_read "${prompt_text}")
     if [[ -z "${name}" ]]; then
-        log_error "${prompt_text%:*} is required but not provided"
+        # Extract label for error message too
+        local label="${prompt_text#Enter }"
+        label="${label%:*}"
+        log_error "${label} is required but not provided"
         log_error ""
         log_error "For non-interactive usage, set the environment variable:"
         log_error "  ${env_var_name}=your-value spawn ..."
