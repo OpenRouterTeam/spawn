@@ -68,12 +68,12 @@ Skip prompts by providing environment variables:
 export OPENROUTER_API_KEY=sk-or-v1-xxxxx
 
 # Cloud-specific credentials (varies by provider)
-export SPRITE_API_KEY=...        # For Sprite
+# Note: Sprite uses `sprite login` for authentication
 export HCLOUD_TOKEN=...           # For Hetzner
 export DO_API_TOKEN=...           # For DigitalOcean
 
 # Run non-interactively
-spawn claude sprite
+spawn claude hetzner
 ```
 
 You can also use inline environment variables:
