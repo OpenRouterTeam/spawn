@@ -1260,16 +1260,11 @@ verify_agent() {
 # Usage: install_claude_code RUN_CB
 install_claude_code() {
     local run_cb="$1"
-    # Include fnm paths so node is found even in non-interactive SSH sessions
-    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/fnm:$PATH; if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi'
+    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
 
     # Clean up ~/.bash_profile if it was created by a previous broken deployment.
-    # On Ubuntu, ~/.bash_profile doesn't exist by default. If present, bash -l
-    # sources it INSTEAD of ~/.profile, breaking the standard PATH setup.
     ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
 
-    # Finalize: set up shell integration and persist PATH to .bashrc/.zshrc.
-    # Do NOT write to ~/.profile or ~/.bash_profile — it breaks shell init on Ubuntu.
     _finalize_claude_install() {
         log_step "Setting up Claude Code shell integration..."
         ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
@@ -1278,16 +1273,16 @@ install_claude_code() {
     }
 
     # Already installed?
-    if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+    if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
         log_info "Claude Code already installed"
         _finalize_claude_install
         return 0
     fi
 
     # Method 1: official curl installer (standalone binary, no node needed)
-    log_step "Installing Claude Code (method 1/3: curl installer)..."
+    log_step "Installing Claude Code (method 1/2: curl installer)..."
     if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
             log_info "Claude Code installed via curl installer"
             _finalize_claude_install
             return 0
@@ -1297,50 +1292,17 @@ install_claude_code() {
         log_warn "curl installer failed (site may be temporarily unavailable)"
     fi
 
-    # npm/bun installs produce a Node.js package — ensure 'node' exists BEFORE
-    # installing, since the claude binary is a Node.js script that needs 'node'.
-    # Tries fnm (platform-agnostic) first, falls back to nodesource (Debian/Ubuntu).
-    _ensure_node_runtime() {
-        if ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
-            return 0
-        fi
-        log_step "Installing Node.js (required by Claude Code npm package)..."
-        if ${run_cb} "curl -fsSL https://fnm.vercel.app/install | bash && export PATH=\$HOME/.local/share/fnm:\$PATH && eval \"\$(fnm env)\" && fnm install --lts && fnm default lts-latest" 2>&1; then
-            log_info "Node.js installed via fnm"
-        elif ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" 2>&1; then
-            log_info "Node.js installed via nodesource"
-        else
-            log_warn "Could not install Node.js automatically"
-        fi
-    }
-
-    # Method 2: bun (faster than npm, no node dependency)
-    log_step "Installing Claude Code (method 2/3: bun)..."
+    # Method 2: bun
+    log_step "Installing Claude Code (method 2/2: bun)..."
     if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
             log_info "Claude Code installed via bun"
             _finalize_claude_install
             return 0
         fi
-        log_warn "bun install exited 0 but claude binary not working"
+        log_warn "bun install exited 0 but claude binary not found"
     else
         log_warn "bun install failed"
-    fi
-
-    # Ensure node is available before npm method (bun doesn't need it)
-    _ensure_node_runtime
-
-    # Method 3: npm
-    log_step "Installing Claude Code (method 3/3: npm)..."
-    if ${run_cb} "${claude_path} && npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
-            log_info "Claude Code installed via npm"
-            _finalize_claude_install
-            return 0
-        fi
-        log_warn "npm install exited 0 but claude binary not working"
-    else
-        log_warn "npm install failed"
     fi
 
     # All methods failed
