@@ -26,16 +26,8 @@ RUN="run_server ${HETZNER_SERVER_IP}"
 UPLOAD="upload_file ${HETZNER_SERVER_IP}"
 SESSION="interactive_session ${HETZNER_SERVER_IP}"
 
-# Claude-specific install: try curl first, fall back to bun
-log_step "Verifying Claude Code installation..."
-if ! ${RUN} "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing..."
-    if ! ${RUN} "curl -fsSL https://claude.ai/install.sh | bash"; then
-        log_warn "curl install failed, falling back to bun..."
-        ${RUN} "export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH && bun add -g @anthropic-ai/claude-code && claude install"
-    fi
-fi
-verify_agent "Claude Code" "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$PATH && command -v claude && claude --version" "curl -fsSL https://claude.ai/install.sh | bash" "$RUN"
+# Install Claude Code (tries curl → npm → bun with clear logging)
+install_claude_code "$RUN"
 
 get_or_prompt_api_key
 inject_env_vars_cb "$RUN" "$UPLOAD" \
@@ -49,4 +41,4 @@ inject_env_vars_cb "$RUN" "$UPLOAD" \
 # Claude-specific config
 setup_claude_code_config "${OPENROUTER_API_KEY}" "$UPLOAD" "$RUN"
 
-launch_session "Hetzner server" "$SESSION" "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
+launch_session "Hetzner server" "$SESSION" "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
