@@ -2235,6 +2235,12 @@ _load_token_from_env() {
 
     local env_value="${!env_var_name}"
     if [[ -n "${env_value}" ]]; then
+        # SECURITY: Validate env var tokens to prevent command injection
+        if ! validate_api_token "${env_value}"; then
+            log_error "Invalid ${provider_name} API token in ${env_var_name}"
+            log_error "Token contains forbidden characters that could enable injection attacks"
+            return 1
+        fi
         log_info "Using ${provider_name} API token from environment"
         return 0
     fi
@@ -2261,6 +2267,14 @@ _load_token_from_config() {
     local saved_token
     saved_token=$(python3 -c "import json, sys; data=json.load(open(sys.argv[1])); print(data.get('api_key','') or data.get('token',''))" "${config_file}" 2>/dev/null)
     if [[ -z "${saved_token}" ]]; then
+        return 1
+    fi
+
+    # SECURITY: Validate config file tokens to prevent command injection
+    if ! validate_api_token "${saved_token}"; then
+        log_error "Invalid ${provider_name} API token in ${config_file}"
+        log_error "Token contains forbidden characters. Please re-enter your token."
+        rm -f "${config_file}"  # Remove corrupted config
         return 1
     fi
 
