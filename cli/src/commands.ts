@@ -2114,9 +2114,9 @@ function getHelpExamplesSection(): string {
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
   spawn aider sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
-  spawn openclaw vultr -f instructions.txt
+  spawn openclaw digitalocean -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
-  spawn interpreter linode --dry-run ${pc.dim("# Preview without provisioning")}
+  spawn interpreter gcp --dry-run    ${pc.dim("# Preview without provisioning")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
