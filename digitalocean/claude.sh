@@ -72,4 +72,4 @@ save_vm_connection "${DO_SERVER_IP}" "root" "${DO_DROPLET_ID}" "${DROPLET_NAME}"
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${DO_SERVER_IP}" 'export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
+interactive_session "${DO_SERVER_IP}" 'source ~/.bashrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
