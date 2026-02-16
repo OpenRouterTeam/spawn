@@ -69,4 +69,4 @@ echo ""
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${LIGHTSAIL_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
+interactive_session "${LIGHTSAIL_SERVER_IP}" "source ~/.bashrc 2>/dev/null; source ~/.zshrc 2>/dev/null; claude"
