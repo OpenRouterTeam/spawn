@@ -239,4 +239,21 @@ upload_file_sprite() {
     sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
 }
 
+# Destroy a sprite (standardized wrapper for cross-cloud compatibility)
+destroy_server() {
+    local sprite_name="$1"
+
+    log_step "Destroying sprite '${sprite_name}'..."
+    if ! sprite destroy "${sprite_name}" 2>&1; then
+        log_error "Failed to destroy sprite '${sprite_name}'"
+        log_error ""
+        log_error "The sprite may still be running and incurring charges."
+        log_error "Delete it manually: sprite destroy ${sprite_name}"
+        log_error "Or check status: sprite list"
+        return 1
+    fi
+
+    log_info "Sprite '${sprite_name}' destroyed"
+}
+
 # Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers, validate_model_id) are now in shared/common.sh
