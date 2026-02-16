@@ -28,6 +28,7 @@ const manifest: Manifest = JSON.parse(
 );
 
 const mockShContent = readFileSync(join(REPO_ROOT, "test/mock.sh"), "utf-8");
+const cloudApiMapContent = readFileSync(join(REPO_ROOT, "test/lib/cloud-api-map.sh"), "utf-8");
 const recordShContent = readFileSync(join(REPO_ROOT, "test/record.sh"), "utf-8");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -91,15 +92,15 @@ function getCloudsInCase(content: string, funcName: string): string[] {
   return clouds;
 }
 
-/** Extract cloud names from _strip_api_base's URL case patterns */
+/** Extract cloud names from strip_cloud_api_base's URL case patterns in the shared map */
 function getCloudsInStripApiBase(): string[] {
   const clouds: string[] = [];
-  const lines = mockShContent.split("\n");
+  const lines = cloudApiMapContent.split("\n");
 
   let inStripApiBase = false;
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.startsWith("_strip_api_base()")) {
+    if (trimmed.startsWith("strip_cloud_api_base()")) {
       inStripApiBase = true;
       continue;
     }
@@ -285,9 +286,9 @@ describe("Test Infrastructure Sync", () => {
       );
       if (missing.length > 0) {
         throw new Error(
-          `Clouds with fixture data but missing from _strip_api_base() in mock curl:\n` +
+          `Clouds with fixture data but missing from strip_cloud_api_base() in test/lib/cloud-api-map.sh:\n` +
           missing.map((c) => `  - ${c}`).join("\n") +
-          `\nAdd URL pattern for each cloud in _strip_api_base() (test/mock.sh).`
+          `\nAdd URL pattern for each cloud in strip_cloud_api_base() (test/lib/cloud-api-map.sh).`
         );
       }
     });
@@ -299,12 +300,12 @@ describe("Test Infrastructure Sync", () => {
     });
   });
 
-  describe("test/mock.sh: _validate_body() coverage", () => {
-    it("should validate POST body for major clouds", () => {
-      // _validate_body has explicit field checks for major REST API clouds
+  describe("test/lib/cloud-api-map.sh: get_required_post_fields() coverage", () => {
+    it("should define required POST fields for major clouds", () => {
+      // get_required_post_fields has explicit field checks for major REST API clouds
       const majorClouds = ["hetzner", "digitalocean"];
       for (const cloud of majorClouds) {
-        expect(mockShContent).toContain(cloud);
+        expect(cloudApiMapContent).toContain(cloud);
       }
     });
   });

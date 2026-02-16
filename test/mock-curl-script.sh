@@ -2,6 +2,11 @@
 # Mock curl — returns fixture data based on URL
 # Env vars from parent: MOCK_LOG, MOCK_FIXTURE_DIR, MOCK_CLOUD
 
+# Source shared cloud API map (URL stripping + required fields).
+# This script gets copied to a temp dir at runtime, so use MOCK_REPO_ROOT.
+# shellcheck disable=SC1091
+source "${MOCK_REPO_ROOT}/test/lib/cloud-api-map.sh"
+
 # --- Helper functions ---
 
 _parse_args() {
@@ -82,13 +87,7 @@ _handle_special_urls() {
 }
 
 _strip_api_base() {
-    ENDPOINT="$URL"
-    case "$URL" in
-        https://api.hetzner.cloud/v1*)     ENDPOINT="${URL#https://api.hetzner.cloud/v1}" ;;
-        https://api.digitalocean.com/v2*)   ENDPOINT="${URL#https://api.digitalocean.com/v2}" ;;
-        *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
-    esac
-    EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
+    EP_CLEAN=$(strip_cloud_api_base "$URL")
 }
 
 _check_fields() {
@@ -106,11 +105,9 @@ _validate_body() {
         echo "BODY_ERROR:invalid_json:${URL}" >> "${MOCK_LOG}"
         return 0
     fi
-    case "${MOCK_CLOUD}" in
-        hetzner)     case "$EP_CLEAN" in /servers)          _check_fields "name server_type image location" ;; esac ;;
-        digitalocean) case "$EP_CLEAN" in /droplets)        _check_fields "name region size image" ;; esac ;;
-        ovh)         case "$EP_CLEAN" in */create)          _check_fields "name" ;; esac ;;
-    esac
+    local _fields
+    _fields=$(get_required_post_fields "${MOCK_CLOUD}" "$EP_CLEAN")
+    [ -n "$_fields" ] && _check_fields "$_fields"
 }
 
 _try_fixture() {

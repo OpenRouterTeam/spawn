@@ -17,6 +17,10 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES_DIR="${REPO_ROOT}/test/fixtures"
+
+# Source shared cloud API map (URL stripping + required fields)
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/test/lib/cloud-api-map.sh"
 TEST_DIR=$(mktemp -d)
 MOCK_LOG="${TEST_DIR}/mock_calls.log"
 
@@ -285,35 +289,11 @@ _strip_pattern_base() {
 
 
 _strip_api_base() {
-    local url="$1"
-    local endpoint="$url"
-
-    case "$url" in
-        https://api.hetzner.cloud/v1*)
-            endpoint="${url#https://api.hetzner.cloud/v1}" ;;
-        https://api.digitalocean.com/v2*)
-            endpoint="${url#https://api.digitalocean.com/v2}" ;;
-        *eu.api.ovh.com*)
-            endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
-    esac
-
-    echo "$endpoint" | sed 's|?.*||'
-}
-
-# Get required POST body fields for a cloud endpoint.
-_get_required_fields() {
-    local cloud="$1"
-    local endpoint="$2"
-
-    case "${cloud}:${endpoint}" in
-        hetzner:/servers) echo "name server_type image location" ;;
-        digitalocean:/droplets) echo "name region size image" ;;
-        ovh:*/create) echo "name" ;;
-    esac
+    strip_cloud_api_base "$1"
 }
 
 # Validate POST request body contains required fields for major clouds.
-# Used during mock script execution to catch invalid API requests.
+# Uses get_required_post_fields from test/lib/cloud-api-map.sh.
 # Args: cloud method endpoint body
 _validate_body() {
     local cloud="$1"
@@ -325,7 +305,7 @@ _validate_body() {
     [[ -z "$body" ]] && return 0
 
     local required_fields
-    required_fields=$(_get_required_fields "$cloud" "$endpoint")
+    required_fields=$(get_required_post_fields "$cloud" "$endpoint")
     [[ -z "$required_fields" ]] && return 0
 
     # Check if body is valid JSON
