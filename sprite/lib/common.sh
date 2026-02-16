@@ -178,8 +178,8 @@ setup_shell_environment() {
 export PATH="${HOME}/.bun/bin:/.sprite/languages/bun/bin:${PATH}"
 EOF
 
-    # Upload and append to shell configs
-    sprite exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.zprofile && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
+    # Upload and append to .profile and .zshrc ONLY (not .zprofile)
+    sprite exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.profile && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
 
     # Switch bash to zsh
     local bash_temp
@@ -209,8 +209,9 @@ inject_env_vars_sprite() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to .profile, .bash_profile, .bashrc, and .zshrc using sprite exec
-    sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "for rc in ~/.profile ~/.bash_profile ~/.bashrc ~/.zshrc ~/.zprofile; do cat /tmp/env_config >> \"\$rc\"; done && rm /tmp/env_config"
+    # Upload and append to .profile, .bashrc, .zshrc ONLY using sprite exec.
+    # CRITICAL: Do NOT write to ~/.bash_profile or ~/.zprofile — see shared/common.sh.
+    sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
     trap - EXIT
 
     # Offer optional GitHub CLI setup

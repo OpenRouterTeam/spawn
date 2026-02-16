@@ -156,7 +156,7 @@ inject_env_vars_local mock_upload mock_run "MY_KEY=my_value"
     // inject_env_vars_local does NOT pass server_ip - upload gets (local_path, remote_path)
     expect(result.stdout).toContain("UPLOAD_ARGS:");
     expect(result.stdout).toContain("/tmp/env_config");
-    expect(result.stdout).toContain("for rc in ~/.profile ~/.bash_profile ~/.bashrc ~/.zshrc ~/.zprofile; do cat /tmp/env_config >>");
+    expect(result.stdout).toContain("cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc");
   });
 
   it("should generate correct env config content", () => {
