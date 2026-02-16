@@ -743,7 +743,7 @@ done
 for cloud in $CLOUDS; do
     if [[ -f "${CLOUD_RESULTS_DIR}/${cloud}.counts" ]]; then
         # Initialize to 0 in case read fails or file is malformed
-        local p=0 f=0 s=0
+        p=0 f=0 s=0
         if read -r p f s < "${CLOUD_RESULTS_DIR}/${cloud}.counts" 2>/dev/null && \
            [[ "$p" =~ ^[0-9]+$ ]] && [[ "$f" =~ ^[0-9]+$ ]] && [[ "$s" =~ ^[0-9]+$ ]]; then
             PASSED=$((PASSED + p))
