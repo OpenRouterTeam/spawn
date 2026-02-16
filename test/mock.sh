@@ -409,7 +409,10 @@ _wait_with_timeout() {
         sleep 1
         i=$((i + 1))
     done
-    wait "$pid" 2>/dev/null || eval "${exit_code_var}=$?"
+    # Capture exit code: wait returns the process exit code, not success/failure of wait itself
+    local actual_exit=0
+    wait "$pid" 2>/dev/null || actual_exit=$?
+    eval "${exit_code_var}=${actual_exit}"
 }
 
 # Run a script in a sandboxed environment with a 4-second timeout.
@@ -720,9 +723,12 @@ for cloud in $CLOUDS; do
     CLOUD_PIDS="${CLOUD_PIDS} $!"
 done
 
-# Wait for all clouds to finish
+# Wait for all clouds to finish and track failures
+PARALLEL_TEST_FAILED=0
 for pid in $CLOUD_PIDS; do
-    wait "$pid" 2>/dev/null || true
+    if ! wait "$pid" 2>/dev/null; then
+        PARALLEL_TEST_FAILED=1
+    fi
 done
 
 # Print output from each cloud (in discovery order for consistent output)
@@ -735,10 +741,16 @@ done
 # Aggregate results from all clouds
 for cloud in $CLOUDS; do
     if [[ -f "${CLOUD_RESULTS_DIR}/${cloud}.counts" ]]; then
-        read -r p f s < "${CLOUD_RESULTS_DIR}/${cloud}.counts"
-        PASSED=$((PASSED + p))
-        FAILED=$((FAILED + f))
-        SKIPPED=$((SKIPPED + s))
+        # Validate counts file has exactly 3 integers
+        if read -r p f s < "${CLOUD_RESULTS_DIR}/${cloud}.counts" && \
+           [[ "$p" =~ ^[0-9]+$ ]] && [[ "$f" =~ ^[0-9]+$ ]] && [[ "$s" =~ ^[0-9]+$ ]]; then
+            PASSED=$((PASSED + p))
+            FAILED=$((FAILED + f))
+            SKIPPED=$((SKIPPED + s))
+        else
+            log_warn "Invalid counts file for ${cloud}, skipping aggregation"
+            PARALLEL_TEST_FAILED=1
+        fi
     fi
 done
 
@@ -748,7 +760,7 @@ TOTAL=$((PASSED + FAILED + SKIPPED))
 printf '%b\n' " Results: ${GREEN}${PASSED} passed${NC}, ${RED}${FAILED} failed${NC}, ${YELLOW}${SKIPPED} skipped${NC}, ${TOTAL} total"
 printf '%b\n' "${CYAN}===============================${NC}"
 
-if [[ "$FAILED" -gt 0 ]]; then
+if [[ "$FAILED" -gt 0 ]] || [[ "$PARALLEL_TEST_FAILED" -eq 1 ]]; then
     exit 1
 fi
 exit 0
