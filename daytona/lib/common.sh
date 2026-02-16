@@ -225,11 +225,17 @@ upload_file() {
         return 1
     fi
 
-    # base64 output is safe (alphanumeric + /+=) so no injection risk
+    # SECURITY: base64 output must be properly quoted to prevent command injection
+    # Even though base64 typically produces safe characters, malformed input or
+    # unusual base64 implementations could produce special shell characters
     local content
     content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
 
-    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "printf '%s' '${content}' | base64 -d > '${remote_path}'"
+    # Properly escape the base64 content for safe shell embedding
+    local escaped_content
+    escaped_content=$(printf '%q' "${content}")
+
+    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "echo ${escaped_content} | base64 -d > '${remote_path}'"
 }
 
 # Daytona has true SSH support — much better than exec-only providers
