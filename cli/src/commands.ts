@@ -1557,6 +1557,39 @@ async function resolveListFilters(
   return { manifest, agentFilter, cloudFilter };
 }
 
+/** Prompt user to choose between reconnecting or rerunning, return selection */
+async function promptRecordAction(connection: VMConnection): Promise<"reconnect" | "rerun"> {
+  const action = await p.select({
+    message: "What would you like to do?",
+    options: [
+      { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${connection.user}@${connection.ip}` },
+      { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
+    ],
+  });
+
+  if (p.isCancel(action)) {
+    handleCancel();
+  }
+
+  return action as "reconnect" | "rerun";
+}
+
+/** Handle reconnect action, with fallback error message */
+async function handleReconnectAction(selected: SpawnRecord, manifest: Manifest | null): Promise<void> {
+  try {
+    await cmdConnect(selected.connection!);
+  } catch (err) {
+    p.log.error(`Connection failed: ${getErrorMessage(err)}`);
+    p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
+  }
+}
+
+/** Handle rerun action (create new spawn) */
+async function handleRerunAction(selected: SpawnRecord, manifest: Manifest | null): Promise<void> {
+  p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
+  await cmdRun(selected.agent, selected.cloud, selected.prompt);
+}
+
 /** Handle reconnect or rerun action for a selected spawn record */
 async function handleRecordAction(
   selected: SpawnRecord,
@@ -1569,31 +1602,13 @@ async function handleRecordAction(
     return;
   }
 
-  const action = await p.select({
-    message: "What would you like to do?",
-    options: [
-      { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${selected.connection.user}@${selected.connection.ip}` },
-      { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
-    ],
-  });
-
-  if (p.isCancel(action)) {
-    handleCancel();
-  }
+  const action = await promptRecordAction(selected.connection);
 
   if (action === "reconnect") {
-    try {
-      await cmdConnect(selected.connection);
-    } catch (err) {
-      p.log.error(`Connection failed: ${getErrorMessage(err)}`);
-      p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
-    }
-    return;
+    await handleReconnectAction(selected, manifest);
+  } else {
+    await handleRerunAction(selected, manifest);
   }
-
-  // Rerun (create new spawn)
-  p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
-  await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
 
 /** Show interactive picker to select and reconnect/rerun a previous spawn */
