@@ -32,6 +32,7 @@ Get your credentials at: [CloudSigma Cloud Portal](https://zrh.cloudsigma.com/) 
 
 - `cloudsigma/claude` — Claude Code (Anthropic's CLI agent)
 - `cloudsigma/aider` — Aider (AI pair programming)
+- `cloudsigma/goose` — Goose (Block's open-source AI coding agent)
 
 More coming soon! See `manifest.json` for the full matrix.
 
