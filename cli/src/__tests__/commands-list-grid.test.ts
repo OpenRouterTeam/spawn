@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, setTerminalWidth, getTerminalWidth } from "./test-helpers";
 import { loadManifest } from "../manifest";
 import type { Manifest } from "../manifest";
 
@@ -214,17 +214,17 @@ describe("cmdMatrix - grid view rendering", () => {
     mockSpinnerStop.mockClear();
 
     originalFetch = global.fetch;
-    originalColumns = process.stdout.columns;
+    originalColumns = getTerminalWidth();
 
     // Force wide terminal for grid view
-    process.stdout.columns = 200;
+    setTerminalWidth(200);
 
     await setManifest(mockManifest);
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    process.stdout.columns = originalColumns!;
+    setTerminalWidth(originalColumns);
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
 

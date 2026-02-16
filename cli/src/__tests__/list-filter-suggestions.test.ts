@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:te
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, setTerminalWidth, getTerminalWidth } from "./test-helpers";
 import { loadManifest, type Manifest } from "../manifest";
 
 /**
@@ -600,19 +600,19 @@ describe("cmdMatrix - compact vs grid view", () => {
     mockSpinnerStop.mockClear();
 
     originalFetch = global.fetch;
-    originalColumns = process.stdout.columns;
+    originalColumns = getTerminalWidth();
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    process.stdout.columns = originalColumns!;
+    setTerminalWidth(originalColumns);
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
 
   describe("grid view (wide terminal)", () => {
     it("should render grid view on wide terminal with few clouds", async () => {
       // Set terminal very wide so grid fits
-      process.stdout.columns = 200;
+      setTerminalWidth(200);
       await setManifest(mockManifest);
 
       await cmdMatrix();
@@ -627,7 +627,7 @@ describe("cmdMatrix - compact vs grid view", () => {
     });
 
     it("should show separator line between header and rows in grid view", async () => {
-      process.stdout.columns = 200;
+      setTerminalWidth(200);
       await setManifest(mockManifest);
 
       await cmdMatrix();
@@ -641,7 +641,7 @@ describe("cmdMatrix - compact vs grid view", () => {
   describe("compact view (narrow terminal)", () => {
     it("should render compact view on narrow terminal with many clouds", async () => {
       // Set terminal very narrow to force compact mode
-      process.stdout.columns = 40;
+      setTerminalWidth(40);
       await setManifest(wideManifest);
 
       await cmdMatrix();
@@ -654,7 +654,7 @@ describe("cmdMatrix - compact vs grid view", () => {
     });
 
     it("should show green for fully-supported agents in compact view", async () => {
-      process.stdout.columns = 40;
+      setTerminalWidth(40);
       await setManifest(wideManifest);
 
       await cmdMatrix();
@@ -665,7 +665,7 @@ describe("cmdMatrix - compact vs grid view", () => {
     });
 
     it("should list missing cloud names in compact view for partial agents", async () => {
-      process.stdout.columns = 40;
+      setTerminalWidth(40);
       await setManifest(wideManifest);
 
       await cmdMatrix();
@@ -676,7 +676,7 @@ describe("cmdMatrix - compact vs grid view", () => {
     });
 
     it("should show ratio X/Y for each agent in compact view", async () => {
-      process.stdout.columns = 40;
+      setTerminalWidth(40);
       await setManifest(wideManifest);
 
       await cmdMatrix();
@@ -688,7 +688,7 @@ describe("cmdMatrix - compact vs grid view", () => {
     });
 
     it("should show compact legend instead of grid legend", async () => {
-      process.stdout.columns = 40;
+      setTerminalWidth(40);
       await setManifest(wideManifest);
 
       await cmdMatrix();
@@ -702,7 +702,7 @@ describe("cmdMatrix - compact vs grid view", () => {
 
   describe("total count in both views", () => {
     it("should show total implemented/total ratio", async () => {
-      process.stdout.columns = 200;
+      setTerminalWidth(200);
       await setManifest(mockManifest);
 
       await cmdMatrix();
@@ -713,7 +713,7 @@ describe("cmdMatrix - compact vs grid view", () => {
     });
 
     it("should show correct count in compact view", async () => {
-      process.stdout.columns = 40;
+      setTerminalWidth(40);
       await setManifest(wideManifest);
 
       await cmdMatrix();
@@ -726,7 +726,7 @@ describe("cmdMatrix - compact vs grid view", () => {
 
   describe("launch hint", () => {
     it("should show spawn command hints in footer", async () => {
-      process.stdout.columns = 200;
+      setTerminalWidth(200);
       await setManifest(mockManifest);
 
       await cmdMatrix();
@@ -861,26 +861,26 @@ describe("getTerminalWidth", () => {
   let originalColumns: number | undefined;
 
   beforeEach(() => {
-    originalColumns = process.stdout.columns;
+    originalColumns = getTerminalWidth();
   });
 
   afterEach(() => {
-    process.stdout.columns = originalColumns!;
+    setTerminalWidth(originalColumns);
   });
 
   it("should return process.stdout.columns when set", () => {
-    process.stdout.columns = 120;
+    setTerminalWidth(120);
     expect(getTerminalWidth()).toBe(120);
   });
 
   it("should return 80 when columns is not set", () => {
     // @ts-ignore - setting to undefined to simulate no terminal
-    process.stdout.columns = undefined;
+    setTerminalWidth(undefined);
     expect(getTerminalWidth()).toBe(80);
   });
 
   it("should return 80 when columns is 0 (falsy)", () => {
-    process.stdout.columns = 0;
+    setTerminalWidth(0);
     expect(getTerminalWidth()).toBe(80);
   });
 });

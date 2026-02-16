@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, setTerminalWidth, getTerminalWidth } from "./test-helpers";
 import { loadManifest } from "../manifest";
 
 /**
@@ -190,12 +190,12 @@ describe("Compact List View", () => {
     mockSpinnerStop.mockClear();
 
     originalFetch = global.fetch;
-    originalColumns = process.stdout.columns;
+    originalColumns = getTerminalWidth();
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    process.stdout.columns = originalColumns!;
+    setTerminalWidth(originalColumns);
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
 
@@ -220,7 +220,7 @@ describe("Compact List View", () => {
     it("should use compact view when terminal is narrow and many clouds", async () => {
       await setManifest(wideManifest);
       // Force narrow terminal - compact view triggered
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -233,7 +233,7 @@ describe("Compact List View", () => {
     it("should use grid view when terminal is wide enough for small manifest", async () => {
       await setManifest(mockManifest);
       // Force wide terminal
-      process.stdout.columns = 200;
+      setTerminalWidth(200);
 
       await cmdMatrix();
       const output = getOutput();
@@ -264,7 +264,7 @@ describe("Compact List View", () => {
   describe("compact view header", () => {
     it("should show three column headers: Agent, Clouds, Not yet available", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -275,7 +275,7 @@ describe("Compact List View", () => {
 
     it("should include a separator line with dashes", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -289,7 +289,7 @@ describe("Compact List View", () => {
   describe("compact view counts", () => {
     it("should show correct count for fully implemented agent", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -299,7 +299,7 @@ describe("Compact List View", () => {
 
     it("should show correct count for partially implemented agent", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -309,7 +309,7 @@ describe("Compact List View", () => {
 
     it("should show 0/N when agent has no implementations", async () => {
       await setManifest(allMissingManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -318,7 +318,7 @@ describe("Compact List View", () => {
 
     it("should show N/N for all agents when everything is implemented", async () => {
       await setManifest(allImplementedManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -335,7 +335,7 @@ describe("Compact List View", () => {
   describe("compact view missing clouds column", () => {
     it("should show 'all clouds supported' when agent is fully implemented", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -345,7 +345,7 @@ describe("Compact List View", () => {
 
     it("should list missing cloud names when agent is partially implemented", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -359,7 +359,7 @@ describe("Compact List View", () => {
 
     it("should not list implemented clouds as missing", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -378,7 +378,7 @@ describe("Compact List View", () => {
 
     it("should list all clouds as missing when agent has no implementations", async () => {
       await setManifest(allMissingManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -394,7 +394,7 @@ describe("Compact List View", () => {
 
     it("should show 'all clouds supported' for every agent when everything is implemented", async () => {
       await setManifest(allImplementedManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -410,7 +410,7 @@ describe("Compact List View", () => {
   describe("compact view agent names", () => {
     it("should display agent display names (not keys)", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -424,7 +424,7 @@ describe("Compact List View", () => {
   describe("footer in compact view", () => {
     it("should show total implemented count", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -434,7 +434,7 @@ describe("Compact List View", () => {
 
     it("should not show grid legend in compact view", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -445,7 +445,7 @@ describe("Compact List View", () => {
 
     it("should show usage hints", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -472,7 +472,7 @@ describe("Compact List View", () => {
         },
       };
       await setManifest(singleAgent);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const output = getOutput();
@@ -488,7 +488,7 @@ describe("Compact List View", () => {
   describe("compact view missing clouds formatting", () => {
     it("should separate missing cloud names with commas", async () => {
       await setManifest(wideManifest);
-      process.stdout.columns = 60;
+      setTerminalWidth(60);
 
       await cmdMatrix();
       const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));

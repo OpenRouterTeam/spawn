@@ -147,3 +147,16 @@ export function teardownTestEnvironment(env: TestEnvironment) {
 
   mock.restore();
 }
+
+// ── Terminal Width Mocking ──────────────────────────────────────────────────
+
+export function setTerminalWidth(width: number | undefined) {
+  Object.defineProperty(process.stdout, "columns", {
+    value: width,
+    configurable: true,
+  });
+}
+
+export function getTerminalWidth(): number | undefined {
+  return process.stdout.columns;
+}
