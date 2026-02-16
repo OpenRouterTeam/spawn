@@ -656,7 +656,7 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   }
 }
 
-export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean): Promise<void> {
+export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean, debug?: boolean): Promise<void> {
   const manifest = await loadManifestWithSpinner();
   ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
 
@@ -676,7 +676,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
   const suffix = prompt ? " with prompt..." : "...";
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
-  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), manifest.clouds[cloud].url);
+  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), manifest.clouds[cloud].url, debug);
 }
 
 export function getStatusDescription(status: number): string {
@@ -1070,10 +1070,10 @@ function handleUserInterrupt(errMsg: string, dashboardUrl?: string): void {
   process.exit(130);
 }
 
-async function runWithRetries(script: string, prompt?: string, dashboardUrl?: string): Promise<string | undefined> {
+async function runWithRetries(script: string, prompt?: string, dashboardUrl?: string, debug?: boolean): Promise<string | undefined> {
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     try {
-      await runBash(script, prompt);
+      await runBash(script, prompt, debug);
       return undefined; // success
     } catch (err) {
       const errMsg = getErrorMessage(err);
@@ -1092,7 +1092,7 @@ async function runWithRetries(script: string, prompt?: string, dashboardUrl?: st
   return "Script failed after all retries";
 }
 
-async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, dashboardUrl?: string): Promise<void> {
+async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, dashboardUrl?: string, debug?: boolean): Promise<void> {
   const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
@@ -1116,13 +1116,13 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     // Non-fatal: don't block the spawn if history write fails
   }
 
-  const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl);
+  const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl, debug);
   if (lastErr) {
     reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl);
   }
 }
 
-function runBash(script: string, prompt?: string): Promise<void> {
+function runBash(script: string, prompt?: string, debug?: boolean): Promise<void> {
   // SECURITY: Validate script content before execution
   validateScriptContent(script);
 
@@ -1131,6 +1131,9 @@ function runBash(script: string, prompt?: string): Promise<void> {
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
     env.SPAWN_MODE = "non-interactive";
+  }
+  if (debug) {
+    env.SPAWN_DEBUG = "1";
   }
 
   return new Promise<void>((resolve, reject) => {

@@ -8,6 +8,15 @@
 # by the scripts that source this file.
 
 # ============================================================
+# Debug mode
+# ============================================================
+
+# Enable debug output if SPAWN_DEBUG is set
+if [[ -n "${SPAWN_DEBUG:-}" ]]; then
+    set -x
+fi
+
+# ============================================================
 # Color definitions and logging
 # ============================================================
 
@@ -1759,6 +1768,9 @@ wait_for_cloud_init() {
 ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
+    if [[ -n "${SPAWN_DEBUG:-}" ]]; then
+        cmd="set -x; ${cmd}"
+    fi
     # shellcheck disable=SC2086
     ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}"
 }
