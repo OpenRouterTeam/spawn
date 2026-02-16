@@ -40,6 +40,10 @@ function bashSyntaxCheck(filePath: string): string | null {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 10000,
+      env: {
+        ...process.env,
+        PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH || ""}`,
+      },
     });
     return null;
   } catch (err: any) {
