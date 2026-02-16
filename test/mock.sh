@@ -409,7 +409,13 @@ _wait_with_timeout() {
         sleep 1
         i=$((i + 1))
     done
-    wait "$pid" 2>/dev/null || eval "${exit_code_var}=$?"
+    # Process exited — capture its actual exit code
+    # Use 'wait' without command substitution to avoid masking the exit code
+    if wait "$pid" 2>/dev/null; then
+        eval "${exit_code_var}=0"
+    else
+        eval "${exit_code_var}=$?"
+    fi
 }
 
 # Run a script in a sandboxed environment with a 4-second timeout.

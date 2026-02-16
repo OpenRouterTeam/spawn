@@ -94,18 +94,36 @@ _strip_api_base() {
 _check_fields() {
     local fields="$1"
     for field in $fields; do
-        if ! printf '%s' "$BODY" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
-            echo "BODY_ERROR:missing_field:${field}:${URL}" >> "${MOCK_LOG}"
+        local check_output check_status
+        check_output=$(printf '%s' "$BODY" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>&1)
+        check_status=$?
+        if [[ $check_status -ne 0 ]]; then
+            # Log python3 errors separately from validation errors
+            if [[ "$check_output" == *"python3: command not found"* ]] || [[ "$check_output" == *"ModuleNotFoundError"* ]]; then
+                echo "BODY_ERROR:python3_failure:${check_output}:${URL}" >> "${MOCK_LOG}"
+            else
+                echo "BODY_ERROR:missing_field:${field}:${URL}" >> "${MOCK_LOG}"
+            fi
         fi
     done
 }
 
 _validate_body() {
     [ "${MOCK_VALIDATE_BODY:-}" = "1" ] && [ -n "$BODY" ] && [ "$METHOD" = "POST" ] || return 0
-    if ! printf '%s' "$BODY" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
-        echo "BODY_ERROR:invalid_json:${URL}" >> "${MOCK_LOG}"
+
+    local validate_output validate_status
+    validate_output=$(printf '%s' "$BODY" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>&1)
+    validate_status=$?
+
+    if [[ $validate_status -ne 0 ]]; then
+        if [[ "$validate_output" == *"python3: command not found"* ]] || [[ "$validate_output" == *"ModuleNotFoundError"* ]]; then
+            echo "BODY_ERROR:python3_failure:${validate_output}:${URL}" >> "${MOCK_LOG}"
+        else
+            echo "BODY_ERROR:invalid_json:${URL}" >> "${MOCK_LOG}"
+        fi
         return 0
     fi
+
     case "${MOCK_CLOUD}" in
         hetzner)     case "$EP_CLEAN" in /servers)          _check_fields "name server_type image location" ;; esac ;;
         digitalocean) case "$EP_CLEAN" in /droplets)        _check_fields "name region size image" ;; esac ;;
