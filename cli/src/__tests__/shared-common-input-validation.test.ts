@@ -44,7 +44,10 @@ function runBash(
       stderr = execSync(`cat /tmp/spawn-test-stderr$$ 2>/dev/null; rm -f /tmp/spawn-test-stderr$$`, {
         encoding: "utf-8",
       });
-    } catch {}
+    } catch (err: any) {
+      // Expected: cat fails if file doesn't exist. Log unexpected command failures.
+      if (err.status !== 1) console.error("Unexpected error in stderr cleanup:", err);
+    }
     return { exitCode: 0, stdout: stdout.trim(), stderr: stderr.trim() };
   } catch (err: any) {
     let stderr = (err.stderr || "").trim();
@@ -53,7 +56,10 @@ function runBash(
         encoding: "utf-8",
       });
       if (captured.trim()) stderr = captured.trim();
-    } catch {}
+    } catch (captureErr: any) {
+      // Expected: cat fails if file doesn't exist.
+      if (captureErr.status !== 1) console.error("Unexpected error capturing stderr:", captureErr);
+    }
     return {
       exitCode: err.status ?? 1,
       stdout: (err.stdout || "").trim(),
@@ -82,16 +88,26 @@ function runBashCapture(
     let stderr = "";
     try {
       stderr = execSync(`cat "${stderrFile}" 2>/dev/null`, { encoding: "utf-8" });
-    } catch {}
-    try { execSync(`rm -f "${stderrFile}"`); } catch {}
+    } catch (err: any) {
+      // Expected: cat fails if file doesn't exist.
+      if (err.status !== 1) console.error("Unexpected error reading stderr file:", err);
+    }
+    try { execSync(`rm -f "${stderrFile}"`); } catch (err: any) {
+      console.error("Unexpected error removing stderr file:", err);
+    }
     return { exitCode: 0, stdout: stdout.trim(), stderr: stderr.trim() };
   } catch (err: any) {
     let stderr = (err.stderr || "").trim();
     try {
       const captured = execSync(`cat "${stderrFile}" 2>/dev/null`, { encoding: "utf-8" });
       if (captured.trim()) stderr = captured.trim();
-    } catch {}
-    try { execSync(`rm -f "${stderrFile}"`); } catch {}
+    } catch (captureErr: any) {
+      // Expected: cat fails if file doesn't exist.
+      if (captureErr.status !== 1) console.error("Unexpected error capturing stderr:", captureErr);
+    }
+    try { execSync(`rm -f "${stderrFile}"`); } catch (rmErr: any) {
+      console.error("Unexpected error removing stderr file:", rmErr);
+    }
     return {
       exitCode: err.status ?? 1,
       stdout: (err.stdout || "").trim(),
