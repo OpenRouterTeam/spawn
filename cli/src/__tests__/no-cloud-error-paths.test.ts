@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { execSync } from "child_process";
 import { resolve } from "path";
 import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
+import { homedir } from "os";
 
 /**
  * Tests for error paths when agent/cloud arguments are missing.
@@ -31,10 +32,11 @@ function runCli(
     .join(" ");
   const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
   try {
+    const bunPath = resolve(homedir(), ".bun/bin");
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,
       env: {
-        PATH: process.env.PATH,
+        PATH: `${bunPath}:${process.env.PATH || ""}`,
         HOME: process.env.HOME,
         SHELL: process.env.SHELL,
         TERM: process.env.TERM || "xterm",

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { execSync } from "child_process";
 import { resolve } from "path";
+import { homedir } from "os";
 
 /**
  * Tests for index.ts main() routing, handleError, and isInteractiveTTY.
@@ -26,11 +27,13 @@ function runCli(
 ): { stdout: string; stderr: string; exitCode: number } {
   const cmd = `bun run src/index.ts ${args.join(" ")}`;
   try {
+    const bunPath = resolve(homedir(), ".bun/bin");
     const stdout = execSync(cmd, {
       cwd: CLI_DIR,
       env: {
         ...process.env,
         ...env,
+        PATH: `${bunPath}:${process.env.PATH || ""}`,
         // Prevent auto-update from running during tests
         SPAWN_NO_UPDATE_CHECK: "1",
         // Prevent local manifest.json from being used
