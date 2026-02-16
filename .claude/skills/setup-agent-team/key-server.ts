@@ -288,6 +288,11 @@ function formPage(
 
 // --- Config file operations ---
 function saveKeys(provider: string, vars: Record<string, string>) {
+  // SECURITY: Validate provider name to prevent path traversal
+  if (!SAFE_PROVIDER_RE.test(provider)) {
+    console.error(`[key-server] SECURITY: Rejected invalid provider name in saveKeys: ${provider}`);
+    return;
+  }
   const cfgPath = join(CONFIG_DIR, `${provider}.json`);
   const data: Record<string, string> = { ...vars };
   // Backward compat: single-var clouds also get api_key/token fields
@@ -372,6 +377,10 @@ const server = Bun.serve({
       const skipped: string[] = [];
 
       for (const pk of body.providers as string[]) {
+        // SECURITY: Validate provider name to prevent path traversal in saveKeys
+        if (typeof pk !== "string" || !SAFE_PROVIDER_RE.test(pk)) {
+          continue; // silently skip invalid provider names
+        }
         if (
           d.batches.some(
             (b) =>
@@ -465,9 +474,10 @@ const server = Bun.serve({
 
       // POST — submit keys (rate-limited)
       if (req.method === "POST") {
+        // SECURITY: Use Bun's server.requestIP for actual connection IP
+        // instead of spoofable x-forwarded-for header
         const ip =
-          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-          "unknown";
+          server.requestIP(req)?.address ?? "unknown";
         let retry = rateCheck(ip, rateMaps.ip, 10, 15 * 60_000);
         if (retry !== null)
           return new Response("Too many requests", {
