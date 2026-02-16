@@ -87,6 +87,10 @@ _strip_api_base() {
         https://api.hetzner.cloud/v1*)     ENDPOINT="${URL#https://api.hetzner.cloud/v1}" ;;
         https://api.digitalocean.com/v2*)   ENDPOINT="${URL#https://api.digitalocean.com/v2}" ;;
         *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
+        https://api.machines.dev/v1*)       ENDPOINT="${URL#https://api.machines.dev/v1}" ;;
+        https://www.googleapis.com*)        ENDPOINT=$(echo "$URL" | sed 's|https://www.googleapis.com||') ;;
+        https://lightsail.amazonaws.com*)   ENDPOINT="${URL#https://lightsail.amazonaws.com}" ;;
+        https://api.daytona.io*)            ENDPOINT="${URL#https://api.daytona.io}" ;;
     esac
     EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
 }
