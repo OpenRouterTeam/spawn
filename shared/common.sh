@@ -1253,46 +1253,54 @@ verify_agent() {
     log_info "${agent_name} installation verified successfully"
 }
 
-# Install Claude Code with multi-method fallback and detailed error reporting.
-# Tries: 1) curl installer (standalone binary)  2) bun  3) npm
-# The curl installer bundles its own runtime. npm/bun install a Node.js package
-# whose shebang needs 'node', so we ensure a node runtime exists after those.
-# Usage: install_claude_code RUN_CB
-install_claude_code() {
+# Finalize Claude Code installation: set up shell integration and update rc files.
+# Usage: _finalize_claude_code_install RUN_CB CLAUDE_PATH
+_finalize_claude_code_install() {
     local run_cb="$1"
-    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+    local claude_path="$2"
 
-    # Clean up ~/.bash_profile if it was created by a previous broken deployment.
-    ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
+    log_step "Setting up Claude Code shell integration..."
+    ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
+    # Write claude PATH to .bashrc and .zshrc
+    ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
+}
 
-    _finalize_claude_install() {
-        log_step "Setting up Claude Code shell integration..."
-        ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
-        # Write claude PATH to .bashrc and .zshrc
-        ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
-    }
+# Check if Claude Code is already installed.
+# Usage: _is_claude_installed RUN_CB CLAUDE_PATH
+# Returns: 0 if installed, 1 if not
+_is_claude_installed() {
+    local run_cb="$1"
+    local claude_path="$2"
 
-    # Already installed?
-    if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
-        log_info "Claude Code already installed"
-        _finalize_claude_install
-        return 0
-    fi
+    ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1
+}
 
-    # Method 1: official curl installer (standalone binary, no node needed)
+# Try to install Claude Code via curl installer (method 1).
+# Usage: _try_curl_install RUN_CB CLAUDE_PATH
+# Returns: 0 if successful, 1 if not
+_try_curl_install() {
+    local run_cb="$1"
+    local claude_path="$2"
+
     log_step "Installing Claude Code (method 1/2: curl installer)..."
     if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
+        if _is_claude_installed "${run_cb}" "${claude_path}"; then
             log_info "Claude Code installed via curl installer"
-            _finalize_claude_install
             return 0
         fi
         log_warn "curl installer exited 0 but claude not found on PATH"
     else
         log_warn "curl installer failed (site may be temporarily unavailable)"
     fi
+    return 1
+}
 
-    # Ensure Node.js runtime for bun-installed package (it's a Node.js script)
+# Ensure Node.js runtime is installed (required for bun/npm installations).
+# Usage: _ensure_nodejs RUN_CB CLAUDE_PATH
+_ensure_nodejs() {
+    local run_cb="$1"
+    local claude_path="$2"
+
     if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
         log_step "Installing Node.js runtime (required for claude package)..."
         if ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" >/dev/null 2>&1; then
@@ -1301,18 +1309,58 @@ install_claude_code() {
             log_warn "Could not install Node.js - bun method may fail"
         fi
     fi
+}
 
-    # Method 2: bun
+# Try to install Claude Code via bun (method 2).
+# Usage: _try_bun_install RUN_CB CLAUDE_PATH
+# Returns: 0 if successful, 1 if not
+_try_bun_install() {
+    local run_cb="$1"
+    local claude_path="$2"
+
     log_step "Installing Claude Code (method 2/2: bun)..."
     if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
+        if _is_claude_installed "${run_cb}" "${claude_path}"; then
             log_info "Claude Code installed via bun"
-            _finalize_claude_install
             return 0
         fi
         log_warn "bun install exited 0 but claude binary not found"
     else
         log_warn "bun install failed"
+    fi
+    return 1
+}
+
+# Install Claude Code with multi-method fallback and detailed error reporting.
+# Tries: 1) curl installer (standalone binary)  2) bun
+# The curl installer bundles its own runtime. bun installs a Node.js package
+# whose shebang needs 'node', so we ensure a node runtime exists before that.
+# Usage: install_claude_code RUN_CB
+install_claude_code() {
+    local run_cb="$1"
+    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+
+    # Clean up ~/.bash_profile if it was created by a previous broken deployment.
+    ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
+
+    # Already installed?
+    if _is_claude_installed "${run_cb}" "${claude_path}"; then
+        log_info "Claude Code already installed"
+        _finalize_claude_code_install "${run_cb}" "${claude_path}"
+        return 0
+    fi
+
+    # Try curl installer first
+    if _try_curl_install "${run_cb}" "${claude_path}"; then
+        _finalize_claude_code_install "${run_cb}" "${claude_path}"
+        return 0
+    fi
+
+    # Ensure Node.js and try bun
+    _ensure_nodejs "${run_cb}" "${claude_path}"
+    if _try_bun_install "${run_cb}" "${claude_path}"; then
+        _finalize_claude_code_install "${run_cb}" "${claude_path}"
+        return 0
     fi
 
     # All methods failed

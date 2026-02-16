@@ -119,6 +119,31 @@ validate_cloud_name() {
     return 0
 }
 
+# Extract PR number from gh pr create output URL.
+# Usage: _extract_pr_number PR_URL
+_extract_pr_number() {
+    local pr_url="$1"
+    printf '%s' "${pr_url}" | grep -oE '[0-9]+$' || true
+}
+
+# Add self-review comment and label to a PR.
+# Usage: _self_review_pr PR_NUMBER PR_TITLE
+_self_review_pr() {
+    local pr_number="$1"
+    local pr_title="$2"
+
+    # Self-review: add a comment summarizing the changes
+    gh pr review "${pr_number}" --repo OpenRouterTeam/spawn --comment \
+        --body "Self-review by QA cycle: ${pr_title}. Automated change -- tests were run before submission.\n\n-- qa/cycle" \
+        2>&1 | tee -a "${LOG_FILE}" || true
+
+    # Label for external review
+    gh pr edit "${pr_number}" --repo OpenRouterTeam/spawn --add-label "needs-team-review" \
+        2>&1 | tee -a "${LOG_FILE}" || true
+
+    log "push_and_create_pr: Self-reviewed and labeled PR #${pr_number} (not merging — awaiting external review)"
+}
+
 # Push → PR → self-review (NO merging — merging is handled externally)
 # Usage: push_and_create_pr BRANCH_NAME PR_TITLE PR_BODY
 push_and_create_pr() {
@@ -153,21 +178,12 @@ push_and_create_pr() {
 
     log "push_and_create_pr: PR created: ${pr_url}"
 
-    # Extract PR number from URL
-    local pr_number=""
-    pr_number=$(printf '%s' "${pr_url}" | grep -oE '[0-9]+$') || true
+    # Extract PR number and self-review
+    local pr_number
+    pr_number=$(_extract_pr_number "${pr_url}")
 
     if [[ -n "${pr_number}" ]]; then
-        # Self-review: add a comment summarizing the changes
-        gh pr review "${pr_number}" --repo OpenRouterTeam/spawn --comment \
-            --body "Self-review by QA cycle: ${pr_title}. Automated change -- tests were run before submission.\n\n-- qa/cycle" \
-            2>&1 | tee -a "${LOG_FILE}" || true
-
-        # Label for external review
-        gh pr edit "${pr_number}" --repo OpenRouterTeam/spawn --add-label "needs-team-review" \
-            2>&1 | tee -a "${LOG_FILE}" || true
-
-        log "push_and_create_pr: Self-reviewed and labeled PR #${pr_number} (not merging — awaiting external review)"
+        _self_review_pr "${pr_number}" "${pr_title}"
     fi
 
     return 0
