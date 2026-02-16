@@ -378,10 +378,9 @@ inject_env_vars_fly() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to .profile, .bashrc, .zshrc ONLY.
-    # CRITICAL: Do NOT write to ~/.bash_profile or ~/.zprofile — see shared/common.sh.
+    # Append to .bashrc and .zshrc only
     upload_file "${env_temp}" "/tmp/env_config"
-    run_server "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    run_server "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 }

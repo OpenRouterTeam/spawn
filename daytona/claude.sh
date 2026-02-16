@@ -64,4 +64,4 @@ echo ""
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "bash -lc claude"
+interactive_session 'export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH && source ~/.bashrc 2>/dev/null; source ~/.zshrc 2>/dev/null; claude'
