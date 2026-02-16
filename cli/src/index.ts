@@ -115,18 +115,28 @@ function showUnknownCommandError(name: string, manifest: { agents: Record<string
   const agentMatch = findClosestKeyByNameOrKey(name, agentKeys(manifest), (k) => manifest.agents[k].name);
   const cloudMatch = findClosestKeyByNameOrKey(name, cloudKeys(manifest), (k) => manifest.clouds[k].name);
 
+  // Check for typos in subcommands
+  const allSubcommands = ["help", "agents", "clouds", "matrix", "m", "list", "ls", "history", "update", "last", "rerun"];
+  const subcommandMatch = findClosestMatch(name, allSubcommands);
+
   console.error(pc.red(`Unknown agent or cloud: ${pc.bold(name)}`));
   console.error();
-  if (agentMatch || cloudMatch) {
-    const suggestions: string[] = [];
-    if (agentMatch) suggestions.push(`${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})`);
-    if (cloudMatch) suggestions.push(`${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})`);
-    console.error(`  Did you mean ${suggestions.join(" or ")}?`);
+
+  const suggestions: string[] = [];
+  if (agentMatch) suggestions.push(`${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})`);
+  if (cloudMatch) suggestions.push(`${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})`);
+  if (subcommandMatch && !agentMatch && !cloudMatch) {
+    suggestions.push(`${pc.cyan(subcommandMatch)} (command)`);
   }
-  console.error();
+
+  if (suggestions.length > 0) {
+    console.error(`  Did you mean ${suggestions.join(" or ")}?`);
+    console.error();
+  }
+
+  console.error(`  Run ${pc.cyan("spawn help")} for available commands.`);
   console.error(`  Run ${pc.cyan("spawn agents")} to see available agents.`);
   console.error(`  Run ${pc.cyan("spawn clouds")} to see available clouds.`);
-  console.error(`  Run ${pc.cyan("spawn help")} for usage information.`);
   process.exit(1);
 }
 

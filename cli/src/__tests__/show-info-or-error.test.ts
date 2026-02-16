@@ -198,6 +198,56 @@ describe("showInfoOrError - single argument routing", () => {
     });
   });
 
+  // ── Subcommand typo suggestions ────────────────────────────────────────
+
+  describe("subcommand typo suggestions", () => {
+    it("should suggest 'help' when user types 'hlep'", () => {
+      const result = runCli(["hlep"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("help");
+      expect(output).toContain("(command)");
+    });
+
+    it("should suggest 'list' when user types 'lst'", () => {
+      const result = runCli(["lst"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("list");
+      expect(output).toContain("(command)");
+    });
+
+    it("should suggest 'agents' when user types 'agens'", () => {
+      const result = runCli(["agens"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("agents");
+      expect(output).toContain("(command)");
+    });
+
+    it("should suggest 'matrix' when user types 'matri'", () => {
+      const result = runCli(["matri"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("Did you mean");
+      expect(output).toContain("matrix");
+      expect(output).toContain("(command)");
+    });
+
+    it("should include 'spawn help' in error for unknown command", () => {
+      const result = runCli(["hlep"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("spawn help");
+    });
+
+    it("should NOT suggest a command if agent/cloud match is closer", () => {
+      // "aider" (agent) should be suggested, not "help" as a command
+      const result = runCli(["aidr"]);
+      const output = result.stdout + result.stderr;
+      expect(output).toContain("aider");
+      expect(output).toContain("(agent:");
+    });
+  });
+
   // ── handleDefaultCommand help flag routing ─────────────────────────────
 
   describe("agent with help flag", () => {
