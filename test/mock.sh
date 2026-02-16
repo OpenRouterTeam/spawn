@@ -11,6 +11,11 @@
 
 set -eo pipefail
 
+# Source shared test helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/mock-helpers.sh"
+
 if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
     printf 'WARNING: bash %s detected. Some features may need bash 4+.\n' "${BASH_VERSION}" >&2
 fi
@@ -141,8 +146,8 @@ assert_server_cleaned_up() {
         return 0
     fi
     local created deleted
-    created=$(grep -c "^CREATED:" "$state_file" 2>/dev/null || true)
-    deleted=$(grep -c "^DELETED:" "$state_file" 2>/dev/null || true)
+    created=$(grep -c "^CREATED:" "$state_file" 2>/dev/null || echo "0")
+    deleted=$(grep -c "^DELETED:" "$state_file" 2>/dev/null || echo "0")
     if [[ "$created" -gt 0 ]]; then
         printf '%b\n' "    ${GREEN}✓${NC} ${msg} (created=${created}, deleted=${deleted})"
         PASSED=$((PASSED + 1))
@@ -283,66 +288,8 @@ _strip_pattern_base() {
     echo "$url" | sed "$sed_pattern"
 }
 
-
-_strip_api_base() {
-    local url="$1"
-    local endpoint="$url"
-
-    case "$url" in
-        https://api.hetzner.cloud/v1*)
-            endpoint="${url#https://api.hetzner.cloud/v1}" ;;
-        https://api.digitalocean.com/v2*)
-            endpoint="${url#https://api.digitalocean.com/v2}" ;;
-        *eu.api.ovh.com*)
-            endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
-    esac
-
-    echo "$endpoint" | sed 's|?.*||'
-}
-
-# Get required POST body fields for a cloud endpoint.
-_get_required_fields() {
-    local cloud="$1"
-    local endpoint="$2"
-
-    case "${cloud}:${endpoint}" in
-        hetzner:/servers) echo "name server_type image location" ;;
-        digitalocean:/droplets) echo "name region size image" ;;
-        ovh:*/create) echo "name" ;;
-    esac
-}
-
-# Validate POST request body contains required fields for major clouds.
-# Used during mock script execution to catch invalid API requests.
-# Args: cloud method endpoint body
-_validate_body() {
-    local cloud="$1"
-    local method="$2"
-    local endpoint="$3"
-    local body="$4"
-
-    [[ "$method" != "POST" ]] && return 0
-    [[ -z "$body" ]] && return 0
-
-    local required_fields
-    required_fields=$(_get_required_fields "$cloud" "$endpoint")
-    [[ -z "$required_fields" ]] && return 0
-
-    # Check if body is valid JSON
-    if ! printf '%s' "$body" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
-        echo "BODY_ERROR:invalid_json:${endpoint}" >> "${MOCK_LOG}"
-        return 1
-    fi
-
-    # Check for required fields
-    for field in $required_fields; do
-        if ! printf '%s' "$body" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
-            echo "BODY_ERROR:missing_field:${field}:${endpoint}" >> "${MOCK_LOG}"
-        fi
-    done
-
-    return 0
-}
+# Note: _strip_api_base(), _get_required_fields(), and _validate_body()
+# are now defined in test/mock-helpers.sh (sourced at the top of this file)
 
 # ============================================================
 # Cloud-specific env var setup

@@ -2,6 +2,11 @@
 # Mock curl — returns fixture data based on URL
 # Env vars from parent: MOCK_LOG, MOCK_FIXTURE_DIR, MOCK_CLOUD
 
+# Source shared test helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/mock-helpers.sh"
+
 # --- Helper functions ---
 
 _parse_args() {
@@ -81,36 +86,24 @@ _handle_special_urls() {
     esac
 }
 
-_strip_api_base() {
-    ENDPOINT="$URL"
-    case "$URL" in
-        https://api.hetzner.cloud/v1*)     ENDPOINT="${URL#https://api.hetzner.cloud/v1}" ;;
-        https://api.digitalocean.com/v2*)   ENDPOINT="${URL#https://api.digitalocean.com/v2}" ;;
-        *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
-    esac
-    EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
+# Note: The following functions use shared helpers from mock-helpers.sh
+# but adapt them to work with the global variables used by this script.
+
+# Strip API base and set global variables ENDPOINT and EP_CLEAN
+_strip_and_set_endpoint() {
+    # Import from mock-helpers.sh: _strip_api_base
+    ENDPOINT=$(_strip_api_base "$URL")
+    EP_CLEAN="$ENDPOINT"
 }
 
-_check_fields() {
-    local fields="$1"
-    for field in $fields; do
-        if ! printf '%s' "$BODY" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
-            echo "BODY_ERROR:missing_field:${field}:${URL}" >> "${MOCK_LOG}"
-        fi
-    done
-}
+# Validate POST body using shared validation logic
+_validate_post_body() {
+    [ "${MOCK_VALIDATE_BODY:-}" = "1" ] || return 0
+    [ -n "$BODY" ] || return 0
+    [ "$METHOD" = "POST" ] || return 0
 
-_validate_body() {
-    [ "${MOCK_VALIDATE_BODY:-}" = "1" ] && [ -n "$BODY" ] && [ "$METHOD" = "POST" ] || return 0
-    if ! printf '%s' "$BODY" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
-        echo "BODY_ERROR:invalid_json:${URL}" >> "${MOCK_LOG}"
-        return 0
-    fi
-    case "${MOCK_CLOUD}" in
-        hetzner)     case "$EP_CLEAN" in /servers)          _check_fields "name server_type image location" ;; esac ;;
-        digitalocean) case "$EP_CLEAN" in /droplets)        _check_fields "name region size image" ;; esac ;;
-        ovh)         case "$EP_CLEAN" in */create)          _check_fields "name" ;; esac ;;
-    esac
+    # Import from mock-helpers.sh: _validate_body
+    _validate_body "${MOCK_CLOUD}" "${METHOD}" "${EP_CLEAN}" "${BODY}"
 }
 
 _try_fixture() {
@@ -199,8 +192,8 @@ _handle_special_urls
 
 if [ -z "$URL" ]; then exit 0; fi
 
-_strip_api_base
-_validate_body
+_strip_and_set_endpoint
+_validate_post_body
 
 case "$METHOD" in
     GET)    _respond_get ;;
