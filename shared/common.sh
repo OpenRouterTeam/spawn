@@ -761,7 +761,13 @@ cleanup_oauth_session() {
         wait "${server_pid}" 2>/dev/null || true
     fi
 
-    if [[ -n "${oauth_dir}" && -d "${oauth_dir}" ]]; then
+    # SAFETY: Validate path before rm -rf to prevent accidental deletion of system directories
+    # Only delete if:
+    # 1. Variable is non-empty
+    # 2. Directory exists
+    # 3. Path starts with /tmp/ (mktemp always creates in /tmp)
+    # 4. Path contains more than just /tmp (prevent rm -rf /tmp)
+    if [[ -n "${oauth_dir}" && -d "${oauth_dir}" && "${oauth_dir}" == /tmp/* && "${oauth_dir}" != "/tmp" && "${oauth_dir}" != "/tmp/" ]]; then
         rm -rf "${oauth_dir}"
     fi
 }
@@ -907,6 +913,13 @@ _generate_csrf_state() {
 _init_oauth_session() {
     local oauth_dir
     oauth_dir=$(mktemp -d)
+
+    # SAFETY: Verify mktemp succeeded before proceeding
+    if [[ -z "${oauth_dir}" || ! -d "${oauth_dir}" ]]; then
+        log_error "Failed to create temporary directory for OAuth session"
+        log_error "Check disk space and /tmp permissions"
+        return 1
+    fi
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
