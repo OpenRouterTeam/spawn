@@ -629,6 +629,8 @@ _validate_oauth_server_args() {
 _generate_oauth_server_script() {
     local expected_state="${1}" success_html="${2}" error_html="${3}"
     local code_file="${4}" port_file="${5}" starting_port="${6}"
+    local max_port=$((starting_port + 10))
+
     printf '%s' "
 const http = require('http');
 const fs = require('fs');
@@ -636,6 +638,11 @@ const url = require('url');
 const expectedState = '${expected_state}';
 const html = '${success_html}';
 const errorHtml = '${error_html}';
+const codeFile = '${code_file}';
+const portFile = '${port_file}';
+const startPort = ${starting_port};
+const maxPort = ${max_port};
+
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url, true);
   if (parsed.pathname === '/callback' && parsed.query.code) {
@@ -645,7 +652,7 @@ const server = http.createServer((req, res) => {
       setTimeout(() => { server.close(); process.exit(1); }, 500);
       return;
     }
-    fs.writeFileSync('${code_file}', parsed.query.code);
+    fs.writeFileSync(codeFile, parsed.query.code);
     res.writeHead(200, {'Content-Type':'text/html','Connection':'close'});
     res.end(html);
     setTimeout(() => { server.close(); process.exit(0); }, 500);
@@ -654,14 +661,15 @@ const server = http.createServer((req, res) => {
     res.end('<html><body>Waiting for OAuth callback...</body></html>');
   }
 });
-let currentPort = ${starting_port};
-const maxPort = ${starting_port} + 10;
+
+let currentPort = startPort;
 function tryListen() {
   server.listen(currentPort, '127.0.0.1', () => {
-    fs.writeFileSync('${port_file}', currentPort.toString());
+    fs.writeFileSync(portFile, currentPort.toString());
     fs.writeFileSync('/dev/fd/1', '');
   });
 }
+
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE' && currentPort < maxPort) {
     currentPort++;
@@ -670,6 +678,7 @@ server.on('error', (err) => {
     process.exit(1);
   }
 });
+
 setTimeout(() => process.exit(0), 300000);
 tryListen();
 "
