@@ -2552,7 +2552,8 @@ _multi_creds_prompt() {
 _multi_creds_validate() {
     local test_func="${1}"
     local provider_name="${2}"
-    shift 2
+    local help_url="${3}"
+    shift 3
 
     if [[ -z "${test_func}" ]]; then
         return 0
@@ -2623,7 +2624,7 @@ ensure_multi_credentials() {
     _multi_creds_prompt "${provider_name}" "${help_url}" "${n}" "${env_vars[@]}" "${labels[@]}" || return 1
 
     # 4. Validate credentials
-    _multi_creds_validate "${test_func}" "${provider_name}" "${env_vars[@]}" || return 1
+    _multi_creds_validate "${test_func}" "${provider_name}" "${help_url}" "${env_vars[@]}" || return 1
 
     # 5. Save to config file
     local save_args=()
@@ -3150,13 +3151,13 @@ save_vm_connection() {
 
     local conn_file="${spawn_dir}/last-connection.json"
 
-    # Build JSON (handle optional fields)
-    local json="{\"ip\":\"${ip}\",\"user\":\"${user}\""
+    # Build JSON with proper escaping (handle optional fields)
+    local json="{\"ip\":$(json_escape "${ip}"),\"user\":$(json_escape "${user}")"
     if [[ -n "${server_id}" ]]; then
-        json="${json},\"server_id\":\"${server_id}\""
+        json="${json},\"server_id\":$(json_escape "${server_id}")"
     fi
     if [[ -n "${server_name}" ]]; then
-        json="${json},\"server_name\":\"${server_name}\""
+        json="${json},\"server_name\":$(json_escape "${server_name}")"
     fi
     json="${json}}"
 
