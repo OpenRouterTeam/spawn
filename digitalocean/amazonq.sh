@@ -24,7 +24,13 @@ wait_for_cloud_init "${DO_SERVER_IP}" 60
 
 log_step "Installing Amazon Q CLI..."
 run_server "${DO_SERVER_IP}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
-log_info "Amazon Q CLI installed"
+
+# Verify installation succeeded
+if ! run_server "${DO_SERVER_IP}" "command -v q &> /dev/null && q --version &> /dev/null"; then
+    log_install_failed "Amazon Q CLI" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash" "${DO_SERVER_IP}"
+    exit 1
+fi
+log_info "Amazon Q CLI installation verified successfully"
 
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then

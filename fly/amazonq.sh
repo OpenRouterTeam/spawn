@@ -26,7 +26,13 @@ wait_for_cloud_init
 # 4. Install Amazon Q CLI
 log_step "Installing Amazon Q CLI..."
 run_server "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
-log_info "Amazon Q CLI installed"
+
+# Verify installation succeeded
+if ! run_server "command -v q &> /dev/null && q --version &> /dev/null"; then
+    log_install_failed "Amazon Q CLI" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
+    exit 1
+fi
+log_info "Amazon Q CLI installation verified successfully"
 
 # 5. Get OpenRouter API key
 echo ""

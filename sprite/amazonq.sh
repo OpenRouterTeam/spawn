@@ -24,6 +24,13 @@ setup_shell_environment "${SPRITE_NAME}"
 log_step "Installing Amazon Q CLI..."
 run_sprite "${SPRITE_NAME}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
 
+# Verify installation succeeded
+if ! run_sprite "${SPRITE_NAME}" "command -v q &> /dev/null && q --version &> /dev/null"; then
+    log_install_failed "Amazon Q CLI" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
+    exit 1
+fi
+log_info "Amazon Q CLI installation verified successfully"
+
 echo ""
 if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
     log_info "Using OpenRouter API key from environment"

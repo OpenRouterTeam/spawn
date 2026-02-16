@@ -46,10 +46,11 @@ test_do_token() {
         return 0
     else
         log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
+        log_error ""
         log_error "How to fix:"
-        log_warn "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
-        log_warn "  2. Ensure the token has read/write permissions"
-        log_warn "  3. Check token hasn't expired or been revoked"
+        log_error "  1. Verify token at: https://cloud.digitalocean.com/account/api/tokens"
+        log_error "  2. Ensure the token has read/write permissions"
+        log_error "  3. Check token hasn't expired or been revoked"
         return 1
     fi
 }
@@ -86,11 +87,11 @@ do_register_ssh_key() {
         return 0
     else
         log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
-
-        log_warn "Common causes:"
-        log_warn "  - SSH key already registered (check: doctl compute ssh-key list)"
-        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
-        log_warn "  - API token lacks write permissions"
+        log_error ""
+        log_error "Common causes:"
+        log_error "  - SSH key already registered (check: doctl compute ssh-key list)"
+        log_error "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_error "  - API token lacks write permissions"
         return 1
     fi
 }
