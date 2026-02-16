@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import {
   cmdInteractive,
+  cmdAgentInteractive,
   cmdRun,
   cmdList,
   cmdListClear,
@@ -163,6 +164,13 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
     await suggestCloudsForPrompt(agent);
     process.exit(1);
   }
+
+  // Interactive cloud selection when agent is provided without cloud
+  if (isInteractiveTTY()) {
+    await cmdAgentInteractive(agent, prompt, dryRun);
+    return;
+  }
+
   await showInfoOrError(agent);
 }
 

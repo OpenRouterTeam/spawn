@@ -431,6 +431,37 @@ export async function cmdInteractive(): Promise<void> {
   await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url);
 }
 
+/** Interactive cloud selection when agent is already known (e.g. `spawn claude`) */
+export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun?: boolean): Promise<void> {
+  p.intro(pc.inverse(` spawn v${VERSION} `));
+
+  const manifest = await loadManifestWithSpinner();
+  const resolvedAgent = resolveAgentKey(manifest, agent);
+
+  if (!resolvedAgent) {
+    const agentMatch = findClosestKeyByNameOrKey(agent, agentKeys(manifest), (k) => manifest.agents[k].name);
+    p.log.error(`Unknown agent: ${pc.bold(agent)}`);
+    if (agentMatch) {
+      p.log.info(`Did you mean ${pc.cyan(agentMatch)} (${manifest.agents[agentMatch].name})?`);
+    }
+    p.log.info(`Run ${pc.cyan("spawn agents")} to see available agents.`);
+    process.exit(1);
+  }
+
+  const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, resolvedAgent);
+  const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
+
+  await preflightCredentialCheck(manifest, cloudChoice);
+
+  const agentName = manifest.agents[resolvedAgent].name;
+  const cloudName = manifest.clouds[cloudChoice].name;
+  p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}`);
+  p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${resolvedAgent} ${cloudChoice}`)}`);
+  p.outro("Handing off to spawn script...");
+
+  await execScript(cloudChoice, resolvedAgent, prompt, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url, dryRun);
+}
+
 // ── Run ────────────────────────────────────────────────────────────────────────
 
 /** Resolve display names / casing and log if resolved to a different key */
@@ -2058,7 +2089,7 @@ function getHelpUsageSection(): string {
                                      Execute agent with prompt (non-interactive)
   spawn <agent> <cloud> --prompt-file <file>  (or -f)
                                      Execute agent with prompt from file
-  spawn <agent>                      Show available clouds for agent
+  spawn <agent>                      Interactive cloud picker for agent
   spawn <cloud>                      Show available agents for cloud
   spawn list                         Browse and rerun previous spawns (aliases: ls, history)
   spawn list <filter>                Filter history by agent or cloud name
