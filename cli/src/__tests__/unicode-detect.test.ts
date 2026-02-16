@@ -13,6 +13,7 @@ import { resolve } from "path";
  */
 
 const CLI_DIR = resolve(import.meta.dir, "../..");
+const bunPath = process.execPath;
 
 // Helper: run a small bun script that imports unicode-detect and prints TERM
 function detectTerm(env: Record<string, string>): string {
@@ -20,7 +21,7 @@ function detectTerm(env: Record<string, string>): string {
     import "./src/unicode-detect.ts";
     console.log(process.env.TERM);
   `;
-  const result = execSync(`bun -e '${script}'`, {
+  const result = execSync(`${bunPath} -e '${script}'`, {
     cwd: CLI_DIR,
     env: { ...env, PATH: process.env.PATH, HOME: process.env.HOME },
     encoding: "utf-8",
@@ -102,7 +103,7 @@ describe("unicode-detect", () => {
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG ?? "undefined");
       `;
-      const result = execSync(`bun -e '${script}'`, {
+      const result = execSync(`${bunPath} -e '${script}'`, {
         cwd: CLI_DIR,
         env: { TERM: "xterm-256color", PATH: process.env.PATH, HOME: process.env.HOME },
         encoding: "utf-8",
@@ -116,7 +117,7 @@ describe("unicode-detect", () => {
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG);
       `;
-      const result = execSync(`bun -e '${script}'`, {
+      const result = execSync(`${bunPath} -e '${script}'`, {
         cwd: CLI_DIR,
         env: { TERM: "xterm-256color", LANG: "fr_FR.UTF-8", PATH: process.env.PATH, HOME: process.env.HOME },
         encoding: "utf-8",
@@ -130,7 +131,7 @@ describe("unicode-detect", () => {
         import "./src/unicode-detect.ts";
         console.log(process.env.LANG);
       `;
-      const result = execSync(`bun -e '${script}'`, {
+      const result = execSync(`${bunPath} -e '${script}'`, {
         cwd: CLI_DIR,
         env: { TERM: "xterm-256color", LANG: "C", PATH: process.env.PATH, HOME: process.env.HOME },
         encoding: "utf-8",
@@ -146,7 +147,7 @@ describe("unicode-detect", () => {
         import "./src/unicode-detect.ts";
       `;
       // Debug output goes to console.error (stderr), so redirect stderr to stdout
-      const result = execSync(`bun -e '${script}' 2>&1`, {
+      const result = execSync(`${bunPath} -e '${script}' 2>&1`, {
         cwd: CLI_DIR,
         env: {
           TERM: "xterm-256color",
@@ -168,7 +169,7 @@ describe("unicode-detect", () => {
         console.log("done");
       `;
       // Capture both stdout and stderr
-      const result = execSync(`bun -e '${script}' 2>&1`, {
+      const result = execSync(`${bunPath} -e '${script}' 2>&1`, {
         cwd: CLI_DIR,
         env: { TERM: "xterm-256color", PATH: process.env.PATH, HOME: process.env.HOME },
         encoding: "utf-8",

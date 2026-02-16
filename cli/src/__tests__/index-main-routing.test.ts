@@ -24,7 +24,9 @@ function runCli(
   args: string[],
   env: Record<string, string> = {}
 ): { stdout: string; stderr: string; exitCode: number } {
-  const cmd = `bun run src/index.ts ${args.join(" ")}`;
+  // Use process.execPath (which is bun when running under bun) or fallback to bun command
+  const bunPath = process.execPath;
+  const cmd = `${bunPath} run src/index.ts ${args.join(" ")}`;
   try {
     const stdout = execSync(cmd, {
       cwd: CLI_DIR,
