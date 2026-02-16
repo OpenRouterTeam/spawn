@@ -706,6 +706,7 @@ wait_for_oauth_code() {
     local elapsed=0
 
     log_step "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
+    log_info "If the browser didn't open, visit the URL shown above"
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
         # Use python3 for float addition since bash arithmetic only handles integers
@@ -732,8 +733,16 @@ exchange_oauth_code() {
 
     if [[ ${curl_exit} -ne 0 ]]; then
         log_error "Failed to contact OpenRouter API (curl exit code: ${curl_exit})"
-        log_warn "This may indicate a network issue or temporary service outage"
-        log_warn "Please check your internet connection and try again"
+        log_error ""
+        log_error "Possible causes:"
+        log_error "  - Network connectivity issue"
+        log_error "  - Firewall blocking HTTPS requests"
+        log_error "  - Temporary OpenRouter API outage"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Check your internet: curl -I https://openrouter.ai"
+        log_error "  2. Try again in a few seconds"
+        log_error "  3. Or set API key manually: export OPENROUTER_API_KEY=sk-or-v1-..."
         return 1
     fi
 

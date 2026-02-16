@@ -305,6 +305,7 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
     console.error();
     console.error("Quick start:");
     console.error(`  ${pc.cyan("spawn <agent> <cloud>")}   Launch an agent`);
+    console.error(`  ${pc.cyan("spawn last")}              Rerun previous`);
     console.error(`  ${pc.cyan("spawn agents")}            Browse all agents`);
     console.error(`  ${pc.cyan("spawn clouds")}            Browse all clouds`);
     console.error();

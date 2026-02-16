@@ -31,8 +31,9 @@ spawn                                    # Interactive picker
 spawn claude sprite                      # Claude Code on Sprite
 spawn aider hetzner                      # Aider on Hetzner
 spawn claude sprite --prompt "Fix bugs"  # Non-interactive with prompt
-spawn aider sprite -p "Add tests"        # Short form
+spawn aider sprite -p "Add tests"        # Short form with -p
 spawn claude                             # Show clouds available for Claude
+spawn last                               # Re-run the most recent spawn
 ```
 
 ### Commands

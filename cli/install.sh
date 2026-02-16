@@ -102,6 +102,11 @@ ensure_in_path() {
         "${install_dir}/spawn" version
         echo ""
         printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
+        echo ""
+        printf "  ${CYAN}spawn${NC}                 # Interactive picker\n"
+        printf "  ${CYAN}spawn claude sprite${NC}   # Launch directly\n"
+        printf "  ${CYAN}spawn help${NC}            # Show all commands\n"
+        echo ""
     else
         echo ""
         log_warn "${BOLD}${install_dir}${NC}${YELLOW} is not in your PATH${NC}"
@@ -111,6 +116,7 @@ ensure_in_path() {
                 echo "  Run this, then reopen your terminal:"
                 echo ""
                 echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.zshrc"
+                echo "    source ~/.zshrc"
                 ;;
             */fish)
                 echo "  Run this, then reopen your terminal:"
@@ -121,6 +127,7 @@ ensure_in_path() {
                 echo "  Run this, then reopen your terminal:"
                 echo ""
                 echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.bashrc"
+                echo "    source ~/.bashrc"
                 ;;
         esac
         echo ""
