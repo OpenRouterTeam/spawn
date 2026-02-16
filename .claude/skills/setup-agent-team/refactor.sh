@@ -50,6 +50,7 @@ cleanup() {
     if [[ -n "${_cleanup_done:-}" ]]; then return; fi
     _cleanup_done=1
 
+    # Capture exit code before any operations that could change it
     local exit_code=$?
     log "Running cleanup (exit_code=${exit_code})..."
 
@@ -64,7 +65,8 @@ cleanup() {
     rm -f "${CLAUDE_PID_FILE:-}" 2>/dev/null || true
 
     log "=== Cycle Done (exit_code=${exit_code}) ==="
-    exit $exit_code
+    # Exit with the captured code to preserve the original error
+    exit ${exit_code}
 }
 
 trap cleanup EXIT SIGTERM SIGINT
