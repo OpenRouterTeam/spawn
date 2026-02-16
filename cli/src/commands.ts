@@ -597,6 +597,10 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   }
 
   p.log.success("Dry run complete -- no resources were provisioned");
+  if (allSet) {
+    console.log();
+    console.log(`Ready to launch: ${pc.cyan(`spawn ${agent} ${cloud}${prompt ? ' --prompt "..."' : ""}`)}`);
+  }
 }
 
 /** Validate inputs for injection attacks (SECURITY) and check they're non-empty */
@@ -674,10 +678,20 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
-  p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
-
   const onlyOpenRouter = missing.length === 1 && missing[0] === "OPENROUTER_API_KEY";
-  p.log.info(getCredentialGuidance(cloud, onlyOpenRouter));
+  const onlyCloud = missing.length === authVars.length && !missing.includes("OPENROUTER_API_KEY");
+
+  // Show a friendlier message based on what's missing
+  if (onlyOpenRouter) {
+    p.log.info(`OpenRouter authentication required for ${cloudName}`);
+    p.log.info("The script will open your browser to authenticate (takes ~10 seconds).");
+  } else if (onlyCloud) {
+    p.log.warn(`Cloud credentials needed: ${missing.map(v => pc.cyan(v)).join(", ")}`);
+    p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
+  } else {
+    p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
+    p.log.info(getCredentialGuidance(cloud, onlyOpenRouter));
+  }
 
   if (isInteractiveTTY()) {
     const shouldContinue = await confirmContinueWithMissingCreds(onlyOpenRouter);
