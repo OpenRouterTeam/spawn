@@ -1164,7 +1164,7 @@ offer_github_auth() {
     if [[ "${SPAWN_GITHUB_AUTH_PROMPTED:-}" == "1" ]]; then
         if [[ "${SPAWN_GITHUB_AUTH_REQUESTED:-}" == "1" ]]; then
             log_step "Installing and authenticating GitHub CLI..."
-            ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+            eval "${run_callback}" "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
         fi
         return 0
     fi
@@ -1178,7 +1178,7 @@ offer_github_auth() {
     fi
 
     log_step "Installing and authenticating GitHub CLI..."
-    ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    eval "${run_callback}" "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
 }
 
 # ============================================================
@@ -2627,10 +2627,10 @@ upload_config_file() {
     local rand_suffix
     rand_suffix=$(basename "${temp_file}")
     local temp_remote="/tmp/spawn_config_${rand_suffix}"
-    ${upload_callback} "${temp_file}" "${temp_remote}"
+    eval "${upload_callback}" "${temp_file}" "${temp_remote}"
     # SECURITY: remote_path must be double-quoted to prevent injection via spaces/metacharacters
     # Note: Callers should use $HOME instead of ~ since tilde does not expand inside double quotes
-    ${run_callback} "mkdir -p \$(dirname \"${remote_path}\") && chmod 600 '${temp_remote}' && mv '${temp_remote}' \"${remote_path}\""
+    eval "${run_callback}" "mkdir -p \$(dirname \"${remote_path}\") && chmod 600 '${temp_remote}' && mv '${temp_remote}' \"${remote_path}\""
 }
 
 # ============================================================
@@ -2696,7 +2696,7 @@ setup_claude_code_config() {
     log_step "Configuring Claude Code..."
 
     # Create ~/.claude directory
-    ${run_callback} "mkdir -p ~/.claude"
+    eval "${run_callback}" "mkdir -p ~/.claude"
 
     # Create settings.json
     local settings_json
@@ -2709,7 +2709,7 @@ setup_claude_code_config() {
     upload_config_file "${upload_callback}" "${run_callback}" "${global_state_json}" "\$HOME/.claude.json"
 
     # Create empty CLAUDE.md
-    ${run_callback} "touch ~/.claude/CLAUDE.md"
+    eval "${run_callback}" "touch ~/.claude/CLAUDE.md"
 }
 
 # ============================================================
@@ -2776,7 +2776,7 @@ setup_openclaw_config() {
     log_step "Configuring openclaw..."
 
     # Create ~/.openclaw directory
-    ${run_callback} "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
+    eval "${run_callback}" "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
 
     # Generate a random gateway token
     local gateway_token
@@ -2818,7 +2818,7 @@ setup_continue_config() {
     log_step "Configuring Continue..."
 
     # Create ~/.continue directory
-    ${run_callback} "mkdir -p ~/.continue"
+    eval "${run_callback}" "mkdir -p ~/.continue"
 
     # Create config.json with json_escape to prevent injection
     local escaped_key
