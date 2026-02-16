@@ -67,28 +67,28 @@ describe("formatCredStatusLine", () => {
     process.env.TEST_VAR_ABC = "value";
     const result = formatCredStatusLine("TEST_VAR_ABC");
     expect(result).toContain("TEST_VAR_ABC");
-    expect(result).toContain("-- set");
+    expect(result).toContain("(set)");
   });
 
   it("should show red 'not set' status when env var is missing", () => {
     delete process.env.TEST_VAR_MISSING_XYZ;
     const result = formatCredStatusLine("TEST_VAR_MISSING_XYZ");
     expect(result).toContain("TEST_VAR_MISSING_XYZ");
-    expect(result).toContain("-- not set");
+    expect(result).toContain("(not set)");
   });
 
   it("should include URL hint when env var is missing and hint is provided", () => {
     delete process.env.TEST_VAR_MISSING_HINT;
     const result = formatCredStatusLine("TEST_VAR_MISSING_HINT", "https://example.com");
     expect(result).toContain("TEST_VAR_MISSING_HINT");
-    expect(result).toContain("-- not set");
+    expect(result).toContain("(not set)");
     expect(result).toContain("https://example.com");
   });
 
   it("should NOT include URL hint when env var IS set, even if hint is provided", () => {
     process.env.TEST_VAR_SET_HINT = "value";
     const result = formatCredStatusLine("TEST_VAR_SET_HINT", "https://example.com");
-    expect(result).toContain("-- set");
+    expect(result).toContain("(set)");
     // URL hint should not appear when the var is already set
     expect(result).not.toContain("https://example.com");
   });
@@ -96,7 +96,7 @@ describe("formatCredStatusLine", () => {
   it("should handle undefined urlHint when env var is missing", () => {
     delete process.env.TEST_VAR_NO_HINT;
     const result = formatCredStatusLine("TEST_VAR_NO_HINT");
-    expect(result).toContain("-- not set");
+    expect(result).toContain("(not set)");
     // No URL suffix should be appended
     expect(result).not.toContain("undefined");
   });
@@ -104,27 +104,27 @@ describe("formatCredStatusLine", () => {
   it("should handle empty string urlHint", () => {
     delete process.env.TEST_VAR_EMPTY_HINT;
     const result = formatCredStatusLine("TEST_VAR_EMPTY_HINT", "");
-    expect(result).toContain("-- not set");
+    expect(result).toContain("(not set)");
   });
 
   it("should treat empty string env var value as falsy (not set)", () => {
     process.env.TEST_VAR_EMPTY_VAL = "";
     const result = formatCredStatusLine("TEST_VAR_EMPTY_VAL");
-    expect(result).toContain("-- not set");
+    expect(result).toContain("(not set)");
   });
 
   it("should handle OPENROUTER_API_KEY specifically", () => {
     process.env.OPENROUTER_API_KEY = "sk-or-test";
     const result = formatCredStatusLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys");
     expect(result).toContain("OPENROUTER_API_KEY");
-    expect(result).toContain("-- set");
+    expect(result).toContain("(set)");
   });
 
   it("should show not-set for OPENROUTER_API_KEY when missing", () => {
     delete process.env.OPENROUTER_API_KEY;
     const result = formatCredStatusLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys");
     expect(result).toContain("OPENROUTER_API_KEY");
-    expect(result).toContain("-- not set");
+    expect(result).toContain("(not set)");
     expect(result).toContain("https://openrouter.ai/settings/keys");
   });
 });
@@ -134,9 +134,9 @@ describe("formatCredStatusLine", () => {
 // Replica of formatAuthVarLine from commands.ts (private)
 function formatAuthVarLine(varName: string, urlHint?: string): string {
   if (process.env[varName]) {
-    return `  ${varName} -- set`;
+    return `  ✓ ${varName} (set)`;
   }
-  const hint = urlHint ? `  # ${urlHint}` : "";
+  const hint = urlHint ? ` -- ${urlHint}` : "";
   return `  export ${varName}=...${hint}`;
 }
 
@@ -161,7 +161,7 @@ describe("formatAuthVarLine (replicated)", () => {
     process.env.HCLOUD_TOKEN = "test-token";
     const result = formatAuthVarLine("HCLOUD_TOKEN");
     expect(result).toContain("HCLOUD_TOKEN");
-    expect(result).toContain("-- set");
+    expect(result).toContain("(set)");
   });
 
   it("should include URL hint when env var is missing", () => {
@@ -174,7 +174,7 @@ describe("formatAuthVarLine (replicated)", () => {
   it("should NOT include URL hint when env var is set", () => {
     process.env.DO_TOKEN = "test";
     const result = formatAuthVarLine("DO_TOKEN", "https://cloud.digitalocean.com/account/api/tokens");
-    expect(result).toContain("-- set");
+    expect(result).toContain("(set)");
     expect(result).not.toContain("https://cloud.digitalocean.com");
   });
 });

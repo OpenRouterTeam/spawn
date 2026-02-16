@@ -531,10 +531,10 @@ function buildCloudLines(cloudInfo: { name: string; description: string; default
 /** Format a single credential env var as a status line (green if set, red if missing) */
 export function formatCredStatusLine(varName: string, urlHint?: string): string {
   if (process.env[varName]) {
-    return `  ${pc.green(varName)} ${pc.dim("-- set")}`;
+    return `  ${pc.green("✓")} ${varName} ${pc.dim("(set)")}`;
   }
-  const suffix = urlHint ? `  ${pc.dim(urlHint)}` : "";
-  return `  ${pc.red(varName)} ${pc.dim("-- not set")}${suffix}`;
+  const suffix = urlHint ? ` ${pc.dim(`-- ${urlHint}`)}` : "";
+  return `  ${pc.red("✗")} ${varName} ${pc.dim("(not set)")}${suffix}`;
 }
 
 /** Build credential status lines for dry-run preview showing which env vars are set/missing */
@@ -1756,9 +1756,9 @@ export function parseAuthEnvVars(auth: string): string[] {
 /** Format an auth env var line showing whether it's already set or needs to be exported */
 function formatAuthVarLine(varName: string, urlHint?: string): string {
   if (process.env[varName]) {
-    return `  ${pc.green(varName)} ${pc.dim("-- set")}`;
+    return `  ${pc.green("✓")} ${varName} ${pc.dim("(set)")}`;
   }
-  const hint = urlHint ? `  ${pc.dim(`# ${urlHint}`)}` : "";
+  const hint = urlHint ? ` ${pc.dim(`-- ${urlHint}`)}` : "";
   return `  ${pc.cyan(`export ${varName}=...`)}${hint}`;
 }
 
@@ -2085,6 +2085,7 @@ function getHelpUsageSection(): string {
   spawn                              Interactive agent + cloud picker
   spawn <agent> <cloud>              Launch agent on cloud directly
   spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
+  spawn <agent> <cloud> --debug      Show all commands being executed
   spawn <agent> <cloud> --prompt "text"
                                      Execute agent with prompt (non-interactive)
   spawn <agent> <cloud> --prompt-file <file>  (or -f)
