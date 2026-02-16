@@ -329,14 +329,33 @@ _validate_body() {
     [[ -z "$required_fields" ]] && return 0
 
     # Check if body is valid JSON
-    if ! printf '%s' "$body" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
+    if ! printf '%s' "$body" | python3 -c "
+import json, sys
+try:
+    json.loads(sys.stdin.read())
+except json.JSONDecodeError:
+    sys.exit(1)
+except Exception as e:
+    print(f'ERROR: JSON validation failed: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null; then
         echo "BODY_ERROR:invalid_json:${endpoint}" >> "${MOCK_LOG}"
         return 1
     fi
 
     # Check for required fields
     for field in $required_fields; do
-        if ! printf '%s' "$body" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
+        if ! printf '%s' "$body" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    assert '$field' in d
+except (json.JSONDecodeError, AssertionError):
+    sys.exit(1)
+except Exception as e:
+    print(f'ERROR: Field validation failed: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null; then
             echo "BODY_ERROR:missing_field:${field}:${endpoint}" >> "${MOCK_LOG}"
         fi
     done

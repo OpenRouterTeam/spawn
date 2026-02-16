@@ -94,7 +94,17 @@ _strip_api_base() {
 _check_fields() {
     local fields="$1"
     for field in $fields; do
-        if ! printf '%s' "$BODY" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
+        if ! printf '%s' "$BODY" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    assert '$field' in d
+except (json.JSONDecodeError, AssertionError):
+    sys.exit(1)
+except Exception as e:
+    print(f'ERROR: Field validation failed: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null; then
             echo "BODY_ERROR:missing_field:${field}:${URL}" >> "${MOCK_LOG}"
         fi
     done
@@ -102,7 +112,16 @@ _check_fields() {
 
 _validate_body() {
     [ "${MOCK_VALIDATE_BODY:-}" = "1" ] && [ -n "$BODY" ] && [ "$METHOD" = "POST" ] || return 0
-    if ! printf '%s' "$BODY" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
+    if ! printf '%s' "$BODY" | python3 -c "
+import json, sys
+try:
+    json.loads(sys.stdin.read())
+except json.JSONDecodeError:
+    sys.exit(1)
+except Exception as e:
+    print(f'ERROR: JSON validation failed: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null; then
         echo "BODY_ERROR:invalid_json:${URL}" >> "${MOCK_LOG}"
         return 0
     fi

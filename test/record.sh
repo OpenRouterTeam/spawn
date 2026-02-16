@@ -100,9 +100,14 @@ _load_multi_config_from_file() {
     vals=$(python3 -c "
 import json, sys
 try:
-    d = json.load(open(sys.argv[1]))
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
     print('\t'.join(d.get(k, '') for k in sys.argv[2:]))
-except: pass
+except (FileNotFoundError, json.JSONDecodeError, KeyError):
+    pass
+except Exception as e:
+    print(f'ERROR: Failed to load config: {e}', file=sys.stderr)
+    sys.exit(1)
 " "$config_file" "${config_keys[@]}" 2>/dev/null) || return 1
 
     [[ -n "${vals:-}" ]] || return 1
@@ -192,7 +197,18 @@ try_load_config() {
             return 1
         fi
         local token
-        token=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('api_key','') or d.get('token',''))" "$config_file" 2>/dev/null) || true
+        token=$(python3 -c "
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+    print(d.get('api_key','') or d.get('token',''))
+except (FileNotFoundError, json.JSONDecodeError, KeyError):
+    pass
+except Exception as e:
+    print(f'ERROR: Failed to load token: {e}', file=sys.stderr)
+    sys.exit(1)
+" "$config_file" 2>/dev/null) || true
         if [[ -n "${token:-}" ]]; then
             export "${env_var}=${token}"
         fi
@@ -244,7 +260,14 @@ save_config() {
         local env_var
         env_var=$(get_auth_env_var "$cloud")
         eval "local val=\"\${${env_var}:-}\""
-        python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"
+        python3 -c "
+import json, sys
+try:
+    print(json.dumps({'api_key': sys.argv[1]}, indent=2))
+except Exception as e:
+    print(f'ERROR: Failed to save config: {e}', file=sys.stderr)
+    sys.exit(1)
+" "$val" > "$config_file"
     fi
     printf '%b\n' "  ${GREEN}saved${NC} → ${config_file}"
 }
@@ -304,7 +327,16 @@ call_api() {
 
 # --- Validation ---
 is_valid_json() {
-    python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null
+    python3 -c "
+import json, sys
+try:
+    json.loads(sys.stdin.read())
+except json.JSONDecodeError:
+    sys.exit(1)
+except Exception as e:
+    print(f'ERROR: JSON validation failed: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null
 }
 
 has_api_error() {
@@ -313,7 +345,16 @@ has_api_error() {
 
     echo "$response" | python3 << VALIDATION_EOF 2>/dev/null
 import json, sys
-d = json.loads(sys.stdin.read())
+
+try:
+    d = json.loads(sys.stdin.read())
+except json.JSONDecodeError as e:
+    print(f'ERROR: Invalid JSON in API response: {e}', file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f'ERROR: Unexpected error parsing API response: {e}', file=sys.stderr)
+    sys.exit(1)
+
 cloud = '$cloud'
 
 # Helper: data keys that indicate success responses (not errors)
@@ -334,7 +375,18 @@ VALIDATION_EOF
 
 # --- Pretty print JSON ---
 pretty_json() {
-    python3 -c "import json,sys; print(json.dumps(json.loads(sys.stdin.read()), indent=2, sort_keys=True))"
+    python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    print(json.dumps(data, indent=2, sort_keys=True))
+except json.JSONDecodeError as e:
+    print(f'ERROR: Invalid JSON: {e}', file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f'ERROR: Failed to pretty-print JSON: {e}', file=sys.stderr)
+    sys.exit(1)
+"
 }
 
 # --- Live create+delete cycle (captures real POST/DELETE responses) ---
@@ -443,7 +495,17 @@ _save_live_fixture() {
 _extract_resource_id() {
     local response="$1" id_py_expr="$2"
 
-    resource_id=$(echo "$response" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${id_py_expr})" 2>/dev/null) || true
+    resource_id=$(echo "$response" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    print(${id_py_expr})
+except (json.JSONDecodeError, KeyError, TypeError) as e:
+    pass
+except Exception as e:
+    print(f'ERROR: Failed to extract resource ID: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null) || true
 
     if [[ -z "${resource_id:-}" ]]; then
         printf '%b\n' "  ${RED}fail${NC} Could not extract resource ID from create response"
