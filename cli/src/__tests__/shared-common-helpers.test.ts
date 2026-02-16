@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import { resolve, join } from "path";
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
@@ -29,17 +29,19 @@ const COMMON_SH = resolve(REPO_ROOT, "shared/common.sh");
 function runBash(script: string): { exitCode: number; stdout: string; stderr: string } {
   const fullScript = `source "${COMMON_SH}"\n${script}`;
   try {
-    const stdout = execSync(`bash -c '${fullScript.replace(/'/g, "'\\''")}'`, {
+    const result = spawnSync("bash", ["-c", fullScript], {
       encoding: "utf-8",
-      timeout: 10000,
-      stdio: ["pipe", "pipe", "pipe"],
     });
-    return { exitCode: 0, stdout: stdout.trim(), stderr: "" };
+    return {
+      exitCode: result.status ?? (result.error ? 1 : 0),
+      stdout: (result.stdout || "").trim(),
+      stderr: (result.stderr || "").trim(),
+    };
   } catch (err: any) {
     return {
-      exitCode: err.status ?? 1,
-      stdout: (err.stdout || "").trim(),
-      stderr: (err.stderr || "").trim(),
+      exitCode: 1,
+      stdout: "",
+      stderr: String(err.message || err),
     };
   }
 }
