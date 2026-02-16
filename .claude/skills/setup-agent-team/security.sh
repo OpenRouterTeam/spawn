@@ -315,13 +315,13 @@ Complete within 30 minutes. At 25 min stop new reviewers, at 29 min shutdown, at
 
 \`\`\`bash
 # Team lead creates base worktree:
-git worktree add ${WORKTREE_BASE} origin/main --detach
+git worktree add "${WORKTREE_BASE}" origin/main --detach
 
 # PR reviewers checkout PR in sub-worktree:
-git worktree add ${WORKTREE_BASE}/pr-NUMBER -b review-pr-NUMBER origin/main
-cd ${WORKTREE_BASE}/pr-NUMBER && gh pr checkout NUMBER
+git worktree add "${WORKTREE_BASE}/pr-NUMBER" -b review-pr-NUMBER origin/main
+cd "${WORKTREE_BASE}/pr-NUMBER" && gh pr checkout NUMBER
 # ... run bash -n, bun test here ...
-cd ${REPO_ROOT} && git worktree remove ${WORKTREE_BASE}/pr-NUMBER --force
+cd "${REPO_ROOT}" && git worktree remove "${WORKTREE_BASE}/pr-NUMBER" --force
 \`\`\`
 
 ## Step 1 — Discover Open PRs
@@ -361,7 +361,7 @@ Each pr-reviewer MUST:
    - Delete branch via \`--delete-branch\`. Report and STOP.
    - If > 48h but no conflicts: proceed to review. If fresh: proceed normally.
 
-4. **Set up worktree**: \`git worktree add ${WORKTREE_BASE}/pr-NUMBER -b review-pr-NUMBER origin/main\` → \`cd\` → \`gh pr checkout NUMBER\`
+4. **Set up worktree**: \`git worktree add "${WORKTREE_BASE}/pr-NUMBER" -b review-pr-NUMBER origin/main\` → \`cd\` → \`gh pr checkout NUMBER\`
 
 5. **Security review** of every changed file:
    - Command injection, credential leaks, path traversal, XSS/injection, unsafe eval/source, curl|bash safety, macOS bash 3.x compat
@@ -372,7 +372,7 @@ Each pr-reviewer MUST:
    - CRITICAL/HIGH found → \`gh pr review NUMBER --request-changes\` + label \`security-review-required\`
    - MEDIUM/LOW or clean → \`gh pr review NUMBER --approve\` + label \`security-approved\` + \`gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch\`
 
-8. **Clean up**: \`cd ${REPO_ROOT} && git worktree remove ${WORKTREE_BASE}/pr-NUMBER --force\`
+8. **Clean up**: \`cd "${REPO_ROOT}" && git worktree remove "${WORKTREE_BASE}/pr-NUMBER" --force\`
 
 9. **Review body format**:
    \`\`\`
@@ -477,8 +477,8 @@ Complete within 15 minutes. At 12 min wrap up, at 14 min shutdown, at 15 min for
 
 ## Worktree Requirement
 
-All teammates work in worktrees. Setup: \`git worktree add ${WORKTREE_BASE} origin/main --detach\`
-Cleanup: \`cd ${REPO_ROOT} && git worktree remove ${WORKTREE_BASE} --force && git worktree prune\`
+All teammates work in worktrees. Setup: \`git worktree add "${WORKTREE_BASE}" origin/main --detach\`
+Cleanup: \`cd "${REPO_ROOT}" && git worktree remove "${WORKTREE_BASE}" --force && git worktree prune\`
 
 ## Team Structure (all working in \`${WORKTREE_BASE}\`)
 
