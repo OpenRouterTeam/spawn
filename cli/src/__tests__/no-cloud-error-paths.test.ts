@@ -29,7 +29,9 @@ function runCli(
   const quotedArgs = args
     .map((a) => `'${a.replace(/'/g, "'\\''")}'`)
     .join(" ");
-  const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
+  // Use absolute bun path to ensure it's available in subprocess
+  const bunPath = resolve(process.env.HOME || "/root", ".bun/bin/bun");
+  const cmd = `${bunPath} run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
   try {
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,
