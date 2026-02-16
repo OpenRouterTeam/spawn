@@ -160,7 +160,10 @@ _download_and_install_gh() {
     local tarball="gh_${version}_${gh_os}_${gh_arch}.tar.gz"
     local url="https://github.com/cli/cli/releases/download/v${version}/${tarball}"
     local tmpdir
-    tmpdir=$(mktemp -d)
+    tmpdir=$(mktemp -d) || {
+        log_error "Failed to create temporary directory for gh installation"
+        return 1
+    }
 
     curl -fsSL "${url}" -o "${tmpdir}/${tarball}" || {
         log_error "Failed to download ${url}"

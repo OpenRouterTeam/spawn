@@ -906,7 +906,10 @@ _generate_csrf_state() {
 # Create temp directory with OAuth session files and CSRF state
 _init_oauth_session() {
     local oauth_dir
-    oauth_dir=$(mktemp -d)
+    oauth_dir=$(mktemp -d) || {
+        log_error "Failed to create temporary directory for OAuth session"
+        return 1
+    }
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
@@ -1084,7 +1087,10 @@ inject_env_vars_ssh() {
     shift 3
 
     local env_temp
-    env_temp=$(mktemp)
+    env_temp=$(mktemp) || {
+        log_error "Failed to create temporary file for environment configuration"
+        return 1
+    }
     chmod 600 "${env_temp}"
     track_temp_file "${env_temp}"
 
@@ -1109,7 +1115,10 @@ inject_env_vars_local() {
     shift 2
 
     local env_temp
-    env_temp=$(mktemp)
+    env_temp=$(mktemp) || {
+        log_error "Failed to create temporary file for environment configuration"
+        return 1
+    }
     chmod 600 "${env_temp}"
     track_temp_file "${env_temp}"
 
@@ -2406,7 +2415,10 @@ upload_config_file() {
     local remote_path="${4}"
 
     local temp_file
-    temp_file=$(mktemp)
+    temp_file=$(mktemp) || {
+        log_error "Failed to create temporary file for config upload"
+        return 1
+    }
     chmod 600 "${temp_file}"
     track_temp_file "${temp_file}"
 
