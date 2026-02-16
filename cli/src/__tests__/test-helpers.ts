@@ -84,6 +84,25 @@ export function restoreMocks(...mocks: Array<{ mockRestore?: () => void } | unde
   mocks.forEach(mock => mock?.mockRestore());
 }
 
+// ── Process Stdout Mocks ────────────────────────────────────────────────────────
+
+export function mockProcessStdoutColumns(columns: number | undefined) {
+  const descriptor = Object.getOwnPropertyDescriptor(process.stdout, 'columns');
+  Object.defineProperty(process.stdout, 'columns', {
+    value: columns,
+    writable: true,
+    configurable: true,
+  });
+
+  return {
+    restore: () => {
+      if (descriptor) {
+        Object.defineProperty(process.stdout, 'columns', descriptor);
+      }
+    }
+  };
+}
+
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────
 
 export function mockSuccessfulFetch(data: any) {

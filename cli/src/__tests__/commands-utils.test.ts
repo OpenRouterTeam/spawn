@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockProcessStdoutColumns } from "./test-helpers";
 import type { Manifest } from "../manifest";
 
 /**
@@ -151,37 +151,41 @@ describe("Command Utility Functions", () => {
 
   describe("getTerminalWidth", () => {
     let originalColumns: number | undefined;
+    let columnsRestorer: { restore: () => void } | null = null;
 
     beforeEach(() => {
       originalColumns = process.stdout.columns;
     });
 
     afterEach(() => {
-      process.stdout.columns = originalColumns!;
+      if (columnsRestorer) {
+        columnsRestorer.restore();
+        columnsRestorer = null;
+      }
     });
 
     it("should return process.stdout.columns when defined", () => {
-      process.stdout.columns = 120;
+      columnsRestorer = mockProcessStdoutColumns(120);
       expect(getTerminalWidth()).toBe(120);
     });
 
     it("should return 80 when process.stdout.columns is undefined", () => {
-      (process.stdout as any).columns = undefined;
+      columnsRestorer = mockProcessStdoutColumns(undefined);
       expect(getTerminalWidth()).toBe(80);
     });
 
     it("should return 80 when process.stdout.columns is 0", () => {
-      (process.stdout as any).columns = 0;
+      columnsRestorer = mockProcessStdoutColumns(0);
       expect(getTerminalWidth()).toBe(80);
     });
 
     it("should return the exact column count for narrow terminals", () => {
-      process.stdout.columns = 40;
+      columnsRestorer = mockProcessStdoutColumns(40);
       expect(getTerminalWidth()).toBe(40);
     });
 
     it("should return the exact column count for very wide terminals", () => {
-      process.stdout.columns = 300;
+      columnsRestorer = mockProcessStdoutColumns(300);
       expect(getTerminalWidth()).toBe(300);
     });
   });

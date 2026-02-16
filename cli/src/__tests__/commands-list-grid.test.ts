@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockProcessStdoutColumns } from "./test-helpers";
 import { loadManifest } from "../manifest";
 import type { Manifest } from "../manifest";
 
@@ -207,6 +207,7 @@ describe("cmdMatrix - grid view rendering", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
   let originalFetch: typeof global.fetch;
   let originalColumns: number | undefined;
+  let columnsRestorer: { restore: () => void } | null = null;
 
   beforeEach(async () => {
     consoleMocks = createConsoleMocks();
@@ -217,14 +218,17 @@ describe("cmdMatrix - grid view rendering", () => {
     originalColumns = process.stdout.columns;
 
     // Force wide terminal for grid view
-    process.stdout.columns = 200;
+    columnsRestorer = mockProcessStdoutColumns(200);
 
     await setManifest(mockManifest);
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    process.stdout.columns = originalColumns!;
+    if (columnsRestorer) {
+      columnsRestorer.restore();
+      columnsRestorer = null;
+    }
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
 

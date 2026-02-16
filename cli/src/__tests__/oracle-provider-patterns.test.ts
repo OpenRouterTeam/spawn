@@ -744,7 +744,9 @@ describe("Oracle claude.sh agent-specific patterns", () => {
   });
 
   it("should install Claude Code if not present", () => {
-    expect(claudeContent).toContain("claude.ai/install.sh");
+    // Oracle uses install_claude_code() function from shared/common.sh
+    // which contains the claude.ai/install.sh logic
+    expect(claudeContent).toContain("install_claude_code");
   });
 
   it("should set ANTHROPIC_BASE_URL for OpenRouter", () => {
