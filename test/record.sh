@@ -244,7 +244,10 @@ save_config() {
         local env_var
         env_var=$(get_auth_env_var "$cloud")
         eval "local val=\"\${${env_var}:-}\""
-        python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"
+        if ! python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"; then
+            printf '%b\n' "  ${RED}error${NC} → failed to write config to ${config_file}" >&2
+            return 1
+        fi
     fi
     printf '%b\n' "  ${GREEN}saved${NC} → ${config_file}"
 }
@@ -334,7 +337,10 @@ VALIDATION_EOF
 
 # --- Pretty print JSON ---
 pretty_json() {
-    python3 -c "import json,sys; print(json.dumps(json.loads(sys.stdin.read()), indent=2, sort_keys=True))"
+    python3 -c "import json,sys; print(json.dumps(json.loads(sys.stdin.read()), indent=2, sort_keys=True))" || {
+        printf '%b\n' "${RED}error${NC} → failed to parse or format JSON" >&2
+        return 1
+    }
 }
 
 # --- Live create+delete cycle (captures real POST/DELETE responses) ---
