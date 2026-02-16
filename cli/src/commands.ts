@@ -304,17 +304,20 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
         const hasCredsMarker = hasCloudCredentials(manifest.clouds[c].auth) ? " (ready)" : "";
         return `spawn ${agent} ${c}${hasCredsMarker}`;
       });
-      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these instead:`);
+      console.log();
+      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these:`);
       for (const cmd of examples) {
         p.log.info(`  ${pc.cyan(cmd)}`);
       }
       if (availableClouds.length > 3) {
-        p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
+        p.log.info(`\nRun ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
       }
       if (credCount > 0) {
+        console.log();
         p.log.info(`${pc.green("ready")} = credentials already set`);
       }
     } else {
+      console.log();
       p.log.info(`This agent has no implemented cloud providers yet.`);
       p.log.info(`Run ${pc.cyan("spawn matrix")} to see the full availability matrix.`);
     }

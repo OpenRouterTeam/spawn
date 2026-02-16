@@ -189,7 +189,8 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
     );
     if (clouds.length === 0) return;
 
-    console.error(`\nAvailable clouds for ${pc.bold(resolvedAgent)}:`);
+    const agentName = manifest.agents[resolvedAgent].name;
+    console.error(`\nAvailable clouds for ${pc.bold(agentName)}:`);
     for (const c of clouds.slice(0, 5)) {
       console.error(`  ${pc.cyan(`spawn ${resolvedAgent} ${c} --prompt "..."`)}`);
     }
