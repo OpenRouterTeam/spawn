@@ -1164,7 +1164,10 @@ offer_github_auth() {
     if [[ "${SPAWN_GITHUB_AUTH_PROMPTED:-}" == "1" ]]; then
         if [[ "${SPAWN_GITHUB_AUTH_REQUESTED:-}" == "1" ]]; then
             log_step "Installing and authenticating GitHub CLI..."
-            ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+            ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash" || {
+                log_warn "GitHub CLI setup failed (this is optional)"
+                return 0
+            }
         fi
         return 0
     fi
@@ -1178,7 +1181,10 @@ offer_github_auth() {
     fi
 
     log_step "Installing and authenticating GitHub CLI..."
-    ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash" || {
+        log_warn "GitHub CLI setup failed (this is optional)"
+        return 0
+    }
 }
 
 # ============================================================
