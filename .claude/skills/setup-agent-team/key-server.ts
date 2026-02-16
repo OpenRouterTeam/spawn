@@ -327,7 +327,7 @@ const UUID_RE =
 // --- Server ---
 const server = Bun.serve({
   port: PORT,
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
     const path = url.pathname;
 
@@ -465,9 +465,8 @@ const server = Bun.serve({
 
       // POST — submit keys (rate-limited)
       if (req.method === "POST") {
-        const ip =
-          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-          "unknown";
+        // SECURITY: Use actual client IP from server object, not spoofable x-forwarded-for header
+        const ip = server.requestIP(req)?.address ?? "unknown";
         let retry = rateCheck(ip, rateMaps.ip, 10, 15 * 60_000);
         if (retry !== null)
           return new Response("Too many requests", {

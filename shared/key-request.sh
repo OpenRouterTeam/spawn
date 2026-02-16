@@ -191,20 +191,22 @@ print(json.dumps(providers))
 
     log "Key preflight: Requesting keys for: ${MISSING_KEY_PROVIDERS}"
 
-    # Fire-and-forget — don't block the QA cycle, but log failures
+    # Fire-and-forget with timeout watchdog — don't block the QA cycle, but log failures
+    # SECURITY: Wrap in timeout to prevent subprocess leak if curl hangs despite --max-time
     (
-        local http_code
-        http_code=$(curl -s -o /dev/stderr -w '%{http_code}' --max-time 10 \
-            -X POST "${key_server_url}/request-batch" \
-            -H "Authorization: Bearer ${key_server_secret}" \
-            -H "Content-Type: application/json" \
-            -d "{\"providers\": ${providers_json}}" 2>/dev/null) || http_code="000"
-        case "${http_code}" in
-            2*) ;; # success
-            000) log "Key preflight: WARNING — key-server unreachable at ${key_server_url}" ;;
-            401) log "Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)" ;;
-            *)   log "Key preflight: WARNING — key-server returned HTTP ${http_code}" ;;
-        esac
+        timeout 15 bash -c '
+            http_code=$(curl -s -o /dev/stderr -w "%{http_code}" --max-time 10 \
+                -X POST "'"${key_server_url}"'/request-batch" \
+                -H "Authorization: Bearer '"${key_server_secret}"'" \
+                -H "Content-Type: application/json" \
+                -d "{\"providers\": '"${providers_json}"'}" 2>/dev/null) || http_code="000"
+            case "${http_code}" in
+                2*) ;; # success
+                000) echo "Key preflight: WARNING — key-server unreachable at '"${key_server_url}"'" >&2 ;;
+                401) echo "Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)" >&2 ;;
+                *)   echo "Key preflight: WARNING — key-server returned HTTP ${http_code}" >&2 ;;
+            esac
+        ' || log "Key preflight: WARNING — request timed out after 15s"
     ) &
 }
 
@@ -214,7 +216,8 @@ invalidate_cloud_key() {
     local provider="${1}"
 
     # Validate provider name to prevent path traversal
-    if [[ ! "${provider}" =~ ^[a-z0-9][a-z0-9._-]{0,63}$ ]]; then
+    # SECURITY: Block dots to prevent relative path components like "foo..bar" or ".."
+    if [[ ! "${provider}" =~ ^[a-z0-9][a-z0-9_-]{0,63}$ ]]; then
         log "invalidate_cloud_key: invalid provider name: ${provider}"
         return 1
     fi
