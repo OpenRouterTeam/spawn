@@ -42,4 +42,4 @@ inject_env_vars_cb "$RUN" "$UPLOAD" \
 # Claude-specific config
 setup_claude_code_config "${OPENROUTER_API_KEY}" "$UPLOAD" "$RUN"
 
-launch_session "Hetzner server" "$SESSION" "source ~/.bashrc 2>/dev/null; source ~/.zshrc 2>/dev/null; claude"
+launch_session "Hetzner server" "$SESSION" "bash -lc claude"

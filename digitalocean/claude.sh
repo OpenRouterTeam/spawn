@@ -72,4 +72,4 @@ save_vm_connection "${DO_SERVER_IP}" "root" "${DO_DROPLET_ID}" "${DROPLET_NAME}"
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${DO_SERVER_IP}" "source ~/.bashrc 2>/dev/null; source ~/.zshrc 2>/dev/null; claude"
+interactive_session "${DO_SERVER_IP}" "bash -lc claude"
