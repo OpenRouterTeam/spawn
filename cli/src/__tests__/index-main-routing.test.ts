@@ -25,11 +25,17 @@ function runCli(
   env: Record<string, string> = {}
 ): { stdout: string; stderr: string; exitCode: number } {
   const cmd = `bun run src/index.ts ${args.join(" ")}`;
+  const bunPath = resolve(process.env.HOME || "", ".bun", "bin");
+  const currentPath = process.env.PATH || "";
+  const fullPath = currentPath
+    ? `${bunPath}:${currentPath}`
+    : bunPath;
   try {
     const stdout = execSync(cmd, {
       cwd: CLI_DIR,
       env: {
         ...process.env,
+        PATH: fullPath,
         ...env,
         // Prevent auto-update from running during tests
         SPAWN_NO_UPDATE_CHECK: "1",

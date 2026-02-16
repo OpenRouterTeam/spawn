@@ -30,11 +30,16 @@ function runCli(
     .map((a) => `'${a.replace(/'/g, "'\\''")}'`)
     .join(" ");
   const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
+  const bunPath = resolve(process.env.HOME || "", ".bun", "bin");
+  const currentPath = process.env.PATH || "";
+  const fullPath = currentPath
+    ? `${bunPath}:${currentPath}`
+    : bunPath;
   try {
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,
       env: {
-        PATH: process.env.PATH,
+        PATH: fullPath,
         HOME: process.env.HOME,
         SHELL: process.env.SHELL,
         TERM: process.env.TERM || "xterm",

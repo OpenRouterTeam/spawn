@@ -32,12 +32,17 @@ function runCli(
   // Quote each arg to handle spaces properly
   const quotedArgs = args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
   const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
+  const bunPath = resolve(process.env.HOME || "", ".bun", "bin");
+  const currentPath = process.env.PATH || "";
+  const fullPath = currentPath
+    ? `${bunPath}:${currentPath}`
+    : bunPath;
   try {
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,
       env: {
         // Start with clean env to avoid bun test's NODE_ENV=test leaking
-        PATH: process.env.PATH,
+        PATH: fullPath,
         HOME: process.env.HOME,
         SHELL: process.env.SHELL,
         TERM: process.env.TERM || "xterm",
