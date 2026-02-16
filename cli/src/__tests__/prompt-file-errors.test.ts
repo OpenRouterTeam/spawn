@@ -98,14 +98,16 @@ describe("--prompt-file ENOENT (file not found)", () => {
     expect(output(result)).toContain("missing-prompt.txt");
   });
 
-  it("should include 'Check the path' hint", () => {
+  it("should include actionable examples for creating a prompt file", () => {
     const result = runCli([
       "claude",
       "sprite",
       "--prompt-file",
       resolve(TEST_DIR, "gone.txt"),
     ]);
-    expect(output(result)).toContain("Check the path and try again");
+    const out = output(result);
+    expect(out).toContain("Create a text file with your prompt");
+    expect(out).toContain("echo");
   });
 });
 
@@ -115,7 +117,7 @@ describe("--prompt-file ENOENT (file not found)", () => {
 // message formatting logic directly via a replica of handlePromptFileError.
 
 describe("handlePromptFileError formatting (EACCES path)", () => {
-  // Exact replica of handlePromptFileError from index.ts (lines 174-190)
+  // Exact replica of handlePromptFileError from index.ts (with new actionable messages)
   function handlePromptFileError(
     promptFile: string,
     err: unknown
@@ -125,21 +127,29 @@ describe("handlePromptFileError formatting (EACCES path)", () => {
       err && typeof err === "object" && "code" in err ? err.code : "";
     if (code === "ENOENT") {
       messages.push(`Prompt file not found: ${promptFile}`);
-      messages.push(`\nCheck the path and try again.`);
+      messages.push(`\nCreate a text file with your prompt and try again:`);
+      messages.push(`  echo "your instructions here" > prompt.txt`);
+      messages.push(`  spawn <agent> <cloud> --prompt-file prompt.txt`);
     } else if (code === "EACCES") {
       messages.push(`Permission denied reading prompt file: ${promptFile}`);
-      messages.push(`\nCheck file permissions: ls -la ${promptFile}`);
+      messages.push(`\nCheck file permissions:`);
+      messages.push(`  ls -la ${promptFile}`);
+      messages.push(`\nMake sure the file is readable:`);
+      messages.push(`  chmod 644 ${promptFile}`);
     } else if (code === "EISDIR") {
       messages.push(`'${promptFile}' is a directory, not a file.`);
-      messages.push(
-        `\nProvide a path to a text file containing your prompt.`
-      );
+      messages.push(`\nProvide the path to a text file containing your prompt:`);
+      messages.push(`  spawn <agent> <cloud> --prompt-file path/to/prompt.txt`);
+      messages.push(`\nCreate a prompt file:`);
+      messages.push(`  echo "your instructions here" > prompt.txt`);
     } else {
       const msg =
         err && typeof err === "object" && "message" in err
           ? String(err.message)
           : String(err);
       messages.push(`Error reading prompt file '${promptFile}': ${msg}`);
+      messages.push(`\nEnsure the file exists and is readable:`);
+      messages.push(`  ls -la ${promptFile}`);
     }
     return { messages };
   }
@@ -154,8 +164,9 @@ describe("handlePromptFileError formatting (EACCES path)", () => {
   it("should include chmod hint in EACCES error", () => {
     const err = { code: "EACCES", message: "permission denied" };
     const { messages } = handlePromptFileError("/tmp/restricted.txt", err);
-    expect(messages[1]).toContain("Check file permissions");
-    expect(messages[1]).toContain("ls -la");
+    const fullMessage = messages.join("\n");
+    expect(fullMessage).toContain("Check file permissions");
+    expect(fullMessage).toContain("chmod 644");
   });
 
   it("should format ENOENT error with not found message", () => {
@@ -165,10 +176,13 @@ describe("handlePromptFileError formatting (EACCES path)", () => {
     expect(messages[0]).toContain("missing.txt");
   });
 
-  it("should include path check hint in ENOENT error", () => {
+  it("should include file creation examples in ENOENT error", () => {
     const err = { code: "ENOENT", message: "no such file" };
     const { messages } = handlePromptFileError("gone.txt", err);
-    expect(messages[1]).toContain("Check the path and try again");
+    const fullMessage = messages.join("\n");
+    expect(fullMessage).toContain("Create a text file");
+    expect(fullMessage).toContain("echo");
+    expect(fullMessage).toContain("prompt.txt");
   });
 
   it("should format EISDIR error with directory message", () => {
@@ -181,15 +195,19 @@ describe("handlePromptFileError formatting (EACCES path)", () => {
   it("should include text file hint in EISDIR error", () => {
     const err = { code: "EISDIR", message: "is a directory" };
     const { messages } = handlePromptFileError("/tmp/mydir", err);
-    expect(messages[1]).toContain("Provide a path to a text file");
+    const fullMessage = messages.join("\n");
+    expect(fullMessage).toContain("Provide the path to a text file");
+    expect(fullMessage).toContain("echo");
   });
 
-  it("should format generic error with error message", () => {
+  it("should format generic error with error message and file check", () => {
     const err = { message: "disk I/O error" };
     const { messages } = handlePromptFileError("broken.txt", err);
-    expect(messages[0]).toContain("Error reading prompt file");
-    expect(messages[0]).toContain("broken.txt");
-    expect(messages[0]).toContain("disk I/O error");
+    const fullMessage = messages.join("\n");
+    expect(fullMessage).toContain("Error reading prompt file");
+    expect(fullMessage).toContain("broken.txt");
+    expect(fullMessage).toContain("disk I/O error");
+    expect(fullMessage).toContain("Ensure the file exists");
   });
 
   it("should handle error without code property", () => {
@@ -245,9 +263,9 @@ describe("--prompt-file EISDIR (path is a directory)", () => {
     mkdirSync(dirPath, { recursive: true });
   });
 
-  it("should show 'is not a regular file' for a directory path", () => {
+  it("should show 'is a directory, not a file' for a directory path", () => {
     const result = runCli(["claude", "sprite", "--prompt-file", dirPath]);
-    expect(output(result)).toContain("is not a regular file");
+    expect(output(result)).toContain("is a directory, not a file");
     expect(result.exitCode).not.toBe(0);
   });
 

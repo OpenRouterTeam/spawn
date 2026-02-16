@@ -206,16 +206,26 @@ function handlePromptFileError(promptFile: string, err: unknown): never {
   const code = err && typeof err === "object" && "code" in err ? err.code : "";
   if (code === "ENOENT") {
     console.error(pc.red(`Prompt file not found: ${pc.bold(promptFile)}`));
-    console.error(`\nCheck the path and try again.`);
+    console.error(`\nCreate a text file with your prompt and try again:`);
+    console.error(`  ${pc.cyan(`echo "your instructions here" > prompt.txt`)}`);
+    console.error(`  ${pc.cyan(`spawn <agent> <cloud> --prompt-file prompt.txt`)}`);
   } else if (code === "EACCES") {
     console.error(pc.red(`Permission denied reading prompt file: ${pc.bold(promptFile)}`));
-    console.error(`\nCheck file permissions: ${pc.cyan(`ls -la ${promptFile}`)}`);
+    console.error(`\nCheck file permissions:`);
+    console.error(`  ${pc.cyan(`ls -la ${promptFile}`)}`);
+    console.error(`\nMake sure the file is readable:`);
+    console.error(`  ${pc.cyan(`chmod 644 ${promptFile}`)}`);
   } else if (code === "EISDIR") {
     console.error(pc.red(`'${promptFile}' is a directory, not a file.`));
-    console.error(`\nProvide a path to a text file containing your prompt.`);
+    console.error(`\nProvide the path to a text file containing your prompt:`);
+    console.error(`  ${pc.cyan(`spawn <agent> <cloud> --prompt-file path/to/prompt.txt`)}`);
+    console.error(`\nCreate a prompt file:`);
+    console.error(`  ${pc.cyan(`echo "your instructions here" > prompt.txt`)}`);
   } else {
     const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
     console.error(pc.red(`Error reading prompt file '${promptFile}': ${msg}`));
+    console.error(`\nEnsure the file exists and is readable:`);
+    console.error(`  ${pc.cyan(`ls -la ${promptFile}`)}`);
   }
   process.exit(1);
 }
