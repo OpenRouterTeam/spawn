@@ -83,6 +83,27 @@ _get_multi_cred_spec() {
     esac
 }
 
+# Extract and export environment variables from loaded data.
+# Arguments: env_vars_array fields_array
+# Tab-separated fields are exported to corresponding env vars with security validation.
+_export_env_vars_from_fields() {
+    local -n env_vars_ref="$1"
+    local -n fields_ref="$2"
+    local i
+
+    for i in "${!env_vars_ref[@]}"; do
+        if [[ -n "${fields_ref[$i]:-}" ]]; then
+            # SECURITY: Validate env var name before export
+            if [[ ! "${env_vars_ref[$i]}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+                echo "SECURITY: Invalid env var name rejected: ${env_vars_ref[$i]}" >&2
+                return 1
+            fi
+            export "${env_vars_ref[$i]}=${fields_ref[$i]}"
+        fi
+    done
+    return 0
+}
+
 # Load multiple fields from a JSON config file and export as env vars.
 # Arguments: CONFIG_FILE SPEC...  (each spec is "config_key:ENV_VAR")
 _load_multi_config_from_file() {
@@ -110,18 +131,7 @@ except: pass
     local IFS=$'\t'
     local fields
     read -ra fields <<< "$vals"
-    local i
-    for i in "${!env_vars[@]}"; do
-        # SECURITY: Validate env var name before export
-        if [[ -n "${fields[$i]:-}" ]]; then
-            if [[ ! "${env_vars[$i]}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
-                echo "SECURITY: Invalid env var name rejected: ${env_vars[$i]}" >&2
-                return 1
-            fi
-            export "${env_vars[$i]}=${fields[$i]}"
-        fi
-    done
-    return 0
+    _export_env_vars_from_fields env_vars fields
 }
 
 # Save multiple env vars to a JSON config file.
@@ -159,6 +169,27 @@ get_auth_env_var() {
 }
 
 # Try loading token from ~/.config/spawn/{cloud}.json (same config the agent scripts use)
+# Load a single API token from JSON config and export it.
+# Arguments: ENV_VAR CONFIG_FILE
+_load_single_token_config() {
+    local env_var="$1"
+    local config_file="$2"
+
+    [[ -f "$config_file" ]] || return 0
+
+    # SECURITY: Validate env var name before export
+    if [[ ! "${env_var}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+        echo "SECURITY: Invalid env var name rejected: ${env_var}" >&2
+        return 1
+    fi
+
+    local token
+    token=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('api_key','') or d.get('token',''))" "$config_file" 2>/dev/null) || true
+    if [[ -n "${token:-}" ]]; then
+        export "${env_var}=${token}"
+    fi
+}
+
 try_load_config() {
     local cloud="$1"
     local env_var
@@ -185,18 +216,7 @@ try_load_config() {
     fi
 
     # Standard single-token config
-    if [[ -f "$config_file" ]]; then
-        # SECURITY: Validate env var name before export
-        if [[ ! "${env_var}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
-            echo "SECURITY: Invalid env var name rejected: ${env_var}" >&2
-            return 1
-        fi
-        local token
-        token=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('api_key','') or d.get('token',''))" "$config_file" 2>/dev/null) || true
-        if [[ -n "${token:-}" ]]; then
-            export "${env_var}=${token}"
-        fi
-    fi
+    _load_single_token_config "$env_var" "$config_file"
 }
 
 has_credentials() {
