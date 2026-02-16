@@ -80,6 +80,21 @@ export function clearHistory(): number {
   return count;
 }
 
+/** Delete a specific spawn record from history */
+export function deleteSpawnRecord(recordToDelete: SpawnRecord): void {
+  const history = loadHistory();
+  const filtered = history.filter((r) =>
+    !(r.agent === recordToDelete.agent &&
+      r.cloud === recordToDelete.cloud &&
+      r.timestamp === recordToDelete.timestamp)
+  );
+
+  if (filtered.length < history.length) {
+    // Record was found and removed
+    writeFileSync(getHistoryPath(), JSON.stringify(filtered, null, 2) + "\n");
+  }
+}
+
 /** Check for pending connection data and merge it into the last history entry.
  *  Bash scripts write connection info to last-connection.json after successful spawn.
  *  This function merges that data into the history and persists it. */

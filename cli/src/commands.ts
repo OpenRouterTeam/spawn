@@ -16,7 +16,7 @@ import {
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
-import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord, type VMConnection } from "./history.js";
+import { saveSpawnRecord, filterHistory, clearHistory, deleteSpawnRecord, type SpawnRecord, type VMConnection } from "./history.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -1557,7 +1557,59 @@ async function resolveListFilters(
   return { manifest, agentFilter, cloudFilter };
 }
 
-/** Handle reconnect or rerun action for a selected spawn record */
+/** Delete a VM and remove it from history */
+async function deleteVM(record: SpawnRecord, manifest: Manifest | null): Promise<void> {
+  if (!record.connection?.server_id) {
+    p.log.error("Cannot delete VM: server_id not found");
+    return;
+  }
+
+  const vmName = record.connection.server_name || record.connection.server_id;
+  const cloudName = manifest?.clouds[record.cloud]?.name || record.cloud;
+
+  // Show confirmation prompt
+  const shouldDelete = await p.confirm({
+    message: `${pc.red("Delete")} ${pc.bold(vmName)} on ${pc.bold(cloudName)}?`,
+    initialValue: false,
+  });
+
+  if (p.isCancel(shouldDelete)) {
+    handleCancel();
+  }
+
+  if (!shouldDelete) {
+    p.log.info("Deletion cancelled");
+    return;
+  }
+
+  // Download and execute the cloud's destroy script
+  const destroyScript = `
+    # Source the cloud's lib/common.sh to get destroy_server function
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+    if [[ -f "$SCRIPT_DIR/${record.cloud}/lib/common.sh" ]]; then
+      source "$SCRIPT_DIR/${record.cloud}/lib/common.sh"
+    else
+      eval "$(curl -fsSL ${RAW_BASE}/${record.cloud}/lib/common.sh)"
+    fi
+
+    # Call destroy_server with the server_id
+    destroy_server "${record.connection.server_id}"
+  `;
+
+  try {
+    p.log.step(`Deleting ${pc.bold(vmName)} on ${pc.bold(cloudName)}...`);
+    await runBash(destroyScript);
+
+    // Remove from history after successful deletion
+    deleteSpawnRecord(record);
+    p.log.success(`VM ${pc.bold(vmName)} deleted successfully`);
+  } catch (err) {
+    p.log.error(`Failed to delete VM: ${getErrorMessage(err)}`);
+    p.log.warn("The VM may still be running. Check your cloud provider's console.");
+  }
+}
+
+/** Handle reconnect, rerun, or delete action for a selected spawn record */
 async function handleRecordAction(
   selected: SpawnRecord,
   manifest: Manifest | null
@@ -1569,12 +1621,24 @@ async function handleRecordAction(
     return;
   }
 
+  // Build action options
+  const actionOptions = [
+    { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${selected.connection.user}@${selected.connection.ip}` },
+    { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
+  ];
+
+  // Add delete option if we have server_id
+  if (selected.connection.server_id) {
+    actionOptions.push({
+      value: "delete",
+      label: pc.red("Delete VM"),
+      hint: `Destroy ${selected.connection.server_name || selected.connection.server_id} on ${selected.cloud}`,
+    });
+  }
+
   const action = await p.select({
     message: "What would you like to do?",
-    options: [
-      { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${selected.connection.user}@${selected.connection.ip}` },
-      { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
-    ],
+    options: actionOptions,
   });
 
   if (p.isCancel(action)) {
@@ -1588,6 +1652,11 @@ async function handleRecordAction(
       p.log.error(`Connection failed: ${getErrorMessage(err)}`);
       p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
     }
+    return;
+  }
+
+  if (action === "delete") {
+    await deleteVM(selected, manifest);
     return;
   }
 
