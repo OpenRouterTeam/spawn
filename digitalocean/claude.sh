@@ -22,7 +22,10 @@ ensure_do_token
 # 2. Generate + register SSH key
 ensure_ssh_key
 
-# 3. Get droplet name and create droplet
+# 3. Gather user preferences before provisioning
+prompt_github_auth
+
+# 4. Get droplet name and create droplet
 DROPLET_NAME=$(get_server_name)
 create_server "${DROPLET_NAME}"
 

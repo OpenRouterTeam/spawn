@@ -16,6 +16,9 @@ echo ""
 ensure_sprite_installed
 ensure_sprite_authenticated
 
+# Gather user preferences before provisioning
+prompt_github_auth
+
 SPRITE_NAME=$(get_sprite_name)
 ensure_sprite_exists "${SPRITE_NAME}"
 verify_sprite_connectivity "${SPRITE_NAME}"

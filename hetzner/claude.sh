@@ -16,6 +16,7 @@ echo ""
 # Provision server
 ensure_hcloud_token
 ensure_ssh_key
+prompt_github_auth
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${HETZNER_SERVER_IP}"
