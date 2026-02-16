@@ -1200,7 +1200,9 @@ track_temp_file() {
 cleanup_temp_files() {
     local exit_code=$?
 
-    for temp_file in "${CLEANUP_TEMP_FILES[@]}"; do
+    # Safe array expansion: only iterate if array has elements
+    # This prevents "unbound variable" errors in strict bash modes
+    for temp_file in "${CLEANUP_TEMP_FILES[@]+"${CLEANUP_TEMP_FILES[@]}"}"; do
         if [[ -f "${temp_file}" ]]; then
             # Securely remove temp files (may contain credentials)
             shred -f -u "${temp_file}" 2>/dev/null || rm -f "${temp_file}"
