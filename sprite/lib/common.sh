@@ -209,8 +209,8 @@ inject_env_vars_sprite() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to .zshrc using sprite exec with -file flag
-    sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    # Upload and append to both .bashrc and .zshrc using sprite exec with -file flag
+    sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
     trap - EXIT
 }
 

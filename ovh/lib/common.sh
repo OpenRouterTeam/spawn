@@ -373,8 +373,8 @@ install_base_deps() {
     run_ovh "$ip" "curl -fsSL https://claude.ai/install.sh | bash"
 
     # Configure PATH
-    run_ovh "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.bashrc"
-    run_ovh "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.claude/local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.zshrc"
+    run_ovh "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.bashrc"
+    run_ovh "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.zshrc"
 
     log_info "Base dependencies installed"
 }
