@@ -1876,6 +1876,11 @@ function printGroupedList(
 
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
+function buildCloudCommandHint(agentKey: string, cloudKey: string, manifest: Manifest): string {
+  const hint = `spawn ${agentKey} ${cloudKey}`;
+  return hasCloudCredentials(manifest.clouds[cloudKey].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
+}
+
 function printAgentCloudsList(
   sortedClouds: string[],
   manifest: Manifest,
@@ -1900,10 +1905,7 @@ function printAgentCloudsList(
   printGroupedList(
     byType,
     (c) => manifest.clouds[c].name,
-    (c) => {
-      const hint = `spawn ${agentKey} ${c}`;
-      return hasCloudCredentials(manifest.clouds[c].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
-    }
+    (c) => buildCloudCommandHint(agentKey, c, manifest)
   );
   console.log();
 }
@@ -1939,6 +1941,19 @@ export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest):
   printAgentCloudsList(sortedClouds, manifest, agentKey, allClouds, credCount);
 }
 
+function checkAllCredentialsReady(auth: string): boolean {
+  const hasCreds = hasCloudCredentials(auth);
+  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
+  return hasOpenRouterKey && (hasCreds || auth.toLowerCase() === "none");
+}
+
+function printAuthVariableStatus(authVars: string[], cloudUrl?: string): void {
+  console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
+  for (let i = 0; i < authVars.length; i++) {
+    console.log(formatAuthVarLine(authVars[i], i === 0 ? cloudUrl : undefined));
+  }
+}
+
 /** Print quick-start instructions showing credential status and example spawn command */
 function printQuickStart(opts: {
   auth: string;
@@ -1946,24 +1961,16 @@ function printQuickStart(opts: {
   cloudUrl?: string;
   spawnCmd?: string;
 }): void {
-  const hasCreds = hasCloudCredentials(opts.auth);
-  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
-  const allReady = hasOpenRouterKey && (hasCreds || opts.authVars.length === 0);
-
   console.log();
-  if (allReady && opts.spawnCmd) {
+
+  if (checkAllCredentialsReady(opts.auth) && opts.spawnCmd) {
     console.log(pc.bold("Quick start:") + "  " + pc.green("credentials detected -- ready to go"));
     console.log(`  ${pc.cyan(opts.spawnCmd)}`);
     return;
   }
 
   console.log(pc.bold("Quick start:"));
-  console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
-  if (opts.authVars.length > 0) {
-    for (let i = 0; i < opts.authVars.length; i++) {
-      console.log(formatAuthVarLine(opts.authVars[i], i === 0 ? opts.cloudUrl : undefined));
-    }
-  }
+  printAuthVariableStatus(opts.authVars, opts.cloudUrl);
   if (opts.spawnCmd) {
     console.log(`  ${pc.cyan(opts.spawnCmd)}`);
   }
