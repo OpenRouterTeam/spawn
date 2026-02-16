@@ -907,6 +907,7 @@ _generate_csrf_state() {
 _init_oauth_session() {
     local oauth_dir
     oauth_dir=$(mktemp -d)
+    track_temp_file "${oauth_dir}"
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
@@ -1195,7 +1196,7 @@ track_temp_file() {
     CLEANUP_TEMP_FILES+=("${temp_file}")
 }
 
-# Cleanup function for temporary files
+# Cleanup function for temporary files and directories
 # Called automatically on EXIT, INT, TERM signals
 cleanup_temp_files() {
     local exit_code=$?
@@ -1204,6 +1205,9 @@ cleanup_temp_files() {
         if [[ -f "${temp_file}" ]]; then
             # Securely remove temp files (may contain credentials)
             shred -f -u "${temp_file}" 2>/dev/null || rm -f "${temp_file}"
+        elif [[ -d "${temp_file}" ]]; then
+            # Remove temp directories (e.g., OAuth session dirs)
+            rm -rf "${temp_file}"
         fi
     done
 
