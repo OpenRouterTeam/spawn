@@ -231,7 +231,7 @@ describe("get_cloud_init_userdata", () => {
 
   it("should configure PATH in both bashrc and zshrc", () => {
     const result = runBash("get_cloud_init_userdata");
-    expect(result.stdout).toContain(".claude/local/bin");
+    expect(result.stdout).toContain(".local/bin");
     expect(result.stdout).toContain(".bun/bin");
   });
 
