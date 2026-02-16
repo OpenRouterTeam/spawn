@@ -427,8 +427,6 @@ async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<
   if ((cmd === "agents" || cmd === "clouds") && filteredArgs.length > 1 && !filteredArgs[1].startsWith("-")) {
     const name = filteredArgs[1];
     warnExtraArgs(filteredArgs, 2);
-    console.error(pc.dim(`Tip: next time you can just run ${pc.cyan(`spawn ${name}`)}`));
-    console.error();
     await showInfoOrError(name);
     return;
   }
@@ -455,8 +453,6 @@ async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: st
 async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean, debug: boolean): Promise<boolean> {
   const parts = cmd.split("/");
   if (parts.length === 2 && parts[0] && parts[1]) {
-    console.error(pc.dim(`Tip: use a space instead of slash: ${pc.cyan(`spawn ${parts[0]} ${parts[1]}`)}`));
-    console.error();
     await handleDefaultCommand(parts[0], parts[1], prompt, dryRun, debug);
     return true;
   }
