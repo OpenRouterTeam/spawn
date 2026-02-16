@@ -13,7 +13,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../shared/common.sh" ]]; then
     source "$SCRIPT_DIR/../../shared/common.sh"
 else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
+    _SHARED_COMMON=$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh) || {
+        echo "ERROR: Failed to download shared/common.sh from GitHub" >&2
+        echo "Check your internet connection or try again later." >&2
+        exit 1
+    }
+    eval "$_SHARED_COMMON"
 fi
 
 # Note: Provider-agnostic functions (logging, OAuth, browser, nc_listen) are now in shared/common.sh
