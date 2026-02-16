@@ -100,7 +100,11 @@ cleanup() {
 
     # Prune worktrees and clean up only OUR worktree base
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+
+    # Safety: only delete if WORKTREE_BASE is non-empty and under /tmp/spawn-worktrees/
+    if [[ -n "${WORKTREE_BASE}" ]] && [[ "${WORKTREE_BASE}" == /tmp/spawn-worktrees/* ]]; then
+        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    fi
 
     # Clean up prompt and PID files
     rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
@@ -127,7 +131,9 @@ git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 
 # Clean stale worktrees
 git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
-if [[ -d "${WORKTREE_BASE}" ]]; then
+
+# Safety: only delete if WORKTREE_BASE is valid and exists
+if [[ -n "${WORKTREE_BASE}" ]] && [[ "${WORKTREE_BASE}" == /tmp/spawn-worktrees/* ]] && [[ -d "${WORKTREE_BASE}" ]]; then
     rm -rf "${WORKTREE_BASE}" 2>&1 | tee -a "${LOG_FILE}" || true
     log "Removed stale ${WORKTREE_BASE} directory"
 fi

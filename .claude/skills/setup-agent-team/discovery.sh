@@ -42,7 +42,11 @@ cleanup() {
     log_info "Running cleanup (exit_code=${exit_code})..."
     cd "${REPO_ROOT}" 2>/dev/null || true
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+
+    # Safety: only delete if WORKTREE_BASE is non-empty and under /tmp/spawn-worktrees/
+    if [[ -n "${WORKTREE_BASE}" ]] && [[ "${WORKTREE_BASE}" == /tmp/spawn-worktrees/* ]]; then
+        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    fi
     rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
     log_info "=== Cycle Done (exit_code=${exit_code}) ==="
     exit $exit_code
@@ -90,7 +94,9 @@ PYEOF
 _cleanup_stale_artifacts() {
     log_info "Pre-cycle cleanup..."
     git worktree prune 2>/dev/null || true
-    if [[ -d "${WORKTREE_BASE}" ]]; then
+
+    # Safety: only delete if WORKTREE_BASE is valid and exists
+    if [[ -n "${WORKTREE_BASE}" ]] && [[ "${WORKTREE_BASE}" == /tmp/spawn-worktrees/* ]] && [[ -d "${WORKTREE_BASE}" ]]; then
         rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
         log_info "Removed stale ${WORKTREE_BASE} directory"
     fi
@@ -249,7 +255,11 @@ run_team_cycle() {
     rm -f "${PROMPT_FILE}" 2>/dev/null || true
     PROMPT_FILE=""
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+
+    # Safety: only delete if WORKTREE_BASE is non-empty and under /tmp/spawn-worktrees/
+    if [[ -n "${WORKTREE_BASE}" ]] && [[ "${WORKTREE_BASE}" == /tmp/spawn-worktrees/* ]]; then
+        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    fi
 
     return $CLAUDE_EXIT
 }
@@ -261,7 +271,12 @@ cleanup_between_cycles() {
     git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+
+    # Safety: only delete if WORKTREE_BASE is non-empty and under /tmp/spawn-worktrees/
+    if [[ -n "${WORKTREE_BASE}" ]] && [[ "${WORKTREE_BASE}" == /tmp/spawn-worktrees/* ]]; then
+        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    fi
+
     git branch --merged main | grep -v 'main' | grep -v '^\*' | xargs -r git branch -d 2>/dev/null || true
     log_info "Cleanup complete"
 }

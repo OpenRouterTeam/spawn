@@ -34,7 +34,11 @@ cleanup() {
     log "Running cleanup (exit_code=${exit_code})..."
     cd "${REPO_ROOT}" 2>/dev/null || true
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+
+    # Safety: only delete if WORKTREE_BASE is non-empty and under /tmp/spawn-worktrees/
+    if [[ -n "${WORKTREE_BASE}" ]] && [[ "${WORKTREE_BASE}" == /tmp/spawn-worktrees/* ]]; then
+        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    fi
     rm -f "${RESULTS_PHASE2}" "${RESULTS_PHASE4}" "/tmp/spawn-qa-record-output.txt" "/tmp/spawn-qa-escalate.txt" 2>/dev/null || true
     log "=== QA Cycle Done (exit_code=${exit_code}) ==="
     exit $exit_code
