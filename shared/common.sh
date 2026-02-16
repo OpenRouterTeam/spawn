@@ -596,9 +596,9 @@ validate_oauth_port() {
 # Generate OAuth callback HTML pages (success and error)
 # Sets OAUTH_SUCCESS_HTML and OAUTH_ERROR_HTML variables
 _generate_oauth_html() {
-    local css='body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}'
-    OAUTH_SUCCESS_HTML="<html><head><style>${css}h1{color:#00d4aa}</style></head><body><div class=\"card\"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>"
-    OAUTH_ERROR_HTML="<html><head><style>${css}h1{color:#d9534f}</style></head><body><div class=\"card\"><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection)</p><p>Please try again</p></div></body></html>"
+    local css='*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}'
+    OAUTH_SUCCESS_HTML="<html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>${css}</style></head><body><div class=\"card\"><div class=\"icon\">&#10003;</div><h1>Authentication Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>"
+    OAUTH_ERROR_HTML="<html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>${css}h1{color:#dc2626}@media(prefers-color-scheme:dark){h1{color:#ef4444}}</style></head><body><div class=\"card\"><div class=\"icon\">&#10007;</div><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>"
 }
 
 # Validate OAuth server prerequisites (port, state token, runtime)
