@@ -25,12 +25,15 @@ function runCli(
   env: Record<string, string> = {}
 ): { stdout: string; stderr: string; exitCode: number } {
   const cmd = `bun run src/index.ts ${args.join(" ")}`;
+  const bunPath = `${process.env.HOME}/.bun/bin`;
+  const pathEnv = `${bunPath}:${process.env.PATH}`;
   try {
     const stdout = execSync(cmd, {
       cwd: CLI_DIR,
       env: {
         ...process.env,
         ...env,
+        PATH: pathEnv,
         // Prevent auto-update from running during tests
         SPAWN_NO_UPDATE_CHECK: "1",
         // Prevent local manifest.json from being used
