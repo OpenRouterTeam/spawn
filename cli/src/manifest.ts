@@ -112,9 +112,9 @@ function stripDangerousKeys(obj: any): any {
   return clean;
 }
 
-function isValidManifest(data: any): data is Manifest {
-  return data && typeof data === "object" && !Array.isArray(data) &&
-    data.agents && data.clouds && data.matrix;
+function isValidManifest(data: unknown): data is Manifest {
+  return !!data && typeof data === "object" && !Array.isArray(data) &&
+    "agents" in data && "clouds" in data && "matrix" in data;
 }
 
 async function fetchManifestFromGitHub(): Promise<Manifest | null> {
