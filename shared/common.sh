@@ -624,18 +624,38 @@ _validate_oauth_server_args() {
     fi
 }
 
+# Escape a string for safe embedding in a JavaScript single-quoted string literal.
+# Escapes backslashes and single quotes to prevent breaking out of the JS string.
+# SECURITY-CRITICAL: Used by _generate_oauth_server_script to prevent JS injection.
+_js_escape_single_quote() {
+    local s="${1}"
+    s="${s//\\/\\\\}"
+    s="${s//\'/\\\'}"
+    printf '%s' "${s}"
+}
+
 # Generate the Node.js script for the OAuth callback server
 # $1=expected_state $2=success_html $3=error_html $4=code_file $5=port_file $6=starting_port
+# SECURITY: All interpolated values are escaped for JS single-quoted strings
 _generate_oauth_server_script() {
     local expected_state="${1}" success_html="${2}" error_html="${3}"
     local code_file="${4}" port_file="${5}" starting_port="${6}"
+
+    # SECURITY: Escape all values that will be interpolated into JS string literals
+    local safe_state safe_html safe_error_html safe_code_file safe_port_file
+    safe_state=$(_js_escape_single_quote "${expected_state}")
+    safe_html=$(_js_escape_single_quote "${success_html}")
+    safe_error_html=$(_js_escape_single_quote "${error_html}")
+    safe_code_file=$(_js_escape_single_quote "${code_file}")
+    safe_port_file=$(_js_escape_single_quote "${port_file}")
+
     printf '%s' "
 const http = require('http');
 const fs = require('fs');
 const url = require('url');
-const expectedState = '${expected_state}';
-const html = '${success_html}';
-const errorHtml = '${error_html}';
+const expectedState = '${safe_state}';
+const html = '${safe_html}';
+const errorHtml = '${safe_error_html}';
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url, true);
   if (parsed.pathname === '/callback' && parsed.query.code) {
@@ -645,7 +665,7 @@ const server = http.createServer((req, res) => {
       setTimeout(() => { server.close(); process.exit(1); }, 500);
       return;
     }
-    fs.writeFileSync('${code_file}', parsed.query.code);
+    fs.writeFileSync('${safe_code_file}', parsed.query.code);
     res.writeHead(200, {'Content-Type':'text/html','Connection':'close'});
     res.end(html);
     setTimeout(() => { server.close(); process.exit(0); }, 500);
@@ -658,7 +678,7 @@ let currentPort = ${starting_port};
 const maxPort = ${starting_port} + 10;
 function tryListen() {
   server.listen(currentPort, '127.0.0.1', () => {
-    fs.writeFileSync('${port_file}', currentPort.toString());
+    fs.writeFileSync('${safe_port_file}', currentPort.toString());
     fs.writeFileSync('/dev/fd/1', '');
   });
 }
@@ -1456,13 +1476,16 @@ get_ssh_fingerprint() {
 
 # JSON-escape a string (for embedding in JSON bodies)
 # Usage: json_escape STRING
+# SECURITY: Fallback escapes backslashes, quotes, newlines, carriage returns, and tabs
+# to prevent JSON injection when python3 is unavailable.
 json_escape() {
     local string="${1}"
     python3 -c "import json, sys; print(json.dumps(sys.stdin.read().rstrip('\n')))" <<< "${string}" 2>/dev/null || {
-        # Fallback: manually escape quotes and backslashes
+        # Fallback: escape all JSON-significant characters
         local escaped="${string//\\/\\\\}"
         escaped="${escaped//\"/\\\"}"
-        echo "\"${escaped}\""
+        escaped="$(printf '%s' "${escaped}" | sed 's/\t/\\t/g' | tr '\n' '\036' | sed 's/\x1e/\\n/g' | tr '\r' '\036' | sed 's/\x1e/\\r/g')"
+        printf '"%s"\n' "${escaped}"
     }
 }
 
