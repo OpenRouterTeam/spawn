@@ -19,7 +19,10 @@ ensure_ovh_authenticated
 # 2. Generate + register SSH key
 ensure_ssh_key
 
-# 3. Get server name and create instance
+# 3. Gather user preferences before provisioning
+prompt_github_auth
+
+# 4. Get server name and create instance
 SERVER_NAME=$(get_server_name)
 create_ovh_instance "${SERVER_NAME}"
 
@@ -67,4 +70,4 @@ echo ""
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${OVH_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
+interactive_session "${OVH_SERVER_IP}" 'export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'

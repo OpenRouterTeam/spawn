@@ -18,7 +18,10 @@ echo ""
 ensure_daytona_cli
 ensure_daytona_token
 
-# 2. Get sandbox name and create sandbox
+# 2. Gather user preferences before provisioning
+prompt_github_auth
+
+# 3. Get sandbox name and create sandbox
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 
@@ -61,4 +64,4 @@ echo ""
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
+interactive_session 'export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'

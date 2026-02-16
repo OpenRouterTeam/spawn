@@ -16,6 +16,9 @@ echo ""
 ensure_sprite_installed
 ensure_sprite_authenticated
 
+# Gather user preferences before provisioning
+prompt_github_auth
+
 SPRITE_NAME=$(get_sprite_name)
 ensure_sprite_exists "${SPRITE_NAME}"
 verify_sprite_connectivity "${SPRITE_NAME}"
@@ -67,11 +70,11 @@ if [[ -n "${SPAWN_PROMPT:-}" ]]; then
     escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
 
     # Execute without -tty flag
-    sprite exec -s "${SPRITE_NAME}" -- zsh -c "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude -p ${escaped_prompt}"
+    sprite exec -s "${SPRITE_NAME}" -- bash -c "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; claude -p ${escaped_prompt}"
 else
     # Interactive mode: start Claude Code normally
     log_step "Starting Claude Code..."
     sleep 1
     clear 2>/dev/null || true
-    sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
+    sprite exec -s "${SPRITE_NAME}" -tty -- bash -c 'export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
 fi

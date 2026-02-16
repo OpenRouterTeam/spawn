@@ -16,6 +16,7 @@ echo ""
 # Provision server
 ensure_hcloud_token
 ensure_ssh_key
+prompt_github_auth
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 verify_server_connectivity "${HETZNER_SERVER_IP}"
@@ -41,4 +42,4 @@ inject_env_vars_cb "$RUN" "$UPLOAD" \
 # Claude-specific config
 setup_claude_code_config "${OPENROUTER_API_KEY}" "$UPLOAD" "$RUN"
 
-launch_session "Hetzner server" "$SESSION" "export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
+launch_session "Hetzner server" "$SESSION" 'export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'

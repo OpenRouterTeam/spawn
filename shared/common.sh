@@ -596,9 +596,9 @@ validate_oauth_port() {
 # Generate OAuth callback HTML pages (success and error)
 # Sets OAUTH_SUCCESS_HTML and OAUTH_ERROR_HTML variables
 _generate_oauth_html() {
-    local css='body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e}.card{text-align:center;color:#fff}h1{margin:0 0 8px;font-size:1.6rem}p{margin:0 0 6px;color:#ffffffcc;font-size:1rem}'
-    OAUTH_SUCCESS_HTML="<html><head><style>${css}h1{color:#00d4aa}</style></head><body><div class=\"card\"><h1>Authentication Successful!</h1><p>You can close this tab</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>"
-    OAUTH_ERROR_HTML="<html><head><style>${css}h1{color:#d9534f}</style></head><body><div class=\"card\"><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection)</p><p>Please try again</p></div></body></html>"
+    local css='*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}'
+    OAUTH_SUCCESS_HTML="<html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>${css}</style></head><body><div class=\"card\"><div class=\"icon\">&#10003;</div><h1>Authentication Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>"
+    OAUTH_ERROR_HTML="<html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>${css}h1{color:#dc2626}@media(prefers-color-scheme:dark){h1{color:#ef4444}}</style></head><body><div class=\"card\"><div class=\"icon\">&#10007;</div><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>"
 }
 
 # Validate OAuth server prerequisites (port, state token, runtime)
@@ -1090,7 +1090,7 @@ inject_env_vars_ssh() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to both .bashrc and .zshrc
+    # Append to .bashrc and .zshrc only — do NOT write to .profile or .bash_profile
     "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
     "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
@@ -1118,7 +1118,7 @@ inject_env_vars_local() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to both .bashrc and .zshrc
+    # Append to .bashrc and .zshrc only
     "${upload_func}" "${env_temp}" "/tmp/env_config"
     "${run_func}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
@@ -1128,18 +1128,48 @@ inject_env_vars_local() {
     offer_github_auth "${run_func}"
 }
 
-# Offer optional GitHub CLI setup on remote VM
-# Usage (SSH clouds): offer_github_auth "run_server SERVER_IP"
-# Usage (local):      offer_github_auth "run_server"
-# Skipped if SPAWN_SKIP_GITHUB_AUTH=1 or non-interactive
-offer_github_auth() {
-    local run_callback="${1}"
+# Prompt user about GitHub CLI setup BEFORE provisioning.
+# Stores the answer so the actual install can happen later (after the
+# server is up) without re-prompting.
+# Usage: prompt_github_auth   (call before create_server)
+prompt_github_auth() {
+    SPAWN_GITHUB_AUTH_PROMPTED=1
 
     # Skip in non-interactive or if user opted out
     if [[ -n "${SPAWN_SKIP_GITHUB_AUTH:-}" ]]; then
         return 0
     fi
 
+    printf '\n'
+    local choice
+    choice=$(safe_read "Set up GitHub CLI (gh) on this machine? (y/N): ") || return 0
+    if [[ "${choice}" =~ ^[Yy]$ ]]; then
+        SPAWN_GITHUB_AUTH_REQUESTED=1
+    fi
+}
+
+# Run GitHub CLI setup on remote VM if previously requested via prompt_github_auth.
+# If prompt_github_auth was never called, falls back to prompting interactively.
+# Usage (SSH clouds): offer_github_auth "run_server SERVER_IP"
+# Usage (local):      offer_github_auth "run_server"
+offer_github_auth() {
+    local run_callback="${1}"
+
+    # Skip if user opted out via env var
+    if [[ -n "${SPAWN_SKIP_GITHUB_AUTH:-}" ]]; then
+        return 0
+    fi
+
+    # If prompt_github_auth was already called, use its stored answer
+    if [[ "${SPAWN_GITHUB_AUTH_PROMPTED:-}" == "1" ]]; then
+        if [[ "${SPAWN_GITHUB_AUTH_REQUESTED:-}" == "1" ]]; then
+            log_step "Installing and authenticating GitHub CLI..."
+            ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+        fi
+        return 0
+    fi
+
+    # Fallback: prompt_github_auth was never called, ask now
     printf '\n'
     local choice
     choice=$(safe_read "Set up GitHub CLI (gh) on this machine? (y/N): ") || return 0
@@ -1224,26 +1254,37 @@ verify_agent() {
 }
 
 # Install Claude Code with multi-method fallback and detailed error reporting.
-# Tries: 1) curl installer (standalone binary)  2) npm  3) bun
+# Tries: 1) curl installer (standalone binary)  2) bun  3) npm
 # The curl installer bundles its own runtime. npm/bun install a Node.js package
 # whose shebang needs 'node', so we ensure a node runtime exists after those.
 # Usage: install_claude_code RUN_CB
 install_claude_code() {
     local run_cb="$1"
-    # Include fnm paths so node is found even in non-interactive SSH sessions
-    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/fnm:$PATH; if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi'
+    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+
+    # Clean up ~/.bash_profile if it was created by a previous broken deployment.
+    ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
+
+    _finalize_claude_install() {
+        log_step "Setting up Claude Code shell integration..."
+        ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
+        # Write claude PATH to .bashrc and .zshrc
+        ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
+    }
 
     # Already installed?
-    if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+    if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
         log_info "Claude Code already installed"
+        _finalize_claude_install
         return 0
     fi
 
     # Method 1: official curl installer (standalone binary, no node needed)
-    log_step "Installing Claude Code (method 1/3: curl installer)..."
+    log_step "Installing Claude Code (method 1/2: curl installer)..."
     if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
             log_info "Claude Code installed via curl installer"
+            _finalize_claude_install
             return 0
         fi
         log_warn "curl installer exited 0 but claude not found on PATH"
@@ -1251,46 +1292,25 @@ install_claude_code() {
         log_warn "curl installer failed (site may be temporarily unavailable)"
     fi
 
-    # npm/bun installs produce a Node.js package — ensure 'node' exists BEFORE
-    # installing, since the claude binary is a Node.js script that needs 'node'.
-    # Tries fnm (platform-agnostic) first, falls back to nodesource (Debian/Ubuntu).
-    _ensure_node_runtime() {
-        if ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
-            return 0
-        fi
-        log_step "Installing Node.js (required by Claude Code npm package)..."
-        if ${run_cb} "curl -fsSL https://fnm.vercel.app/install | bash && export PATH=\$HOME/.local/share/fnm:\$PATH && eval \"\$(fnm env)\" && fnm install --lts && fnm default lts-latest" 2>&1; then
-            log_info "Node.js installed via fnm"
-        elif ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" 2>&1; then
+    # Ensure Node.js runtime for bun-installed package (it's a Node.js script)
+    if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
+        log_step "Installing Node.js runtime (required for claude package)..."
+        if ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" >/dev/null 2>&1; then
             log_info "Node.js installed via nodesource"
         else
-            log_warn "Could not install Node.js automatically"
+            log_warn "Could not install Node.js - bun method may fail"
         fi
-    }
-
-    # Ensure node is available before npm/bun methods
-    _ensure_node_runtime
-
-    # Method 2: npm
-    log_step "Installing Claude Code (method 2/3: npm)..."
-    if ${run_cb} "${claude_path} && npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
-            log_info "Claude Code installed via npm"
-            return 0
-        fi
-        log_warn "npm install exited 0 but claude binary not working"
-    else
-        log_warn "npm install failed"
     fi
 
-    # Method 3: bun
-    log_step "Installing Claude Code (method 3/3: bun)..."
-    if ${run_cb} "${claude_path} && bun add -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+    # Method 2: bun
+    log_step "Installing Claude Code (method 2/2: bun)..."
+    if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
+        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
             log_info "Claude Code installed via bun"
+            _finalize_claude_install
             return 0
         fi
-        log_warn "bun install exited 0 but claude binary not working"
+        log_warn "bun install exited 0 but claude binary not found"
     else
         log_warn "bun install failed"
     fi
@@ -1489,10 +1509,9 @@ runcmd:
   # Mark as sandbox environment (disposable cloud VM)
   - echo 'export IS_SANDBOX=1' >> /root/.bashrc
   - echo 'export IS_SANDBOX=1' >> /root/.zshrc
-  # Configure PATH in .bashrc
-  - echo 'export PATH="${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
-  # Configure PATH in .zshrc
-  - echo 'export PATH="${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
+  # Configure PATH in .bashrc and .zshrc (include claude installer path)
+  - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.bashrc
+  - echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /root/.zshrc
   # Signal completion
   - touch /root/.cloud-init-complete
 CLOUD_INIT_EOF

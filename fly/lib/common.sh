@@ -378,7 +378,7 @@ inject_env_vars_fly() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to both .bashrc and .zshrc
+    # Append to .bashrc and .zshrc only
     upload_file "${env_temp}" "/tmp/env_config"
     run_server "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 

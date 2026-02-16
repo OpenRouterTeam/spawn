@@ -22,7 +22,10 @@ ensure_do_token
 # 2. Generate + register SSH key
 ensure_ssh_key
 
-# 3. Get droplet name and create droplet
+# 3. Gather user preferences before provisioning
+prompt_github_auth
+
+# 4. Get droplet name and create droplet
 DROPLET_NAME=$(get_server_name)
 create_server "${DROPLET_NAME}"
 
@@ -69,4 +72,4 @@ save_vm_connection "${DO_SERVER_IP}" "root" "${DO_DROPLET_ID}" "${DROPLET_NAME}"
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${DO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"
+interactive_session "${DO_SERVER_IP}" 'export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'

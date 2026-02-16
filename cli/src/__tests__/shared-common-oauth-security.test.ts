@@ -168,13 +168,13 @@ describe("_generate_oauth_html", () => {
     expect(result.stdout).toContain("font-family");
   });
 
-  it("success HTML should have green color for heading", () => {
+  it("success HTML should contain checkmark icon", () => {
     const result = runBash(`
       _generate_oauth_html
       echo "$OAUTH_SUCCESS_HTML"
     `);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("#00d4aa");
+    expect(result.stdout).toContain("&#10003;");
   });
 
   it("error HTML should have red color for heading", () => {
@@ -183,7 +183,7 @@ describe("_generate_oauth_html", () => {
       echo "$OAUTH_ERROR_HTML"
     `);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("#d9534f");
+    expect(result.stdout).toContain("#dc2626");
   });
 
   it("should include 'close this tab' message in success HTML", () => {

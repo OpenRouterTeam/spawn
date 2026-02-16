@@ -178,8 +178,8 @@ setup_shell_environment() {
 export PATH="${HOME}/.bun/bin:/.sprite/languages/bun/bin:${PATH}"
 EOF
 
-    # Upload and append to shell configs
-    sprite exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.zprofile && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
+    # Upload and append to .bashrc and .zshrc only
+    sprite exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.bashrc && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
 
     # Switch bash to zsh
     local bash_temp
@@ -209,7 +209,7 @@ inject_env_vars_sprite() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to both .bashrc and .zshrc using sprite exec with -file flag
+    # Append to .bashrc and .zshrc only
     sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
     trap - EXIT
 
