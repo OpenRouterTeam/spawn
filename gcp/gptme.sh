@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
@@ -47,7 +47,6 @@ log_step "Setting up environment variables..."
 
 inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-rm "$ENV_TEMP"
 
 echo ""
 log_info "GCP instance setup completed successfully!"
