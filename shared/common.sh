@@ -1090,9 +1090,9 @@ inject_env_vars_ssh() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to both .bashrc and .zshrc
+    # Upload and append to .profile, .bashrc, and .zshrc
     "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1118,9 +1118,9 @@ inject_env_vars_local() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to both .bashrc and .zshrc
+    # Upload and append to .profile, .bashrc, and .zshrc
     "${upload_func}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${run_func}" "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1270,7 +1270,7 @@ install_claude_code() {
         ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
         # Ensure fnm bootstrap is in .bashrc and .zshrc so new shells can find node
         local fnm_snippet='export PATH="\$HOME/.local/share/fnm:\$PATH"; if command -v fnm >/dev/null 2>&1; then eval "\$(fnm env)"; fi'
-        ${run_cb} "if command -v fnm >/dev/null 2>&1 || test -d \$HOME/.local/share/fnm; then for rc in ~/.bashrc ~/.zshrc; do grep -q 'fnm env' \"\$rc\" 2>/dev/null || printf '\\n# fnm (node version manager)\\n${fnm_snippet}\\n' >> \"\$rc\"; done; fi" >/dev/null 2>&1 || true
+        ${run_cb} "if command -v fnm >/dev/null 2>&1 || test -d \$HOME/.local/share/fnm; then for rc in ~/.profile ~/.bashrc ~/.zshrc; do grep -q 'fnm env' \"\$rc\" 2>/dev/null || printf '\\n# fnm (node version manager)\\n${fnm_snippet}\\n' >> \"\$rc\"; done; fi" >/dev/null 2>&1 || true
     }
 
     # Already installed?
@@ -1310,11 +1310,24 @@ install_claude_code() {
         fi
     }
 
-    # Ensure node is available before npm/bun methods
+    # Ensure node is available before bun/npm methods
     _ensure_node_runtime
 
-    # Method 2: npm
-    log_step "Installing Claude Code (method 2/3: npm)..."
+    # Method 2: bun (faster than npm, often pre-installed)
+    log_step "Installing Claude Code (method 2/3: bun)..."
+    if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
+        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+            log_info "Claude Code installed via bun"
+            _finalize_claude_install
+            return 0
+        fi
+        log_warn "bun install exited 0 but claude binary not working"
+    else
+        log_warn "bun install failed"
+    fi
+
+    # Method 3: npm
+    log_step "Installing Claude Code (method 3/3: npm)..."
     if ${run_cb} "${claude_path} && npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via npm"
@@ -1324,19 +1337,6 @@ install_claude_code() {
         log_warn "npm install exited 0 but claude binary not working"
     else
         log_warn "npm install failed"
-    fi
-
-    # Method 3: bun
-    log_step "Installing Claude Code (method 3/3: bun)..."
-    if ${run_cb} "${claude_path} && bun add -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
-            log_info "Claude Code installed via bun"
-            _finalize_claude_install
-            return 0
-        fi
-        log_warn "bun install exited 0 but claude binary not working"
-    else
-        log_warn "bun install failed"
     fi
 
     # All methods failed
@@ -1374,7 +1374,7 @@ inject_env_vars_cb() {
     generate_env_config "$@" > "${env_temp}"
 
     ${upload_cb} "${env_temp}" "/tmp/env_config"
-    ${run_cb} "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    ${run_cb} "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Offer optional GitHub CLI setup
     offer_github_auth "${run_cb}"
