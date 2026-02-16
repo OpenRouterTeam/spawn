@@ -136,7 +136,7 @@ _save_multi_config_to_file() {
     for spec in "$@"; do
         local config_key="${spec%%:*}"
         local env_var="${spec#*:}"
-        eval "local val=\"\${${env_var}:-}\""
+        local val="${!env_var:-}"
         py_args+=("$val")
         py_keys="${py_keys}'${config_key}': sys.argv[${idx}], "
         idx=$((idx + 1))
