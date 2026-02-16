@@ -1090,10 +1090,10 @@ inject_env_vars_ssh() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to .profile, .bash_profile, .bashrc, and .zshrc
-    # bash -l sources the FIRST of ~/.bash_profile, ~/.bash_login, ~/.profile
+    # Append to .profile, .bashrc, .zshrc only — NEVER create ~/.bash_profile
+    # (creating it makes bash -l skip ~/.profile, destroying the standard PATH)
     "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "${server_ip}" "for rc in ~/.profile ~/.bash_profile ~/.bashrc ~/.zshrc ~/.zprofile; do cat /tmp/env_config >> \"\$rc\"; done && rm /tmp/env_config"
+    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1119,9 +1119,9 @@ inject_env_vars_local() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to .profile, .bash_profile, .bashrc, and .zshrc
+    # Append to .profile, .bashrc, .zshrc only — never .bash_profile
     "${upload_func}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "for rc in ~/.profile ~/.bash_profile ~/.bashrc ~/.zshrc ~/.zprofile; do cat /tmp/env_config >> \"\$rc\"; done && rm /tmp/env_config"
+    "${run_func}" "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1264,20 +1264,15 @@ install_claude_code() {
     # Include fnm paths so node is found even in non-interactive SSH sessions
     local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/fnm:$PATH; if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi'
 
-    # Finalize installation: set up shell integration (PATH, completions)
-    # Persists claude and fnm PATH entries to .profile/.bashrc/.zshrc
+    # Finalize: set up shell integration and persist PATH to .profile/.bashrc/.zshrc.
+    # NEVER write to ~/.bash_profile — creating it breaks Ubuntu's login shell chain.
     _finalize_claude_install() {
         log_step "Setting up Claude Code shell integration..."
         ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
-        # Write claude PATH to all shell configs so login shells find the binary.
-        # .bashrc has a non-interactive guard that skips appended exports when
-        # run via `ssh host "cmd"` or `bash -lc`, so .profile is essential.
-        # Write claude PATH to all shell configs so login shells find the binary.
-        # bash -l sources the FIRST of ~/.bash_profile, ~/.bash_login, ~/.profile
-        # so we must write to all of them to be safe.
-        ${run_cb} "for rc in ~/.profile ~/.bash_profile ~/.bashrc ~/.zshrc ~/.zprofile; do touch \"\$rc\"; grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
-        # Ensure fnm bootstrap is in all shell configs so new shells can find node
-        ${run_cb} "if command -v fnm >/dev/null 2>&1 || test -d \$HOME/.local/share/fnm; then for rc in ~/.profile ~/.bash_profile ~/.bashrc ~/.zshrc ~/.zprofile; do grep -q 'fnm env' \"\$rc\" 2>/dev/null || printf '\\n# fnm (node version manager)\\nexport PATH=\"\$HOME/.local/share/fnm:\$PATH\"\\nif command -v fnm >/dev/null 2>&1; then eval \"\\\$(fnm env)\"; fi\\n' >> \"\$rc\"; done; fi" >/dev/null 2>&1 || true
+        # Write claude PATH to .profile (login shells), .bashrc, .zshrc
+        ${run_cb} "for rc in ~/.profile ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
+        # Ensure fnm bootstrap is in shell configs so new shells can find node
+        ${run_cb} "if command -v fnm >/dev/null 2>&1 || test -d \$HOME/.local/share/fnm; then for rc in ~/.profile ~/.bashrc ~/.zshrc; do grep -q 'fnm env' \"\$rc\" 2>/dev/null || printf '\\n# fnm (node version manager)\\nexport PATH=\"\$HOME/.local/share/fnm:\$PATH\"\\nif command -v fnm >/dev/null 2>&1; then eval \"\\\$(fnm env)\"; fi\\n' >> \"\$rc\"; done; fi" >/dev/null 2>&1 || true
     }
 
     # Already installed?
@@ -1381,7 +1376,7 @@ inject_env_vars_cb() {
     generate_env_config "$@" > "${env_temp}"
 
     ${upload_cb} "${env_temp}" "/tmp/env_config"
-    ${run_cb} "for rc in ~/.profile ~/.bash_profile ~/.bashrc ~/.zshrc ~/.zprofile; do cat /tmp/env_config >> \"\$rc\"; done && rm /tmp/env_config"
+    ${run_cb} "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Offer optional GitHub CLI setup
     offer_github_auth "${run_cb}"
