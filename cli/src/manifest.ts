@@ -42,8 +42,15 @@ export interface Manifest {
 
 const REPO = "OpenRouterTeam/spawn";
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/main`;
-const CACHE_DIR = join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "spawn");
-const CACHE_FILE = join(CACHE_DIR, "manifest.json");
+// Dynamic getters so tests can override XDG_CACHE_HOME at runtime
+function getCacheDir(): string {
+  return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "spawn");
+}
+function getCacheFile(): string {
+  return join(getCacheDir(), "manifest.json");
+}
+// Backward-compatible export (evaluated at import time)
+const CACHE_DIR = getCacheDir();
 const CACHE_TTL = 3600; // 1 hour in seconds
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 
@@ -51,7 +58,7 @@ const FETCH_TIMEOUT = 10_000; // 10 seconds
 
 function cacheAge(): number {
   try {
-    const st: ReturnType<typeof statSync> = statSync(CACHE_FILE);
+    const st: ReturnType<typeof statSync> = statSync(getCacheFile());
     return (Date.now() - st.mtimeMs) / 1000;
   } catch (err) {
     // Cache file doesn't exist or is inaccessible - treat as infinitely old
@@ -66,18 +73,28 @@ function logError(message: string, err?: unknown): void {
 
 function readCache(): Manifest | null {
   try {
-    const raw = JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
+    const raw = JSON.parse(readFileSync(getCacheFile(), "utf-8"));
     return stripDangerousKeys(raw) as Manifest;
   } catch (err) {
     // Cache file missing, corrupted, or unreadable
-    logError(`Failed to read cache from ${CACHE_FILE}`, err);
+    logError(`Failed to read cache from ${getCacheFile()}`, err);
     return null;
   }
 }
 
+function isTestEnv(): boolean {
+  return !!(process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test");
+}
+
 function writeCache(data: Manifest): void {
-  mkdirSync(CACHE_DIR, { recursive: true });
-  writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), "utf-8");
+  // In test environments, only write to disk if XDG_CACHE_HOME is set (i.e.,
+  // the test has opted into an isolated cache dir). This prevents test fixtures
+  // from leaking into the real ~/.cache/spawn/manifest.json.
+  if (isTestEnv() && !process.env.XDG_CACHE_HOME) {
+    return;
+  }
+  mkdirSync(getCacheDir(), { recursive: true });
+  writeFileSync(getCacheFile(), JSON.stringify(data, null, 2), "utf-8");
 }
 
 // ── Fetching ───────────────────────────────────────────────────────────────────
@@ -201,7 +218,7 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
     `  1. Check your internet connection\n` +
     `  2. Try again in a few moments (GitHub may be temporarily unreachable)\n` +
     `  3. If the problem persists, clear the cache and retry:\n` +
-    `     rm -rf ${CACHE_DIR}`
+    `     rm -rf ${getCacheDir()}`
   );
 }
 
