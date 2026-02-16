@@ -312,6 +312,31 @@ _get_required_fields() {
     esac
 }
 
+# Check if JSON body is valid
+# Args: body endpoint
+_check_json_validity() {
+    local body="$1"
+    local endpoint="$2"
+    if ! printf '%s' "$body" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
+        echo "BODY_ERROR:invalid_json:${endpoint}" >> "${MOCK_LOG}"
+        return 1
+    fi
+    return 0
+}
+
+# Check for required fields in JSON body
+# Args: body endpoint required_fields
+_check_required_fields() {
+    local body="$1"
+    local endpoint="$2"
+    local required_fields="$3"
+    for field in $required_fields; do
+        if ! printf '%s' "$body" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
+            echo "BODY_ERROR:missing_field:${field}:${endpoint}" >> "${MOCK_LOG}"
+        fi
+    done
+}
+
 # Validate POST request body contains required fields for major clouds.
 # Used during mock script execution to catch invalid API requests.
 # Args: cloud method endpoint body
@@ -328,19 +353,8 @@ _validate_body() {
     required_fields=$(_get_required_fields "$cloud" "$endpoint")
     [[ -z "$required_fields" ]] && return 0
 
-    # Check if body is valid JSON
-    if ! printf '%s' "$body" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
-        echo "BODY_ERROR:invalid_json:${endpoint}" >> "${MOCK_LOG}"
-        return 1
-    fi
-
-    # Check for required fields
-    for field in $required_fields; do
-        if ! printf '%s' "$body" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); assert '$field' in d" 2>/dev/null; then
-            echo "BODY_ERROR:missing_field:${field}:${endpoint}" >> "${MOCK_LOG}"
-        fi
-    done
-
+    _check_json_validity "$body" "$endpoint" || return 1
+    _check_required_fields "$body" "$endpoint" "$required_fields"
     return 0
 }
 

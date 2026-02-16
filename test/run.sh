@@ -43,16 +43,15 @@ trap 'cleanup' EXIT
 
 # --- Mock sprite CLI ---
 # Records every call to a log, returns success for expected commands
-setup_mocks() {
+_create_sprite_mock() {
     cat > "${TEST_DIR}/sprite" << 'MOCK'
 #!/bin/bash
 echo "sprite $*" >> "${MOCK_LOG}"
 
 case "$1" in
-    org)    exit 0 ;;                          # auth check passes
+    org)    exit 0 ;;
     list)
         echo "existing-sprite"
-        # After create, also return the test sprite name so provisioning poll succeeds
         if [[ -f "/tmp/sprite_mock_created_$$" ]] || [[ -f "/tmp/sprite_mock_created" ]]; then
             echo "${SPRITE_NAME:-}"
         fi
@@ -63,16 +62,13 @@ case "$1" in
         exit 0
         ;;
     exec)
-        # If there's a -file flag, just pretend to upload
         if [[ "$*" == *"-file"* ]]; then
             exit 0
         fi
-        # If -tty, this is the final interactive launch — signal success and exit
         if [[ "$*" == *"-tty"* ]]; then
             echo "[MOCK] Would launch interactive session: $*" >> "${MOCK_LOG}"
             exit 0
         fi
-        # Regular exec — just succeed
         exit 0
         ;;
     login)  exit 0 ;;
@@ -80,6 +76,10 @@ case "$1" in
 esac
 MOCK
     chmod +x "${TEST_DIR}/sprite"
+}
+
+setup_mocks() {
+    _create_sprite_mock
 }
 
 # --- Mock other commands that shouldn't run for real ---
