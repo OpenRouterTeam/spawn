@@ -61,6 +61,6 @@ echo ""
 
 # 8. Start Claude Code interactively
 log_step "Starting Claude Code..."
-sleep 1
+sleep "${SLEEP_BRIEF}"
 clear
 interactive_session "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.bashrc && claude"

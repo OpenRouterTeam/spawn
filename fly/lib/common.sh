@@ -99,7 +99,11 @@ _try_flyctl_auth() {
 # Validate a Fly.io token by making a test API call
 _validate_fly_token() {
     local response
-    response=$(fly_api GET "/apps?org_slug=personal")
+    response=$(fly_api GET "/apps?org_slug=personal") || {
+        log_error "Failed to contact Fly.io API"
+        log_error "Check your network connection and API endpoint"
+        return 1
+    }
     if echo "$response" | grep -q '"error"'; then
         log_error "Authentication failed: Invalid Fly.io API token"
         log_error "API Error: $(echo "$response" | _fly_parse_error "No details available")"
@@ -256,7 +260,7 @@ _fly_wait_for_machine_start() {
         fi
 
         log_step "Machine state: $state ($attempt/$max_attempts)"
-        sleep 3
+        sleep "${SLEEP_MEDIUM}"
         attempt=$((attempt + 1))
     done
 
@@ -357,7 +361,7 @@ if isinstance(data, list):
     for mid in $machine_ids; do
         log_step "Stopping machine $mid..."
         fly_api POST "/apps/$app_name/machines/$mid/stop" '{}' >/dev/null 2>&1 || true
-        sleep 2
+        sleep "${SLEEP_POLLING}"
         log_step "Destroying machine $mid..."
         fly_api DELETE "/apps/$app_name/machines/$mid?force=true" >/dev/null 2>&1 || true
     done

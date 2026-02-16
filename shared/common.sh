@@ -27,6 +27,16 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# ============================================================
+# Timing constants
+# ============================================================
+
+# Sleep durations in seconds for consistent timing across scripts
+SLEEP_BRIEF=1        # Brief pause after operations (default agent script sleep)
+SLEEP_SHORT=2        # Short pause for openclaw/similar startup
+SLEEP_MEDIUM=3       # Medium pause for VM startup checks
+SLEEP_POLLING=2      # Polling interval for status checks
+
 # Print colored messages (to stderr so they don't pollute command substitution output)
 log_info() {
     printf '%b\n' "${GREEN}${1}${NC}" >&2
@@ -722,7 +732,10 @@ exchange_oauth_code() {
 
     # SECURITY: Use json_escape to prevent JSON injection via crafted OAuth codes
     local escaped_code
-    escaped_code=$(json_escape "${oauth_code}")
+    escaped_code=$(json_escape "${oauth_code}") || {
+        log_error "Failed to escape OAuth code for JSON"
+        return 1
+    }
 
     local key_response curl_exit
     key_response=$(curl -s --max-time 30 -X POST "https://openrouter.ai/api/v1/auth/keys" \
@@ -906,11 +919,17 @@ _generate_csrf_state() {
 # Create temp directory with OAuth session files and CSRF state
 _init_oauth_session() {
     local oauth_dir
-    oauth_dir=$(mktemp -d)
+    oauth_dir=$(mktemp -d) || {
+        log_error "Failed to create temporary directory for OAuth session"
+        return 1
+    }
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
-    csrf_state=$(_generate_csrf_state)
+    csrf_state=$(_generate_csrf_state) || {
+        rm -rf "${oauth_dir}"
+        return 1
+    }
     printf '%s' "${csrf_state}" > "${oauth_dir}/state"
     chmod 600 "${oauth_dir}/state"
 

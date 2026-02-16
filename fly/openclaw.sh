@@ -71,5 +71,5 @@ echo ""
 # 8. Start openclaw gateway in background and launch TUI
 log_step "Starting openclaw..."
 run_server "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
-sleep 2
+sleep "${SLEEP_SHORT}"
 interactive_session "source ~/.zshrc && openclaw tui"
