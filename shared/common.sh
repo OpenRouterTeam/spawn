@@ -2584,6 +2584,30 @@ _multi_creds_validate() {
 #   ENV_VAR    - Environment variable name (e.g., CONTABO_CLIENT_ID)
 #   config_key - JSON key in the config file (e.g., client_id)
 #   Prompt Label - Human-readable label for prompting (e.g., "Client ID")
+_parse_credential_specs() {
+    local -n out_env_vars="$1"
+    local -n out_config_keys="$2"
+    local -n out_labels="$3"
+    shift 3
+    local spec
+    for spec in "$@"; do
+        out_env_vars+=("${spec%%:*}")
+        local rest="${spec#*:}"
+        out_config_keys+=("${rest%%:*}")
+        out_labels+=("${rest#*:}")
+    done
+}
+
+_build_save_args_for_config() {
+    local -n creds_config_keys="$1"
+    local -n creds_env_vars="$2"
+    local n="$3"
+    local idx
+    for idx in $(seq 0 $((n - 1))); do
+        echo "${creds_config_keys[$idx]}" "${!creds_env_vars[$idx]}"
+    done
+}
+
 ensure_multi_credentials() {
     local provider_name="${1}"
     local config_file="${2}"
@@ -2595,14 +2619,7 @@ ensure_multi_credentials() {
 
     # Parse credential specs into parallel arrays
     local env_vars=() config_keys=() labels=()
-    local spec
-    for spec in "$@"; do
-        env_vars+=("${spec%%:*}")
-        local rest="${spec#*:}"
-        config_keys+=("${rest%%:*}")
-        labels+=("${rest#*:}")
-    done
-
+    _parse_credential_specs env_vars config_keys labels "$@"
     local n="${#env_vars[@]}"
 
     # 1. All env vars already set?
@@ -2625,10 +2642,7 @@ ensure_multi_credentials() {
 
     # 5. Save to config file
     local save_args=()
-    local idx
-    for idx in $(seq 0 $((n - 1))); do
-        save_args+=("${config_keys[$idx]}" "${!env_vars[$idx]}")
-    done
+    mapfile -t save_args < <(_build_save_args_for_config config_keys env_vars "${n}")
     _save_json_config "${config_file}" "${save_args[@]}"
     return 0
 }
