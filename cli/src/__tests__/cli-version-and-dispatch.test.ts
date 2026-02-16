@@ -34,7 +34,8 @@ function runCLI(
   env?: Record<string, string>,
 ): { stdout: string; stderr: string; exitCode: number } {
   const { spawnSync } = require("child_process");
-  const result = spawnSync("bun", ["run", CLI_PATH, ...args], {
+  const bunPath = process.execPath;
+  const result = spawnSync(bunPath, ["run", CLI_PATH, ...args], {
     cwd: REPO_ROOT,
     encoding: "utf-8",
     timeout: 15000,
