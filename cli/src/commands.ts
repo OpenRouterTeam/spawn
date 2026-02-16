@@ -632,15 +632,35 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
   return authVars.length > 0 ? authVars.join(" + ") : undefined;
 }
 
+/** Check if a saved config file exists for a cloud provider.
+ *  Config files are stored at ~/.config/spawn/{cloud}.json */
+function hasCloudConfigFile(cloud: string): boolean {
+  try {
+    const { existsSync } = require("fs");
+    const { homedir } = require("os");
+    const { join } = require("path");
+    const configPath = join(homedir(), ".config", "spawn", `${cloud}.json`);
+    return existsSync(configPath);
+  } catch {
+    return false;
+  }
+}
+
 /** Check for missing credentials before running a script and warn the user.
- *  In interactive mode, asks for confirmation. In non-interactive mode, just warns. */
-function collectMissingCredentials(authVars: string[]): string[] {
+ *  In interactive mode, asks for confirmation. In non-interactive mode, just warns.
+ *  Returns only the credentials that are truly missing (not in env vars AND not in saved config). */
+function collectMissingCredentials(authVars: string[], cloud: string): string[] {
   const missing: string[] = [];
   if (!process.env.OPENROUTER_API_KEY) {
     missing.push("OPENROUTER_API_KEY");
   }
+
+  // Check if cloud has a saved config file - if so, the cloud-specific token is available
+  const hasConfigFile = hasCloudConfigFile(cloud);
+
   for (const v of authVars) {
-    if (!process.env[v]) {
+    // Skip cloud-specific vars if a config file exists (the script will load from it)
+    if (!process.env[v] && !hasConfigFile) {
       missing.push(v);
     }
   }
@@ -670,7 +690,7 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   if (cloudAuth.toLowerCase() === "none") return;
 
   const authVars = parseAuthEnvVars(cloudAuth);
-  const missing = collectMissingCredentials(authVars);
+  const missing = collectMissingCredentials(authVars, cloud);
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
@@ -867,12 +887,24 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
   const authVars = authHint.split(/\s*\+\s*/).map(s => s.trim()).filter(Boolean);
   const allVars = [...authVars, "OPENROUTER_API_KEY"];
 
-  const missing = allVars.filter(v => !process.env[v]);
+  // Check if cloud has a saved config file
+  const hasConfigFile = hasCloudConfigFile(cloud);
+
+  const missing = allVars.filter(v => {
+    // If it's a cloud-specific var and config file exists, it's not missing
+    if (authVars.includes(v) && hasConfigFile) {
+      return false;
+    }
+    return !process.env[v];
+  });
 
   if (missing.length === 0) {
     // All credentials are set -- the issue is likely something else
+    const credStatus = hasConfigFile
+      ? `${allVars.filter(v => !authVars.includes(v)).map(v => pc.cyan(v)).join(", ")} + saved config`
+      : allVars.map(v => pc.cyan(v)).join(", ");
     return [
-      `  - Credentials appear to be set (${allVars.map(v => pc.cyan(v)).join(", ")})`,
+      `  - Credentials appear to be set (${credStatus})`,
       `    The error may be due to invalid or expired credentials`,
       `    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`,
     ];
@@ -883,6 +915,9 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
   lines.push(`  - Missing credentials:`);
   for (const v of missing) {
     lines.push(`      ${pc.cyan(v)} -- not set`);
+  }
+  if (hasConfigFile && authVars.length > 0) {
+    lines.push(`      ${pc.dim(`(cloud token will be loaded from saved config)`)}`);
   }
   lines.push(`    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`);
 
