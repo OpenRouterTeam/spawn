@@ -13,51 +13,24 @@ fi
 log_info "Goose on Hetzner Cloud"
 echo ""
 
-# 1. Resolve Hetzner API token
+# Provision server
 ensure_hcloud_token
-
-# 2. Generate + register SSH key
 ensure_ssh_key
-
-# 3. Get server name and create server
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
-
-# 4. Wait for SSH and cloud-init
 verify_server_connectivity "${HETZNER_SERVER_IP}"
 wait_for_cloud_init "${HETZNER_SERVER_IP}" 60
 
-# 5. Install Goose
-log_step "Installing Goose..."
-run_server "${HETZNER_SERVER_IP}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
+# Set up callbacks
+RUN="run_server ${HETZNER_SERVER_IP}"
+UPLOAD="upload_file ${HETZNER_SERVER_IP}"
+SESSION="interactive_session ${HETZNER_SERVER_IP}"
 
-# Verify installation succeeded
-if ! run_server "${HETZNER_SERVER_IP}" "command -v goose &> /dev/null && goose --version &> /dev/null"; then
-    log_install_failed "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" "${HETZNER_SERVER_IP}"
-    exit 1
-fi
-log_info "Goose installation verified successfully"
-
-# 6. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_ssh "${HETZNER_SERVER_IP}" upload_file run_server \
+# Install, configure, launch
+install_agent "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" "$RUN"
+verify_agent "Goose" "command -v goose && goose --version" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" "$RUN"
+get_or_prompt_api_key
+inject_env_vars_cb "$RUN" "$UPLOAD" \
     "GOOSE_PROVIDER=openrouter" \
     "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Hetzner server setup completed successfully!"
-log_info "Server: ${SERVER_NAME} (ID: ${HETZNER_SERVER_ID}, IP: ${HETZNER_SERVER_IP})"
-echo ""
-
-# 8. Start Goose interactively
-log_step "Starting Goose..."
-sleep 1
-clear
-interactive_session "${HETZNER_SERVER_IP}" "source ~/.zshrc && goose"
+launch_session "Hetzner server" "$SESSION" "source ~/.zshrc && goose"

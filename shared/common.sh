@@ -1187,6 +1187,92 @@ register_cleanup_trap() {
 }
 
 # ============================================================
+# Agent setup helpers (composable, callback-based)
+# ============================================================
+# These helpers accept pre-applied RUN/UPLOAD/SESSION callbacks,
+# following the same callback pattern used by offer_github_auth
+# and setup_claude_code_config.
+#
+# Usage pattern in agent scripts:
+#   RUN="run_server ${SERVER_IP}"
+#   UPLOAD="upload_file ${SERVER_IP}"
+#   SESSION="interactive_session ${SERVER_IP}"
+#
+#   install_agent "Aider" "pip install aider-chat" "$RUN"
+#   verify_agent "Aider" "command -v aider && aider --version" "pip install aider-chat" "$RUN"
+#   get_or_prompt_api_key
+#   inject_env_vars_cb "$RUN" "$UPLOAD" "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+#   launch_session "Hetzner server" "$SESSION" "source ~/.zshrc && aider"
+
+# Run an agent's install command on the target machine
+# Usage: install_agent AGENT_NAME INSTALL_CMD RUN_CB
+install_agent() {
+    local agent_name="$1" install_cmd="$2" run_cb="$3"
+    log_step "Installing ${agent_name}..."
+    ${run_cb} "${install_cmd}"
+}
+
+# Verify an agent installed correctly; exit 1 on failure
+# Usage: verify_agent AGENT_NAME VERIFY_CMD INSTALL_CMD RUN_CB
+verify_agent() {
+    local agent_name="$1" verify_cmd="$2" install_cmd="$3" run_cb="$4"
+    if ! ${run_cb} "${verify_cmd}" >/dev/null 2>&1; then
+        log_install_failed "${agent_name}" "${install_cmd}"
+        exit 1
+    fi
+    log_info "${agent_name} installation verified successfully"
+}
+
+# Get OpenRouter API key from environment or prompt via OAuth
+# Sets the global OPENROUTER_API_KEY variable
+get_or_prompt_api_key() {
+    echo ""
+    if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+        log_info "Using OpenRouter API key from environment"
+    else
+        OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
+    fi
+}
+
+# Inject environment variables using pre-applied callbacks
+# Usage: inject_env_vars_cb RUN_CB UPLOAD_CB KEY1=val1 KEY2=val2 ...
+# Example: inject_env_vars_cb "$RUN" "$UPLOAD" \
+#            "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
+#            "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+inject_env_vars_cb() {
+    local run_cb="$1" upload_cb="$2"
+    shift 2
+
+    log_step "Setting up environment variables..."
+
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    generate_env_config "$@" > "${env_temp}"
+
+    ${upload_cb} "${env_temp}" "/tmp/env_config"
+    ${run_cb} "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+
+    # Offer optional GitHub CLI setup
+    offer_github_auth "${run_cb}"
+}
+
+# Print success message and launch an interactive agent session
+# Usage: launch_session CLOUD_MSG SESSION_CB LAUNCH_CMD
+launch_session() {
+    local cloud_msg="$1" session_cb="$2" launch_cmd="$3"
+    echo ""
+    log_info "${cloud_msg} setup completed successfully!"
+    echo ""
+    log_step "Starting agent..."
+    sleep 1
+    clear 2>/dev/null || true
+    ${session_cb} "${launch_cmd}"
+}
+
+# ============================================================
 # SSH configuration
 # ============================================================
 
