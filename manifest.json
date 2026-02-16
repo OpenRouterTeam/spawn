@@ -388,6 +388,21 @@
       "provision_method": "sprite create",
       "exec_method": "sprite exec",
       "interactive_method": "sprite exec -tty"
+    },
+    "hostkey": {
+      "name": "HOSTKEY",
+      "description": "HOSTKEY VPS hosting via REST API",
+      "url": "https://hostkey.com/",
+      "type": "api",
+      "auth": "HOSTKEY_API_KEY",
+      "provision_method": "POST /eq/order_instance",
+      "exec_method": "ssh root@IP",
+      "interactive_method": "ssh -t root@IP",
+      "defaults": {
+        "preset": "1",
+        "location": "nl",
+        "os": "ubuntu-24.04"
+      }
     }
   },
   "matrix": {
@@ -540,6 +555,21 @@
     "local/opencode": "missing",
     "local/plandex": "implemented",
     "local/kilocode": "implemented",
-    "local/continue": "implemented"
+    "local/continue": "implemented",
+    "hostkey/claude": "missing",
+    "hostkey/openclaw": "missing",
+    "hostkey/nanoclaw": "missing",
+    "hostkey/aider": "missing",
+    "hostkey/goose": "missing",
+    "hostkey/codex": "missing",
+    "hostkey/interpreter": "missing",
+    "hostkey/gemini": "missing",
+    "hostkey/amazonq": "implemented",
+    "hostkey/cline": "missing",
+    "hostkey/gptme": "missing",
+    "hostkey/opencode": "missing",
+    "hostkey/plandex": "missing",
+    "hostkey/kilocode": "missing",
+    "hostkey/continue": "missing"
   }
 }
