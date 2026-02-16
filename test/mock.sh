@@ -18,6 +18,10 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES_DIR="${REPO_ROOT}/test/fixtures"
 TEST_DIR=$(mktemp -d)
+if [[ -z "${TEST_DIR}" ]] || [[ ! -d "${TEST_DIR}" ]]; then
+    printf 'ERROR: Failed to create temporary directory\n' >&2
+    exit 1
+fi
 MOCK_LOG="${TEST_DIR}/mock_calls.log"
 
 # Colors (respect NO_COLOR standard: https://no-color.org/)
@@ -38,7 +42,10 @@ SKIPPED=0
 
 # Cleanup on exit
 cleanup() {
-    rm -rf "${TEST_DIR}"
+    # Only remove if TEST_DIR is set, non-empty, and under /tmp
+    if [[ -n "${TEST_DIR:-}" ]] && [[ "${TEST_DIR}" == /tmp/* ]] && [[ -d "${TEST_DIR}" ]]; then
+        rm -rf "${TEST_DIR}"
+    fi
 }
 trap cleanup EXIT
 
@@ -735,10 +742,16 @@ done
 # Aggregate results from all clouds
 for cloud in $CLOUDS; do
     if [[ -f "${CLOUD_RESULTS_DIR}/${cloud}.counts" ]]; then
-        read -r p f s < "${CLOUD_RESULTS_DIR}/${cloud}.counts"
-        PASSED=$((PASSED + p))
-        FAILED=$((FAILED + f))
-        SKIPPED=$((SKIPPED + s))
+        # Initialize to 0 in case read fails or file is malformed
+        local p=0 f=0 s=0
+        if read -r p f s < "${CLOUD_RESULTS_DIR}/${cloud}.counts" 2>/dev/null && \
+           [[ "$p" =~ ^[0-9]+$ ]] && [[ "$f" =~ ^[0-9]+$ ]] && [[ "$s" =~ ^[0-9]+$ ]]; then
+            PASSED=$((PASSED + p))
+            FAILED=$((FAILED + f))
+            SKIPPED=$((SKIPPED + s))
+        else
+            printf '%b\n' "${YELLOW}Warning: Invalid counts file for ${cloud}, skipping${NC}" >&2
+        fi
     fi
 done
 

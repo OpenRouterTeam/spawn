@@ -823,6 +823,10 @@ mkdir -p "$FIXTURES_DIR"
 
 # --- Run clouds in parallel ---
 RECORD_RESULTS_DIR=$(mktemp -d)
+if [[ -z "${RECORD_RESULTS_DIR}" ]] || [[ ! -d "${RECORD_RESULTS_DIR}" ]]; then
+    printf 'ERROR: Failed to create temporary directory\n' >&2
+    exit 1
+fi
 RECORD_PIDS=""
 
 for cloud in $CLOUDS_TO_RECORD; do
@@ -852,14 +856,23 @@ done
 # Aggregate results
 for cloud in $CLOUDS_TO_RECORD; do
     if [[ -f "${RECORD_RESULTS_DIR}/${cloud}.counts" ]]; then
-        read -r r s e < "${RECORD_RESULTS_DIR}/${cloud}.counts"
-        RECORDED=$((RECORDED + r))
-        SKIPPED=$((SKIPPED + s))
-        ERRORS=$((ERRORS + e))
+        # Initialize to 0 in case read fails or file is malformed
+        local r=0 s=0 e=0
+        if read -r r s e < "${RECORD_RESULTS_DIR}/${cloud}.counts" 2>/dev/null && \
+           [[ "$r" =~ ^[0-9]+$ ]] && [[ "$s" =~ ^[0-9]+$ ]] && [[ "$e" =~ ^[0-9]+$ ]]; then
+            RECORDED=$((RECORDED + r))
+            SKIPPED=$((SKIPPED + s))
+            ERRORS=$((ERRORS + e))
+        else
+            printf '%b\n' "${YELLOW}Warning: Invalid counts file for ${cloud}, skipping${NC}" >&2
+        fi
     fi
 done
 
-rm -rf "${RECORD_RESULTS_DIR}"
+# Safe cleanup: only remove if dir is set, non-empty, and under /tmp
+if [[ -n "${RECORD_RESULTS_DIR:-}" ]] && [[ "${RECORD_RESULTS_DIR}" == /tmp/* ]] && [[ -d "${RECORD_RESULTS_DIR}" ]]; then
+    rm -rf "${RECORD_RESULTS_DIR}"
+fi
 
 # --- Summary ---
 printf '%b\n' "${CYAN}===============================${NC}"

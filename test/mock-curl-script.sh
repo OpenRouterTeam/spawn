@@ -2,6 +2,20 @@
 # Mock curl — returns fixture data based on URL
 # Env vars from parent: MOCK_LOG, MOCK_FIXTURE_DIR, MOCK_CLOUD
 
+# Validate required environment variables
+if [[ -z "${MOCK_LOG:-}" ]]; then
+    printf 'ERROR: MOCK_LOG environment variable not set\n' >&2
+    exit 1
+fi
+if [[ -z "${MOCK_FIXTURE_DIR:-}" ]]; then
+    printf 'ERROR: MOCK_FIXTURE_DIR environment variable not set\n' >&2
+    exit 1
+fi
+if [[ -z "${MOCK_CLOUD:-}" ]]; then
+    printf 'ERROR: MOCK_CLOUD environment variable not set\n' >&2
+    exit 1
+fi
+
 # --- Helper functions ---
 
 _parse_args() {

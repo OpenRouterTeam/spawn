@@ -19,6 +19,10 @@ set -eo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIR=$(mktemp -d)
+if [[ -z "${TEST_DIR}" ]] || [[ ! -d "${TEST_DIR}" ]]; then
+    printf 'ERROR: Failed to create temporary directory\n' >&2
+    exit 1
+fi
 MOCK_LOG="${TEST_DIR}/sprite_calls.log"
 PASSED=0
 FAILED=0
@@ -37,7 +41,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 cleanup() {
-    rm -rf "${TEST_DIR}"
+    # Only remove if TEST_DIR is set, non-empty, and under /tmp
+    if [[ -n "${TEST_DIR:-}" ]] && [[ "${TEST_DIR}" == /tmp/* ]] && [[ -d "${TEST_DIR}" ]]; then
+        rm -rf "${TEST_DIR}"
+    fi
 }
 trap 'cleanup' EXIT
 
