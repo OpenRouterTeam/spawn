@@ -457,7 +457,7 @@ describe("non-interactive terminal handling", () => {
     // Running as subprocess inherently lacks a TTY for stdin
     const { stderr, exitCode } = runCLI([]);
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("Cannot run interactive picker: not a terminal");
+    expect(stderr).toContain("Interactive picker requires a terminal");
     expect(stderr).toContain("spawn <agent> <cloud>");
     expect(stderr).toContain("spawn agents");
     expect(stderr).toContain("spawn clouds");

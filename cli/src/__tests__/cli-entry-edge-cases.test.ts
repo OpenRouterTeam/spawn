@@ -251,7 +251,7 @@ describe("non-TTY behavior", () => {
     // Subprocesses don't have TTY stdin, so isInteractiveTTY returns false
     const result = runCli([]);
     const out = output(result);
-    expect(out).toContain("Cannot run interactive picker");
+    expect(out).toContain("Interactive picker requires a terminal");
     expect(result.exitCode).toBe(1);
   });
 

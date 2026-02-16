@@ -300,14 +300,19 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
   if (isInteractiveTTY()) {
     await cmdInteractive();
   } else {
-    console.error(pc.yellow("Cannot run interactive picker: not a terminal"));
-    console.error(pc.dim("  (stdin/stdout is piped or redirected)"));
+    console.error(pc.yellow("Interactive picker requires a terminal"));
+    console.error(pc.dim("  stdin/stdout is piped or not a TTY"));
     console.error();
-    console.error(`  Launch directly:  ${pc.cyan("spawn <agent> <cloud>")}`);
-    console.error(`  Rerun previous:   ${pc.cyan("spawn list")}`);
-    console.error(`  Browse agents:    ${pc.cyan("spawn agents")}`);
-    console.error(`  Browse clouds:    ${pc.cyan("spawn clouds")}`);
-    console.error(`  Full help:        ${pc.cyan("spawn help")}`);
+    console.error("Quick start:");
+    console.error(`  ${pc.cyan("spawn <agent> <cloud>")}   Launch an agent`);
+    console.error(`  ${pc.cyan("spawn agents")}            Browse all agents`);
+    console.error(`  ${pc.cyan("spawn clouds")}            Browse all clouds`);
+    console.error();
+    console.error("Examples:");
+    console.error(`  ${pc.cyan("spawn claude sprite")}     Launch Claude Code on Sprite`);
+    console.error(`  ${pc.cyan("spawn aider hetzner")}     Launch Aider on Hetzner`);
+    console.error();
+    console.error(`Run ${pc.cyan("spawn help")} for full usage information.`);
     console.error();
     process.exit(1);
   }
