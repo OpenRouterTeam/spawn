@@ -32,13 +32,9 @@ create_server "${SERVER_NAME}"
 verify_server_connectivity "${GCP_SERVER_IP}"
 wait_for_cloud_init "${GCP_SERVER_IP}" 60
 
-# 5. Verify Claude Code is installed (fallback to manual install)
-log_step "Verifying Claude Code installation..."
-if ! run_server "${GCP_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
-    run_server "${GCP_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
-fi
-log_info "Claude Code is installed"
+# 5. Install Claude Code (tries curl → npm → bun with clear logging)
+RUN="run_server ${GCP_SERVER_IP}"
+install_claude_code "$RUN"
 
 # 6. Get OpenRouter API key
 echo ""

@@ -25,16 +25,9 @@ log_step "Setting up sprite environment..."
 # Configure shell environment
 setup_shell_environment "${SPRITE_NAME}"
 
-# Install Claude Code
-log_step "Installing Claude Code..."
-run_sprite "${SPRITE_NAME}" "curl -fsSL https://claude.ai/install.sh | bash"
-
-# Verify installation succeeded
-if ! run_sprite "${SPRITE_NAME}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
-    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash"
-    exit 1
-fi
-log_info "Claude Code installation verified successfully"
+# Install Claude Code (tries curl → npm → bun with clear logging)
+RUN="run_sprite ${SPRITE_NAME}"
+install_claude_code "$RUN"
 
 # Get OpenRouter API key
 echo ""

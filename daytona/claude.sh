@@ -25,13 +25,8 @@ create_server "${SERVER_NAME}"
 # 3. Wait for base tools
 wait_for_cloud_init
 
-# 4. Verify Claude Code is installed (fallback to manual install)
-log_step "Verifying Claude Code installation..."
-if ! run_server "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
-    run_server "curl -fsSL https://claude.ai/install.sh | bash"
-fi
-log_info "Claude Code is installed"
+# 4. Install Claude Code (tries curl → npm → bun with clear logging)
+install_claude_code "run_server"
 
 # 5. Get OpenRouter API key
 echo ""

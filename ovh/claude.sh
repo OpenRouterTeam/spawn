@@ -32,19 +32,9 @@ verify_server_connectivity "${OVH_SERVER_IP}"
 # 6. Install base dependencies and Claude Code
 install_base_deps "${OVH_SERVER_IP}"
 
-# 7. Verify Claude Code is installed (fallback to manual install)
-log_step "Verifying Claude Code installation..."
-if ! run_ovh "${OVH_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude" >/dev/null 2>&1; then
-    log_step "Claude Code not found, installing manually..."
-    run_ovh "${OVH_SERVER_IP}" "curl -fsSL https://claude.ai/install.sh | bash"
-fi
-
-# Verify installation succeeded
-if ! run_ovh "${OVH_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && command -v claude &> /dev/null && claude --version &> /dev/null"; then
-    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash" "${OVH_SERVER_IP}"
-    exit 1
-fi
-log_info "Claude Code installation verified successfully"
+# 7. Install Claude Code (tries curl → npm → bun with clear logging)
+RUN="run_ovh ${OVH_SERVER_IP}"
+install_claude_code "$RUN"
 
 # 8. Get OpenRouter API key
 echo ""
