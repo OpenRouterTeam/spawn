@@ -136,7 +136,7 @@ _save_multi_config_to_file() {
     for spec in "$@"; do
         local config_key="${spec%%:*}"
         local env_var="${spec#*:}"
-        eval "local val=\"\${${env_var}:-}\""
+        local val="${!env_var:-}"
         py_args+=("$val")
         py_keys="${py_keys}'${config_key}': sys.argv[${idx}], "
         idx=$((idx + 1))
@@ -165,7 +165,7 @@ try_load_config() {
     env_var=$(get_auth_env_var "$cloud")
 
     # Already set via env var — nothing to do
-    eval "local current_val=\"\${${env_var}:-}\""
+    local current_val="${!env_var:-}"
     if [[ -n "$current_val" ]]; then
         return 0
     fi
@@ -212,7 +212,7 @@ has_credentials() {
         local line
         while IFS= read -r line; do
             local env_var="${line#*:}"
-            eval "[[ -n \"\${${env_var}:-}\" ]]" || return 1
+            [[ -n "${!env_var:-}" ]] || return 1
         done <<< "$specs"
         return 0
     fi
@@ -220,7 +220,7 @@ has_credentials() {
     # Single-credential clouds
     local env_var
     env_var=$(get_auth_env_var "$cloud")
-    eval "[[ -n \"\${${env_var}:-}\" ]]"
+    [[ -n "${!env_var:-}" ]]
 }
 
 # Save credentials to ~/.config/spawn/{cloud}.json for future use
@@ -243,7 +243,7 @@ save_config() {
         # Standard single-token config
         local env_var
         env_var=$(get_auth_env_var "$cloud")
-        eval "local val=\"\${${env_var}:-}\""
+        local val="${!env_var:-}"
         python3 -c "import json, sys; print(json.dumps({'api_key': sys.argv[1]}, indent=2))" "$val" > "$config_file"
     fi
     printf '%b\n' "  ${GREEN}saved${NC} → ${config_file}"
@@ -268,12 +268,12 @@ prompt_credentials() {
     fi
 
     for var_name in $vars_needed; do
-        # SECURITY: Validate env var name before using in eval or export
+        # SECURITY: Validate env var name before using in indirect expansion or export
         if [[ ! "${var_name}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
             echo "SECURITY: Invalid env var name rejected: ${var_name}" >&2
             return 1
         fi
-        eval "local current=\"\${${var_name}:-}\""
+        local current="${!var_name:-}"
         if [[ -n "$current" ]]; then
             continue
         fi
