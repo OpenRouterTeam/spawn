@@ -2085,6 +2085,7 @@ function getHelpUsageSection(): string {
   spawn                              Interactive agent + cloud picker
   spawn <agent> <cloud>              Launch agent on cloud directly
   spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
+  spawn <agent> <cloud> --debug      Enable verbose shell tracing for debugging
   spawn <agent> <cloud> --prompt "text"
                                      Execute agent with prompt (non-interactive)
   spawn <agent> <cloud> --prompt-file <file>  (or -f)
