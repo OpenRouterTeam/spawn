@@ -232,9 +232,19 @@ upload_file_sprite() {
         return 1
     fi
 
-    # Generate a unique temp path to avoid collisions (safe: only uses basename + PID)
-    local temp_remote
-    temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_$$"
+    # SECURITY: Generate cryptographically random temp path to prevent symlink attacks
+    # Fallback chain: openssl (strongest) → /dev/urandom → failure (no weak fallback)
+    local temp_random
+    if command -v openssl &>/dev/null; then
+        temp_random=$(openssl rand -hex 8)
+    elif [[ -r /dev/urandom ]]; then
+        temp_random=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
+    else
+        log_error "FATAL: Neither openssl nor /dev/urandom available for secure temp file generation"
+        return 1
+    fi
+
+    local temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_${temp_random}"
 
     sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
 }
