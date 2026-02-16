@@ -22,7 +22,7 @@ function detectTerm(env: Record<string, string>): string {
   `;
   const result = execSync(`bun -e '${script}'`, {
     cwd: CLI_DIR,
-    env: { ...env, PATH: process.env.PATH, HOME: process.env.HOME },
+    env: { ...env, PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`, HOME: process.env.HOME },
     encoding: "utf-8",
     timeout: 5000,
   });
