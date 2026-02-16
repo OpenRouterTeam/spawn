@@ -1223,6 +1223,80 @@ verify_agent() {
     log_info "${agent_name} installation verified successfully"
 }
 
+# Install Claude Code with multi-method fallback and detailed error reporting.
+# Tries: 1) curl installer (standalone binary)  2) npm  3) bun
+# The curl installer bundles its own runtime. npm/bun install a Node.js package
+# whose shebang needs 'node', so we ensure a node runtime exists after those.
+# Usage: install_claude_code RUN_CB
+install_claude_code() {
+    local run_cb="$1"
+    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+
+    # Already installed?
+    if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+        log_info "Claude Code already installed"
+        return 0
+    fi
+
+    # Method 1: official curl installer (standalone binary, no node needed)
+    log_step "Installing Claude Code (method 1/3: curl installer)..."
+    if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
+        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+            log_info "Claude Code installed via curl installer"
+            return 0
+        fi
+        log_warn "curl installer exited 0 but claude not found on PATH"
+    else
+        log_warn "curl installer failed (site may be temporarily unavailable)"
+    fi
+
+    # npm/bun installs produce a Node.js package — ensure 'node' exists.
+    # Tries fnm (platform-agnostic) first, falls back to nodesource (Debian/Ubuntu).
+    _ensure_node_runtime() {
+        if ${run_cb} "command -v node" >/dev/null 2>&1; then
+            return 0
+        fi
+        log_step "Installing Node.js (required by Claude Code npm package)..."
+        if ${run_cb} "curl -fsSL https://fnm.vercel.app/install | bash && export PATH=\$HOME/.local/share/fnm:\$PATH && eval \"\$(fnm env)\" && fnm install --lts && fnm default lts-latest" 2>&1; then
+            log_info "Node.js installed via fnm"
+        elif ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" 2>&1; then
+            log_info "Node.js installed via nodesource"
+        else
+            log_warn "Could not install Node.js automatically"
+        fi
+    }
+
+    # Method 2: npm
+    log_step "Installing Claude Code (method 2/3: npm)..."
+    if ${run_cb} "npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
+        _ensure_node_runtime
+        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+            log_info "Claude Code installed via npm"
+            return 0
+        fi
+        log_warn "npm install exited 0 but claude binary not working"
+    else
+        log_warn "npm install failed"
+    fi
+
+    # Method 3: bun
+    log_step "Installing Claude Code (method 3/3: bun)..."
+    if ${run_cb} "${claude_path} && bun add -g @anthropic-ai/claude-code 2>&1" 2>&1; then
+        _ensure_node_runtime
+        if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
+            log_info "Claude Code installed via bun"
+            return 0
+        fi
+        log_warn "bun install exited 0 but claude binary not working"
+    else
+        log_warn "bun install failed"
+    fi
+
+    # All methods failed
+    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash"
+    exit 1
+}
+
 # Get OpenRouter API key from environment or prompt via OAuth
 # Sets the global OPENROUTER_API_KEY variable
 get_or_prompt_api_key() {
