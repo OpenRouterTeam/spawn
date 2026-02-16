@@ -1095,6 +1095,9 @@ inject_env_vars_ssh() {
     "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
+
+    # Offer optional GitHub CLI setup
+    offer_github_auth "${run_func} ${server_ip}"
 }
 
 # Inject environment variables for providers without SSH (modal, e2b, sprite)
@@ -1120,6 +1123,32 @@ inject_env_vars_local() {
     "${run_func}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
 
     # Note: temp file will be cleaned up by trap handler
+
+    # Offer optional GitHub CLI setup
+    offer_github_auth "${run_func}"
+}
+
+# Offer optional GitHub CLI setup on remote VM
+# Usage (SSH clouds): offer_github_auth "run_server SERVER_IP"
+# Usage (local):      offer_github_auth "run_server"
+# Skipped if SPAWN_SKIP_GITHUB_AUTH=1 or non-interactive
+offer_github_auth() {
+    local run_callback="${1}"
+
+    # Skip in non-interactive or if user opted out
+    if [[ -n "${SPAWN_SKIP_GITHUB_AUTH:-}" ]]; then
+        return 0
+    fi
+
+    printf '\n'
+    local choice
+    choice=$(safe_read "Set up GitHub CLI (gh) on this machine? (y/N): ") || return 0
+    if [[ ! "${choice}" =~ ^[Yy]$ ]]; then
+        return 0
+    fi
+
+    log_step "Installing and authenticating GitHub CLI..."
+    ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
 }
 
 # ============================================================

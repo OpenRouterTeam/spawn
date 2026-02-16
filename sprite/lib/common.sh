@@ -212,6 +212,9 @@ inject_env_vars_sprite() {
     # Upload and append to both .bashrc and .zshrc using sprite exec with -file flag
     sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
     trap - EXIT
+
+    # Offer optional GitHub CLI setup
+    offer_github_auth "run_sprite ${sprite_name}"
 }
 
 # Upload file to sprite (for use with setup_claude_code_config callback)
