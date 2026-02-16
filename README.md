@@ -16,6 +16,28 @@ Or install directly from GitHub:
 curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
 ```
 
+## Quick Start
+
+**First time?** Just run `spawn` for an interactive picker:
+
+```bash
+spawn    # Pick agent + cloud from interactive menu
+```
+
+**Know what you want?** Launch directly:
+
+```bash
+spawn <agent> <cloud>    # Example: spawn claude sprite
+```
+
+**List what's available:**
+
+```bash
+spawn agents    # See all agents
+spawn clouds    # See all cloud providers
+spawn matrix    # View the full compatibility matrix
+```
+
 ## Usage
 
 ```bash

@@ -262,7 +262,9 @@ export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "
   if (checkSameKindTypo(value, kind, manifest, def, collection)) return false;
   if (checkOppositeKindTypo(value, kind, manifest)) return false;
 
+  p.log.info("");
   p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
+  p.log.info(`Or use the interactive picker: ${pc.cyan("spawn")}`);
   return false;
 }
 
@@ -295,24 +297,26 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
     const agentName = manifest.agents[agent].name;
     const cloudName = manifest.clouds[cloud].name;
     p.log.error(`${agentName} on ${cloudName} is not yet implemented.`);
+    p.log.info("");
 
     const availableClouds = getImplementedClouds(manifest, agent);
     if (availableClouds.length > 0) {
       // Prioritize clouds where the user already has credentials
       const { sortedClouds, credCount } = prioritizeCloudsByCredentials(availableClouds, manifest);
       const examples = sortedClouds.slice(0, 3).map((c) => {
-        const hasCredsMarker = hasCloudCredentials(manifest.clouds[c].auth) ? " (ready)" : "";
-        return `spawn ${agent} ${c}${hasCredsMarker}`;
+        const hasCredsMarker = hasCloudCredentials(manifest.clouds[c].auth) ? pc.green(" ✓ ready") : "";
+        return `${pc.cyan(`spawn ${agent} ${c}`)}${hasCredsMarker}`;
       });
-      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these instead:`);
+      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these:`);
       for (const cmd of examples) {
-        p.log.info(`  ${pc.cyan(cmd)}`);
+        p.log.info(`  ${cmd}`);
       }
       if (availableClouds.length > 3) {
-        p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
+        p.log.info(`  Run ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options`);
       }
       if (credCount > 0) {
-        p.log.info(`${pc.green("ready")} = credentials already set`);
+        p.log.info("");
+        p.log.info(`${pc.green("✓ ready")} = credentials detected in environment`);
       }
     } else {
       p.log.info(`This agent has no implemented cloud providers yet.`);

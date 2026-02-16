@@ -158,6 +158,7 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   if (dryRun) {
     console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
     console.error(`\nUsage: ${pc.cyan(`spawn <agent> <cloud> --dry-run`)}`);
+    console.error(`Example: ${pc.cyan(`spawn ${agent} <cloud> --dry-run`)}`);
     process.exit(1);
   }
   if (prompt) {
@@ -290,11 +291,13 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
   if (dryRun) {
     console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
     console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --dry-run")}`);
+    console.error(`Example: ${pc.cyan("spawn claude sprite --dry-run")}`);
     process.exit(1);
   }
   if (prompt) {
     console.error(pc.red("Error: --prompt requires both <agent> and <cloud>"));
     console.error(`\nUsage: ${pc.cyan('spawn <agent> <cloud> --prompt "your prompt here"')}`);
+    console.error(`Example: ${pc.cyan('spawn aider hetzner --prompt "Add tests"')}`);
     process.exit(1);
   }
   if (isInteractiveTTY()) {
