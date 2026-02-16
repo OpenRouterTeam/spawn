@@ -674,7 +674,8 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
-  p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
+  const missingList = missing.map(v => pc.cyan(v)).join(", ");
+  p.log.warn(`Missing credentials for ${cloudName}: ${missingList}`);
 
   const onlyOpenRouter = missing.length === 1 && missing[0] === "OPENROUTER_API_KEY";
   p.log.info(getCredentialGuidance(cloud, onlyOpenRouter));
@@ -716,7 +717,7 @@ export function getStatusDescription(status: number): string {
 
 async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: string): Promise<string> {
   const s = p.spinner();
-  s.start("Downloading spawn script...");
+  s.start("Downloading spawn script (may take a moment)...");
 
   try {
     const res = await fetch(primaryUrl, {
