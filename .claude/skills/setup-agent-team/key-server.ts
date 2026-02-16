@@ -324,6 +324,33 @@ const HTML_HEADERS: Record<string, string> = {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+// --- Request handlers ---
+function countPendingProviders(batches: KeyBatch[]): number {
+  return batches.reduce(
+    (n, b) => n + b.providers.filter((x) => x.status === "pending").length,
+    0
+  );
+}
+
+function countFulfilledProviders(batches: KeyBatch[]): number {
+  return batches.reduce(
+    (n, b) =>
+      n + b.providers.filter((x) => x.status === "fulfilled").length,
+    0
+  );
+}
+
+function handleHealthCheck(): Response {
+  const d = load();
+  cleanup(d);
+  return Response.json({
+    status: "ok",
+    pending: countPendingProviders(d.batches),
+    fulfilled: countFulfilledProviders(d.batches),
+    batches: d.batches.length,
+  });
+}
+
 // --- Server ---
 const server = Bun.serve({
   port: PORT,
@@ -333,21 +360,7 @@ const server = Bun.serve({
 
     // GET /health (read-only, no side effects)
     if (req.method === "GET" && path === "/health") {
-      const d = load();
-      cleanup(d);
-      return Response.json({
-        status: "ok",
-        pending: d.batches.reduce(
-          (n, b) => n + b.providers.filter((x) => x.status === "pending").length,
-          0
-        ),
-        fulfilled: d.batches.reduce(
-          (n, b) =>
-            n + b.providers.filter((x) => x.status === "fulfilled").length,
-          0
-        ),
-        batches: d.batches.length,
-      });
+      return handleHealthCheck();
     }
 
     // POST /request-batch (authed)
