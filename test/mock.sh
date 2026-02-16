@@ -247,6 +247,9 @@ setup_mock_agents() {
     # Tools used during agent install
     _create_logging_mock pip pip3 npm npx bun node openssl shred cargo go git
 
+    # Cloud CLIs
+    _create_logging_mock oci fly flyctl gcloud aws daytona
+
     # Silent mocks (no logging needed)
     _create_silent_mock clear sleep
 
@@ -295,6 +298,17 @@ _strip_api_base() {
             endpoint="${url#https://api.digitalocean.com/v2}" ;;
         *eu.api.ovh.com*)
             endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
+        https://api.machines.dev/v1*)
+            endpoint="${url#https://api.machines.dev/v1}" ;;
+        https://www.googleapis.com*)
+            endpoint=$(echo "$url" | sed 's|https://www.googleapis.com||') ;;
+        https://lightsail.amazonaws.com*)
+            endpoint="${url#https://lightsail.amazonaws.com}" ;;
+        https://api.daytona.io*)
+            endpoint="${url#https://api.daytona.io}" ;;
+        oci\ *)
+            # OCI CLI commands don't have URLs, just extract the command
+            endpoint="oci_cli" ;;
     esac
 
     echo "$endpoint" | sed 's|?.*||'

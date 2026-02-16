@@ -1,0 +1,7 @@
+{
+  "cloud": "gcp",
+  "name": "Google Cloud Platform",
+  "api_base": "https://www.googleapis.com",
+  "test_agents": ["claude"],
+  "recorded_at": "2025-02-16T00:00:00Z"
+}

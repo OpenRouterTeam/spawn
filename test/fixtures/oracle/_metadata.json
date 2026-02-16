@@ -1,0 +1,7 @@
+{
+  "cloud": "oracle",
+  "name": "Oracle Cloud Infrastructure",
+  "cli": "oci",
+  "test_agents": ["claude", "openclaw", "nanoclaw"],
+  "recorded_at": "2025-02-16T00:00:00Z"
+}

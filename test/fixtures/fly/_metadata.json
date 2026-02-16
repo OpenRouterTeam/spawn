@@ -1,0 +1,7 @@
+{
+  "cloud": "fly",
+  "name": "Fly.io",
+  "api_base": "https://api.machines.dev/v1",
+  "test_agents": ["claude"],
+  "recorded_at": "2025-02-16T00:00:00Z"
+}

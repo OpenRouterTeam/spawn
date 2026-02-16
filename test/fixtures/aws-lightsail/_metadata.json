@@ -1,0 +1,7 @@
+{
+  "cloud": "aws-lightsail",
+  "name": "AWS Lightsail",
+  "api_base": "https://lightsail.amazonaws.com",
+  "test_agents": ["claude"],
+  "recorded_at": "2025-02-16T00:00:00Z"
+}
