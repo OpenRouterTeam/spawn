@@ -139,7 +139,9 @@ function reapAndEnforce() {
       );
       try {
         run.proc.kill(9);
-      } catch {}
+      } catch (err) {
+        console.error(`[trigger] Failed to kill process ${pid}:`, err);
+      }
       runs.delete(id);
     }
   }
@@ -168,7 +170,9 @@ function gracefulShutdown(signal: string) {
     for (const [, run] of runs) {
       try {
         run.proc.kill(9);
-      } catch {}
+      } catch (err) {
+        console.error(`[trigger] Failed to kill process ${run.proc.pid}:`, err);
+      }
     }
     process.exit(1);
   }, HARD_TIMEOUT_MS);

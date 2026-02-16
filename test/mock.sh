@@ -403,13 +403,13 @@ _wait_with_timeout() {
         if [[ "$i" -ge "$timeout" ]]; then
             kill -9 "$pid" 2>/dev/null
             wait "$pid" 2>/dev/null || true
-            eval "${exit_code_var}=124"
+            printf -v "${exit_code_var}" 124
             return
         fi
         sleep 1
         i=$((i + 1))
     done
-    wait "$pid" 2>/dev/null || eval "${exit_code_var}=$?"
+    wait "$pid" 2>/dev/null || printf -v "${exit_code_var}" "$?"
 }
 
 # Run a script in a sandboxed environment with a 4-second timeout.

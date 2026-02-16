@@ -761,8 +761,18 @@ cleanup_oauth_session() {
         wait "${server_pid}" 2>/dev/null || true
     fi
 
+    # Validate oauth_dir before deletion to prevent catastrophic rm -rf
     if [[ -n "${oauth_dir}" && -d "${oauth_dir}" ]]; then
-        rm -rf "${oauth_dir}"
+        # Safety: Must be under /tmp and contain "oauth" or "spawn"
+        case "${oauth_dir}" in
+            /tmp/*oauth*|/tmp/*spawn*)
+                rm -rf "${oauth_dir}"
+                ;;
+            *)
+                log_error "Refusing to delete directory outside safe paths: ${oauth_dir}"
+                return 1
+                ;;
+        esac
     fi
 }
 
