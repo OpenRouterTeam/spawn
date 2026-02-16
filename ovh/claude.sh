@@ -77,4 +77,4 @@ echo ""
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${OVH_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"
+interactive_session "${OVH_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"

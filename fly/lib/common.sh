@@ -291,8 +291,8 @@ wait_for_cloud_init() {
     log_step "Installing base tools on Fly.io machine..."
     run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 pip" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' >/dev/null 2>&1 || true
+    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' >/dev/null 2>&1 || true
+    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' >/dev/null 2>&1 || true
     log_info "Base tools installed"
 }
 

@@ -79,4 +79,4 @@ save_vm_connection "${DO_SERVER_IP}" "root" "${DO_DROPLET_ID}" "${DROPLET_NAME}"
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "${DO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$PATH && source ~/.zshrc && claude"
+interactive_session "${DO_SERVER_IP}" "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.zshrc && claude"

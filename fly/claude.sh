@@ -68,4 +68,4 @@ echo ""
 log_step "Starting Claude Code..."
 sleep 1
 clear
-interactive_session "export PATH=\$HOME/.local/bin:\$PATH && source ~/.bashrc && claude"
+interactive_session "export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH && source ~/.bashrc && claude"
