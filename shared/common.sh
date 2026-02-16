@@ -1263,9 +1263,20 @@ install_claude_code() {
     # Include fnm paths so node is found even in non-interactive SSH sessions
     local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.local/share/fnm:$PATH; if command -v fnm >/dev/null 2>&1; then eval "$(fnm env)"; fi'
 
+    # Finalize installation: set up shell integration (PATH, completions)
+    # Also persists fnm bootstrap to shell configs so interactive sessions find node
+    _finalize_claude_install() {
+        log_step "Setting up Claude Code shell integration..."
+        ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
+        # Ensure fnm bootstrap is in .bashrc and .zshrc so new shells can find node
+        local fnm_snippet='export PATH="\$HOME/.local/share/fnm:\$PATH"; if command -v fnm >/dev/null 2>&1; then eval "\$(fnm env)"; fi'
+        ${run_cb} "if command -v fnm >/dev/null 2>&1 || test -d \$HOME/.local/share/fnm; then for rc in ~/.bashrc ~/.zshrc; do grep -q 'fnm env' \"\$rc\" 2>/dev/null || printf '\\n# fnm (node version manager)\\n${fnm_snippet}\\n' >> \"\$rc\"; done; fi" >/dev/null 2>&1 || true
+    }
+
     # Already installed?
     if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
         log_info "Claude Code already installed"
+        _finalize_claude_install
         return 0
     fi
 
@@ -1274,6 +1285,7 @@ install_claude_code() {
     if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via curl installer"
+            _finalize_claude_install
             return 0
         fi
         log_warn "curl installer exited 0 but claude not found on PATH"
@@ -1306,6 +1318,7 @@ install_claude_code() {
     if ${run_cb} "${claude_path} && npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via npm"
+            _finalize_claude_install
             return 0
         fi
         log_warn "npm install exited 0 but claude binary not working"
@@ -1318,6 +1331,7 @@ install_claude_code() {
     if ${run_cb} "${claude_path} && bun add -g @anthropic-ai/claude-code 2>&1" 2>&1; then
         if ${run_cb} "${claude_path} && command -v claude && claude --version" >/dev/null 2>&1; then
             log_info "Claude Code installed via bun"
+            _finalize_claude_install
             return 0
         fi
         log_warn "bun install exited 0 but claude binary not working"
