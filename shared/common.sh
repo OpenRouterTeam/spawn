@@ -1674,6 +1674,7 @@ _log_ssh_wait_progress() {
         log_step "Waiting for ${description}... (${elapsed_time}s elapsed, taking longer than usual)"
     else
         log_warn "Still waiting for ${description}... (${elapsed_time}s elapsed, this is unusually slow)"
+        log_warn "  Tip: check your cloud dashboard for server status, or press Ctrl+C to abort"
     fi
 }
 
@@ -1814,6 +1815,9 @@ _show_post_session_summary() {
     log_warn ""
     log_info "To reconnect:"
     log_info "  ssh ${SSH_USER:-root}@${ip}"
+    log_info ""
+    log_info "To see your spawn history:"
+    log_info "  spawn list"
 }
 
 # Show a post-session summary for exec-based (non-SSH) cloud providers.
@@ -1847,6 +1851,9 @@ _show_exec_post_session_summary() {
         log_info "To reconnect:"
         log_info "  ${reconnect_cmd}"
     fi
+    log_info ""
+    log_info "To see your spawn history:"
+    log_info "  spawn list"
 }
 
 # Start an interactive SSH session
@@ -1949,7 +1956,12 @@ _poll_instance_once() {
     status=$(_extract_json_field "${response}" "${status_py}" "unknown")
 
     if [[ "${status}" != "${target_status}" ]]; then
-        log_step "${description} status: ${status} ($((attempt * poll_delay))s elapsed)"
+        local elapsed=$((attempt * poll_delay))
+        if [[ ${elapsed} -lt 60 ]]; then
+            log_step "${description} status: ${status} (${elapsed}s elapsed, typically takes 30-90s)"
+        else
+            log_step "${description} status: ${status} (${elapsed}s elapsed, taking longer than usual)"
+        fi
         return 2
     fi
 

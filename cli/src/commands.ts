@@ -1405,7 +1405,7 @@ async function suggestFilterCorrection(
 async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string): Promise<void> {
   if (!agentFilter && !cloudFilter) {
     p.log.info("No spawns recorded yet.");
-    p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to launch your first agent.`);
+    p.log.info(`Run ${pc.cyan("spawn")} to pick interactively, or ${pc.cyan("spawn <agent> <cloud>")} to launch directly.`);
     return;
   }
 
@@ -2117,6 +2117,7 @@ function getHelpExamplesSection(): string {
   spawn openclaw vultr -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
   spawn interpreter linode --dry-run ${pc.dim("# Preview without provisioning")}
+  spawn claude sprite --debug        ${pc.dim("# Show all commands being executed")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
