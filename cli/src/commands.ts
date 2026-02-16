@@ -301,7 +301,7 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
       // Prioritize clouds where the user already has credentials
       const { sortedClouds, credCount } = prioritizeCloudsByCredentials(availableClouds, manifest);
       const examples = sortedClouds.slice(0, 3).map((c) => {
-        const hasCredsMarker = hasCloudCredentials(manifest.clouds[c].auth) ? " (ready)" : "";
+        const hasCredsMarker = hasCloudCredentialsOrConfig(c, manifest.clouds[c].auth) ? " (ready)" : "";
         return `spawn ${agent} ${c}${hasCredsMarker}`;
       });
       p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these instead:`);
@@ -332,7 +332,7 @@ export function prioritizeCloudsByCredentials(
   const withCreds: string[] = [];
   const withoutCreds: string[] = [];
   for (const c of clouds) {
-    if (hasCloudCredentials(manifest.clouds[c].auth)) {
+    if (hasCloudCredentialsOrConfig(c, manifest.clouds[c].auth)) {
       withCreds.push(c);
     } else {
       withoutCreds.push(c);
@@ -356,7 +356,7 @@ export function buildAgentPickerHints(manifest: Manifest): Record<string, string
       hints[agent] = "no clouds available yet";
       continue;
     }
-    const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+    const readyCount = implClouds.filter(c => hasCloudCredentialsOrConfig(c, manifest.clouds[c].auth)).length;
     const cloudLabel = `${implClouds.length} cloud${implClouds.length !== 1 ? "s" : ""}`;
     if (readyCount > 0) {
       hints[agent] = `${cloudLabel}, ${readyCount} ready`;
@@ -1264,7 +1264,7 @@ function buildCompactListRow(manifest: Manifest, agent: string, clouds: string[]
   const missing = getMissingClouds(manifest, agent, clouds);
   const countStr = `${implClouds.length}/${clouds.length}`;
   const colorFn = implClouds.length === clouds.length ? pc.green : pc.yellow;
-  const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+  const readyCount = implClouds.filter(c => hasCloudCredentialsOrConfig(c, manifest.clouds[c].auth)).length;
   const readyStr = readyCount > 0 ? pc.green(`${readyCount}`) : pc.dim("0");
 
   let line = pc.bold(manifest.agents[agent].name.padEnd(COMPACT_NAME_WIDTH));
@@ -1769,6 +1769,29 @@ export function hasCloudCredentials(auth: string): boolean {
   return vars.every((v) => !!process.env[v]);
 }
 
+/** Check if a saved config file exists for a cloud provider */
+function hasConfigFile(cloud: string): boolean {
+  const { existsSync } = require("fs");
+  const { homedir } = require("os");
+  const { join } = require("path");
+  const configPath = join(homedir(), ".config", "spawn", `${cloud}.json`);
+  return existsSync(configPath);
+}
+
+/** Check if a cloud's required auth is satisfied (env vars OR config file) */
+export function hasCloudCredentialsOrConfig(cloudKey: string, auth: string): boolean {
+  // First check env vars
+  if (hasCloudCredentials(auth)) return true;
+
+  // Then check for saved config file
+  const cloudsWithConfigSupport = new Set(["hetzner", "digitalocean", "fly", "ovh", "daytona"]);
+  if (cloudsWithConfigSupport.has(cloudKey)) {
+    return hasConfigFile(cloudKey);
+  }
+
+  return false;
+}
+
 export async function cmdAgents(): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
@@ -1780,7 +1803,7 @@ export async function cmdAgents(): Promise<void> {
   for (const key of allAgents) {
     const a = manifest.agents[key];
     const implClouds = getImplementedClouds(manifest, key);
-    const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+    const readyCount = implClouds.filter(c => hasCloudCredentialsOrConfig(c, manifest.clouds[c].auth)).length;
     if (readyCount > 0) totalReady++;
     const cloudStr = `${implClouds.length} cloud${implClouds.length !== 1 ? "s" : ""}`;
     const readyStr = readyCount > 0 ? `  ${pc.green(`${readyCount} ready`)}` : "";
@@ -1797,9 +1820,9 @@ export async function cmdAgents(): Promise<void> {
 // ── Clouds ─────────────────────────────────────────────────────────────────────
 
 /** Format credential status indicator for a cloud in the list view */
-function formatCredentialIndicator(auth: string): string {
+function formatCredentialIndicator(cloudKey: string, auth: string): string {
   if (auth.toLowerCase() === "none") return "";
-  return hasCloudCredentials(auth)
+  return hasCloudCredentialsOrConfig(cloudKey, auth)
     ? `  ${pc.green("ready")}`
     : `  ${pc.yellow("needs")} ${pc.dim(auth)}`;
 }
@@ -1823,8 +1846,8 @@ export async function cmdClouds(): Promise<void> {
       const c = manifest.clouds[key];
       const implCount = getImplementedAgents(manifest, key).length;
       const countStr = `${implCount}/${allAgents.length}`;
-      if (hasCloudCredentials(c.auth)) credCount++;
-      const credIndicator = formatCredentialIndicator(c.auth);
+      if (hasCloudCredentialsOrConfig(key, c.auth)) credCount++;
+      const credIndicator = formatCredentialIndicator(key, c.auth);
       console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator}`);
     }
   }
@@ -1902,7 +1925,7 @@ function printAgentCloudsList(
     (c) => manifest.clouds[c].name,
     (c) => {
       const hint = `spawn ${agentKey} ${c}`;
-      return hasCloudCredentials(manifest.clouds[c].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
+      return hasCloudCredentialsOrConfig(c, manifest.clouds[c].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
     }
   );
   console.log();
@@ -1929,6 +1952,7 @@ export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest):
     const exampleCloud = sortedClouds[0];
     const cloudDef = manifest.clouds[exampleCloud];
     printQuickStart({
+      cloudKey: exampleCloud,
       auth: cloudDef.auth,
       authVars: parseAuthEnvVars(cloudDef.auth),
       cloudUrl: cloudDef.url,
@@ -1941,12 +1965,13 @@ export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest):
 
 /** Print quick-start instructions showing credential status and example spawn command */
 function printQuickStart(opts: {
+  cloudKey: string;
   auth: string;
   authVars: string[];
   cloudUrl?: string;
   spawnCmd?: string;
 }): void {
-  const hasCreds = hasCloudCredentials(opts.auth);
+  const hasCreds = hasCloudCredentialsOrConfig(opts.cloudKey, opts.auth);
   const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
   const allReady = hasOpenRouterKey && (hasCreds || opts.authVars.length === 0);
 
@@ -2000,13 +2025,14 @@ export async function cmdCloudInfo(cloud: string, preloadedManifest?: Manifest):
 
   const c = manifest.clouds[cloudKey];
   printInfoHeader(c);
-  const credStatus = hasCloudCredentials(c.auth) ? pc.green("credentials detected") : pc.dim("no credentials set");
+  const credStatus = hasCloudCredentialsOrConfig(cloudKey, c.auth) ? pc.green("credentials detected") : pc.dim("no credentials set");
   console.log(pc.dim(`  Type: ${c.type}  |  Auth: ${c.auth}  |  `) + credStatus);
 
   const authVars = parseAuthEnvVars(c.auth);
   const implAgents = getImplementedAgents(manifest, cloudKey);
   const exampleAgent = implAgents[0];
   printQuickStart({
+    cloudKey,
     auth: c.auth,
     authVars,
     cloudUrl: c.url,
