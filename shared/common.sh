@@ -1090,9 +1090,15 @@ inject_env_vars_ssh() {
 
     generate_env_config "$@" > "${env_temp}"
 
+    # SECURITY: Use unpredictable temp file name to prevent race condition
+    # Attacker could create symlink at /tmp/env_config to exfiltrate credentials
+    local rand_suffix
+    rand_suffix=$(basename "${env_temp}")
+    local temp_remote="/tmp/spawn_env_${rand_suffix}"
+
     # Append to .bashrc and .zshrc only — do NOT write to .profile or .bash_profile
-    "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${upload_func}" "${server_ip}" "${env_temp}" "${temp_remote}"
+    "${run_func}" "${server_ip}" "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1118,9 +1124,14 @@ inject_env_vars_local() {
 
     generate_env_config "$@" > "${env_temp}"
 
+    # SECURITY: Use unpredictable temp file name to prevent race condition
+    local rand_suffix
+    rand_suffix=$(basename "${env_temp}")
+    local temp_remote="/tmp/spawn_env_${rand_suffix}"
+
     # Append to .bashrc and .zshrc only
-    "${upload_func}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${upload_func}" "${env_temp}" "${temp_remote}"
+    "${run_func}" "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1349,8 +1360,13 @@ inject_env_vars_cb() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    ${upload_cb} "${env_temp}" "/tmp/env_config"
-    ${run_cb} "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    # SECURITY: Use unpredictable temp file name to prevent race condition
+    local rand_suffix
+    rand_suffix=$(basename "${env_temp}")
+    local temp_remote="/tmp/spawn_env_${rand_suffix}"
+
+    ${upload_cb} "${env_temp}" "${temp_remote}"
+    ${run_cb} "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
 
     # Offer optional GitHub CLI setup
     offer_github_auth "${run_cb}"
