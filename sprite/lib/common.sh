@@ -209,8 +209,8 @@ inject_env_vars_sprite() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    # Upload and append to .profile, .bashrc, and .zshrc using sprite exec with -file flag
-    sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.profile && cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    # Upload and append to .profile, .bash_profile, .bashrc, and .zshrc using sprite exec
+    sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "for rc in ~/.profile ~/.bash_profile ~/.bashrc ~/.zshrc ~/.zprofile; do cat /tmp/env_config >> \"\$rc\"; done && rm /tmp/env_config"
     trap - EXIT
 
     # Offer optional GitHub CLI setup
