@@ -2309,7 +2309,8 @@ _multi_creds_prompt() {
 _multi_creds_validate() {
     local test_func="${1}"
     local provider_name="${2}"
-    shift 2
+    local help_url="${3}"
+    shift 3
 
     if [[ -z "${test_func}" ]]; then
         return 0
@@ -2330,6 +2331,23 @@ _multi_creds_validate() {
         return 1
     fi
     return 0
+}
+
+# Parse credential specs from colon-delimited triples into parallel arrays.
+# Stores results in global arrays: _parsed_env_vars, _parsed_config_keys, _parsed_labels
+# Each spec format: "ENV_VAR:config_key:Prompt Label"
+_parse_credential_specs() {
+    _parsed_env_vars=()
+    _parsed_config_keys=()
+    _parsed_labels=()
+
+    local spec
+    for spec in "$@"; do
+        _parsed_env_vars+=("${spec%%:*}")
+        local rest="${spec#*:}"
+        _parsed_config_keys+=("${rest%%:*}")
+        _parsed_labels+=("${rest#*:}")
+    done
 }
 
 # Generic multi-credential ensure function
@@ -2353,14 +2371,10 @@ ensure_multi_credentials() {
     check_python_available || return 1
 
     # Parse credential specs into parallel arrays
-    local env_vars=() config_keys=() labels=()
-    local spec
-    for spec in "$@"; do
-        env_vars+=("${spec%%:*}")
-        local rest="${spec#*:}"
-        config_keys+=("${rest%%:*}")
-        labels+=("${rest#*:}")
-    done
+    _parse_credential_specs "$@"
+    local env_vars=("${_parsed_env_vars[@]}")
+    local config_keys=("${_parsed_config_keys[@]}")
+    local labels=("${_parsed_labels[@]}")
 
     local n="${#env_vars[@]}"
 
@@ -2380,7 +2394,7 @@ ensure_multi_credentials() {
     _multi_creds_prompt "${provider_name}" "${help_url}" "${n}" "${env_vars[@]}" "${labels[@]}" || return 1
 
     # 4. Validate credentials
-    _multi_creds_validate "${test_func}" "${provider_name}" "${env_vars[@]}" || return 1
+    _multi_creds_validate "${test_func}" "${provider_name}" "${help_url}" "${env_vars[@]}" || return 1
 
     # 5. Save to config file
     local save_args=()
