@@ -1128,18 +1128,48 @@ inject_env_vars_local() {
     offer_github_auth "${run_func}"
 }
 
-# Offer optional GitHub CLI setup on remote VM
-# Usage (SSH clouds): offer_github_auth "run_server SERVER_IP"
-# Usage (local):      offer_github_auth "run_server"
-# Skipped if SPAWN_SKIP_GITHUB_AUTH=1 or non-interactive
-offer_github_auth() {
-    local run_callback="${1}"
+# Prompt user about GitHub CLI setup BEFORE provisioning.
+# Stores the answer so the actual install can happen later (after the
+# server is up) without re-prompting.
+# Usage: prompt_github_auth   (call before create_server)
+prompt_github_auth() {
+    SPAWN_GITHUB_AUTH_PROMPTED=1
 
     # Skip in non-interactive or if user opted out
     if [[ -n "${SPAWN_SKIP_GITHUB_AUTH:-}" ]]; then
         return 0
     fi
 
+    printf '\n'
+    local choice
+    choice=$(safe_read "Set up GitHub CLI (gh) on this machine? (y/N): ") || return 0
+    if [[ "${choice}" =~ ^[Yy]$ ]]; then
+        SPAWN_GITHUB_AUTH_REQUESTED=1
+    fi
+}
+
+# Run GitHub CLI setup on remote VM if previously requested via prompt_github_auth.
+# If prompt_github_auth was never called, falls back to prompting interactively.
+# Usage (SSH clouds): offer_github_auth "run_server SERVER_IP"
+# Usage (local):      offer_github_auth "run_server"
+offer_github_auth() {
+    local run_callback="${1}"
+
+    # Skip if user opted out via env var
+    if [[ -n "${SPAWN_SKIP_GITHUB_AUTH:-}" ]]; then
+        return 0
+    fi
+
+    # If prompt_github_auth was already called, use its stored answer
+    if [[ "${SPAWN_GITHUB_AUTH_PROMPTED:-}" == "1" ]]; then
+        if [[ "${SPAWN_GITHUB_AUTH_REQUESTED:-}" == "1" ]]; then
+            log_step "Installing and authenticating GitHub CLI..."
+            ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+        fi
+        return 0
+    fi
+
+    # Fallback: prompt_github_auth was never called, ask now
     printf '\n'
     local choice
     choice=$(safe_read "Set up GitHub CLI (gh) on this machine? (y/N): ") || return 0

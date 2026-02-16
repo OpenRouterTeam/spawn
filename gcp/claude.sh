@@ -24,7 +24,10 @@ ensure_gcloud
 # 2. Generate + register SSH key
 ensure_ssh_key
 
-# 3. Get server name and create server
+# 3. Gather user preferences before provisioning
+prompt_github_auth
+
+# 4. Get server name and create server
 SERVER_NAME=$(get_server_name)
 create_server "${SERVER_NAME}"
 
