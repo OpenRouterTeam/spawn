@@ -31,6 +31,8 @@ function runCli(
       env: {
         ...process.env,
         ...env,
+        // Ensure bun is in PATH for subprocess execution
+        PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`,
         // Prevent auto-update from running during tests
         SPAWN_NO_UPDATE_CHECK: "1",
         // Prevent local manifest.json from being used
