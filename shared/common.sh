@@ -1292,6 +1292,16 @@ install_claude_code() {
         log_warn "curl installer failed (site may be temporarily unavailable)"
     fi
 
+    # Ensure Node.js runtime for bun-installed package (it's a Node.js script)
+    if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
+        log_step "Installing Node.js runtime (required for claude package)..."
+        if ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" >/dev/null 2>&1; then
+            log_info "Node.js installed via nodesource"
+        else
+            log_warn "Could not install Node.js - bun method may fail"
+        fi
+    fi
+
     # Method 2: bun
     log_step "Installing Claude Code (method 2/2: bun)..."
     if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
