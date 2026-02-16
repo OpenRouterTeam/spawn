@@ -42,6 +42,7 @@ spawn claude                             # Show clouds available for Claude
 | `spawn` | Interactive agent + cloud picker |
 | `spawn <agent> <cloud>` | Launch agent on cloud directly |
 | `spawn <agent> <cloud> --dry-run` | Preview without provisioning |
+| `spawn <agent> <cloud> --debug` | Enable verbose shell tracing for debugging |
 | `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
 | `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
 | `spawn <agent>` | Show available clouds for an agent |
