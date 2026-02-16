@@ -16,7 +16,7 @@ import {
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
-import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord, type VMConnection } from "./history.js";
+import { saveSpawnRecord, filterHistory, clearHistory, deleteSpawnRecord, type SpawnRecord, type VMConnection } from "./history.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -1557,36 +1557,61 @@ async function resolveListFilters(
   return { manifest, agentFilter, cloudFilter };
 }
 
+/** Confirm and delete a spawn record, returning true if deleted */
+async function confirmAndDeleteRecord(selected: SpawnRecord, manifest: Manifest | null): Promise<boolean> {
+  const label = buildRecordLabel(selected, manifest);
+  const shouldDelete = await p.confirm({
+    message: `Delete ${label} from history?`,
+    initialValue: false,
+  });
+  if (p.isCancel(shouldDelete) || !shouldDelete) return false;
+
+  const deleted = deleteSpawnRecord(selected.agent, selected.cloud, selected.timestamp);
+  if (deleted) {
+    p.log.success(`Removed ${label} from spawn history.`);
+  } else {
+    p.log.warn("Record was already removed.");
+  }
+  return deleted;
+}
+
 /** Handle reconnect or rerun action for a selected spawn record */
 async function handleRecordAction(
   selected: SpawnRecord,
   manifest: Manifest | null
 ): Promise<void> {
-  if (!selected.connection) {
-    // No connection info -- just rerun
-    p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
-    await cmdRun(selected.agent, selected.cloud, selected.prompt);
-    return;
+  const options: Array<{ value: string; label: string; hint: string }> = [];
+
+  if (selected.connection) {
+    const connHint = selected.connection.ip === "sprite-console" && selected.connection.server_name
+      ? `sprite console -s ${selected.connection.server_name}`
+      : `ssh ${selected.connection.user}@${selected.connection.ip}`;
+    options.push({ value: "reconnect", label: "Reconnect to existing VM", hint: connHint });
   }
+
+  options.push({ value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" });
+  options.push({ value: "delete", label: "Delete from history", hint: "Remove this record" });
 
   const action = await p.select({
     message: "What would you like to do?",
-    options: [
-      { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${selected.connection.user}@${selected.connection.ip}` },
-      { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
-    ],
+    options,
   });
 
   if (p.isCancel(action)) {
     handleCancel();
   }
 
-  if (action === "reconnect") {
+  if (action === "delete") {
+    await confirmAndDeleteRecord(selected, manifest);
+    return;
+  }
+
+  if (action === "reconnect" && selected.connection) {
     try {
       await cmdConnect(selected.connection);
     } catch (err) {
       p.log.error(`Connection failed: ${getErrorMessage(err)}`);
-      p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
+      p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`);
     }
     return;
   }
