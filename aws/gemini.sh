@@ -3,23 +3,24 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-# shellcheck source=aws-lightsail/lib/common.sh
+# shellcheck source=aws/lib/common.sh
 if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
     source "${SCRIPT_DIR}/lib/common.sh"
 else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/aws-lightsail/lib/common.sh)"
+    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/aws/lib/common.sh)"
 fi
 
-log_info "Cline on AWS Lightsail"
+log_info "Gemini CLI on AWS Lightsail"
 echo ""
 
-agent_install() { install_agent "Cline" "npm install -g cline" cloud_run; }
+agent_install() { install_agent "Gemini CLI" "npm install -g @google/gemini-cli" cloud_run; }
 agent_env_vars() {
     generate_env_config \
         "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
         "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
         "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 }
-agent_launch_cmd() { echo 'source ~/.zshrc && cline'; }
+agent_launch_cmd() { echo 'source ~/.zshrc && gemini'; }
 
-spawn_agent "Cline"
+spawn_agent "Gemini CLI"

@@ -330,18 +330,40 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
 
 // ── Interactive ────────────────────────────────────────────────────────────────
 
-/** Sort clouds by credential availability and build hint overrides for the picker */
+/** Map of cloud keys to their CLI tool names */
+const CLOUD_CLI_MAP: Record<string, string> = {
+  gcp: "gcloud",
+  aws: "aws",
+  oracle: "oci",
+  fly: "flyctl",
+  sprite: "sprite",
+  hetzner: "hcloud",
+  digitalocean: "doctl",
+};
+
+/** Check if the relevant CLI tool for a cloud provider is installed */
+export function hasCloudCli(cloud: string): boolean {
+  const cli = CLOUD_CLI_MAP[cloud];
+  if (!cli) return false;
+  return Bun.which(cli) !== null;
+}
+
+/** Sort clouds by credential/CLI availability and build hint overrides for the picker.
+ *  Three tiers: credentials set > CLI installed > neither. */
 export function prioritizeCloudsByCredentials(
   clouds: string[],
   manifest: Manifest
-): { sortedClouds: string[]; hintOverrides: Record<string, string>; credCount: number } {
+): { sortedClouds: string[]; hintOverrides: Record<string, string>; credCount: number; cliCount: number } {
   const withCreds: string[] = [];
-  const withoutCreds: string[] = [];
+  const withCli: string[] = [];
+  const rest: string[] = [];
   for (const c of clouds) {
     if (hasCloudCredentials(manifest.clouds[c].auth)) {
       withCreds.push(c);
+    } else if (hasCloudCli(c)) {
+      withCli.push(c);
     } else {
-      withoutCreds.push(c);
+      rest.push(c);
     }
   }
 
@@ -349,8 +371,11 @@ export function prioritizeCloudsByCredentials(
   for (const c of withCreds) {
     hintOverrides[c] = `credentials detected -- ${manifest.clouds[c].description}`;
   }
+  for (const c of withCli) {
+    hintOverrides[c] = `CLI installed -- ${manifest.clouds[c].description}`;
+  }
 
-  return { sortedClouds: [...withCreds, ...withoutCreds], hintOverrides, credCount: withCreds.length };
+  return { sortedClouds: [...withCreds, ...withCli, ...rest], hintOverrides, credCount: withCreds.length, cliCount: withCli.length };
 }
 
 /** Build hint overrides for the agent picker showing cloud count and credential readiness */
@@ -399,9 +424,12 @@ function getAndValidateCloudChoices(
     process.exit(1);
   }
 
-  const { sortedClouds, hintOverrides, credCount } = prioritizeCloudsByCredentials(clouds, manifest);
+  const { sortedClouds, hintOverrides, credCount, cliCount } = prioritizeCloudsByCredentials(clouds, manifest);
   if (credCount > 0) {
     p.log.info(`${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected (shown first)`);
+  }
+  if (cliCount > 0) {
+    p.log.info(`${cliCount} cloud${cliCount > 1 ? "s" : ""} with CLI installed`);
   }
 
   return { clouds: sortedClouds, hintOverrides, credCount };
@@ -1518,7 +1546,7 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
       const project = connection.metadata?.project || "";
       return `${sourceLib}\nensure_gcloud\nexport GCP_ZONE="${zone}"\nexport GCP_PROJECT="${project}"\ndestroy_server "${id}"`;
     }
-    case "aws-lightsail":
+    case "aws":
       return `${sourceLib}\nensure_aws_cli\ndestroy_server "${id}"`;
     case "oracle":
       return `${sourceLib}\nensure_oci_cli\ndestroy_server "${id}"`;
