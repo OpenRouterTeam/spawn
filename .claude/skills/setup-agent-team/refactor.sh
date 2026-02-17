@@ -355,7 +355,7 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 
    Leave unreviewed PRs alone. Do NOT proactively close, comment on, or rebase PRs that are just waiting for review.
 
-6. **community-coordinator** (google/gemini-3-flash-preview)
+6. **community-coordinator** (Sonnet)
    First: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
 
    **COMPLETELY IGNORE issues labeled `discovery-team`, `cloud-proposal`, or `agent-proposal`** — those are managed by the discovery team. Do NOT comment on them, do NOT change labels, do NOT interact in any way. Filter them out:
@@ -410,17 +410,35 @@ Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cy
 
 ## Team Coordination
 
-You use **spawn teams**. Messages arrive AUTOMATICALLY between turns. **Session ENDS when you produce a response with no tool call.**
+You use **spawn teams**. Messages from teammates arrive AUTOMATICALLY between turns — you do NOT need to check for them.
 
-After spawning, loop: `TaskList` → process messages → `Bash("sleep 5")` → repeat. EVERY iteration MUST call TaskList.
+**CRITICAL: Your session ENDS if you produce a response with NO tool call. You MUST call a tool every turn to stay alive.**
+
+After spawning all teammates, enter a monitoring loop:
+1. Call `TaskList` to check progress
+2. Process any plan approval requests (approve/reject immediately)
+3. Process any teammate messages (respond if needed)
+4. Call `Bash("sleep 3")` to yield before next check
+5. Repeat until all work is done
+
+**IMPORTANT rules for the monitoring loop:**
+- NEVER use `sleep` longer than 5 seconds — short sleeps keep you responsive to teammate messages
+- NEVER produce a text-only response — always include a tool call (even just `TaskList` or `Bash("sleep 3")`)
+- If you have nothing else to do, call `TaskList` — that counts as a tool call and keeps you alive
+- Teammates typically respond within 30-60 seconds — if no messages after 2 minutes, check `TaskList` for stuck tasks
 
 ## Lifecycle Management
 
-Stay active until: all tasks completed, all PRs created, all issues engaged+labeled, all worktrees cleaned, all teammates shut down.
+**You MUST stay active until every teammate has confirmed shutdown.** Exiting early orphans teammates.
 
-Shutdown: poll TaskList → verify PRs → verify issues engaged → `shutdown_request` to each teammate → wait for confirmations → `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER` → checkpoint → summary → exit.
+Follow this exact shutdown sequence:
+1. At 10 min: broadcast "wrap up" to all teammates
+2. At 12 min: send `shutdown_request` to EACH teammate by name
+3. Wait for ALL shutdown confirmations — keep calling `TaskList` while waiting
+4. After all confirmations: `git worktree prune && rm -rf WORKTREE_BASE_PLACEHOLDER`
+5. Print summary and exit
 
-CRITICAL: Exiting early orphans teammates. Wait for ALL shutdown confirmations.
+**NEVER exit without shutting down all teammates first.** If a teammate doesn't respond to shutdown_request within 2 minutes, send it again.
 
 ## Safety
 
