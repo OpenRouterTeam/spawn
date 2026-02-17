@@ -280,20 +280,59 @@ jobs:
 - `--max-time 5400` — Hard cap (90 min) as a safety net. Should exceed your longest expected cycle.
 - `timeout-minutes: 90` — The GH Actions job timeout. Must match or exceed `--max-time`.
 
+## Step 5.5: Determine the Service URL
+
+Before setting GitHub secrets, you need to know the public URL where this service can be accessed. The approach depends on your VM type:
+
+### Option A: Sprite/Fly.io VM
+
+Sprite VMs have a public URL assigned automatically. Get it with:
+
+```bash
+flyctl status --json | jq -r '.Hostname'
+# Example output: my-sprite-abc1.sprites.app
+```
+
+The service URL will be: `https://my-sprite-abc1.sprites.app`
+
+### Option B: Hetzner or other cloud VM (with public IP)
+
+For VMs with a static public IP, use the IP directly:
+
+```bash
+curl -s https://api.ipify.org
+# Example output: 203.0.113.45
+```
+
+The service URL will be: `http://YOUR_IP:8080`
+
+**Important:** Ensure port 8080 is open in your firewall/security group settings.
+
+### Option C: Custom domain or reverse proxy
+
+If you've set up a custom domain or reverse proxy (e.g., nginx with SSL):
+
+The service URL will be: `https://your-custom-domain.com`
+
+Make sure the domain/proxy forwards requests to `localhost:8080`.
+
 ## Step 6: Set GitHub Actions secrets
 
 **Cron examples:**
 - `'*/30 * * * *'` — every 30 minutes
-- `'0 */2 * * *'` — every 2 hours
+- `'0 */2 * * * *'` — every 2 hours
 - `'0 */6 * * *'` — every 6 hours
 - `'0 0 * * *'`   — daily at midnight
 
 Set two secrets per service. Use **namespaced** secret names to avoid collisions:
 
 ```bash
-# Set the service's public URL
-printf '<sprite-url>' | gh secret set <SERVICE_NAME>_SPRITE_URL --repo <owner>/<repo>
-# Example: printf 'https://my-sprite-abc1.sprites.app' | gh secret set DISCOVERY_SPRITE_URL --repo OpenRouterTeam/spawn
+# Set the service's public URL (from Step 5.5)
+printf '<service-url>' | gh secret set <SERVICE_NAME>_SPRITE_URL --repo <owner>/<repo>
+
+# Examples:
+# Sprite VM: printf 'https://my-sprite-abc1.sprites.app' | gh secret set DISCOVERY_SPRITE_URL --repo OpenRouterTeam/spawn
+# Hetzner/IP: printf 'http://YOUR_IP:8080' | gh secret set SECURITY_SPRITE_URL --repo OpenRouterTeam/spawn
 
 # Set the trigger secret (from Step 2)
 printf '<secret-from-step-2>' | gh secret set <SERVICE_NAME>_TRIGGER_SECRET --repo <owner>/<repo>
