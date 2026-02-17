@@ -165,12 +165,26 @@ _run_watchdog_loop() {
         CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
         local WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
 
+        # Check if the stream-json "result" event has been emitted (team lead done).
+        # In team-based workflows, the team lead's result fires after spawning
+        # teammates — the actual work is still running as child processes.
         if [[ "${SESSION_ENDED}" = false ]] && tail -c +"$((log_start_size + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
             SESSION_ENDED=true
-            log_info "Session ended (result event detected) — waiting 30s for cleanup then killing"
-            sleep 30
-            _kill_claude_process "${pipe_pid}" "${claude_pid_file}"
-            break
+            log_info "Team lead session ended — waiting for teammate processes to complete"
+        fi
+
+        # After team lead finishes, monitor child processes instead of log output.
+        if [[ "${SESSION_ENDED}" = true ]]; then
+            local LEAD_PID
+            LEAD_PID=$(cat "${claude_pid_file}" 2>/dev/null || true)
+            if [[ -n "${LEAD_PID}" ]] && pgrep -P "${LEAD_PID}" >/dev/null 2>&1; then
+                IDLE_SECONDS=0
+            else
+                log_info "All teammate processes completed — shutting down"
+                sleep 10
+                _kill_claude_process "${pipe_pid}" "${claude_pid_file}"
+                break
+            fi
         fi
 
         if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
