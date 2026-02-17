@@ -38,6 +38,8 @@ NC='\033[0m'
 
 cleanup() {
     rm -rf "${TEST_DIR}"
+    # Clean up any /tmp pollution from mock sprite state files
+    rm -f /tmp/sprite_mock_created_* /tmp/sprite_mock_created 2>/dev/null || true
 }
 trap 'cleanup' EXIT
 
@@ -53,13 +55,13 @@ case "$1" in
     list)
         echo "existing-sprite"
         # After create, also return the test sprite name so provisioning poll succeeds
-        if [[ -f "/tmp/sprite_mock_created_$$" ]] || [[ -f "/tmp/sprite_mock_created" ]]; then
+        if [[ -f "${TEST_DIR}/sprite_mock_created" ]]; then
             echo "${SPRITE_NAME:-}"
         fi
         exit 0
         ;;
     create)
-        touch "/tmp/sprite_mock_created_$$" "/tmp/sprite_mock_created"
+        touch "${TEST_DIR}/sprite_mock_created"
         exit 0
         ;;
     exec)
@@ -250,7 +252,7 @@ run_script_test() {
 
     # Reset mock state
     : > "${MOCK_LOG}"
-    rm -f /tmp/sprite_mock_created_* /tmp/sprite_mock_created 2>/dev/null || true
+    rm -f "${TEST_DIR}/sprite_mock_created" 2>/dev/null || true
 
     # Run the script with mocked PATH and env vars (timeout 30s)
     local exit_code=0

@@ -15,6 +15,12 @@ set -eo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES_DIR="${REPO_ROOT}/test/fixtures"
 
+# Sandbox: Use test-specific config directory if TEST_CONFIG_DIR is set
+# This prevents polluting production ~/.config/spawn/ during tests
+if [[ -n "${TEST_CONFIG_DIR:-}" ]]; then
+    export HOME="${TEST_CONFIG_DIR}"
+fi
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
