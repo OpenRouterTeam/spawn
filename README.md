@@ -86,6 +86,64 @@ Get your OpenRouter API key at: https://openrouter.ai/settings/keys
 
 For cloud-specific auth, see each cloud's README in this repository.
 
+## Troubleshooting
+
+### Installation issues
+
+If spawn fails to install, try these steps:
+
+1. **Check bun version**: spawn requires bun >= 1.2.0
+   ```bash
+   bun --version
+   bun upgrade  # if needed
+   ```
+
+2. **Manual installation**: If auto-install fails, install bun first
+   ```bash
+   curl -fsSL https://bun.sh/install | bash
+   source ~/.bashrc  # or ~/.zshrc for zsh
+   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
+   ```
+
+3. **PATH issues**: If `spawn` command not found after install
+   ```bash
+   # Add to your shell config (~/.bashrc or ~/.zshrc)
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+
+### Agent launch failures
+
+If an agent fails to install or launch on a cloud:
+
+1. **Check credentials**: Ensure cloud provider credentials are set
+   ```bash
+   # Example for Hetzner
+   export HCLOUD_TOKEN=your-token-here
+   spawn claude hetzner
+   ```
+
+2. **Try a different cloud**: Some clouds may have temporary issues
+   ```bash
+   spawn <agent>  # Interactive picker to choose another cloud
+   ```
+
+3. **Use --dry-run**: Preview what spawn will do before provisioning
+   ```bash
+   spawn claude hetzner --dry-run
+   ```
+
+4. **Check cloud status**: Visit your cloud provider's status page
+   - Many failures are transient (network timeouts, package mirror issues)
+   - Retrying often succeeds
+
+### Getting help
+
+- **View command history**: `spawn list` shows all previous launches
+- **Rerun last session**: `spawn last` or `spawn rerun`
+- **Check version**: `spawn version` shows CLI version and cache status
+- **Update spawn**: `spawn update` checks for the latest version
+- **Report bugs**: Open an issue at https://github.com/OpenRouterTeam/spawn/issues
+
 ## Matrix
 
 | | [Local Machine](local/) | [Oracle Cloud Infrastructure](oracle/) | [Hetzner Cloud](hetzner/) | [OVHcloud](ovh/) | [Fly.io](fly/) | [AWS Lightsail](aws-lightsail/) | [Daytona](daytona/) | [DigitalOcean](digitalocean/) | [GCP Compute Engine](gcp/) | [Sprite](sprite/) |
