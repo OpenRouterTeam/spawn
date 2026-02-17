@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 
 /**
  * Tests for prompt-related display logic in cmdList and the
@@ -282,7 +282,7 @@ describe("cmdList prompt display", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `spawn-prompt-display-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `spawn-prompt-display-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     originalEnv = { ...process.env };
     process.env.SPAWN_HOME = testDir;

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest, _resetCacheForTesting } from "../manifest";
 import type { SpawnRecord } from "../history";
@@ -459,7 +459,7 @@ describe("cmdList integration with filter resolution", () => {
   let processExitSpy: ReturnType<typeof spyOn>;
 
   beforeEach(async () => {
-    testDir = join(tmpdir(), `spawn-resolve-list-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `spawn-resolve-list-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     cacheDir = join(testDir, "cache");
     mkdirSync(cacheDir, { recursive: true });

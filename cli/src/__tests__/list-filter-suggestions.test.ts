@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest, type Manifest } from "../manifest";
 
@@ -212,7 +212,7 @@ describe("cmdList - filter suggestions", () => {
   }
 
   beforeEach(async () => {
-    testDir = join(tmpdir(), `spawn-filter-test-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `spawn-filter-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     consoleMocks = createConsoleMocks();
     mockLogError.mockClear();

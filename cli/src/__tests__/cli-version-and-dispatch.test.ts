@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { resolve } from "path";
+import { resolve, join } from "path";
 
 /**
  * Tests for CLI version output and dispatch routing via subprocess execution.
@@ -493,19 +493,22 @@ describe("subcommand alias routing", () => {
 
 describe("list command aliases", () => {
   it("'list' should not crash with empty history", () => {
-    const { exitCode } = runCLI(["list"], { SPAWN_HOME: "/tmp/spawn-test-empty-home-" + Date.now() });
+    const { homedir } = require("os");
+    const { exitCode } = runCLI(["list"], { SPAWN_HOME: join(homedir(), ".spawn-test-empty-home-" + Date.now()) });
     // May exit 0 (shows "no spawns") or run interactive picker in non-TTY
     // The important thing is it doesn't crash
     expect(exitCode).toBeDefined();
   });
 
   it("'ls' should work as alias for 'list'", () => {
-    const { exitCode } = runCLI(["ls"], { SPAWN_HOME: "/tmp/spawn-test-empty-home-" + Date.now() });
+    const { homedir } = require("os");
+    const { exitCode } = runCLI(["ls"], { SPAWN_HOME: join(homedir(), ".spawn-test-empty-home-" + Date.now()) });
     expect(exitCode).toBeDefined();
   });
 
   it("'history' should work as alias for 'list'", () => {
-    const { exitCode } = runCLI(["history"], { SPAWN_HOME: "/tmp/spawn-test-empty-home-" + Date.now() });
+    const { homedir } = require("os");
+    const { exitCode } = runCLI(["history"], { SPAWN_HOME: join(homedir(), ".spawn-test-empty-home-" + Date.now()) });
     expect(exitCode).toBeDefined();
   });
 

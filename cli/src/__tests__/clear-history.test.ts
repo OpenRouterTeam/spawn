@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 import {
   clearHistory,
   loadHistory,
@@ -27,7 +27,7 @@ describe("clearHistory", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `spawn-clear-test-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     originalEnv = { ...process.env };
     process.env.SPAWN_HOME = testDir;
@@ -253,7 +253,7 @@ describe("cmdListClear", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `spawn-cmdclear-test-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     originalEnv = { ...process.env };
     process.env.SPAWN_HOME = testDir;

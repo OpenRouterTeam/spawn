@@ -16,7 +16,9 @@ describe("history", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `spawn-history-test-${Date.now()}-${Math.random()}`);
+    // Use a directory within home directory for testing (required by security validation)
+    const { homedir } = require("os");
+    testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     originalEnv = { ...process.env };
     process.env.SPAWN_HOME = testDir;
@@ -32,9 +34,11 @@ describe("history", () => {
   // ── getSpawnDir ─────────────────────────────────────────────────────────
 
   describe("getSpawnDir", () => {
-    it("returns SPAWN_HOME when set", () => {
-      process.env.SPAWN_HOME = "/custom/spawn/dir";
-      expect(getSpawnDir()).toBe("/custom/spawn/dir");
+    it("returns SPAWN_HOME when set to valid path within home", () => {
+      const { homedir } = require("os");
+      const validPath = join(homedir(), "custom", "spawn", "dir");
+      process.env.SPAWN_HOME = validPath;
+      expect(getSpawnDir()).toBe(validPath);
     });
 
     it("falls back to ~/.spawn when SPAWN_HOME is not set", () => {
@@ -53,14 +57,47 @@ describe("history", () => {
       expect(() => getSpawnDir()).toThrow("must be an absolute path");
     });
 
-    it("resolves .. segments in absolute SPAWN_HOME", () => {
-      process.env.SPAWN_HOME = "/tmp/foo/../bar";
-      expect(getSpawnDir()).toBe("/tmp/bar");
+    it("resolves .. segments in absolute SPAWN_HOME within home", () => {
+      const { homedir } = require("os");
+      const pathWithDots = join(homedir(), "foo", "..", "bar");
+      process.env.SPAWN_HOME = pathWithDots;
+      expect(getSpawnDir()).toBe(join(homedir(), "bar"));
     });
 
-    it("accepts normal absolute SPAWN_HOME", () => {
-      process.env.SPAWN_HOME = "/home/user/.spawn";
-      expect(getSpawnDir()).toBe("/home/user/.spawn");
+    it("accepts normal absolute SPAWN_HOME within home", () => {
+      const { homedir } = require("os");
+      const validPath = join(homedir(), ".spawn");
+      process.env.SPAWN_HOME = validPath;
+      expect(getSpawnDir()).toBe(validPath);
+    });
+
+    it("throws for SPAWN_HOME outside home directory", () => {
+      process.env.SPAWN_HOME = "/tmp/spawn";
+      expect(() => getSpawnDir()).toThrow("must be within your home directory");
+    });
+
+    it("throws for SPAWN_HOME pointing to /root when user home is different", () => {
+      const { homedir } = require("os");
+      // Only run this test if we're not actually running as root
+      if (homedir() !== "/root") {
+        process.env.SPAWN_HOME = "/root/.spawn";
+        expect(() => getSpawnDir()).toThrow("must be within your home directory");
+      }
+    });
+
+    it("throws for path traversal attempt to escape home directory", () => {
+      const { homedir } = require("os");
+      // Attempt to traverse outside home using .. segments
+      // e.g., /home/user/../../etc/.spawn
+      const traversalPath = join(homedir(), "..", "..", "etc", ".spawn");
+      process.env.SPAWN_HOME = traversalPath;
+      expect(() => getSpawnDir()).toThrow("must be within your home directory");
+    });
+
+    it("accepts home directory itself as SPAWN_HOME", () => {
+      const { homedir } = require("os");
+      process.env.SPAWN_HOME = homedir();
+      expect(getSpawnDir()).toBe(homedir());
     });
   });
 
@@ -142,7 +179,8 @@ describe("history", () => {
 
   describe("saveSpawnRecord", () => {
     it("creates directory and file when neither exist", () => {
-      const nestedDir = join(testDir, "nested", "spawn");
+      const { homedir } = require("os");
+      const nestedDir = join(homedir(), ".spawn-test", "nested", "spawn");
       process.env.SPAWN_HOME = nestedDir;
 
       saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" });
@@ -151,6 +189,9 @@ describe("history", () => {
       const data = JSON.parse(readFileSync(join(nestedDir, "history.json"), "utf-8"));
       expect(data).toHaveLength(1);
       expect(data[0].agent).toBe("claude");
+
+      // Clean up
+      rmSync(join(homedir(), ".spawn-test"), { recursive: true, force: true });
     });
 
     it("appends to existing history", () => {

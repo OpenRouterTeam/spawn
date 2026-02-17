@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:test";
 import { existsSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 
 /**
  * Tests for edge cases across core CLI modules (manifest.ts, security.ts,
@@ -697,7 +697,7 @@ describe("history.ts additional edge cases", () => {
   let originalSpawnHome: string | undefined;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `spawn-test-history-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = join(homedir(), `spawn-test-history-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
     originalSpawnHome = process.env.SPAWN_HOME;
     process.env.SPAWN_HOME = testDir;
@@ -716,15 +716,17 @@ describe("history.ts additional edge cases", () => {
 
   describe("getSpawnDir edge cases", () => {
     it("should resolve absolute SPAWN_HOME with trailing slash", () => {
-      process.env.SPAWN_HOME = "/tmp/test-spawn/";
+      const { homedir } = require("os");
+      process.env.SPAWN_HOME = join(homedir(), "test-spawn") + "/";
       const dir = getSpawnDir();
-      expect(dir).toBe("/tmp/test-spawn");
+      expect(dir).toBe(join(homedir(), "test-spawn"));
     });
 
     it("should resolve SPAWN_HOME with .. segments", () => {
-      process.env.SPAWN_HOME = "/tmp/a/../b";
+      const { homedir } = require("os");
+      process.env.SPAWN_HOME = join(homedir(), "a", "..", "b");
       const dir = getSpawnDir();
-      expect(dir).toBe("/tmp/b");
+      expect(dir).toBe(join(homedir(), "b"));
     });
 
     it("should throw for relative path ./data", () => {

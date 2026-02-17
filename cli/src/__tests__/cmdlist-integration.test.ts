@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import type { SpawnRecord } from "../history";
 
@@ -93,7 +93,7 @@ describe("cmdList integration", () => {
 
 
   beforeEach(async () => {
-    testDir = join(tmpdir(), `spawn-cmdlist-test-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `spawn-cmdlist-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
 
     originalEnv = { ...process.env };
