@@ -196,6 +196,11 @@ create_server() {
     fi
 
     DO_DROPLET_ID=$(_extract_json_field "$response" "d['droplet']['id']")
+    if [[ -z "$DO_DROPLET_ID" ]]; then
+        log_error "Failed to extract droplet ID from API response"
+        log_error "Response: $response"
+        return 1
+    fi
     export DO_DROPLET_ID
     log_info "Droplet created: ID=$DO_DROPLET_ID"
 
