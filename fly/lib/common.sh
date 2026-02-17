@@ -318,7 +318,9 @@ _fly_wait_for_ssh() {
     local attempt=1
     log_step "Waiting for SSH connectivity..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
-        if run_server "echo ok" 30 2>/dev/null | grep -q "ok"; then
+        local output=""
+        output=$(run_server "echo ok" 15 2>/dev/null) || true
+        if [[ "$output" == *"ok"* ]]; then
             log_info "SSH is ready"
             return 0
         fi
@@ -348,10 +350,10 @@ wait_for_cloud_init() {
 }
 
 # Run a command on the Fly.io machine via flyctl ssh
-# Times out after 5 minutes by default to prevent hangs
+# Optional second arg: timeout in seconds (used with timeout/gtimeout if available)
 run_server() {
     local cmd="$1"
-    local timeout_secs="${2:-300}"
+    local timeout_secs="${2:-}"
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$cmd")
@@ -359,16 +361,19 @@ run_server() {
     local fly_cmd
     fly_cmd=$(_get_fly_cmd)
 
-    # Run with timeout to prevent indefinite hangs (macOS has no timeout cmd)
-    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null &
-    local ssh_pid=$!
-    ( sleep "${timeout_secs}" && kill "${ssh_pid}" 2>/dev/null ) &
-    local watcher_pid=$!
-    wait "${ssh_pid}" 2>/dev/null
-    local rc=$?
-    kill "${watcher_pid}" 2>/dev/null
-    wait "${watcher_pid}" 2>/dev/null 2>&1 || true
-    return "${rc}"
+    # Use timeout if available and requested (fly ssh console must run in foreground)
+    if [[ -n "${timeout_secs}" ]]; then
+        local timeout_bin=""
+        if command -v timeout &>/dev/null; then timeout_bin="timeout"
+        elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"
+        fi
+        if [[ -n "${timeout_bin}" ]]; then
+            "${timeout_bin}" "${timeout_secs}" "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
+            return $?
+        fi
+    fi
+
+    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
 }
 
 # Upload a file to the machine via base64 encoding through exec
