@@ -194,6 +194,8 @@ create_server() {
 
     _resolve_sandbox_id "${name}"
     log_info "Sandbox created: ${DAYTONA_SANDBOX_ID}"
+
+    save_vm_connection "daytona-sandbox" "daytona" "${DAYTONA_SANDBOX_ID}" "$name" "daytona"
 }
 
 wait_for_cloud_init() {

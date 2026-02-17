@@ -423,6 +423,8 @@ create_server() {
 
     export OCI_SERVER_IP="${server_ip}"
     log_info "Instance created: IP=${OCI_SERVER_IP}"
+
+    save_vm_connection "${OCI_SERVER_IP}" "ubuntu" "${OCI_INSTANCE_ID}" "$name" "oracle"
 }
 
 # OCI Ubuntu images use 'ubuntu' user

@@ -406,6 +406,8 @@ create_server() {
     export HETZNER_SERVER_ID HETZNER_SERVER_IP
 
     log_info "Server created: ID=$HETZNER_SERVER_ID, IP=$HETZNER_SERVER_IP"
+
+    save_vm_connection "${HETZNER_SERVER_IP}" "root" "${HETZNER_SERVER_ID}" "$name" "hetzner"
 }
 
 # SSH operations — delegates to shared helpers (SSH_USER defaults to root)

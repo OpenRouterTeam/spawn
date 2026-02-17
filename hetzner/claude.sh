@@ -25,6 +25,6 @@ agent_env_vars() {
         "CLAUDE_CODE_ENABLE_TELEMETRY=0"
 }
 agent_configure() { setup_claude_code_config "${OPENROUTER_API_KEY}" cloud_upload cloud_run; }
-agent_launch_cmd() { echo 'source ~/.bashrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'; }
+agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'; }
 
 spawn_agent "Claude Code"

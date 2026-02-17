@@ -1409,7 +1409,15 @@ _spawn_inject_env_vars() {
     agent_env_vars > "${env_temp}"
 
     cloud_upload "${env_temp}" "/tmp/env_config"
-    cloud_run "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+
+    # Write env vars to ~/.spawnrc instead of inlining into .bashrc/.zshrc.
+    # Ubuntu's default .bashrc has an interactive-shell guard that exits early —
+    # anything appended after the guard is never loaded when SSH runs a command string.
+    cloud_run "cp /tmp/env_config ~/.spawnrc && chmod 600 ~/.spawnrc && rm /tmp/env_config"
+
+    # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc"
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc"
 
     offer_github_auth cloud_run
 }
@@ -3198,13 +3206,16 @@ opencode_install_cmd() {
 
 # Save VM connection info for spawn list reconnect functionality.
 # This allows users to reconnect to previously spawned VMs via `spawn list`.
-# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME]
-# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME"
+# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME] [CLOUD] [METADATA_JSON]
+# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME" "digitalocean"
+# Example: save_vm_connection "$GCP_IP" "root" "" "$NAME" "gcp" '{"zone":"us-central1-a"}'
 save_vm_connection() {
     local ip="${1}"
     local user="${2}"
     local server_id="${3:-}"
     local server_name="${4:-}"
+    local cloud="${5:-}"
+    local metadata="${6:-}"
 
     local spawn_dir="${HOME}/.spawn"
     mkdir -p "${spawn_dir}"
@@ -3218,6 +3229,12 @@ save_vm_connection() {
     fi
     if [[ -n "${server_name}" ]]; then
         json="${json},\"server_name\":\"${server_name}\""
+    fi
+    if [[ -n "${cloud}" ]]; then
+        json="${json},\"cloud\":\"${cloud}\""
+    fi
+    if [[ -n "${metadata}" ]]; then
+        json="${json},\"metadata\":${metadata}"
     fi
     json="${json}}"
 

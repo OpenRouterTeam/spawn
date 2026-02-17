@@ -200,6 +200,8 @@ create_server() {
     log_info "Droplet created: ID=$DO_DROPLET_ID"
 
     _wait_for_droplet_active "$DO_DROPLET_ID"
+
+    save_vm_connection "${DO_SERVER_IP}" "root" "${DO_DROPLET_ID}" "$name" "digitalocean"
 }
 
 # SSH operations — delegates to shared helpers (SSH_USER defaults to root)

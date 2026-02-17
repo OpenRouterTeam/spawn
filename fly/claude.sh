@@ -33,7 +33,7 @@ agent_configure() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.bashrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
+    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
 }
 
 spawn_agent "Claude Code"
