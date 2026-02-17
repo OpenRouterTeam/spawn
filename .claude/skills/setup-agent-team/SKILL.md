@@ -427,7 +427,7 @@ if [[ -f "${HOME}/.spawnrc" ]]; then
 fi
 ```
 
-This is idempotent — it only appends once. All three service scripts (`discovery.sh`, `refactor.sh`, `security.sh`) include this check.
+This is idempotent — it only appends once. All four service scripts (`discovery.sh`, `refactor.sh`, `security.sh`, `qa-cycle.sh`) include this check.
 
 All service scripts use **agent teams**, not subagents. Key differences:
 
