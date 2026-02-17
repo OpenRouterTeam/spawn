@@ -165,6 +165,16 @@ clone_cli() {
         curl -fsSL "${SPAWN_RAW_BASE}/cli/bun.lock"       -o "${dest}/cli/bun.lock"
         curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"  -o "${dest}/cli/tsconfig.json"
         for f in $files; do
+            # SECURITY: Validate filename to prevent path traversal attacks
+            # Block parent directory references (..) and directory separators (/)
+            if [[ "$f" =~ \.\. ]] || [[ "$f" =~ / ]] || [[ "$f" =~ \\ ]]; then
+                log_error "Security: Invalid filename from API (path traversal attempt): $f"
+                log_error "This may indicate a compromised network connection or API response."
+                log_error "Installation aborted for safety."
+                exit 1
+            fi
+
+            # Filename is safe - proceed with download
             curl -fsSL "${SPAWN_RAW_BASE}/cli/src/${f}" -o "${dest}/cli/src/${f}"
         done
     fi
