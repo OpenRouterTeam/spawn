@@ -13,59 +13,21 @@ fi
 log_info "OpenClaw on OVHcloud"
 echo ""
 
-# 1. Resolve OVH credentials
-ensure_ovh_authenticated
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
 
-# 2. Generate + register SSH key
-ensure_ssh_key
+agent_install() { install_agent "openclaw" "source ~/.bashrc && bun install -g openclaw" cloud_run; }
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+}
+agent_configure() { setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run; }
+agent_pre_launch() {
+    cloud_run "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
+    sleep 2
+}
+agent_launch_cmd() { echo 'source ~/.zshrc && openclaw tui'; }
 
-# 3. Get server name and create instance
-SERVER_NAME=$(get_server_name)
-create_ovh_instance "${SERVER_NAME}"
-
-# 4. Wait for instance to be active and get IP
-wait_for_ovh_instance "${OVH_INSTANCE_ID}"
-
-# 5. Wait for SSH connectivity
-verify_server_connectivity "${OVH_SERVER_IP}"
-
-# 6. Install base dependencies
-install_base_deps "${OVH_SERVER_IP}"
-
-# 7. Install openclaw via bun
-log_step "Installing openclaw..."
-run_ovh "${OVH_SERVER_IP}" "source ~/.bashrc && bun install -g openclaw"
-log_info "OpenClaw installed"
-
-# 8. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# Get model preference
-MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
-
-log_step "Setting up environment variables..."
-inject_env_vars_ovh "${OVH_SERVER_IP}" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-
-# 9. Configure openclaw
-setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" \
-    "upload_file_ovh ${OVH_SERVER_IP}" \
-    "run_ovh ${OVH_SERVER_IP}"
-
-echo ""
-log_info "OVHcloud instance setup completed successfully!"
-log_info "Instance: ${SERVER_NAME} (ID: ${OVH_INSTANCE_ID}, IP: ${OVH_SERVER_IP})"
-echo ""
-
-# 10. Start openclaw gateway in background and launch TUI
-log_step "Starting openclaw..."
-run_ovh "${OVH_SERVER_IP}" "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
-sleep 2
-interactive_session "${OVH_SERVER_IP}" "source ~/.zshrc && openclaw tui"
+spawn_agent "OpenClaw"

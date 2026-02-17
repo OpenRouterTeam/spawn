@@ -403,9 +403,21 @@ create_server() {
     # Extract server ID and IP
     HETZNER_SERVER_ID=$(printf '%s' "$response" | jq -r '.server.id')
     HETZNER_SERVER_IP=$(printf '%s' "$response" | jq -r '.server.public_net.ipv4.ip')
+    if [[ -z "$HETZNER_SERVER_ID" || "$HETZNER_SERVER_ID" == "null" ]]; then
+        log_error "Failed to extract server ID from API response"
+        log_error "Response: $response"
+        return 1
+    fi
+    if [[ -z "$HETZNER_SERVER_IP" || "$HETZNER_SERVER_IP" == "null" ]]; then
+        log_error "Failed to extract server IP from API response"
+        log_error "Response: $response"
+        return 1
+    fi
     export HETZNER_SERVER_ID HETZNER_SERVER_IP
 
     log_info "Server created: ID=$HETZNER_SERVER_ID, IP=$HETZNER_SERVER_IP"
+
+    save_vm_connection "${HETZNER_SERVER_IP}" "root" "${HETZNER_SERVER_ID}" "$name" "hetzner"
 }
 
 # SSH operations — delegates to shared helpers (SSH_USER defaults to root)
@@ -455,3 +467,15 @@ list_servers() {
             printf '%-25s %-12s %-12s %-16s %-10s\n' "$name" "$sid" "$status" "$ip" "$stype"
         done
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_hcloud_token; ensure_ssh_key; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { verify_server_connectivity "${HETZNER_SERVER_IP}"; wait_for_cloud_init "${HETZNER_SERVER_IP}" 60; }
+cloud_run() { run_server "${HETZNER_SERVER_IP}" "$1"; }
+cloud_upload() { upload_file "${HETZNER_SERVER_IP}" "$1" "$2"; }
+cloud_interactive() { interactive_session "${HETZNER_SERVER_IP}" "$1"; }
+cloud_label() { echo "Hetzner server"; }

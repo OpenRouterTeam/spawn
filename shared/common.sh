@@ -629,6 +629,16 @@ _validate_oauth_server_args() {
 _generate_oauth_server_script() {
     local expected_state="${1}" success_html="${2}" error_html="${3}"
     local code_file="${4}" port_file="${5}" starting_port="${6}"
+
+    # SECURITY: Escape single quotes in all parameters to prevent injection
+    # When parameters are embedded in the Node.js script string, unescaped quotes
+    # could break out of the string context and execute arbitrary code
+    expected_state="${expected_state//\'/\\\'}"
+    success_html="${success_html//\'/\\\'}"
+    error_html="${error_html//\'/\\\'}"
+    code_file="${code_file//\'/\\\'}"
+    port_file="${port_file//\'/\\\'}"
+
     printf '%s' "
 const http = require('http');
 const fs = require('fs');
@@ -757,11 +767,22 @@ cleanup_oauth_session() {
     local oauth_dir="${2}"
 
     if [[ -n "${server_pid}" ]]; then
-        kill "${server_pid}" 2>/dev/null || true
+        # Kill process group to catch any child processes (netcat listeners, etc)
+        kill -TERM "-${server_pid}" 2>/dev/null || kill "${server_pid}" 2>/dev/null || true
+        # Give it time to shut down gracefully
+        sleep 0.5
+        # Force kill if still running
+        kill -KILL "-${server_pid}" 2>/dev/null || true
         wait "${server_pid}" 2>/dev/null || true
     fi
 
-    if [[ -n "${oauth_dir}" && -d "${oauth_dir}" ]]; then
+    # SAFETY: Validate path before rm -rf to prevent accidental deletion of system directories
+    # Only delete if:
+    # 1. Variable is non-empty
+    # 2. Directory exists
+    # 3. Path starts with /tmp/ (mktemp always creates in /tmp)
+    # 4. Path contains more than just /tmp (prevent rm -rf /tmp)
+    if [[ -n "${oauth_dir}" && -d "${oauth_dir}" && "${oauth_dir}" == /tmp/* && "${oauth_dir}" != "/tmp" && "${oauth_dir}" != "/tmp/" ]]; then
         rm -rf "${oauth_dir}"
     fi
 }
@@ -906,13 +927,30 @@ _generate_csrf_state() {
 # Create temp directory with OAuth session files and CSRF state
 _init_oauth_session() {
     local oauth_dir
-    oauth_dir=$(mktemp -d)
+    oauth_dir=$(mktemp -d) || {
+        log_error "Failed to create temporary directory for OAuth session"
+        log_error "Check disk space and /tmp permissions"
+        return 1
+    }
+
+    # SAFETY: Verify mktemp succeeded before proceeding
+    if [[ -z "${oauth_dir}" || ! -d "${oauth_dir}" ]]; then
+        log_error "Failed to create temporary directory for OAuth session"
+        log_error "Check disk space and /tmp permissions"
+        return 1
+    fi
+
+    # Track directory for cleanup on exit
     track_temp_file "${oauth_dir}"
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
     csrf_state=$(_generate_csrf_state)
-    printf '%s' "${csrf_state}" > "${oauth_dir}/state"
+    printf '%s' "${csrf_state}" > "${oauth_dir}/state" || {
+        rm -rf "${oauth_dir}"
+        log_error "Failed to write OAuth state file"
+        return 1
+    }
     chmod 600 "${oauth_dir}/state"
 
     echo "${oauth_dir}"
@@ -1067,6 +1105,14 @@ generate_env_config() {
     for env_pair in "$@"; do
         local key="${env_pair%%=*}"
         local value="${env_pair#*=}"
+
+        # SECURITY: Validate environment variable names to prevent injection
+        # Only allow uppercase letters, numbers, and underscores (standard env var format)
+        if [[ ! "${key}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+            log_error "SECURITY: Invalid environment variable name rejected: ${key}"
+            continue
+        fi
+
         # Escape any single quotes in the value: replace ' with '\''
         local escaped_value="${value//\'/\'\\\'\'}"
         echo "export ${key}='${escaped_value}'"
@@ -1091,9 +1137,15 @@ inject_env_vars_ssh() {
 
     generate_env_config "$@" > "${env_temp}"
 
+    # SECURITY: Use unpredictable temp file name to prevent race condition
+    # Attacker could create symlink at /tmp/env_config to exfiltrate credentials
+    local rand_suffix
+    rand_suffix=$(basename "${env_temp}")
+    local temp_remote="/tmp/spawn_env_${rand_suffix}"
+
     # Append to .bashrc and .zshrc only — do NOT write to .profile or .bash_profile
-    "${upload_func}" "${server_ip}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "${server_ip}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${upload_func}" "${server_ip}" "${env_temp}" "${temp_remote}"
+    "${run_func}" "${server_ip}" "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1119,9 +1171,14 @@ inject_env_vars_local() {
 
     generate_env_config "$@" > "${env_temp}"
 
+    # SECURITY: Use unpredictable temp file name to prevent race condition
+    local rand_suffix
+    rand_suffix=$(basename "${env_temp}")
+    local temp_remote="/tmp/spawn_env_${rand_suffix}"
+
     # Append to .bashrc and .zshrc only
-    "${upload_func}" "${env_temp}" "/tmp/env_config"
-    "${run_func}" "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    "${upload_func}" "${env_temp}" "${temp_remote}"
+    "${run_func}" "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1262,41 +1319,41 @@ verify_agent() {
 # The curl installer bundles its own runtime. npm/bun install a Node.js package
 # whose shebang needs 'node', so we ensure a node runtime exists after those.
 # Usage: install_claude_code RUN_CB
-install_claude_code() {
+_finalize_claude_install() {
     local run_cb="$1"
-    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+    local claude_path="$2"
+    log_step "Setting up Claude Code shell integration..."
+    ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
+    # Write claude PATH to .bashrc and .zshrc
+    ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
+}
 
-    # Clean up ~/.bash_profile if it was created by a previous broken deployment.
-    ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
+_verify_claude_installed() {
+    local run_cb="$1"
+    local claude_path="$2"
+    ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1
+}
 
-    _finalize_claude_install() {
-        log_step "Setting up Claude Code shell integration..."
-        ${run_cb} "${claude_path} && claude install --force" >/dev/null 2>&1 || true
-        # Write claude PATH to .bashrc and .zshrc
-        ${run_cb} "for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' \"\$rc\" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH=\"\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"\\n' >> \"\$rc\"; done" >/dev/null 2>&1 || true
-    }
-
-    # Already installed?
-    if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
-        log_info "Claude Code already installed"
-        _finalize_claude_install
-        return 0
-    fi
-
-    # Method 1: official curl installer (standalone binary, no node needed)
+_install_via_curl() {
+    local run_cb="$1"
+    local claude_path="$2"
     log_step "Installing Claude Code (method 1/2: curl installer)..."
     if ${run_cb} "curl -fsSL https://claude.ai/install.sh | bash" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
+        if _verify_claude_installed "$run_cb" "$claude_path"; then
             log_info "Claude Code installed via curl installer"
-            _finalize_claude_install
+            _finalize_claude_install "$run_cb" "$claude_path"
             return 0
         fi
         log_warn "curl installer exited 0 but claude not found on PATH"
     else
         log_warn "curl installer failed (site may be temporarily unavailable)"
     fi
+    return 1
+}
 
-    # Ensure Node.js runtime for bun-installed package (it's a Node.js script)
+_ensure_nodejs_runtime() {
+    local run_cb="$1"
+    local claude_path="$2"
     if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
         log_step "Installing Node.js runtime (required for claude package)..."
         if ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" >/dev/null 2>&1; then
@@ -1305,18 +1362,50 @@ install_claude_code() {
             log_warn "Could not install Node.js - bun method may fail"
         fi
     fi
+}
 
-    # Method 2: bun
+_install_via_bun() {
+    local run_cb="$1"
+    local claude_path="$2"
     log_step "Installing Claude Code (method 2/2: bun)..."
     if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
-        if ${run_cb} "${claude_path} && command -v claude" >/dev/null 2>&1; then
+        if _verify_claude_installed "$run_cb" "$claude_path"; then
             log_info "Claude Code installed via bun"
-            _finalize_claude_install
+            _finalize_claude_install "$run_cb" "$claude_path"
             return 0
         fi
         log_warn "bun install exited 0 but claude binary not found"
     else
         log_warn "bun install failed"
+    fi
+    return 1
+}
+
+install_claude_code() {
+    local run_cb="$1"
+    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+
+    # Clean up ~/.bash_profile if it was created by a previous broken deployment.
+    ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
+
+    # Already installed?
+    if _verify_claude_installed "$run_cb" "$claude_path"; then
+        log_info "Claude Code already installed"
+        _finalize_claude_install "$run_cb" "$claude_path"
+        return 0
+    fi
+
+    # Try curl installer first
+    if _install_via_curl "$run_cb" "$claude_path"; then
+        return 0
+    fi
+
+    # Ensure Node.js runtime for bun method
+    _ensure_nodejs_runtime "$run_cb" "$claude_path"
+
+    # Try bun installer
+    if _install_via_bun "$run_cb" "$claude_path"; then
+        return 0
     fi
 
     # All methods failed
@@ -1353,8 +1442,13 @@ inject_env_vars_cb() {
 
     generate_env_config "$@" > "${env_temp}"
 
-    ${upload_cb} "${env_temp}" "/tmp/env_config"
-    ${run_cb} "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+    # SECURITY: Use unpredictable temp file name to prevent race condition
+    local rand_suffix
+    rand_suffix=$(basename "${env_temp}")
+    local temp_remote="/tmp/spawn_env_${rand_suffix}"
+
+    ${upload_cb} "${env_temp}" "${temp_remote}"
+    ${run_cb} "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
 
     # Offer optional GitHub CLI setup
     offer_github_auth "${run_cb}"
@@ -1371,6 +1465,107 @@ launch_session() {
     sleep 1
     clear 2>/dev/null || true
     ${session_cb} "${launch_cmd}"
+}
+
+# ============================================================
+# Cloud adapter runner (spawn_agent)
+# ============================================================
+# Orchestrates the standard agent deployment flow using cloud_* adapter
+# functions. Agent scripts define hooks (agent_install, agent_env_vars,
+# agent_launch_cmd, etc.) and call spawn_agent to run them.
+#
+# Required cloud_* functions (defined in {cloud}/lib/common.sh):
+#   cloud_authenticate, cloud_provision, cloud_wait_ready,
+#   cloud_run, cloud_upload, cloud_interactive, cloud_label
+#
+# Required agent hooks:
+#   agent_env_vars   — print env config lines to stdout (via generate_env_config)
+#   agent_launch_cmd — print the shell command to launch the agent
+#
+# Optional agent hooks:
+#   agent_pre_provision — run before provisioning (e.g., prompt_github_auth)
+#   agent_install       — install the agent on the server
+#   agent_configure     — agent-specific config (settings files, etc.)
+#   agent_save_connection — save connection info for `spawn list`
+#   agent_pre_launch    — run before launching (e.g., start daemon)
+#
+# Optional agent variables:
+#   AGENT_MODEL_PROMPT  — if set, prompt for model selection
+#   AGENT_MODEL_DEFAULT — default model ID (default: openrouter/auto)
+
+# Check if a function is defined (bash 3.2 compatible)
+_fn_exists() { type "$1" 2>/dev/null | head -1 | grep -q 'function'; }
+
+# Inject env vars using cloud_* adapter functions
+_spawn_inject_env_vars() {
+    log_step "Setting up environment variables..."
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    agent_env_vars > "${env_temp}"
+
+    cloud_upload "${env_temp}" "/tmp/env_config"
+
+    # Write env vars to ~/.spawnrc instead of inlining into .bashrc/.zshrc.
+    # Ubuntu's default .bashrc has an interactive-shell guard that exits early —
+    # anything appended after the guard is never loaded when SSH runs a command string.
+    cloud_run "cp /tmp/env_config ~/.spawnrc && chmod 600 ~/.spawnrc && rm /tmp/env_config"
+
+    # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc"
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc"
+
+    offer_github_auth cloud_run
+}
+
+# Main orchestration runner for agent deployment
+# Usage: spawn_agent AGENT_DISPLAY_NAME
+spawn_agent() {
+    local agent_name="$1"
+
+    # 1. Authenticate with cloud provider
+    cloud_authenticate
+
+    # 2. Pre-provision hooks (e.g., prompt for GitHub auth)
+    if _fn_exists agent_pre_provision; then agent_pre_provision; fi
+
+    # 3. Provision server
+    local server_name
+    server_name=$(get_server_name)
+    cloud_provision "${server_name}"
+
+    # 4. Wait for readiness
+    cloud_wait_ready
+
+    # 5. Install agent
+    if _fn_exists agent_install; then agent_install; fi
+
+    # 6. Get API key
+    get_or_prompt_api_key
+
+    # 7. Model selection (if agent needs it)
+    if [[ -n "${AGENT_MODEL_PROMPT:-}" ]]; then
+        MODEL_ID=$(get_model_id_interactive "${AGENT_MODEL_DEFAULT:-openrouter/auto}" "${agent_name}") || exit 1
+    fi
+
+    # 8. Inject environment variables
+    _spawn_inject_env_vars
+
+    # 9. Agent-specific configuration
+    if _fn_exists agent_configure; then agent_configure; fi
+
+    # 10. Save connection info
+    if _fn_exists agent_save_connection; then agent_save_connection; fi
+
+    # 11. Pre-launch hooks (e.g., start gateway daemon)
+    if _fn_exists agent_pre_launch; then agent_pre_launch; fi
+
+    # 12. Launch interactive session
+    local launch_cmd
+    launch_cmd=$(agent_launch_cmd)
+    launch_session "$(cloud_label)" cloud_interactive "${launch_cmd}"
 }
 
 # ============================================================
@@ -3109,13 +3304,16 @@ opencode_install_cmd() {
 
 # Save VM connection info for spawn list reconnect functionality.
 # This allows users to reconnect to previously spawned VMs via `spawn list`.
-# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME]
-# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME"
+# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME] [CLOUD] [METADATA_JSON]
+# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME" "digitalocean"
+# Example: save_vm_connection "$GCP_IP" "root" "" "$NAME" "gcp" '{"zone":"us-central1-a"}'
 save_vm_connection() {
     local ip="${1}"
     local user="${2}"
     local server_id="${3:-}"
     local server_name="${4:-}"
+    local cloud="${5:-}"
+    local metadata="${6:-}"
 
     local spawn_dir="${HOME}/.spawn"
     mkdir -p "${spawn_dir}"
@@ -3129,6 +3327,12 @@ save_vm_connection() {
     fi
     if [[ -n "${server_name}" ]]; then
         json="${json},\"server_name\":\"${server_name}\""
+    fi
+    if [[ -n "${cloud}" ]]; then
+        json="${json},\"cloud\":\"${cloud}\""
+    fi
+    if [[ -n "${metadata}" ]]; then
+        json="${json},\"metadata\":${metadata}"
     fi
     json="${json}}"
 

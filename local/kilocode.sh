@@ -12,52 +12,19 @@ fi
 log_info "Kilo Code on local machine"
 echo ""
 
-# 1. Ensure local prerequisites
-ensure_local_ready
+agent_install() {
+    install_agent "Kilo Code" "npm install -g @kilocode/cli" cloud_run
+}
 
-# 2. Install Kilo Code if not already installed
-if command -v kilocode &>/dev/null; then
-    log_info "Kilo Code already installed"
-else
-    log_step "Installing Kilo Code..."
-    npm install -g @kilocode/cli
-fi
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "KILO_PROVIDER_TYPE=openrouter" \
+        "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-# Verify installation
-if ! command -v kilocode &>/dev/null; then
-    log_install_failed "Kilo Code" "npm install -g @kilocode/cli"
-    exit 1
-fi
-log_info "Kilo Code installation verified"
+agent_launch_cmd() {
+    echo 'source ~/.zshrc 2>/dev/null; kilocode'
+}
 
-# 3. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 4. Inject environment variables
-log_step "Setting up environment variables..."
-inject_env_vars_local upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "KILO_PROVIDER_TYPE=openrouter" \
-    "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Local setup completed successfully!"
-echo ""
-
-# 5. Start Kilo Code
-if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_step "Executing Kilo Code with prompt..."
-    source ~/.zshrc 2>/dev/null || true
-    kilocode "${SPAWN_PROMPT}"
-else
-    log_step "Starting Kilo Code..."
-    sleep 1
-    clear 2>/dev/null || true
-    source ~/.zshrc 2>/dev/null || true
-    exec kilocode
-fi
+spawn_agent "Kilo Code"

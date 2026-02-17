@@ -217,14 +217,24 @@ describe("cmdMatrix - grid view rendering", () => {
     originalColumns = process.stdout.columns;
 
     // Force wide terminal for grid view
-    process.stdout.columns = 200;
+    Object.defineProperty(process.stdout, 'columns', {
+      value: 200,
+      writable: true,
+      configurable: true
+    });
 
     await setManifest(mockManifest);
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    process.stdout.columns = originalColumns!;
+    if (originalColumns !== undefined) {
+      Object.defineProperty(process.stdout, 'columns', {
+        value: originalColumns,
+        writable: true,
+        configurable: true
+      });
+    }
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
 

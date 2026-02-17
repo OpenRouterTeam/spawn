@@ -219,12 +219,12 @@ _assert_agent_specific() {
             assert_contains "${MOCK_LOG}" "sprite exec.*mv.*\.claude\.json" "Moves .claude.json to final path"
             ;;
         openclaw)
-            assert_contains "${MOCK_LOG}" "sprite exec.*\.sprite.*bun.*openclaw" "Installs openclaw via bun"
+            assert_contains "${MOCK_LOG}" "sprite exec.*bun.*openclaw" "Installs openclaw via bun"
             assert_contains "${MOCK_LOG}" "sprite exec.*openclaw gateway" "Starts openclaw gateway"
             ;;
         nanoclaw)
             assert_contains "${MOCK_LOG}" "sprite exec.*git.*nanoclaw" "Clones nanoclaw repo"
-            assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/nanoclaw_env" "Uploads nanoclaw .env"
+            assert_contains "${MOCK_LOG}" "sprite exec.*nanoclaw/\.env" "Uploads nanoclaw .env"
             ;;
     esac
 }

@@ -303,7 +303,12 @@ create_ovh_instance() {
     fi
 
     # Extract instance ID
-    OVH_INSTANCE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    OVH_INSTANCE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])" 2>/dev/null)
+    if [[ -z "$OVH_INSTANCE_ID" ]]; then
+        log_error "Failed to extract instance ID from API response"
+        log_error "Response: $response"
+        return 1
+    fi
     export OVH_INSTANCE_ID
 
     log_info "Instance created: ID=$OVH_INSTANCE_ID"
@@ -341,6 +346,11 @@ destroy_ovh_instance() {
     fi
 
     log_info "Instance $instance_id destroyed"
+}
+
+# Standardized destroy_server wrapper (for compatibility with cross-cloud scripts)
+destroy_server() {
+    destroy_ovh_instance "$@"
 }
 
 # OVH uses configurable SSH user (ubuntu for newer images, root for older)
@@ -412,3 +422,20 @@ for s in data:
     print(f'{name:<25} {sid:<40} {status:<12} {ip:<16} {flavor:<10}')
 " <<< "$response"
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_ovh_authenticated; ensure_ssh_key; }
+cloud_provision() { local name="$1"; create_ovh_instance "${name}"; }
+cloud_wait_ready() {
+    wait_for_ovh_instance "${OVH_INSTANCE_ID}"
+    save_vm_connection "${OVH_SERVER_IP}" "${OVH_SSH_USER:-ubuntu}" "${OVH_INSTANCE_ID}" "${OVH_SERVER_NAME:-}" "ovh"
+    verify_server_connectivity "${OVH_SERVER_IP}"
+    install_base_deps "${OVH_SERVER_IP}"
+}
+cloud_run() { run_ovh "${OVH_SERVER_IP}" "$1"; }
+cloud_upload() { upload_file_ovh "${OVH_SERVER_IP}" "$1" "$2"; }
+cloud_interactive() { interactive_session "${OVH_SERVER_IP}" "$1"; }
+cloud_label() { echo "OVHcloud instance"; }

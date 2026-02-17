@@ -232,11 +232,65 @@ upload_file_sprite() {
         return 1
     fi
 
-    # Generate a unique temp path to avoid collisions (safe: only uses basename + PID)
-    local temp_remote
-    temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_$$"
+    # SECURITY: Generate cryptographically random temp path to prevent symlink attacks
+    # Fallback chain: openssl (strongest) → /dev/urandom → failure (no weak fallback)
+    local temp_random
+    if command -v openssl &>/dev/null; then
+        temp_random=$(openssl rand -hex 8)
+    elif [[ -r /dev/urandom ]]; then
+        temp_random=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
+    else
+        log_error "FATAL: Neither openssl nor /dev/urandom available for secure temp file generation"
+        return 1
+    fi
+
+    local temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_${temp_random}"
 
     sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
 }
 
+# Destroy a sprite (standardized wrapper for cross-cloud compatibility)
+destroy_server() {
+    local sprite_name="$1"
+
+    log_step "Destroying sprite '${sprite_name}'..."
+    if ! sprite destroy "${sprite_name}" 2>&1; then
+        log_error "Failed to destroy sprite '${sprite_name}'"
+        log_error ""
+        log_error "The sprite may still be running and incurring charges."
+        log_error "Delete it manually: sprite destroy ${sprite_name}"
+        log_error "Or check status: sprite list"
+        return 1
+    fi
+
+    log_info "Sprite '${sprite_name}' destroyed"
+}
+
 # Note: Provider-agnostic functions (nc_listen, open_browser, OAuth helpers, validate_model_id) are now in shared/common.sh
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+# Wrapper for spawn_agent compatibility (sprite uses get_sprite_name)
+get_server_name() { get_sprite_name; }
+
+cloud_authenticate() { ensure_sprite_installed; ensure_sprite_authenticated; }
+cloud_provision() {
+    SPRITE_NAME="$1"
+    ensure_sprite_exists "${SPRITE_NAME}"
+    verify_sprite_connectivity "${SPRITE_NAME}"
+    setup_shell_environment "${SPRITE_NAME}"
+}
+cloud_wait_ready() { :; }
+cloud_run() { run_sprite "${SPRITE_NAME}" "$1"; }
+cloud_upload() { upload_file_sprite "${SPRITE_NAME}" "$1" "$2"; }
+cloud_interactive() {
+    local cmd="$1"
+    if [[ -n "${SPAWN_PROMPT:-}" ]]; then
+        sprite exec -s "${SPRITE_NAME}" -- bash -c "${cmd}"
+    else
+        sprite exec -s "${SPRITE_NAME}" -tty -- bash -c "${cmd}"
+    fi
+}
+cloud_label() { echo "Sprite"; }

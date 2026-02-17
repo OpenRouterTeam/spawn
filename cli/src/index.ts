@@ -6,6 +6,7 @@ import {
   cmdList,
   cmdListClear,
   cmdLast,
+  cmdDelete,
   cmdMatrix,
   cmdAgents,
   cmdClouds,
@@ -189,7 +190,8 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
     );
     if (clouds.length === 0) return;
 
-    console.error(`\nAvailable clouds for ${pc.bold(resolvedAgent)}:`);
+    const agentName = manifest.agents[resolvedAgent].name;
+    console.error(`\nAvailable clouds for ${pc.bold(agentName)}:`);
     for (const c of clouds.slice(0, 5)) {
       console.error(`  ${pc.cyan(`spawn ${resolvedAgent} ${c} --prompt "..."`)}`);
     }
@@ -353,6 +355,9 @@ const SUBCOMMANDS: Record<string, () => Promise<void>> = {
 // list/ls/history handled separately for -a/-c flag parsing
 const LIST_COMMANDS = new Set(["list", "ls", "history"]);
 
+// delete/rm/destroy handled separately for -a/-c flag parsing
+const DELETE_COMMANDS = new Set(["delete", "rm", "destroy"]);
+
 // Common verb prefixes that users naturally try (e.g. "spawn run claude sprite")
 // These are not real subcommands -- we strip them and forward to the default handler
 const VERB_ALIASES = new Set(["run", "launch", "start", "deploy", "exec"]);
@@ -419,6 +424,13 @@ async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
   await cmdList(agentFilter, cloudFilter);
 }
 
+/** Handle delete/rm/destroy commands with filters */
+async function dispatchDeleteCommand(filteredArgs: string[]): Promise<void> {
+  if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+  const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
+  await cmdDelete(agentFilter, cloudFilter);
+}
+
 /** Handle named subcommands (agents, clouds, matrix, etc.) */
 async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<void> {
   if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
@@ -472,6 +484,7 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
   }
 
   if (LIST_COMMANDS.has(cmd)) { await dispatchListCommand(filteredArgs); return; }
+  if (DELETE_COMMANDS.has(cmd)) { await dispatchDeleteCommand(filteredArgs); return; }
   if (SUBCOMMANDS[cmd]) { await dispatchSubcommand(cmd, filteredArgs); return; }
   if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun, debug); return; }
 

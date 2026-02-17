@@ -7,6 +7,10 @@ export interface VMConnection {
   user: string;
   server_id?: string;
   server_name?: string;
+  cloud?: string;
+  deleted?: boolean;
+  deleted_at?: string;
+  metadata?: Record<string, string>;
 }
 
 export interface SpawnRecord {
@@ -106,6 +110,35 @@ export function mergeLastConnection(): void {
   } catch {
     // Ignore errors - connection data is optional
   }
+}
+
+export function markRecordDeleted(record: SpawnRecord): boolean {
+  const history = loadHistory();
+  const index = history.findIndex(
+    (r) =>
+      r.timestamp === record.timestamp &&
+      r.agent === record.agent &&
+      r.cloud === record.cloud
+  );
+  if (index < 0) return false;
+  const found = history[index];
+  if (!found.connection) return false;
+  found.connection.deleted = true;
+  found.connection.deleted_at = new Date().toISOString();
+  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
+  return true;
+}
+
+export function getActiveServers(): SpawnRecord[] {
+  mergeLastConnection();
+  const records = loadHistory();
+  return records.filter(
+    (r) =>
+      r.connection &&
+      r.connection.cloud &&
+      r.connection.cloud !== "local" &&
+      !r.connection.deleted
+  );
 }
 
 export function filterHistory(

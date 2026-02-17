@@ -13,44 +13,28 @@ fi
 log_info "NanoClaw on Hetzner Cloud"
 echo ""
 
-# Provision server
-ensure_hcloud_token
-ensure_ssh_key
-SERVER_NAME=$(get_server_name)
-create_server "${SERVER_NAME}"
-verify_server_connectivity "${HETZNER_SERVER_IP}"
-wait_for_cloud_init "${HETZNER_SERVER_IP}" 60
+agent_install() {
+    log_step "Installing tsx..."
+    cloud_run "source ~/.bashrc && bun install -g tsx"
+    log_step "Cloning and building nanoclaw..."
+    cloud_run "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
+    log_info "NanoClaw installed"
+}
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+}
+agent_configure() {
+    log_step "Configuring nanoclaw..."
+    local dotenv_temp
+    dotenv_temp=$(mktemp)
+    trap 'rm -f "${dotenv_temp}"' EXIT
+    chmod 600 "${dotenv_temp}"
+    printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${dotenv_temp}"
+    cloud_upload "${dotenv_temp}" "/root/nanoclaw/.env"
+}
+agent_launch_cmd() { echo 'cd ~/nanoclaw && source ~/.zshrc && npm run dev'; }
 
-# Set up callbacks
-RUN="run_server ${HETZNER_SERVER_IP}"
-UPLOAD="upload_file ${HETZNER_SERVER_IP}"
-
-# NanoClaw multi-step install
-log_step "Installing tsx..."
-${RUN} "source ~/.bashrc && bun install -g tsx"
-log_step "Cloning and building nanoclaw..."
-${RUN} "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
-log_info "NanoClaw installed"
-
-get_or_prompt_api_key
-inject_env_vars_cb "$RUN" "$UPLOAD" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-
-# NanoClaw-specific .env file
-log_step "Configuring nanoclaw..."
-DOTENV_TEMP=$(mktemp)
-trap 'rm -f "${DOTENV_TEMP}"' EXIT
-chmod 600 "${DOTENV_TEMP}"
-printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
-${UPLOAD} "${DOTENV_TEMP}" "/root/nanoclaw/.env"
-
-echo ""
-log_info "Hetzner server setup completed successfully!"
-echo ""
-
-log_step "Starting nanoclaw..."
-log_info "You will need to scan a WhatsApp QR code to authenticate."
-echo ""
-interactive_session "${HETZNER_SERVER_IP}" "cd ~/nanoclaw && source ~/.zshrc && npm run dev"
+spawn_agent "NanoClaw"

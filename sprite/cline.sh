@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
+# Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
     source "${SCRIPT_DIR}/lib/common.sh"
@@ -11,37 +12,19 @@ fi
 log_info "Cline on Sprite"
 echo ""
 
-ensure_sprite_installed
-ensure_sprite_authenticated
+agent_install() {
+    install_agent "Cline" "npm install -g cline" cloud_run
+}
 
-SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "${SPRITE_NAME}"
-verify_sprite_connectivity "${SPRITE_NAME}"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+}
 
-log_step "Setting up sprite environment..."
-setup_shell_environment "${SPRITE_NAME}"
+agent_launch_cmd() {
+    echo 'source ~/.zshrc && cline'
+}
 
-log_step "Installing Cline..."
-run_sprite "${SPRITE_NAME}" "npm install -g cline"
-
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_sprite "${SPRITE_NAME}" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
-
-echo ""
-log_info "Sprite setup completed successfully!"
-echo ""
-
-log_step "Starting Cline..."
-sleep 1
-clear
-sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && cline"
+spawn_agent "Cline"

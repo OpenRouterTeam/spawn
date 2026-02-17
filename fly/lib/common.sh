@@ -233,6 +233,11 @@ _fly_create_machine() {
     fi
 
     FLY_MACHINE_ID=$(_extract_json_field "$response" "d['id']")
+    if [[ -z "$FLY_MACHINE_ID" ]]; then
+        log_error "Failed to extract machine ID from API response"
+        log_error "Response: $response"
+        return 1
+    fi
     export FLY_MACHINE_ID FLY_APP_NAME="$name"
     log_info "Machine created: ID=$FLY_MACHINE_ID, App=$name"
 }
@@ -284,6 +289,8 @@ create_server() {
     _fly_create_app "$name" || return 1
     _fly_create_machine "$name" "$region" "$vm_memory" || return 1
     _fly_wait_for_machine_start "$name" "$FLY_MACHINE_ID"
+
+    save_vm_connection "fly-ssh" "root" "${FLY_MACHINE_ID}" "$name" "fly"
 }
 
 # Wait for base tools to be installed (Fly.io uses bare Ubuntu image)
@@ -407,3 +414,15 @@ for a in apps:
     print(f'{name:<25} {aid:<20} {status:<12} {network:<20}')
 " <<< "$response"
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_fly_cli; ensure_fly_token; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { wait_for_cloud_init; }
+cloud_run() { run_server "$1"; }
+cloud_upload() { upload_file "$1" "$2"; }
+cloud_interactive() { interactive_session "$1"; }
+cloud_label() { echo "Fly.io machine"; }

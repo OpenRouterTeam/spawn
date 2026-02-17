@@ -194,6 +194,8 @@ create_server() {
 
     _resolve_sandbox_id "${name}"
     log_info "Sandbox created: ${DAYTONA_SANDBOX_ID}"
+
+    save_vm_connection "daytona-sandbox" "daytona" "${DAYTONA_SANDBOX_ID}" "$name" "daytona"
 }
 
 wait_for_cloud_init() {
@@ -265,3 +267,15 @@ destroy_server() {
 list_servers() {
     daytona list
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_daytona_cli; ensure_daytona_token; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { wait_for_cloud_init; }
+cloud_run() { run_server "$1"; }
+cloud_upload() { upload_file "$1" "$2"; }
+cloud_interactive() { interactive_session "$1"; }
+cloud_label() { echo "Daytona sandbox"; }

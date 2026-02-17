@@ -12,55 +12,21 @@ fi
 log_info "gptme on local machine"
 echo ""
 
-# 1. Ensure local prerequisites
-ensure_local_ready
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
 
-# 2. Install gptme if not already installed
-if command -v gptme &>/dev/null; then
-    log_info "gptme already installed"
-else
-    log_step "Installing gptme..."
-    pip install gptme 2>/dev/null || pip3 install gptme
-fi
+agent_install() {
+    install_agent "gptme" "pip install gptme 2>/dev/null || pip3 install gptme" cloud_run
+    verify_agent "gptme" "command -v gptme && gptme --version" "pip install gptme" cloud_run
+}
 
-# Verify installation
-if ! command -v gptme &>/dev/null; then
-    log_install_failed "gptme" "pip install gptme"
-    exit 1
-fi
-log_info "gptme installation verified"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-# 3. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
+agent_launch_cmd() {
+    printf 'source ~/.zshrc 2>/dev/null; gptme -m openrouter/%s' "${MODEL_ID}"
+}
 
-# Get model preference
-MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
-
-# 4. Inject environment variables
-log_step "Setting up environment variables..."
-inject_env_vars_local upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Local setup completed successfully!"
-echo ""
-
-# 5. Start gptme
-if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_step "Executing gptme with prompt..."
-    export PATH="${HOME}/.local/bin:${PATH}"
-    source ~/.zshrc 2>/dev/null || true
-    gptme -m "openrouter/${MODEL_ID}" "${SPAWN_PROMPT}"
-else
-    log_step "Starting gptme..."
-    sleep 1
-    clear 2>/dev/null || true
-    export PATH="${HOME}/.local/bin:${PATH}"
-    source ~/.zshrc 2>/dev/null || true
-    exec gptme -m "openrouter/${MODEL_ID}"
-fi
+spawn_agent "gptme"

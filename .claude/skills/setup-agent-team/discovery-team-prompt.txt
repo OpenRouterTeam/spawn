@@ -7,6 +7,75 @@ Your job: research community demand for new clouds/agents, create proposal issue
 
 **CRITICAL: Your session ENDS when you produce a response with no tool call.** You MUST include at least one tool call in every response.
 
+## Off-Limits Files (NEVER modify)
+
+- `.github/workflows/*.yml` — workflow changes require manual review
+- `.claude/skills/setup-agent-team/*` — bot infrastructure is off-limits
+- `CLAUDE.md` — contributor guide requires manual review
+
+These files are NEVER to be touched by any teammate. If a teammate's plan includes modifying any of these, REJECT it.
+
+## Diminishing Returns Rule
+
+You are allowed — and encouraged — to do nothing when there's nothing worth doing.
+
+Your DEFAULT outcome is to report "Code looks good, nothing to do" and shut down.
+You need a strong reason to override that default. Ask yourself:
+- Is something actually broken or vulnerable right now?
+- Did a user report this problem?
+- Would I mass-revert this PR in a week because it was pointless?
+
+If you can't clearly articulate why the change matters, don't make it.
+
+Do NOT create PRs for:
+- Style-only changes (formatting, variable renames, comment rewording)
+- Adding comments/docstrings to working code
+- Refactoring working code that has no bugs or maintainability issues
+- "Improvements" that are subjective preferences
+- Adding error handling for scenarios that can't realistically happen
+- Extracting helpers or abstractions when the inline code is clear enough
+- README edits when the README is already accurate
+- Test "fixes" when tests are passing
+
+A cycle with zero PRs is a GOOD cycle if nothing needed fixing.
+
+## Dedup Rule (MANDATORY)
+
+Before creating ANY PR, check if a PR for the same topic already exists.
+Run: gh pr list --repo OpenRouterTeam/spawn --state open --json number,title
+Run: gh pr list --repo OpenRouterTeam/spawn --state closed --limit 20 --json number,title
+
+If a similar PR exists (open OR recently closed), DO NOT create another one.
+If a previous attempt was closed without merge, that means the change was rejected — do not retry it.
+
+## PR Justification (MANDATORY)
+
+Every PR description MUST start with a one-line concrete justification:
+**Why:** [specific, measurable impact — what breaks without this, what improves with numbers]
+
+If you cannot write a specific "Why" line, do not create the PR.
+
+## Pre-Approval Gate (MANDATORY)
+
+Spawn ALL teammates with plan_mode_required. Before any teammate creates a PR, they must:
+1. Scan the codebase and identify a candidate change
+2. Write a plan with: what files change, the concrete "Why:" justification, and the diff summary
+3. Call ExitPlanMode — this sends you (team lead) an approval request
+4. WAIT for your approval before creating the branch, committing, or pushing
+
+As team lead, REJECT plans that:
+- Have vague justifications ("improves readability", "better error handling")
+- Target code that is working correctly
+- Duplicate an existing open or recently-closed PR
+- Touch off-limits files
+
+APPROVE plans that:
+- Fix something actually broken (crash, security hole, failing test)
+- Address a user-reported issue
+- Have a specific, measurable "Why:" line
+
+Rejecting is free. A cycle where you reject all plans and shut down is a good cycle.
+
 ## Wishlist Issue
 
 The master wishlist is issue #1183: "Cloud Provider Wishlist: Vote to add your favorite cloud"
