@@ -12,49 +12,19 @@ fi
 log_info "Goose on Sprite"
 echo ""
 
-# Setup sprite environment
-ensure_sprite_installed
-ensure_sprite_authenticated
+agent_install() {
+    install_agent "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" cloud_run
+    verify_agent "Goose" "command -v goose && goose --version" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash" cloud_run
+}
 
-SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "${SPRITE_NAME}"
-verify_sprite_connectivity "${SPRITE_NAME}"
+agent_env_vars() {
+    generate_env_config \
+        "GOOSE_PROVIDER=openrouter" \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-log_step "Setting up sprite environment..."
+agent_launch_cmd() {
+    echo 'source ~/.zshrc && goose'
+}
 
-# Configure shell environment
-setup_shell_environment "${SPRITE_NAME}"
-
-# Install Goose
-log_step "Installing Goose..."
-run_sprite "${SPRITE_NAME}" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
-
-# Verify installation succeeded
-if ! run_sprite "${SPRITE_NAME}" "command -v goose &> /dev/null && goose --version &> /dev/null"; then
-    log_install_failed "Goose" "CONFIGURE=false curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash"
-    exit 1
-fi
-log_info "Goose installation verified successfully"
-
-# Get OpenRouter API key via OAuth
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_sprite "${SPRITE_NAME}" \
-    "GOOSE_PROVIDER=openrouter" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Sprite setup completed successfully!"
-echo ""
-
-# Start Goose interactively
-log_step "Starting Goose..."
-sleep 1
-clear
-sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && goose"
+spawn_agent "Goose"

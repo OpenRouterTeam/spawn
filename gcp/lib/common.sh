@@ -264,3 +264,15 @@ destroy_server() {
 list_servers() {
     gcloud compute instances list --project="${GCP_PROJECT}" --format='table(name,zone,status,networkInterfaces[0].accessConfigs[0].natIP:label=EXTERNAL_IP,machineType.basename())'
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_gcloud; ensure_ssh_key; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { verify_server_connectivity "${GCP_SERVER_IP}"; wait_for_cloud_init "${GCP_SERVER_IP}" 60; }
+cloud_run() { run_server "${GCP_SERVER_IP}" "$1"; }
+cloud_upload() { upload_file "${GCP_SERVER_IP}" "$1" "$2"; }
+cloud_interactive() { interactive_session "${GCP_SERVER_IP}" "$1"; }
+cloud_label() { echo "GCP instance"; }

@@ -12,37 +12,13 @@ fi
 log_info "Open Interpreter on DigitalOcean"
 echo ""
 
-ensure_do_token
-ensure_ssh_key
+agent_install() { install_agent "Open Interpreter" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter" cloud_run; }
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+}
+agent_launch_cmd() { echo 'source ~/.zshrc && interpreter'; }
 
-DROPLET_NAME=$(get_server_name)
-create_server "${DROPLET_NAME}"
-verify_server_connectivity "${DO_SERVER_IP}"
-wait_for_cloud_init "${DO_SERVER_IP}" 60
-
-log_step "Installing Open Interpreter..."
-run_server "${DO_SERVER_IP}" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter"
-log_info "Open Interpreter installed"
-
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_ssh "${DO_SERVER_IP}" upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
-
-echo ""
-log_info "DigitalOcean droplet setup completed successfully!"
-log_info "Droplet: ${DROPLET_NAME} (ID: ${DO_DROPLET_ID}, IP: ${DO_SERVER_IP})"
-echo ""
-
-log_step "Starting Open Interpreter..."
-sleep 1
-clear
-interactive_session "${DO_SERVER_IP}" "source ~/.zshrc && interpreter"
+spawn_agent "Open Interpreter"

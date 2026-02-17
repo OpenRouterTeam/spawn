@@ -12,43 +12,17 @@ fi
 log_info "OpenCode on Fly.io"
 echo ""
 
-# 1. Ensure flyctl CLI and API token
-ensure_fly_cli
-ensure_fly_token
+agent_install() {
+    install_agent "OpenCode" "$(opencode_install_cmd)" cloud_run
+}
 
-# 2. Get app name and create machine
-SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-# 3. Install base tools
-wait_for_cloud_init
+agent_launch_cmd() {
+    echo 'source ~/.zshrc && opencode'
+}
 
-# 4. Install OpenCode
-log_step "Installing OpenCode..."
-run_server "$(opencode_install_cmd)"
-log_info "OpenCode installed"
-
-# 5. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 6. Inject environment variables
-log_step "Setting up environment variables..."
-
-inject_env_vars_fly \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Fly.io machine setup completed successfully!"
-log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
-echo ""
-
-# 7. Start OpenCode interactively
-log_step "Starting OpenCode..."
-sleep 1
-clear
-interactive_session "source ~/.bashrc && opencode"
+spawn_agent "OpenCode"

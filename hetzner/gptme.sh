@@ -12,24 +12,14 @@ fi
 log_info "gptme on Hetzner Cloud"
 echo ""
 
-# Provision server
-ensure_hcloud_token
-ensure_ssh_key
-SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
-verify_server_connectivity "$HETZNER_SERVER_IP"
-wait_for_cloud_init "$HETZNER_SERVER_IP"
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
 
-# Set up callbacks
-RUN="run_server ${HETZNER_SERVER_IP}"
-UPLOAD="upload_file ${HETZNER_SERVER_IP}"
-SESSION="interactive_session ${HETZNER_SERVER_IP}"
+agent_install() {
+    install_agent "gptme" "pip install gptme 2>/dev/null || pip3 install gptme" cloud_run
+    verify_agent "gptme" "command -v gptme && gptme --version" "pip install gptme" cloud_run
+}
+agent_env_vars() { generate_env_config "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"; }
+agent_launch_cmd() { printf 'source ~/.zshrc && gptme -m openrouter/%s' "${MODEL_ID}"; }
 
-# Install, configure, launch
-install_agent "gptme" "pip install gptme 2>/dev/null || pip3 install gptme" "$RUN"
-verify_agent "gptme" "command -v gptme && gptme --version" "pip install gptme" "$RUN"
-get_or_prompt_api_key
-MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme") || exit 1
-inject_env_vars_cb "$RUN" "$UPLOAD" \
-    "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
-launch_session "Hetzner server" "$SESSION" "source ~/.zshrc && gptme -m openrouter/${MODEL_ID}"
+spawn_agent "gptme"

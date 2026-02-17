@@ -12,39 +12,17 @@ fi
 log_info "OpenCode on Sprite"
 echo ""
 
-# Setup sprite environment
-ensure_sprite_installed
-ensure_sprite_authenticated
+agent_install() {
+    install_agent "OpenCode" "$(opencode_install_cmd)" cloud_run
+}
 
-SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "${SPRITE_NAME}"
-verify_sprite_connectivity "${SPRITE_NAME}"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-log_step "Setting up sprite environment..."
-setup_shell_environment "${SPRITE_NAME}"
+agent_launch_cmd() {
+    echo 'source ~/.zshrc && opencode'
+}
 
-log_step "Installing OpenCode..."
-run_sprite "${SPRITE_NAME}" "$(opencode_install_cmd)"
-log_info "OpenCode installed"
-
-# Get OpenRouter API key via OAuth
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_sprite "${SPRITE_NAME}" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Sprite setup completed successfully!"
-echo ""
-
-# Start OpenCode interactively
-log_step "Starting OpenCode..."
-sleep 1
-clear
-sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && opencode"
+spawn_agent "OpenCode"
