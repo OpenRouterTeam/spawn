@@ -416,6 +416,19 @@ This can also be set in `settings.json`:
 }
 ```
 
+### .spawnrc persistence
+
+On spawn VMs, `~/.spawnrc` is sourced by every agent launch command. Service scripts automatically inject the flag into `.spawnrc` if it exists, ensuring all Claude sessions on the VM inherit it:
+
+```bash
+if [[ -f "${HOME}/.spawnrc" ]]; then
+    grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "${HOME}/.spawnrc" 2>/dev/null || \
+        printf '\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n' >> "${HOME}/.spawnrc"
+fi
+```
+
+This is idempotent — it only appends once. All three service scripts (`discovery.sh`, `refactor.sh`, `security.sh`) include this check.
+
 All service scripts use **agent teams**, not subagents. Key differences:
 
 | | Subagents | Agent Teams |

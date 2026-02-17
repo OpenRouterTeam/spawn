@@ -66,6 +66,11 @@ if [[ ! -f "${MANIFEST}" ]]; then
 fi
 
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+# Persist into .spawnrc so all Claude sessions on this VM inherit the flag
+if [[ -f "${HOME}/.spawnrc" ]]; then
+    grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "${HOME}/.spawnrc" 2>/dev/null || \
+        printf '\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n' >> "${HOME}/.spawnrc"
+fi
 
 get_matrix_summary() {
     python3 - "${MANIFEST}" <<'PYEOF'
