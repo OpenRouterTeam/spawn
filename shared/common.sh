@@ -719,9 +719,11 @@ wait_for_oauth_code() {
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
         # Use python3 for float addition since bash arithmetic only handles integers
-        # If POLL_INTERVAL is 0.5, bash $(( )) would fail. Fallback to integer increment.
-        if ! elapsed=$(python3 -c "print(int(${elapsed} + ${POLL_INTERVAL}))" 2>/dev/null); then
-            # Python failed (not installed or syntax error) - fallback to integer increment
+        # If POLL_INTERVAL is 0.5, bash $(( )) would fail. Fallback keeps timeout working.
+        if command -v python3 &>/dev/null; then
+            elapsed=$(python3 -c "print(int(${elapsed} + ${POLL_INTERVAL}))" 2>/dev/null || echo "$((elapsed + 1))")
+        else
+            # No python3 available - fall back to integer seconds (may timeout early with fractional POLL_INTERVAL)
             elapsed=$((elapsed + 1))
         fi
     done
@@ -770,13 +772,16 @@ cleanup_oauth_session() {
     local oauth_dir="${2}"
 
     if [[ -n "${server_pid}" ]]; then
-        # Kill process group to catch any child processes (netcat listeners, etc)
-        kill -TERM "-${server_pid}" 2>/dev/null || kill "${server_pid}" 2>/dev/null || true
-        # Give it time to shut down gracefully
-        sleep 0.5
-        # Force kill if still running
-        kill -KILL "-${server_pid}" 2>/dev/null || true
-        wait "${server_pid}" 2>/dev/null || true
+        # Verify PID still exists before killing to prevent race conditions
+        if kill -0 "${server_pid}" 2>/dev/null; then
+            # Kill process group to catch any child processes (netcat listeners, etc)
+            kill -TERM "-${server_pid}" 2>/dev/null || kill "${server_pid}" 2>/dev/null || true
+            # Give it time to shut down gracefully
+            sleep 0.5
+            # Force kill if still running
+            kill -KILL "-${server_pid}" 2>/dev/null || true
+            wait "${server_pid}" 2>/dev/null || true
+        fi
     fi
 
     # SAFETY: Validate path before rm -rf to prevent accidental deletion of system directories
@@ -942,9 +947,6 @@ _init_oauth_session() {
         log_error "Check disk space and /tmp permissions"
         return 1
     fi
-
-    # Track directory for cleanup on exit
-    track_temp_file "${oauth_dir}"
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
@@ -1256,7 +1258,7 @@ track_temp_file() {
     CLEANUP_TEMP_FILES+=("${temp_file}")
 }
 
-# Cleanup function for temporary files and directories
+# Cleanup function for temporary files
 # Called automatically on EXIT, INT, TERM signals
 cleanup_temp_files() {
     local exit_code=$?
@@ -1265,9 +1267,6 @@ cleanup_temp_files() {
         if [[ -f "${temp_file}" ]]; then
             # Securely remove temp files (may contain credentials)
             shred -f -u "${temp_file}" 2>/dev/null || rm -f "${temp_file}"
-        elif [[ -d "${temp_file}" ]]; then
-            # Remove temp directories (e.g., OAuth session dirs)
-            rm -rf "${temp_file}"
         fi
     done
 
