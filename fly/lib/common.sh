@@ -312,13 +312,38 @@ create_server() {
     save_vm_connection "fly-ssh" "root" "${FLY_MACHINE_ID}" "$name" "fly"
 }
 
+# Wait for SSH to be reachable on the Fly.io machine
+_fly_wait_for_ssh() {
+    local max_attempts="${1:-20}"
+    local attempt=1
+    log_step "Waiting for SSH connectivity..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        if run_server "echo ok" 30 2>/dev/null | grep -q "ok"; then
+            log_info "SSH is ready"
+            return 0
+        fi
+        log_step "SSH not ready yet ($attempt/$max_attempts)"
+        sleep 5
+        attempt=$((attempt + 1))
+    done
+    log_error "SSH connectivity failed after $max_attempts attempts"
+    log_error "The machine may need more time. Try: fly ssh console -a $FLY_APP_NAME"
+    return 1
+}
+
 # Wait for base tools to be installed (Fly.io uses bare Ubuntu image)
 wait_for_cloud_init() {
-    log_step "Installing base tools on Fly.io machine..."
-    run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 pip" >/dev/null 2>&1 || true
-    run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' >/dev/null 2>&1 || true
+    _fly_wait_for_ssh || return 1
+
+    log_step "Installing packages (this may take 1-2 minutes)..."
+    run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 pip" 600 || {
+        log_warn "Package install timed out or failed, retrying..."
+        run_server "apt-get install -y curl unzip git zsh python3 pip" 300 || true
+    }
+    log_step "Installing bun..."
+    run_server "curl -fsSL https://bun.sh/install | bash" 120 || true
+    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' 30 || true
+    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' 30 || true
     log_info "Base tools installed"
 }
 
