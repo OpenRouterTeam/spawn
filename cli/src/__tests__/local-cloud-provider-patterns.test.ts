@@ -153,47 +153,37 @@ describe("local agent scripts — shared patterns", () => {
     }
   });
 
-  describe("calls ensure_local_ready", () => {
+  describe("uses spawn_agent abstraction", () => {
     for (const { key, path } of localEntries) {
-      it(`${key}.sh should call ensure_local_ready`, () => {
+      it(`${key}.sh should call spawn_agent`, () => {
         const content = readScript(path);
-        expect(content).toContain("ensure_local_ready");
+        expect(content).toContain("spawn_agent");
       });
     }
   });
 
   describe("OpenRouter API key handling", () => {
     for (const { key, path } of localEntries) {
-      it(`${key}.sh should check for OPENROUTER_API_KEY env var`, () => {
+      it(`${key}.sh should reference OPENROUTER_API_KEY in agent_env_vars hook`, () => {
         const content = readScript(path);
+        // Scripts use OPENROUTER_API_KEY in their agent_env_vars() hook
         expect(content).toContain("OPENROUTER_API_KEY");
-      });
-
-      it(`${key}.sh should use safe env var check with :- default`, () => {
-        const content = readScript(path);
-        expect(content).toMatch(/OPENROUTER_API_KEY:-/);
-      });
-
-      it(`${key}.sh should fall back to OAuth if key not set`, () => {
-        const content = readScript(path);
-        expect(content).toContain("get_openrouter_api_key_oauth");
       });
     }
   });
 
-  describe("uses inject_env_vars_local (not SSH-based inject_env_vars)", () => {
+  describe("defines agent_env_vars hook", () => {
     for (const { key, path } of localEntries) {
-      it(`${key}.sh should use inject_env_vars_local or manual env injection`, () => {
+      it(`${key}.sh should define agent_env_vars() hook`, () => {
         const content = readScript(path);
-        const codeLines = getCodeLines(content);
-        const codeStr = codeLines.join("\n");
-        // Should use inject_env_vars_local OR manual env var setup (some scripts do it inline)
-        const usesLocalInject = codeStr.includes("inject_env_vars_local");
-        const usesManualExport = codeStr.includes("export OPENROUTER_API_KEY");
-        const usesShellConfig = codeStr.includes("SHELL_CONFIG");
-        expect(usesLocalInject || usesManualExport || usesShellConfig).toBe(
-          true
-        );
+        // Scripts define agent_env_vars() hook for spawn_agent framework
+        expect(content).toMatch(/agent_env_vars\s*\(\)\s*\{/);
+      });
+
+      it(`${key}.sh agent_env_vars should use generate_env_config`, () => {
+        const content = readScript(path);
+        // agent_env_vars hook should use generate_env_config helper
+        expect(content).toContain("generate_env_config");
       });
     }
   });
@@ -235,29 +225,17 @@ describe("local agent scripts — shared patterns", () => {
 // ==============================================================
 
 describe("local agent scripts — installation verification", () => {
-  // Scripts that install a CLI tool should verify the installation succeeded
-  // using command -v checks
-  for (const { key, path, agent } of localEntries) {
-    it(`${key}.sh should verify installation with command -v`, () => {
-      const content = readScript(path);
-      // All local scripts install something and should verify it
-      const hasCommandCheck = content.includes("command -v");
-      expect(hasCommandCheck).toBe(true);
-    });
-  }
-
   for (const { key, path } of localEntries) {
-    it(`${key}.sh should have an installation failure message`, () => {
+    it(`${key}.sh should define agent_install() hook`, () => {
       const content = readScript(path);
-      // Should have log_error or log_install_failed for installation failures
-      const hasInstallError =
-        content.includes("log_install_failed") ||
-        content.includes("log_error") ||
-        content.includes("installation failed") ||
-        content.includes("not available") ||
-        content.includes("not installed") ||
-        content.includes("is required");
-      expect(hasInstallError).toBe(true);
+      // Scripts define agent_install() hook for spawn_agent framework
+      expect(content).toMatch(/agent_install\s*\(\)\s*\{/);
+    });
+
+    it(`${key}.sh should define agent_launch_cmd() hook`, () => {
+      const content = readScript(path);
+      // Scripts define agent_launch_cmd() hook to specify how to launch the agent
+      expect(content).toMatch(/agent_launch_cmd\s*\(\)\s*\{/);
     });
   }
 });
@@ -297,19 +275,13 @@ describe("local agent scripts — SPAWN_PROMPT handling", () => {
 
 describe("local agent scripts — shell config persistence", () => {
   for (const { key, path } of localEntries) {
-    it(`${key}.sh should source shell config before launching agent`, () => {
+    it(`${key}.sh launch command should source ~/.spawnrc or export env vars`, () => {
       const content = readScript(path);
-      // Should source .zshrc/.bashrc before running the agent
-      const sourcesConfig =
-        content.includes("source ~/.zshrc") ||
-        content.includes("source ~/.bashrc") ||
-        content.includes("source ${SHELL_CONFIG}") ||
-        content.includes("source \"${SHELL_CONFIG}\"");
-      // inject_env_vars_local handles this internally for most scripts
-      const usesLocalInject = content.includes("inject_env_vars_local");
-      // Some scripts export vars directly in the current session instead
-      const exportsDirectly = content.includes("export OPENROUTER_API_KEY=");
-      expect(sourcesConfig || usesLocalInject || exportsDirectly).toBe(true);
+      // Launch commands should source ~/.spawnrc (where spawn_agent writes env vars)
+      // OR the framework handles env injection via agent_env_vars hook
+      const sourcesSpawnrc = content.includes("source ~/.spawnrc") || content.includes("source ~/.zshrc") || content.includes("source ~/.bashrc");
+      const hasEnvHook = content.includes("agent_env_vars");
+      expect(sourcesSpawnrc || hasEnvHook).toBe(true);
     });
   }
 });
