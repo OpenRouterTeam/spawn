@@ -139,9 +139,19 @@ clone_cli() {
         git sparse-checkout set cli 2>/dev/null
         mv cli "${dest}/cli"
         cd "${dest}"
-        # Safety check: only delete if path contains 'repo' and is within dest directory
-        if [[ "${dest}/repo" == "${dest}/"* ]] && [[ -d "${dest}/repo" ]]; then
-            rm -rf "${dest}/repo"
+        # Safety check: only delete if path is canonically within dest directory
+        local repo_dir="${dest}/repo"
+        if [[ -d "${repo_dir}" ]]; then
+            local canonical_repo
+            canonical_repo=$(cd "${repo_dir}" 2>/dev/null && pwd) || true
+            local canonical_dest
+            canonical_dest=$(cd "${dest}" 2>/dev/null && pwd) || true
+
+            if [[ -n "${canonical_repo}" ]] && [[ -n "${canonical_dest}" ]] && [[ "${canonical_repo}" == "${canonical_dest}/repo" ]]; then
+                rm -rf "${repo_dir}"
+            else
+                log_warn "Skipping cleanup: path validation failed"
+            fi
         fi
     else
         log_step "Downloading CLI source..."
