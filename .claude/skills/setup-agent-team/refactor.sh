@@ -116,6 +116,9 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
 fi
 
 # Launch Claude Code with mode-specific prompt
+# Enable agent teams (required for team-based workflows)
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+
 log "Launching ${RUN_MODE} cycle..."
 
 PROMPT_FILE=$(mktemp /tmp/refactor-prompt-XXXXXX.md)

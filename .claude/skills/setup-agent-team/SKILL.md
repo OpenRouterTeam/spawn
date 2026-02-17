@@ -123,6 +123,7 @@ SCRIPT_DIR="<REPO_ROOT>/.claude/skills/setup-agent-team"
 export TRIGGER_SECRET="<secret-from-step-2>"
 export TARGET_SCRIPT="${SCRIPT_DIR}/<target-script>.sh"
 export REPO_ROOT="<REPO_ROOT>"
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export MAX_CONCURRENT=5
 export RUN_TIMEOUT_MS=7200000
 exec bun run "${SCRIPT_DIR}/trigger-server.ts"
@@ -399,6 +400,21 @@ If converting from a looping script, remove the `while true` / `sleep` and keep 
 - `refactor.sh` — Refactoring team service (already single-cycle ready)
 
 ## Agent Teams (ref: https://code.claude.com/docs/en/agent-teams)
+
+**Agent teams are experimental and disabled by default.** Every service script and wrapper MUST export:
+
+```bash
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+```
+
+This can also be set in `settings.json`:
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
+```
 
 All service scripts use **agent teams**, not subagents. Key differences:
 
