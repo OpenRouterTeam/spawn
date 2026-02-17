@@ -40,6 +40,8 @@ function runCLI(
     timeout: 15000,
     env: {
       ...process.env,
+      // Ensure bun is in PATH for child processes
+      PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`,
       SPAWN_NO_UPDATE_CHECK: "1",
       BUN_ENV: "test",
       // Avoid terminal-dependent output

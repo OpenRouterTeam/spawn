@@ -34,7 +34,7 @@ function runCli(
     const stdout = execSync(cmd, {
       cwd: PROJECT_ROOT,
       env: {
-        PATH: process.env.PATH,
+        PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`,
         HOME: process.env.HOME,
         SHELL: process.env.SHELL,
         TERM: process.env.TERM || "xterm",
