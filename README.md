@@ -44,6 +44,7 @@ spawn claude                             # Show clouds available for Claude
 | `spawn <agent> <cloud> --dry-run` | Preview without provisioning |
 | `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
 | `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
+| `spawn <agent> <cloud> --debug` | Show all commands being executed |
 | `spawn <agent>` | Show available clouds for an agent |
 | `spawn matrix` | Full agent x cloud matrix |
 | `spawn list` | Show previously launched spawns |
