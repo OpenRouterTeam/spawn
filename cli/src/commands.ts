@@ -17,6 +17,19 @@ import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
 import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord, type VMConnection } from "./history.js";
+import {
+  EXIT_CODE_GUIDANCE,
+  SIGNAL_GUIDANCE,
+  NETWORK_ERROR_GUIDANCE,
+  buildDashboardHint,
+  optionalDashboardLine,
+  getSignalGuidanceLines,
+  getExitCodeGuidanceLines,
+  setCredentialHintsFn,
+  type ExitCodeEntry,
+  type SignalEntry,
+  type ErrorGuidance,
+} from "./error-guidance.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -791,49 +804,6 @@ function classifyNetworkError(errMsg: string): "timeout" | "connection" | "unkno
   return "unknown";
 }
 
-interface ErrorGuidance {
-  causes: string[];
-  steps: (ghUrl: string) => string[];
-}
-
-const NETWORK_ERROR_GUIDANCE: Record<"timeout" | "connection" | "unknown", ErrorGuidance> = {
-  timeout: {
-    causes: [
-      "  • Slow or unstable internet connection",
-      "  • Download server not responding (possibly overloaded)",
-      "  • Firewall blocking or slowing the connection",
-    ],
-    steps: (ghUrl) => [
-      "  2. Verify combination exists: " + pc.cyan("spawn matrix"),
-      "  3. Wait a moment and retry",
-      "  4. Test URL directly: " + pc.dim(ghUrl),
-    ],
-  },
-  connection: {
-    causes: [
-      "  • No internet connection",
-      "  • Firewall or proxy blocking GitHub access",
-      "  • DNS not resolving GitHub's domain",
-    ],
-    steps: () => [
-      "  2. Test github.com access in your browser",
-      "  3. Check firewall/VPN settings",
-      "  4. Try disabling proxy temporarily",
-    ],
-  },
-  unknown: {
-    causes: [
-      "  • Internet connection issue",
-      "  • GitHub's servers temporarily down",
-    ],
-    steps: (ghUrl) => [
-      "  2. Verify combination exists: " + pc.cyan("spawn matrix"),
-      "  3. Wait a moment and retry",
-      "  4. Test URL directly: " + pc.dim(ghUrl),
-    ],
-  },
-};
-
 function reportDownloadError(ghUrl: string, err: unknown): never {
   p.log.error("Script download failed");
   const errMsg = getErrorMessage(err);
@@ -889,162 +859,8 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
   return lines;
 }
 
-function buildDashboardHint(dashboardUrl?: string): string {
-  return dashboardUrl
-    ? `  - Check your dashboard: ${pc.cyan(dashboardUrl)}`
-    : "  - Check your cloud provider dashboard to stop or delete any unused servers";
-}
-
-interface SignalEntry {
-  header: string;
-  causes: string[];
-  includeDashboard: boolean;
-}
-
-interface ExitCodeEntry {
-  header: string;
-  lines: string[];
-  includeDashboard: boolean;
-  specialHandling?: (cloud: string, authHint?: string, dashboardUrl?: string) => string[];
-}
-
-const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
-  130: {
-    header: "Script was interrupted (Ctrl+C).",
-    lines: ["Note: If a server was already created, it may still be running."],
-    includeDashboard: true,
-  },
-  137: {
-    header: "Script was killed (likely by the system due to timeout or out of memory).",
-    lines: [
-      "  - The server may not have enough RAM for this agent",
-      "  - Try a larger instance size or a different cloud provider",
-    ],
-    includeDashboard: true,
-  },
-  255: {
-    header: "SSH connection failed. Common causes:",
-    lines: [
-      "  - Server is still booting (wait a moment and retry)",
-      "  - Firewall blocking SSH port 22",
-      "  - Server was terminated before the session started",
-    ],
-    includeDashboard: false,
-  },
-  127: {
-    header: "A required command was not found. Check that these are installed:",
-    lines: ["  - bash, curl, ssh, jq"],
-    includeDashboard: false,
-    specialHandling: (cloud) => [`  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`],
-  },
-  126: {
-    header: "A command was found but could not be executed (permission denied).",
-    lines: [
-      "  - A downloaded binary may lack execute permissions",
-      "  - The script may require root/sudo access",
-      `  - Report it if this persists: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`,
-    ],
-    includeDashboard: false,
-  },
-  2: {
-    header: "Shell syntax or argument error. This is likely a bug in the script.",
-    lines: [`  Report it at: ${pc.cyan(`https://github.com/OpenRouterTeam/spawn/issues`)}`],
-    includeDashboard: false,
-  },
-  1: {
-    header: "Common causes:",
-    lines: [],
-    includeDashboard: true,
-    specialHandling: (cloud, authHint) => [
-      ...credentialHints(cloud, authHint),
-      "  - Cloud provider API error (quota, rate limit, or region issue)",
-      "  - Server provisioning failed (try again or pick a different region)",
-    ],
-  },
-};
-
-const SIGNAL_GUIDANCE: Record<string, SignalEntry> = {
-  SIGKILL: {
-    header: "Script was forcibly killed (SIGKILL). Common causes:",
-    causes: [
-      "  - Out of memory (OOM killer terminated the process)",
-      "  - The server may not have enough RAM for this agent",
-      "  - Try a larger instance size or a different cloud provider",
-    ],
-    includeDashboard: true,
-  },
-  SIGTERM: {
-    header: "Script was terminated (SIGTERM). Common causes:",
-    causes: [
-      "  - The process was stopped by the system or a supervisor",
-      "  - Server shutdown or reboot in progress",
-      "  - Cloud provider terminated the instance (spot/preemptible instance or billing issue)",
-    ],
-    includeDashboard: true,
-  },
-  SIGINT: {
-    header: "Script was interrupted (Ctrl+C).",
-    causes: [
-      "Note: If a server was already created, it may still be running.",
-    ],
-    includeDashboard: true,
-  },
-  SIGHUP: {
-    header: "Script lost its terminal connection (SIGHUP). Common causes:",
-    causes: [
-      "  - SSH session disconnected or timed out",
-      "  - Terminal window was closed during execution",
-      "  - Try using a more stable connection or a terminal multiplexer (tmux/screen)",
-    ],
-    includeDashboard: false,
-  },
-};
-
-export function getSignalGuidance(signal: string, dashboardUrl?: string): string[] {
-  const entry = SIGNAL_GUIDANCE[signal];
-  if (entry) {
-    const lines = [entry.header, ...entry.causes];
-    if (entry.includeDashboard) lines.push(buildDashboardHint(dashboardUrl));
-    return lines;
-  }
-  return [
-    `Script was killed by signal ${signal}.`,
-    "  - The process was terminated by the system or another process",
-    buildDashboardHint(dashboardUrl),
-  ];
-}
-
-function optionalDashboardLine(dashboardUrl?: string): string[] {
-  return dashboardUrl ? [`  - Check your dashboard: ${pc.cyan(dashboardUrl)}`] : [];
-}
-
-export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string, dashboardUrl?: string): string[] {
-  const entry = exitCode !== null ? EXIT_CODE_GUIDANCE[exitCode] : null;
-
-  if (!entry) {
-    // Default/unknown exit code
-    return [
-      `${pc.bold("Common causes:")}`,
-      ...credentialHints(cloud, authHint, "Missing"),
-      "  - Cloud provider API rate limit or quota exceeded",
-      "  - Missing local dependencies (SSH, curl, jq)",
-      ...optionalDashboardLine(dashboardUrl),
-    ];
-  }
-
-  const lines = [pc.bold(entry.header), ...entry.lines];
-
-  // Apply special handling if defined for this exit code
-  if (entry.specialHandling) {
-    lines.push(...entry.specialHandling(cloud, authHint, dashboardUrl));
-  }
-
-  if (entry.includeDashboard) {
-    lines.push(buildDashboardHint(dashboardUrl));
-  }
-
-  return lines;
-}
+// Register credentialHints function with error-guidance module to avoid circular dependency
+setCredentialHintsFn(credentialHints);
 
 export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
   if (!prompt) return `spawn ${agent} ${cloud}`;
@@ -1068,8 +884,8 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   const signal = signalMatch ? signalMatch[1] : null;
 
   const lines = signal
-    ? getSignalGuidance(signal, dashboardUrl)
-    : getScriptFailureGuidance(exitCode, cloud, authHint, dashboardUrl);
+    ? getSignalGuidanceLines(signal, dashboardUrl)
+    : getExitCodeGuidanceLines(exitCode, cloud, authHint, dashboardUrl);
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
@@ -2188,4 +2004,15 @@ export function cmdHelp(): void {
     getHelpFooterSection(),
   ];
   console.log(sections.join("\n"));
+}
+
+// ── Re-exports for backward compatibility ──────────────────────────────────────
+
+// These functions are now in error-guidance.ts but re-exported here for backward compatibility
+export function getSignalGuidance(signal: string, dashboardUrl?: string): string[] {
+  return getSignalGuidanceLines(signal, dashboardUrl);
+}
+
+export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string, dashboardUrl?: string): string[] {
+  return getExitCodeGuidanceLines(exitCode, cloud, authHint, dashboardUrl);
 }
