@@ -192,20 +192,38 @@ print(json.dumps(providers))
     log "Key preflight: Requesting keys for: ${MISSING_KEY_PROVIDERS}"
 
     # Fire-and-forget — don't block the QA cycle, but log failures
-    (
-        local http_code
-        http_code=$(curl -s -o /dev/stderr -w '%{http_code}' --max-time 10 \
-            -X POST "${key_server_url}/request-batch" \
-            -H "Authorization: Bearer ${key_server_secret}" \
-            -H "Content-Type: application/json" \
-            -d "{\"providers\": ${providers_json}}" 2>/dev/null) || http_code="000"
-        case "${http_code}" in
-            2*) ;; # success
-            000) log "Key preflight: WARNING — key-server unreachable at ${key_server_url}" ;;
-            401) log "Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)" ;;
-            *)   log "Key preflight: WARNING — key-server returned HTTP ${http_code}" ;;
-        esac
-    ) &
+    # Use positional parameters to safely pass variables to subshell (prevents command injection)
+    if command -v timeout &>/dev/null; then
+        # Linux/GNU timeout available - wrap the subshell with timeout
+        timeout 15s bash -c '
+            http_code=$(curl -s -o /dev/stderr -w "%{http_code}" --max-time 10 \
+                -X POST "$1/request-batch" \
+                -H "Authorization: Bearer $2" \
+                -H "Content-Type: application/json" \
+                -d "{\"providers\": $3}" 2>/dev/null) || http_code="000"
+            case "${http_code}" in
+                2*) ;; # success
+                000) printf "[%s] [keys] Key preflight: WARNING — key-server unreachable at %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "$1" ;;
+                401) printf "[%s] [keys] Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)\n" "$(date +"%Y-%m-%d %H:%M:%S")" ;;
+                *)   printf "[%s] [keys] Key preflight: WARNING — key-server returned HTTP %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "${http_code}" ;;
+            esac
+        ' -- "${key_server_url}" "${key_server_secret}" "${providers_json}" &
+    else
+        # macOS fallback - no timeout command, rely on curl --max-time only
+        (
+            http_code=$(curl -s -o /dev/stderr -w '%{http_code}' --max-time 10 \
+                -X POST "${key_server_url}/request-batch" \
+                -H "Authorization: Bearer ${key_server_secret}" \
+                -H "Content-Type: application/json" \
+                -d "{\"providers\": ${providers_json}}" 2>/dev/null) || http_code="000"
+            case "${http_code}" in
+                2*) ;; # success
+                000) printf "[%s] [keys] Key preflight: WARNING — key-server unreachable at %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "${key_server_url}" ;;
+                401) printf "[%s] [keys] Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)\n" "$(date +"%Y-%m-%d %H:%M:%S")" ;;
+                *)   printf "[%s] [keys] Key preflight: WARNING — key-server returned HTTP %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "${http_code}" ;;
+            esac
+        ) &
+    fi
 }
 
 # Invalidate a cloud provider's stored key by deleting its config file
@@ -214,7 +232,8 @@ invalidate_cloud_key() {
     local provider="${1}"
 
     # Validate provider name to prevent path traversal
-    if [[ ! "${provider}" =~ ^[a-z0-9][a-z0-9._-]{0,63}$ ]]; then
+    # Only allow lowercase letters, numbers, hyphens, and underscores (no dots to prevent ..)
+    if [[ ! "${provider}" =~ ^[a-z0-9][a-z0-9_-]{0,63}$ ]]; then
         log "invalidate_cloud_key: invalid provider name: ${provider}"
         return 1
     fi
