@@ -33,9 +33,9 @@ agent_configure() {
 agent_launch_cmd() {
     if [[ -n "${SPAWN_PROMPT:-}" ]]; then
         local escaped; escaped=$(printf '%q' "${SPAWN_PROMPT}")
-        printf 'source ~/.bashrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude -p %s' "${escaped}"
+        printf 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude -p %s' "${escaped}"
     else
-        echo 'source ~/.bashrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
+        echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
     fi
 }
 

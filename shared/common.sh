@@ -1409,7 +1409,15 @@ _spawn_inject_env_vars() {
     agent_env_vars > "${env_temp}"
 
     cloud_upload "${env_temp}" "/tmp/env_config"
-    cloud_run "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
+
+    # Write env vars to ~/.spawnrc instead of inlining into .bashrc/.zshrc.
+    # Ubuntu's default .bashrc has an interactive-shell guard that exits early —
+    # anything appended after the guard is never loaded when SSH runs a command string.
+    cloud_run "cp /tmp/env_config ~/.spawnrc && chmod 600 ~/.spawnrc && rm /tmp/env_config"
+
+    # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc"
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc"
 
     offer_github_auth cloud_run
 }
