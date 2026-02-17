@@ -7,6 +7,19 @@
 // Only lowercase alphanumeric, hyphens, and underscores allowed
 const IDENTIFIER_PATTERN = /^[a-z0-9_-]+$/;
 
+// IPv4 address pattern (simple validation)
+const IPV4_PATTERN = /^(\d{1,3}\.){3}\d{1,3}$/;
+
+// IPv6 address pattern (simplified - catches most valid IPv6 addresses)
+const IPV6_PATTERN = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+
+// Unix username pattern: starts with lowercase letter or underscore,
+// followed by lowercase letters, digits, underscores, hyphens, optional $ suffix
+const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]*\$?$/;
+
+// Special connection sentinel values (not actual IPs)
+const CONNECTION_SENTINELS = ["sprite-console", "fly-ssh", "daytona-sandbox"];
+
 /**
  * Validates an identifier (agent or cloud name) against security constraints.
  * SECURITY-CRITICAL: Prevents path traversal, command injection, and URL injection.
@@ -122,6 +135,148 @@ export function validateScriptContent(script: string): void {
       "  2. Run 'spawn matrix' to verify the combination is marked as implemented\n" +
       "  3. Wait a few moments (the script may be deploying) and retry\n" +
       "  4. If the issue persists, report it: https://github.com/OpenRouterTeam/spawn/issues"
+    );
+  }
+}
+
+/**
+ * Validates a connection IP address or special sentinel value.
+ * SECURITY-CRITICAL: Prevents command injection via malicious IP addresses in history.
+ *
+ * Allows:
+ * - Valid IPv4 addresses (e.g., "192.168.1.1")
+ * - Valid IPv6 addresses (e.g., "::1", "2001:db8::1")
+ * - Special sentinel values ("sprite-console", "fly-ssh", "daytona-sandbox")
+ *
+ * @param ip - The IP address or sentinel to validate
+ * @throws Error if validation fails
+ */
+export function validateConnectionIP(ip: string): void {
+  if (!ip || ip.trim() === "") {
+    throw new Error("Connection IP is required but was empty");
+  }
+
+  // Allow special sentinel values
+  if (CONNECTION_SENTINELS.includes(ip)) {
+    return;
+  }
+
+  // Validate as IPv4 (with octet range check) or IPv6
+  const isIPv4 = IPV4_PATTERN.test(ip);
+  const isIPv6 = IPV6_PATTERN.test(ip);
+
+  if (isIPv4) {
+    // Additional check: ensure each octet is 0-255
+    const octets = ip.split(".");
+    const validOctets = octets.every((octet) => {
+      const num = parseInt(octet, 10);
+      return num >= 0 && num <= 255;
+    });
+    if (!validOctets) {
+      throw new Error(
+        `Invalid connection IP address: "${ip}"\n\n` +
+        `IPv4 addresses must have octets in the range 0-255.\n\n` +
+        `Your spawn history file may be corrupted or tampered with.\n` +
+        `To fix: remove the invalid entry from ~/.spawn/history.json`
+      );
+    }
+    return;
+  }
+
+  if (isIPv6) {
+    return;
+  }
+
+  // Neither IPv4 nor IPv6
+  throw new Error(
+    `Invalid connection IP address: "${ip}"\n\n` +
+    `Expected a valid IPv4 or IPv6 address, or one of: ${CONNECTION_SENTINELS.join(", ")}\n\n` +
+    `Your spawn history file may be corrupted or tampered with.\n` +
+    `To fix: remove the invalid entry from ~/.spawn/history.json`
+  );
+}
+
+/**
+ * Validates a Unix username.
+ * SECURITY-CRITICAL: Prevents command injection via malicious usernames in history.
+ *
+ * Pattern: lowercase letters, digits, underscores, hyphens, optional $ suffix
+ * Examples: root, ubuntu, user-123, _system, deploy$
+ *
+ * @param username - The username to validate
+ * @throws Error if validation fails
+ */
+export function validateUsername(username: string): void {
+  if (!username || username.trim() === "") {
+    throw new Error("Username is required but was empty");
+  }
+
+  if (username.length > 32) {
+    throw new Error(
+      `Username is too long: "${username}" (${username.length} characters, maximum is 32)\n\n` +
+      `Your spawn history file may be corrupted or tampered with.\n` +
+      `To fix: remove the invalid entry from ~/.spawn/history.json`
+    );
+  }
+
+  if (!USERNAME_PATTERN.test(username)) {
+    throw new Error(
+      `Invalid username: "${username}"\n\n` +
+      `Unix usernames must:\n` +
+      `  • Start with a lowercase letter or underscore\n` +
+      `  • Contain only lowercase letters, digits, underscores, hyphens\n` +
+      `  • Optionally end with $ (for system accounts)\n\n` +
+      `Examples of valid usernames: root, ubuntu, user-123, _system\n\n` +
+      `Your spawn history file may be corrupted or tampered with.\n` +
+      `To fix: remove the invalid entry from ~/.spawn/history.json`
+    );
+  }
+}
+
+/**
+ * Validates a server identifier (server_id or server_name from cloud provider).
+ * SECURITY-CRITICAL: Prevents command injection via malicious server IDs in history.
+ *
+ * Pattern: alphanumeric, hyphens, underscores, dots, colons (for namespaced IDs)
+ * Examples: hetzner-12345, i-0abcd1234, my-server.example, sprite:my-vm
+ *
+ * @param id - The server identifier to validate
+ * @throws Error if validation fails
+ */
+export function validateServerIdentifier(id: string): void {
+  if (!id || id.trim() === "") {
+    throw new Error("Server identifier is required but was empty");
+  }
+
+  if (id.length > 128) {
+    throw new Error(
+      `Server identifier is too long: "${id}" (${id.length} characters, maximum is 128)\n\n` +
+      `Your spawn history file may be corrupted or tampered with.\n` +
+      `To fix: remove the invalid entry from ~/.spawn/history.json`
+    );
+  }
+
+  // Prevent path traversal patterns (check BEFORE general pattern validation)
+  if (id.includes("..") || id.startsWith("/") || id.startsWith("\\")) {
+    throw new Error(
+      `Invalid server identifier: "${id}"\n\n` +
+      `Server identifiers cannot contain path-like patterns (/, \\, ..)\n\n` +
+      `Your spawn history file may be corrupted or tampered with.\n` +
+      `To fix: remove the invalid entry from ~/.spawn/history.json`
+    );
+  }
+
+  // Allowlist: alphanumeric, hyphens, underscores, dots, colons
+  // Reject shell metacharacters: ; & | $ ( ) ` ' " \ < > space newline
+  const serverIdPattern = /^[a-zA-Z0-9_.-]+$/;
+  if (!serverIdPattern.test(id)) {
+    throw new Error(
+      `Invalid server identifier: "${id}"\n\n` +
+      `Server identifiers can only contain:\n` +
+      `  • Letters and digits (a-z, A-Z, 0-9)\n` +
+      `  • Hyphens (-), underscores (_), dots (.)\n\n` +
+      `Your spawn history file may be corrupted or tampered with.\n` +
+      `To fix: remove the invalid entry from ~/.spawn/history.json`
     );
   }
 }

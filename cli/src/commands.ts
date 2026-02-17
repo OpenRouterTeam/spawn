@@ -17,8 +17,8 @@ import {
 } from "./manifest.js";
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
-import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
-import { saveSpawnRecord, filterHistory, clearHistory, markRecordDeleted, getActiveServers, type SpawnRecord, type VMConnection } from "./history.js";
+import { validateIdentifier, validateScriptContent, validatePrompt, validateConnectionIP, validateUsername, validateServerIdentifier } from "./security.js";
+import { saveSpawnRecord, filterHistory, clearHistory, markRecordDeleted, getActiveServers, getHistoryPath, type SpawnRecord, type VMConnection } from "./history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE, type ExitCodeEntry, type SignalEntry } from "./guidance-data.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -1533,6 +1533,19 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
   // Determine the identifier to pass to destroy_server
   const id = connection.server_id || connection.server_name || "";
 
+  // SECURITY: Validate server ID to prevent command injection
+  // This protects against corrupted or tampered history files
+  try {
+    validateServerIdentifier(id);
+  } catch (err) {
+    throw new Error(
+      `Invalid server identifier in history: ${getErrorMessage(err)}\n\n` +
+      `Your spawn history file may be corrupted or tampered with.\n` +
+      `Location: ${getHistoryPath()}\n` +
+      `To fix: edit the file and remove the invalid entry, or run 'spawn clear-history'`
+    );
+  }
+
   // Cloud-specific auth + destroy mapping
   switch (cloud) {
     case "hetzner":
@@ -1872,6 +1885,22 @@ function runInteractiveCommand(
 
 /** Connect to an existing VM via SSH */
 async function cmdConnect(connection: VMConnection): Promise<void> {
+  // SECURITY: Validate all connection parameters before use
+  // This prevents command injection if the history file is corrupted or tampered with
+  try {
+    validateConnectionIP(connection.ip);
+    validateUsername(connection.user);
+    if (connection.server_name) {
+      validateServerIdentifier(connection.server_name);
+    }
+  } catch (err) {
+    p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
+    p.log.info(`Your spawn history file may be corrupted or tampered with.`);
+    p.log.info(`Location: ${getHistoryPath()}`);
+    p.log.info(`To fix: edit the file and remove the invalid entry, or run 'spawn clear-history'`);
+    process.exit(1);
+  }
+
   // Handle Sprite console connections
   if (connection.ip === "sprite-console" && connection.server_name) {
     p.log.step(`Connecting to sprite ${pc.bold(connection.server_name)}...`);
