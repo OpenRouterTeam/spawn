@@ -18,6 +18,7 @@ export interface SpawnRecord {
   agent: string;
   cloud: string;
   timestamp: string;
+  name?: string;
   prompt?: string;
   connection?: VMConnection;
 }

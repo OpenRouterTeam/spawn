@@ -453,9 +453,17 @@ get_resource_name() {
     local prompt_text="${2}"
     local resource_value="${!env_var_name}"
 
+    # First check platform-specific env var
     if [[ -n "${resource_value}" ]]; then
         log_info "Using ${prompt_text%:*} from environment: ${resource_value}"
         echo "${resource_value}"
+        return 0
+    fi
+
+    # Then check for SPAWN_NAME (set by CLI)
+    if [[ -n "${SPAWN_NAME:-}" ]]; then
+        log_info "Using spawn name: ${SPAWN_NAME}"
+        echo "${SPAWN_NAME}"
         return 0
     fi
 
