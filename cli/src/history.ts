@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join, resolve, isAbsolute } from "path";
 import { homedir } from "os";
+import { validateConnectionIP, validateUsername, validateServerIdentifier } from "./security.js";
 
 export interface VMConnection {
   ip: string;
@@ -93,6 +94,25 @@ export function mergeLastConnection(): void {
 
   try {
     const connData = JSON.parse(readFileSync(connPath, "utf-8")) as VMConnection;
+
+    // SECURITY: Validate connection data before merging into history
+    // This prevents malicious bash scripts from injecting invalid data
+    try {
+      validateConnectionIP(connData.ip);
+      validateUsername(connData.user);
+      if (connData.server_id) {
+        validateServerIdentifier(connData.server_id);
+      }
+      if (connData.server_name) {
+        validateServerIdentifier(connData.server_name);
+      }
+    } catch (err) {
+      // Log validation failure and skip merging
+      console.error(`Warning: Invalid connection data from bash script, skipping merge: ${err instanceof Error ? err.message : String(err)}`);
+      unlinkSync(connPath);
+      return;
+    }
+
     const history = loadHistory();
 
     if (history.length > 0) {
