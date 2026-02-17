@@ -757,7 +757,12 @@ cleanup_oauth_session() {
     local oauth_dir="${2}"
 
     if [[ -n "${server_pid}" ]]; then
-        kill "${server_pid}" 2>/dev/null || true
+        # Kill process group to catch any child processes (netcat listeners, etc)
+        kill -TERM "-${server_pid}" 2>/dev/null || kill "${server_pid}" 2>/dev/null || true
+        # Give it time to shut down gracefully
+        sleep 0.5
+        # Force kill if still running
+        kill -KILL "-${server_pid}" 2>/dev/null || true
         wait "${server_pid}" 2>/dev/null || true
     fi
 
@@ -906,12 +911,20 @@ _generate_csrf_state() {
 # Create temp directory with OAuth session files and CSRF state
 _init_oauth_session() {
     local oauth_dir
-    oauth_dir=$(mktemp -d)
+    oauth_dir=$(mktemp -d) || {
+        log_error "Failed to create temporary directory for OAuth session"
+        log_error "Check disk space and /tmp permissions"
+        return 1
+    }
 
     # SECURITY: Generate random CSRF state token (32 hex chars = 128 bits)
     local csrf_state
     csrf_state=$(_generate_csrf_state)
-    printf '%s' "${csrf_state}" > "${oauth_dir}/state"
+    printf '%s' "${csrf_state}" > "${oauth_dir}/state" || {
+        rm -rf "${oauth_dir}"
+        log_error "Failed to write OAuth state file"
+        return 1
+    }
     chmod 600 "${oauth_dir}/state"
 
     echo "${oauth_dir}"
@@ -1066,6 +1079,14 @@ generate_env_config() {
     for env_pair in "$@"; do
         local key="${env_pair%%=*}"
         local value="${env_pair#*=}"
+
+        # SECURITY: Validate environment variable names to prevent injection
+        # Only allow uppercase letters, numbers, and underscores (standard env var format)
+        if [[ ! "${key}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+            log_error "SECURITY: Invalid environment variable name rejected: ${key}"
+            continue
+        fi
+
         # Escape any single quotes in the value: replace ' with '\''
         local escaped_value="${value//\'/\'\\\'\'}"
         echo "export ${key}='${escaped_value}'"
