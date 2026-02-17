@@ -296,7 +296,10 @@ describe("cmdList prompt display", () => {
     consoleMocks.log.mockRestore();
     consoleMocks.error.mockRestore();
     process.env = originalEnv;
-    try { rmSync(testDir, { recursive: true, force: true }); } catch {}
+    try { rmSync(testDir, { recursive: true, force: true }); } catch (err: any) {
+      // Expected: ENOENT if directory doesn't exist.
+      if (err.code !== "ENOENT") console.error("Unexpected error removing test directory:", err);
+    }
   });
 
   describe("prompt preview in record rows", () => {

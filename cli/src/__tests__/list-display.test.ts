@@ -322,7 +322,10 @@ describe("cmdList output", () => {
     consoleMocks.error.mockRestore();
     processExitMock.mockRestore();
     process.env = originalEnv;
-    try { rmSync(testDir, { recursive: true, force: true }); } catch {}
+    try { rmSync(testDir, { recursive: true, force: true }); } catch (err: any) {
+      // Expected: ENOENT if directory doesn't exist.
+      if (err.code !== "ENOENT") console.error("Unexpected error removing test directory:", err);
+    }
   });
 
   it("should show empty state when no history exists", async () => {

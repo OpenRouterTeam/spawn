@@ -719,8 +719,11 @@ wait_for_oauth_code() {
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
         # Use python3 for float addition since bash arithmetic only handles integers
-        # If POLL_INTERVAL is 0.5, bash $(( )) would fail. Fallback keeps timeout working.
-        elapsed=$(python3 -c "print(int(${elapsed} + ${POLL_INTERVAL}))" 2>/dev/null || echo "$((elapsed + 1))")
+        # If POLL_INTERVAL is 0.5, bash $(( )) would fail. Fallback to integer increment.
+        if ! elapsed=$(python3 -c "print(int(${elapsed} + ${POLL_INTERVAL}))" 2>/dev/null); then
+            # Python failed (not installed or syntax error) - fallback to integer increment
+            elapsed=$((elapsed + 1))
+        fi
     done
 
     [[ -f "${code_file}" ]]

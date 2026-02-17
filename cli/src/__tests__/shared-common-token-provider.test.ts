@@ -62,13 +62,22 @@ function runBash(script: string): { exitCode: number; stdout: string; stderr: st
       }
     );
     let stderr = "";
-    try { stderr = readFileSync(stderrFile, "utf-8"); } catch {}
-    try { rmSync(stderrFile, { force: true }); } catch {}
+    try { stderr = readFileSync(stderrFile, "utf-8"); } catch (err: any) {
+      // Expected: ENOENT if stderr file wasn't created. Log unexpected errors.
+      if (err.code !== "ENOENT") console.error("Unexpected error reading stderr:", err);
+    }
+    try { rmSync(stderrFile, { force: true }); } catch (err: any) {
+      if (err.code !== "ENOENT") console.error("Unexpected error removing stderr file:", err);
+    }
     return { exitCode: 0, stdout: stdout.trim(), stderr: stderr.trim() };
   } catch (err: any) {
     let stderr = (err.stderr || "").trim();
-    try { stderr = readFileSync(stderrFile, "utf-8").trim() || stderr; } catch {}
-    try { rmSync(stderrFile, { force: true }); } catch {}
+    try { stderr = readFileSync(stderrFile, "utf-8").trim() || stderr; } catch (readErr: any) {
+      if (readErr.code !== "ENOENT") console.error("Unexpected error reading stderr:", readErr);
+    }
+    try { rmSync(stderrFile, { force: true }); } catch (rmErr: any) {
+      if (rmErr.code !== "ENOENT") console.error("Unexpected error removing stderr file:", rmErr);
+    }
     return {
       exitCode: err.status ?? 1,
       stdout: (err.stdout || "").trim(),

@@ -82,7 +82,10 @@ function runBashHeredoc(
   } finally {
     try {
       rmSync(tmpFile);
-    } catch {}
+    } catch (err: any) {
+      // Expected: ENOENT if file was already deleted.
+      if (err.code !== "ENOENT") console.error("Unexpected error removing temp file:", err);
+    }
   }
 }
 

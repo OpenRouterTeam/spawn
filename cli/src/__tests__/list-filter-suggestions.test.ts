@@ -230,7 +230,10 @@ describe("cmdList - filter suggestions", () => {
     global.fetch = originalFetch;
     restoreMocks(consoleMocks.log, consoleMocks.error);
     delete process.env.SPAWN_HOME;
-    try { rmSync(testDir, { recursive: true, force: true }); } catch {}
+    try { rmSync(testDir, { recursive: true, force: true }); } catch (err: any) {
+      // Expected: ENOENT if directory doesn't exist.
+      if (err.code !== "ENOENT") console.error("Unexpected error removing test directory:", err);
+    }
   });
 
   // ── Typo correction for agent filter ────────────────────────────────
