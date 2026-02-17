@@ -398,13 +398,14 @@ export function buildAgentPickerHints(manifest: Manifest): Record<string, string
   return hints;
 }
 
-// Prompt user to select an agent with hints
+// Prompt user to select an agent with hints and type-ahead filtering
 async function selectAgent(manifest: Manifest): Promise<string> {
   const agents = agentKeys(manifest);
   const agentHints = buildAgentPickerHints(manifest);
-  const agentChoice = await p.select({
-    message: "Select an agent",
+  const agentChoice = await p.autocomplete({
+    message: "Select an agent (type to filter)",
     options: mapToSelectOptions(agents, manifest.agents, agentHints),
+    placeholder: "Start typing to search...",
   });
   if (p.isCancel(agentChoice)) handleCancel();
   return agentChoice;
@@ -435,11 +436,12 @@ function getAndValidateCloudChoices(
   return { clouds: sortedClouds, hintOverrides, credCount };
 }
 
-// Prompt user to select a cloud from the sorted list
+// Prompt user to select a cloud from the sorted list with type-ahead filtering
 async function selectCloud(manifest: Manifest, cloudList: string[], hintOverrides: Record<string, string>): Promise<string> {
-  const cloudChoice = await p.select({
-    message: "Select a cloud provider",
+  const cloudChoice = await p.autocomplete({
+    message: "Select a cloud provider (type to filter)",
     options: mapToSelectOptions(cloudList, manifest.clouds, hintOverrides),
+    placeholder: "Start typing to search...",
   });
   if (p.isCancel(cloudChoice)) handleCancel();
   return cloudChoice;
