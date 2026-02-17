@@ -83,10 +83,11 @@ v = data.get(sys.argv[2], '') or data.get('api_key', '') or data.get('token', ''
 print(v)
 " "${config_file}" "${var_name}" 2>/dev/null)
         if [[ -n "${val}" ]]; then
-            # SECURITY: Validate value to prevent command injection attacks
-            # Block shell metacharacters that could be exploited in unquoted contexts
-            if [[ "${val}" =~ [\;\'\"\<\>\|\&\$\`\\\(\)] ]]; then
-                log "SECURITY: Malicious characters detected in config value for ${var_name}"
+            # SECURITY: Defense-in-depth — prevent malicious values from being misused
+            # downstream in unquoted expansions, eval contexts, or logging
+            # Block ALL non-alphanumeric except safe chars: - _ . / @ (for API keys/tokens)
+            if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@-]+$ ]]; then
+                log "SECURITY: Invalid characters in config value for ${var_name}"
                 return 1
             fi
             # SECURITY: Use printf to safely assign value without command injection risk
