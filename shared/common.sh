@@ -655,7 +655,16 @@ const server = http.createServer((req, res) => {
       setTimeout(() => { server.close(); process.exit(1); }, 500);
       return;
     }
-    fs.writeFileSync('${code_file}', parsed.query.code);
+    // SECURITY: Validate OAuth code format before writing to file
+    // OpenRouter OAuth codes are alphanumeric with hyphens/underscores, typically 32-64 chars
+    const code = String(parsed.query.code || '');
+    if (!/^[a-zA-Z0-9_-]{16,128}\$/.test(code)) {
+      res.writeHead(400, {'Content-Type':'text/html','Connection':'close'});
+      res.end('<html><body><h1>Invalid OAuth Code</h1><p>The authorization code format is invalid.</p></body></html>');
+      setTimeout(() => { server.close(); process.exit(1); }, 500);
+      return;
+    }
+    fs.writeFileSync('${code_file}', code);
     res.writeHead(200, {'Content-Type':'text/html','Connection':'close'});
     res.end(html);
     setTimeout(() => { server.close(); process.exit(0); }, 500);
