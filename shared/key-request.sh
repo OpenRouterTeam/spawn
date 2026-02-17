@@ -192,21 +192,38 @@ print(json.dumps(providers))
     log "Key preflight: Requesting keys for: ${MISSING_KEY_PROVIDERS}"
 
     # Fire-and-forget — don't block the QA cycle, but log failures
-    # Wrap in timeout to prevent leaked subprocess if curl hangs
+    # Wrap in timeout to prevent leaked subprocess if curl hangs (Linux only - macOS relies on curl --max-time)
     (
-        timeout 15s bash -c '
-            http_code=$(curl -s -o /dev/stderr -w "%{http_code}" --max-time 10 \
-                -X POST "'"${key_server_url}"'/request-batch" \
-                -H "Authorization: Bearer '"${key_server_secret}"'" \
-                -H "Content-Type: application/json" \
-                -d "{\"providers\": '"${providers_json}"'}" 2>/dev/null) || http_code="000"
-            case "${http_code}" in
-                2*) ;; # success
-                000) echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — key-server unreachable at '"${key_server_url}"'" ;;
-                401) echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)" ;;
-                *)   echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — key-server returned HTTP ${http_code}" ;;
-            esac
-        ' || true
+        if command -v timeout &>/dev/null; then
+            timeout 15s bash -c '
+                http_code=$(curl -s -o /dev/stderr -w "%{http_code}" --max-time 10 \
+                    -X POST "'"${key_server_url}"'/request-batch" \
+                    -H "Authorization: Bearer '"${key_server_secret}"'" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"providers\": '"${providers_json}"'}" 2>/dev/null) || http_code="000"
+                case "${http_code}" in
+                    2*) ;; # success
+                    000) echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — key-server unreachable at '"${key_server_url}"'" ;;
+                    401) echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)" ;;
+                    *)   echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — key-server returned HTTP ${http_code}" ;;
+                esac
+            ' || true
+        else
+            # macOS fallback - rely on curl --max-time only
+            bash -c '
+                http_code=$(curl -s -o /dev/stderr -w "%{http_code}" --max-time 10 \
+                    -X POST "'"${key_server_url}"'/request-batch" \
+                    -H "Authorization: Bearer '"${key_server_secret}"'" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"providers\": '"${providers_json}"'}" 2>/dev/null) || http_code="000"
+                case "${http_code}" in
+                    2*) ;; # success
+                    000) echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — key-server unreachable at '"${key_server_url}"'" ;;
+                    401) echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)" ;;
+                    *)   echo "[$(date +"%Y-%m-%d %H:%M:%S")] [keys] Key preflight: WARNING — key-server returned HTTP ${http_code}" ;;
+                esac
+            ' || true
+        fi
     ) &
 }
 
