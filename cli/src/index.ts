@@ -196,7 +196,7 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
     if (clouds.length > 5) {
       console.error(`  Run ${pc.cyan(`spawn ${resolvedAgent}`)} to see all ${clouds.length} clouds.`);
     }
-  } catch {
+  } catch (err) {
     // Manifest unavailable — skip cloud suggestions
   }
 }
