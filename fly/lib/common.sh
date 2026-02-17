@@ -354,9 +354,13 @@ wait_for_cloud_init() {
 run_server() {
     local cmd="$1"
     local timeout_secs="${2:-}"
+    # Prepend PATH so tools installed by wait_for_cloud_init are always available.
+    # Ubuntu's default .bashrc returns early for non-interactive shells, so
+    # "source ~/.bashrc && bun ..." fails — bun's PATH line is never reached.
+    local full_cmd="export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\" && $cmd"
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
-    escaped_cmd=$(printf '%q' "$cmd")
+    escaped_cmd=$(printf '%q' "$full_cmd")
 
     local fly_cmd
     fly_cmd=$(_get_fly_cmd)
