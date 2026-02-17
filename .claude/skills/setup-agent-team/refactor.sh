@@ -412,24 +412,13 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 
 Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cycle end.
 
-## Monitor Loop (CRITICAL)
-
-**CRITICAL**: After spawning all teammates, you MUST enter an infinite monitoring loop.
-
-1. Call \`TaskList\` to check task status
-2. Process any completed tasks or teammate messages
-3. Call \`Bash("sleep 15")\` to wait before next check
-4. **REPEAT** steps 1-3 until all teammates report done or time budget reached
-
-**The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include at minimum: \`TaskList\` + \`Bash("sleep 15")\`.
-
-Keep looping until:
-- All tasks are completed OR
-- Time budget is reached (10 min warn, 12 min shutdown, 15 min force)
-
 ## Team Coordination
 
-You use **spawn teams**. Messages arrive AUTOMATICALLY between turns.
+You use **spawn teams**. Teammate messages are delivered to you AUTOMATICALLY as new conversation turns — you do NOT need to poll or sleep. Just respond to each message as it arrives, call \`TaskList\` to check progress, and take action (approve plans, send messages, shutdown teammates).
+
+After spawning all teammates, call \`TaskList\` once to confirm tasks are created, then simply wait — teammate messages will keep your session alive. Each message is a new turn.
+
+When all tasks are completed or time budget is reached (20 min warn, 23 min shutdown, 25 min force), begin shutdown.
 
 ## Lifecycle Management
 

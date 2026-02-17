@@ -410,16 +410,11 @@ All service scripts use **agent teams**, not subagents. Key differences:
 
 ### Team coordination pattern for `claude -p` mode
 
-In `claude -p` (print) mode, the session ends when no tool call is made. The lead must stay alive by always including a tool call. **The correct monitoring loop is:**
+In `claude -p` (print) mode, teammate messages are delivered AUTOMATICALLY as new conversation turns. The team lead does NOT need to poll or sleep — each incoming message is a new turn that keeps the session alive.
 
-```
-1. Call TaskList to check task status
-2. Process any teammate messages (they arrive automatically as user turns)
-3. If tasks still pending, call Bash("sleep 15") to yield, then go back to step 1
-4. Once all tasks complete, shutdown teammates and exit
-```
+After spawning all teammates, call `TaskList` once to confirm tasks are created, then simply wait. When a teammate message arrives, respond to it, call `TaskList` to check overall progress, and take action (approve plans, send messages, shutdown teammates).
 
-**EVERY iteration MUST call TaskList.** Looping on `sleep` alone blocks message delivery without checking progress. This is the #1 cause of stuck cycles.
+**Do NOT use `Bash("sleep")` loops.** The sleep-based polling pattern wastes tokens and can cause the model to get stuck in a sleep loop without processing messages.
 
 ### Spawning teammates correctly
 

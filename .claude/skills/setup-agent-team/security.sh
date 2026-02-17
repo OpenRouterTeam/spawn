@@ -200,18 +200,13 @@ Complete within 12 minutes. At 9 min wrap up, at 11 min shutdown, at 12 min forc
    `gh issue edit ISSUE_NUM_PLACEHOLDER --repo OpenRouterTeam/spawn --remove-label "pending-review" --remove-label "under-review" --add-label "in-progress"`
 2. Set up worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER -b team-building/issue-ISSUE_NUM_PLACEHOLDER origin/main`
 3. Spawn implementer (opus) → spawn reviewer (opus)
-4. **Monitor Loop (CRITICAL)**: After spawning teammates, enter an infinite monitoring loop:
-   - Call \`TaskList\` to check task status
-   - Process any completed tasks or teammate messages
-   - Call \`Bash("sleep 15")\` to wait before next check
-   - **REPEAT** until both teammates report done or time budget reached (9/11/12 min)
-   - **The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include: \`TaskList\` + \`Bash("sleep 15")\`
+4. Wait for teammates — their messages arrive AUTOMATICALLY as new conversation turns. Respond to each, call \`TaskList\` to check progress, approve/reject plans.
 5. When both report: if merged, close issue; if issues found, comment on issue
 6. Shutdown teammates, clean up worktree, TeamDelete, exit
 
 ## Team Coordination
 
-Messages arrive AUTOMATICALLY. Keep looping with tool calls until work is complete.
+Teammate messages are delivered to you AUTOMATICALLY as new conversation turns — you do NOT need to poll or sleep. Just respond to each message as it arrives and call \`TaskList\` to check progress. Each message is a new turn that keeps your session alive.
 
 ## Safety
 
@@ -427,21 +422,11 @@ Skip if >5 open PRs. Otherwise spawn in parallel:
 2. **code-scanner** (Sonnet) — Same for .ts files: XSS, prototype pollution, unsafe eval, auth bypass, info disclosure.
    File CRITICAL/HIGH as individual issues (dedup first). Report findings.
 
-## Step 5 — Monitor Loop (CRITICAL)
+## Step 5 — Wait for Teammates
 
-**CRITICAL**: After spawning all teammates, you MUST enter an infinite monitoring loop.
+After spawning all teammates, call \`TaskList\` once to confirm tasks are created. Then simply wait — teammate messages arrive AUTOMATICALLY as new conversation turns. Respond to each message, call \`TaskList\` to check progress, and take action.
 
-**Example monitoring loop structure**:
-1. Call \`TaskList\` to check task status
-2. Process any completed tasks or teammate messages
-3. Call \`Bash("sleep 15")\` to wait before next check
-4. **REPEAT** steps 1-3 until all teammates report done
-
-**The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include at minimum: \`TaskList\` + \`Bash("sleep 15")\`.
-
-Keep looping until:
-- All tasks are completed OR
-- Time budget is reached (see timeout warnings at 25/29/30 min)
+When all tasks are completed or time budget is reached (25/29/30 min), proceed to summary.
 
 ## Step 6 — Summary + Slack
 
@@ -503,16 +488,9 @@ CRITICAL/HIGH → individual issues:
 
 MEDIUM/LOW → single batch issue with severity/file/description table.
 
-## Monitor Loop (CRITICAL)
+## Team Coordination
 
-**CRITICAL**: After spawning all teammates, enter an infinite monitoring loop:
-
-1. Call \`TaskList\` to check task status
-2. Process any completed tasks or teammate messages
-3. Call \`Bash("sleep 15")\` to wait before next check
-4. **REPEAT** until all teammates report done or time budget reached (12/14/15 min)
-
-**The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include: \`TaskList\` + \`Bash("sleep 15")\`.
+Teammate messages are delivered to you AUTOMATICALLY as new conversation turns — you do NOT need to poll or sleep. After spawning, call \`TaskList\` once, then wait for messages. Respond to each, call \`TaskList\` to check progress. When all done or time budget reached (12/14/15 min), proceed to shutdown.
 
 ## Slack Notification
 
