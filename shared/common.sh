@@ -2567,9 +2567,13 @@ ensure_api_token_with_provider() {
         return 0
     fi
 
-    # Try config file
+    # Try config file (validate if test function provided, fall through to prompt on failure)
     if _load_token_from_config "${config_file}" "${env_var_name}" "${provider_name}"; then
-        return 0
+        if [[ -z "${test_func}" ]] || "${test_func}" 2>/dev/null; then
+            return 0
+        fi
+        log_warn "Saved ${provider_name} token is invalid or expired, requesting a new one..."
+        unset "${env_var_name}"
     fi
 
     # Prompt for new token
