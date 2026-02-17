@@ -303,7 +303,12 @@ create_ovh_instance() {
     fi
 
     # Extract instance ID
-    OVH_INSTANCE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])")
+    OVH_INSTANCE_ID=$(echo "$response" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])" 2>/dev/null)
+    if [[ -z "$OVH_INSTANCE_ID" ]]; then
+        log_error "Failed to extract instance ID from API response"
+        log_error "Response: $response"
+        return 1
+    fi
     export OVH_INSTANCE_ID
 
     log_info "Instance created: ID=$OVH_INSTANCE_ID"
@@ -341,6 +346,11 @@ destroy_ovh_instance() {
     fi
 
     log_info "Instance $instance_id destroyed"
+}
+
+# Standardized destroy_server wrapper (for compatibility with cross-cloud scripts)
+destroy_server() {
+    destroy_ovh_instance "$@"
 }
 
 # OVH uses configurable SSH user (ubuntu for newer images, root for older)

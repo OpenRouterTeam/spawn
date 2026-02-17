@@ -37,7 +37,7 @@ function runCli(
       cwd: PROJECT_ROOT,
       env: {
         // Start with clean env to avoid bun test's NODE_ENV=test leaking
-        PATH: process.env.PATH,
+        PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`,
         HOME: process.env.HOME,
         SHELL: process.env.SHELL,
         TERM: process.env.TERM || "xterm",

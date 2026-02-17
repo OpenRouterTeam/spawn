@@ -304,17 +304,20 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
         const hasCredsMarker = hasCloudCredentials(manifest.clouds[c].auth) ? " (ready)" : "";
         return `spawn ${agent} ${c}${hasCredsMarker}`;
       });
-      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these instead:`);
+      console.log();
+      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these:`);
       for (const cmd of examples) {
         p.log.info(`  ${pc.cyan(cmd)}`);
       }
       if (availableClouds.length > 3) {
-        p.log.info(`Run ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
+        p.log.info(`\nRun ${pc.cyan(`spawn ${agent}`)} to see all ${availableClouds.length} options.`);
       }
       if (credCount > 0) {
+        console.log();
         p.log.info(`${pc.green("ready")} = credentials already set`);
       }
     } else {
+      console.log();
       p.log.info(`This agent has no implemented cloud providers yet.`);
       p.log.info(`Run ${pc.cyan("spawn matrix")} to see the full availability matrix.`);
     }
@@ -1143,8 +1146,12 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
       timestamp: new Date().toISOString(),
       ...(prompt ? { prompt } : {}),
     });
-  } catch {
+  } catch (err) {
     // Non-fatal: don't block the spawn if history write fails
+    // Log for debugging but continue execution
+    if (debug) {
+      console.error(pc.dim(`Warning: Failed to save spawn record: ${getErrorMessage(err)}`));
+    }
   }
 
   const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl, debug);
@@ -1366,7 +1373,8 @@ export function formatRelativeTime(iso: string): string {
     // Fall back to absolute date for old entries
     const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     return date;
-  } catch {
+  } catch (err) {
+    // Invalid date format - return as-is
     return iso;
   }
 }
@@ -1378,7 +1386,8 @@ export function formatTimestamp(iso: string): string {
     const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
     return `${date} ${time}`;
-  } catch {
+  } catch (err) {
+    // Invalid date format - return as-is
     return iso;
   }
 }
@@ -1422,7 +1431,7 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
     if (cloudFilter) {
       await suggestFilterCorrection(cloudFilter, "-c", cloudKeys(manifest), resolveCloudKey, (k) => manifest.clouds[k].name, manifest);
     }
-  } catch {
+  } catch (err) {
     // Manifest unavailable -- skip suggestions
   }
 
@@ -1538,7 +1547,7 @@ async function resolveListFilters(
   let manifest: Manifest | null = null;
   try {
     manifest = await loadManifest();
-  } catch {
+  } catch (err) {
     // Manifest unavailable -- show raw keys
   }
 
@@ -1872,7 +1881,7 @@ export async function cmdLast(): Promise<void> {
   let manifest: Manifest | null = null;
   try {
     manifest = await loadManifest();
-  } catch {
+  } catch (err) {
     // Manifest unavailable -- show raw keys
   }
 
@@ -2074,6 +2083,11 @@ function printGroupedList(
 
 // ── Agent Info ─────────────────────────────────────────────────────────────────
 
+function buildCloudCommandHint(agentKey: string, cloudKey: string, manifest: Manifest): string {
+  const hint = `spawn ${agentKey} ${cloudKey}`;
+  return hasCloudCredentials(manifest.clouds[cloudKey].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
+}
+
 function printAgentCloudsList(
   sortedClouds: string[],
   manifest: Manifest,
@@ -2098,10 +2112,7 @@ function printAgentCloudsList(
   printGroupedList(
     byType,
     (c) => manifest.clouds[c].name,
-    (c) => {
-      const hint = `spawn ${agentKey} ${c}`;
-      return hasCloudCredentials(manifest.clouds[c].auth) ? `${hint}  ${pc.green("(credentials detected)")}` : hint;
-    }
+    (c) => buildCloudCommandHint(agentKey, c, manifest)
   );
   console.log();
 }
@@ -2137,6 +2148,19 @@ export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest):
   printAgentCloudsList(sortedClouds, manifest, agentKey, allClouds, credCount);
 }
 
+function checkAllCredentialsReady(auth: string): boolean {
+  const hasCreds = hasCloudCredentials(auth);
+  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
+  return hasOpenRouterKey && (hasCreds || auth.toLowerCase() === "none");
+}
+
+function printAuthVariableStatus(authVars: string[], cloudUrl?: string): void {
+  console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
+  for (let i = 0; i < authVars.length; i++) {
+    console.log(formatAuthVarLine(authVars[i], i === 0 ? cloudUrl : undefined));
+  }
+}
+
 /** Print quick-start instructions showing credential status and example spawn command */
 function printQuickStart(opts: {
   auth: string;
@@ -2144,24 +2168,16 @@ function printQuickStart(opts: {
   cloudUrl?: string;
   spawnCmd?: string;
 }): void {
-  const hasCreds = hasCloudCredentials(opts.auth);
-  const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
-  const allReady = hasOpenRouterKey && (hasCreds || opts.authVars.length === 0);
-
   console.log();
-  if (allReady && opts.spawnCmd) {
+
+  if (checkAllCredentialsReady(opts.auth) && opts.spawnCmd) {
     console.log(pc.bold("Quick start:") + "  " + pc.green("credentials detected -- ready to go"));
     console.log(`  ${pc.cyan(opts.spawnCmd)}`);
     return;
   }
 
   console.log(pc.bold("Quick start:"));
-  console.log(formatAuthVarLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"));
-  if (opts.authVars.length > 0) {
-    for (let i = 0; i < opts.authVars.length; i++) {
-      console.log(formatAuthVarLine(opts.authVars[i], i === 0 ? opts.cloudUrl : undefined));
-    }
-  }
+  printAuthVariableStatus(opts.authVars, opts.cloudUrl);
   if (opts.spawnCmd) {
     console.log(`  ${pc.cyan(opts.spawnCmd)}`);
   }
@@ -2244,7 +2260,7 @@ async function performUpdate(remoteVersion: string): Promise<void> {
     console.log();
     p.log.success(`Updated successfully!`);
     p.log.info("Run spawn again to use the new version.");
-  } catch {
+  } catch (err) {
     p.log.error("Auto-update failed. Update manually:");
     console.log();
     console.log(`  ${pc.cyan(INSTALL_CMD)}`);
