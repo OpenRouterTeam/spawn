@@ -27,11 +27,18 @@ readonly FLY_API_BASE="https://api.machines.dev/v1"
 SPAWN_DASHBOARD_URL="https://fly.io/dashboard"
 
 # Centralized curl wrapper for Fly.io Machines API
+# Handles both token formats:
+#   - FlyV1 tokens (from dashboard/fly tokens create): Authorization: FlyV1 fm2_...
+#   - Legacy tokens (from fly auth token): Authorization: Bearer <token>
 fly_api() {
     local method="$1"
     local endpoint="$2"
     local body="${3:-}"
-    generic_cloud_api "$FLY_API_BASE" "$FLY_API_TOKEN" "$method" "$endpoint" "$body"
+    if [[ "$FLY_API_TOKEN" == FlyV1\ * ]]; then
+        generic_cloud_api_custom_auth "$FLY_API_BASE" "$method" "$endpoint" "$body" 3 -H "Authorization: $FLY_API_TOKEN"
+    else
+        generic_cloud_api "$FLY_API_BASE" "$FLY_API_TOKEN" "$method" "$endpoint" "$body"
+    fi
 }
 
 # Resolve the flyctl CLI command name ("fly" or "flyctl")
