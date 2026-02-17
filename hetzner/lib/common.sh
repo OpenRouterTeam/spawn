@@ -66,7 +66,7 @@ ensure_hcloud_token() {
             log_info "Using hcloud CLI (context: $(hcloud context active))"
             # Export token from CLI context for API fallback compatibility
             if [[ -z "${HCLOUD_TOKEN:-}" ]]; then
-                HCLOUD_TOKEN=$(hcloud context active 2>/dev/null | xargs -I{} grep -A1 "{}" ~/.config/hcloud/cli.toml 2>/dev/null | grep token | sed 's/.*= *"\(.*\)"/\1/' || true)
+                HCLOUD_TOKEN=$(hcloud context active 2>/dev/null | xargs -I{} grep -A1 '{}' ~/.config/hcloud/cli.toml 2>/dev/null | grep token | sed 's/.*= *"\(.*\)"/\1/' || true)
                 if [[ -n "${HCLOUD_TOKEN:-}" ]]; then
                     export HCLOUD_TOKEN
                 fi
