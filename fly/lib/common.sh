@@ -407,3 +407,15 @@ for a in apps:
     print(f'{name:<25} {aid:<20} {status:<12} {network:<20}')
 " <<< "$response"
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_fly_cli; ensure_fly_token; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { wait_for_cloud_init; }
+cloud_run() { run_server "$1"; }
+cloud_upload() { upload_file "$1" "$2"; }
+cloud_interactive() { interactive_session "$1"; }
+cloud_label() { echo "Fly.io machine"; }

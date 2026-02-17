@@ -1,8 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
+# Source common functions - try local file first, fall back to remote
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/lib/common.sh" ]]; then
+if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
     source "$SCRIPT_DIR/lib/common.sh"
 else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/fly/lib/common.sh)"
@@ -11,34 +12,21 @@ fi
 log_info "Continue on Fly.io"
 echo ""
 
-ensure_fly_cli
-ensure_fly_token
+agent_install() {
+    install_agent "Continue CLI" "npm install -g @continuedev/cli" cloud_run
+}
 
-SERVER_NAME=$(get_server_name)
-create_server "${SERVER_NAME}"
-wait_for_cloud_init
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-log_step "Installing Continue CLI..."
-run_server "npm install -g @continuedev/cli"
+agent_configure() {
+    setup_continue_config "${OPENROUTER_API_KEY}" cloud_upload cloud_run
+}
 
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
+agent_launch_cmd() {
+    echo 'source ~/.zshrc && cn'
+}
 
-log_step "Setting up environment variables..."
-inject_env_vars_fly \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-setup_continue_config "${OPENROUTER_API_KEY}" "upload_file" "run_server"
-
-echo ""
-log_info "Fly.io setup completed successfully!"
-echo ""
-
-log_step "Starting Continue CLI in TUI mode..."
-sleep 1
-clear
-interactive_session "source ~/.zshrc && cn"
+spawn_agent "Continue"

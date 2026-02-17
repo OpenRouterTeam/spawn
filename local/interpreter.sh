@@ -12,52 +12,19 @@ fi
 log_info "Open Interpreter on local machine"
 echo ""
 
-# 1. Ensure local prerequisites
-ensure_local_ready
+agent_install() {
+    install_agent "Open Interpreter" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter" cloud_run
+}
 
-# 2. Install Open Interpreter if not already installed
-if command -v interpreter &>/dev/null; then
-    log_info "Open Interpreter already installed"
-else
-    log_step "Installing Open Interpreter..."
-    pip install open-interpreter 2>/dev/null || pip3 install open-interpreter
-fi
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+}
 
-# Verify installation
-if ! command -v interpreter &>/dev/null; then
-    log_install_failed "Open Interpreter" "pip install open-interpreter"
-    exit 1
-fi
-log_info "Open Interpreter installation verified"
+agent_launch_cmd() {
+    echo 'source ~/.zshrc 2>/dev/null; interpreter'
+}
 
-# 3. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 4. Inject environment variables
-log_step "Setting up environment variables..."
-inject_env_vars_local upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
-
-echo ""
-log_info "Local setup completed successfully!"
-echo ""
-
-# 5. Start Open Interpreter
-if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_step "Executing Open Interpreter with prompt..."
-    source ~/.zshrc 2>/dev/null || true
-    interpreter -m "${SPAWN_PROMPT}"
-else
-    log_step "Starting Open Interpreter..."
-    sleep 1
-    clear 2>/dev/null || true
-    source ~/.zshrc 2>/dev/null || true
-    exec interpreter
-fi
+spawn_agent "Open Interpreter"

@@ -12,62 +12,21 @@ fi
 log_info "Continue on local machine"
 echo ""
 
-# 1. Ensure local prerequisites
-ensure_local_ready
+agent_install() {
+    install_agent "Continue CLI" "npm install -g @continuedev/cli" cloud_run
+}
 
-# 2. Install Node.js if not already installed
-if ! command -v node &>/dev/null; then
-    log_error "Node.js is required but not installed"
-    log_error "Please install Node.js from https://nodejs.org/"
-    exit 1
-fi
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-# 3. Install Continue if not already installed
-if command -v cn &>/dev/null; then
-    log_info "Continue already installed"
-else
-    log_step "Installing Continue..."
-    npm install -g @continuedev/cli
-fi
+agent_configure() {
+    setup_continue_config "${OPENROUTER_API_KEY}" cloud_upload cloud_run
+}
 
-# Verify installation
-if ! command -v cn &>/dev/null; then
-    log_install_failed "Continue" "npm install -g @continuedev/cli"
-    exit 1
-fi
-log_info "Continue installation verified"
+agent_launch_cmd() {
+    echo 'source ~/.zshrc 2>/dev/null; cn'
+}
 
-# 4. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 5. Inject environment variables
-log_step "Setting up environment variables..."
-inject_env_vars_local upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-# 6. Configure Continue (uses json_escape to prevent injection)
-setup_continue_config "${OPENROUTER_API_KEY}" \
-    "upload_file" \
-    "run_server"
-
-echo ""
-log_info "Local setup completed successfully!"
-echo ""
-
-# 7. Start Continue
-if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    log_step "Executing Continue with prompt..."
-    source ~/.zshrc 2>/dev/null || true
-    cn -p "${SPAWN_PROMPT}"
-else
-    log_step "Starting Continue..."
-    sleep 1
-    clear 2>/dev/null || true
-    source ~/.zshrc 2>/dev/null || true
-    exec cn
-fi
+spawn_agent "Continue"

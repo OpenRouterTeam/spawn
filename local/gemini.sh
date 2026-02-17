@@ -12,49 +12,20 @@ fi
 log_info "Gemini CLI on local machine"
 echo ""
 
-# 1. Ensure local prerequisites
-ensure_local_ready
+agent_install() {
+    install_agent "Gemini CLI" "npm install -g @google/gemini-cli" cloud_run
+}
 
-# 2. Install Gemini CLI if not already installed
-if command -v gemini &>/dev/null; then
-    log_info "Gemini CLI already installed"
-else
-    log_step "Installing Gemini CLI..."
-    npm install -g @google/gemini-cli
-    export PATH="${HOME}/.npm-global/bin:${PATH}"
-fi
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+}
 
-# Verify installation
-if ! command -v gemini &>/dev/null; then
-    log_install_failed "Gemini CLI" "npm install -g @google/gemini-cli"
-    exit 1
-fi
-log_info "Gemini CLI installation verified"
+agent_launch_cmd() {
+    echo 'source ~/.zshrc 2>/dev/null; gemini'
+}
 
-# 3. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 4. Inject environment variables
-log_step "Setting up environment variables..."
-inject_env_vars_local upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
-
-echo ""
-log_info "Local setup completed successfully!"
-echo ""
-
-# 5. Start Gemini CLI
-log_step "Starting Gemini..."
-sleep 1
-clear 2>/dev/null || true
-export PATH="${HOME}/.npm-global/bin:${PATH}"
-source ~/.zshrc 2>/dev/null || true
-exec gemini
+spawn_agent "Gemini CLI"
