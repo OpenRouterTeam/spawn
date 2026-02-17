@@ -111,6 +111,36 @@ fi
 check_timeout || exit 0
 
 # ============================================================
+# Phase 0.5: macOS Compatibility Lint
+# ============================================================
+log "=== Phase 0.5: macOS Compatibility Lint ==="
+
+LINT_OUTPUT="${DRY_RUN_DIR}/macos-compat-output.txt"
+LINT_ERRORS=0
+LINT_WARNS=0
+
+if [[ -f "${REPO_ROOT}/test/macos-compat.sh" ]]; then
+    LINT_EXIT=0
+    bash "${REPO_ROOT}/test/macos-compat.sh" > "${LINT_OUTPUT}" 2>&1 || LINT_EXIT=$?
+
+    if [[ -f "${LINT_OUTPUT}" ]]; then
+        LINT_ERRORS=$(grep -c "^error " "${LINT_OUTPUT}" 2>/dev/null || true)
+        LINT_WARNS=$(grep -c "^warn " "${LINT_OUTPUT}" 2>/dev/null || true)
+    fi
+
+    if [[ "${LINT_EXIT}" -eq 0 ]]; then
+        log "Phase 0.5: macOS compat lint passed (${LINT_WARNS} warning(s))"
+    else
+        log "Phase 0.5: macOS compat lint found ${LINT_ERRORS} error(s), ${LINT_WARNS} warning(s)"
+        log "Phase 0.5: Continuing (lint is advisory for now)"
+    fi
+else
+    log "Phase 0.5: test/macos-compat.sh not found, skipping"
+fi
+
+check_timeout || exit 0
+
+# ============================================================
 # Phase 1: Record fixtures
 # ============================================================
 log "=== Phase 1: Record fixtures ==="
@@ -412,7 +442,8 @@ fi
 # ============================================================
 log ""
 log "=== QA Dry Run Summary ==="
-log "Phase 2 (initial):  ${PASS_COUNT:-0} pass / ${FAIL_COUNT:-0} fail"
+log "Phase 0.5 (lint):    ${LINT_ERRORS:-0} error(s) / ${LINT_WARNS:-0} warning(s)"
+log "Phase 2 (initial):   ${PASS_COUNT:-0} pass / ${FAIL_COUNT:-0} fail"
 log "Phase 4 (after fix): ${RETRY_PASS:-0} pass / ${RETRY_FAIL:-0} fail"
 if [[ "${FAIL_COUNT:-0}" -gt 0 ]] && [[ "${RETRY_FAIL:-0}" -lt "${FAIL_COUNT:-0}" ]]; then
     FIXED=$(( ${FAIL_COUNT:-0} - ${RETRY_FAIL:-0} ))
@@ -421,6 +452,7 @@ fi
 log ""
 log "Output files:"
 log "  ${DRY_RUN_DIR}/qa-dry-run.log          — full log"
+log "  ${DRY_RUN_DIR}/macos-compat-output.txt  — macOS compat lint output"
 log "  ${DRY_RUN_DIR}/results-phase2.txt       — mock test results (initial)"
 log "  ${DRY_RUN_DIR}/results-phase4.txt       — mock test results (after fixes)"
 log "  ${DRY_RUN_DIR}/would-commit.txt         — git/gh commands that would have run"

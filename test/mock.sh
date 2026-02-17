@@ -642,6 +642,26 @@ _record_categorized_result() {
     fi
 }
 
+# Run per-agent install assertions.
+# Sources shared assertions file and optional per-cloud overrides.
+_run_agent_assertions() {
+    local cloud="$1"
+    local agent="$2"
+    local shared_file="${FIXTURES_DIR}/_shared_agent_assertions.sh"
+    local cloud_file="${FIXTURES_DIR}/${cloud}/_agent_assertions.sh"
+
+    if [[ -f "$shared_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$shared_file"
+        # Apply per-cloud overrides if they exist
+        if [[ -f "$cloud_file" ]]; then
+            # shellcheck disable=SC1090
+            source "$cloud_file"
+        fi
+        assert_agent_install "$cloud" "$agent"
+    fi
+}
+
 run_test() {
     local cloud="$1"
     local agent="$2"
@@ -674,6 +694,10 @@ run_test() {
 
     # Normal mode: run standard assertions and track failures per category
     _run_assertions_and_track "${exit_code}" "${cloud}" "${state_file}"
+
+    # Per-agent install assertions
+    _run_agent_assertions "$cloud" "$agent"
+
     _record_categorized_result "${cloud}" "${agent}" "$_pre_failed"
 
     printf '\n'
