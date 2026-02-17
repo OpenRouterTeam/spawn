@@ -348,6 +348,11 @@ destroy_ovh_instance() {
     log_info "Instance $instance_id destroyed"
 }
 
+# Standardized destroy_server wrapper (for compatibility with cross-cloud scripts)
+destroy_server() {
+    destroy_ovh_instance "$@"
+}
+
 # OVH uses configurable SSH user (ubuntu for newer images, root for older)
 SSH_USER="${OVH_SSH_USER:-ubuntu}"
 
