@@ -139,9 +139,9 @@ get_cloud_init_userdata() {
 apt-get update -y
 apt-get install -y curl unzip git zsh
 # Install Bun
-su - $(logname 2>/dev/null || echo "$(whoami)") -c 'curl -fsSL https://bun.sh/install | bash' || true
+su - $(logname 2>/dev/null || echo "$USER") -c 'curl -fsSL https://bun.sh/install | bash' || true
 # Install Claude Code
-su - $(logname 2>/dev/null || echo "$(whoami)") -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
+su - $(logname 2>/dev/null || echo "$USER") -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
 # Configure PATH for all users
 echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /etc/profile.d/spawn.sh
 chmod +x /etc/profile.d/spawn.sh
