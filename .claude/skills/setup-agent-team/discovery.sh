@@ -134,11 +134,8 @@ PYEOF
 
 # Kill claude process and its full process tree
 _kill_claude_process() {
-    local pipe_pid="$1"
-    local claude_pid_file="$2"
-    local cpid
-    cpid=$(cat "${claude_pid_file}" 2>/dev/null)
-    if [[ -n "${cpid}" ]] && kill -0 "${cpid}" 2>/dev/null; then
+    local cpid="$1"
+    if kill -0 "${cpid}" 2>/dev/null; then
         log_info "Killing claude (pid=${cpid}) and its process tree"
         pkill -TERM -P "${cpid}" 2>/dev/null || true
         kill -TERM "${cpid}" 2>/dev/null || true
@@ -146,72 +143,28 @@ _kill_claude_process() {
         pkill -KILL -P "${cpid}" 2>/dev/null || true
         kill -KILL "${cpid}" 2>/dev/null || true
     fi
-    kill "${pipe_pid}" 2>/dev/null || true
 }
 
-# Monitor watchdog for claude process
+# Watchdog: wall-clock timeout as safety net
 _run_watchdog_loop() {
-    local pipe_pid="$1"
-    local idle_timeout="$2"
-    local hard_timeout="$3"
-    local claude_pid_file="$4"
-    local log_start_size="$5"
+    local claude_pid="$1"
+    local hard_timeout="$2"
 
-    local LAST_SIZE
-    LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
-    local IDLE_SECONDS=0
     local WALL_START
     WALL_START=$(date +%s)
-    local SESSION_ENDED=false
 
-    while kill -0 "${pipe_pid}" 2>/dev/null; do
-        sleep 10
-        local CURR_SIZE
-        CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+    while kill -0 "${claude_pid}" 2>/dev/null; do
+        sleep 30
         local WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
-
-        # Check if the stream-json "result" event has been emitted (team lead done).
-        # In team-based workflows, the team lead's result fires after spawning
-        # teammates — the actual work is still running as child processes.
-        if [[ "${SESSION_ENDED}" = false ]] && tail -c +"$((log_start_size + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
-            SESSION_ENDED=true
-            log_info "Team lead session ended — waiting for teammate processes to complete"
-        fi
-
-        # After team lead finishes, monitor child processes instead of log output.
-        if [[ "${SESSION_ENDED}" = true ]]; then
-            local LEAD_PID
-            LEAD_PID=$(cat "${claude_pid_file}" 2>/dev/null || true)
-            if [[ -n "${LEAD_PID}" ]] && pgrep -P "${LEAD_PID}" >/dev/null 2>&1; then
-                IDLE_SECONDS=0
-            else
-                log_info "All teammate processes completed — shutting down"
-                sleep 10
-                _kill_claude_process "${pipe_pid}" "${claude_pid_file}"
-                break
-            fi
-        fi
-
-        if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
-            IDLE_SECONDS=$((IDLE_SECONDS + 10))
-            if [[ "${IDLE_SECONDS}" -ge "${idle_timeout}" ]]; then
-                log_warn "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
-                _kill_claude_process "${pipe_pid}" "${claude_pid_file}"
-                break
-            fi
-        else
-            IDLE_SECONDS=0
-            LAST_SIZE="${CURR_SIZE}"
-        fi
 
         if [[ "${WALL_ELAPSED}" -ge "${hard_timeout}" ]]; then
             log_warn "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
-            _kill_claude_process "${pipe_pid}" "${claude_pid_file}"
+            _kill_claude_process "${claude_pid}"
             break
         fi
     done
 
-    wait "${pipe_pid}" 2>/dev/null
+    wait "${claude_pid}" 2>/dev/null
     echo $?
 }
 
@@ -235,27 +188,17 @@ run_team_cycle() {
     log_info "Worktree base: ${WORKTREE_BASE}"
     echo ""
 
-    local IDLE_TIMEOUT=600  # 10 minutes of silence = hung
     local HARD_TIMEOUT=3600 # 60 min wall-clock safety net
 
-    log_info "Idle timeout: ${IDLE_TIMEOUT}s, Hard timeout: ${HARD_TIMEOUT}s"
+    log_info "Hard timeout: ${HARD_TIMEOUT}s"
 
-    local CLAUDE_PID_FILE
-    CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
+    claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
+        >> "${LOG_FILE}" 2>&1 &
 
-    ( claude -p "$(cat "${PROMPT_FILE}")" --dangerously-skip-permissions --model sonnet \
-        --output-format stream-json --verbose &
-      echo $! > "${CLAUDE_PID_FILE}"
-      wait
-    ) 2>&1 | tee -a "${LOG_FILE}" &
+    local CLAUDE_PID=$!
+    log_info "Claude started (pid=${CLAUDE_PID})"
 
-    local PIPE_PID=$!
-    sleep 2
-
-    local LOG_START_SIZE
-    LOG_START_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
-
-    _run_watchdog_loop "${PIPE_PID}" "${IDLE_TIMEOUT}" "${HARD_TIMEOUT}" "${CLAUDE_PID_FILE}" "${LOG_START_SIZE}"
+    _run_watchdog_loop "${CLAUDE_PID}" "${HARD_TIMEOUT}"
     local CLAUDE_EXIT=$?
 
     if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
@@ -264,7 +207,6 @@ run_team_cycle() {
         log_error "Cycle failed (exit_code=${CLAUDE_EXIT})"
     fi
 
-    rm -f "${CLAUDE_PID_FILE}" 2>/dev/null || true
     rm -f "${PROMPT_FILE}" 2>/dev/null || true
     PROMPT_FILE=""
     git worktree prune 2>/dev/null || true

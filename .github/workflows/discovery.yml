@@ -7,10 +7,6 @@ on:
     types: [opened, reopened, labeled]
   workflow_dispatch:
 
-concurrency:
-  group: discovery-sprite-trigger
-  cancel-in-progress: false
-
 jobs:
   trigger:
     runs-on: ubuntu-latest

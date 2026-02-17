@@ -102,9 +102,11 @@ cleanup() {
     git worktree prune 2>/dev/null || true
     rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
 
-    # Clean up prompt and PID files
+    # Clean up prompt file and kill claude if still running
     rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
-    rm -f "${CLAUDE_PID_FILE:-}" 2>/dev/null || true
+    if [[ -n "${CLAUDE_PID:-}" ]] && kill -0 "${CLAUDE_PID}" 2>/dev/null; then
+        kill -TERM "${CLAUDE_PID}" 2>/dev/null || true
+    fi
 
     log "=== Cycle Done (exit_code=${exit_code}) ==="
     exit $exit_code
@@ -542,85 +544,36 @@ HARD_TIMEOUT=$((CYCLE_TIMEOUT + 300))
 
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
-# Activity watchdog: kill claude if no output for IDLE_TIMEOUT seconds.
-IDLE_TIMEOUT=600  # 10 minutes of silence = hung
-
-# Run claude in background so we can monitor output activity.
+# Run claude in background, output goes to log file.
 # Triage uses gemini-3-flash (lightweight safety check); other modes use default (Opus) for team lead.
 CLAUDE_MODEL_FLAG=""
 if [[ "${RUN_MODE}" == "triage" ]]; then
     CLAUDE_MODEL_FLAG="--model google/gemini-3-flash-preview"
 fi
 
-CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
-( claude -p "$(cat "${PROMPT_FILE}")" ${CLAUDE_MODEL_FLAG} --output-format stream-json --verbose &
-  echo $! > "${CLAUDE_PID_FILE}"
-  wait
-) 2>&1 | tee -a "${LOG_FILE}" &
-PIPE_PID=$!
-sleep 2  # let claude start and write its PID
+claude -p "$(cat "${PROMPT_FILE}")" ${CLAUDE_MODEL_FLAG} >> "${LOG_FILE}" 2>&1 &
+CLAUDE_PID=$!
+log "Claude started (pid=${CLAUDE_PID})"
 
 # Kill claude and its full process tree reliably
 kill_claude() {
-    local cpid
-    cpid=$(cat "${CLAUDE_PID_FILE}" 2>/dev/null)
-    if [[ -n "${cpid}" ]] && kill -0 "${cpid}" 2>/dev/null; then
-        log "Killing claude (pid=${cpid}) and its process tree"
-        pkill -TERM -P "${cpid}" 2>/dev/null || true
-        kill -TERM "${cpid}" 2>/dev/null || true
+    if kill -0 "${CLAUDE_PID}" 2>/dev/null; then
+        log "Killing claude (pid=${CLAUDE_PID}) and its process tree"
+        pkill -TERM -P "${CLAUDE_PID}" 2>/dev/null || true
+        kill -TERM "${CLAUDE_PID}" 2>/dev/null || true
         sleep 5
-        pkill -KILL -P "${cpid}" 2>/dev/null || true
-        kill -KILL "${cpid}" 2>/dev/null || true
+        pkill -KILL -P "${CLAUDE_PID}" 2>/dev/null || true
+        kill -KILL "${CLAUDE_PID}" 2>/dev/null || true
     fi
-    kill "${PIPE_PID}" 2>/dev/null || true
 }
 
-# Watchdog loop: check log file growth and detect session completion
-LAST_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
-LOG_START_SIZE="${LAST_SIZE}"
-IDLE_SECONDS=0
+# Watchdog: wall-clock timeout as safety net
 WALL_START=$(date +%s)
-SESSION_ENDED=false
 
-while kill -0 "${PIPE_PID}" 2>/dev/null; do
-    sleep 10
-    CURR_SIZE=$(wc -c < "${LOG_FILE}" 2>/dev/null || echo 0)
+while kill -0 "${CLAUDE_PID}" 2>/dev/null; do
+    sleep 30
     WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
 
-    # Check if the stream-json "result" event has been emitted (team lead done).
-    # In team-based workflows, the team lead's result fires after spawning
-    # teammates — the actual work is still running as child processes.
-    if [[ "${SESSION_ENDED}" = false ]] && tail -c +"$((LOG_START_SIZE + 1))" "${LOG_FILE}" 2>/dev/null | grep -q '"type":"result"'; then
-        SESSION_ENDED=true
-        log "Team lead session ended — waiting for teammate processes to complete"
-    fi
-
-    # After team lead finishes, monitor child processes instead of log output.
-    if [[ "${SESSION_ENDED}" = true ]]; then
-        LEAD_PID=$(cat "${CLAUDE_PID_FILE}" 2>/dev/null || true)
-        if [[ -n "${LEAD_PID}" ]] && pgrep -P "${LEAD_PID}" >/dev/null 2>&1; then
-            IDLE_SECONDS=0
-        else
-            log "All teammate processes completed — shutting down"
-            sleep 10
-            kill_claude
-            break
-        fi
-    fi
-
-    if [[ "${CURR_SIZE}" -eq "${LAST_SIZE}" ]]; then
-        IDLE_SECONDS=$((IDLE_SECONDS + 10))
-        if [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
-            log "Watchdog: no output for ${IDLE_SECONDS}s — killing hung process"
-            kill_claude
-            break
-        fi
-    else
-        IDLE_SECONDS=0
-        LAST_SIZE="${CURR_SIZE}"
-    fi
-
-    # Hard wall-clock timeout as final safety net
     if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
         log "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
         kill_claude
@@ -628,15 +581,11 @@ while kill -0 "${PIPE_PID}" 2>/dev/null; do
     fi
 done
 
-wait "${PIPE_PID}" 2>/dev/null
+wait "${CLAUDE_PID}" 2>/dev/null
 CLAUDE_EXIT=$?
 
-if [[ "${CLAUDE_EXIT}" -eq 0 ]] || [[ "${SESSION_ENDED}" = true ]]; then
+if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
     log "Cycle completed successfully"
-elif [[ "${IDLE_SECONDS}" -ge "${IDLE_TIMEOUT}" ]]; then
-    log "Cycle killed by activity watchdog (no output for ${IDLE_TIMEOUT}s)"
-elif [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    log "Cycle timed out after ${HARD_TIMEOUT}s — killed by hard timeout"
 else
     log "Cycle failed (exit_code=${CLAUDE_EXIT})"
 fi

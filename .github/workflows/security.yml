@@ -7,10 +7,6 @@ on:
     - cron: '*/30 * * * *'
   workflow_dispatch:
 
-concurrency:
-  group: security-${{ github.event_name == 'issues' && format('issue-{0}', github.event.issue.number) || 'scheduled' }}
-  cancel-in-progress: false
-
 jobs:
   review:
     runs-on: ubuntu-latest
