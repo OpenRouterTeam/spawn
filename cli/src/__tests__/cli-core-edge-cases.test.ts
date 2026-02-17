@@ -716,15 +716,17 @@ describe("history.ts additional edge cases", () => {
 
   describe("getSpawnDir edge cases", () => {
     it("should resolve absolute SPAWN_HOME with trailing slash", () => {
-      process.env.SPAWN_HOME = "/tmp/test-spawn/";
+      const { homedir } = require("os");
+      process.env.SPAWN_HOME = join(homedir(), "test-spawn") + "/";
       const dir = getSpawnDir();
-      expect(dir).toBe("/tmp/test-spawn");
+      expect(dir).toBe(join(homedir(), "test-spawn"));
     });
 
     it("should resolve SPAWN_HOME with .. segments", () => {
-      process.env.SPAWN_HOME = "/tmp/a/../b";
+      const { homedir } = require("os");
+      process.env.SPAWN_HOME = join(homedir(), "a", "..", "b");
       const dir = getSpawnDir();
-      expect(dir).toBe("/tmp/b");
+      expect(dir).toBe(join(homedir(), "b"));
     });
 
     it("should throw for relative path ./data", () => {

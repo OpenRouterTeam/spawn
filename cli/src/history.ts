@@ -37,7 +37,22 @@ export function getSpawnDir(): string {
     );
   }
   // Resolve to canonical form (collapses .. segments)
-  return resolve(spawnHome);
+  const resolved = resolve(spawnHome);
+
+  // SECURITY: Prevent path traversal to system directories
+  // Even though the path is absolute, resolve() can normalize paths like
+  // /tmp/../../root/.spawn to /root/.spawn, potentially allowing unauthorized
+  // file writes to sensitive directories.
+  const userHome = homedir();
+  if (!resolved.startsWith(userHome + "/") && resolved !== userHome) {
+    throw new Error(
+      `SPAWN_HOME must be within your home directory.\n` +
+      `Got: ${resolved}\n` +
+      `Home: ${userHome}`
+    );
+  }
+
+  return resolved;
 }
 
 export function getHistoryPath(): string {
