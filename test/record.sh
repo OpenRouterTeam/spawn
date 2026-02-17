@@ -31,7 +31,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean ovh"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean ovh fly"
 
 # --- Endpoint registry ---
 # Declare endpoints as string literal for each cloud
@@ -58,6 +58,9 @@ images:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/image
 ssh_keys:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/sshkey
 "
 
+_ENDPOINTS_fly="
+apps:/apps?org_slug=personal
+"
 
 get_endpoints() {
     local cloud="$1"
@@ -165,6 +168,7 @@ get_auth_env_var() {
         hetzner)       printf "HCLOUD_TOKEN" ;;
         digitalocean)  printf "DO_API_TOKEN" ;;
         ovh)           printf "OVH_APPLICATION_KEY" ;;
+        fly)           printf "FLY_API_TOKEN" ;;
     esac
 }
 
@@ -319,6 +323,7 @@ call_api() {
         hetzner)       hetzner_api GET "$endpoint" ;;
         digitalocean)  do_api GET "$endpoint" ;;
         ovh)           ovh_api_call GET "$endpoint" ;;
+        fly)           curl -fsSL -H "Authorization: ${FLY_API_TOKEN}" "https://api.machines.dev/v1${endpoint}" ;;
     esac
 }
 
@@ -343,6 +348,7 @@ error_checks = {
     'hetzner': lambda d: d.get('error') and isinstance(d.get('error'), dict),
     'digitalocean': lambda d: 'id' in d and isinstance(d.get('id'), str) and 'message' in d,
     'ovh': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
+    'fly': lambda d: 'error' in d and isinstance(d.get('error'), str),
 }
 
 if cloud in error_checks:
@@ -372,6 +378,7 @@ _record_live_cycle() {
     case "$cloud" in
         hetzner)       _live_hetzner "$fixture_dir" ;;
         digitalocean)  _live_digitalocean "$fixture_dir" ;;
+        fly)           _live_fly "$fixture_dir" ;;
         *)  return 0 ;;  # No live cycle for this cloud yet
     esac
 }
@@ -583,6 +590,85 @@ _live_digitalocean() {
         '{"status":"deleted","http_code":204}'
 }
 
+_live_fly_body() {
+    local fixture_dir="$1"
+    local name="spawn-record-$(date +%s)"
+    printf '%b\n' "  ${CYAN}live${NC} Creating test app+machine '${name}' (shared-cpu-1x, iad)..." >&2
+
+    python3 -c "
+import json, sys
+print(json.dumps({
+    'name': sys.argv[1], 'region': 'iad',
+    'config': {
+        'image': 'ubuntu:24.04', 'auto_destroy': True,
+        'guest': {'cpu_kind': 'shared', 'cpus': 1, 'memory_mb': 256}
+    }
+}))
+" "$name"
+}
+
+_live_fly() {
+    local fixture_dir="$1"
+    local name="spawn-record-$(date +%s)"
+    local fly_api_base="https://api.machines.dev/v1"
+    local auth_header="Authorization: ${FLY_API_TOKEN}"
+
+    # Detect FlyV1 tokens (dashboard/deploy tokens use FlyV1 scheme, not Bearer)
+    if [[ "$FLY_API_TOKEN" == FlyV1\ * ]]; then
+        auth_header="Authorization: ${FLY_API_TOKEN}"
+    else
+        auth_header="Authorization: Bearer ${FLY_API_TOKEN}"
+    fi
+
+    # Create app
+    printf '%b\n' "  ${CYAN}live${NC} Creating Fly.io app '${name}'..."
+    local app_resp
+    app_resp=$(curl -fsSL -X POST "${fly_api_base}/apps" \
+        -H "${auth_header}" \
+        -H "Content-Type: application/json" \
+        -d "{\"app_name\":\"${name}\",\"org_slug\":\"personal\"}") || true
+
+    if [[ -n "$app_resp" ]]; then
+        _save_live_fixture "$fixture_dir" "create_app" "POST /apps" "$app_resp" || {
+            printf '%b\n' "  ${RED}fail${NC} App creation failed — skipping machine"
+            return 0
+        }
+    fi
+
+    # Create machine
+    local body
+    body=$(_live_fly_body "$fixture_dir")
+    local machine_resp
+    machine_resp=$(curl -fsSL -X POST "${fly_api_base}/apps/${name}/machines" \
+        -H "${auth_header}" \
+        -H "Content-Type: application/json" \
+        -d "$body") || true
+
+    _save_live_fixture "$fixture_dir" "create_server" "POST /apps/{name}/machines" "$machine_resp" || {
+        # Cleanup app even if machine failed
+        curl -fsSL -X DELETE "${fly_api_base}/apps/${name}" -H "${auth_header}" >/dev/null 2>&1 || true
+        return 0
+    }
+
+    local machine_id
+    machine_id=$(echo "$machine_resp" | python3 -c "import json,sys; print(json.loads(sys.stdin.read())['id'])" 2>/dev/null) || true
+
+    # Cleanup: stop + delete machine, delete app
+    printf '%b\n' "  ${CYAN}live${NC} Cleaning up..."
+    if [[ -n "$machine_id" ]]; then
+        curl -fsSL -X POST "${fly_api_base}/apps/${name}/machines/${machine_id}/stop" \
+            -H "${auth_header}" >/dev/null 2>&1 || true
+        sleep 3
+        local del_resp
+        del_resp=$(curl -fsSL -X DELETE "${fly_api_base}/apps/${name}/machines/${machine_id}?force=true" \
+            -H "${auth_header}" 2>/dev/null) || true
+        if [[ -n "$del_resp" ]]; then
+            _save_live_fixture "$fixture_dir" "delete_server" "DELETE /apps/{name}/machines/{id}" "$del_resp" || true
+        fi
+    fi
+    curl -fsSL -X DELETE "${fly_api_base}/apps/${name}" -H "${auth_header}" >/dev/null 2>&1 || true
+    printf '%b\n' "  ${CYAN}live${NC} Cleanup complete"
+}
 
 # --- Record one cloud ---
 # Check credentials and prompt if needed; returns 1 to skip this cloud
@@ -781,7 +867,7 @@ list_clouds() {
     total_count=$(echo "$ALL_RECORDABLE_CLOUDS" | wc -w | tr -d ' ')
     printf '%b\n' "  ${ready_count}/${total_count} clouds have credentials set"
     printf '\n'
-    printf "  CLI-based clouds (not recordable): sprite, gcp, fly, daytona, aws, oracle, local\n"
+    printf "  CLI-based clouds (not recordable): sprite, gcp, daytona, aws, oracle, local\n"
 }
 
 # --- Main ---
