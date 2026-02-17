@@ -412,6 +412,19 @@ export function validatePrompt(prompt: string): void {
     { pattern: /;\s*rm\s+-rf/, description: "dangerous command sequence", suggestion: "Describe what you want the agent to do without using shell syntax" },
     { pattern: /\|\s*bash/, description: "shell piping to bash", suggestion: "Describe the desired outcome instead" },
     { pattern: /\|\s*sh/, description: "shell piping to sh", suggestion: "Describe the desired outcome instead" },
+    { pattern: /\$\{[^}]*\}/, description: "bash variable expansion", suggestion: "Describe the value you need instead of using shell variables" },
+    // Match && and || only when they appear to be shell command chaining
+    // Pattern: look for common shell commands after && or ||
+    // This avoids false positives on programming expressions like "a > b && c < d" or "value || default"
+    { pattern: /&&\s+(ls|rm|cp|mv|mkdir|cat|grep|find|echo|curl|wget|git|npm|yarn|bun|cd|chmod|chown|sudo|kill|pkill|systemctl|service|apt|yum|brew|docker|kubectl|terraform|ansible|python|node|go|java|ruby|php|perl|bash|sh|zsh|fish|powershell|cmd|exit|return)\b/i, description: "command chaining with &&", suggestion: "Describe your tasks separately instead of chaining commands" },
+    { pattern: /\|\|\s+(ls|rm|cp|mv|mkdir|cat|grep|find|echo|curl|wget|git|npm|yarn|bun|cd|chmod|chown|sudo|kill|pkill|systemctl|service|apt|yum|brew|docker|kubectl|terraform|ansible|python|node|go|java|ruby|php|perl|bash|sh|zsh|fish|powershell|cmd|exit|return)\b/i, description: "command chaining with ||", suggestion: "Describe error handling in plain language" },
+    // Match redirection only when followed by filesystem paths (/, ~, or word chars at line boundaries)
+    // This avoids false positives on mathematical comparisons like "x > 5"
+    { pattern: />\s*[/~]/, description: "file redirection", suggestion: "Ask the agent to save output instead of using redirection syntax" },
+    { pattern: />\s*\w+\.\w+/, description: "file redirection", suggestion: "Ask the agent to save output instead of using redirection syntax" },
+    { pattern: /<\s*[/~]/, description: "file input redirection", suggestion: "Describe the input source in plain language" },
+    { pattern: /<\s*\w+\.\w+/, description: "file input redirection", suggestion: "Describe the input source in plain language" },
+    { pattern: /&\s*$/, description: "background execution", suggestion: "Describe the desired behavior instead" },
   ];
 
   for (const { pattern, description, suggestion } of dangerousPatterns) {
@@ -427,5 +440,21 @@ export function validatePrompt(prompt: string): void {
         `  Write: "Fix the directory listing issues"`
       );
     }
+  }
+
+  // Generic check for suspicious operator combinations
+  // Exclude comparison expressions (like "a > b && c < d") by checking for comparison context
+  // Pattern matches doubled operators but not when used in comparison expressions
+  const hasDoubledOperators = /[;&|<>]\s*[;&|<>]/.test(prompt);
+  const looksLikeComparison = /\w\s*[<>!=]=?\s*\w\s*&&\s*\w\s*[<>!=]=?\s*\w/.test(prompt);
+
+  if (hasDoubledOperators && !looksLikeComparison) {
+    throw new Error(
+      `Your prompt contains shell operators that could be unsafe.\n\n` +
+      `Please describe what you want in plain English without shell syntax.\n\n` +
+      `Example:\n` +
+      `  Instead of: "Build a web server && deploy it"\n` +
+      `  Write: "Build a web server and deploy it"`
+    );
   }
 }
