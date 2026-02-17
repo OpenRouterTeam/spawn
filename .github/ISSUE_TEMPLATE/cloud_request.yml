@@ -1,70 +1,20 @@
 name: Cloud Provider Request
-description: Request support for a new cloud provider
+description: Request a new cloud provider
 title: "[Cloud]: "
 labels: ["cloud-request", "enhancement", "pending-review"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thanks for suggesting a new cloud provider! Put the provider name in the issue title above.
-
   - type: input
     id: cloud-url
     attributes:
-      label: Website URL
-      description: Link to the provider's homepage
+      label: Link
       placeholder: https://cloud.provider.com
     validations:
-      required: true
-
-  - type: dropdown
-    id: cloud-type
-    attributes:
-      label: Provider Type
-      description: What kind of compute does it offer?
-      options:
-        - VPS / Cloud Servers (SSH access)
-        - Container / Sandbox Platform
-        - GPU Cloud
-        - Serverless / Functions
-        - Other (describe below)
-    validations:
-      required: true
-
-  - type: dropdown
-    id: api-type
-    attributes:
-      label: API / CLI Access
-      description: How do you provision and manage instances?
-      options:
-        - REST API
-        - CLI tool
-        - Both REST API and CLI
-        - SDK only (Python, Node, etc.)
-        - Web console only (no API)
-    validations:
-      required: true
+      required: false
 
   - type: textarea
     id: why
     attributes:
-      label: Why This Provider?
-      description: What makes this provider a good fit for spawn? (pricing, speed, regions, unique features)
-      placeholder: |
-        - Fast provisioning (~30s)
-        - Cheap instances starting at $5/mo
-        - Good API docs
-    validations:
-      required: true
-
-  - type: textarea
-    id: additional
-    attributes:
-      label: Additional Context
-      description: Any other details (API docs link, auth method, regions, billing model, limitations)
-      placeholder: |
-        - API docs: https://docs.provider.com/api
-        - Per-hour billing, API key auth
-        - Available in US and EU regions
+      label: Why?
+      placeholder: "What makes this provider a good fit? (pricing, speed, etc.)"
     validations:
       required: false

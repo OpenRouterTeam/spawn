@@ -1,71 +1,20 @@
 name: Agent Request
-description: Request support for a new AI coding agent
+description: Request a new AI agent
 title: "[Agent]: "
 labels: ["agent-request", "enhancement", "pending-review"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thanks for suggesting a new agent! Put the agent name in the issue title above.
-
   - type: input
     id: agent-url
     attributes:
-      label: Repository / Website URL
-      description: Link to the agent's GitHub repo or homepage
+      label: Link
       placeholder: https://github.com/org/agent
     validations:
-      required: true
-
-  - type: dropdown
-    id: install-method
-    attributes:
-      label: Install Method
-      description: How is the agent installed?
-      options:
-        - npm / npx
-        - pip / pipx
-        - curl | bash
-        - brew
-        - Other (describe below)
-    validations:
-      required: true
-
-  - type: dropdown
-    id: openrouter-support
-    attributes:
-      label: OpenRouter Compatibility
-      description: Does the agent work with OpenRouter?
-      options:
-        - Native support (OPENROUTER_API_KEY)
-        - Via OPENAI_BASE_URL override
-        - Via ANTHROPIC_BASE_URL override
-        - Not sure
-    validations:
-      required: true
+      required: false
 
   - type: textarea
-    id: evidence
+    id: why
     attributes:
-      label: Why This Agent?
-      description: |
-        Any of the following count as evidence of traction:
-        - GitHub stars or active fork activity
-        - Hacker News, Reddit, or Twitter buzz
-        - Venture-funded or backed by a known company
-        - Personal experience / recommendation
-      placeholder: |
-        - 5k GitHub stars, 200+ forks
-        - Backed by YC / raised Series A
-        - HN front page post (link)
-    validations:
-      required: true
-
-  - type: textarea
-    id: additional
-    attributes:
-      label: Additional Context
-      description: Any other details (config requirements, env vars, known limitations)
-      placeholder: Requires Node 20+, uses OPENAI_API_KEY env var
+      label: Why?
+      placeholder: "What makes this agent worth adding?"
     validations:
       required: false
