@@ -1,0 +1,13 @@
+{
+  "apps": [
+    {
+      "id": "test-app-id",
+      "name": "test-app",
+      "organization": {
+        "slug": "personal"
+      },
+      "status": "deployed"
+    }
+  ],
+  "total_apps": 1
+}

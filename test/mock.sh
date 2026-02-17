@@ -244,14 +244,39 @@ setup_mock_agents() {
     # Agent binaries
     _create_logging_mock claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q
 
-    # Tools used during agent install
-    _create_logging_mock pip pip3 npm npx bun node openssl shred cargo go git
+    # Tools used during agent install and file upload
+    _create_logging_mock pip pip3 npm npx bun node openssl shred cargo go git base64
 
     # Silent mocks (no logging needed)
     _create_silent_mock clear sleep
 
     # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
     _create_ssh_keygen_mock
+
+    # Mock fly/flyctl CLI — handles ssh console, auth token, version
+    _create_fly_mock
+}
+
+_create_fly_mock() {
+    cat > "${TEST_DIR}/fly" << 'MOCK'
+#!/bin/bash
+echo "fly $*" >> "${MOCK_LOG}"
+case "$1" in
+    auth)
+        case "${2:-}" in
+            token) echo "test-token-fly" ;;
+        esac ;;
+    ssh)
+        # fly ssh console -a APP -C "bash -c CMD" --quiet
+        # Succeed silently — the command "ran"
+        ;;
+    version)
+        echo "fly v0.3.50" ;;
+esac
+exit 0
+MOCK
+    chmod +x "${TEST_DIR}/fly"
+    cp "${TEST_DIR}/fly" "${TEST_DIR}/flyctl"
 }
 
 setup_fake_home() {
@@ -295,6 +320,8 @@ _strip_api_base() {
             endpoint="${url#https://api.digitalocean.com/v2}" ;;
         *eu.api.ovh.com*)
             endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
+        https://api.machines.dev/v1*)
+            endpoint="${url#https://api.machines.dev/v1}" ;;
     esac
 
     echo "$endpoint" | sed 's|?.*||'
@@ -309,6 +336,7 @@ _get_required_fields() {
         hetzner:/servers) echo "name server_type image location" ;;
         digitalocean:/droplets) echo "name region size image" ;;
         ovh:*/create) echo "name" ;;
+        fly:*/machines) echo "name region config" ;;
     esac
 }
 

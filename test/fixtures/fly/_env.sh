@@ -1,0 +1,7 @@
+export FLY_API_TOKEN="test-token-fly"
+export FLY_APP_NAME="test-app"
+export FLY_REGION="iad"
+export FLY_VM_SIZE="shared-cpu-1x"
+export FLY_VM_MEMORY="1024"
+export FLY_ORG="personal"
+export MODEL_ID="openrouter/auto"

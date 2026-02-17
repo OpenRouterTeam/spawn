@@ -53,7 +53,7 @@ _maybe_inject_error() {
         create_failure)
             if [ "$METHOD" = "POST" ]; then
                 case "$URL" in
-                    *servers*|*droplets*|*instances*)
+                    *servers*|*droplets*|*instances*|*machines*)
                         printf '{"error":"Unprocessable entity"}'
                         if [ "$HAS_WRITE_OUT" = "true" ]; then printf '\n422'; fi
                         exit 1 ;;
@@ -87,6 +87,7 @@ _strip_api_base() {
         https://api.hetzner.cloud/v1*)     ENDPOINT="${URL#https://api.hetzner.cloud/v1}" ;;
         https://api.digitalocean.com/v2*)   ENDPOINT="${URL#https://api.digitalocean.com/v2}" ;;
         *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
+        https://api.machines.dev/v1*)       ENDPOINT="${URL#https://api.machines.dev/v1}" ;;
     esac
     EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
 }
@@ -110,6 +111,7 @@ _validate_body() {
         hetzner)     case "$EP_CLEAN" in /servers)          _check_fields "name server_type image location" ;; esac ;;
         digitalocean) case "$EP_CLEAN" in /droplets)        _check_fields "name region size image" ;; esac ;;
         ovh)         case "$EP_CLEAN" in */create)          _check_fields "name" ;; esac ;;
+        fly)         case "$EP_CLEAN" in */machines)        _check_fields "name region config" ;; esac ;;
     esac
 }
 
@@ -123,6 +125,7 @@ _synthetic_active_response() {
     case "$MOCK_CLOUD" in
         digitalocean) printf '{"droplet":{"id":12345678,"name":"test-srv","status":"active","networks":{"v4":[{"ip_address":"10.0.0.1","type":"public"}]}}}' ;;
         hetzner)      printf '{"server":{"id":99999,"name":"test-srv","status":"running","public_net":{"ipv4":{"ip":"10.0.0.1"}}}}' ;;
+        fly)          printf '{"id":"d890e84b0d3089","name":"test-app","state":"started","region":"iad","private_ip":"fdaa:0:0:0:a7b:0:0:2"}' ;;
         *)            printf '{}' ;;
     esac
 }
@@ -155,6 +158,9 @@ _respond_post() {
         /ssh_keys|/ssh-keys|/account/keys|/profile/sshkeys|/sshkeys|*/sshkey)
             printf '{"ssh_key":{"id":99999,"name":"test-key","fingerprint":"af:0d:c5:57:a8:fd:b2:82:5e:d4:c1:65:f0:0c:8a:9d"}}'
             ;;
+        /apps)
+            printf '{"id":"test-app","name":"test-app","status":"deployed","organization":{"slug":"personal"}}'
+            ;;
         *)
             if _try_fixture "create_server"; then
                 :
@@ -177,7 +183,7 @@ _track_state() {
     case "$METHOD" in
         POST)
             case "$EP_CLEAN" in
-                /servers|/droplets|/instances|/instance-operations/launch)
+                /servers|/droplets|/instances|/instance-operations/launch|*/machines)
                     echo "CREATED:${MOCK_CLOUD}:${TS}" >> "${MOCK_STATE_FILE}" ;;
             esac ;;
         DELETE)
