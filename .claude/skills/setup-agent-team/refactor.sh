@@ -116,6 +116,14 @@ if [[ "${RUN_MODE}" == "refactor" ]]; then
 fi
 
 # Launch Claude Code with mode-specific prompt
+# Enable agent teams (required for team-based workflows)
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+# Persist into .spawnrc so all Claude sessions on this VM inherit the flag
+if [[ -f "${HOME}/.spawnrc" ]]; then
+    grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "${HOME}/.spawnrc" 2>/dev/null || \
+        printf '\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n' >> "${HOME}/.spawnrc"
+fi
+
 log "Launching ${RUN_MODE} cycle..."
 
 PROMPT_FILE=$(mktemp /tmp/refactor-prompt-XXXXXX.md)
@@ -155,7 +163,7 @@ Complete within 10 minutes. At 7 min stop new work, at 9 min shutdown teammates,
 ## Team Structure
 
 1. **issue-fixer** (Sonnet) — Diagnose root cause, implement fix in worktree, run tests, create PR with `Fixes #SPAWN_ISSUE_PLACEHOLDER`
-2. **issue-tester** (Haiku) — Review fix for correctness/edge cases, run `bun test` + `bash -n` on modified .sh files, report results
+2. **issue-tester** (Sonnet) — Review fix for correctness/edge cases, run `bun test` + `bash -n` on modified .sh files, report results
 
 ## Label Management
 
@@ -304,8 +312,8 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 
 1. **security-auditor** (Sonnet) — Scan .sh for injection/path traversal/credential leaks, .ts for XSS/prototype pollution. Fix HIGH/CRITICAL only, document medium/low.
 2. **ux-engineer** (Sonnet) — Test e2e flows, improve error messages, fix UX papercuts, verify README examples.
-3. **complexity-hunter** (Haiku) — Find functions >50 lines (bash) / >80 lines (ts). Pick top 2-3, ONE PR. Run tests after refactoring.
-4. **test-engineer** (Haiku) — ONE test PR max. Add missing tests, verify shellcheck, run `bun test`, fix failures.
+3. **complexity-hunter** (Sonnet) — Find functions >50 lines (bash) / >80 lines (ts). Pick top 2-3, ONE PR. Run tests after refactoring.
+4. **test-engineer** (Sonnet) — ONE test PR max. Add missing tests, verify shellcheck, run `bun test`, fix failures.
 
 5. **code-health** (Sonnet) — Proactive codebase health scan. ONE PR max.
    Scan for:
@@ -347,7 +355,7 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 
    Leave unreviewed PRs alone. Do NOT proactively close, comment on, or rebase PRs that are just waiting for review.
 
-6. **community-coordinator** (moonshotai/kimi-k2.5)
+6. **community-coordinator** (google/gemini-3-flash-preview)
    First: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
 
    **COMPLETELY IGNORE issues labeled `discovery-team`, `cloud-proposal`, or `agent-proposal`** — those are managed by the discovery team. Do NOT comment on them, do NOT change labels, do NOT interact in any way. Filter them out:

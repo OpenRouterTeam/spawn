@@ -63,6 +63,14 @@ run_with_timeout() {
     wait "$pid" 2>/dev/null
 }
 
+# Enable agent teams (required for team-based workflows)
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+# Persist into .spawnrc so all Claude sessions on this VM inherit the flag
+if [[ -f "${HOME}/.spawnrc" ]]; then
+    grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "${HOME}/.spawnrc" 2>/dev/null || \
+        printf '\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n' >> "${HOME}/.spawnrc"
+fi
+
 log "=== Starting QA cycle (reason=${SPAWN_REASON}) ==="
 log "Repo root: ${REPO_ROOT}"
 log "Timeout: ${CYCLE_TIMEOUT}s"

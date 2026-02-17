@@ -151,6 +151,14 @@ done
 log "Pre-cycle cleanup done."
 
 # Launch Claude Code with mode-specific prompt
+# Enable agent teams (required for team-based workflows)
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+# Persist into .spawnrc so all Claude sessions on this VM inherit the flag
+if [[ -f "${HOME}/.spawnrc" ]]; then
+    grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "${HOME}/.spawnrc" 2>/dev/null || \
+        printf '\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n' >> "${HOME}/.spawnrc"
+fi
+
 log "Launching ${RUN_MODE} cycle..."
 
 PROMPT_FILE=$(mktemp /tmp/security-prompt-XXXXXX.md)
@@ -336,7 +344,7 @@ If zero PRs, skip to Step 3.
 2. TaskCreate per PR
 3. Spawn **pr-reviewer** (model=sonnet) per PR, named pr-reviewer-NUMBER
    **CRITICAL: Copy the COMPLETE review protocol below into every reviewer's prompt.**
-4. Spawn **branch-cleaner** (model=haiku) — see Step 3
+4. Spawn **branch-cleaner** (model=sonnet) — see Step 3
 
 ### Per-PR Reviewer Protocol
 
@@ -390,14 +398,14 @@ Each pr-reviewer MUST:
 
 ## Step 3 — Branch Cleanup
 
-Spawn **branch-cleaner** (model=haiku):
+Spawn **branch-cleaner** (model=sonnet):
 - List remote branches: \`git branch -r --format='%(refname:short) %(committerdate:unix)'\`
 - For each non-main branch: if no open PR + stale >48h → \`git push origin --delete BRANCH\`
 - Report summary.
 
 ## Step 4 — Stale Issue Re-triage
 
-Spawn **issue-checker** (model=moonshotai/kimi-k2.5):
+Spawn **issue-checker** (model=google/gemini-3-flash-preview):
 - \`gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels,updatedAt,comments\`
 - For each issue, fetch full context: \`gh issue view NUMBER --repo OpenRouterTeam/spawn --comments\`
 - **STRICT DEDUP — MANDATORY**: Check comments for \`-- security/issue-checker\` OR \`-- security/triage\`. If EITHER sign-off already exists in ANY comment on the issue → **SKIP this issue entirely** (do NOT comment again) UNLESS there are new human comments posted AFTER the last security sign-off comment
@@ -484,7 +492,7 @@ Cleanup: \`cd ${REPO_ROOT} && git worktree remove ${WORKTREE_BASE} --force && gi
 
 1. **shell-auditor** (Opus) — Scan ALL .sh files for: command injection, credential leaks, path traversal, unsafe eval/source, curl|bash safety, macOS bash 3.x compat, permission issues. Run \`bash -n\` on every file. Classify CRITICAL/HIGH/MEDIUM/LOW.
 2. **code-auditor** (Opus) — Scan ALL .ts files for: XSS/injection, prototype pollution, unsafe eval, dependency issues, auth bypass, info disclosure. Run \`bun test\`. Check key files for unexpected content.
-3. **drift-detector** (Haiku) — Check for: uncommitted sensitive files (.env, keys), unexpected binaries, unusual permissions, suspicious recent commits (\`git log --oneline -50\`), .gitignore coverage.
+3. **drift-detector** (Sonnet) — Check for: uncommitted sensitive files (.env, keys), unexpected binaries, unusual permissions, suspicious recent commits (\`git log --oneline -50\`), .gitignore coverage.
 
 ## Issue Filing
 
@@ -538,10 +546,10 @@ log "Hard timeout: ${HARD_TIMEOUT}s"
 IDLE_TIMEOUT=600  # 10 minutes of silence = hung
 
 # Run claude in background so we can monitor output activity.
-# Triage uses kimi-k2.5 (lightweight safety check); other modes use default (Opus) for team lead.
+# Triage uses gemini-3-flash (lightweight safety check); other modes use default (Opus) for team lead.
 CLAUDE_MODEL_FLAG=""
 if [[ "${RUN_MODE}" == "triage" ]]; then
-    CLAUDE_MODEL_FLAG="--model moonshotai/kimi-k2.5"
+    CLAUDE_MODEL_FLAG="--model google/gemini-3-flash-preview"
 fi
 
 CLAUDE_PID_FILE=$(mktemp /tmp/claude-pid-XXXXXX)
