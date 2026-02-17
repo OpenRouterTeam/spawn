@@ -2,6 +2,8 @@ import "./unicode-detect.js"; // Must be first: configures TERM before clack rea
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { spawn } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 import {
   loadManifest,
   agentKeys,
@@ -637,7 +639,22 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
 
 /** Check for missing credentials before running a script and warn the user.
  *  In interactive mode, asks for confirmation. In non-interactive mode, just warns. */
-function collectMissingCredentials(authVars: string[]): string[] {
+/** Check if credentials are saved in ~/.config/spawn/{cloud}.json */
+function hasCloudConfigCredentials(cloud: string): boolean {
+  try {
+    const configPath = path.join(process.env.HOME || "", ".config/spawn", `${cloud}.json`);
+    if (!fs.existsSync(configPath)) return false;
+    const content = fs.readFileSync(configPath, "utf-8");
+    const config = JSON.parse(content);
+    // Check if config has any non-empty credentials
+    return Object.values(config).some(v => typeof v === "string" && v.trim().length > 0);
+  } catch {
+    // If config can't be read, assume no saved credentials
+    return false;
+  }
+}
+
+function collectMissingCredentials(authVars: string[], cloud?: string): string[] {
   const missing: string[] = [];
   if (!process.env.OPENROUTER_API_KEY) {
     missing.push("OPENROUTER_API_KEY");
@@ -647,6 +664,12 @@ function collectMissingCredentials(authVars: string[]): string[] {
       missing.push(v);
     }
   }
+
+  // If there are missing credentials but the cloud has saved config, don't report them as missing
+  if (missing.length > 0 && cloud && hasCloudConfigCredentials(cloud)) {
+    return missing.filter(v => v === "OPENROUTER_API_KEY");
+  }
+
   return missing;
 }
 
@@ -673,7 +696,7 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   if (cloudAuth.toLowerCase() === "none") return;
 
   const authVars = parseAuthEnvVars(cloudAuth);
-  const missing = collectMissingCredentials(authVars);
+  const missing = collectMissingCredentials(authVars, cloud);
   if (missing.length === 0) return;
 
   const cloudName = manifest.clouds[cloud].name;
