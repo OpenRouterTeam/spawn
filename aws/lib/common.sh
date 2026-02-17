@@ -61,6 +61,24 @@ ensure_ssh_key() {
     # Generate key if needed
     generate_ssh_key_if_missing "${key_path}"
 
+    # Validate SSH public key path before upload
+    if [[ ! -f "${pub_path}" ]]; then
+        log_error "SSH public key not found: ${pub_path}"
+        return 1
+    fi
+    if [[ -L "${pub_path}" ]]; then
+        log_error "SSH public key cannot be a symlink: ${pub_path}"
+        return 1
+    fi
+    # SSH public keys are typically 100-600 bytes (ed25519/RSA)
+    # Reject suspiciously large files to prevent arbitrary file upload
+    local size
+    size=$(wc -c <"${pub_path}")
+    if [[ ${size} -gt 10000 ]]; then
+        log_error "SSH public key file too large: ${size} bytes (max 10000)"
+        return 1
+    fi
+
     local key_name="spawn-key"
 
     # Check if already registered
