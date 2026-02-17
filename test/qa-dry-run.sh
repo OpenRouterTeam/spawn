@@ -396,8 +396,8 @@ if [[ -f "${RESULTS_PHASE4}" ]]; then
             would_commit "git checkout -b qa/readme-update-\$(date +%s) && git add README.md && git commit && git push && gh pr create && gh pr merge"
             # Show the diff but don't commit
             git diff README.md > "${DRY_RUN_DIR}/diff-readme.patch" 2>/dev/null || true
-            # Revert README changes (dry run)
-            git checkout README.md 2>/dev/null || true
+            # Revert README changes (dry run) - use git restore to avoid checkout pollution
+            git restore README.md 2>/dev/null || git checkout -- README.md 2>/dev/null || true
             log "Phase 4: README diff saved to diff-readme.patch (not committed)"
         else
             log "Phase 4: No README changes needed"
