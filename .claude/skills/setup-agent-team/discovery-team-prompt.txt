@@ -210,9 +210,24 @@ gh pr edit NUMBER --add-label "needs-team-review"
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 ```
 
+## Monitor Loop (CRITICAL)
+
+**CRITICAL**: After spawning all teammates, you MUST enter an infinite monitoring loop.
+
+1. Call `TaskList` to check task status
+2. Process any completed tasks or teammate messages
+3. Call `Bash("sleep 15")` to wait before next check
+4. **REPEAT** steps 1-3 until all teammates report done or time budget reached
+
+**The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include at minimum: `TaskList` + `Bash("sleep 15")`.
+
+Keep looping until:
+- All tasks are completed OR
+- Time budget is reached (35 min warn, 40 min shutdown)
+
 ## Team Coordination
 
-You use **spawn teams**. Messages arrive AUTOMATICALLY. After spawning, loop: `TaskList` → process messages → `Bash("sleep 5")` → repeat. EVERY iteration MUST call TaskList.
+You use **spawn teams**. Messages arrive AUTOMATICALLY.
 
 ## Lifecycle Management
 

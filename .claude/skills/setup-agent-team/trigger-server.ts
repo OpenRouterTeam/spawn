@@ -9,15 +9,12 @@
  *
  * Endpoints:
  *   GET  /health  → {"status":"ok", runs, ...}
- *   POST /trigger → validates auth, runs TARGET_SCRIPT, streams output back
+ *   POST /trigger → validates auth, spawns TARGET_SCRIPT, returns immediately
  *
- * The /trigger endpoint returns a streaming text/plain response with the
- * script's stdout/stderr. The long-lived HTTP connection keeps the VM
- * alive for the entire duration of the cycle. A heartbeat line is emitted
- * every 30s during silent periods to prevent proxy idle timeouts.
- *
- * If the client disconnects mid-stream, the script keeps running — output
- * continues to drain to the server console.
+ * The /trigger endpoint is fire-and-forget: it spawns the script and returns
+ * a JSON response with the run ID immediately. Script output goes to the
+ * server console (captured by journalctl). The real state lives on the VM
+ * (log files at .docs/).
  */
 
 import { timingSafeEqual } from "crypto";
@@ -191,69 +188,10 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 /**
- * Create a safe enqueue function that gracefully handles client disconnect.
+ * Spawn the target script and return immediately with a JSON response.
+ * Script stdout/stderr are piped to the server console (journalctl).
  */
-function createEnqueuer(encoder: TextEncoder): {
-  enqueue: (controller: ReadableStreamDefaultController, chunk: Uint8Array) => void;
-  isConnected: () => boolean;
-  setDisconnected: () => void;
-} {
-  let clientConnected = true;
-
-  return {
-    enqueue(controller: ReadableStreamDefaultController, chunk: Uint8Array) {
-      if (!clientConnected) return;
-      try {
-        controller.enqueue(chunk);
-      } catch {
-        clientConnected = false;
-      }
-    },
-    isConnected() {
-      return clientConnected;
-    },
-    setDisconnected() {
-      clientConnected = false;
-    },
-  };
-}
-
-/**
- * Drain a readable stream, logging to console and enqueuing to HTTP response.
- */
-async function drainStreamOutput(
-  src: ReadableStream<Uint8Array> | null,
-  enqueue: (chunk: Uint8Array) => void,
-  onActivity: () => void
-): Promise<void> {
-  if (!src) return;
-  const reader = src.getReader();
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      // Always log locally
-      process.stdout.write(value);
-      // Stream to HTTP client if still connected
-      onActivity();
-      enqueue(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-/**
- * Spawn the target script and return a streaming Response.
- *
- * stdout/stderr are piped back as chunked text/plain. A heartbeat line
- * is injected every 30 seconds of silence so intermediary proxies
- * keep the connection alive.
- *
- * If the HTTP client disconnects, the process keeps running — we just
- * stop writing to the response stream and continue draining to console.
- */
-function startStreamingRun(reason: string, issue: string): Response {
+function startFireAndForgetRun(reason: string, issue: string): Response {
   const id = nextRunId++;
   const startedAt = Date.now();
 
@@ -269,8 +207,8 @@ function startStreamingRun(reason: string, issue: string): Response {
         VALIDATED_TARGET_SCRIPT.lastIndexOf("/")
       ) ||
       ".",
-    stdout: "pipe",
-    stderr: "pipe",
+    stdout: "inherit",
+    stderr: "inherit",
     env: {
       ...process.env,
       SPAWN_ISSUE: issue,
@@ -280,86 +218,32 @@ function startStreamingRun(reason: string, issue: string): Response {
 
   runs.set(id, { proc, startedAt, reason, issue });
 
-  // Safety net: ensure run is cleaned up even if streaming logic errors
+  // Clean up run entry when process exits
   proc.exited
-    .then(() => {
-      if (runs.has(id)) runs.delete(id);
+    .then((exitCode) => {
+      const elapsed = Math.round((Date.now() - startedAt) / 1000);
+      console.log(
+        `[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size - 1}/${MAX_CONCURRENT})`
+      );
+      runs.delete(id);
     })
     .catch(() => {
-      if (runs.has(id)) runs.delete(id);
+      runs.delete(id);
     });
 
-  const encoder = new TextEncoder();
-  const enqueuer = createEnqueuer(encoder);
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      // --- Header ---
-      const header = `[trigger] Run #${id} started (reason=${reason}${issue ? `, issue=#${issue}` : ""}, concurrent=${runs.size}/${MAX_CONCURRENT})\n`;
-      enqueuer.enqueue(controller, encoder.encode(header));
-
-      // --- Heartbeat: emit every 15s of silence to keep connection alive ---
-      // Must fire well before Bun's idleTimeout (255s) and any proxy timeouts.
-      let lastActivity = Date.now();
-      const heartbeat = setInterval(() => {
-        if (!enqueuer.isConnected()) return;
-        const silentMs = Date.now() - lastActivity;
-        if (silentMs >= 14_000) {
-          const elapsed = Math.round((Date.now() - startedAt) / 1000);
-          const msg = `[heartbeat] Run #${id} active (${elapsed}s elapsed)\n`;
-          enqueuer.enqueue(controller, encoder.encode(msg));
-          lastActivity = Date.now();
-        }
-      }, 15_000);
-
-      try {
-        await Promise.all([
-          drainStreamOutput(proc.stdout, (chunk) => enqueuer.enqueue(controller, chunk), () => {
-            lastActivity = Date.now();
-          }),
-          drainStreamOutput(proc.stderr, (chunk) => enqueuer.enqueue(controller, chunk), () => {
-            lastActivity = Date.now();
-          }),
-        ]);
-
-        // --- Wait for exit ---
-        const exitCode = await proc.exited;
-
-        const elapsed = Math.round((Date.now() - startedAt) / 1000);
-        const footer = `\n[trigger] Run #${id} finished (exit=${exitCode}, duration=${elapsed}s, remaining=${runs.size}/${MAX_CONCURRENT})\n`;
-        console.log(footer.trim());
-        enqueuer.enqueue(controller, encoder.encode(footer));
-      } catch (err) {
-        const elapsed = Math.round((Date.now() - startedAt) / 1000);
-        const errMsg = `\n[trigger] Run #${id} stream error after ${elapsed}s: ${err}\n`;
-        console.error(errMsg.trim());
-        enqueuer.enqueue(controller, encoder.encode(errMsg));
-      } finally {
-        runs.delete(id);
-        clearInterval(heartbeat);
-        try {
-          controller.close();
-        } catch {}
-      }
+  return Response.json(
+    {
+      ok: true,
+      runId: id,
+      reason,
+      issue: issue || undefined,
+      concurrent: runs.size,
+      max: MAX_CONCURRENT,
     },
-
-    cancel() {
-      // Called when the HTTP client disconnects
-      enqueuer.setDisconnected();
-      console.log(
-        `[trigger] Client disconnected from run #${id} stream (process continues running)`
-      );
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "X-Run-Id": String(id),
-      "X-Accel-Buffering": "no", // Nginx: don't buffer
-      "Cache-Control": "no-cache",
-    },
-  });
+    {
+      headers: { "X-Run-Id": String(id) },
+    }
+  );
 }
 
 const server = Bun.serve({
@@ -471,12 +355,7 @@ const server = Bun.serve({
         }
       }
 
-      // Disable idle timeout for this request — the stream may be silent for
-      // minutes at a time while Claude thinks. 0 = no timeout.
-      server.timeout(req, 0);
-
-      // Stream the script output back as the response body.
-      return startStreamingRun(reason, issue);
+      return startFireAndForgetRun(reason, issue);
     }
 
     return Response.json({ error: "not found" }, { status: 404 });
@@ -495,4 +374,4 @@ console.log(`[trigger] MAX_CONCURRENT=${MAX_CONCURRENT}`);
 console.log(
   `[trigger] RUN_TIMEOUT_MS=${RUN_TIMEOUT_MS} (${Math.round(RUN_TIMEOUT_MS / 1000 / 60)}min)`
 );
-console.log(`[trigger] Output streaming enabled — responses stream script output in chunks`);
+console.log(`[trigger] Fire-and-forget mode — /trigger returns immediately, output goes to console`);

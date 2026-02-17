@@ -9,13 +9,13 @@ concurrency:
 jobs:
   trigger:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 5
     steps:
-      - name: Trigger QA cycle on Sprite
+      - name: Trigger QA cycle
         env:
           SPRITE_URL: ${{ secrets.QA_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.QA_TRIGGER_SECRET }}
         run: |
-          curl -sSN --fail-with-body --max-time 5400 -X POST \
+          curl -sS --fail-with-body -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"

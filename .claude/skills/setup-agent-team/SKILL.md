@@ -81,19 +81,15 @@ It reads env vars:
 **Stale run detection:**
 Before accepting a trigger, the server checks if tracked processes are still alive (`kill -0`). Dead processes are reaped automatically. Runs exceeding `RUN_TIMEOUT_MS` are force-killed to free the slot.
 
-**Output streaming:**
-The `/trigger` endpoint returns a **streaming `text/plain` response** — the script's stdout/stderr are piped back as chunked output in real-time. This gives visibility — GitHub Actions logs show the full cycle output in real-time.
-
-A heartbeat line (`[heartbeat] Run #N active (Xs elapsed)`) is emitted every 15 seconds during silent periods to prevent proxy idle timeouts. If the client disconnects mid-stream, the script keeps running — output continues to drain to the server console.
-
-**Bun idle timeout:** The server calls `server.timeout(req, 0)` on streaming requests to fully disable Bun's per-connection idle timeout (which defaults to 10 seconds and would otherwise kill the connection during silent periods like Claude thinking).
+**Fire-and-forget:**
+The `/trigger` endpoint spawns the script and returns a JSON response immediately with the run ID. Script stdout/stderr go to the server console (captured by journalctl). The real state lives on the VM (log files at `.docs/`). GitHub Actions is just a dumb trigger — it makes the POST and exits.
 
 **Endpoints:**
 - `GET /health` → `{"status":"ok","running":N,"max":N,"timeoutSec":N,"runs":[...]}` (no auth, shows per-run pid/age)
-- `POST /trigger` → validates `Authorization: Bearer <secret>`, reaps stale runs, then streams script output back
+- `POST /trigger` → validates `Authorization: Bearer <secret>`, reaps stale runs, spawns script, returns immediately
 
 **Responses:**
-- `200` — Streaming `text/plain` response with script output (success)
+- `200` — `{"ok":true,"runId":N,"reason":"...","concurrent":N,"max":N}` (script spawned)
 - `400` — `{"error":"issue must be a positive integer"}` if issue param is invalid
 - `401` — `{"error":"unauthorized"}` if bearer token is wrong
 - `409` — `{"error":"run for this issue already in progress"}` if duplicate issue trigger
@@ -218,7 +214,7 @@ curl -sf -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/trigger
 # Test valid trigger
 curl -sf -X POST "http://localhost:8080/trigger?reason=test" \
   -H "Authorization: Bearer <secret-from-step-2>"
-# Expected: streaming output from the target script
+# Expected: {"ok":true,"runId":1,...}
 ```
 
 ## Step 5: Create the GitHub Actions workflow
@@ -242,44 +238,19 @@ concurrency:
 jobs:
   trigger:
     runs-on: ubuntu-latest
-    timeout-minutes: 90          # Must exceed longest expected cycle
+    timeout-minutes: 5
     steps:
-      - name: Trigger and stream <service-name> cycle
+      - name: Trigger <service-name> cycle
         env:
           SPRITE_URL: ${{ secrets.<SERVICE_NAME>_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.<SERVICE_NAME>_TRIGGER_SECRET }}
         run: |
-          set +e
-          # --http1.1: avoid HTTP/2 stream errors on long-lived responses
-          # --fail-with-body: exit 22 on HTTP errors but still print the body
-          # -N: no output buffering (stream chunks in real-time)
-          # --max-time: hard cap matching the cycle timeout + grace
-          curl -sSN --http1.1 --fail-with-body --max-time 5400 -X POST \
+          curl -sS --fail-with-body -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
-          CURL_EXIT=$?
-          set -e
-
-          if [ "$CURL_EXIT" -eq 0 ]; then
-            echo ""
-            echo "=== Cycle completed ==="
-          elif [ "$CURL_EXIT" -eq 22 ]; then
-            # HTTP error — body was already printed above (429, 409, etc.)
-            echo ""
-            echo "=== Trigger returned HTTP error (see output above) ==="
-          else
-            echo ""
-            echo "=== curl failed (exit=$CURL_EXIT) ==="
-            exit 1
-          fi
 ```
 
-**Important curl flags for streaming:**
-- `--http1.1` — **Required.** HTTP/2 has strict stream lifecycle management that kills long-lived chunked responses with `error 92: INTERNAL_ERROR`.
-- `-N` — Disables curl's output buffering so chunks appear in the GH Actions log in real-time.
-- `--fail-with-body` — Returns exit code 22 on HTTP errors (429/409/401) while still printing the JSON response body for debugging.
-- `--max-time 5400` — Hard cap (90 min) as a safety net. Should exceed your longest expected cycle.
-- `timeout-minutes: 90` — The GH Actions job timeout. Must match or exceed `--max-time`.
+The trigger is fire-and-forget — the workflow just makes the POST and exits. The script runs on the VM independently. Use `--fail-with-body` so HTTP errors (429/409/401) still print the JSON response body for debugging.
 
 ## Step 5.5: Determine the Service URL
 
@@ -444,11 +415,11 @@ In `claude -p` (print) mode, the session ends when no tool call is made. The lea
 ```
 1. Call TaskList to check task status
 2. Process any teammate messages (they arrive automatically as user turns)
-3. If tasks still pending, call Bash("sleep 5") to yield, then go back to step 1
+3. If tasks still pending, call Bash("sleep 15") to yield, then go back to step 1
 4. Once all tasks complete, shutdown teammates and exit
 ```
 
-**EVERY iteration MUST call TaskList.** Looping on `sleep 5` alone blocks message delivery without checking progress. This is the #1 cause of stuck cycles.
+**EVERY iteration MUST call TaskList.** Looping on `sleep` alone blocks message delivery without checking progress. This is the #1 cause of stuck cycles.
 
 ### Spawning teammates correctly
 
@@ -619,31 +590,13 @@ To add a new automation script (beyond discovery.sh and refactor.sh):
 4. Create a corresponding `start-<script-name>.sh` wrapper with the appropriate env vars
 5. Follow the setup steps above to register the service and create the GitHub Actions workflow
 
-### Bun `idleTimeout` Gotcha
-
-Bun's HTTP server has a default `idleTimeout` of **10 seconds** — it will close connections with no data flowing after 10s. For streaming responses that may be silent for minutes (Claude thinking, waiting for API responses), you MUST disable it:
-
-```ts
-// In the fetch handler, before returning the streaming response:
-server.timeout(req, 0); // 0 = disable idle timeout for this request
-```
-
-The `server.timeout(req, seconds)` API is per-request. Setting `idleTimeout` globally in `Bun.serve()` options has a max of 255 seconds, which is insufficient for long cycles. Always use `server.timeout(req, 0)` for streaming endpoints.
-
-### HTTP/1.1 Required for Streaming
-
-HTTP/2's stream multiplexing does not handle long-lived chunked responses well. curl will fail with `error 92: HTTP/2 stream was not closed cleanly: INTERNAL_ERROR`. Always use `--http1.1` in the curl command.
-
 ## Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
 | Service won't start | Check if another service is using port 8080 |
 | 401 on trigger | Verify `TRIGGER_SECRET` matches between wrapper script and GitHub secret |
-| curl exits with code 22 | The service URL may require auth — ensure it is publicly accessible |
-| curl exits with code 92 | HTTP/2 stream error — add `--http1.1` flag to curl |
-| curl exits with code 18 | Connection closed prematurely — ensure `server.timeout(req, 0)` is set for streaming requests in trigger-server.ts |
-| VM becomes unreachable mid-cycle | The streaming connection dropped. Check that GH Actions `timeout-minutes` exceeds cycle length and curl uses `--http1.1 -N` flags |
+| curl exits with code 22 | HTTP error — `--fail-with-body` prints the JSON body (429/409/401) |
 | Script runs but nothing happens | Check the target script works standalone: `bash /path/to/script.sh` |
 | VM doesn't respond | Verify `<SERVICE>_SPRITE_URL` secret matches the service's public URL |
 | `{"error":"max concurrent runs reached"}` | Max concurrent limit reached (default 1) — wait for runs to finish or increase `MAX_CONCURRENT` env var in wrapper script |
@@ -651,6 +604,7 @@ HTTP/2's stream multiplexing does not handle long-lived chunked responses well. 
 | GitHub Actions secret is empty | Check `gh secret list --repo <owner>/<repo>` and re-set with `printf` (not `echo`, to avoid trailing newline) |
 | systemd service won't start | Check `journalctl -u spawn-<name> -n 50` — common issues: port in use (EADDRINUSE), wrong PATH (bun/claude not found), permission denied |
 | systemd service keeps restarting | Check exit code in `systemctl status` — if exit 1, check journal logs. If EADDRINUSE, run `fuser -k 8080/tcp` first |
+| Run status unknown | Use `GET /health` to check active runs, or check VM logs via `journalctl -u spawn-<name>` |
 
 ## Current Deployed Services
 
