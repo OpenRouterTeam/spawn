@@ -445,10 +445,32 @@ async function selectCloud(manifest: Manifest, cloudList: string[], hintOverride
   return cloudChoice;
 }
 
+// Prompt user to enter a spawn name for the instance
+async function promptSpawnName(): Promise<string | undefined> {
+  const spawnName = await p.text({
+    message: "Enter a name for this spawn (optional)",
+    placeholder: "my-spawn",
+    validate: (value) => {
+      if (!value) return undefined; // Optional field
+      // Validate name format (alphanumeric, hyphens, underscores)
+      if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+        return "Name must contain only letters, numbers, hyphens, and underscores";
+      }
+      if (value.length > 63) {
+        return "Name must be 63 characters or less";
+      }
+      return undefined;
+    },
+  });
+  if (p.isCancel(spawnName)) handleCancel();
+  return spawnName || undefined;
+}
+
 export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
   const manifest = await loadManifestWithSpinner();
+  const spawnName = await promptSpawnName();
   const agentChoice = await selectAgent(manifest);
 
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, agentChoice);
@@ -462,7 +484,7 @@ export async function cmdInteractive(): Promise<void> {
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url);
+  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url, undefined, spawnName);
 }
 
 /** Interactive cloud selection when agent is already known (e.g. `spawn claude`) */
@@ -470,6 +492,7 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
   const manifest = await loadManifestWithSpinner();
+  const spawnName = await promptSpawnName();
   const resolvedAgent = resolveAgentKey(manifest, agent);
 
   if (!resolvedAgent) {
@@ -493,7 +516,7 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${resolvedAgent} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(cloudChoice, resolvedAgent, prompt, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url, dryRun);
+  await execScript(cloudChoice, resolvedAgent, prompt, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url, dryRun, spawnName);
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────
@@ -1055,10 +1078,10 @@ function handleUserInterrupt(errMsg: string, dashboardUrl?: string): void {
   process.exit(130);
 }
 
-async function runWithRetries(script: string, prompt?: string, dashboardUrl?: string, debug?: boolean): Promise<string | undefined> {
+async function runWithRetries(script: string, prompt?: string, dashboardUrl?: string, debug?: boolean, spawnName?: string): Promise<string | undefined> {
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     try {
-      await runBash(script, prompt, debug);
+      await runBash(script, prompt, debug, spawnName);
       return undefined; // success
     } catch (err) {
       const errMsg = getErrorMessage(err);
@@ -1077,7 +1100,7 @@ async function runWithRetries(script: string, prompt?: string, dashboardUrl?: st
   return "Script failed after all retries";
 }
 
-async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, dashboardUrl?: string, debug?: boolean): Promise<void> {
+async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, dashboardUrl?: string, debug?: boolean, spawnName?: string): Promise<void> {
   const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
@@ -1095,6 +1118,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
       agent,
       cloud,
       timestamp: new Date().toISOString(),
+      ...(spawnName ? { name: spawnName } : {}),
       ...(prompt ? { prompt } : {}),
     });
   } catch (err) {
@@ -1105,13 +1129,13 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
     }
   }
 
-  const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl, debug);
+  const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {
     reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl);
   }
 }
 
-function runBash(script: string, prompt?: string, debug?: boolean): Promise<void> {
+function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<void> {
   // SECURITY: Validate script content before execution
   validateScriptContent(script);
 
@@ -1123,6 +1147,9 @@ function runBash(script: string, prompt?: string, debug?: boolean): Promise<void
   }
   if (debug) {
     env.SPAWN_DEBUG = "1";
+  }
+  if (spawnName) {
+    env.SPAWN_NAME = spawnName;
   }
 
   return new Promise<void>((resolve, reject) => {
