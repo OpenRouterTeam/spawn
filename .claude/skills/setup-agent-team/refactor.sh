@@ -412,24 +412,24 @@ git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 
 Setup: `mkdir -p WORKTREE_BASE_PLACEHOLDER`. Cleanup: `git worktree prune` at cycle end.
 
+## Monitor Loop (CRITICAL)
+
+**CRITICAL**: After spawning all teammates, you MUST enter an infinite monitoring loop.
+
+1. Call \`TaskList\` to check task status
+2. Process any completed tasks or teammate messages
+3. Call \`Bash("sleep 15")\` to wait before next check
+4. **REPEAT** steps 1-3 until all teammates report done or time budget reached
+
+**The session ENDS when you produce a response with NO tool calls.** EVERY iteration MUST include at minimum: \`TaskList\` + \`Bash("sleep 15")\`.
+
+Keep looping until:
+- All tasks are completed OR
+- Time budget is reached (10 min warn, 12 min shutdown, 15 min force)
+
 ## Team Coordination
 
-You use **spawn teams**. Messages from teammates arrive AUTOMATICALLY between turns — you do NOT need to check for them.
-
-**CRITICAL: Your session ENDS if you produce a response with NO tool call. You MUST call a tool every turn to stay alive.**
-
-After spawning all teammates, enter a monitoring loop:
-1. Call `TaskList` to check progress
-2. Process any plan approval requests (approve/reject immediately)
-3. Process any teammate messages (respond if needed)
-4. Call `Bash("sleep 3")` to yield before next check
-5. Repeat until all work is done
-
-**IMPORTANT rules for the monitoring loop:**
-- NEVER use `sleep` longer than 5 seconds — short sleeps keep you responsive to teammate messages
-- NEVER produce a text-only response — always include a tool call (even just `TaskList` or `Bash("sleep 3")`)
-- If you have nothing else to do, call `TaskList` — that counts as a tool call and keeps you alive
-- Teammates typically respond within 30-60 seconds — if no messages after 2 minutes, check `TaskList` for stuck tasks
+You use **spawn teams**. Messages arrive AUTOMATICALLY between turns.
 
 ## Lifecycle Management
 
@@ -466,8 +466,8 @@ fi
 
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
-# NOTE: VM keep-alive is handled by the trigger server streaming output back
-# to the GitHub Actions runner via a long-lived HTTP response.
+# NOTE: The trigger server is fire-and-forget — GitHub Actions just makes
+# the POST and exits. VM keep-alive is handled by systemd.
 
 # Activity watchdog: kill claude if no output for IDLE_TIMEOUT seconds.
 # This catches hung API calls (pre-flight check hangs, network issues) much

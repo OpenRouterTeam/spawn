@@ -14,7 +14,7 @@ concurrency:
 jobs:
   trigger:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 5
     # Only trigger on issues with safe-to-work AND (bug, cli, enhancement, or maintenance) labels, or schedule/manual
     if: >-
       github.event_name != 'issues' ||
@@ -24,30 +24,11 @@ jobs:
         contains(github.event.issue.labels.*.name, 'enhancement') ||
         contains(github.event.issue.labels.*.name, 'maintenance')))
     steps:
-      - name: Trigger and stream refactor cycle
+      - name: Trigger refactor cycle
         env:
           SPRITE_URL: ${{ secrets.REFACTOR_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.REFACTOR_TRIGGER_SECRET }}
         run: |
-          set +e
-          # --fail-with-body: exit 22 on HTTP errors but still print the body
-          # -N: no output buffering (stream chunks in real-time)
-          # --max-time: hard cap matching the Sprite's cycle timeout + grace
-          curl -sSN --http1.1 --fail-with-body --max-time 5400 -X POST \
+          curl -sS --fail-with-body -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}&issue=${{ github.event.issue.number || '' }}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
-          CURL_EXIT=$?
-          set -e
-
-          if [ "$CURL_EXIT" -eq 0 ]; then
-            echo ""
-            echo "=== Cycle completed ==="
-          elif [ "$CURL_EXIT" -eq 22 ]; then
-            # HTTP error — body was already printed above (429 = already running, 409 = dedup, etc.)
-            echo ""
-            echo "=== Trigger returned HTTP error (see output above) ==="
-          else
-            echo ""
-            echo "=== curl failed (exit=$CURL_EXIT) ==="
-            exit 1
-          fi
