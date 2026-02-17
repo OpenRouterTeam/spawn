@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { resolve } from "path";
+import { resolve, join } from "path";
 
 /**
  * Tests for CLI version output and dispatch routing via subprocess execution.

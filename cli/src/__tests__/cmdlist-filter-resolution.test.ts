@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
 import type { Manifest } from "../manifest";
@@ -100,7 +100,7 @@ describe("cmdList filter resolution via display names", () => {
   }
 
   beforeEach(async () => {
-    testDir = join(tmpdir(), `spawn-filter-res-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `spawn-filter-res-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
 
     originalEnv = { ...process.env };
@@ -578,7 +578,7 @@ describe("showListFooter prompt escaping", () => {
   }
 
   beforeEach(async () => {
-    testDir = join(tmpdir(), `spawn-footer-esc-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `spawn-footer-esc-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     originalEnv = { ...process.env };
     process.env.SPAWN_HOME = testDir;

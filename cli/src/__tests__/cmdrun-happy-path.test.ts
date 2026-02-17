@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
 
@@ -164,7 +164,7 @@ describe("cmdRun happy-path pipeline", () => {
     originalFetch = global.fetch;
 
     // Set up isolated history directory
-    historyDir = join(tmpdir(), `spawn-test-history-${Date.now()}-${Math.random()}`);
+    historyDir = join(homedir(), `spawn-test-history-${Date.now()}-${Math.random()}`);
     mkdirSync(historyDir, { recursive: true });
     originalSpawnHome = process.env.SPAWN_HOME;
     process.env.SPAWN_HOME = historyDir;
@@ -352,7 +352,7 @@ describe("cmdRun happy-path pipeline", () => {
 
     it("should still execute script when history save fails", async () => {
       // Make history dir read-only to force saveSpawnRecord failure
-      const readOnlyDir = join(tmpdir(), `spawn-test-readonly-${Date.now()}`);
+      const readOnlyDir = join(homedir(), `spawn-test-readonly-${Date.now()}`);
       mkdirSync(readOnlyDir, { recursive: true });
       // Create a file where the directory should be, so mkdir fails
       writeFileSync(join(readOnlyDir, "history.json"), "not-a-directory");

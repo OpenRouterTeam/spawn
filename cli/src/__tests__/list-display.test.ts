@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 
 /**
  * Tests for the `spawn list` display logic in commands.ts and index.ts.
@@ -304,7 +304,7 @@ describe("cmdList output", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `spawn-list-test-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `spawn-list-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     originalEnv = { ...process.env };
     process.env.SPAWN_HOME = testDir;

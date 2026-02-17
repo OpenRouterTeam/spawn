@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
-import { tmpdir } from "os";
+import { homedir } from "os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
 import type { Manifest } from "../manifest";
@@ -113,7 +113,7 @@ describe("cmdList table rendering", () => {
     originalEnv = { ...process.env };
 
     // Set up temp history dir
-    testDir = join(tmpdir(), `spawn-list-table-test-${Date.now()}-${Math.random()}`);
+    testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, { recursive: true });
     process.env.SPAWN_HOME = testDir;
   });
