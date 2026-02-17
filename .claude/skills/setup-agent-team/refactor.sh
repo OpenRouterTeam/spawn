@@ -31,7 +31,7 @@ else
     RUN_MODE="refactor"
     WORKTREE_BASE="/tmp/spawn-worktrees/refactor"
     TEAM_NAME="spawn-refactor"
-    CYCLE_TIMEOUT=1800  # 30 min for refactor runs
+    CYCLE_TIMEOUT=1500  # 25 min for refactor runs
 fi
 
 LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"
@@ -213,33 +213,23 @@ Mission: Spawn specialized teammates to maintain and improve the spawn codebase.
 
 These files are NEVER to be touched by any teammate. If a teammate's plan includes modifying any of these, REJECT it.
 
-## Diminishing Returns Rule
+## Diminishing Returns Rule (proactive work only)
 
-You are allowed — and encouraged — to do nothing when there's nothing worth doing.
+This rule applies to PROACTIVE scanning (finding things to improve on your own). It does NOT apply to fixing labeled issues — those are mandates (see Issue-First Policy below).
 
-Your DEFAULT outcome is to report "Code looks good, nothing to do" and shut down.
+For proactive work: your DEFAULT outcome is "Code looks good, nothing to do" and shut down.
 You need a strong reason to override that default. Ask yourself:
 - Is something actually broken or vulnerable right now?
-- Did a user report this problem?
 - Would I mass-revert this PR in a week because it was pointless?
 
-If you can't clearly articulate why the change matters, don't make it.
-
-Before creating a PR, every teammate MUST ask: "Is this change worth a reviewer's time?"
-If the answer is no, report "No actionable findings — codebase is in good shape" and shut down.
-
-Do NOT create PRs for:
+Do NOT create proactive PRs for:
 - Style-only changes (formatting, variable renames, comment rewording)
 - Adding comments/docstrings to working code
 - Refactoring working code that has no bugs or maintainability issues
 - "Improvements" that are subjective preferences
 - Adding error handling for scenarios that can't realistically happen
-- Extracting helpers or abstractions when the inline code is clear enough
-- README edits when the README is already accurate
-- Test "fixes" when tests are passing
 
-"ONE PR max" means AT MOST one — zero is the ideal outcome.
-A cycle with zero PRs is a GOOD cycle if nothing needed fixing.
+A cycle with zero proactive PRs is fine — but ignoring labeled issues is NOT fine.
 
 ## Dedup Rule (MANDATORY)
 
@@ -261,45 +251,57 @@ Good: "Blocks XSS via user-supplied model ID in query param"
 Good: "Fixes crash when OPENROUTER_API_KEY is unset (repro: run without env)"
 Bad: "Improves readability" / "Better error handling" / "Follows best practices"
 
-## Pre-Approval Gate (MANDATORY)
+## Pre-Approval Gate
 
-Spawn ALL teammates with plan_mode_required. Before any teammate creates a PR, they must:
+There are TWO tracks:
+
+### Issue track (NO plan mode)
+Teammates assigned to fix a labeled issue (safe-to-work, security, bug) are spawned WITHOUT plan_mode_required. They go straight to fixing — no approval needed. The issue label IS the approval.
+
+### Proactive track (plan mode required)
+Teammates doing proactive scanning (no specific issue) are spawned WITH plan_mode_required. They must:
 1. Scan the codebase and identify a candidate change
 2. Write a plan with: what files change, the concrete "Why:" justification, and the diff summary
 3. Call ExitPlanMode — this sends you (team lead) an approval request
 4. WAIT for your approval before creating the branch, committing, or pushing
 
-As team lead, REJECT plans that:
+As team lead, REJECT proactive plans that:
 - Have vague justifications ("improves readability", "better error handling")
 - Target code that is working correctly
 - Duplicate an existing open or recently-closed PR
 - Touch off-limits files
 
-APPROVE plans that:
+APPROVE proactive plans that:
 - Fix something actually broken (crash, security hole, failing test)
-- Address a user-reported issue
 - Have a specific, measurable "Why:" line
 
-Rejecting is free. A cycle where you reject all plans and shut down is a good cycle.
+## Issue-First Policy (MANDATORY — this is your primary job)
 
-## Issue-First Policy (MANDATORY)
+**Labeled issues are mandates, not suggestions.** If an open issue has `safe-to-work`, `security`, or `bug` labels, a teammate MUST attempt to fix it. The Diminishing Returns Rule does NOT apply to issue fixes.
 
-Before doing ANY refactoring work, check open issues:
+FIRST, fetch all actionable issues:
 ```bash
-gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,labels --jq 'length'
+gh issue list --repo OpenRouterTeam/spawn --state open --label "safe-to-work" --json number,title,labels
+gh issue list --repo OpenRouterTeam/spawn --state open --label "security" --json number,title,labels
+gh issue list --repo OpenRouterTeam/spawn --state open --label "bug" --json number,title,labels
 ```
 
-If there are **10 or fewer open issues**: there is NO "deferring to next cycle." Every open issue is YOUR problem to solve NOW. Assign issues to teammates, plan fixes, and deliver PRs.
+Filter out discovery team issues (labels: `discovery-team`, `cloud-proposal`, `agent-proposal`).
 
-**NEVER** comment on an issue saying "we'll look at this in a future cycle" or "deferring." You have a full team of capable agents — use them. Pick up the issue, plan a fix, and execute it.
+**For every remaining issue**: assign it to the most relevant teammate. Spawn that teammate WITHOUT plan_mode_required — the issue label is the approval. They go straight to fixing.
 
-Teammates can work on issues AND do proactive scanning simultaneously — but the Diminishing Returns Rule applies to all proactive work.
+If there are more issues than teammates, prioritize: `security` > `bug` > `safe-to-work`.
+
+**Only AFTER all labeled issues are assigned** should remaining teammates do proactive scanning (with plan_mode_required).
+
+If there are zero labeled issues, ALL teammates do proactive scanning with plan mode.
 
 ## Time Budget
 
-Complete within 15 minutes. At 10 min tell teammates to wrap up, at 12 min send shutdown_request, at 15 min force shutdown.
+Complete within 25 minutes. At 20 min tell teammates to wrap up, at 23 min send shutdown_request, at 25 min force shutdown.
 
-Teammates: AT MOST one PR each — zero is the ideal if nothing needs fixing.
+Issue-fixing teammates: one PR per issue.
+Proactive teammates: AT MOST one PR each — zero is the ideal if nothing needs fixing.
 
 ## Separation of Concerns
 
@@ -310,12 +312,14 @@ Refactor team **creates PRs** — security team **reviews and merges** them.
 
 ## Team Structure
 
-1. **security-auditor** (Sonnet) — Scan .sh for injection/path traversal/credential leaks, .ts for XSS/prototype pollution. Fix HIGH/CRITICAL only, document medium/low.
-2. **ux-engineer** (Sonnet) — Test e2e flows, improve error messages, fix UX papercuts, verify README examples.
-3. **complexity-hunter** (Sonnet) — Find functions >50 lines (bash) / >80 lines (ts). Pick top 2-3, ONE PR. Run tests after refactoring.
-4. **test-engineer** (Sonnet) — ONE test PR max. Add missing tests, verify shellcheck, run `bun test`, fix failures.
+Assign teammates to labeled issues first (no plan mode). Remaining teammates do proactive scanning (with plan mode).
 
-5. **code-health** (Sonnet) — Proactive codebase health scan. ONE PR max.
+1. **security-auditor** (Sonnet) — Best match for `security` labeled issues. Proactive: scan .sh for injection/path traversal/credential leaks, .ts for XSS/prototype pollution.
+2. **ux-engineer** (Sonnet) — Best match for `cli` or UX-related issues. Proactive: test e2e flows, improve error messages, fix UX papercuts.
+3. **complexity-hunter** (Sonnet) — Best match for `maintenance` issues. Proactive: find functions >50 lines (bash) / >80 lines (ts), refactor top 2-3.
+4. **test-engineer** (Sonnet) — Best match for test-related issues. Proactive: add missing tests, verify shellcheck, run `bun test`, fix failures.
+
+5. **code-health** (Sonnet) — Best match for `bug` labeled issues. Proactive: codebase health scan. ONE PR max.
    Scan for:
    - **Reliability**: unhandled error paths, missing exit code checks, race conditions, unchecked return values
    - **Maintainability**: duplicated logic that should be extracted, inconsistent patterns across similar files, dead code, unclear variable names
@@ -457,7 +461,7 @@ fi
 if [[ "${RUN_MODE}" == "issue" ]]; then
     HARD_TIMEOUT=$((CYCLE_TIMEOUT + 300))   # 15 + 5 = 20 min
 else
-    HARD_TIMEOUT=$((CYCLE_TIMEOUT + 600))   # 30 + 10 = 40 min
+    HARD_TIMEOUT=$((CYCLE_TIMEOUT + 600))   # 25 + 10 = 35 min
 fi
 
 log "Hard timeout: ${HARD_TIMEOUT}s"
