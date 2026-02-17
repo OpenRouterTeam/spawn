@@ -412,6 +412,16 @@ export function validatePrompt(prompt: string): void {
     { pattern: /;\s*rm\s+-rf/, description: "dangerous command sequence", suggestion: "Describe what you want the agent to do without using shell syntax" },
     { pattern: /\|\s*bash/, description: "shell piping to bash", suggestion: "Describe the desired outcome instead" },
     { pattern: /\|\s*sh/, description: "shell piping to sh", suggestion: "Describe the desired outcome instead" },
+    { pattern: /\$\{[^}]*\}/, description: "bash variable expansion", suggestion: "Describe the value you need instead of using shell variables" },
+    { pattern: /&&/, description: "command chaining with &&", suggestion: "Describe your tasks separately instead of chaining commands" },
+    { pattern: /\|\|/, description: "command chaining with ||", suggestion: "Describe error handling in plain language" },
+    // Match redirection only when followed by filesystem paths (/, ~, or word chars at line boundaries)
+    // This avoids false positives on mathematical comparisons like "x > 5"
+    { pattern: />\s*[/~]/, description: "file redirection", suggestion: "Ask the agent to save output instead of using redirection syntax" },
+    { pattern: />\s*\w+\.\w+/, description: "file redirection", suggestion: "Ask the agent to save output instead of using redirection syntax" },
+    { pattern: /<\s*[/~]/, description: "file input redirection", suggestion: "Describe the input source in plain language" },
+    { pattern: /<\s*\w+\.\w+/, description: "file input redirection", suggestion: "Describe the input source in plain language" },
+    { pattern: /&\s*$/, description: "background execution", suggestion: "Describe the desired behavior instead" },
   ];
 
   for (const { pattern, description, suggestion } of dangerousPatterns) {
@@ -427,5 +437,16 @@ export function validatePrompt(prompt: string): void {
         `  Write: "Fix the directory listing issues"`
       );
     }
+  }
+
+  // Generic check for suspicious operator combinations
+  if (/[;&|<>]\s*[;&|<>]/.test(prompt)) {
+    throw new Error(
+      `Your prompt contains shell operators that could be unsafe.\n\n` +
+      `Please describe what you want in plain English without shell syntax.\n\n` +
+      `Example:\n` +
+      `  Instead of: "Build a web server && deploy it"\n` +
+      `  Write: "Build a web server and deploy it"`
+    );
   }
 }
