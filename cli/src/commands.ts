@@ -1146,8 +1146,12 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
       timestamp: new Date().toISOString(),
       ...(prompt ? { prompt } : {}),
     });
-  } catch {
+  } catch (err) {
     // Non-fatal: don't block the spawn if history write fails
+    // Log for debugging but continue execution
+    if (debug) {
+      console.error(pc.dim(`Warning: Failed to save spawn record: ${getErrorMessage(err)}`));
+    }
   }
 
   const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl, debug);
@@ -1369,7 +1373,8 @@ export function formatRelativeTime(iso: string): string {
     // Fall back to absolute date for old entries
     const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     return date;
-  } catch {
+  } catch (err) {
+    // Invalid date format - return as-is
     return iso;
   }
 }
@@ -1381,7 +1386,8 @@ export function formatTimestamp(iso: string): string {
     const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
     return `${date} ${time}`;
-  } catch {
+  } catch (err) {
+    // Invalid date format - return as-is
     return iso;
   }
 }
@@ -1425,7 +1431,7 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
     if (cloudFilter) {
       await suggestFilterCorrection(cloudFilter, "-c", cloudKeys(manifest), resolveCloudKey, (k) => manifest.clouds[k].name, manifest);
     }
-  } catch {
+  } catch (err) {
     // Manifest unavailable -- skip suggestions
   }
 
@@ -1541,7 +1547,7 @@ async function resolveListFilters(
   let manifest: Manifest | null = null;
   try {
     manifest = await loadManifest();
-  } catch {
+  } catch (err) {
     // Manifest unavailable -- show raw keys
   }
 
@@ -1875,7 +1881,7 @@ export async function cmdLast(): Promise<void> {
   let manifest: Manifest | null = null;
   try {
     manifest = await loadManifest();
-  } catch {
+  } catch (err) {
     // Manifest unavailable -- show raw keys
   }
 
@@ -2254,7 +2260,7 @@ async function performUpdate(remoteVersion: string): Promise<void> {
     console.log();
     p.log.success(`Updated successfully!`);
     p.log.info("Run spawn again to use the new version.");
-  } catch {
+  } catch (err) {
     p.log.error("Auto-update failed. Update manually:");
     console.log();
     console.log(`  ${pc.cyan(INSTALL_CMD)}`);
