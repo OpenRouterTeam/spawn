@@ -629,6 +629,16 @@ _validate_oauth_server_args() {
 _generate_oauth_server_script() {
     local expected_state="${1}" success_html="${2}" error_html="${3}"
     local code_file="${4}" port_file="${5}" starting_port="${6}"
+
+    # SECURITY: Escape single quotes in all parameters to prevent injection
+    # When parameters are embedded in the Node.js script string, unescaped quotes
+    # could break out of the string context and execute arbitrary code
+    expected_state="${expected_state//\'/\\\'}"
+    success_html="${success_html//\'/\\\'}"
+    error_html="${error_html//\'/\\\'}"
+    code_file="${code_file//\'/\\\'}"
+    port_file="${port_file//\'/\\\'}"
+
     printf '%s' "
 const http = require('http');
 const fs = require('fs');
