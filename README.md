@@ -46,11 +46,19 @@ spawn claude                             # Show clouds available for Claude
 | `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
 | `spawn <agent> <cloud> --debug` | Show all commands being executed |
 | `spawn <agent>` | Show available clouds for an agent |
+| `spawn <cloud>` | Show available agents for a cloud |
 | `spawn matrix` | Full agent x cloud matrix |
-| `spawn list` | Show previously launched spawns |
-| `spawn agents` | List all agents |
+| `spawn list` | Browse and rerun previous spawns |
+| `spawn list <filter>` | Filter history by agent or cloud name |
+| `spawn list -a <agent>` | Filter history by agent |
+| `spawn list -c <cloud>` | Filter history by cloud |
+| `spawn list --clear` | Clear all spawn history |
+| `spawn last` | Instantly rerun the most recent spawn |
+| `spawn agents` | List all agents with descriptions |
 | `spawn clouds` | List all cloud providers |
 | `spawn update` | Check for CLI updates |
+| `spawn help` | Show help message |
+| `spawn version` | Show version |
 
 ### Without the CLI
 
