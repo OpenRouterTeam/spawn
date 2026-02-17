@@ -73,14 +73,12 @@ _gcp_check_cli_installed() {
 # Verify gcloud has an active authenticated account
 _gcp_check_auth() {
     if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1 | grep -q '@'; then
-        _log_diagnostic \
-            "gcloud is not authenticated" \
-            "No active Google Cloud account found" \
-            "Previous authentication may have expired" \
-            --- \
-            "Run: gcloud auth login" \
-            "Or set credentials via: export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json"
-        return 1
+        log_warn "No active Google Cloud account — launching gcloud auth login..."
+        gcloud auth login || {
+            log_error "Authentication failed. You can also set credentials via:"
+            log_error "  export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json"
+            return 1
+        }
     fi
 }
 
@@ -184,9 +182,31 @@ _gcp_run_create() {
         return 0
     fi
 
-    log_error "Failed to create GCP instance"
     local err_output
     err_output=$(cat "${gcloud_err}" 2>/dev/null)
+
+    # Auto-reauth on expired tokens, then retry once
+    if printf '%s' "${err_output}" | grep -qi "reauthentication\|refresh.*auth\|token.*expired\|credentials.*invalid"; then
+        log_warn "Auth tokens expired — running gcloud auth login..."
+        if gcloud auth login && gcloud config set project "${GCP_PROJECT}"; then
+            log_info "Re-authenticated, retrying instance creation..."
+            if gcloud compute instances create "${name}" \
+                --zone="${zone}" \
+                --machine-type="${machine_type}" \
+                --image-family="${image_family}" \
+                --image-project="${image_project}" \
+                --metadata-from-file="startup-script=${startup_script_file}" \
+                --metadata="ssh-keys=${GCP_USERNAME}:${pub_key}" \
+                --project="${GCP_PROJECT}" \
+                --quiet \
+                >/dev/null 2>"${gcloud_err}"; then
+                return 0
+            fi
+            err_output=$(cat "${gcloud_err}" 2>/dev/null)
+        fi
+    fi
+
+    log_error "Failed to create GCP instance"
     if [[ -n "${err_output}" ]]; then
         log_error "gcloud error: ${err_output}"
     fi
