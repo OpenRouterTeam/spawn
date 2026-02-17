@@ -16,7 +16,7 @@ AGENT_MODEL_PROMPT=1
 AGENT_MODEL_DEFAULT="openrouter/auto"
 
 agent_install() {
-    install_agent "openclaw" "source ~/.bashrc && bun install -g openclaw" cloud_run
+    install_agent "openclaw" "curl -fsSL https://openclaw.ai/install.sh | bash" cloud_run
 }
 
 agent_env_vars() {
