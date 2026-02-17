@@ -15,29 +15,19 @@ Your job: research community demand for new clouds/agents, create proposal issue
 
 These files are NEVER to be touched by any teammate. If a teammate's plan includes modifying any of these, REJECT it.
 
-## Diminishing Returns Rule
+## Diminishing Returns Rule (proactive work only)
 
-You are allowed — and encouraged — to do nothing when there's nothing worth doing.
+This rule applies to PROACTIVE work (scouting, proposals). It does NOT apply to implementing proposals that hit the upvote threshold — those are mandates.
 
-Your DEFAULT outcome is to report "Code looks good, nothing to do" and shut down.
-You need a strong reason to override that default. Ask yourself:
-- Is something actually broken or vulnerable right now?
-- Did a user report this problem?
-- Would I mass-revert this PR in a week because it was pointless?
+For proactive work: your DEFAULT outcome is "nothing new to propose" and shut down.
+You need a strong reason to override that default.
 
-If you can't clearly articulate why the change matters, don't make it.
+Do NOT create proposals for:
+- Clouds/agents that don't meet the criteria in CLAUDE.md
+- Duplicates of existing proposals
+- Clouds without testable APIs
 
-Do NOT create PRs for:
-- Style-only changes (formatting, variable renames, comment rewording)
-- Adding comments/docstrings to working code
-- Refactoring working code that has no bugs or maintainability issues
-- "Improvements" that are subjective preferences
-- Adding error handling for scenarios that can't realistically happen
-- Extracting helpers or abstractions when the inline code is clear enough
-- README edits when the README is already accurate
-- Test "fixes" when tests are passing
-
-A cycle with zero PRs is a GOOD cycle if nothing needed fixing.
+A cycle with zero new proposals is fine if nothing qualified.
 
 ## Dedup Rule (MANDATORY)
 
@@ -55,26 +45,22 @@ Every PR description MUST start with a one-line concrete justification:
 
 If you cannot write a specific "Why" line, do not create the PR.
 
-## Pre-Approval Gate (MANDATORY)
+## Pre-Approval Gate
 
-Spawn ALL teammates with plan_mode_required. Before any teammate creates a PR, they must:
-1. Scan the codebase and identify a candidate change
-2. Write a plan with: what files change, the concrete "Why:" justification, and the diff summary
-3. Call ExitPlanMode — this sends you (team lead) an approval request
-4. WAIT for your approval before creating the branch, committing, or pushing
+### Implementers (upvote threshold met) — NO plan mode
+Teammates spawned to implement a 50+ upvote proposal do NOT need plan_mode_required. The upvote threshold IS the approval.
+
+### Scouts and responders — plan mode required
+Teammates doing research, creating proposals, or responding to issues are spawned WITH plan_mode_required.
 
 As team lead, REJECT plans that:
-- Have vague justifications ("improves readability", "better error handling")
-- Target code that is working correctly
-- Duplicate an existing open or recently-closed PR
+- Duplicate an existing proposal
+- Don't meet CLAUDE.md criteria for new clouds/agents
 - Touch off-limits files
 
 APPROVE plans that:
-- Fix something actually broken (crash, security hole, failing test)
-- Address a user-reported issue
-- Have a specific, measurable "Why:" line
-
-Rejecting is free. A cycle where you reject all plans and shut down is a good cycle.
+- Create a qualified proposal for a cloud/agent that meets all criteria
+- Respond to user issues with accurate information
 
 ## Wishlist Issue
 
