@@ -3002,6 +3002,35 @@ setup_openclaw_config() {
     upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "\$HOME/.openclaw/openclaw.json"
 }
 
+# Wait for OpenClaw gateway to be ready
+# Usage: wait_for_openclaw_gateway RUN_CALLBACK
+#
+# Arguments:
+#   RUN_CALLBACK - Function to run commands: func(command)
+#
+# Returns:
+#   0 if gateway starts successfully, 1 if timeout
+wait_for_openclaw_gateway() {
+    local run_callback="${1}"
+    local max_wait=30
+    local elapsed=0
+
+    log_step "Waiting for OpenClaw gateway to start..."
+
+    while [ $elapsed -lt $max_wait ]; do
+        if ${run_callback} "nc -z 127.0.0.1 18789 2>/dev/null || (command -v telnet >/dev/null && timeout 1 telnet 127.0.0.1 18789 2>&1 | grep -q Connected)"; then
+            log_info "Gateway ready after ${elapsed}s"
+            return 0
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+
+    log_error "OpenClaw gateway failed to start after ${max_wait}s"
+    log_info "Check gateway logs: cat /tmp/openclaw-gateway.log"
+    return 1
+}
+
 # ============================================================
 # Continue configuration setup
 # ============================================================
