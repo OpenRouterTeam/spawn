@@ -175,10 +175,14 @@ _fly_create_app() {
             log_info "App '$name' already exists, reusing it"
             return 0
         fi
+        # Name taken by another user — return 2 so caller can re-prompt
+        if echo "$error_msg" | grep -qi "taken\|Name.*valid"; then
+            log_warn "App name '$name' is not available (taken by another user or invalid)"
+            return 2
+        fi
         log_error "Failed to create Fly.io app"
         log_error "API Error: $error_msg"
         log_warn "Common issues:"
-        log_warn "  - App name already taken by another user"
         log_warn "  - Invalid organization slug"
         log_warn "  - API token lacks permissions"
         return 1
@@ -293,30 +297,87 @@ create_server() {
     validate_resource_name "$vm_size" || { log_error "Invalid FLY_VM_SIZE"; return 1; }
     if [[ ! "$vm_memory" =~ ^[0-9]+$ ]]; then log_error "Invalid FLY_VM_MEMORY: must be numeric"; return 1; fi
 
-    _fly_create_app "$name" || return 1
+    local create_rc=0
+    _fly_create_app "$name" || create_rc=$?
+    while [[ "$create_rc" -eq 2 ]]; do
+        log_warn "Try a different name (Fly.io app names are globally unique)"
+        name=$(safe_read "Enter app name: ") || return 1
+        create_rc=0
+        _fly_create_app "$name" || create_rc=$?
+    done
+    if [[ "$create_rc" -ne 0 ]]; then return 1; fi
     _fly_create_machine "$name" "$region" "$vm_memory" || return 1
     _fly_wait_for_machine_start "$name" "$FLY_MACHINE_ID"
 
     save_vm_connection "fly-ssh" "root" "${FLY_MACHINE_ID}" "$name" "fly"
 }
 
+# Wait for SSH to be reachable on the Fly.io machine
+_fly_wait_for_ssh() {
+    local max_attempts="${1:-20}"
+    local attempt=1
+    log_step "Waiting for SSH connectivity..."
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        local output=""
+        output=$(run_server "echo ok" 15 2>/dev/null) || true
+        if [[ "$output" == *"ok"* ]]; then
+            log_info "SSH is ready"
+            return 0
+        fi
+        log_step "SSH not ready yet ($attempt/$max_attempts)"
+        sleep 5
+        attempt=$((attempt + 1))
+    done
+    log_error "SSH connectivity failed after $max_attempts attempts"
+    log_error "The machine may need more time. Try: fly ssh console -a $FLY_APP_NAME"
+    return 1
+}
+
 # Wait for base tools to be installed (Fly.io uses bare Ubuntu image)
 wait_for_cloud_init() {
-    log_step "Installing base tools on Fly.io machine..."
-    run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 pip" >/dev/null 2>&1 || true
-    run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' >/dev/null 2>&1 || true
+    _fly_wait_for_ssh || return 1
+
+    log_step "Installing packages (this may take 1-2 minutes)..."
+    run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 pip" 600 || {
+        log_warn "Package install timed out or failed, retrying..."
+        run_server "apt-get install -y curl unzip git zsh python3 pip" 300 || true
+    }
+    log_step "Installing bun..."
+    run_server "curl -fsSL https://bun.sh/install | bash" 120 || true
+    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' 30 || true
+    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' 30 || true
     log_info "Base tools installed"
 }
 
 # Run a command on the Fly.io machine via flyctl ssh
+# Optional second arg: timeout in seconds (used with timeout/gtimeout if available)
 run_server() {
     local cmd="$1"
+    local timeout_secs="${2:-}"
+    # Prepend PATH so tools installed by wait_for_cloud_init are always available.
+    # Ubuntu's default .bashrc returns early for non-interactive shells, so
+    # "source ~/.bashrc && bun ..." fails — bun's PATH line is never reached.
+    local full_cmd="export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\" && $cmd"
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
-    escaped_cmd=$(printf '%q' "$cmd")
-    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
+    escaped_cmd=$(printf '%q' "$full_cmd")
+
+    local fly_cmd
+    fly_cmd=$(_get_fly_cmd)
+
+    # Use timeout if available and requested (fly ssh console must run in foreground)
+    if [[ -n "${timeout_secs}" ]]; then
+        local timeout_bin=""
+        if command -v timeout &>/dev/null; then timeout_bin="timeout"
+        elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"
+        fi
+        if [[ -n "${timeout_bin}" ]]; then
+            "${timeout_bin}" "${timeout_secs}" "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
+            return $?
+        fi
+    fi
+
+    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
 }
 
 # Upload a file to the machine via base64 encoding through exec
