@@ -10,63 +10,24 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/gcp/lib/common.sh)"
 fi
 
-# Variables exported by create_server() in lib/common.sh
-# shellcheck disable=SC2154
-: "${GCP_SERVER_IP:?}" "${GCP_INSTANCE_NAME_ACTUAL:?}" "${GCP_ZONE:?}"
-
-
 log_info "OpenClaw on GCP Compute Engine"
 echo ""
 
-# 1. Ensure gcloud is configured
-ensure_gcloud
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
 
-# 2. Generate + register SSH key
-ensure_ssh_key
+agent_install() { install_agent "openclaw" "source ~/.bashrc && bun install -g openclaw" cloud_run; }
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+}
+agent_configure() { setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run; }
+agent_pre_launch() {
+    cloud_run "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
+    sleep 2
+}
+agent_launch_cmd() { echo 'source ~/.zshrc && openclaw tui'; }
 
-# 3. Get server name and create server
-SERVER_NAME=$(get_server_name)
-create_server "${SERVER_NAME}"
-
-# 4. Wait for SSH and cloud-init
-verify_server_connectivity "${GCP_SERVER_IP}"
-wait_for_cloud_init "${GCP_SERVER_IP}" 60
-
-# 5. Install openclaw via bun
-log_step "Installing openclaw..."
-run_server "${GCP_SERVER_IP}" "source ~/.bashrc && bun install -g openclaw"
-log_info "OpenClaw installed"
-
-# 6. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 7. Get model preference
-MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
-
-# 8. Inject environment variables into ~/.zshrc
-log_step "Setting up environment variables..."
-inject_env_vars_ssh "${GCP_SERVER_IP}" upload_file run_server \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-
-# 9. Configure openclaw
-setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" \
-    "upload_file ${GCP_SERVER_IP}" \
-    "run_server ${GCP_SERVER_IP}"
-
-echo ""
-log_info "GCP instance setup completed successfully!"
-log_info "Instance: ${GCP_INSTANCE_NAME_ACTUAL} (Zone: ${GCP_ZONE}, IP: ${GCP_SERVER_IP})"
-echo ""
-
-# 10. Start openclaw gateway in background and launch TUI
-log_step "Starting openclaw..."
-run_server "${GCP_SERVER_IP}" "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
-sleep 2
-interactive_session "${GCP_SERVER_IP}" "source ~/.zshrc && openclaw tui"
+spawn_agent "OpenClaw"

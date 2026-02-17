@@ -9,60 +9,41 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)"
 fi
 
-log_info "🐾 Spawn a NanoClaw agent on Sprite"
+log_info "NanoClaw on Sprite"
 echo ""
 
-# Setup sprite environment
-ensure_sprite_installed
-ensure_sprite_authenticated
+agent_install() {
+    log_step "Installing tsx..."
+    cloud_run "source ~/.bashrc && bun install -g tsx"
+    log_step "Cloning and building nanoclaw..."
+    cloud_run "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
+    log_info "NanoClaw installed"
+}
 
-SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "${SPRITE_NAME}"
-verify_sprite_connectivity "${SPRITE_NAME}"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+}
 
-log_step "Setting up sprite environment..."
+agent_configure() {
+    log_step "Configuring nanoclaw..."
+    local dotenv_temp
+    dotenv_temp=$(mktemp)
+    chmod 600 "${dotenv_temp}"
+    track_temp_file "${dotenv_temp}"
+    printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${dotenv_temp}"
+    cloud_upload "${dotenv_temp}" "/root/nanoclaw/.env"
+}
 
-# Configure shell environment
-setup_shell_environment "${SPRITE_NAME}"
+agent_launch_cmd() {
+    echo 'cd ~/nanoclaw && source ~/.zshrc && npm run dev'
+}
 
-# Install Node.js dependencies
-log_step "Installing Node.js..."
-run_sprite "${SPRITE_NAME}" "/.sprite/languages/bun/bin/bun install -g tsx"
+agent_pre_launch() {
+    log_info "You will need to scan a WhatsApp QR code to authenticate."
+    echo ""
+}
 
-# Clone nanoclaw
-log_step "Cloning nanoclaw..."
-run_sprite "${SPRITE_NAME}" "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
-
-# Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_sprite "${SPRITE_NAME}" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-
-# Create nanoclaw .env file
-log_step "Configuring nanoclaw..."
-
-DOTENV_TEMP=$(mktemp)
-trap 'rm -f "${DOTENV_TEMP}"' EXIT
-chmod 600 "${DOTENV_TEMP}"
-printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
-
-sprite exec -s "${SPRITE_NAME}" -file "${DOTENV_TEMP}:/tmp/nanoclaw_env" -- bash -c "chmod 600 /tmp/nanoclaw_env && mv /tmp/nanoclaw_env ~/nanoclaw/.env"
-
-echo ""
-log_info "Sprite setup completed successfully!"
-echo ""
-
-# Start nanoclaw
-log_step "Starting nanoclaw..."
-log_info "You will need to scan a WhatsApp QR code to authenticate."
-echo ""
-sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "cd ~/nanoclaw && source ~/.zshrc && npm run dev"
+spawn_agent "NanoClaw"

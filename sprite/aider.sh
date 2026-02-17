@@ -12,63 +12,26 @@ fi
 log_info "Aider on Sprite"
 echo ""
 
-# Setup sprite environment
-ensure_sprite_installed
-ensure_sprite_authenticated
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
 
-SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "${SPRITE_NAME}"
-verify_sprite_connectivity "${SPRITE_NAME}"
+agent_install() {
+    install_agent "Aider" "pip install aider-chat 2>/dev/null || pip3 install aider-chat" cloud_run
+    verify_agent "Aider" "command -v aider && aider --version" "pip install aider-chat" cloud_run
+}
 
-log_step "Setting up sprite environment..."
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
 
-# Configure shell environment
-setup_shell_environment "${SPRITE_NAME}"
+agent_launch_cmd() {
+    if [[ -n "${SPAWN_PROMPT:-}" ]]; then
+        local escaped; escaped=$(printf '%q' "${SPAWN_PROMPT}")
+        printf 'source ~/.zshrc && aider --model openrouter/%s -m %s' "${MODEL_ID}" "${escaped}"
+    else
+        printf 'source ~/.zshrc && aider --model openrouter/%s' "${MODEL_ID}"
+    fi
+}
 
-# Install Aider
-log_step "Installing Aider..."
-run_sprite "${SPRITE_NAME}" "pip install aider-chat 2>/dev/null || pip3 install aider-chat"
-
-# Verify installation succeeded
-if ! run_sprite "${SPRITE_NAME}" "command -v aider &> /dev/null && aider --version &> /dev/null"; then
-    log_install_failed "Aider" "pip install aider-chat"
-    exit 1
-fi
-log_info "Aider installation verified successfully"
-
-# Get OpenRouter API key via OAuth
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# Get model preference
-MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider") || exit 1
-
-log_step "Setting up environment variables..."
-inject_env_vars_sprite "${SPRITE_NAME}" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-
-echo ""
-log_info "Sprite setup completed successfully!"
-echo ""
-
-# Check if running in non-interactive mode
-if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-    # Non-interactive mode: execute prompt and exit
-    log_step "Executing Aider with prompt..."
-
-    # Escape prompt for safe shell execution
-    escaped_prompt=$(printf '%q' "${SPAWN_PROMPT}")
-
-    # Execute without -tty flag, using -m (message) for non-interactive execution
-    sprite exec -s "${SPRITE_NAME}" -- zsh -c "source ~/.zshrc && aider --model openrouter/${MODEL_ID} -m ${escaped_prompt}"
-else
-    # Interactive mode: start Aider normally
-    log_step "Starting Aider..."
-    sleep 1
-    clear
-    sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && aider --model openrouter/${MODEL_ID}"
-fi
+spawn_agent "Aider"

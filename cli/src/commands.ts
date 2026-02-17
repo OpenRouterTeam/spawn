@@ -16,7 +16,7 @@ import {
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt } from "./security.js";
-import { saveSpawnRecord, filterHistory, clearHistory, type SpawnRecord, type VMConnection } from "./history.js";
+import { saveSpawnRecord, filterHistory, clearHistory, markRecordDeleted, getActiveServers, type SpawnRecord, type VMConnection } from "./history.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -1507,9 +1507,15 @@ export function buildRecordHint(r: SpawnRecord): string {
   const relative = formatRelativeTime(r.timestamp);
   const parts: string[] = [relative];
 
-  if (r.connection) {
+  if (r.connection?.deleted) {
+    parts.push(pc.dim("[deleted]"));
+  } else if (r.connection) {
     if (r.connection.ip === "sprite-console" && r.connection.server_name) {
       parts.push(pc.green(`sprite console -s ${r.connection.server_name}`));
+    } else if (r.connection.ip === "fly-ssh" && r.connection.server_name) {
+      parts.push(pc.green(`fly ssh console -a ${r.connection.server_name}`));
+    } else if (r.connection.ip === "daytona-sandbox" && r.connection.server_id) {
+      parts.push(pc.green(`daytona ssh ${r.connection.server_id}`));
     } else {
       parts.push(pc.green(`ssh ${r.connection.user}@${r.connection.ip}`));
     }
@@ -1557,6 +1563,106 @@ async function resolveListFilters(
   return { manifest, agentFilter, cloudFilter };
 }
 
+// ── Delete ──────────────────────────────────────────────────────────────────────
+
+/** Build a bash script to delete a server on the given cloud */
+function buildDeleteScript(cloud: string, connection: VMConnection): string {
+  const libUrl = `${RAW_BASE}/${cloud}/lib/common.sh`;
+  const sourceLib = `eval "$(curl -fsSL '${libUrl}')"`;
+
+  // Determine the identifier to pass to destroy_server
+  const id = connection.server_id || connection.server_name || "";
+
+  // Cloud-specific auth + destroy mapping
+  switch (cloud) {
+    case "hetzner":
+      return `${sourceLib}\nensure_hcloud_token\ndestroy_server "${id}"`;
+    case "digitalocean":
+      return `${sourceLib}\nensure_do_token\ndestroy_server "${id}"`;
+    case "fly":
+      return `${sourceLib}\nensure_fly_cli\nensure_fly_token\ndestroy_server "${id}"`;
+    case "gcp": {
+      const zone = connection.metadata?.zone || "us-central1-a";
+      const project = connection.metadata?.project || "";
+      return `${sourceLib}\nensure_gcloud\nexport GCP_ZONE="${zone}"\nexport GCP_PROJECT="${project}"\ndestroy_server "${id}"`;
+    }
+    case "aws-lightsail":
+      return `${sourceLib}\nensure_aws_cli\ndestroy_server "${id}"`;
+    case "oracle":
+      return `${sourceLib}\nensure_oci_cli\ndestroy_server "${id}"`;
+    case "ovh":
+      return `${sourceLib}\nensure_ovh_authenticated\ndestroy_ovh_instance "${id}"`;
+    case "daytona":
+      return `${sourceLib}\nensure_daytona_cli\nensure_daytona_token\ndestroy_server "${id}"`;
+    case "sprite":
+      return `${sourceLib}\nensure_sprite_installed\nsprite destroy "${id}"`;
+    default:
+      return "";
+  }
+}
+
+/** Execute server deletion for a given record */
+async function execDeleteServer(
+  record: SpawnRecord
+): Promise<boolean> {
+  const conn = record.connection;
+  if (!conn?.cloud || conn.cloud === "local") return false;
+
+  const script = buildDeleteScript(conn.cloud, conn);
+  if (!script) {
+    p.log.error(`No delete handler for cloud: ${conn.cloud}`);
+    return false;
+  }
+
+  try {
+    await runBash(script);
+    markRecordDeleted(record);
+    return true;
+  } catch (err) {
+    const errMsg = getErrorMessage(err);
+    // If the server is already gone, treat as success
+    if (errMsg.includes("404") || errMsg.includes("not found") || errMsg.includes("Not Found")) {
+      p.log.warn("Server already deleted or not found. Marking as deleted.");
+      markRecordDeleted(record);
+      return true;
+    }
+    p.log.error(`Delete failed: ${errMsg}`);
+    p.log.info("The server may still be running. Check your cloud provider dashboard.");
+    return false;
+  }
+}
+
+/** Prompt for delete confirmation and execute */
+async function confirmAndDelete(
+  record: SpawnRecord,
+  manifest: Manifest | null
+): Promise<void> {
+  const conn = record.connection!;
+  const label = conn.server_name || conn.server_id || conn.ip;
+  const cloudLabel = manifest?.clouds[conn.cloud!]?.name || conn.cloud;
+
+  const confirmed = await p.confirm({
+    message: `Delete server "${label}" on ${cloudLabel}? This will permanently destroy the server and all data on it.`,
+    initialValue: false,
+  });
+
+  if (p.isCancel(confirmed) || !confirmed) {
+    p.log.info("Delete cancelled.");
+    return;
+  }
+
+  const s = p.spinner();
+  s.start(`Deleting ${label}...`);
+
+  const success = await execDeleteServer(record);
+
+  if (success) {
+    s.stop(`Server "${label}" deleted.`);
+  } else {
+    s.stop("Delete failed.");
+  }
+}
+
 /** Handle reconnect or rerun action for a selected spawn record */
 async function handleRecordAction(
   selected: SpawnRecord,
@@ -1569,12 +1675,46 @@ async function handleRecordAction(
     return;
   }
 
+  const conn = selected.connection;
+  const canDelete =
+    conn.cloud &&
+    conn.cloud !== "local" &&
+    !conn.deleted &&
+    (conn.server_id || conn.server_name);
+
+  const options: { value: string; label: string; hint?: string }[] = [];
+
+  if (!conn.deleted) {
+    options.push({
+      value: "reconnect",
+      label: "Reconnect to existing VM",
+      hint: conn.ip === "sprite-console"
+        ? `sprite console -s ${conn.server_name}`
+        : conn.ip === "fly-ssh"
+        ? `fly ssh console -a ${conn.server_name}`
+        : conn.ip === "daytona-sandbox"
+        ? `daytona ssh ${conn.server_id}`
+        : `ssh ${conn.user}@${conn.ip}`,
+    });
+  }
+
+  options.push({
+    value: "rerun",
+    label: "Spawn a new VM",
+    hint: "Create a fresh instance",
+  });
+
+  if (canDelete) {
+    options.push({
+      value: "delete",
+      label: "Delete this server",
+      hint: `destroy ${conn.server_name || conn.server_id}`,
+    });
+  }
+
   const action = await p.select({
     message: "What would you like to do?",
-    options: [
-      { value: "reconnect", label: "Reconnect to existing VM", hint: `ssh ${selected.connection.user}@${selected.connection.ip}` },
-      { value: "rerun", label: "Spawn a new VM", hint: "Create a fresh instance" },
-    ],
+    options,
   });
 
   if (p.isCancel(action)) {
@@ -1588,6 +1728,11 @@ async function handleRecordAction(
       p.log.error(`Connection failed: ${getErrorMessage(err)}`);
       p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
     }
+    return;
+  }
+
+  if (action === "delete") {
+    await confirmAndDelete(selected, manifest);
     return;
   }
 
@@ -1659,6 +1804,59 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
 
   renderListTable(records, manifest);
   showListFooter(records, agentFilter, cloudFilter);
+}
+
+export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Promise<void> {
+  const servers = getActiveServers();
+
+  let filtered = servers;
+  if (agentFilter) {
+    const lower = agentFilter.toLowerCase();
+    filtered = filtered.filter((r) => r.agent.toLowerCase() === lower);
+  }
+  if (cloudFilter) {
+    const lower = cloudFilter.toLowerCase();
+    filtered = filtered.filter((r) => r.cloud.toLowerCase() === lower);
+  }
+
+  if (filtered.length === 0) {
+    p.log.info("No active servers to delete.");
+    if (servers.length > 0) {
+      p.log.info(pc.dim(`${servers.length} active server${servers.length !== 1 ? "s" : ""} found, but none matched your filters.`));
+    }
+    p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to create a spawn first.`);
+    return;
+  }
+
+  let manifest: Manifest | null = null;
+  try {
+    manifest = await loadManifest();
+  } catch {
+    // Manifest unavailable
+  }
+
+  if (!isInteractiveTTY()) {
+    p.log.error("spawn delete requires an interactive terminal.");
+    p.log.info(`Use ${pc.cyan("spawn list")} to see your servers.`);
+    process.exit(1);
+  }
+
+  const options = filtered.map((r, i) => ({
+    value: i,
+    label: buildRecordLabel(r, manifest),
+    hint: buildRecordHint(r),
+  }));
+
+  const choice = await p.select({
+    message: `Select a server to delete (${filtered.length} active)`,
+    options,
+  });
+  if (p.isCancel(choice)) {
+    handleCancel();
+  }
+
+  const selected = filtered[choice];
+  await confirmAndDelete(selected, manifest);
 }
 
 export async function cmdLast(): Promise<void> {
@@ -2096,6 +2294,9 @@ function getHelpUsageSection(): string {
   spawn list -a <agent>              Filter spawn history by agent (or --agent)
   spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
   spawn list --clear                 Clear all spawn history
+  spawn delete                       Delete a previously spawned server (aliases: rm, destroy)
+  spawn delete -a <agent>            Filter servers by agent
+  spawn delete -c <cloud>            Filter servers by cloud
   spawn last                         Instantly rerun the most recent spawn (alias: rerun)
   spawn matrix                       Full availability matrix (alias: m)
   spawn agents                       List all agents with descriptions

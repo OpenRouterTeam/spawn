@@ -423,6 +423,8 @@ create_server() {
 
     export OCI_SERVER_IP="${server_ip}"
     log_info "Instance created: IP=${OCI_SERVER_IP}"
+
+    save_vm_connection "${OCI_SERVER_IP}" "ubuntu" "${OCI_INSTANCE_ID}" "$name" "oracle"
 }
 
 # OCI Ubuntu images use 'ubuntu' user
@@ -465,3 +467,15 @@ list_servers() {
         --query 'data[?("lifecycle-state"!=`TERMINATED`)].{"Name":"display-name","State":"lifecycle-state","Shape":"shape","Created":"time-created"}' \
         --output table 2>/dev/null
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_oci_cli; ensure_ssh_key; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { verify_server_connectivity "${OCI_SERVER_IP}"; wait_for_cloud_init "${OCI_SERVER_IP}" 60; }
+cloud_run() { run_server "${OCI_SERVER_IP}" "$1"; }
+cloud_upload() { upload_file "${OCI_SERVER_IP}" "$1" "$2"; }
+cloud_interactive() { interactive_session "${OCI_SERVER_IP}" "$1"; }
+cloud_label() { echo "OCI instance"; }

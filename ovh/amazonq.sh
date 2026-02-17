@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
@@ -9,43 +10,16 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/ovh/lib/common.sh)"
 fi
 
-log_info "Amazon Q CLI on OVHcloud"
+log_info "Amazon Q on OVHcloud"
 echo ""
 
-ensure_ovh_authenticated
-ensure_ssh_key
+agent_install() { install_agent "Amazon Q CLI" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash" cloud_run; }
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+}
+agent_launch_cmd() { echo 'source ~/.zshrc && q chat'; }
 
-SERVER_NAME=$(get_server_name)
-create_ovh_instance "${SERVER_NAME}"
-wait_for_ovh_instance "${OVH_INSTANCE_ID}"
-verify_server_connectivity "${OVH_SERVER_IP}"
-
-# Install base dependencies
-install_base_deps "${OVH_SERVER_IP}"
-
-log_step "Installing Amazon Q CLI..."
-run_ovh "${OVH_SERVER_IP}" "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash"
-log_info "Amazon Q CLI installed"
-
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-log_step "Setting up environment variables..."
-inject_env_vars_ovh "${OVH_SERVER_IP}" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-    "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
-
-echo ""
-log_info "OVHcloud instance setup completed successfully!"
-log_info "Instance: ${SERVER_NAME} (ID: ${OVH_INSTANCE_ID}, IP: ${OVH_SERVER_IP})"
-echo ""
-
-log_step "Starting Amazon Q CLI..."
-sleep 1
-clear
-interactive_session "${OVH_SERVER_IP}" "source ~/.zshrc && q chat"
+spawn_agent "Amazon Q"

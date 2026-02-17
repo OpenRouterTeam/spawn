@@ -200,6 +200,8 @@ create_server() {
     log_info "Droplet created: ID=$DO_DROPLET_ID"
 
     _wait_for_droplet_active "$DO_DROPLET_ID"
+
+    save_vm_connection "${DO_SERVER_IP}" "root" "${DO_DROPLET_ID}" "$name" "digitalocean"
 }
 
 # SSH operations — delegates to shared helpers (SSH_USER defaults to root)
@@ -247,3 +249,15 @@ for d in droplets:
     print(f'{name:<25} {did:<12} {status:<12} {ip:<16} {size:<15}')
 " <<< "$response"
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { register_cleanup_trap; ensure_do_token; ensure_ssh_key; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { verify_server_connectivity "${DO_SERVER_IP}"; wait_for_cloud_init "${DO_SERVER_IP}" 60; }
+cloud_run() { run_server "${DO_SERVER_IP}" "$1"; }
+cloud_upload() { upload_file "${DO_SERVER_IP}" "$1" "$2"; }
+cloud_interactive() { interactive_session "${DO_SERVER_IP}" "$1"; }
+cloud_label() { echo "DigitalOcean droplet"; }

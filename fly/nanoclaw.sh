@@ -12,59 +12,38 @@ fi
 log_info "NanoClaw on Fly.io"
 echo ""
 
-# 1. Ensure flyctl CLI and API token
-ensure_fly_cli
-ensure_fly_token
+agent_install() {
+    log_step "Installing tsx..."
+    cloud_run "source ~/.bashrc && bun install -g tsx"
+    log_step "Cloning and building nanoclaw..."
+    cloud_run "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
+    log_info "NanoClaw installed"
+}
 
-# 2. Get app name and create machine
-SERVER_NAME=$(get_server_name)
-create_server "$SERVER_NAME"
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+}
 
-# 3. Install base tools
-wait_for_cloud_init
+agent_configure() {
+    log_step "Configuring nanoclaw..."
+    local dotenv_temp
+    dotenv_temp=$(mktemp)
+    chmod 600 "${dotenv_temp}"
+    track_temp_file "${dotenv_temp}"
+    printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${dotenv_temp}"
+    cloud_upload "${dotenv_temp}" "/root/nanoclaw/.env"
+}
 
-# 4. Install tsx and clone nanoclaw
-log_step "Installing tsx..."
-run_server "source ~/.bashrc && bun install -g tsx"
+agent_launch_cmd() {
+    echo 'cd ~/nanoclaw && source ~/.zshrc && npm run dev'
+}
 
-log_step "Cloning and building nanoclaw..."
-run_server "git clone https://github.com/gavrielc/nanoclaw.git ~/nanoclaw && cd ~/nanoclaw && npm install && npm run build"
-log_info "NanoClaw installed"
+agent_pre_launch() {
+    log_info "You will need to scan a WhatsApp QR code to authenticate."
+    echo ""
+}
 
-# 5. Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
-
-# 6. Inject environment variables into shell config
-log_step "Setting up environment variables..."
-
-inject_env_vars_fly \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
-    "PATH=\$HOME/.bun/bin:\$PATH"
-
-# 7. Create nanoclaw .env file
-log_step "Configuring nanoclaw..."
-
-DOTENV_TEMP=$(mktemp)
-chmod 600 "$DOTENV_TEMP"
-printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${DOTENV_TEMP}"
-
-upload_file "$DOTENV_TEMP" "/root/nanoclaw/.env"
-rm "$DOTENV_TEMP"
-
-echo ""
-log_info "Fly.io machine setup completed successfully!"
-log_info "App: $SERVER_NAME (Machine ID: $FLY_MACHINE_ID)"
-echo ""
-
-# 8. Start nanoclaw
-log_step "Starting nanoclaw..."
-log_info "You will need to scan a WhatsApp QR code to authenticate."
-echo ""
-interactive_session "cd ~/nanoclaw && source ~/.zshrc && npm run dev"
+spawn_agent "NanoClaw"

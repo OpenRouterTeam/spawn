@@ -9,53 +9,34 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)"
 fi
 
-log_info "🚀 Spawn an OpenClaw agent on Sprite"
+log_info "OpenClaw on Sprite"
 echo ""
 
-# Setup sprite environment
-ensure_sprite_installed
-ensure_sprite_authenticated
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
 
-SPRITE_NAME=$(get_sprite_name)
-ensure_sprite_exists "${SPRITE_NAME}"
+agent_install() {
+    install_agent "openclaw" "source ~/.bashrc && bun install -g openclaw" cloud_run
+}
 
-log_step "Setting up sprite environment..."
+agent_env_vars() {
+    generate_env_config \
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
+        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
+}
 
-# Configure shell environment
-setup_shell_environment "${SPRITE_NAME}"
+agent_configure() {
+    setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run
+}
 
-# Install openclaw using bun
-log_step "Installing openclaw..."
-run_sprite "${SPRITE_NAME}" "/.sprite/languages/bun/bin/bun install -g openclaw"
+agent_pre_launch() {
+    cloud_run "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
+    sleep 2
+}
 
-# Get OpenRouter API key
-echo ""
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-    log_info "Using OpenRouter API key from environment"
-else
-    OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
-fi
+agent_launch_cmd() {
+    echo 'source ~/.zshrc && openclaw tui'
+}
 
-# Get model preference
-MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Openclaw") || exit 1
-
-log_step "Setting up environment variables..."
-inject_env_vars_sprite "${SPRITE_NAME}" \
-    "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-    "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-
-# Setup openclaw to bypass initial settings
-setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" \
-    "upload_file_sprite ${SPRITE_NAME}" \
-    "run_sprite ${SPRITE_NAME}"
-
-echo ""
-log_info "Sprite setup completed successfully!"
-echo ""
-
-# Start openclaw gateway in background and run openclaw tui
-log_step "Starting openclaw..."
-sprite exec -s "${SPRITE_NAME}" -- zsh -c "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
-sleep 2
-sprite exec -s "${SPRITE_NAME}" -tty -- zsh -c "source ~/.zshrc && openclaw tui"
+spawn_agent "OpenClaw"

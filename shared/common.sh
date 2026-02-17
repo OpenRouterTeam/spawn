@@ -1370,6 +1370,107 @@ launch_session() {
 }
 
 # ============================================================
+# Cloud adapter runner (spawn_agent)
+# ============================================================
+# Orchestrates the standard agent deployment flow using cloud_* adapter
+# functions. Agent scripts define hooks (agent_install, agent_env_vars,
+# agent_launch_cmd, etc.) and call spawn_agent to run them.
+#
+# Required cloud_* functions (defined in {cloud}/lib/common.sh):
+#   cloud_authenticate, cloud_provision, cloud_wait_ready,
+#   cloud_run, cloud_upload, cloud_interactive, cloud_label
+#
+# Required agent hooks:
+#   agent_env_vars   — print env config lines to stdout (via generate_env_config)
+#   agent_launch_cmd — print the shell command to launch the agent
+#
+# Optional agent hooks:
+#   agent_pre_provision — run before provisioning (e.g., prompt_github_auth)
+#   agent_install       — install the agent on the server
+#   agent_configure     — agent-specific config (settings files, etc.)
+#   agent_save_connection — save connection info for `spawn list`
+#   agent_pre_launch    — run before launching (e.g., start daemon)
+#
+# Optional agent variables:
+#   AGENT_MODEL_PROMPT  — if set, prompt for model selection
+#   AGENT_MODEL_DEFAULT — default model ID (default: openrouter/auto)
+
+# Check if a function is defined (bash 3.2 compatible)
+_fn_exists() { type "$1" 2>/dev/null | head -1 | grep -q 'function'; }
+
+# Inject env vars using cloud_* adapter functions
+_spawn_inject_env_vars() {
+    log_step "Setting up environment variables..."
+    local env_temp
+    env_temp=$(mktemp)
+    chmod 600 "${env_temp}"
+    track_temp_file "${env_temp}"
+
+    agent_env_vars > "${env_temp}"
+
+    cloud_upload "${env_temp}" "/tmp/env_config"
+
+    # Write env vars to ~/.spawnrc instead of inlining into .bashrc/.zshrc.
+    # Ubuntu's default .bashrc has an interactive-shell guard that exits early —
+    # anything appended after the guard is never loaded when SSH runs a command string.
+    cloud_run "cp /tmp/env_config ~/.spawnrc && chmod 600 ~/.spawnrc && rm /tmp/env_config"
+
+    # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc"
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc"
+
+    offer_github_auth cloud_run
+}
+
+# Main orchestration runner for agent deployment
+# Usage: spawn_agent AGENT_DISPLAY_NAME
+spawn_agent() {
+    local agent_name="$1"
+
+    # 1. Authenticate with cloud provider
+    cloud_authenticate
+
+    # 2. Pre-provision hooks (e.g., prompt for GitHub auth)
+    if _fn_exists agent_pre_provision; then agent_pre_provision; fi
+
+    # 3. Provision server
+    local server_name
+    server_name=$(get_server_name)
+    cloud_provision "${server_name}"
+
+    # 4. Wait for readiness
+    cloud_wait_ready
+
+    # 5. Install agent
+    if _fn_exists agent_install; then agent_install; fi
+
+    # 6. Get API key
+    get_or_prompt_api_key
+
+    # 7. Model selection (if agent needs it)
+    if [[ -n "${AGENT_MODEL_PROMPT:-}" ]]; then
+        MODEL_ID=$(get_model_id_interactive "${AGENT_MODEL_DEFAULT:-openrouter/auto}" "${agent_name}") || exit 1
+    fi
+
+    # 8. Inject environment variables
+    _spawn_inject_env_vars
+
+    # 9. Agent-specific configuration
+    if _fn_exists agent_configure; then agent_configure; fi
+
+    # 10. Save connection info
+    if _fn_exists agent_save_connection; then agent_save_connection; fi
+
+    # 11. Pre-launch hooks (e.g., start gateway daemon)
+    if _fn_exists agent_pre_launch; then agent_pre_launch; fi
+
+    # 12. Launch interactive session
+    local launch_cmd
+    launch_cmd=$(agent_launch_cmd)
+    launch_session "$(cloud_label)" cloud_interactive "${launch_cmd}"
+}
+
+# ============================================================
 # SSH configuration
 # ============================================================
 
@@ -3105,13 +3206,16 @@ opencode_install_cmd() {
 
 # Save VM connection info for spawn list reconnect functionality.
 # This allows users to reconnect to previously spawned VMs via `spawn list`.
-# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME]
-# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME"
+# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME] [CLOUD] [METADATA_JSON]
+# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME" "digitalocean"
+# Example: save_vm_connection "$GCP_IP" "root" "" "$NAME" "gcp" '{"zone":"us-central1-a"}'
 save_vm_connection() {
     local ip="${1}"
     local user="${2}"
     local server_id="${3:-}"
     local server_name="${4:-}"
+    local cloud="${5:-}"
+    local metadata="${6:-}"
 
     local spawn_dir="${HOME}/.spawn"
     mkdir -p "${spawn_dir}"
@@ -3125,6 +3229,12 @@ save_vm_connection() {
     fi
     if [[ -n "${server_name}" ]]; then
         json="${json},\"server_name\":\"${server_name}\""
+    fi
+    if [[ -n "${cloud}" ]]; then
+        json="${json},\"cloud\":\"${cloud}\""
+    fi
+    if [[ -n "${metadata}" ]]; then
+        json="${json},\"metadata\":${metadata}"
     fi
     json="${json}}"
 

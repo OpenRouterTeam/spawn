@@ -169,6 +169,8 @@ create_server() {
     log_info "Instance creation initiated: ${name}"
 
     _wait_for_lightsail_instance "${name}"
+
+    save_vm_connection "${LIGHTSAIL_SERVER_IP}" "ubuntu" "" "$name" "aws-lightsail"
 }
 
 # Lightsail uses 'ubuntu' user, not 'root'
@@ -201,3 +203,15 @@ destroy_server() {
 list_servers() {
     aws lightsail get-instances --query 'instances[].{Name:name,State:state.name,IP:publicIpAddress,Bundle:bundleId}' --output table
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_aws_cli; ensure_ssh_key; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { verify_server_connectivity "${LIGHTSAIL_SERVER_IP}"; wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}" 60; }
+cloud_run() { run_server "${LIGHTSAIL_SERVER_IP}" "$1"; }
+cloud_upload() { upload_file "${LIGHTSAIL_SERVER_IP}" "$1" "$2"; }
+cloud_interactive() { interactive_session "${LIGHTSAIL_SERVER_IP}" "$1"; }
+cloud_label() { echo "Lightsail instance"; }

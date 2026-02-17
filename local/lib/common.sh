@@ -43,6 +43,8 @@ get_server_name() {
 create_server() {
     local name="${1}"
     log_info "Using local machine: ${name}"
+
+    save_vm_connection "localhost" "${USER:-$(whoami)}" "" "$name" "local"
 }
 
 # No cloud-init needed
@@ -83,3 +85,15 @@ destroy_server() {
 list_servers() {
     printf '%s\n' "$(hostname 2>/dev/null || echo "local")"
 }
+
+# ============================================================
+# Cloud adapter interface
+# ============================================================
+
+cloud_authenticate() { ensure_local_ready; }
+cloud_provision() { create_server "$1"; }
+cloud_wait_ready() { :; }
+cloud_run() { run_server "$1"; }
+cloud_upload() { upload_file "$1" "$2"; }
+cloud_interactive() { bash -c "$1"; }
+cloud_label() { echo "local machine"; }
