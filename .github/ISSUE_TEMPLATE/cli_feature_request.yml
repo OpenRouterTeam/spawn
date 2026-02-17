@@ -1,51 +1,12 @@
 name: CLI Feature Request
-description: Suggest a new feature or improvement for the spawn CLI
+description: Suggest something for the spawn CLI
 title: "[CLI]: "
 labels: ["cli", "enhancement", "pending-review"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thanks for the suggestion! Describe what you'd like the spawn CLI to do.
-
   - type: textarea
     id: description
     attributes:
-      label: Feature Description
-      description: What should the CLI do? Be as specific as you can.
-      placeholder: |
-        spawn should support a `--dry-run` flag that shows what would
-        be provisioned without actually creating anything.
+      label: What would you like?
+      placeholder: "e.g. Add a --dry-run flag to preview what gets created"
     validations:
       required: true
-
-  - type: textarea
-    id: use-case
-    attributes:
-      label: Use Case
-      description: Why do you need this? What problem does it solve?
-      placeholder: |
-        I want to preview costs before spinning up a server.
-    validations:
-      required: true
-
-  - type: textarea
-    id: proposed-ux
-    attributes:
-      label: Proposed UX
-      description: How would you expect to use this feature? Show example commands or workflows.
-      placeholder: |
-        $ spawn claude hetzner --dry-run
-        Would create: Hetzner CX22 in fsn1 (~$0.01/hr)
-        Run without --dry-run to proceed.
-      render: shell
-    validations:
-      required: false
-
-  - type: textarea
-    id: additional
-    attributes:
-      label: Additional Context
-      description: Any other details, mockups, or references to similar tools
-    validations:
-      required: false
