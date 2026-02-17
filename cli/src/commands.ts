@@ -332,7 +332,7 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
 /** Map of cloud keys to their CLI tool names */
 const CLOUD_CLI_MAP: Record<string, string> = {
   gcp: "gcloud",
-  "aws-lightsail": "aws",
+  aws: "aws",
   oracle: "oci",
   fly: "flyctl",
   sprite: "sprite",
@@ -1646,7 +1646,7 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
       const project = connection.metadata?.project || "";
       return `${sourceLib}\nensure_gcloud\nexport GCP_ZONE="${zone}"\nexport GCP_PROJECT="${project}"\ndestroy_server "${id}"`;
     }
-    case "aws-lightsail":
+    case "aws":
       return `${sourceLib}\nensure_aws_cli\ndestroy_server "${id}"`;
     case "oracle":
       return `${sourceLib}\nensure_oci_cli\ndestroy_server "${id}"`;

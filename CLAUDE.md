@@ -48,7 +48,7 @@ We are currently shipping with **9 curated clouds** (sorted by price):
 3. **hetzner** — ~€3.29/mo (CX22)
 4. **ovh** — ~€3.50/mo (d2-2)
 5. **fly** — free tier (3 shared-cpu VMs)
-6. **aws-lightsail** — $3.50/mo (nano)
+6. **aws** — $3.50/mo (nano)
 7. **daytona** — pay-per-second sandboxes
 8. **digitalocean** — $4/mo (Basic droplet)
 9. **gcp** — $7.11/mo (e2-micro)

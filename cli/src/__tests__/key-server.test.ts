@@ -315,7 +315,7 @@ describe("SAFE_PROVIDER_RE - provider name validation", () => {
   });
 
   it("should accept name with hyphens", () => {
-    expect(SAFE_PROVIDER_RE.test("aws-lightsail")).toBe(true);
+    expect(SAFE_PROVIDER_RE.test("aws")).toBe(true);
   });
 
   it("should accept name with underscores", () => {

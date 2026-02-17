@@ -155,7 +155,7 @@ If an agent fails to install or launch on a cloud:
 
 ## Matrix
 
-| | [Local Machine](local/) | [Oracle Cloud Infrastructure](oracle/) | [Hetzner Cloud](hetzner/) | [OVHcloud](ovh/) | [Fly.io](fly/) | [AWS Lightsail](aws-lightsail/) | [Daytona](daytona/) | [DigitalOcean](digitalocean/) | [GCP Compute Engine](gcp/) | [Sprite](sprite/) |
+| | [Local Machine](local/) | [Oracle Cloud Infrastructure](oracle/) | [Hetzner Cloud](hetzner/) | [OVHcloud](ovh/) | [Fly.io](fly/) | [AWS Lightsail](aws/) | [Daytona](daytona/) | [DigitalOcean](digitalocean/) | [GCP Compute Engine](gcp/) | [Sprite](sprite/) |
 |---|---|---|---|---|---|---|---|---|---|---|
 | [**Claude Code**](https://claude.ai) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenClaw**](https://github.com/OpenRouterTeam/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
