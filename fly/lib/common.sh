@@ -175,10 +175,14 @@ _fly_create_app() {
             log_info "App '$name' already exists, reusing it"
             return 0
         fi
+        # Name taken by another user — return 2 so caller can re-prompt
+        if echo "$error_msg" | grep -qi "taken\|Name.*valid"; then
+            log_warn "App name '$name' is not available (taken by another user or invalid)"
+            return 2
+        fi
         log_error "Failed to create Fly.io app"
         log_error "API Error: $error_msg"
         log_warn "Common issues:"
-        log_warn "  - App name already taken by another user"
         log_warn "  - Invalid organization slug"
         log_warn "  - API token lacks permissions"
         return 1
@@ -293,7 +297,15 @@ create_server() {
     validate_resource_name "$vm_size" || { log_error "Invalid FLY_VM_SIZE"; return 1; }
     if [[ ! "$vm_memory" =~ ^[0-9]+$ ]]; then log_error "Invalid FLY_VM_MEMORY: must be numeric"; return 1; fi
 
-    _fly_create_app "$name" || return 1
+    local create_rc=0
+    _fly_create_app "$name" || create_rc=$?
+    while [[ "$create_rc" -eq 2 ]]; do
+        log_warn "Try a different name (Fly.io app names are globally unique)"
+        name=$(safe_read "Enter app name: ") || return 1
+        create_rc=0
+        _fly_create_app "$name" || create_rc=$?
+    done
+    if [[ "$create_rc" -ne 0 ]]; then return 1; fi
     _fly_create_machine "$name" "$region" "$vm_memory" || return 1
     _fly_wait_for_machine_start "$name" "$FLY_MACHINE_ID"
 
@@ -311,12 +323,27 @@ wait_for_cloud_init() {
 }
 
 # Run a command on the Fly.io machine via flyctl ssh
+# Times out after 5 minutes by default to prevent hangs
 run_server() {
     local cmd="$1"
+    local timeout_secs="${2:-300}"
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$cmd")
-    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
+
+    local fly_cmd
+    fly_cmd=$(_get_fly_cmd)
+
+    # Run with timeout to prevent indefinite hangs (macOS has no timeout cmd)
+    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null &
+    local ssh_pid=$!
+    ( sleep "${timeout_secs}" && kill "${ssh_pid}" 2>/dev/null ) &
+    local watcher_pid=$!
+    wait "${ssh_pid}" 2>/dev/null
+    local rc=$?
+    kill "${watcher_pid}" 2>/dev/null
+    wait "${watcher_pid}" 2>/dev/null 2>&1 || true
+    return "${rc}"
 }
 
 # Upload a file to the machine via base64 encoding through exec
