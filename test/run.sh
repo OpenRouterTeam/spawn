@@ -38,14 +38,16 @@ NC='\033[0m'
 
 cleanup() {
     rm -rf "${TEST_DIR}"
-    # Clean up any /tmp pollution from mock sprite state files
+    # Clean up any /tmp pollution from mock sprite state files and spawn temp files
     rm -f /tmp/sprite_mock_created_* /tmp/sprite_mock_created 2>/dev/null || true
+    rm -f /tmp/spawn_* 2>/dev/null || true
 }
 trap 'cleanup' EXIT
 
 # --- Mock sprite CLI ---
 # Records every call to a log, returns success for expected commands
 setup_mocks() {
+    export TEST_DIR
     cat > "${TEST_DIR}/sprite" << 'MOCK'
 #!/bin/bash
 echo "sprite $*" >> "${MOCK_LOG}"
@@ -100,6 +102,40 @@ MOCK
 echo "mock-gateway-token-abc123"
 MOCK
     chmod +x "${TEST_DIR}/openssl"
+
+    # mock sleep to avoid polling delays
+    cat > "${TEST_DIR}/sleep" << 'MOCK'
+#!/bin/bash
+exit 0
+MOCK
+    chmod +x "${TEST_DIR}/sleep"
+
+    # mock timeout/gtimeout to just run the command
+    cat > "${TEST_DIR}/timeout" << 'MOCK'
+#!/bin/bash
+# Skip the timeout value, run the rest
+shift
+exec "$@"
+MOCK
+    chmod +x "${TEST_DIR}/timeout"
+    cp "${TEST_DIR}/timeout" "${TEST_DIR}/gtimeout"
+
+    # mock python3 for JSON parsing used by shared/common.sh
+    cat > "${TEST_DIR}/python3" << 'MOCK'
+#!/bin/bash
+# Read the python script from -c argument
+script=""
+for arg in "$@"; do
+    if [[ "$prev" == "-c" ]]; then
+        script="$arg"
+        break
+    fi
+    prev="$arg"
+done
+# Delegate to real python3 for JSON operations
+exec /usr/bin/python3 "$@"
+MOCK
+    chmod +x "${TEST_DIR}/python3"
 }
 
 # --- Assertions ---
@@ -257,9 +293,11 @@ run_script_test() {
     # Run the script with mocked PATH and env vars (timeout 30s)
     local exit_code=0
     MOCK_LOG="${MOCK_LOG}" \
+    TEST_DIR="${TEST_DIR}" \
     SPRITE_NAME="test-sprite-${script_name}" \
     OPENROUTER_API_KEY="sk-or-v1-0000000000000000000000000000000000000000000000000000000000000000" \
     PATH="${TEST_DIR}:${PATH}" \
+    HOME="${TEST_DIR}/fakehome" \
         timeout 30 bash "${script_path}" > "${output_file}" 2>&1 || exit_code=$?
 
     assert_exit_code "${exit_code}" 0 "Script exits successfully"
@@ -661,6 +699,12 @@ echo "Remote:   ${REMOTE}"
 
 setup_mocks
 setup_extra_mocks
+
+# Create fake home for sprite script tests
+mkdir -p "${TEST_DIR}/fakehome/.ssh"
+mkdir -p "${TEST_DIR}/fakehome/.config/spawn"
+mkdir -p "${TEST_DIR}/fakehome/.claude"
+mkdir -p "${TEST_DIR}/fakehome/.local/bin"
 
 run_shellcheck
 test_common_source
