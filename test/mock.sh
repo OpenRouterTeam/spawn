@@ -39,6 +39,7 @@ SKIPPED=0
 # Cleanup on exit
 cleanup() {
     rm -rf "${TEST_DIR}"
+    rm -f /tmp/spawn_* 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -250,6 +251,22 @@ setup_mock_agents() {
     # Silent mocks (no logging needed)
     _create_silent_mock clear sleep
 
+    # Mock timeout/gtimeout to just run the command (skip the timeout value)
+    cat > "${TEST_DIR}/timeout" << 'MOCK'
+#!/bin/bash
+shift
+exec "$@"
+MOCK
+    chmod +x "${TEST_DIR}/timeout"
+    cp "${TEST_DIR}/timeout" "${TEST_DIR}/gtimeout"
+
+    # Mock python3 — delegate to real python3 for JSON parsing
+    cat > "${TEST_DIR}/python3" << 'MOCK'
+#!/bin/bash
+exec /usr/bin/python3 "$@"
+MOCK
+    chmod +x "${TEST_DIR}/python3"
+
     # Mock 'ssh-keygen' — returns MD5 fingerprint matching fixture data
     _create_ssh_keygen_mock
 
@@ -268,7 +285,12 @@ case "$1" in
         esac ;;
     ssh)
         # fly ssh console -a APP -C "bash -c CMD" --quiet
-        # Succeed silently — the command "ran"
+        # Extract the command and simulate its output
+        all_args="$*"
+        # Check for "echo ok" (may be escaped as echo\ ok by printf %q)
+        if [[ "$all_args" == *"echo ok"* ]] || [[ "$all_args" == *'echo\ ok'* ]]; then
+            echo "ok"
+        fi
         ;;
     version)
         echo "fly v0.3.50" ;;
