@@ -233,6 +233,8 @@ create_server() {
     export GCP_SERVER_IP="$(_gcp_get_instance_ip "${name}" "${zone}")"
 
     log_info "Instance created: IP=${GCP_SERVER_IP}"
+
+    save_vm_connection "${GCP_SERVER_IP}" "${SSH_USER:-$(whoami)}" "" "$name" "gcp" "{\"zone\":\"${zone}\",\"project\":\"${GCP_PROJECT}\"}"
 }
 
 verify_server_connectivity() { ssh_verify_connectivity "$@"; }

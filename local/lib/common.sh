@@ -43,6 +43,8 @@ get_server_name() {
 create_server() {
     local name="${1}"
     log_info "Using local machine: ${name}"
+
+    save_vm_connection "localhost" "${USER:-$(whoami)}" "" "$name" "local"
 }
 
 # No cloud-init needed

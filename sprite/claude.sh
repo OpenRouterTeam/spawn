@@ -33,7 +33,7 @@ agent_configure() {
 }
 
 agent_save_connection() {
-    save_vm_connection "sprite-console" "${USER:-root}" "" "${SPRITE_NAME}"
+    save_vm_connection "sprite-console" "${USER:-root}" "" "${SPRITE_NAME}" "sprite"
 }
 
 agent_launch_cmd() {

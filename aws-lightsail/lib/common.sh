@@ -169,6 +169,8 @@ create_server() {
     log_info "Instance creation initiated: ${name}"
 
     _wait_for_lightsail_instance "${name}"
+
+    save_vm_connection "${LIGHTSAIL_SERVER_IP}" "ubuntu" "" "$name" "aws-lightsail"
 }
 
 # Lightsail uses 'ubuntu' user, not 'root'
