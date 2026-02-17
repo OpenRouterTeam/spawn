@@ -3198,13 +3198,16 @@ opencode_install_cmd() {
 
 # Save VM connection info for spawn list reconnect functionality.
 # This allows users to reconnect to previously spawned VMs via `spawn list`.
-# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME]
-# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME"
+# Usage: save_vm_connection IP USER [SERVER_ID] [SERVER_NAME] [CLOUD] [METADATA_JSON]
+# Example: save_vm_connection "$DO_SERVER_IP" "root" "$DO_DROPLET_ID" "$DROPLET_NAME" "digitalocean"
+# Example: save_vm_connection "$GCP_IP" "root" "" "$NAME" "gcp" '{"zone":"us-central1-a"}'
 save_vm_connection() {
     local ip="${1}"
     local user="${2}"
     local server_id="${3:-}"
     local server_name="${4:-}"
+    local cloud="${5:-}"
+    local metadata="${6:-}"
 
     local spawn_dir="${HOME}/.spawn"
     mkdir -p "${spawn_dir}"
@@ -3218,6 +3221,12 @@ save_vm_connection() {
     fi
     if [[ -n "${server_name}" ]]; then
         json="${json},\"server_name\":\"${server_name}\""
+    fi
+    if [[ -n "${cloud}" ]]; then
+        json="${json},\"cloud\":\"${cloud}\""
+    fi
+    if [[ -n "${metadata}" ]]; then
+        json="${json},\"metadata\":${metadata}"
     fi
     json="${json}}"
 

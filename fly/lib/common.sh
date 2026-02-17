@@ -284,6 +284,8 @@ create_server() {
     _fly_create_app "$name" || return 1
     _fly_create_machine "$name" "$region" "$vm_memory" || return 1
     _fly_wait_for_machine_start "$name" "$FLY_MACHINE_ID"
+
+    save_vm_connection "fly-ssh" "root" "${FLY_MACHINE_ID}" "$name" "fly"
 }
 
 # Wait for base tools to be installed (Fly.io uses bare Ubuntu image)
