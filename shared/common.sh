@@ -1311,7 +1311,11 @@ register_cleanup_trap() {
 install_agent() {
     local agent_name="$1" install_cmd="$2" run_cb="$3"
     log_step "Installing ${agent_name}..."
-    ${run_cb} "${install_cmd}"
+    if ! ${run_cb} "${install_cmd}"; then
+        log_install_failed "${agent_name}" "${install_cmd}"
+        return 1
+    fi
+    log_info "${agent_name} installation completed"
 }
 
 # Verify an agent installed correctly; exit 1 on failure
