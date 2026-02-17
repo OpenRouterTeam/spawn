@@ -790,6 +790,200 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
   await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), manifest.clouds[cloud].url, debug);
 }
 
+// ── Headless Mode ──────────────────────────────────────────────────────────────
+
+/** Exit codes for headless mode:
+ *  0 = success
+ *  1 = script execution error (provisioning/setup failed)
+ *  2 = script download error (network/404)
+ *  3 = validation error (bad inputs, missing credentials) */
+
+export interface HeadlessOptions {
+  prompt?: string;
+  debug?: boolean;
+  outputFormat?: string;
+}
+
+interface SpawnResult {
+  status: "success" | "error";
+  cloud: string;
+  agent: string;
+  server_id?: string;
+  server_name?: string;
+  ip_address?: string;
+  ssh_user?: string;
+  error_message?: string;
+  error_code?: string;
+}
+
+function headlessOutput(result: SpawnResult, outputFormat?: string): void {
+  if (outputFormat === "json") {
+    console.log(JSON.stringify(result));
+  } else {
+    // Plain text output for headless without --output json
+    if (result.status === "success") {
+      console.error(`Success: ${result.agent} on ${result.cloud}`);
+      if (result.ip_address) console.error(`  IP: ${result.ip_address}`);
+      if (result.ssh_user) console.error(`  User: ${result.ssh_user}`);
+      if (result.server_id) console.error(`  Server ID: ${result.server_id}`);
+    } else {
+      console.error(`Error: ${result.error_message}`);
+    }
+  }
+}
+
+function headlessError(agent: string, cloud: string, errorCode: string, errorMessage: string, outputFormat?: string, exitCode = 1): never {
+  headlessOutput({ status: "error", cloud, agent, error_code: errorCode, error_message: errorMessage }, outputFormat);
+  process.exit(exitCode);
+}
+
+/** Run a bash script in headless mode (all output to stderr, no interactive session) */
+function runBashHeadless(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<number> {
+  validateScriptContent(script);
+
+  const env = { ...process.env };
+  env.SPAWN_HEADLESS = "1";
+  env.SPAWN_MODE = "non-interactive";
+  if (prompt) {
+    env.SPAWN_PROMPT = prompt;
+  }
+  if (debug) {
+    env.SPAWN_DEBUG = "1";
+  }
+  if (spawnName) {
+    env.SPAWN_NAME = spawnName;
+  }
+
+  return new Promise<number>((resolve, reject) => {
+    const child = spawn("bash", ["-c", script], {
+      stdio: ["ignore", "pipe", "inherit"],
+      env,
+    });
+    // Forward stdout to stderr so JSON output stays clean on stdout
+    if (child.stdout) {
+      child.stdout.pipe(process.stderr);
+    }
+    child.on("close", (code: number | null) => {
+      resolve(code ?? 1);
+    });
+    child.on("error", reject);
+  });
+}
+
+export async function cmdRunHeadless(agent: string, cloud: string, opts: HeadlessOptions = {}): Promise<void> {
+  const { prompt, debug, outputFormat } = opts;
+
+  // Phase 1: Validate inputs (exit code 3)
+  try {
+    validateIdentifier(agent, "Agent name");
+    validateIdentifier(cloud, "Cloud name");
+    if (prompt) validatePrompt(prompt);
+  } catch (err) {
+    headlessError(agent, cloud, "VALIDATION_ERROR", getErrorMessage(err), outputFormat, 3);
+  }
+
+  // Load manifest (silently - no spinner in headless mode)
+  let manifest: Manifest;
+  try {
+    manifest = await loadManifest();
+  } catch (err) {
+    headlessError(agent, cloud, "MANIFEST_ERROR", getErrorMessage(err), outputFormat, 3);
+  }
+
+  // Resolve agent/cloud names
+  const resolvedAgent = resolveAgentKey(manifest, agent) ?? agent;
+  const resolvedCloud = resolveCloudKey(manifest, cloud) ?? cloud;
+
+  // Validate entities exist
+  if (!manifest.agents[resolvedAgent]) {
+    headlessError(resolvedAgent, resolvedCloud, "UNKNOWN_AGENT", `Unknown agent: ${resolvedAgent}`, outputFormat, 3);
+  }
+  if (!manifest.clouds[resolvedCloud]) {
+    headlessError(resolvedAgent, resolvedCloud, "UNKNOWN_CLOUD", `Unknown cloud: ${resolvedCloud}`, outputFormat, 3);
+  }
+
+  const matrixKey = `${resolvedCloud}/${resolvedAgent}`;
+  if (manifest.matrix[matrixKey] !== "implemented") {
+    headlessError(resolvedAgent, resolvedCloud, "NOT_IMPLEMENTED", `${resolvedAgent} on ${resolvedCloud} is not implemented`, outputFormat, 3);
+  }
+
+  // Check credentials upfront
+  const cloudAuth = manifest.clouds[resolvedCloud].auth;
+  if (cloudAuth.toLowerCase() !== "none") {
+    const authVars = parseAuthEnvVars(cloudAuth);
+    const missing = collectMissingCredentials(authVars, resolvedCloud);
+    if (missing.length > 0) {
+      headlessError(resolvedAgent, resolvedCloud, "MISSING_CREDENTIALS",
+        `Missing required credentials: ${missing.join(", ")}`, outputFormat, 3);
+    }
+  }
+
+  // Phase 2: Download script (exit code 2)
+  const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
+  const ghUrl = `${RAW_BASE}/${resolvedCloud}/${resolvedAgent}.sh`;
+
+  let scriptContent: string;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+    if (res.ok) {
+      scriptContent = await res.text();
+    } else {
+      const ghRes = await fetch(ghUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+      if (!ghRes.ok) {
+        headlessError(resolvedAgent, resolvedCloud, "DOWNLOAD_ERROR",
+          `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`, outputFormat, 2);
+      }
+      scriptContent = await ghRes.text();
+    }
+  } catch (err) {
+    headlessError(resolvedAgent, resolvedCloud, "DOWNLOAD_ERROR",
+      `Failed to download script: ${getErrorMessage(err)}`, outputFormat, 2);
+  }
+
+  // Phase 3: Execute script (exit code 1)
+  if (debug) {
+    console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud}...`);
+  }
+
+  const exitCode = await runBashHeadless(scriptContent, prompt, debug);
+
+  if (exitCode !== 0) {
+    headlessError(resolvedAgent, resolvedCloud, "EXECUTION_ERROR",
+      `Script exited with code ${exitCode}`, outputFormat, 1);
+  }
+
+  // Read connection info from last-connection.json
+  const { getConnectionPath } = await import("./history.js");
+  let connectionInfo: { ip?: string; user?: string; server_id?: string; server_name?: string } = {};
+  try {
+    const connPath = getConnectionPath();
+    const { readFileSync, existsSync } = await import("fs");
+    if (existsSync(connPath)) {
+      const raw = JSON.parse(readFileSync(connPath, "utf-8"));
+      connectionInfo = {
+        ip: raw.ip,
+        user: raw.user,
+        server_id: raw.server_id,
+        server_name: raw.server_name,
+      };
+    }
+  } catch {
+    // Connection info not available - not fatal
+  }
+
+  const result: SpawnResult = {
+    status: "success",
+    cloud: resolvedCloud,
+    agent: resolvedAgent,
+    ...(connectionInfo.ip ? { ip_address: connectionInfo.ip } : {}),
+    ...(connectionInfo.user ? { ssh_user: connectionInfo.user } : {}),
+    ...(connectionInfo.server_id ? { server_id: connectionInfo.server_id } : {}),
+    ...(connectionInfo.server_name ? { server_name: connectionInfo.server_name } : {}),
+  };
+
+  headlessOutput(result, outputFormat);
+}
+
 export function getStatusDescription(status: number): string {
   return status === 404 ? "not found" : `HTTP ${status}`;
 }
@@ -2308,6 +2502,9 @@ function getHelpUsageSection(): string {
   spawn                              Interactive agent + cloud picker
   spawn <agent> <cloud>              Launch agent on cloud directly
   spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
+  spawn <agent> <cloud> --headless   Provision and exit (no interactive session)
+  spawn <agent> <cloud> --output json
+                                     Headless mode with structured JSON on stdout
   spawn <agent> <cloud> --prompt "text"
                                      Execute agent with prompt (non-interactive)
   spawn <agent> <cloud> --prompt-file <file>  (or -f)
@@ -2343,6 +2540,8 @@ function getHelpExamplesSection(): string {
   spawn openclaw ovh -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
   spawn interpreter gcp --dry-run    ${pc.dim("# Preview without provisioning")}
+  spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}
+  spawn claude hetzner --output json ${pc.dim("# Structured JSON output on stdout")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
@@ -2385,7 +2584,8 @@ function getHelpEnvVarsSection(): string {
   ${pc.cyan("SPAWN_NO_UNICODE=1")}        Force ASCII output (no unicode symbols)
   ${pc.cyan("SPAWN_UNICODE=1")}           Force Unicode output (override auto-detection)
   ${pc.cyan("SPAWN_HOME")}                Override spawn data directory (default: ~/.spawn)
-  ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)`;
+  ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)
+  ${pc.cyan("SPAWN_HEADLESS=1")}          Set automatically in --headless mode (for scripts)`;
 }
 
 function getHelpFooterSection(): string {
