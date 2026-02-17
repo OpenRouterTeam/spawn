@@ -1555,7 +1555,9 @@ spawn_agent() {
     cloud_wait_ready
 
     # 5. Install agent
-    if _fn_exists agent_install; then agent_install; fi
+    if _fn_exists agent_install; then
+        agent_install || exit 1
+    fi
 
     # 6. Get API key
     get_or_prompt_api_key
