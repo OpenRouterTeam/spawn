@@ -20,6 +20,16 @@ fi
 # Hetzner Cloud specific functions
 # ============================================================
 
+# Detect hcloud CLI availability
+_hcloud_cli_available() {
+    command -v hcloud &>/dev/null
+}
+
+# Check if hcloud CLI has an active context (authenticated)
+_hcloud_cli_authenticated() {
+    _hcloud_cli_available && hcloud context active &>/dev/null 2>&1
+}
+
 readonly HETZNER_API_BASE="https://api.hetzner.cloud/v1"
 SPAWN_DASHBOARD_URL="https://console.hetzner.cloud/"
 # SSH_OPTS is now defined in shared/common.sh
@@ -48,8 +58,27 @@ test_hcloud_token() {
     return 0
 }
 
-# Ensure HCLOUD_TOKEN is available (env var → config file → prompt+save)
+# Ensure Hetzner auth is available (hcloud CLI → env var → config file → prompt+save)
 ensure_hcloud_token() {
+    # If hcloud CLI is available, prefer it for authentication
+    if _hcloud_cli_available; then
+        if _hcloud_cli_authenticated; then
+            log_info "Using hcloud CLI (context: $(hcloud context active))"
+            # Export token from CLI context for API fallback compatibility
+            if [[ -z "${HCLOUD_TOKEN:-}" ]]; then
+                HCLOUD_TOKEN=$(hcloud context active 2>/dev/null | xargs -I{} grep -A1 "{}" ~/.config/hcloud/cli.toml 2>/dev/null | grep token | sed 's/.*= *"\(.*\)"/\1/' || true)
+                if [[ -n "${HCLOUD_TOKEN:-}" ]]; then
+                    export HCLOUD_TOKEN
+                fi
+            fi
+            return 0
+        else
+            log_info "hcloud CLI found but no active context"
+            log_info "Run: hcloud context create myproject"
+            log_info "Falling back to API token authentication..."
+        fi
+    fi
+
     ensure_api_token_with_provider \
         "Hetzner Cloud" \
         "HCLOUD_TOKEN" \
@@ -60,6 +89,16 @@ ensure_hcloud_token() {
 
 # Check if SSH key is registered with Hetzner
 hetzner_check_ssh_key() {
+    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
+        # Use hcloud CLI to check by fingerprint
+        local fingerprint="$1"
+        local result
+        result=$(hcloud ssh-key list -o json 2>/dev/null || true)
+        if [[ -n "$result" ]] && printf '%s' "$result" | jq -e --arg fp "$fingerprint" '.[] | select(.fingerprint == $fp)' &>/dev/null; then
+            return 0
+        fi
+        return 1
+    fi
     check_ssh_key_by_fingerprint hetzner_api "/ssh_keys" "$1"
 }
 
@@ -67,6 +106,16 @@ hetzner_check_ssh_key() {
 hetzner_register_ssh_key() {
     local key_name="$1"
     local pub_path="$2"
+
+    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
+        # Use hcloud CLI to register
+        if hcloud ssh-key create --name "$key_name" --public-key-from-file "$pub_path" &>/dev/null; then
+            return 0
+        fi
+        # Fall through to API on CLI failure
+        log_warn "hcloud ssh-key create failed, falling back to API"
+    fi
+
     local pub_key
     pub_key=$(cat "$pub_path")
     local json_pub_key json_name
@@ -362,7 +411,7 @@ _hetzner_resolve_server_type() {
     printf '%s' "$validated_type"
 }
 
-# Create a Hetzner server with cloud-init
+# Create a Hetzner server with cloud-init (hcloud CLI preferred, API fallback)
 create_server() {
     local name="$1"
 
@@ -384,6 +433,38 @@ create_server() {
 
     log_step "Creating Hetzner server '$name' (type: $server_type, location: $location)..."
 
+    # Try hcloud CLI first
+    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
+        local userdata_file
+        userdata_file=$(mktemp)
+        get_cloud_init_userdata > "$userdata_file"
+
+        local cli_response
+        if cli_response=$(hcloud server create \
+            --name "$name" \
+            --type "$server_type" \
+            --location "$location" \
+            --image "$image" \
+            --ssh-key all \
+            --user-data-from-file "$userdata_file" \
+            -o json 2>&1); then
+            rm -f "$userdata_file"
+
+            HETZNER_SERVER_ID=$(printf '%s' "$cli_response" | jq -r '.server.id')
+            HETZNER_SERVER_IP=$(printf '%s' "$cli_response" | jq -r '.server.public_net.ipv4.ip')
+
+            if [[ -n "$HETZNER_SERVER_ID" && "$HETZNER_SERVER_ID" != "null" && -n "$HETZNER_SERVER_IP" && "$HETZNER_SERVER_IP" != "null" ]]; then
+                export HETZNER_SERVER_ID HETZNER_SERVER_IP
+                log_info "Server created via hcloud CLI: ID=$HETZNER_SERVER_ID, IP=$HETZNER_SERVER_IP"
+                save_vm_connection "${HETZNER_SERVER_IP}" "root" "${HETZNER_SERVER_ID}" "$name" "hetzner"
+                return 0
+            fi
+        fi
+        rm -f "$userdata_file"
+        log_warn "hcloud CLI server create failed, falling back to API"
+    fi
+
+    # Fallback: REST API
     # Get all SSH key IDs
     local ssh_keys_response
     ssh_keys_response=$(hetzner_api GET "/ssh_keys")
@@ -426,11 +507,21 @@ run_server() { ssh_run_server "$@"; }
 upload_file() { ssh_upload_file "$@"; }
 interactive_session() { ssh_interactive_session "$@"; }
 
-# Destroy a Hetzner server
+# Destroy a Hetzner server (hcloud CLI preferred, API fallback)
 destroy_server() {
     local server_id="$1"
 
     log_step "Destroying server $server_id..."
+
+    # Try hcloud CLI first
+    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
+        if hcloud server delete "$server_id" 2>/dev/null; then
+            log_info "Server $server_id destroyed via hcloud CLI"
+            return 0
+        fi
+        log_warn "hcloud CLI delete failed, falling back to API"
+    fi
+
     local response
     response=$(hetzner_api DELETE "/servers/$server_id")
 
@@ -446,8 +537,30 @@ destroy_server() {
     log_info "Server $server_id destroyed"
 }
 
-# List all Hetzner servers
+# List all Hetzner servers (hcloud CLI preferred, API fallback)
 list_servers() {
+    # Try hcloud CLI first
+    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
+        local cli_response
+        if cli_response=$(hcloud server list -o json 2>/dev/null); then
+            local count
+            count=$(printf '%s' "$cli_response" | jq 'length')
+            if [[ "$count" -eq 0 ]]; then
+                printf 'No servers found\n'
+                return 0
+            fi
+            printf '%-25s %-12s %-12s %-16s %-10s\n' "NAME" "ID" "STATUS" "IP" "TYPE"
+            printf '%s\n' "---------------------------------------------------------------------------"
+            printf '%s' "$cli_response" | jq -r \
+                '.[] | "\(.name)|\(.id)|\(.status)|\(.public_net.ipv4.ip // "N/A")|\(.server_type.name)"' \
+                | while IFS='|' read -r name sid status ip stype; do
+                    printf '%-25s %-12s %-12s %-16s %-10s\n' "$name" "$sid" "$status" "$ip" "$stype"
+                done
+            return 0
+        fi
+    fi
+
+    # Fallback: REST API
     local response
     response=$(hetzner_api GET "/servers")
 
