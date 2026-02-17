@@ -3,9 +3,6 @@ on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
-concurrency:
-  group: qa-sprite-trigger
-  cancel-in-progress: false
 jobs:
   trigger:
     runs-on: ubuntu-latest
