@@ -129,6 +129,11 @@ describe("cmdList integration", () => {
     global.fetch = originalFetch;
     processExitSpy.mockRestore();
     restoreMocks(consoleMocks.log, consoleMocks.error);
+
+    // Clean up test directory
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   // ── Empty history ───────────────────────────────────────────────────────────
