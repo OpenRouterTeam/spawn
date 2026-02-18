@@ -137,9 +137,7 @@ get_cloud_init_userdata() {
     cat << 'CLOUD_INIT_EOF'
 #!/bin/bash
 apt-get update -y
-apt-get install -y curl unzip git zsh
-# Install Node.js (v22 LTS) — needed by npm-based agents (codex, etc.)
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs || true
+apt-get install -y curl unzip git zsh nodejs npm
 # Install Bun
 su - $(logname 2>/dev/null || echo "$USER") -c 'curl -fsSL https://bun.sh/install | bash' || true
 # Install Claude Code
