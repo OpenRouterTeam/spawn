@@ -41,7 +41,7 @@ do_api() {
 test_do_token() {
     local response
     response=$(do_api GET "/account")
-    if [[ "$response" == *'"id"'* ]]; then
+    if [[ "$response" == *'"uuid"'* ]]; then
         log_info "API token validated"
         return 0
     else
@@ -165,7 +165,7 @@ _do_check_create_error() {
 # Create a DigitalOcean droplet with cloud-init
 create_server() {
     local name="$1"
-    local size="${DO_DROPLET_SIZE:-s-2vcpu-2gb}"
+    local size="${DO_DROPLET_SIZE:-s-2vcpu-4gb}"
     local region="${DO_REGION:-nyc3}"
     local image="ubuntu-24-04-x64"
 

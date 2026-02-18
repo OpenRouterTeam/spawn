@@ -2598,6 +2598,87 @@
       "cpu_type": "shared",
       "deprecated": false,
       "deprecation": null,
+      "description": "CX 22",
+      "disk": 40,
+      "id": 120,
+      "locations": [
+        {
+          "deprecation": null,
+          "id": 1,
+          "name": "fsn1"
+        },
+        {
+          "deprecation": null,
+          "id": 2,
+          "name": "nbg1"
+        },
+        {
+          "deprecation": null,
+          "id": 3,
+          "name": "hel1"
+        }
+      ],
+      "memory": 2,
+      "name": "cx22",
+      "prices": [
+        {
+          "included_traffic": 21990232555520,
+          "location": "fsn1",
+          "price_hourly": {
+            "gross": "0.0048000000000000",
+            "net": "0.0048000000"
+          },
+          "price_monthly": {
+            "gross": "2.9900000000000000",
+            "net": "2.9900000000"
+          },
+          "price_per_tb_traffic": {
+            "gross": "1.2000000000000000",
+            "net": "1.2000000000"
+          }
+        },
+        {
+          "included_traffic": 21990232555520,
+          "location": "hel1",
+          "price_hourly": {
+            "gross": "0.0048000000000000",
+            "net": "0.0048000000"
+          },
+          "price_monthly": {
+            "gross": "2.9900000000000000",
+            "net": "2.9900000000"
+          },
+          "price_per_tb_traffic": {
+            "gross": "1.2000000000000000",
+            "net": "1.2000000000"
+          }
+        },
+        {
+          "included_traffic": 21990232555520,
+          "location": "nbg1",
+          "price_hourly": {
+            "gross": "0.0048000000000000",
+            "net": "0.0048000000"
+          },
+          "price_monthly": {
+            "gross": "2.9900000000000000",
+            "net": "2.9900000000"
+          },
+          "price_per_tb_traffic": {
+            "gross": "1.2000000000000000",
+            "net": "1.2000000000"
+          }
+        }
+      ],
+      "storage_type": "local"
+    },
+    {
+      "architecture": "x86",
+      "category": "cost_optimized",
+      "cores": 2,
+      "cpu_type": "shared",
+      "deprecated": false,
+      "deprecation": null,
       "description": "CX 23",
       "disk": 40,
       "id": 114,

@@ -81,6 +81,111 @@ _get_token_env_var() {
     esac
 }
 
+# --- Credential helpers ---
+
+# Try to load a token from the spawn config file into the env var.
+# Returns 0 if token was loaded, 1 if not.
+_load_token_from_config() {
+    local cloud="$1"
+    local token_var
+    token_var=$(_get_token_env_var "$cloud")
+    [[ -z "$token_var" ]] && return 1
+
+    # Already set — nothing to do
+    local current="${!token_var:-}"
+    [[ -n "$current" ]] && return 0
+
+    local config_file="${HOME}/.config/spawn/${cloud}.json"
+    [[ -f "$config_file" ]] || return 1
+
+    local saved
+    saved=$(python3 -c "import json, sys; data=json.load(open(sys.argv[1])); print(data.get('api_key','') or data.get('token',''))" "$config_file" 2>/dev/null)
+    if [[ -n "$saved" ]]; then
+        export "$token_var=$saved"
+        return 0
+    fi
+    return 1
+}
+
+# Interactive credential collection — runs BEFORE non-interactive tests.
+# For each token-based cloud, ensures the env var is set by:
+#   1. Checking the env var
+#   2. Loading from ~/.config/spawn/{cloud}.json
+#   3. Prompting the user (Enter to skip)
+_collect_credentials() {
+    local clouds="$1"
+    local collected=""
+    local skipped=""
+
+    for cloud in $clouds; do
+        local token_var
+        token_var=$(_get_token_env_var "$cloud")
+
+        # CLI-auth clouds (aws, gcp, oracle, sprite) — no token to collect
+        [[ -z "$token_var" ]] && continue
+
+        # Already in env?
+        if [[ -n "${!token_var:-}" ]]; then
+            collected="${collected} ${cloud}"
+            continue
+        fi
+
+        # Try config file
+        if _load_token_from_config "$cloud"; then
+            _e2e_log "Loaded ${token_var} from ~/.config/spawn/${cloud}.json"
+            collected="${collected} ${cloud}"
+            continue
+        fi
+
+        # Fly: try CLI auth (fly auth token)
+        if [[ "$cloud" == "fly" ]] && _try_fly_cli_token; then
+            _e2e_log "Loaded FLY_API_TOKEN from fly CLI auth"
+            collected="${collected} ${cloud}"
+            continue
+        fi
+
+        # No TTY? Can't prompt — skip
+        if ! echo -n "" > /dev/tty 2>/dev/null; then
+            skipped="${skipped} ${cloud}"
+            continue
+        fi
+
+        # Interactive prompt
+        printf '  %s: paste %s (Enter to skip): ' "$cloud" "$token_var"
+        local token=""
+        read -r token </dev/tty
+        if [[ -n "$token" ]]; then
+            export "$token_var=$token"
+            collected="${collected} ${cloud}"
+        else
+            skipped="${skipped} ${cloud}"
+        fi
+    done
+
+    if [[ -n "$skipped" ]]; then
+        _e2e_log "Skipped (no credentials):${skipped}"
+    fi
+}
+
+# Try to get FLY_API_TOKEN from the flyctl CLI (fly auth token)
+_try_fly_cli_token() {
+    local fly_cmd=""
+    if command -v fly &>/dev/null; then
+        fly_cmd="fly"
+    elif command -v flyctl &>/dev/null; then
+        fly_cmd="flyctl"
+    else
+        return 1
+    fi
+    local token
+    token=$("$fly_cmd" auth token 2>/dev/null) || return 1
+    if [[ -n "$token" ]]; then
+        export FLY_API_TOKEN="$token"
+        return 0
+    fi
+    return 1
+}
+
 # --- Credential check ---
 
 # Check if a cloud has credentials available (non-interactive)
@@ -98,7 +203,7 @@ _cloud_has_credentials() {
         local)  return 0 ;;
     esac
 
-    # Token-based clouds: check env var, then spawn config file
+    # Token-based clouds: check env var, then spawn config file, then CLI
     if [[ -n "$token_var" ]]; then
         local token_val="${!token_var:-}"
         if [[ -n "$token_val" ]]; then
@@ -108,6 +213,10 @@ _cloud_has_credentials() {
         local config_file="${HOME}/.config/spawn/${cloud}.json"
         if [[ -f "$config_file" ]]; then
             return 0
+        fi
+        # Fly: also check CLI auth
+        if [[ "$cloud" == "fly" ]]; then
+            _try_fly_cli_token &>/dev/null && return 0
         fi
     fi
     return 1
@@ -314,7 +423,7 @@ _setup_noninteractive_env() {
     case "$cloud" in
         hetzner)
             export HETZNER_LOCATION="${HETZNER_LOCATION:-fsn1}"
-            export HETZNER_SERVER_TYPE="${HETZNER_SERVER_TYPE:-cpx11}"
+            export HETZNER_SERVER_TYPE="${HETZNER_SERVER_TYPE:-cx23}"
             ;;
         fly)
             export FLY_REGION="${FLY_REGION:-iad}"
@@ -491,60 +600,46 @@ _build_failure_context() {
     fi
 }
 
-# Spawn one Claude agent per cloud to fix ALL failures on that cloud at once
-auto_fix_cloud() {
-    local cloud="$1"
-    shift
-    local agents="$*"
+# Spawn one Claude agent to fix a single failing combo
+auto_fix_combo() {
+    local cloud="$1" agent="$2"
 
     if ! command -v claude &>/dev/null; then
-        _e2e_log "claude CLI not found — skipping auto-fix for ${cloud}"
+        _e2e_log "claude CLI not found — skipping auto-fix for ${cloud}/${agent}"
         return 1
     fi
 
-    local agent_count=0
-    local prompt=""
-    local files_list=""
-
-    # Build combined prompt with all failures for this cloud
-    for agent in $agents; do
-        prompt="${prompt}$(_build_failure_context "$cloud" "$agent")"
-        prompt="${prompt}---
-
-"
-        files_list="${files_list} ${cloud}/${agent}.sh"
-        agent_count=$((agent_count + 1))
-    done
+    local prompt
+    prompt=$(_build_failure_context "$cloud" "$agent")
 
     local cloud_lib=""
     if [[ -f "${REPO_ROOT}/${cloud}/lib/common.sh" ]]; then
         cloud_lib=$(cat "${REPO_ROOT}/${cloud}/lib/common.sh")
     fi
 
-    _e2e_log "Spawning Claude agent for ${cloud} (${agent_count} failure(s): ${agents})..."
+    _e2e_log "Spawning Claude agent for ${cloud}/${agent}..."
 
-    claude -p "You are fixing E2E test failures for the **${cloud}** cloud provider.
+    claude -p "You are fixing an E2E test failure for **${cloud}/${agent}**.
 
 ## Cloud Library (${cloud}/lib/common.sh)
 \`\`\`bash
 ${cloud_lib}
 \`\`\`
 
-## Failures to Fix
+## Failure
 
 ${prompt}
 
 ## Instructions
 
-Fix ALL ${agent_count} failing script(s):${files_list}
+Fix the failing script: ${cloud}/${agent}.sh
 
-For each script:
 1. Read the error output to understand what went wrong
 2. Compare with the reference script (working on another cloud) if available
 3. Fix the issue — common problems: wrong install command, missing PATH, timeout in non-TTY
 4. Run \`bash -n\` on every modified file
 
-Only modify files under ${cloud}/. Do not modify lib/common.sh or shared/." 2>&1 | tee -a "${E2E_RESULTS_DIR}/autofix_${cloud}.log" || true
+Only modify files under ${cloud}/. Do not modify lib/common.sh or shared/." 2>&1 | tee -a "${E2E_RESULTS_DIR}/autofix_${cloud}_${agent}.log" || true
 }
 
 # --- Timing history ---
@@ -810,68 +905,48 @@ _build_slow_context() {
     fi
 }
 
-# Spawn one Claude agent per cloud to optimize ALL slow combos on that cloud
-optimize_slow_cloud() {
-    local cloud="$1"
-    shift
-    # Remaining args: "agent:elapsed:reasons" entries
-    local entries="$*"
+# Spawn one Claude agent to optimize a single slow combo
+optimize_slow_combo() {
+    local cloud="$1" agent="$2" elapsed="$3" reasons="$4"
 
     if ! command -v claude &>/dev/null; then
-        _e2e_log "claude CLI not found — skipping optimization for ${cloud}"
+        _e2e_log "claude CLI not found — skipping optimization for ${cloud}/${agent}"
         return 1
     fi
 
-    local agent_count=0
-    local prompt=""
-    local files_list=""
-
-    for entry in $entries; do
-        local agent="${entry%%:*}"
-        local rest="${entry#*:}"
-        local elapsed="${rest%%:*}"
-        local reasons
-        reasons=$(printf '%s' "${rest#*:}" | tr '|' '\n')
-
-        prompt="${prompt}$(_build_slow_context "$cloud" "$agent" "$elapsed" "$reasons")"
-        prompt="${prompt}---
-
-"
-        files_list="${files_list} ${cloud}/${agent}.sh"
-        agent_count=$((agent_count + 1))
-    done
+    local prompt
+    prompt=$(_build_slow_context "$cloud" "$agent" "$elapsed" "$reasons")
 
     local cloud_lib=""
     if [[ -f "${REPO_ROOT}/${cloud}/lib/common.sh" ]]; then
         cloud_lib=$(cat "${REPO_ROOT}/${cloud}/lib/common.sh")
     fi
 
-    _e2e_log "Spawning Claude agent for ${cloud} (${agent_count} slow combo(s))..."
+    _e2e_log "Spawning Claude agent for ${cloud}/${agent} (${elapsed}s)..."
 
-    claude -p "You are optimizing slow E2E tests for the **${cloud}** cloud provider.
-All these scripts PASS but are too slow.
+    claude -p "You are optimizing a slow E2E test for **${cloud}/${agent}**.
+The script PASSES but is too slow.
 
 ## Cloud Library (${cloud}/lib/common.sh)
 \`\`\`bash
 ${cloud_lib}
 \`\`\`
 
-## Slow Scripts to Optimize
+## Slow Script
 
 ${prompt}
 
 ## Instructions
 
-Optimize ALL ${agent_count} slow script(s):${files_list}
+Optimize the script: ${cloud}/${agent}.sh
 
-For each script:
 1. Compare timings with the fastest peer cloud for the same agent
 2. Identify what makes it slow (heavy installer, compiling native deps, unnecessary steps)
 3. Make it faster — use lighter install methods, skip unnecessary setup, parallelize where possible
 4. Run \`bash -n\` on every modified file
-5. Don't break anything — the scripts must still pass E2E
+5. Don't break anything — the script must still pass E2E
 
-Only modify files under ${cloud}/. Do not modify lib/common.sh or shared/." 2>&1 | tee -a "${E2E_RESULTS_DIR}/optimize_${cloud}.log" || true
+Only modify files under ${cloud}/. Do not modify lib/common.sh or shared/." 2>&1 | tee -a "${E2E_RESULTS_DIR}/optimize_${cloud}_${agent}.log" || true
 }
 
 # --- Main ---
@@ -974,6 +1049,16 @@ main() {
 
     # Testable clouds (excludes local, sprite which don't provision real servers the same way)
     local testable_clouds="fly hetzner digitalocean ovh aws daytona gcp oracle"
+
+    # --- Credential collection (interactive) ---
+    # Load tokens from config files and prompt for any missing ones
+    # BEFORE we go non-interactive. This lets the user provide tokens
+    # that aren't in env vars or config files.
+    echo ""
+    _e2e_log "━━━ Credential Collection ━━━"
+    echo ""
+    _collect_credentials "$testable_clouds"
+    echo ""
 
     # Discover clouds with available credentials
     local available_clouds=""
@@ -1200,34 +1285,19 @@ main() {
         done
         echo ""
 
-        # Group slow combos by cloud and spawn one agent per cloud in parallel
-        local opt_clouds=""
+        # Spawn one Claude agent per slow combo, all in parallel
+        local opt_pids=""
         for entry in $slow_combos; do
             local combo="${entry%%:*}"
+            local rest="${entry#*:}"
+            local elapsed="${rest%%:*}"
+            local reasons
+            reasons=$(printf '%s' "${rest#*:}" | tr '|' '\n')
             local cloud="${combo%%/*}"
-            case " $opt_clouds " in
-                *" $cloud "*) ;;  # already listed
-                *) opt_clouds="${opt_clouds} ${cloud}" ;;
-            esac
-        done
-
-        local opt_pids=""
-        for cloud in $opt_clouds; do
-            # Collect all slow entries for this cloud: "agent:elapsed:reasons ..."
-            local cloud_entries=""
-            for entry in $slow_combos; do
-                local combo="${entry%%:*}"
-                local entry_cloud="${combo%%/*}"
-                local agent="${combo##*/}"
-                if [[ "$entry_cloud" == "$cloud" ]]; then
-                    local rest="${entry#*:}"
-                    cloud_entries="${cloud_entries} ${agent}:${rest}"
-                fi
-            done
-            cloud_entries=$(printf '%s' "$cloud_entries" | sed 's/^ //')
+            local agent="${combo##*/}"
 
             (
-                optimize_slow_cloud "$cloud" $cloud_entries
+                optimize_slow_combo "$cloud" "$agent" "$elapsed" "$reasons"
             ) &
             opt_pids="${opt_pids} $!"
         done
@@ -1249,7 +1319,7 @@ main() {
             local cloud="${combo%%/*}"
             local agent="${combo##*/}"
 
-            run_e2e_test "$cloud" "$agent"
+            run_e2e_test "$cloud" "$agent" || true
 
             local result_file="${E2E_RESULTS_DIR}/${cloud}_${agent}.result"
             local timing_file="${E2E_RESULTS_DIR}/${cloud}_${agent}.timing"
@@ -1267,37 +1337,20 @@ main() {
         done
     fi
 
-    # Auto-fix failures — one Claude agent per cloud, all in parallel
+    # Auto-fix failures — one Claude agent per combo, all in parallel
     if [[ "$total_fail" -gt 0 ]] && [[ "$E2E_AUTO_FIX" == "1" ]]; then
         echo ""
         _e2e_log "━━━ Auto-Fix Phase ━━━"
         echo ""
 
-        # Group failures by cloud
-        local fix_clouds=""
+        # Spawn one agent per failing combo in parallel
+        local fix_pids=""
         for combo in $failed_combos; do
             local cloud="${combo%%/*}"
-            case " $fix_clouds " in
-                *" $cloud "*) ;;
-                *) fix_clouds="${fix_clouds} ${cloud}" ;;
-            esac
-        done
-
-        # Spawn one agent per cloud in parallel
-        local fix_pids=""
-        for cloud in $fix_clouds; do
-            local cloud_agents=""
-            for combo in $failed_combos; do
-                local c="${combo%%/*}"
-                local a="${combo##*/}"
-                if [[ "$c" == "$cloud" ]]; then
-                    cloud_agents="${cloud_agents} ${a}"
-                fi
-            done
-            cloud_agents=$(printf '%s' "$cloud_agents" | sed 's/^ //')
+            local agent="${combo##*/}"
 
             (
-                auto_fix_cloud "$cloud" $cloud_agents
+                auto_fix_combo "$cloud" "$agent"
             ) &
             fix_pids="${fix_pids} $!"
         done
@@ -1319,7 +1372,7 @@ main() {
             local cloud="${combo%%/*}"
             local agent="${combo##*/}"
 
-            run_e2e_test "$cloud" "$agent"
+            run_e2e_test "$cloud" "$agent" || true
 
             local result_file="${E2E_RESULTS_DIR}/${cloud}_${agent}.result"
             local timing_file="${E2E_RESULTS_DIR}/${cloud}_${agent}.timing"

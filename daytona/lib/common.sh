@@ -100,7 +100,7 @@ _is_snapshot_conflict() {
 _daytona_create_with_resources() {
     local name="${1}"
     local cpu="${DAYTONA_CPU:-2}"
-    local memory="${DAYTONA_MEMORY:-2048}"
+    local memory="${DAYTONA_MEMORY:-4096}"
     local disk="${DAYTONA_DISK:-5}"
 
     # Validate numeric env vars to prevent command injection

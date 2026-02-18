@@ -394,7 +394,7 @@ _launch_oci_instance() {
 
 create_server() {
     local name="${1}"
-    local shape="${OCI_SHAPE:-VM.Standard.E2.1.Micro}"
+    local shape="${OCI_SHAPE:-VM.Standard.A1.Flex}"
 
     log_step "Creating OCI instance '${name}' (shape: ${shape})..."
 
