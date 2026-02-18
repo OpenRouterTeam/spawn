@@ -2211,14 +2211,20 @@ wait_for_cloud_init() {
 ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
+    # Prepend common tool directories so that tools installed during setup
+    # (uv, bun, pip, etc.) are always available in subsequent commands.
+    # Without this, "uv: command not found" occurs after the uv install script
+    # adds the binary to ~/.local/bin but PATH isn't updated for the session.
+    # Same pattern as fly/lib/common.sh run_server().
+    local full_cmd="export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\" && ${cmd}"
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
-        cmd="set -x; ${cmd}"
+        full_cmd="set -x; ${full_cmd}"
     fi
     # shellcheck disable=SC2086
     # < /dev/null prevents SSH from consuming the parent script's stdin.
     # Without this, sequential SSH calls can steal input meant for later
     # commands (e.g., safe_read prompts), causing hangs.
-    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}" < /dev/null
+    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${full_cmd}" < /dev/null
 }
 
 # Upload a file to a remote server via SCP
