@@ -3120,10 +3120,10 @@ EOF
 #   DEFAULT_VALUE    - Default value if env var unset and list is empty or choice invalid
 #   PROMPT_TEXT      - Label shown above the menu (e.g., "locations", "server types")
 #   LIST_CALLBACK    - Function that outputs pipe-delimited lines (first field = ID)
-#   DEFAULT_ID       - Optional: ID to pre-select as default (e.g., "cpx11")
+#   DEFAULT_ID       - Optional: ID to pre-select as default (e.g., "cx23")
 #
 # LIST_CALLBACK must output pipe-delimited lines where the first field is the selectable ID.
-# Example output: "fsn1|Falkenstein|DE" or "cpx11|2 vCPU|4 GB RAM|40 GB disk"
+# Example output: "fsn1|Falkenstein|DE" or "cx23|2 vCPU|4 GB RAM|40 GB disk"
 #
 # Display a numbered list and read user selection
 # Pipe-delimited items: "id|label". Returns selected id via stdout.

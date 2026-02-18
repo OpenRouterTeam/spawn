@@ -338,9 +338,13 @@ wait_for_cloud_init() {
     _fly_wait_for_ssh || return 1
 
     log_step "Installing packages (this may take 1-2 minutes)..."
-    run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 pip" 600 || {
+    run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 python3-pip build-essential" 600 || {
         log_warn "Package install timed out or failed, retrying..."
-        run_server "apt-get install -y curl unzip git zsh python3 pip" 300 || true
+        run_server "apt-get install -y curl unzip git zsh python3 python3-pip build-essential" 300 || true
+    }
+    log_step "Installing Node.js..."
+    run_server "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs" 120 || {
+        log_warn "Node.js install failed, npm-based agents may not work"
     }
     log_step "Installing bun..."
     run_server "curl -fsSL https://bun.sh/install | bash" 120 || true
@@ -401,9 +405,12 @@ upload_file() {
 # Start an interactive SSH session on the Fly.io machine
 interactive_session() {
     local cmd="$1"
+    # Wrap in bash -c with PATH prepended (same as run_server) so shell builtins
+    # like "source" work — fly ssh console -C execs directly, not via a shell.
+    local full_cmd="export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\" && $cmd"
     # SECURITY: Properly escape command to prevent injection
     local escaped_cmd
-    escaped_cmd=$(printf '%q' "$cmd")
+    escaped_cmd=$(printf '%q' "$full_cmd")
     local session_exit=0
     "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c \"$escaped_cmd\"" || session_exit=$?
     SERVER_NAME="${FLY_APP_NAME:-}" SPAWN_RECONNECT_CMD="fly ssh console -a ${FLY_APP_NAME:-}" \

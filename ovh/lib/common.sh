@@ -265,7 +265,7 @@ print(json.dumps(body))
 # Create an OVH Public Cloud instance
 create_ovh_instance() {
     local name="$1"
-    local flavor="${OVH_FLAVOR:-d2-2}"
+    local flavor="${OVH_FLAVOR:-d2-4}"
     local region="${OVH_REGION:-GRA7}"
 
     # Validate env var inputs to prevent injection into Python code

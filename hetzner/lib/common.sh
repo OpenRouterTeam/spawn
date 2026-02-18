@@ -211,7 +211,7 @@ _pick_server_type() {
     local location="$1"
     # Wrap the location-specific list function for interactive_pick
     _list_server_types_for_current_location() { _list_server_types_for_location "$location"; }
-    interactive_pick "HETZNER_SERVER_TYPE" "cpx11" "server types" _list_server_types_for_current_location "cpx11"
+    interactive_pick "HETZNER_SERVER_TYPE" "cx23" "server types" _list_server_types_for_current_location "cx23"
     unset -f _list_server_types_for_current_location
 }
 
@@ -253,7 +253,7 @@ _hetzner_get_available_ids() {
 }
 
 # Search for a compatible fallback server type when the requested one is unavailable
-# Tries same CPU family first, then any family with >= specs
+# Tries: 1) same CPU family with >= specs, 2) any family with >= specs, 3) cheapest available
 # Prints the fallback type name on success; emits FALLBACK: info on stderr
 _hetzner_find_fallback_type() {
     local server_type="$1" types_response="$2" location="$3" available_ids="$4"
@@ -269,12 +269,15 @@ _hetzner_find_fallback_type() {
     ids_json=$(printf '%s\n' "$available_ids" | jq -Rn '[inputs | tonumber]')
 
     local family candidates replacement
-    for family in "same" "any"; do
+    for family in "same" "any" "cheapest"; do
         local filter
         if [[ "$family" == "same" ]]; then
             filter="select(.cpu_type == \"${wanted_cpu}\" and .cores >= ${wanted_cores} and .memory >= ${wanted_memory})"
-        else
+        elif [[ "$family" == "any" ]]; then
             filter="select(.cores >= ${wanted_cores} and .memory >= ${wanted_memory})"
+        else
+            # Last resort: any available non-deprecated type (cheapest)
+            filter="."
         fi
 
         candidates=$(_hetzner_find_candidates "$types_response" "$location" "$ids_json" "$filter")
@@ -282,6 +285,7 @@ _hetzner_find_fallback_type() {
             replacement=$(printf '%s\n' "$candidates" | head -1 | cut -d'|' -f2)
             local label="${wanted_cpu}"
             [[ "$family" == "any" ]] && label="any"
+            [[ "$family" == "cheapest" ]] && label="cheapest"
             printf 'FALLBACK:%s:%s:%s:%s\n' "$server_type" "$replacement" "$location" "$label" >&2
             printf '%s' "$replacement"
             return 0
@@ -308,20 +312,28 @@ _validate_server_type_for_location() {
     local types_response
     types_response=$(hetzner_api GET "/server_types?per_page=50")
 
-    # Check if the requested type exists and is directly available
+    # Check if the requested type exists (including deprecated) for spec lookup
     local wanted_id
     wanted_id=$(printf '%s' "$types_response" | jq -r \
         --arg name "$server_type" \
         '.server_types[] | select(.name == $name and .deprecation == null) | .id')
 
-    if [[ -z "$wanted_id" ]]; then
-        printf 'ERROR:unknown_type\n' >&2
-        return 1
-    fi
-
-    if printf '%s\n' "$available_ids" | grep -qx "$wanted_id"; then
+    if [[ -n "$wanted_id" ]] && printf '%s\n' "$available_ids" | grep -qx "$wanted_id"; then
         printf '%s' "$server_type"
         return 0
+    fi
+
+    # Type is unavailable (not in available list or deprecated) — find a fallback.
+    # If the type exists but is deprecated, we can still read its specs for fallback matching.
+    if [[ -z "$wanted_id" ]]; then
+        # Check if it exists at all (even deprecated) so we can read specs for fallback
+        wanted_id=$(printf '%s' "$types_response" | jq -r \
+            --arg name "$server_type" \
+            '.server_types[] | select(.name == $name) | .id')
+        if [[ -z "$wanted_id" ]]; then
+            printf 'ERROR:unknown_type\n' >&2
+            return 1
+        fi
     fi
 
     _hetzner_find_fallback_type "$server_type" "$types_response" "$location" "$available_ids"

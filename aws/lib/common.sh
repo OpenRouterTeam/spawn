@@ -120,6 +120,7 @@ su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'
 # Configure PATH
 echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.bashrc
 echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.zshrc
+chown ubuntu:ubuntu /home/ubuntu/.bashrc /home/ubuntu/.zshrc
 touch /home/ubuntu/.cloud-init-complete
 chown ubuntu:ubuntu /home/ubuntu/.cloud-init-complete
 CLOUD_INIT_EOF
