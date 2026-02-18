@@ -13,6 +13,15 @@ jobs:
           SPRITE_URL: ${{ secrets.QA_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.QA_TRIGGER_SECRET }}
         run: |
-          curl -sS --fail-with-body -X POST \
+          HTTP_CODE=$(curl -sS -o /tmp/trigger-response.txt -w '%{http_code}' -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
-            -H "Authorization: Bearer ${TRIGGER_SECRET}"
+            -H "Authorization: Bearer ${TRIGGER_SECRET}" || echo "000")
+          BODY=$(cat /tmp/trigger-response.txt 2>/dev/null || true)
+          rm -f /tmp/trigger-response.txt
+          echo "HTTP ${HTTP_CODE}: ${BODY}"
+          case "$HTTP_CODE" in
+            2*) echo "Trigger accepted" ;;
+            409) echo "Already in progress — skipping (not an error)" ;;
+            429) echo "Capacity full — skipping (not an error)" ;;
+            *)  echo "::error::Trigger failed with HTTP ${HTTP_CODE}"; exit 1 ;;
+          esac
