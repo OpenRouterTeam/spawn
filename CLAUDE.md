@@ -44,15 +44,14 @@ Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 
 We are currently shipping with **9 curated clouds** (sorted by price):
 1. **local** — free (no provisioning)
-2. **oracle** — free tier (Always Free ARM instances)
-3. **hetzner** — ~€3.29/mo (CX22)
-4. **ovh** — ~€3.50/mo (d2-2)
-5. **fly** — free tier (3 shared-cpu VMs)
-6. **aws** — $3.50/mo (nano)
-7. **daytona** — pay-per-second sandboxes
-8. **digitalocean** — $4/mo (Basic droplet)
-9. **gcp** — $7.11/mo (e2-micro)
-10. **sprite** — Fly.io managed VMs
+2. **hetzner** — ~€3.29/mo (CX22)
+3. **ovh** — ~€3.50/mo (d2-2)
+4. **fly** — free tier (3 shared-cpu VMs)
+5. **aws** — $3.50/mo (nano)
+6. **daytona** — pay-per-second sandboxes
+7. **digitalocean** — $4/mo (Basic droplet)
+8. **gcp** — $7.11/mo (e2-micro)
+9. **sprite** — Fly.io managed VMs
 
 **Do NOT add clouds speculatively.** Every cloud must be manually tested and verified end-to-end before shipping. Adding a cloud that can't be tested is worse than not having it.
 

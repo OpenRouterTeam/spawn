@@ -334,7 +334,7 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
 const CLOUD_CLI_MAP: Record<string, string> = {
   gcp: "gcloud",
   aws: "aws",
-  oracle: "oci",
+
   fly: "flyctl",
   sprite: "sprite",
   hetzner: "hcloud",
@@ -349,17 +349,21 @@ export function hasCloudCli(cloud: string): boolean {
 }
 
 /** Sort clouds by credential/CLI availability and build hint overrides for the picker.
- *  Three tiers: credentials set > CLI installed > neither. */
+ *  Four tiers: credentials set > featured cloud > CLI installed > neither. */
 export function prioritizeCloudsByCredentials(
   clouds: string[],
-  manifest: Manifest
+  manifest: Manifest,
+  featuredCloud?: string
 ): { sortedClouds: string[]; hintOverrides: Record<string, string>; credCount: number; cliCount: number } {
   const withCreds: string[] = [];
+  const featured: string[] = [];
   const withCli: string[] = [];
   const rest: string[] = [];
   for (const c of clouds) {
     if (hasCloudCredentials(manifest.clouds[c].auth)) {
       withCreds.push(c);
+    } else if (featuredCloud && c === featuredCloud) {
+      featured.push(c);
     } else if (hasCloudCli(c)) {
       withCli.push(c);
     } else {
@@ -371,11 +375,14 @@ export function prioritizeCloudsByCredentials(
   for (const c of withCreds) {
     hintOverrides[c] = `credentials detected -- ${manifest.clouds[c].description}`;
   }
+  for (const c of featured) {
+    hintOverrides[c] = `recommended -- ${manifest.clouds[c].description}`;
+  }
   for (const c of withCli) {
     hintOverrides[c] = `CLI installed -- ${manifest.clouds[c].description}`;
   }
 
-  return { sortedClouds: [...withCreds, ...withCli, ...rest], hintOverrides, credCount: withCreds.length, cliCount: withCli.length };
+  return { sortedClouds: [...withCreds, ...featured, ...withCli, ...rest], hintOverrides, credCount: withCreds.length, cliCount: withCli.length };
 }
 
 /** Build hint overrides for the agent picker showing cloud count and credential readiness */
@@ -425,7 +432,8 @@ function getAndValidateCloudChoices(
     process.exit(1);
   }
 
-  const { sortedClouds, hintOverrides, credCount, cliCount } = prioritizeCloudsByCredentials(clouds, manifest);
+  const featuredCloud = manifest.agents[agent]?.featured_cloud;
+  const { sortedClouds, hintOverrides, credCount, cliCount } = prioritizeCloudsByCredentials(clouds, manifest, featuredCloud);
   if (credCount > 0) {
     p.log.info(`${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected (shown first)`);
   }
@@ -1784,8 +1792,7 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
     }
     case "aws":
       return `${sourceLib}\nensure_aws_cli\ndestroy_server "${id}"`;
-    case "oracle":
-      return `${sourceLib}\nensure_oci_cli\ndestroy_server "${id}"`;
+
     case "ovh":
       return `${sourceLib}\nensure_ovh_authenticated\ndestroy_ovh_instance "${id}"`;
     case "daytona":
