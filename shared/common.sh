@@ -1537,12 +1537,17 @@ _spawn_inject_env_vars() {
 
     agent_env_vars > "${env_temp}"
 
-    cloud_upload "${env_temp}" "/tmp/env_config"
+    # SECURITY: Use unpredictable temp file name to prevent symlink attacks
+    local rand_suffix
+    rand_suffix=$(basename "${env_temp}")
+    local temp_remote="/tmp/spawn_env_${rand_suffix}"
+
+    cloud_upload "${env_temp}" "${temp_remote}"
 
     # Write env vars to ~/.spawnrc instead of inlining into .bashrc/.zshrc.
     # Ubuntu's default .bashrc has an interactive-shell guard that exits early —
     # anything appended after the guard is never loaded when SSH runs a command string.
-    cloud_run "cp /tmp/env_config ~/.spawnrc && chmod 600 ~/.spawnrc && rm /tmp/env_config"
+    cloud_run "cp '${temp_remote}' ~/.spawnrc && chmod 600 ~/.spawnrc && rm '${temp_remote}'"
 
     # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
     cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc"
@@ -2769,7 +2774,8 @@ _multi_creds_prompt() {
 _multi_creds_validate() {
     local test_func="${1}"
     local provider_name="${2}"
-    shift 2
+    local help_url="${3}"
+    shift 3
 
     if [[ -z "${test_func}" ]]; then
         return 0
@@ -2840,7 +2846,7 @@ ensure_multi_credentials() {
     _multi_creds_prompt "${provider_name}" "${help_url}" "${n}" "${env_vars[@]}" "${labels[@]}" || return 1
 
     # 4. Validate credentials
-    _multi_creds_validate "${test_func}" "${provider_name}" "${env_vars[@]}" || return 1
+    _multi_creds_validate "${test_func}" "${provider_name}" "${help_url}" "${env_vars[@]}" || return 1
 
     # 5. Save to config file
     local save_args=()

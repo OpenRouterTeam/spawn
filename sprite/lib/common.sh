@@ -193,30 +193,6 @@ EOF
     sprite exec -s "${sprite_name}" -file "${bash_temp}:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
 }
 
-# Inject environment variables into sprite's shell config
-# Usage: inject_env_vars_sprite SPRITE_NAME KEY1=val1 KEY2=val2 ...
-# Example: inject_env_vars_sprite "$SPRITE_NAME" \
-#            "OPENROUTER_API_KEY=$OPENROUTER_API_KEY" \
-#            "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-inject_env_vars_sprite() {
-    local sprite_name="${1}"
-    shift
-
-    local env_temp
-    env_temp=$(mktemp)
-    trap 'rm -f "${env_temp}"' EXIT
-    chmod 600 "${env_temp}"
-
-    generate_env_config "$@" > "${env_temp}"
-
-    # Append to .bashrc and .zshrc only
-    sprite exec -s "${sprite_name}" -file "${env_temp}:/tmp/env_config" -- bash -c "cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc && rm /tmp/env_config"
-    trap - EXIT
-
-    # Offer optional GitHub CLI setup
-    offer_github_auth "run_sprite ${sprite_name}"
-}
-
 # Upload file to sprite (for use with setup_claude_code_config callback)
 # Usage: upload_file_sprite SPRITE_NAME LOCAL_PATH REMOTE_PATH
 # Example: upload_file_sprite "$SPRITE_NAME" "/tmp/settings.json" "/root/.claude/settings.json"
