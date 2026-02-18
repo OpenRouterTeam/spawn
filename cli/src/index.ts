@@ -72,6 +72,7 @@ const KNOWN_FLAGS = new Set([
   "--debug",
   "--headless",
   "--output",
+  "--default",
   "-a", "-c", "--agent", "--cloud",
   "--clear",
 ]);
@@ -105,6 +106,9 @@ function checkUnknownFlags(args: string[]): void {
       console.error(`    ${pc.cyan("--output json")}       Output structured JSON to stdout`);
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
+      console.error();
+      console.error(`  For ${pc.cyan("spawn pick")}:`);
+      console.error(`    ${pc.cyan("--default")}           Pre-selected value in the picker`);
       console.error();
       console.error(`  For ${pc.cyan("spawn list")}:`);
       console.error(`    ${pc.cyan("-a, --agent")}         Filter history by agent`);
@@ -524,7 +528,11 @@ async function main(): Promise<void> {
   // Must be handled before expandEqualsFlags / resolvePrompt so that pick's
   // own --prompt flag is not mistakenly consumed by the top-level prompt logic.
   if (rawArgs[0] === "pick") {
-    await cmdPick(expandEqualsFlags(rawArgs.slice(1)));
+    try {
+      await cmdPick(expandEqualsFlags(rawArgs.slice(1)));
+    } catch (err) {
+      handleError(err);
+    }
     return;
   }
 
