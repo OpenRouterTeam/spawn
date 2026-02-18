@@ -36,8 +36,8 @@ assert_agent_install() {
             # git clone https://github.com/gavrielc/nanoclaw.git && npm install
             _assert_install_pattern "git.*clone.*nanoclaw" "installs nanoclaw via git clone" ;;
         aider)
-            # pip install aider-chat (or pip3)
-            _assert_install_pattern "pip.*install.*aider" "installs aider via pip" ;;
+            # uv tool install --python 3.12 --upgrade aider-chat
+            _assert_install_pattern "uv.*tool.*install.*aider" "installs aider via uv" ;;
         goose)
             # curl -fsSL https://github.com/block/goose/releases/.../download_cli.sh | bash
             _assert_install_pattern "goose.*download_cli" "installs goose via curl installer" ;;
@@ -45,8 +45,8 @@ assert_agent_install() {
             # npm install -g @openai/codex
             _assert_install_pattern "npm.*install.*codex" "installs codex via npm" ;;
         interpreter)
-            # pip install open-interpreter (or pip3)
-            _assert_install_pattern "pip.*install.*open-interpreter" "installs interpreter via pip" ;;
+            # uv tool install open-interpreter --python 3.12
+            _assert_install_pattern "uv.*tool.*install.*open-interpreter" "installs interpreter via uv" ;;
         gemini)
             # npm install -g @google/gemini-cli
             _assert_install_pattern "npm.*install.*gemini-cli" "installs gemini via npm" ;;
@@ -57,8 +57,8 @@ assert_agent_install() {
             # npm install -g cline
             _assert_install_pattern "npm.*install.*cline" "installs cline via npm" ;;
         gptme)
-            # pip install gptme (or pip3)
-            _assert_install_pattern "pip.*install.*gptme" "installs gptme via pip" ;;
+            # uv tool install gptme
+            _assert_install_pattern "uv.*tool.*install.*gptme" "installs gptme via uv" ;;
         opencode)
             # curl to download opencode tarball (via opencode_install_cmd)
             _assert_install_pattern "opencode" "installs opencode" ;;

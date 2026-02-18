@@ -208,13 +208,14 @@ wait_for_cloud_init() {
     log_info "Base tools installed"
 }
 
-# Daytona uses `daytona exec` for running commands in sandboxes
-# SECURITY: Uses printf %q to properly escape commands to prevent injection
+# Daytona uses `daytona exec` for running commands in sandboxes.
+# The command string is passed directly to bash -c as a single argument.
+# All callers pass trusted, hardcoded command strings (not user input).
+# Do NOT use printf '%q' here — it escapes shell operators like && and ||
+# into literal characters, breaking multi-part commands.
 run_server() {
     local cmd="${1}"
-    local escaped_cmd
-    escaped_cmd=$(printf '%q' "${cmd}")
-    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${escaped_cmd}"
+    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${cmd}"
 }
 
 upload_file() {
@@ -242,11 +243,9 @@ interactive_session() {
         # Pure interactive shell via SSH
         daytona ssh "${DAYTONA_SANDBOX_ID}" || session_exit=$?
     else
-        # Run a specific command interactively via exec
-        # SECURITY: Properly escape command
-        local escaped_cmd
-        escaped_cmd=$(printf '%q' "${cmd}")
-        daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${escaped_cmd}" || session_exit=$?
+        # Run a specific command interactively via exec.
+        # Pass directly to bash -c — do NOT use printf '%q' (see run_server comment).
+        daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${cmd}" || session_exit=$?
     fi
     SERVER_NAME="${DAYTONA_SANDBOX_ID:-}" SPAWN_RECONNECT_CMD="daytona ssh ${DAYTONA_SANDBOX_ID:-}" \
         _show_exec_post_session_summary
