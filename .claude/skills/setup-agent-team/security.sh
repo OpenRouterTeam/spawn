@@ -358,40 +358,47 @@ Each pr-reviewer MUST:
 
 1. **Fetch full context**:
    \`\`\`bash
-   gh pr view NUMBER --repo OpenRouterTeam/spawn --json updatedAt,mergeable,title,headRefName
+   gh pr view NUMBER --repo OpenRouterTeam/spawn --json updatedAt,mergeable,title,headRefName,headRefOid
    gh pr diff NUMBER --repo OpenRouterTeam/spawn
    gh pr view NUMBER --repo OpenRouterTeam/spawn --comments
    gh api repos/OpenRouterTeam/spawn/pulls/NUMBER/comments --jq '.[] | "\(.user.login): \(.body)"'
+   gh api repos/OpenRouterTeam/spawn/pulls/NUMBER/reviews --jq '.[] | {state: .state, submitted_at: .submitted_at, commit_id: .commit_id, user: .user.login, bodySnippet: (.body[:200])}'
    \`\`\`
-   Read ALL comments — prior discussion contains decisions, rejected approaches, and scope changes.
+   Read ALL comments AND reviews — prior discussion contains decisions, rejected approaches, and scope changes. Reviews (approve/request-changes) are separate from comments and must be checked independently.
 
-2. **Comment-based triage** — Close if comments indicate superseded/duplicate/abandoned:
+2. **Review dedup** — If ANY prior review from \`louisgv\` OR containing \`-- security/pr-reviewer\` already exists:
+   - If prior review is **CHANGES_REQUESTED** → Do NOT post a new review. Report "already flagged by prior security review, skipping" and STOP.
+   - If prior review is **APPROVED** and PR is not yet merged → The prior approval stands. Do NOT post another review. Report "already approved, skipping" and STOP.
+   - Only proceed if there are **NEW COMMITS** pushed after the latest security review (compare the review's \`commit_id\` with the PR's current HEAD \`headRefOid\`). If the commit SHAs match, STOP — no new code to review.
+
+3. **Comment-based triage** — Close if comments indicate superseded/duplicate/abandoned:
    \`gh pr close NUMBER --repo OpenRouterTeam/spawn --delete-branch --comment "Closing: [reason].\n\n-- security/pr-reviewer"\`
    Report and STOP.
 
-3. **Staleness check** — If \`updatedAt\` > 48h AND \`mergeable\` is CONFLICTING:
+4. **Staleness check** — If \`updatedAt\` > 48h AND \`mergeable\` is CONFLICTING:
    - If PR contains valid work: file follow-up issue, then close PR referencing the new issue
    - If trivial/outdated: close without follow-up
    - Delete branch via \`--delete-branch\`. Report and STOP.
    - If > 48h but no conflicts: proceed to review. If fresh: proceed normally.
 
-4. **Set up worktree**: \`git worktree add WORKTREE_BASE_PLACEHOLDER/pr-NUMBER -b review-pr-NUMBER origin/main\` → \`cd\` → \`gh pr checkout NUMBER\`
+5. **Set up worktree**: \`git worktree add WORKTREE_BASE_PLACEHOLDER/pr-NUMBER -b review-pr-NUMBER origin/main\` → \`cd\` → \`gh pr checkout NUMBER\`
 
-5. **Security review** of every changed file:
+6. **Security review** of every changed file:
    - Command injection, credential leaks, path traversal, XSS/injection, unsafe eval/source, curl|bash safety, macOS bash 3.x compat
 
-6. **Test** (in worktree): \`bash -n\` on .sh files, \`bun test\` for .ts files, verify source fallback pattern
+7. **Test** (in worktree): \`bash -n\` on .sh files, \`bun test\` for .ts files, verify source fallback pattern
 
-7. **Decision**:
+8. **Decision** — Before posting any review, verify it applies to the **current HEAD commit**:
    - CRITICAL/HIGH found → \`gh pr review NUMBER --request-changes\` + label \`security-review-required\`
    - MEDIUM/LOW or clean → \`gh pr review NUMBER --approve\` + label \`security-approved\` + \`gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch\`
 
-8. **Clean up**: \`cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/pr-NUMBER --force\`
+9. **Clean up**: \`cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/pr-NUMBER --force\`
 
-9. **Review body format**:
+10. **Review body format** — MUST include the HEAD commit SHA for traceability:
    \`\`\`
    ## Security Review
    **Verdict**: [APPROVED / CHANGES REQUESTED]
+   **Commit**: [HEAD_COMMIT_SHA]
    ### Findings
    - [SEVERITY] file:line — description
    ### Tests
@@ -400,7 +407,7 @@ Each pr-reviewer MUST:
    *-- security/pr-reviewer*
    \`\`\`
 
-10. Report: PR number, verdict, finding count, merge status.
+11. Report: PR number, verdict, finding count, merge status.
 
 ## Step 3 — Branch Cleanup
 
