@@ -425,6 +425,16 @@ export function validatePrompt(prompt: string): void {
     { pattern: /<\s*[/~]/, description: "file input redirection", suggestion: "Describe the input source in plain language" },
     { pattern: /<\s*\w+\.\w+/, description: "file input redirection", suggestion: "Describe the input source in plain language" },
     { pattern: /&\s*$/, description: "background execution", suggestion: "Describe the desired behavior instead" },
+    // Stderr/fd redirections: 2>, 2>&1, 1>&2
+    { pattern: /\d+>\s*&?\d*/, description: "stderr/fd redirection", suggestion: "Describe the output handling in plain language instead" },
+    // Heredoc syntax: << EOF or <<- EOF
+    { pattern: /<<-?\s*'?\w+'?/, description: "heredoc", suggestion: "Describe the multi-line input in plain language instead" },
+    // Process substitution: <(cmd) or >(cmd)
+    { pattern: /<\s*\(|>\s*\(/, description: "process substitution", suggestion: "Describe the command output in plain language instead" },
+    // Redirection to paths with slashes: > foo/bar, > dir/output
+    { pattern: />\s*\w+\/[\w/]*/, description: "file redirection to path", suggestion: "Ask the agent to save output instead of using redirection syntax" },
+    // Redirection to simple filenames without extensions (3+ chars to avoid math like "> 5")
+    { pattern: />>?\s*[a-zA-Z_]\w{2,}/, description: "file redirection to path", suggestion: "Ask the agent to save output instead of using redirection syntax" },
   ];
 
   for (const { pattern, description, suggestion } of dangerousPatterns) {
