@@ -222,10 +222,12 @@ ensure_gh_auth() {
             return 1
         }
     else
-        # Interactive: browser-based OAuth flow
-        log_step "Initiating GitHub CLI authentication..."
-        gh auth login || {
-            log_error "Failed to authenticate with GitHub CLI"
+        # Device code flow — works on headless/remote servers
+        # Shows a URL + code; user opens URL in local browser and enters the code
+        log_step "Authenticating via device code flow..."
+        log_info "A URL and code will appear below. Open the URL in your browser and enter the code."
+        gh auth login --web -p https -h github.com || {
+            log_error "GitHub authentication failed"
             log_error "Run manually: gh auth login"
             return 1
         }
@@ -254,7 +256,8 @@ ensure_github_auth() {
 # ============================================================
 
 # If executed directly (not sourced), run ensure_github_auth
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# When piped via curl|bash, BASH_SOURCE[0] is empty and $0 is "bash"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]] || [[ -z "${BASH_SOURCE[0]:-}" ]]; then
     set -eo pipefail
     ensure_github_auth
 fi
