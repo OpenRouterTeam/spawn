@@ -26,7 +26,8 @@
           "hasCompletedOnboarding": true,
           "bypassPermissionsModeAccepted": true
         }
-      }
+      },
+      "featured_cloud": "sprite"
     },
     "openclaw": {
       "name": "OpenClaw",
@@ -45,7 +46,8 @@
           "prompt": "Enter model ID",
           "default": "openrouter/auto"
         }
-      }
+      },
+      "featured_cloud": "fly"
     },
     "nanoclaw": {
       "name": "NanoClaw",
@@ -67,7 +69,8 @@
           "ANTHROPIC_API_KEY": "${OPENROUTER_API_KEY}"
         }
       },
-      "notes": "Requires WhatsApp QR code scan for authentication"
+      "notes": "Requires WhatsApp QR code scan for authentication",
+      "featured_cloud": "fly"
     },
     "aider": {
       "name": "Aider",
@@ -84,7 +87,8 @@
           "default": "openrouter/auto"
         }
       },
-      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and --model openrouter/... flag"
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and --model openrouter/... flag",
+      "featured_cloud": "gcp"
     },
     "goose": {
       "name": "Goose",
@@ -96,7 +100,8 @@
         "GOOSE_PROVIDER": "openrouter",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Model-agnostic agent by Block (formerly Square), supports OpenRouter as a provider"
+      "notes": "Model-agnostic agent by Block (formerly Square), supports OpenRouter as a provider",
+      "featured_cloud": "fly"
     },
     "codex": {
       "name": "Codex CLI",
@@ -109,7 +114,8 @@
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1"
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1",
+      "featured_cloud": "fly"
     },
     "interpreter": {
       "name": "Open Interpreter",
@@ -122,7 +128,8 @@
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override",
+      "featured_cloud": "gcp"
     },
     "gemini": {
       "name": "Gemini CLI",
@@ -136,7 +143,8 @@
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Works with OpenRouter via OPENAI_BASE_URL override and GEMINI_API_KEY"
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override and GEMINI_API_KEY",
+      "featured_cloud": "gcp"
     },
     "amazonq": {
       "name": "Amazon Q CLI",
@@ -149,7 +157,8 @@
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override",
+      "featured_cloud": "fly"
     },
     "cline": {
       "name": "Cline",
@@ -162,7 +171,8 @@
         "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Works with OpenRouter via OPENAI_BASE_URL override"
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override",
+      "featured_cloud": "fly"
     },
     "gptme": {
       "name": "gptme",
@@ -179,7 +189,8 @@
           "default": "openrouter/auto"
         }
       },
-      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and -m openrouter/... flag"
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and -m openrouter/... flag",
+      "featured_cloud": "daytona"
     },
     "opencode": {
       "name": "OpenCode",
@@ -190,7 +201,8 @@
       "env": {
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea."
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea.",
+      "featured_cloud": "daytona"
     },
     "plandex": {
       "name": "Plandex",
@@ -201,7 +213,8 @@
       "env": {
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based CLI with sandbox and version control for AI changes."
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based CLI with sandbox and version control for AI changes.",
+      "featured_cloud": "daytona"
     },
     "kilocode": {
       "name": "Kilo Code",
@@ -214,7 +227,8 @@
         "KILO_OPEN_ROUTER_API_KEY": "${OPENROUTER_API_KEY}",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'."
+      "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'.",
+      "featured_cloud": "fly"
     },
     "continue": {
       "name": "Continue",
@@ -238,7 +252,8 @@
           ]
         }
       },
-      "notes": "Natively supports OpenRouter via config.json. CLI supports TUI mode (interactive) and headless mode (-p flag). 31K+ GitHub stars."
+      "notes": "Natively supports OpenRouter via config.json. CLI supports TUI mode (interactive) and headless mode (-p flag). 31K+ GitHub stars.",
+      "featured_cloud": "fly"
     }
   },
   "clouds": {
@@ -252,21 +267,6 @@
       "exec_method": "bash -c",
       "interactive_method": "exec",
       "notes": "No cloud provisioning needed. Installs agents and injects OpenRouter credentials locally. Useful for local development and testing."
-    },
-    "oracle": {
-      "name": "Oracle Cloud Infrastructure",
-      "description": "Oracle Cloud compute instances via OCI CLI",
-      "url": "https://cloud.oracle.com/",
-      "type": "cli",
-      "auth": "oci setup config (OCI CLI config with API keys)",
-      "provision_method": "oci compute instance launch with --user-data",
-      "exec_method": "ssh ubuntu@IP",
-      "interactive_method": "ssh -t ubuntu@IP",
-      "defaults": {
-        "shape": "VM.Standard.E2.1.Micro",
-        "image": "Ubuntu 24.04"
-      },
-      "notes": "Has a generous Always Free tier (VM.Standard.E2.1.Micro, VM.Standard.A1.Flex). Uses 'ubuntu' user for SSH. Requires OCI CLI installed (pip install oci-cli) and configured. Set OCI_COMPARTMENT_ID for the target compartment."
     },
     "hetzner": {
       "name": "Hetzner Cloud",
@@ -503,20 +503,6 @@
     "fly/kilocode": "implemented",
     "daytona/kilocode": "implemented",
     "ovh/kilocode": "implemented",
-    "oracle/claude": "implemented",
-    "oracle/aider": "implemented",
-    "oracle/goose": "implemented",
-    "oracle/openclaw": "implemented",
-    "oracle/nanoclaw": "implemented",
-    "oracle/codex": "implemented",
-    "oracle/interpreter": "implemented",
-    "oracle/gemini": "implemented",
-    "oracle/amazonq": "implemented",
-    "oracle/cline": "implemented",
-    "oracle/gptme": "implemented",
-    "oracle/opencode": "implemented",
-    "oracle/plandex": "implemented",
-    "oracle/kilocode": "implemented",
     "sprite/continue": "implemented",
     "hetzner/continue": "implemented",
     "digitalocean/continue": "implemented",
@@ -525,7 +511,6 @@
     "fly/continue": "implemented",
     "daytona/continue": "implemented",
     "ovh/continue": "implemented",
-    "oracle/continue": "implemented",
     "local/claude": "implemented",
     "local/openclaw": "implemented",
     "local/nanoclaw": "implemented",

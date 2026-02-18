@@ -63,7 +63,7 @@ _get_name_env_var() {
         daytona)      echo "DAYTONA_SANDBOX_NAME" ;;
         ovh)          echo "OVH_SERVER_NAME" ;;
         gcp)          echo "GCP_INSTANCE_NAME" ;;
-        oracle)       echo "OCI_INSTANCE_NAME" ;;
+
         sprite)       echo "SPRITE_NAME" ;;
         *)            echo "" ;;
     esac
@@ -121,7 +121,7 @@ _collect_credentials() {
         local token_var
         token_var=$(_get_token_env_var "$cloud")
 
-        # CLI-auth clouds (aws, gcp, oracle, sprite) — no token to collect
+        # CLI-auth clouds (aws, gcp, sprite) — no token to collect
         [[ -z "$token_var" ]] && continue
 
         # Already in env?
@@ -198,7 +198,7 @@ _cloud_has_credentials() {
     case "$cloud" in
         aws)    command -v aws &>/dev/null && aws sts get-caller-identity &>/dev/null 2>&1; return $? ;;
         gcp)    command -v gcloud &>/dev/null && gcloud auth print-access-token &>/dev/null 2>&1; return $? ;;
-        oracle) command -v oci &>/dev/null && oci iam region list --output table &>/dev/null 2>&1; return $? ;;
+
         sprite) command -v sprite &>/dev/null; return $? ;;
         local)  return 0 ;;
     esac
@@ -391,20 +391,6 @@ for i in (data if isinstance(data, list) else []):
         print(i['id']); break
 " 2>/dev/null) || return 0
             [[ -n "$iid" ]] && destroy_server "$iid" 2>/dev/null || true
-            ;;
-        oracle)
-            source "${REPO_ROOT}/oracle/lib/common.sh" 2>/dev/null || return 0
-            # Oracle needs OCID — list and find by name
-            local instances_json ocid
-            instances_json=$(oci compute instance list --compartment-id "${OCI_COMPARTMENT_ID:-}" --display-name "$server_name" --lifecycle-state RUNNING 2>/dev/null) || return 0
-            ocid=$(printf '%s' "$instances_json" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-items = data.get('data', [])
-if items:
-    print(items[0]['id'])
-" 2>/dev/null) || return 0
-            [[ -n "$ocid" ]] && destroy_server "$ocid" 2>/dev/null || true
             ;;
     esac
 }
@@ -1048,7 +1034,7 @@ main() {
     E2E_RESULTS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/e2e-results-XXXXXX")
 
     # Testable clouds (excludes local, sprite which don't provision real servers the same way)
-    local testable_clouds="fly hetzner digitalocean ovh aws daytona gcp oracle"
+    local testable_clouds="fly hetzner digitalocean ovh aws daytona gcp"
 
     # --- Credential collection (interactive) ---
     # Load tokens from config files and prompt for any missing ones
