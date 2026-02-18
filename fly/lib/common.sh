@@ -372,12 +372,12 @@ run_server() {
         elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"
         fi
         if [[ -n "${timeout_bin}" ]]; then
-            "${timeout_bin}" "${timeout_secs}" "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
+            "${timeout_bin}" "${timeout_secs}" "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c \"$escaped_cmd\"" --quiet 2>/dev/null
             return $?
         fi
     fi
 
-    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet 2>/dev/null
+    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c \"$escaped_cmd\"" --quiet 2>/dev/null
 }
 
 # Upload a file to the machine via base64 encoding through exec
@@ -405,7 +405,7 @@ interactive_session() {
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$cmd")
     local session_exit=0
-    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" || session_exit=$?
+    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c \"$escaped_cmd\"" || session_exit=$?
     SERVER_NAME="${FLY_APP_NAME:-}" SPAWN_RECONNECT_CMD="fly ssh console -a ${FLY_APP_NAME:-}" \
         _show_exec_post_session_summary
     return "${session_exit}"
