@@ -509,7 +509,7 @@ describe("interactive_pick", () => {
 
     it("should accept hyphenated env var values", () => {
       const result = runBash(
-        'interactive_pick "SERVER_TYPE" "cpx11" "types" "echo unused"',
+        'interactive_pick "SERVER_TYPE" "cx23" "types" "echo unused"',
         { env: { SERVER_TYPE: "cpx21" } }
       );
       expect(result.exitCode).toBe(0);
@@ -590,7 +590,7 @@ describe("_display_and_select", () => {
 
     it("should display Available heading with prompt text", () => {
       const result = runBashCapture(
-        '_display_and_select "server types" "cpx11" "" <<< "cpx11|2 vCPU|4 GB"',
+        '_display_and_select "server types" "cx23" "" <<< "cx23|2 vCPU|4 GB"',
       );
       expect(result.stderr).toContain("Available server types");
     });

@@ -1317,7 +1317,7 @@ register_cleanup_trap() {
 #   SESSION="interactive_session ${SERVER_IP}"
 #
 #   install_agent "Aider" "pip install aider-chat" "$RUN"
-#   verify_agent "Aider" "command -v aider && aider --version" "pip install aider-chat" "$RUN"
+#   verify_agent "Aider" "command -v aider" "pip install aider-chat" "$RUN"
 #   get_or_prompt_api_key
 #   inject_env_vars_cb "$RUN" "$UPLOAD" "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 #   launch_session "Hetzner server" "$SESSION" "source ~/.zshrc && aider"

@@ -12,13 +12,19 @@ fi
 log_info "Open Interpreter on AWS Lightsail"
 echo ""
 
-agent_install() { install_agent "Open Interpreter" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter" cloud_run; }
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
+
+agent_install() {
+    install_agent "Open Interpreter" "command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh && export PATH=\"\$HOME/.local/bin:\$PATH\" && uv tool install open-interpreter --python 3.12 --with 'setuptools<80'" cloud_run
+    verify_agent "Open Interpreter" "export PATH=\"\$HOME/.local/bin:\$PATH\" && command -v interpreter" "uv tool install open-interpreter --python 3.12 --with 'setuptools<80'" cloud_run
+}
 agent_env_vars() {
     generate_env_config \
         "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
         "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
         "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
 }
-agent_launch_cmd() { echo 'source ~/.zshrc && interpreter'; }
+agent_launch_cmd() { printf 'export PATH="$HOME/.local/bin:$PATH"; source ~/.zshrc && interpreter --model %s --api_key %s' "${MODEL_ID}" "${OPENROUTER_API_KEY}"; }
 
 spawn_agent "Open Interpreter"

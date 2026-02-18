@@ -12,8 +12,12 @@ fi
 log_info "Open Interpreter on local machine"
 echo ""
 
+AGENT_MODEL_PROMPT=1
+AGENT_MODEL_DEFAULT="openrouter/auto"
+
 agent_install() {
-    install_agent "Open Interpreter" "pip install open-interpreter 2>/dev/null || pip3 install open-interpreter" cloud_run
+    install_agent "Open Interpreter" "command -v uv >/dev/null || { command -v brew >/dev/null && brew install uv || curl -LsSf https://astral.sh/uv/install.sh | sh; } && uv tool install open-interpreter --python 3.12 --with 'setuptools<80'" cloud_run
+    verify_agent "Open Interpreter" "export PATH=\"\$HOME/.local/bin:\$PATH\" && command -v interpreter" "uv tool install open-interpreter --python 3.12 --with 'setuptools<80'" cloud_run
 }
 
 agent_env_vars() {
@@ -24,7 +28,7 @@ agent_env_vars() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.zshrc 2>/dev/null; interpreter'
+    printf 'export PATH="$HOME/.local/bin:$PATH"; source ~/.zshrc 2>/dev/null; interpreter --model %s --api_key %s' "${MODEL_ID}" "${OPENROUTER_API_KEY}"
 }
 
 spawn_agent "Open Interpreter"
