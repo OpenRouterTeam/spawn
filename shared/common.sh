@@ -1387,8 +1387,8 @@ _ensure_nodejs_runtime() {
     local claude_path="$2"
     if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
         log_step "Installing Node.js runtime (required for claude package)..."
-        if ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" >/dev/null 2>&1; then
-            log_info "Node.js installed via nodesource"
+        if ${run_cb} "apt-get install -y nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1; then
+            log_info "Node.js installed via n"
         else
             log_warn "Could not install Node.js - bun method may fail"
         fi
@@ -1736,6 +1736,9 @@ packages:
   - npm
 
 runcmd:
+  # Upgrade Node.js to v22 LTS (apt has v18, agents like Cline need v20+)
+  # n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
+  - npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
   # Install Bun
   - su - root -c 'curl -fsSL https://bun.sh/install | bash'
   # Install Claude Code

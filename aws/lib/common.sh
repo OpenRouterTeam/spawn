@@ -113,6 +113,9 @@ get_cloud_init_userdata() {
 #!/bin/bash
 apt-get update -y
 apt-get install -y curl unzip git zsh nodejs npm
+# Upgrade Node.js to v22 LTS (apt has v18, agents like Cline need v20+)
+# n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
+npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
 # Install Bun
 su - ubuntu -c 'curl -fsSL https://bun.sh/install | bash'
 # Install Claude Code

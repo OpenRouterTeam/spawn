@@ -258,7 +258,7 @@ create_server() {
 wait_for_cloud_init() {
     log_step "Installing base tools in sandbox..."
     run_server "apt-get update -y && apt-get install -y curl unzip git zsh nodejs npm" >/dev/null 2>&1 || true
-    run_server "npm install -g n && n 22" >/dev/null 2>&1 || true
+    run_server "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
     run_server 'echo "export PATH=\"${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true
