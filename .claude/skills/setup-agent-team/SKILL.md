@@ -358,17 +358,24 @@ export RUN_TIMEOUT_MS=43200000   # 12 hours (safe starting point)
 
 ## Step 8: Ensure the target script is single-cycle
 
-The target script (e.g., `refactor.sh`, `discovery.sh`) MUST:
+The target script (e.g., `refactor.sh`, `discovery.sh`, `security.sh`, `qa-cycle.sh`) MUST:
 
 1. **Run a single cycle and exit** — no `while true` loops
-2. **Sync with origin before work** — `git fetch origin main && git pull origin main`
+2. **Sync with origin before work** (MANDATORY) — Update to latest main before every cycle:
+   ```bash
+   git fetch --prune origin
+   git reset --hard origin/main  # OR: git pull --rebase origin main
+   ```
+   **This ensures the service always runs the latest code.** Without this, the service will run stale code indefinitely.
 3. **Exit cleanly** — so the trigger server marks it as "not running" and accepts the next trigger
 
 If converting from a looping script, remove the `while true` / `sleep` and keep only the body of one iteration.
 
 **Included scripts in this skill directory:**
-- `discovery.sh` — Continuous discovery loop for spawn (already single-cycle ready)
-- `refactor.sh` — Refactoring team service (already single-cycle ready)
+- `discovery.sh` — Discovery team service (uses `git pull --rebase`)
+- `refactor.sh` — Refactoring team service (uses `git reset --hard`)
+- `security.sh` — Security team service (uses `git pull --rebase`)
+- `qa-cycle.sh` — QA team service (uses `git reset --hard`)
 
 ## Agent Teams (ref: https://code.claude.com/docs/en/agent-teams)
 

@@ -83,14 +83,13 @@ if [[ "${RUN_MODE}" == "issue" ]]; then
     log "Issue: #${SPAWN_ISSUE}"
 fi
 
-# Fetch latest refs (read-only, safe for concurrent runs)
+# Fetch latest refs and sync to latest main (required for both modes)
 log "Fetching latest refs..."
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
+git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
 # Pre-cycle cleanup only in refactor mode (issue runs skip housekeeping)
 if [[ "${RUN_MODE}" == "refactor" ]]; then
-    # Reset main checkout to origin/main
-    git reset --hard origin/main 2>&1 | tee -a "${LOG_FILE}" || true
 
     log "Pre-cycle cleanup: stale worktrees and branches..."
     git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
