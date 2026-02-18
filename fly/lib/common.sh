@@ -362,7 +362,12 @@ run_server() {
     # Ubuntu's default .bashrc returns early for non-interactive shells, so
     # "source ~/.bashrc && bun ..." fails — bun's PATH line is never reached.
     local full_cmd="export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\" && $cmd"
-    # SECURITY: Properly escape command to prevent injection
+    # printf '%q' escapes the command so it becomes a single shell word.
+    # The remote shell parses "bash -c <escaped>" — the backslash escapes
+    # are consumed during word parsing, reconstructing the original command
+    # as the sole argument to bash -c.
+    # NOTE: Do NOT wrap $escaped_cmd in additional quotes — double-quoting
+    # preserves the backslashes literally, breaking operators like && and |.
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$full_cmd")
 
@@ -376,12 +381,12 @@ run_server() {
         elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"
         fi
         if [[ -n "${timeout_bin}" ]]; then
-            "${timeout_bin}" "${timeout_secs}" "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c \"$escaped_cmd\"" --quiet 2>/dev/null
+            "${timeout_bin}" "${timeout_secs}" "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet
             return $?
         fi
     fi
 
-    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c \"$escaped_cmd\"" --quiet 2>/dev/null
+    "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet
 }
 
 # Upload a file to the machine via base64 encoding through exec
@@ -408,11 +413,13 @@ interactive_session() {
     # Wrap in bash -c with PATH prepended (same as run_server) so shell builtins
     # like "source" work — fly ssh console -C execs directly, not via a shell.
     local full_cmd="export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\" && $cmd"
-    # SECURITY: Properly escape command to prevent injection
+    # printf '%q' makes the command a single shell word; the remote shell
+    # unescapes it back into the original command for bash -c.
+    # Do NOT add quotes around $escaped_cmd (see run_server comment).
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$full_cmd")
     local session_exit=0
-    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c \"$escaped_cmd\"" || session_exit=$?
+    "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" || session_exit=$?
     SERVER_NAME="${FLY_APP_NAME:-}" SPAWN_RECONNECT_CMD="fly ssh console -a ${FLY_APP_NAME:-}" \
         _show_exec_post_session_summary
     return "${session_exit}"

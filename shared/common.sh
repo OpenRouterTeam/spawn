@@ -1627,12 +1627,12 @@ _validate_ssh_opts() {
 # Default SSH options for all cloud providers
 # Clouds can override this if they need provider-specific settings
 if [[ -z "${SSH_OPTS:-}" ]]; then
-    SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i ${HOME}/.ssh/id_ed25519"
+    SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -i ${HOME}/.ssh/id_ed25519"
 else
     # Validate user-provided SSH_OPTS for security
     if ! _validate_ssh_opts "${SSH_OPTS}"; then
         log_error "Invalid SSH_OPTS provided. Using secure defaults."
-        SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i ${HOME}/.ssh/id_ed25519"
+        SSH_OPTS="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -i ${HOME}/.ssh/id_ed25519"
     fi
 fi
 
@@ -2166,7 +2166,7 @@ generic_ssh_wait() {
     log_step "Waiting for ${description} to ${ip} (this usually takes 30-90 seconds)..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
         # shellcheck disable=SC2086
-        if ssh ${ssh_opts} "${username}@${ip}" "${test_cmd}" >/dev/null 2>&1; then
+        if ssh ${ssh_opts} "${username}@${ip}" "${test_cmd}" < /dev/null >/dev/null 2>&1; then
             log_info "${description} ready (took ${elapsed_time}s)"
             return 0
         fi
@@ -2215,7 +2215,10 @@ ssh_run_server() {
         cmd="set -x; ${cmd}"
     fi
     # shellcheck disable=SC2086
-    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}"
+    # < /dev/null prevents SSH from consuming the parent script's stdin.
+    # Without this, sequential SSH calls can steal input meant for later
+    # commands (e.g., safe_read prompts), causing hangs.
+    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}" < /dev/null
 }
 
 # Upload a file to a remote server via SCP
