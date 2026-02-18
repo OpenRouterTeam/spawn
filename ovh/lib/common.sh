@@ -375,6 +375,7 @@ install_base_deps() {
     fi
 
     run_ovh "$ip" "${sudo_prefix}apt-get update -qq && ${sudo_prefix}apt-get install -y -qq curl unzip git zsh build-essential python3 python3-pip nodejs npm > /dev/null 2>&1"
+    run_ovh "$ip" "${sudo_prefix}npm install -g n && ${sudo_prefix}n 22 && ${sudo_prefix}ln -sf /usr/local/bin/node /usr/bin/node && ${sudo_prefix}ln -sf /usr/local/bin/npm /usr/bin/npm && ${sudo_prefix}ln -sf /usr/local/bin/npx /usr/bin/npx"
 
     # Install Bun
     run_ovh "$ip" "curl -fsSL https://bun.sh/install | bash"

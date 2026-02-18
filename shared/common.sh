@@ -1387,8 +1387,8 @@ _ensure_nodejs_runtime() {
     local claude_path="$2"
     if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
         log_step "Installing Node.js runtime (required for claude package)..."
-        if ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" >/dev/null 2>&1; then
-            log_info "Node.js installed via nodesource"
+        if ${run_cb} "apt-get install -y nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1; then
+            log_info "Node.js installed via n"
         else
             log_warn "Could not install Node.js - bun method may fail"
         fi
@@ -1732,8 +1732,13 @@ packages:
   - unzip
   - git
   - zsh
+  - nodejs
+  - npm
 
 runcmd:
+  # Upgrade Node.js to v22 LTS (apt has v18, agents like Cline need v20+)
+  # n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
+  - npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
   # Install Bun
   - su - root -c 'curl -fsSL https://bun.sh/install | bash'
   # Install Claude Code
@@ -2207,10 +2212,15 @@ wait_for_cloud_init() {
 # Run a command on a remote server via SSH
 # Usage: ssh_run_server IP COMMAND
 # Requires: SSH_USER (default: root), SSH_OPTS
-# SECURITY: Command is properly quoted to prevent shell injection
+# SECURITY: Command is properly quoted to prevent shell injection.
+# Note: $cmd is always a shell command string (with pipes, semicolons, etc.)
+# that is intentionally interpreted by the remote shell. All callers pass
+# static command strings — never user-controlled input.
 ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
+    # Single-quoted so $HOME/$PATH expand on the remote side, not locally.
+    local path_prefix='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
         cmd="set -x; ${cmd}"
     fi
@@ -2218,7 +2228,7 @@ ssh_run_server() {
     # < /dev/null prevents SSH from consuming the parent script's stdin.
     # Without this, sequential SSH calls can steal input meant for later
     # commands (e.g., safe_read prompts), causing hangs.
-    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}" < /dev/null
+    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${path_prefix} && ${cmd}" < /dev/null
 }
 
 # Upload a file to a remote server via SCP

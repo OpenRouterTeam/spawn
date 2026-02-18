@@ -10,7 +10,7 @@ on:
 jobs:
   trigger:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 2
     # Only trigger on issues with safe-to-work AND (cloud-request or agent-request) labels, or schedule/manual
     if: >-
       github.event_name != 'issues' ||
@@ -23,6 +23,24 @@ jobs:
           SPRITE_URL: ${{ secrets.DISCOVERY_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.DISCOVERY_TRIGGER_SECRET }}
         run: |
-          curl -sS --fail-with-body -X POST \
+          HTTP_CODE=$(curl -sS --connect-timeout 15 --max-time 30 \
+            -o /tmp/response.json -w "%{http_code}" -X POST \
             "${SPRITE_URL}/trigger?reason=${{ github.event_name }}&issue=${{ github.event.issue.number || '' }}" \
-            -H "Authorization: Bearer ${TRIGGER_SECRET}"
+            -H "Authorization: Bearer ${TRIGGER_SECRET}")
+          BODY=$(cat /tmp/response.json 2>/dev/null || echo '{}')
+          echo "$BODY"
+          case "$HTTP_CODE" in
+            2*)
+              echo "::notice::Trigger accepted (HTTP $HTTP_CODE)"
+              ;;
+            409)
+              echo "::notice::Run already in progress — this is expected (HTTP 409)"
+              ;;
+            429)
+              echo "::warning::Server at capacity (HTTP 429)"
+              ;;
+            *)
+              echo "::error::Trigger failed (HTTP $HTTP_CODE)"
+              exit 1
+              ;;
+          esac
