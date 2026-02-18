@@ -33,6 +33,8 @@ spawn aider hetzner                      # Aider on Hetzner
 spawn claude sprite --prompt "Fix bugs"  # Non-interactive with prompt
 spawn aider sprite -p "Add tests"        # Short form
 spawn claude                             # Show clouds available for Claude
+spawn delete                             # Delete a running server
+spawn delete -c hetzner                  # Delete a server on Hetzner
 ```
 
 ### Commands
@@ -57,6 +59,9 @@ spawn claude                             # Show clouds available for Claude
 | `spawn agents` | List all agents with descriptions |
 | `spawn clouds` | List all cloud providers |
 | `spawn update` | Check for CLI updates |
+| `spawn delete` | Interactively select and destroy a cloud server |
+| `spawn delete -a <agent>` | Filter servers to delete by agent |
+| `spawn delete -c <cloud>` | Filter servers to delete by cloud |
 | `spawn help` | Show help message |
 | `spawn version` | Show version |
 
