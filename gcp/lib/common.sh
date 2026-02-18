@@ -82,31 +82,131 @@ _gcp_check_auth() {
     fi
 }
 
-# Resolve and export GCP_PROJECT from env var or gcloud config
+# ============================================================
+# Interactive pickers for GCP project, zone, and machine type
+# ============================================================
+
+# Curated list of popular GCP machine types (value\tLabel\tHint)
+_gcp_machine_type_options() {
+    printf '%s\n' \
+        "e2-micro	e2-micro	Shared CPU · 2 vCPU · 1 GB RAM   (~\$7/mo)" \
+        "e2-small	e2-small	Shared CPU · 2 vCPU · 2 GB RAM   (~\$14/mo)" \
+        "e2-medium	e2-medium	Shared CPU · 2 vCPU · 4 GB RAM   (~\$28/mo)  ← default" \
+        "e2-standard-2	e2-standard-2	2 vCPU · 8 GB RAM                (~\$49/mo)" \
+        "e2-standard-4	e2-standard-4	4 vCPU · 16 GB RAM               (~\$98/mo)" \
+        "n2-standard-2	n2-standard-2	2 vCPU · 8 GB RAM, higher perf   (~\$72/mo)" \
+        "n2-standard-4	n2-standard-4	4 vCPU · 16 GB RAM, higher perf  (~\$144/mo)" \
+        "c4-standard-2	c4-standard-2	2 vCPU · 8 GB RAM, latest gen    (~\$82/mo)"
+}
+
+# Curated list of popular GCP zones (value\tLabel\tHint)
+_gcp_zone_options() {
+    printf '%s\n' \
+        "us-central1-a	us-central1-a	Iowa, US        ← default" \
+        "us-east1-b	us-east1-b	South Carolina, US" \
+        "us-east4-a	us-east4-a	N. Virginia, US" \
+        "us-west1-a	us-west1-a	Oregon, US" \
+        "us-west2-a	us-west2-a	Los Angeles, US" \
+        "northamerica-northeast1-a	northamerica-northeast1-a	Montreal, Canada" \
+        "europe-west1-b	europe-west1-b	Belgium" \
+        "europe-west4-a	europe-west4-a	Netherlands" \
+        "europe-west6-a	europe-west6-a	Zurich, Switzerland" \
+        "asia-east1-a	asia-east1-a	Taiwan" \
+        "asia-southeast1-a	asia-southeast1-a	Singapore" \
+        "australia-southeast1-a	australia-southeast1-a	Sydney, Australia"
+}
+
+# Fetch active GCP projects accessible to the authenticated user (value\tLabel\tHint)
+_gcp_project_options() {
+    gcloud projects list \
+        --filter="lifecycleState=ACTIVE" \
+        --format="value(projectId,name)" \
+        2>/dev/null | \
+    awk -F'\t' '{ print $1 "\t" $1 "\t" $2 }'
+}
+
+# Generic GCP interactive picker.
+# Respects the named env var (skip picker if already set).
+# Tries `spawn pick` for a nice arrow-key UI, falls back to a numbered list.
+#
+# Usage: _gcp_interactive_pick DISPLAY_NAME ENV_VAR_NAME DEFAULT OPTIONS_FN
+# Outputs the selected value on stdout.
+_gcp_interactive_pick() {
+    local display="${1}"     # e.g. "GCP machine type"
+    local env_var="${2}"     # e.g. "GCP_MACHINE_TYPE"
+    local default_val="${3}" # e.g. "e2-medium"
+    local options_fn="${4}"  # function name that prints "value\tLabel\tHint" lines
+
+    # Honour an explicit env var override — no prompt needed
+    local current_val
+    eval "current_val=\"\${${env_var}:-}\""
+    if [[ -n "${current_val}" ]]; then
+        echo "${current_val}"
+        return
+    fi
+
+    # Fetch available options
+    local options_text
+    options_text=$("${options_fn}")
+    if [[ -z "${options_text}" ]]; then
+        log_warn "Could not list ${display} options — using default: ${default_val}"
+        echo "${default_val}"
+        return
+    fi
+
+    # Try `spawn pick` for a nicer arrow-key UI (available when user ran `spawn`)
+    if command -v spawn >/dev/null 2>&1; then
+        local picked
+        picked=$(printf '%s\n' "${options_text}" | \
+            spawn pick --prompt "Select ${display}" --default "${default_val}" 2>/dev/tty) && {
+            echo "${picked}"
+            return
+        }
+    fi
+
+    # Fallback: shared/common.sh numbered-list selector
+    # Convert "value\tLabel\tHint" → "value|Label" for _display_and_select
+    local items
+    items=$(printf '%s\n' "${options_text}" | awk -F'\t' '{ print $1 "|" $2 }')
+    _display_and_select "${display}" "${default_val}" "${default_val}" <<< "${items}"
+}
+
+_gcp_pick_machine_type() {
+    _gcp_interactive_pick "GCP machine type" "GCP_MACHINE_TYPE" "e2-medium" "_gcp_machine_type_options"
+}
+
+_gcp_pick_zone() {
+    _gcp_interactive_pick "GCP zone" "GCP_ZONE" "us-central1-a" "_gcp_zone_options"
+}
+
+_gcp_pick_project() {
+    _gcp_interactive_pick "GCP project" "GCP_PROJECT" "" "_gcp_project_options"
+}
+
+# Resolve and export GCP_PROJECT — prompt interactively if not already set
 _gcp_resolve_project() {
+    # Check env var and gcloud config
     local project="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
-    if [[ -z "${project}" || "${project}" == "(unset)" ]]; then
-        log_error "No GCP project configured"
+    if [[ "${project}" == "(unset)" ]]; then project=""; fi
+
+    # If not set, offer an interactive project picker
+    if [[ -z "${project}" ]]; then
+        log_info "No GCP project configured — fetching your projects..."
+        project=$(_gcp_pick_project)
+    fi
+
+    if [[ -z "${project}" ]]; then
+        log_error "No GCP project selected"
         log_error ""
-        log_error "Possible causes:"
-        log_error "  - No project is set in gcloud config or GCP_PROJECT env var"
-        log_error "  - You haven't created a GCP project yet"
+        log_error "Set one before retrying:"
+        log_error "  export ${CYAN}GCP_PROJECT=your-project-id${NC}"
+        log_error "  or: gcloud config set project YOUR_PROJECT_ID"
         log_error ""
-        log_error "How to fix:"
-        log_error "  1. List your existing projects:"
-        log_error "     ${CYAN}gcloud projects list${NC}"
+        log_error "Don't have a project? Create one:"
+        log_error "  ${CYAN}https://console.cloud.google.com/projectcreate${NC}"
         log_error ""
-        log_error "  2. Set a project via environment variable:"
-        log_error "     ${CYAN}export GCP_PROJECT=your-project-id${NC}"
-        log_error ""
-        log_error "  3. Or set via gcloud config:"
-        log_error "     ${CYAN}gcloud config set project YOUR_PROJECT_ID${NC}"
-        log_error ""
-        log_error "  4. Don't have a project? Create one:"
-        log_error "     ${CYAN}https://console.cloud.google.com/projectcreate${NC}"
-        log_error ""
-        log_error "  5. Enable Compute Engine API for your project:"
-        log_error "     ${CYAN}https://console.cloud.google.com/apis/library/compute.googleapis.com${NC}"
+        log_error "Then enable Compute Engine API:"
+        log_error "  ${CYAN}https://console.cloud.google.com/apis/library/compute.googleapis.com${NC}"
         return 1
     fi
     export GCP_PROJECT="${project}"
@@ -230,14 +330,22 @@ _gcp_get_instance_ip() {
 
 create_server() {
     local name="${1}"
-    local machine_type="${GCP_MACHINE_TYPE:-e2-medium}"
-    local zone="${GCP_ZONE:-us-central1-a}"
     local image_family="ubuntu-2404-lts-amd64"
     local image_project="ubuntu-os-cloud"
 
-    # Validate env var inputs to prevent command injection
-    validate_resource_name "${machine_type}" || { log_error "Invalid GCP_MACHINE_TYPE"; return 1; }
-    validate_region_name "${zone}" || { log_error "Invalid GCP_ZONE"; return 1; }
+    # Interactive pickers — each respects the env var override and skips the
+    # prompt when GCP_MACHINE_TYPE / GCP_ZONE are already set.
+    local machine_type zone
+    machine_type=$(_gcp_pick_machine_type)
+    zone=$(_gcp_pick_zone)
+
+    # Validate to prevent command injection (covers both interactive and env-var paths)
+    validate_resource_name "${machine_type}" || { log_error "Invalid GCP_MACHINE_TYPE: ${machine_type}"; return 1; }
+    validate_region_name "${zone}" || { log_error "Invalid GCP_ZONE: ${zone}"; return 1; }
+
+    # Export so downstream functions (cloud_wait_ready, destroy_server, etc.) see them
+    export GCP_MACHINE_TYPE="${machine_type}"
+    export GCP_ZONE="${zone}"
 
     log_step "Creating GCP instance '${name}' (type: ${machine_type}, zone: ${zone})..."
 

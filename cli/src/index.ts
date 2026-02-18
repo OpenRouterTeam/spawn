@@ -15,6 +15,7 @@ import {
   cmdCloudInfo,
   cmdUpdate,
   cmdHelp,
+  cmdPick,
   findClosestKeyByNameOrKey,
   resolveAgentKey,
   resolveCloudKey,
@@ -517,7 +518,17 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
 }
 
 async function main(): Promise<void> {
-  const args = expandEqualsFlags(process.argv.slice(2));
+  const rawArgs = process.argv.slice(2);
+
+  // ── `spawn pick` — bypass all flag parsing; used by bash scripts ──────────
+  // Must be handled before expandEqualsFlags / resolvePrompt so that pick's
+  // own --prompt flag is not mistakenly consumed by the top-level prompt logic.
+  if (rawArgs[0] === "pick") {
+    await cmdPick(expandEqualsFlags(rawArgs.slice(1)));
+    return;
+  }
+
+  const args = expandEqualsFlags(rawArgs);
 
   await checkForUpdates();
 
