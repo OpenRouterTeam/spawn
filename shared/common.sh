@@ -1233,6 +1233,13 @@ prompt_github_auth() {
     choice=$(safe_read "Set up GitHub CLI (gh) on this machine? (y/N): ") || return 0
     if [[ "${choice}" =~ ^[Yy]$ ]]; then
         SPAWN_GITHUB_AUTH_REQUESTED=1
+
+        # Capture local GitHub token for passthrough to remote VM
+        if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+            SPAWN_GITHUB_TOKEN="${GITHUB_TOKEN}"
+        elif command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+            SPAWN_GITHUB_TOKEN="$(gh auth token 2>/dev/null)" || true
+        fi
     fi
 }
 
@@ -1248,11 +1255,19 @@ offer_github_auth() {
         return 0
     fi
 
+    # Build the remote command with optional token export
+    local gh_cmd="curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    if [[ -n "${SPAWN_GITHUB_TOKEN:-}" ]]; then
+        local escaped_token
+        escaped_token=$(printf '%q' "${SPAWN_GITHUB_TOKEN}")
+        gh_cmd="export GITHUB_TOKEN=${escaped_token}; ${gh_cmd}"
+    fi
+
     # If prompt_github_auth was already called, use its stored answer
     if [[ "${SPAWN_GITHUB_AUTH_PROMPTED:-}" == "1" ]]; then
         if [[ "${SPAWN_GITHUB_AUTH_REQUESTED:-}" == "1" ]]; then
             log_step "Installing and authenticating GitHub CLI..."
-            ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+            ${run_callback} "${gh_cmd}"
         fi
         return 0
     fi
@@ -1265,8 +1280,22 @@ offer_github_auth() {
         return 0
     fi
 
+    # Attempt token capture in fallback path too
+    if [[ -z "${SPAWN_GITHUB_TOKEN:-}" ]]; then
+        if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+            SPAWN_GITHUB_TOKEN="${GITHUB_TOKEN}"
+        elif command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+            SPAWN_GITHUB_TOKEN="$(gh auth token 2>/dev/null)" || true
+        fi
+        if [[ -n "${SPAWN_GITHUB_TOKEN:-}" ]]; then
+            local escaped_token
+            escaped_token=$(printf '%q' "${SPAWN_GITHUB_TOKEN}")
+            gh_cmd="export GITHUB_TOKEN=${escaped_token}; ${gh_cmd}"
+        fi
+    fi
+
     log_step "Installing and authenticating GitHub CLI..."
-    ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    ${run_callback} "${gh_cmd}"
 }
 
 # ============================================================
