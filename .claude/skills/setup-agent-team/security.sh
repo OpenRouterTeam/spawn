@@ -126,6 +126,7 @@ fi
 # Pre-cycle cleanup (stale branches, worktrees from prior runs)
 log "Pre-cycle cleanup..."
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
+git pull --rebase origin main 2>&1 | tee -a "${LOG_FILE}" || true
 
 # Clean stale worktrees
 git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
