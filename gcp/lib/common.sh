@@ -139,7 +139,7 @@ _gcp_interactive_pick() {
 
     # Honour an explicit env var override — no prompt needed
     local current_val
-    eval "current_val=\"\${${env_var}:-}\""
+    current_val="${!env_var:-}"
     if [[ -n "${current_val}" ]]; then
         echo "${current_val}"
         return
