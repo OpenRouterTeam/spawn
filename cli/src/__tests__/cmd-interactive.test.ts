@@ -54,6 +54,12 @@ mock.module("@clack/prompts", () => ({
   outro: mockOutro,
   cancel: mockCancel,
   confirm: mockConfirm,
+  text: mock(async () => undefined),
+  autocomplete: mock(async () => {
+    const value = selectReturnValues[selectCallIndex] ?? "claude";
+    selectCallIndex++;
+    return value;
+  }),
   select: mock(async () => {
     const value = selectReturnValues[selectCallIndex] ?? "claude";
     selectCallIndex++;
