@@ -64,7 +64,7 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.3.0" }),
+          json: () => Promise.resolve({ version: "99.0.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
@@ -85,7 +85,7 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.3.0" }),
+          json: () => Promise.resolve({ version: "99.0.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
@@ -101,7 +101,7 @@ describe("update-check", () => {
       expect(consoleErrorSpy).toHaveBeenCalled();
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
       expect(output).toContain("Update available");
-      expect(output).toContain("0.3.0");
+      expect(output).toContain("99.0.0");
       expect(output).toContain("Updating automatically");
 
       // Should have run the install script
@@ -155,7 +155,7 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.3.0" }),
+          json: () => Promise.resolve({ version: "99.0.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
@@ -205,7 +205,7 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.3.0" }),
+          json: () => Promise.resolve({ version: "99.0.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
@@ -252,7 +252,7 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.3.0" }),
+          json: () => Promise.resolve({ version: "99.0.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
@@ -285,7 +285,7 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.3.0" }),
+          json: () => Promise.resolve({ version: "99.0.0" }),
         } as Response)
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
