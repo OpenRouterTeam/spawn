@@ -17,8 +17,8 @@ AGENT_MODEL_PROMPT=1
 AGENT_MODEL_DEFAULT="openrouter/auto"
 
 agent_install() {
-    install_agent "Aider" "python3 -m pip install pipx && pipx install aider-chat" cloud_run
-    verify_agent "Aider" "command -v aider && aider --version" "pipx install aider-chat" cloud_run
+    install_agent "Aider" "command -v uv >/dev/null || { command -v brew >/dev/null && brew install uv || curl -LsSf https://astral.sh/uv/install.sh | sh; } && echo Installing aider-chat this may take a few minutes... && uv tool install --upgrade --with audioop-lts aider-chat" cloud_run
+    verify_agent "Aider" "export PATH=\"\$HOME/.local/bin:\$PATH\" && command -v aider" "uv tool install --upgrade --with audioop-lts --reinstall aider-chat" cloud_run
 }
 agent_env_vars() { generate_env_config "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"; }
 agent_launch_cmd() { printf 'source ~/.zshrc && aider --model openrouter/%s' "${MODEL_ID}"; }
