@@ -17,8 +17,8 @@ AGENT_MODEL_PROMPT=1
 AGENT_MODEL_DEFAULT="openrouter/auto"
 
 agent_install() {
-    install_agent "Aider" "pip install aider-chat 2>/dev/null || pip3 install aider-chat" cloud_run
-    verify_agent "Aider" "command -v aider && aider --version" "pip install aider-chat" cloud_run
+    install_agent "Aider" "python3 -m pip install pipx && pipx install aider-chat" cloud_run
+    verify_agent "Aider" "command -v aider && aider --version" "pipx install aider-chat" cloud_run
 }
 agent_env_vars() { generate_env_config "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"; }
 agent_launch_cmd() { printf 'source ~/.zshrc && aider --model openrouter/%s' "${MODEL_ID}"; }
