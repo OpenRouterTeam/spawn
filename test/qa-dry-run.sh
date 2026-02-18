@@ -438,6 +438,198 @@ else
 fi
 
 # ============================================================
+# Phase 5: E2E Tests (optional — requires cloud credentials)
+# ============================================================
+E2E_PASS=0
+E2E_FAIL=0
+E2E_SKIPPED=0
+
+if [[ -f "${REPO_ROOT}/test/e2e.sh" ]]; then
+    # Check if any cloud credentials are available
+    HAS_CLOUD_CREDS=0
+    for _var in FLY_API_TOKEN HCLOUD_TOKEN DO_API_TOKEN DAYTONA_API_KEY OVH_APP_KEY; do
+        if [[ -n "${!_var:-}" ]]; then
+            HAS_CLOUD_CREDS=1
+            break
+        fi
+    done
+
+    if [[ "${HAS_CLOUD_CREDS}" -eq 1 ]] && [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+        log "=== Phase 5: E2E Tests ==="
+
+        E2E_OUTPUT="${DRY_RUN_DIR}/e2e-output.txt"
+        E2E_EXIT=0
+        # Stream live so failures are visible immediately, not after the full run
+        E2E_AUTO_FIX=0 bash "${REPO_ROOT}/test/e2e.sh" \
+            2>&1 | tee "${E2E_OUTPUT}" | tee -a "${LOG_FILE}" || E2E_EXIT=$?
+
+        # Count only cloud/agent lines (contain "/"), not pre-flight checkmarks
+        if [[ -f "${E2E_OUTPUT}" ]]; then
+            E2E_PASS=$(grep '✓' "${E2E_OUTPUT}" | grep -c '/' 2>/dev/null || true)
+            E2E_FAIL=$(grep '✗' "${E2E_OUTPUT}" | grep -c '/' 2>/dev/null || true)
+        fi
+
+        if [[ "${E2E_EXIT}" -eq 0 ]]; then
+            log "Phase 5: E2E tests passed (${E2E_PASS} passed)"
+        else
+            log "Phase 5: E2E tests had ${E2E_FAIL} failure(s), ${E2E_PASS} passed"
+        fi
+
+        # --- Phase 5b: Fix E2E failures (dry run — copies, no git/PR) ---
+        if [[ "${E2E_FAIL}" -gt 0 ]] && [[ -f "${E2E_OUTPUT}" ]]; then
+            check_timeout || true
+
+            log "=== Phase 5b: Fix E2E failures ==="
+
+            # Parse failing combos — only lines with "/" (skip pre-flight)
+            E2E_FAILED_COMBOS=""
+            E2E_FAILED_AGENTS=""
+            while IFS= read -r line; do
+                clean=$(printf '%s' "$line" | sed 's/\x1b\[[0-9;]*m//g')
+                case "$clean" in
+                    *"✗ "*"/"*)
+                        combo=$(printf '%s' "$clean" | sed 's/.*✗ //; s/  .*//')
+                        reason=$(printf '%s' "$clean" | sed 's/.*(\(.*\))/\1/' || true)
+                        cloud="${combo%%/*}"
+                        agent="${combo##*/}"
+                        E2E_FAILED_COMBOS="${E2E_FAILED_COMBOS} ${cloud}/${agent}|${reason}"
+                        case " ${E2E_FAILED_AGENTS} " in
+                            *" ${agent} "*) ;;
+                            *) E2E_FAILED_AGENTS="${E2E_FAILED_AGENTS} ${agent}" ;;
+                        esac
+                        ;;
+                esac
+            done < "${E2E_OUTPUT}"
+            E2E_FAILED_COMBOS=$(printf '%s' "${E2E_FAILED_COMBOS}" | sed 's/^ //')
+            E2E_FAILED_AGENTS=$(printf '%s' "${E2E_FAILED_AGENTS}" | sed 's/^ //')
+
+            if [[ -n "${E2E_FAILED_AGENTS}" ]]; then
+                log "Phase 5b: Failing agents: ${E2E_FAILED_AGENTS}"
+
+                E2E_FIX_PIDS=""
+                E2E_FIX_WORK_DIRS=""
+
+                for agent in ${E2E_FAILED_AGENTS}; do
+                    check_timeout || break
+
+                    # Collect failing clouds and reasons
+                    failing_clouds=""
+                    failure_summary=""
+                    for entry in ${E2E_FAILED_COMBOS}; do
+                        entry_combo="${entry%%|*}"
+                        entry_reason="${entry#*|}"
+                        entry_agent="${entry_combo##*/}"
+                        entry_cloud="${entry_combo%%/*}"
+                        if [[ "${entry_agent}" == "${agent}" ]]; then
+                            failing_clouds="${failing_clouds} ${entry_cloud}"
+                            failure_summary="${failure_summary}  - ${entry_cloud}/${agent}.sh: ${entry_reason}\n"
+                        fi
+                    done
+                    failing_clouds=$(printf '%s' "${failing_clouds}" | sed 's/^ //')
+
+                    # Find ALL clouds with this agent
+                    all_clouds_for_agent=""
+                    other_cloud_scripts=""
+                    for cloud_dir in "${REPO_ROOT}"/*/; do
+                        cname=$(basename "${cloud_dir}")
+                        [[ "${cname}" == "shared" || "${cname}" == "cli" || "${cname}" == "test" || "${cname}" == ".claude" || "${cname}" == ".github" || "${cname}" == ".docs" ]] && continue
+                        if [[ -f "${cloud_dir}${agent}.sh" ]]; then
+                            all_clouds_for_agent="${all_clouds_for_agent} ${cname}"
+                            case " ${failing_clouds} " in
+                                *" ${cname} "*) ;;
+                                *) other_cloud_scripts="${other_cloud_scripts} ${cname}/${agent}.sh" ;;
+                            esac
+                        fi
+                    done
+                    all_clouds_for_agent=$(printf '%s' "${all_clouds_for_agent}" | sed 's/^ //')
+                    other_cloud_scripts=$(printf '%s' "${other_cloud_scripts}" | sed 's/^ //')
+
+                    fail_count=0
+                    for _c in ${failing_clouds}; do fail_count=$((fail_count + 1)); done
+
+                    log "Phase 5b: Spawning agent for '${agent}' (${fail_count} failure(s), propagating to: ${other_cloud_scripts:-none})"
+                    would_commit "git worktree add ... -b qa/e2e-fix-${agent} origin/main"
+
+                    WORK_DIR=$(mktemp -d "/tmp/spawn-qa-dry-XXXXXX")
+                    cp -r "${REPO_ROOT}/." "${WORK_DIR}/" 2>/dev/null || true
+                    ORIG_HEAD=$(cd "${WORK_DIR}" && git rev-parse HEAD 2>/dev/null) || ORIG_HEAD=""
+
+                    modify_files=""
+                    for _c in ${all_clouds_for_agent}; do
+                        modify_files="${modify_files} ${_c}/${agent}.sh ${_c}/lib/common.sh"
+                    done
+
+                    (
+                        cd "${WORK_DIR}"
+                        run_with_timeout "${AGENT_TIMEOUT}" claude -p "Fix E2E test failures for agent **${agent}** and propagate fixes to all clouds.
+
+## E2E Failure Summary
+$(printf '%b' "${failure_summary}")
+## All clouds with ${agent}
+${all_clouds_for_agent}
+
+## What happened
+These scripts were run with real cloud servers (SPAWN_NON_INTERACTIVE=1, no TTY).
+A script passes if it prints 'setup completed successfully' before the session step.
+Common E2E failure causes:
+- Install command fails (wrong package name, missing repo, network timeout)
+- Config file written to wrong path or with wrong permissions
+- Env var injection missing (OPENROUTER_API_KEY, ANTHROPIC_BASE_URL, etc.)
+- Script hangs on an interactive prompt that wasn't guarded by SPAWN_NON_INTERACTIVE
+- SSH wait/connect fails (firewall, wrong port, key not imported)
+
+## Fix Process
+
+1. **Read each failing script** and its cloud's lib/common.sh.
+2. **Compare with working clouds.** Diff the scripts — look for divergence.
+3. **Fix the root cause** in each failing script.
+4. **Propagate to other clouds:** ${other_cloud_scripts:-"(no other clouds)"}
+   Only propagate if the same problematic pattern exists.
+5. **Validate:** Run bash -n on every modified .sh file.
+
+You may modify:${modify_files}" \
+                            2>&1 | tee -a "${DRY_RUN_DIR}/agent-e2e-fix-${agent}.log" || true
+
+                        # Copy changed files back to repo
+                        changed=$(git diff --name-only "${ORIG_HEAD}" 2>/dev/null || true)
+                        uncommitted=$(git status --porcelain 2>/dev/null | sed 's/^.. //' || true)
+                        for f in ${changed} ${uncommitted}; do
+                            [[ -f "$f" ]] || continue
+                            mkdir -p "${REPO_ROOT}/$(dirname "$f")"
+                            cp "$f" "${REPO_ROOT}/$f"
+                        done
+                    ) &
+                    E2E_FIX_PIDS="${E2E_FIX_PIDS} $!"
+                    E2E_FIX_WORK_DIRS="${E2E_FIX_WORK_DIRS} ${WORK_DIR}"
+                done
+
+                # Wait for all E2E fix agents
+                for pid in ${E2E_FIX_PIDS}; do
+                    wait "$pid" 2>/dev/null || true
+                done
+
+                for agent in ${E2E_FAILED_AGENTS}; do
+                    would_commit "git add */\${agent}.sh && git commit && git push && gh pr create && gh pr merge"
+                done
+                for work_dir in ${E2E_FIX_WORK_DIRS}; do
+                    rm -rf "${work_dir}"
+                done
+
+                log "Phase 5b: E2E fix agents complete"
+            fi
+        fi
+    else
+        E2E_SKIPPED=1
+        log "=== Phase 5: E2E Tests (Skipped — no cloud credentials or OPENROUTER_API_KEY) ==="
+    fi
+else
+    E2E_SKIPPED=1
+    log "=== Phase 5: E2E Tests (Skipped — test/e2e.sh not found) ==="
+fi
+
+check_timeout || exit 0
+
+# ============================================================
 # Summary
 # ============================================================
 log ""
@@ -448,6 +640,11 @@ log "Phase 4 (after fix): ${RETRY_PASS:-0} pass / ${RETRY_FAIL:-0} fail"
 if [[ "${FAIL_COUNT:-0}" -gt 0 ]] && [[ "${RETRY_FAIL:-0}" -lt "${FAIL_COUNT:-0}" ]]; then
     FIXED=$(( ${FAIL_COUNT:-0} - ${RETRY_FAIL:-0} ))
     log "Fixed ${FIXED} failure(s) this cycle"
+fi
+if [[ "${E2E_SKIPPED:-0}" -eq 0 ]]; then
+    log "Phase 5 (e2e):       ${E2E_PASS:-0} pass / ${E2E_FAIL:-0} fail"
+else
+    log "Phase 5 (e2e):       skipped"
 fi
 log ""
 log "Output files:"
