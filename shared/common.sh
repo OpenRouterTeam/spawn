@@ -1734,6 +1734,8 @@ packages:
   - zsh
 
 runcmd:
+  # Install Node.js (v22 LTS) — needed by npm-based agents (codex, etc.)
+  - curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
   # Install Bun
   - su - root -c 'curl -fsSL https://bun.sh/install | bash'
   # Install Claude Code
