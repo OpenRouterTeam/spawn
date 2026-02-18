@@ -270,10 +270,22 @@ wget http://example.com/install.sh | sh
       expect(() => validatePrompt("Swap fds 1>&2")).toThrow("shell syntax");
     });
 
+    it("should reject higher fd redirections (3-9)", () => {
+      expect(() => validatePrompt("Redirect 3>&1")).toThrow("shell syntax");
+      expect(() => validatePrompt("Open fd 5> /tmp/log")).toThrow("shell syntax");
+      expect(() => validatePrompt("Custom fd 9>&2")).toThrow("shell syntax");
+    });
+
     it("should reject heredoc syntax", () => {
       expect(() => validatePrompt("Write config << EOF")).toThrow("shell syntax");
       expect(() => validatePrompt("Create file <<- HEREDOC")).toThrow("shell syntax");
       expect(() => validatePrompt("Inline data <<MARKER")).toThrow("shell syntax");
+    });
+
+    it("should reject heredoc with quoted delimiters", () => {
+      expect(() => validatePrompt("Write config << 'EOF'")).toThrow("shell syntax");
+      expect(() => validatePrompt("Create file <<'EOF'")).toThrow("shell syntax");
+      expect(() => validatePrompt("Inline data <<- 'MARKER'")).toThrow("shell syntax");
     });
 
     it("should reject process substitution", () => {
@@ -286,6 +298,12 @@ wget http://example.com/install.sh | sh
       expect(() => validatePrompt("Save > output")).toThrow("shell syntax");
       expect(() => validatePrompt("Write > foo/bar")).toThrow("shell syntax");
       expect(() => validatePrompt("Dump > logfile")).toThrow("shell syntax");
+    });
+
+    it("should reject append redirection operator", () => {
+      expect(() => validatePrompt("Append >> logfile")).toThrow("shell syntax");
+      expect(() => validatePrompt("Add data >> output")).toThrow("shell syntax");
+      expect(() => validatePrompt("Log >> server_log")).toThrow("shell syntax");
     });
 
     it("should comprehensively detect all command injection patterns from issue #1400", () => {
