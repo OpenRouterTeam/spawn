@@ -12,6 +12,12 @@ const KNOWN_FLAGS = new Set([
   "--version", "-v", "-V",
   "--prompt", "-p", "--prompt-file", "-f",
   "--dry-run", "-n",
+  "--debug",
+  "--headless",
+  "--output",
+  "--default",
+  "-a", "-c", "--agent", "--cloud",
+  "--clear",
 ]);
 
 /** Replicated from index.ts for testability - returns the first unknown flag or null */
@@ -41,8 +47,8 @@ describe("Unknown Flag Detection", () => {
       expect(findUnknownFlag(["list", "-x"])).toBe("-x");
     });
 
-    it("should detect --output as unknown", () => {
-      expect(findUnknownFlag(["agents", "--output", "json"])).toBe("--output");
+    it("should detect --force as unknown", () => {
+      expect(findUnknownFlag(["agents", "--force"])).toBe("--force");
     });
 
     it("should detect --verbose as unknown", () => {
@@ -101,6 +107,22 @@ describe("Unknown Flag Detection", () => {
 
     it("should allow -n (short form of --dry-run)", () => {
       expect(findUnknownFlag(["claude", "sprite", "-n"])).toBeNull();
+    });
+
+    it("should allow --default (used by spawn pick)", () => {
+      expect(findUnknownFlag(["--default", "us-central1-a"])).toBeNull();
+    });
+
+    it("should allow --output", () => {
+      expect(findUnknownFlag(["claude", "sprite", "--output", "json"])).toBeNull();
+    });
+
+    it("should allow --headless", () => {
+      expect(findUnknownFlag(["claude", "sprite", "--headless"])).toBeNull();
+    });
+
+    it("should allow --debug", () => {
+      expect(findUnknownFlag(["claude", "sprite", "--debug"])).toBeNull();
     });
   });
 

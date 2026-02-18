@@ -200,7 +200,12 @@ const KNOWN_FLAGS = new Set([
   "--version", "-v", "-V",
   "--prompt", "-p", "--prompt-file", "-f",
   "--dry-run", "-n",
+  "--debug",
+  "--headless",
+  "--output",
+  "--default",
   "-a", "-c", "--agent", "--cloud",
+  "--clear",
 ]);
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -974,8 +979,13 @@ describe("KNOWN_FLAGS completeness", () => {
     "--prompt", "-p",
     "--prompt-file", "-f",
     "--dry-run", "-n",
+    "--debug",
+    "--headless",
+    "--output",
+    "--default",
     "-a", "-c",
     "--agent", "--cloud",
+    "--clear",
   ];
 
   for (const flag of expectedFlags) {
@@ -991,8 +1001,8 @@ describe("KNOWN_FLAGS completeness", () => {
     expect(KNOWN_FLAGS.has("--force")).toBe(false);
   });
 
-  it("should have exactly 15 known flags", () => {
-    expect(KNOWN_FLAGS.size).toBe(15);
+  it("should have exactly 20 known flags", () => {
+    expect(KNOWN_FLAGS.size).toBe(20);
   });
 });
 
