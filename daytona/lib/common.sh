@@ -229,7 +229,7 @@ upload_file() {
 
     # base64 output is safe (alphanumeric + /+=) so no injection risk
     local content
-    content=$(base64 -w0 "${local_path}" 2>/dev/null || base64 "${local_path}")
+    content=$(base64 -w0 < "${local_path}" 2>/dev/null || base64 < "${local_path}")
 
     daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "printf '%s' '${content}' | base64 -d > '${remote_path}'"
 }

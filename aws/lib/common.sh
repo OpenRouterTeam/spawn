@@ -88,10 +88,19 @@ ensure_ssh_key() {
     fi
 
     log_step "Importing SSH key to Lightsail..."
+    # --public-key-base64 accepts the OpenSSH key directly (not base64-wrapped)
     aws lightsail import-key-pair \
         --key-pair-name "${key_name}" \
-        --public-key-base64 "$(base64 -w0 "${pub_path}" 2>/dev/null || base64 "${pub_path}")" \
-        >/dev/null
+        --public-key-base64 "$(cat "${pub_path}")" \
+        >/dev/null 2>&1 || {
+        # Race condition: another process may have imported it
+        if aws lightsail get-key-pair --key-pair-name "${key_name}" &>/dev/null; then
+            log_info "SSH key already registered with Lightsail"
+            return 0
+        fi
+        log_error "Failed to import SSH key to Lightsail"
+        return 1
+    }
     log_info "SSH key imported to Lightsail"
 }
 

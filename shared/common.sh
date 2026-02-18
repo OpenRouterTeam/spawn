@@ -223,9 +223,17 @@ ensure_jq() {
 # ============================================================
 
 # Safe read function that works in both interactive and non-interactive modes
+# Set SPAWN_NON_INTERACTIVE=1 to force immediate failure (for CI/CD, e2e tests)
 safe_read() {
     local prompt="${1}"
     local result=""
+
+    # Honour explicit non-interactive flag (e2e tests, CI/CD pipelines)
+    if [[ "${SPAWN_NON_INTERACTIVE:-}" == "1" ]]; then
+        log_error "Cannot prompt for input: SPAWN_NON_INTERACTIVE is set"
+        log_error "Set all required environment variables before launching spawn."
+        return 1
+    fi
 
     if [[ -t 0 ]]; then
         # stdin is a terminal - read directly

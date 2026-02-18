@@ -16,7 +16,8 @@ AGENT_MODEL_PROMPT=1
 AGENT_MODEL_DEFAULT="openrouter/auto"
 
 agent_install() {
-    install_agent "openclaw" "curl -fsSL https://openclaw.ai/install.sh | bash" cloud_run
+    cloud_run "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs"
+    install_agent "openclaw" "npm install -g --ignore-scripts openclaw@latest" cloud_run
 }
 
 agent_env_vars() {

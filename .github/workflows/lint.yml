@@ -34,3 +34,15 @@ jobs:
       - name: ShellCheck version info
         if: always()
         run: shellcheck --version
+
+  macos-compat:
+    name: macOS Compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Warn-only for initial rollout — switch to blocking after burn-in
+      - name: Run macOS compat linter
+        run: bash test/macos-compat.sh --warn-only
