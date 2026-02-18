@@ -1562,25 +1562,25 @@ spawn_agent() {
     # 2. Pre-provision hooks (e.g., prompt for GitHub auth)
     if _fn_exists agent_pre_provision; then agent_pre_provision; fi
 
-    # 3. Provision server
+    # 3. Get API key (before provisioning so user isn't waiting on server)
+    get_or_prompt_api_key
+
+    # 4. Model selection (if agent needs it)
+    if [[ -n "${AGENT_MODEL_PROMPT:-}" ]]; then
+        MODEL_ID=$(get_model_id_interactive "${AGENT_MODEL_DEFAULT:-openrouter/auto}" "${agent_name}") || exit 1
+    fi
+
+    # 5. Provision server
     local server_name
     server_name=$(get_server_name)
     cloud_provision "${server_name}"
 
-    # 4. Wait for readiness
+    # 6. Wait for readiness
     cloud_wait_ready
 
-    # 5. Install agent
+    # 7. Install agent
     if _fn_exists agent_install; then
         agent_install || exit 1
-    fi
-
-    # 6. Get API key
-    get_or_prompt_api_key
-
-    # 7. Model selection (if agent needs it)
-    if [[ -n "${AGENT_MODEL_PROMPT:-}" ]]; then
-        MODEL_ID=$(get_model_id_interactive "${AGENT_MODEL_DEFAULT:-openrouter/auto}" "${agent_name}") || exit 1
     fi
 
     # 8. Inject environment variables
