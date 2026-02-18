@@ -2212,24 +2212,23 @@ wait_for_cloud_init() {
 # Run a command on a remote server via SSH
 # Usage: ssh_run_server IP COMMAND
 # Requires: SSH_USER (default: root), SSH_OPTS
-# SECURITY: Command is properly quoted to prevent shell injection
+# SECURITY: Command is properly quoted to prevent shell injection.
+# Note: $cmd is always a shell command string (with pipes, semicolons, etc.)
+# that is intentionally interpreted by the remote shell. All callers pass
+# static command strings — never user-controlled input.
 ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
-    # Prepend common tool directories so that tools installed during setup
-    # (uv, bun, pip, etc.) are always available in subsequent commands.
-    # Without this, "uv: command not found" occurs after the uv install script
-    # adds the binary to ~/.local/bin but PATH isn't updated for the session.
-    # Same pattern as fly/lib/common.sh run_server().
-    local full_cmd="export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\" && ${cmd}"
+    # Single-quoted so $HOME/$PATH expand on the remote side, not locally.
+    local path_prefix='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
-        full_cmd="set -x; ${full_cmd}"
+        cmd="set -x; ${cmd}"
     fi
     # shellcheck disable=SC2086
     # < /dev/null prevents SSH from consuming the parent script's stdin.
     # Without this, sequential SSH calls can steal input meant for later
     # commands (e.g., safe_read prompts), causing hangs.
-    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${full_cmd}" < /dev/null
+    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${path_prefix} && ${cmd}" < /dev/null
 }
 
 # Upload a file to a remote server via SCP

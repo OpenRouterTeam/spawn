@@ -27,11 +27,6 @@ fi
 
 SPAWN_DASHBOARD_URL="https://app.daytona.io/"
 
-# Ensure the CLI talks to Daytona Cloud (not a local self-hosted server).
-# The SDK defaults to this URL but the CLI may not — without it, every
-# command hangs trying to connect to localhost.
-export DAYTONA_API_URL="${DAYTONA_API_URL:-https://app.daytona.io/api}"
-
 ensure_daytona_cli() {
     if ! command -v daytona &>/dev/null; then
         log_step "Installing Daytona CLI..."
@@ -87,7 +82,8 @@ test_daytona_token() {
     local exit_code=0
 
     # Authenticate CLI with the API key (30s timeout)
-    test_response=$(_daytona_with_timeout 30 daytona login --api-key "${DAYTONA_API_KEY}" 2>&1) || exit_code=$?
+    # Use --api-key=VALUE syntax per official Daytona docs
+    test_response=$(_daytona_with_timeout 30 daytona login --api-key="${DAYTONA_API_KEY}" 2>&1) || exit_code=$?
 
     if [[ ${exit_code} -eq 124 ]]; then
         log_error "Daytona login timed out (Daytona API may be temporarily unavailable)"
@@ -109,7 +105,7 @@ test_daytona_token() {
 
     # Verify by listing sandboxes (30s timeout)
     exit_code=0
-    test_response=$(_daytona_with_timeout 30 daytona list --limit 1 2>&1) || exit_code=$?
+    test_response=$(_daytona_with_timeout 30 daytona sandbox list --limit 1 2>&1) || exit_code=$?
 
     if [[ ${exit_code} -eq 124 ]] || _is_daytona_timeout "${test_response:-}"; then
         log_error "Daytona API timed out (service may be temporarily slow)"
@@ -139,7 +135,7 @@ ensure_daytona_token() {
     # Always authenticate CLI — ensure_api_token_with_provider may skip
     # the test function when loading from env var, so daytona login
     # would never be called. Re-running login is idempotent and fast.
-    _daytona_with_timeout 30 daytona login --api-key "${DAYTONA_API_KEY}" 2>/dev/null || true
+    _daytona_with_timeout 30 daytona login --api-key="${DAYTONA_API_KEY}" 2>/dev/null || true
 }
 
 get_server_name() {
@@ -162,7 +158,7 @@ _daytona_create_with_resources() {
     if [[ ! "${disk}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_DISK: must be numeric"; return 1; fi
 
     log_step "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
-    _daytona_with_timeout 120 daytona create \
+    _daytona_with_timeout 120 daytona sandbox create \
         --name "${name}" \
         --cpu "${cpu}" \
         --memory "${memory}" \
@@ -183,7 +179,7 @@ _daytona_create_with_class() {
     fi
 
     log_step "Creating Daytona sandbox '${name}' (class: ${sandbox_class})..."
-    _daytona_with_timeout 120 daytona create \
+    _daytona_with_timeout 120 daytona sandbox create \
         --name "${name}" \
         --class "${sandbox_class}" \
         --auto-stop 0 \
@@ -196,7 +192,7 @@ _resolve_sandbox_id() {
 
     # Try to get the sandbox ID from `daytona info`
     local info_output
-    info_output=$(daytona info "${name}" --format json 2>/dev/null) || true
+    info_output=$(daytona sandbox info "${name}" --format json 2>/dev/null) || true
 
     if [[ -n "${info_output}" ]]; then
         DAYTONA_SANDBOX_ID=$(printf '%s' "${info_output}" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null) || true
@@ -317,12 +313,12 @@ destroy_server() {
         return 0
     fi
     log_step "Destroying sandbox ${sandbox_id}..."
-    daytona delete "${sandbox_id}" 2>/dev/null || true
+    daytona sandbox delete "${sandbox_id}" 2>/dev/null || true
     log_info "Sandbox destroyed"
 }
 
 list_servers() {
-    daytona list
+    daytona sandbox list
 }
 
 # ============================================================
