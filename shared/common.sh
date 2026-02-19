@@ -1438,10 +1438,11 @@ register_cleanup_trap() {
 install_agent() {
     local agent_name="$1" install_cmd="$2" run_cb="$3"
     log_step "Installing ${agent_name}..."
-    local escaped_cmd
-    escaped_cmd=$(printf '%q' "${install_cmd}")
-    local timed_cmd="if command -v timeout >/dev/null 2>&1; then timeout 600 bash -c \"${escaped_cmd}\"; else bash -c \"${escaped_cmd}\"; fi"
-    if ! ${run_cb} "${timed_cmd}"; then
+    # Pass the raw command to the run callback — do NOT use printf '%q' + bash -c
+    # here. The run callback (run_server, run_sprite, ssh) already handles escaping
+    # for remote transport. Double-escaping breaks shell operators (&&, ||, >, |)
+    # inside install commands.
+    if ! ${run_cb} "${install_cmd}"; then
         log_install_failed "${agent_name}" "${install_cmd}"
         return 1
     fi
