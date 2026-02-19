@@ -98,6 +98,19 @@
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea.",
       "featured_cloud": ["daytona"]
     },
+    "zeroclaw": {
+      "name": "ZeroClaw",
+      "description": "Fast, small, fully autonomous AI assistant infrastructure — deploy anywhere, swap anything",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw",
+      "install": "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install.sh | bash -s -- --install-rust --install-system-deps",
+      "launch": "zeroclaw agent",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "ZEROCLAW_PROVIDER": "openrouter"
+      },
+      "notes": "Rust-based agent framework built by Harvard/MIT/Sundai.Club communities. Natively supports OpenRouter via OPENROUTER_API_KEY + ZEROCLAW_PROVIDER=openrouter. Requires compilation from source (~5-10 min).",
+      "featured_cloud": ["hetzner", "fly"]
+    },
     "kilocode": {
       "name": "Kilo Code",
       "description": "All-in-one agentic engineering platform with CLI",
@@ -274,6 +287,14 @@
     "gcp/kilocode": "implemented",
     "fly/kilocode": "implemented",
     "daytona/kilocode": "implemented",
+    "sprite/zeroclaw": "implemented",
+    "hetzner/zeroclaw": "implemented",
+    "digitalocean/zeroclaw": "implemented",
+    "aws/zeroclaw": "implemented",
+    "gcp/zeroclaw": "implemented",
+    "fly/zeroclaw": "implemented",
+    "daytona/zeroclaw": "implemented",
+    "local/zeroclaw": "implemented",
     "local/claude": "implemented",
     "local/openclaw": "implemented",
     "local/nanoclaw": "implemented",
