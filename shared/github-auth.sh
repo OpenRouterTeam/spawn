@@ -49,15 +49,19 @@ _install_gh_brew() {
 
 # Install gh via APT with GitHub's official repository (Debian/Ubuntu)
 _install_gh_apt() {
+    # Use sudo only when not already root (Fly.io containers run as root)
+    local SUDO=""
+    if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
+
     log_step "Adding GitHub CLI APT repository..."
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-        | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
-    sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+        | ${SUDO} dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
+    ${SUDO} chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
     printf 'deb [arch=%s signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' \
         "$(dpkg --print-architecture)" \
-        | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-    sudo apt-get update -qq
-    sudo apt-get install -y gh || {
+        | ${SUDO} tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    ${SUDO} apt-get update -qq
+    ${SUDO} apt-get install -y gh || {
         log_error "Failed to install gh via apt"
         return 1
     }
@@ -65,7 +69,9 @@ _install_gh_apt() {
 
 # Install gh via DNF (Fedora/RHEL)
 _install_gh_dnf() {
-    sudo dnf install -y gh || {
+    local SUDO=""
+    if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
+    ${SUDO} dnf install -y gh || {
         log_error "Failed to install gh via dnf"
         return 1
     }

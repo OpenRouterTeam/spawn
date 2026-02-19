@@ -12,12 +12,16 @@ fi
 log_info "OpenClaw on Fly.io"
 echo ""
 
+# OpenClaw is heavy (52 deps + native modules) — needs more resources
+FLY_VM_MEMORY="${FLY_VM_MEMORY:-2048}"
+FLY_VM_SIZE="${FLY_VM_SIZE:-shared-cpu-2x}"
+
 AGENT_MODEL_PROMPT=1
 AGENT_MODEL_DEFAULT="openrouter/auto"
 
 agent_install() {
-    # Node.js is installed in wait_for_cloud_init; bun install -g fails on Fly
-    install_agent "openclaw" "npm install -g openclaw@latest" cloud_run
+    # Try bun first (much faster), fall back to npm if it fails
+    install_agent "openclaw" "source ~/.bashrc && { bun install -g openclaw 2>/dev/null || npm install -g openclaw@latest; }" cloud_run
 }
 
 agent_env_vars() {
@@ -32,7 +36,7 @@ agent_configure() {
 }
 
 agent_pre_launch() {
-    cloud_run "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &"
+    cloud_run "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 </dev/null & disown"
     wait_for_openclaw_gateway cloud_run
 }
 

@@ -310,6 +310,63 @@ validate_model_id() {
     return 0
 }
 
+# Verify an OpenRouter API key is valid by hitting the /auth/key endpoint
+# Returns 0 if valid, 1 if invalid/expired/network error
+verify_openrouter_key() {
+    local api_key="${1}"
+    if [[ -z "${api_key}" ]]; then return 1; fi
+    if [[ -n "${SPAWN_SKIP_API_VALIDATION:-}" || "${BUN_ENV:-}" == "test" || "${NODE_ENV:-}" == "test" ]]; then return 0; fi
+    if ! command -v curl &>/dev/null; then return 0; fi  # skip if no curl
+
+    local response http_code
+    response=$(curl -s --connect-timeout 5 --max-time 10 -w "\n%{http_code}" \
+        -H "Authorization: Bearer ${api_key}" \
+        "https://openrouter.ai/api/v1/auth/key" 2>/dev/null) || return 0  # network error = skip
+    http_code=$(printf '%s' "${response}" | tail -1)
+
+    case "${http_code}" in
+        200) return 0 ;;
+        401|403)
+            log_error "OpenRouter API key is invalid or expired"
+            log_error "Get a new key at: https://openrouter.ai/settings/keys"
+            return 1 ;;
+        *)  return 0 ;;  # unknown status = don't block
+    esac
+}
+
+# Verify a model ID exists on OpenRouter
+# Returns 0 if valid (or can't check), 1 if model not found
+verify_openrouter_model() {
+    local model_id="${1}"
+    if [[ -z "${model_id}" ]]; then return 0; fi
+    if [[ "${model_id}" == "openrouter/auto" || "${model_id}" == "openrouter/free" ]]; then return 0; fi
+    if [[ -n "${SPAWN_SKIP_API_VALIDATION:-}" || "${BUN_ENV:-}" == "test" || "${NODE_ENV:-}" == "test" ]]; then return 0; fi
+    if ! command -v curl &>/dev/null; then return 0; fi
+    if ! command -v python3 &>/dev/null; then return 0; fi
+
+    local models_json
+    models_json=$(curl -s --connect-timeout 5 --max-time 15 \
+        "https://openrouter.ai/api/v1/models" 2>/dev/null) || return 0
+
+    # Extract model IDs and check for exact match
+    local found
+    found=$(printf '%s' "${models_json}" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    ids = [m['id'] for m in data.get('data', [])]
+    print('yes' if sys.argv[1] in ids else 'no')
+except: print('skip')
+" "${model_id}" 2>/dev/null)
+
+    if [[ "${found}" == "no" ]]; then
+        log_warn "Model '${model_id}' not found on OpenRouter"
+        log_info "Browse available models at: https://openrouter.ai/models"
+        return 1
+    fi
+    return 0
+}
+
 # Helper to show server name validation requirements
 show_server_name_requirements() {
     log_error ""
@@ -516,28 +573,53 @@ get_model_id_interactive() {
             log_error "MODEL_ID environment variable contains invalid characters"
             return 1
         fi
-        echo "${MODEL_ID}"
+        if ! verify_openrouter_model "${MODEL_ID}"; then
+            log_warn "MODEL_ID from environment not found on OpenRouter, prompting..."
+            MODEL_ID=""
+        else
+            echo "${MODEL_ID}"
+            return 0
+        fi
+    fi
+
+    local max_attempts=3 attempt=0
+    while true; do
+        attempt=$((attempt + 1))
+        if [[ ${attempt} -gt ${max_attempts} ]]; then
+            log_error "No valid model after ${max_attempts} attempts"
+            return 1
+        fi
+
+        echo "" >&2
+        log_info "Browse models at: https://openrouter.ai/models"
+        if [[ -n "${agent_name}" ]]; then
+            log_info "Which model would you like to use with ${agent_name}?"
+        else
+            log_info "Which model would you like to use?"
+        fi
+
+        local model_id=""
+        model_id=$(safe_read "Enter model ID [${default_model}]: ") || model_id=""
+        model_id="${model_id:-${default_model}}"
+
+        if ! validate_model_id "${model_id}"; then
+            log_error "Invalid characters in model ID, try again"
+            continue
+        fi
+
+        if ! verify_openrouter_model "${model_id}"; then
+            local confirm
+            confirm=$(safe_read "Use '${model_id}' anyway? (y/N): ") || confirm=""
+            if [[ "${confirm}" =~ ^[Yy]$ ]]; then
+                echo "${model_id}"
+                return 0
+            fi
+            continue
+        fi
+
+        echo "${model_id}"
         return 0
-    fi
-
-    echo "" >&2
-    log_info "Browse models at: https://openrouter.ai/models"
-    if [[ -n "${agent_name}" ]]; then
-        log_info "Which model would you like to use with ${agent_name}?"
-    else
-        log_info "Which model would you like to use?"
-    fi
-
-    local model_id=""
-    model_id=$(safe_read "Enter model ID [${default_model}]: ") || model_id=""
-    model_id="${model_id:-${default_model}}"
-
-    if ! validate_model_id "${model_id}"; then
-        log_error "Exiting due to invalid model ID"
-        return 1
-    fi
-
-    echo "${model_id}"
+    done
 }
 
 # ============================================================
@@ -1356,6 +1438,10 @@ register_cleanup_trap() {
 install_agent() {
     local agent_name="$1" install_cmd="$2" run_cb="$3"
     log_step "Installing ${agent_name}..."
+    # Pass the raw command to the run callback — do NOT use printf '%q' + bash -c
+    # here. The run callback (run_server, run_sprite, ssh) already handles escaping
+    # for remote transport. Double-escaping breaks shell operators (&&, ||, >, |)
+    # inside install commands.
     if ! ${run_cb} "${install_cmd}"; then
         log_install_failed "${agent_name}" "${install_cmd}"
         return 1
@@ -1479,9 +1565,24 @@ get_or_prompt_api_key() {
     echo ""
     if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
         log_info "Using OpenRouter API key from environment"
-    else
-        OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180)
+        if ! verify_openrouter_key "${OPENROUTER_API_KEY}"; then
+            log_warn "Environment key failed validation, prompting for a new one..."
+            OPENROUTER_API_KEY=""
+        fi
     fi
+
+    local max_attempts=3 attempt=0
+    while [[ -z "${OPENROUTER_API_KEY:-}" ]]; do
+        attempt=$((attempt + 1))
+        if [[ ${attempt} -gt ${max_attempts} ]]; then
+            log_error "No valid API key after ${max_attempts} attempts"
+            exit 1
+        fi
+        OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180) || true
+        if [[ -n "${OPENROUTER_API_KEY:-}" ]] && ! verify_openrouter_key "${OPENROUTER_API_KEY}"; then
+            OPENROUTER_API_KEY=""
+        fi
+    done
 }
 
 # Inject environment variables using pre-applied callbacks
@@ -1609,7 +1710,15 @@ spawn_agent() {
     server_name=$(get_server_name)
     cloud_provision "${server_name}"
 
-    # 6. Wait for readiness
+    # 4. Get API key while server provisions (overlaps with cloud-init)
+    get_or_prompt_api_key
+
+    # 5. Model selection while server provisions (if agent needs it)
+    if [[ -n "${AGENT_MODEL_PROMPT:-}" ]]; then
+        MODEL_ID=$(get_model_id_interactive "${AGENT_MODEL_DEFAULT:-openrouter/auto}" "${agent_name}") || exit 1
+    fi
+
+    # 6. Wait for readiness (may already be done after OAuth)
     cloud_wait_ready
 
     # 7. Install agent
@@ -1630,6 +1739,7 @@ spawn_agent() {
     if _fn_exists agent_pre_launch; then agent_pre_launch; fi
 
     # 12. Launch interactive session
+    log_info "${agent_name} is ready"
     local launch_cmd
     launch_cmd=$(agent_launch_cmd)
     launch_session "$(cloud_label)" cloud_interactive "${launch_cmd}"
@@ -1770,6 +1880,11 @@ packages:
   - npm
 
 runcmd:
+  # Set up 2G swap to prevent OOM kills on small VMs
+  - fallocate -l 2G /swapfile
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
   # Upgrade Node.js to v22 LTS (apt has v18, agents like Cline need v20+)
   # n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
   - npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
@@ -3025,9 +3140,10 @@ _generate_openclaw_json() {
     local model_id="${2}"
     local gateway_token="${3}"
 
-    local escaped_key escaped_token
+    local escaped_key escaped_token escaped_model
     escaped_key=$(json_escape "${openrouter_key}")
     escaped_token=$(json_escape "${gateway_token}")
+    escaped_model=$(json_escape "${model_id}")
 
     cat << EOF
 {
@@ -3043,7 +3159,7 @@ _generate_openclaw_json() {
   "agents": {
     "defaults": {
       "model": {
-        "primary": "openrouter/${model_id}"
+        "primary": ${escaped_model}
       }
     }
   }
@@ -3060,7 +3176,7 @@ setup_openclaw_config() {
     log_step "Configuring openclaw..."
 
     # Create ~/.openclaw directory
-    ${run_callback} "rm -rf ~/.openclaw && mkdir -p ~/.openclaw"
+    ${run_callback} "mkdir -p ~/.openclaw"
 
     # Generate a random gateway token
     local gateway_token
@@ -3098,6 +3214,7 @@ wait_for_openclaw_gateway() {
 
     log_error "OpenClaw gateway failed to start after ${max_wait}s"
     log_info "Check gateway logs: cat /tmp/openclaw-gateway.log"
+    ${run_callback} "tail -10 /tmp/openclaw-gateway.log 2>/dev/null" || true
     return 1
 }
 
