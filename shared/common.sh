@@ -3200,6 +3200,22 @@ setup_openclaw_config() {
     upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "\$HOME/.openclaw/openclaw.json"
 }
 
+# Start OpenClaw gateway as a fully detached daemon
+# Usage: start_openclaw_gateway RUN_CALLBACK
+#
+# Arguments:
+#   RUN_CALLBACK - Function to run commands: func(command)
+#
+# SSH/exec channels hang if a backgrounded daemon inherits the session's file
+# descriptors. setsid creates a new session, fully detaching the gateway so
+# the channel can close. Falls back to nohup where setsid is unavailable
+# (e.g. macOS local — no SSH, so the hang doesn't apply).
+start_openclaw_gateway() {
+    local run_callback="${1}"
+    log_step "Starting OpenClaw gateway daemon..."
+    ${run_callback} "source ~/.zshrc 2>/dev/null; if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi"
+}
+
 # Wait for OpenClaw gateway to be ready
 # Usage: wait_for_openclaw_gateway RUN_CALLBACK
 #

@@ -25,7 +25,7 @@ agent_env_vars() {
 }
 agent_configure() { setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run; }
 agent_pre_launch() {
-    cloud_run "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 </dev/null & disown"
+    start_openclaw_gateway cloud_run
     wait_for_openclaw_gateway cloud_run
 }
 agent_launch_cmd() { echo 'source ~/.zshrc && openclaw tui'; }
