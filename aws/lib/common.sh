@@ -120,9 +120,11 @@ npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /
 su - ubuntu -c 'curl -fsSL https://bun.sh/install | bash'
 # Install Claude Code
 su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'
+# Configure npm global prefix so ubuntu can npm install -g without sudo
+su - ubuntu -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'
 # Configure PATH
-echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.bashrc
-echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.zshrc
+echo 'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.bashrc
+echo 'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.zshrc
 chown ubuntu:ubuntu /home/ubuntu/.bashrc /home/ubuntu/.zshrc
 touch /home/ubuntu/.cloud-init-complete
 chown ubuntu:ubuntu /home/ubuntu/.cloud-init-complete

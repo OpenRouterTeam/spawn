@@ -2381,7 +2381,8 @@ ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
     # Single-quoted so $HOME/$PATH expand on the remote side, not locally.
-    local path_prefix='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
+    # .npm-global/bin: user-writable npm prefix (AWS Lightsail runs as ubuntu, not root)
+    local path_prefix='export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
         cmd="set -x; ${cmd}"
     fi

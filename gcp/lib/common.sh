@@ -249,8 +249,10 @@ if [[ ! "$GCP_USERNAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
 fi
 su - "$GCP_USERNAME" -c 'curl -fsSL https://bun.sh/install | bash' || true
 su - "$GCP_USERNAME" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
+# Configure npm global prefix so non-root user can npm install -g without sudo
+su - "$GCP_USERNAME" -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'
 # Configure PATH for all users
-echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /etc/profile.d/spawn.sh
+echo 'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /etc/profile.d/spawn.sh
 chmod +x /etc/profile.d/spawn.sh
 touch /tmp/.cloud-init-complete
 CLOUD_INIT_EOF
