@@ -16,7 +16,7 @@ echo ""
 AGENT_MODEL_PROMPT=1
 AGENT_MODEL_DEFAULT="openrouter/auto"
 
-agent_install() { install_agent "openclaw" "export PATH=\$HOME/.bun/bin:\$PATH && bun install -g openclaw" cloud_run; }
+agent_install() { install_agent "openclaw" "source ~/.bashrc && bun install -g openclaw" cloud_run; }
 agent_env_vars() {
     generate_env_config \
         "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
@@ -25,7 +25,7 @@ agent_env_vars() {
 }
 agent_configure() { setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run; }
 agent_pre_launch() {
-    cloud_run "source ~/.spawnrc 2>/dev/null; export PATH=\$HOME/.bun/bin:\$PATH && nohup openclaw gateway </dev/null > /tmp/openclaw-gateway.log 2>&1 & disown"
+    cloud_run "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 </dev/null & disown"
     wait_for_openclaw_gateway cloud_run
 }
 agent_launch_cmd() { echo 'source ~/.zshrc && openclaw tui'; }
