@@ -220,10 +220,17 @@ ensure_gh_auth() {
     # "not logged into any GitHub hosts" after dropping into the session.
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
         log_step "Persisting GITHUB_TOKEN to gh credential store..."
-        printf '%s\n' "${GITHUB_TOKEN}" | gh auth login --with-token || {
+        # Must unset GITHUB_TOKEN before calling gh auth login --with-token,
+        # otherwise gh refuses: "The value of the GITHUB_TOKEN environment
+        # variable is being used for authentication."
+        local _gh_token="${GITHUB_TOKEN}"
+        unset GITHUB_TOKEN
+        printf '%s\n' "${_gh_token}" | gh auth login --with-token || {
             log_error "Failed to authenticate with GITHUB_TOKEN"
+            export GITHUB_TOKEN="${_gh_token}"
             return 1
         }
+        export GITHUB_TOKEN="${_gh_token}"
     elif gh auth status &>/dev/null; then
         log_info "Authenticated with GitHub CLI"
         return 0
