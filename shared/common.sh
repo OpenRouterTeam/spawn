@@ -1337,8 +1337,18 @@ offer_github_auth() {
         return 0
     fi
 
-    # Build the remote command with optional token export
-    local gh_cmd="curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    # Build the remote command with optional token export.
+    # Prefer the local copy (running from a checkout) so fixes don't wait for
+    # a merge to main. Base64-encode it for safe inline transport.
+    local gh_cmd
+    local _local_gh="${SCRIPT_DIR:-}/../../shared/github-auth.sh"
+    if [[ -n "${SCRIPT_DIR:-}" && -f "${_local_gh}" ]]; then
+        local _gh_b64
+        _gh_b64=$(base64 < "${_local_gh}" | tr -d '\n')
+        gh_cmd="printf '%s' '${_gh_b64}' | base64 -d | bash"
+    else
+        gh_cmd="curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    fi
     if [[ -n "${SPAWN_GITHUB_TOKEN:-}" ]]; then
         local escaped_token
         escaped_token=$(printf '%q' "${SPAWN_GITHUB_TOKEN}")
