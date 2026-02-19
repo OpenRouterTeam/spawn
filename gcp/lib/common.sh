@@ -238,7 +238,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    get_resource_name "GCP_INSTANCE_NAME" "Enter instance name: "
+    get_validated_server_name "GCP_INSTANCE_NAME" "Enter instance name: "
 }
 
 get_cloud_init_userdata() {
@@ -379,7 +379,10 @@ create_server() {
 
     log_info "Instance created: IP=${GCP_SERVER_IP}"
 
-    save_vm_connection "${GCP_SERVER_IP}" "${SSH_USER:-$(whoami)}" "" "$name" "gcp" "{\"zone\":\"${zone}\",\"project\":\"${GCP_PROJECT}\"}"
+    local _zone_escaped _project_escaped
+    _zone_escaped=$(json_escape "${zone}")
+    _project_escaped=$(json_escape "${GCP_PROJECT}")
+    save_vm_connection "${GCP_SERVER_IP}" "${SSH_USER:-$(whoami)}" "" "$name" "gcp" "{\"zone\":${_zone_escaped},\"project\":${_project_escaped}}"
 }
 
 verify_server_connectivity() { ssh_verify_connectivity "$@"; }
