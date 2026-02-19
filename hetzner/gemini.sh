@@ -18,8 +18,7 @@ agent_env_vars() {
     generate_env_config \
         "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
         "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
-        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+        "GOOGLE_GEMINI_BASE_URL=https://openrouter.ai/api/v1"
 }
 agent_launch_cmd() { echo 'source ~/.zshrc && gemini'; }
 
