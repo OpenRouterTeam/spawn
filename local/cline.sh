@@ -23,7 +23,7 @@ agent_env_vars() {
 
 agent_configure() {
     log_step "Authenticating Cline with OpenRouter..."
-    cloud_run "source ~/.zshrc 2>/dev/null; cline auth -p openrouter -k ${OPENROUTER_API_KEY}"
+    cloud_run "source ~/.zshrc 2>/dev/null; cline auth -p openrouter -k \"${OPENROUTER_API_KEY}\""
 }
 
 agent_launch_cmd() {
