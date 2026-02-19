@@ -18,9 +18,11 @@ agent_install() {
 
 agent_env_vars() {
     generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
+
+agent_configure() {
+    setup_codex_config "${OPENROUTER_API_KEY}" cloud_upload cloud_run
 }
 
 agent_launch_cmd() {

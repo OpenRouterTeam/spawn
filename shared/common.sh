@@ -3242,6 +3242,37 @@ wait_for_openclaw_gateway() {
 }
 
 # ============================================================
+# Codex CLI configuration setup
+# ============================================================
+
+# Setup Codex CLI config.toml for OpenRouter
+# Uses the native model_provider config instead of OPENAI_BASE_URL env var,
+# which fixes "Invalid Responses API request" errors with OpenRouter.
+# Usage: setup_codex_config OPENROUTER_KEY UPLOAD_CALLBACK RUN_CALLBACK
+setup_codex_config() {
+    local openrouter_key="${1}"
+    local upload_callback="${2}"
+    local run_callback="${3}"
+
+    log_step "Configuring Codex CLI for OpenRouter..."
+
+    local config_toml
+    config_toml=$(cat <<TOML
+model = "openai/gpt-5-codex"
+model_provider = "openrouter"
+
+[model_providers.openrouter]
+name = "OpenRouter"
+base_url = "https://openrouter.ai/api/v1"
+env_key = "OPENROUTER_API_KEY"
+wire_api = "responses"
+TOML
+)
+
+    upload_config_file "${upload_callback}" "${run_callback}" "${config_toml}" "\$HOME/.codex/config.toml"
+}
+
+# ============================================================
 # Continue configuration setup
 # ============================================================
 
