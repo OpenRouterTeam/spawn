@@ -11,14 +11,9 @@ If you have the [spawn CLI](https://github.com/OpenRouterTeam/spawn) installed:
 ```bash
 spawn claude local
 spawn openclaw local
-spawn nanoclaw local
+spawn zeroclaw local
 spawn codex local
-spawn cline local
-spawn gptme local
-spawn opencode local
-spawn plandex local
 spawn kilocode local
-spawn continue local
 ```
 
 Or run directly without the CLI:
@@ -26,14 +21,9 @@ Or run directly without the CLI:
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/openclaw.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/zeroclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/codex.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/cline.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/gptme.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/opencode.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/plandex.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/kilocode.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/continue.sh)
 ```
 
 ## Non-Interactive Mode

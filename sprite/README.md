@@ -16,10 +16,10 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/openclaw.sh)
 ```
 
-#### NanoClaw
+#### ZeroClaw
 
 ```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/nanoclaw.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/zeroclaw.sh)
 ```
 
 #### Codex CLI
@@ -28,40 +28,16 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/nanoclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/codex.sh)
 ```
 
-#### Cline
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/cline.sh)
-```
-
-#### gptme
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/gptme.sh)
-```
-
 #### OpenCode
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/opencode.sh)
 ```
 
-#### Plandex
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/plandex.sh)
-```
-
 #### Kilo Code
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/kilocode.sh)
-```
-
-#### Continue
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/sprite/continue.sh)
 ```
 
 ## Non-Interactive Mode
