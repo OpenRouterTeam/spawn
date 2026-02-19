@@ -120,7 +120,6 @@ function getCloudsInStripApiBase(): string[] {
         "console.kamatera.com": "kamatera",
         "api.latitude.sh": "latitude",
         "infrahub-api.nexgencloud.com": "hyperstack",
-        "eu.api.ovh.com": "ovh",
         "cloudapi.atlantic.net": "atlanticnet",
         "invapi.hostkey.com": "hostkey",
         "cloudsigma.com": "cloudsigma",

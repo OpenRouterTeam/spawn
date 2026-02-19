@@ -353,7 +353,7 @@ export function hasCloudCli(cloud: string): boolean {
 export function prioritizeCloudsByCredentials(
   clouds: string[],
   manifest: Manifest,
-  featuredCloud?: string
+  featuredCloud?: string[]
 ): { sortedClouds: string[]; hintOverrides: Record<string, string>; credCount: number; cliCount: number } {
   const withCreds: string[] = [];
   const featured: string[] = [];
@@ -362,7 +362,7 @@ export function prioritizeCloudsByCredentials(
   for (const c of clouds) {
     if (hasCloudCredentials(manifest.clouds[c].auth)) {
       withCreds.push(c);
-    } else if (featuredCloud && c === featuredCloud) {
+    } else if (featuredCloud && featuredCloud.includes(c)) {
       featured.push(c);
     } else if (hasCloudCli(c)) {
       withCli.push(c);
@@ -1817,8 +1817,6 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
     case "aws":
       return `${sourceLib}\nensure_aws_cli\ndestroy_server "${id}"`;
 
-    case "ovh":
-      return `${sourceLib}\nensure_ovh_authenticated\ndestroy_ovh_instance "${id}"`;
     case "daytona":
       return `${sourceLib}\nensure_daytona_cli\nensure_daytona_token\ndestroy_server "${id}"`;
     case "sprite":
@@ -2568,7 +2566,7 @@ function getHelpExamplesSection(): string {
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
   spawn codex sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
-  spawn openclaw ovh -f instructions.txt
+  spawn openclaw fly -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
   spawn gptme gcp --dry-run          ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}

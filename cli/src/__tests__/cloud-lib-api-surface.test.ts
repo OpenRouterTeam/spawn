@@ -74,12 +74,12 @@ function isSandboxOrContainer(cloud: string): boolean {
 }
 
 /** Check if a function name matches a pattern, allowing cloud-prefixed variants.
- *  e.g. hasFunctionOrVariant(fns, "run_server", "ovh") matches "run_server" or "run_ovh" */
+ *  e.g. hasFunctionOrVariant(fns, "run_server", "sprite") matches "run_server" or "run_sprite" */
 function hasFunctionOrVariant(functions: string[], baseName: string, cloud: string): boolean {
   if (functions.includes(baseName)) return true;
-  // Check for cloud-prefixed variant (e.g. run_ovh, upload_file_sprite)
+  // Check for cloud-prefixed variant (e.g. run_sprite, upload_file_sprite)
   const prefix = baseName.replace(/_server$/, "").replace(/_file$/, "");
-  const variant1 = `${prefix}_${cloud}`;        // run_ovh, upload_file_ovh
+  const variant1 = `${prefix}_${cloud}`;        // run_sprite, upload_file_sprite
   const variant2 = `${baseName}_${cloud}`;       // upload_file_sprite
   return functions.includes(variant1) || functions.includes(variant2);
 }
@@ -161,11 +161,11 @@ describe("Cloud lib/common.sh API surface contracts", () => {
 
       for (const fn of SSH_REQUIRED_FUNCTIONS) {
         it(`${cloud}/lib/common.sh defines ${fn}() or cloud-prefixed variant`, () => {
-          // Some clouds (OVH, Sprite) use cloud-prefixed function names
-          // e.g. run_ovh instead of run_server, create_ovh_instance instead of create_server
+          // Some clouds use cloud-prefixed function names
+          // e.g. run_sprite instead of run_server, create_sprite_instance instead of create_server
           const hasStandard = functions.includes(fn);
           const hasVariant = hasFunctionOrVariant(functions, fn, cloud);
-          // Also check for <action>_<cloud>_<noun> patterns (create_ovh_instance)
+          // Also check for <action>_<cloud>_<noun> patterns (create_sprite_instance)
           const hasExtendedVariant = functions.some((f) => {
             const prefix = fn.split("_")[0]; // "create", "run", "upload", etc.
             return f.startsWith(`${prefix}_${cloud}`);
@@ -524,25 +524,6 @@ describe("Cloud lib/common.sh API surface contracts", () => {
         }
       });
     }
-  });
-
-  // ── OVH special case (uses function prefixing) ─────────────────────
-
-  describe("OVH cloud special API pattern", () => {
-    const content = readCloudLib("ovh");
-    if (!content) return;
-    const functions = extractFunctionNames(content);
-
-    it("OVH lib defines signature-based auth functions", () => {
-      // OVH uses a custom auth pattern with signatures
-      const hasSigAuth = functions.some(
-        (fn) =>
-          fn.includes("sign") ||
-          fn.includes("ovh_api") ||
-          fn.includes("_signature")
-      );
-      expect(hasSigAuth).toBe(true);
-    });
   });
 
   // ── Sprite special case (CLI-based, no standard SSH) ───────────────

@@ -37,6 +37,9 @@ function runCli(
         HOME: process.env.HOME,
         SHELL: process.env.SHELL,
         TERM: process.env.TERM || "xterm",
+        // Prevent OAuth browser from opening during tests — if OPENROUTER_API_KEY
+        // is set, get_or_prompt_api_key() skips the entire OAuth flow.
+        OPENROUTER_API_KEY: "sk-or-test-fake",
         ...env,
         SPAWN_NO_UPDATE_CHECK: "1",
         NODE_ENV: "",

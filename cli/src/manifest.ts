@@ -17,7 +17,7 @@ export interface AgentDef {
   interactive_prompts?: Record<string, { prompt: string; default: string }>;
   dotenv?: { path: string; values: Record<string, string> };
   notes?: string;
-  featured_cloud?: string;
+  featured_cloud?: string[];
 }
 
 export interface CloudDef {
