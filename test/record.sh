@@ -79,27 +79,6 @@ _get_multi_cred_spec() {
     esac
 }
 
-# Extract and export environment variables from loaded data.
-# Arguments: env_vars_array fields_array
-# Tab-separated fields are exported to corresponding env vars with security validation.
-_export_env_vars_from_fields() {
-    local -n env_vars_ref="$1"
-    local -n fields_ref="$2"
-    local i
-
-    for i in "${!env_vars_ref[@]}"; do
-        if [[ -n "${fields_ref[$i]:-}" ]]; then
-            # SECURITY: Validate env var name before export
-            if [[ ! "${env_vars_ref[$i]}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
-                echo "SECURITY: Invalid env var name rejected: ${env_vars_ref[$i]}" >&2
-                return 1
-            fi
-            export "${env_vars_ref[$i]}=${fields_ref[$i]}"
-        fi
-    done
-    return 0
-}
-
 # Load multiple fields from a JSON config file and export as env vars.
 # Arguments: CONFIG_FILE SPEC...  (each spec is "config_key:ENV_VAR")
 _load_multi_config_from_file() {
@@ -127,7 +106,18 @@ except: pass
     local IFS=$'\t'
     local fields
     read -ra fields <<< "$vals"
-    _export_env_vars_from_fields env_vars fields
+
+    local i
+    for i in "${!env_vars[@]}"; do
+        if [[ -n "${fields[$i]:-}" ]]; then
+            # SECURITY: Validate env var name before export
+            if [[ ! "${env_vars[$i]}" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+                echo "SECURITY: Invalid env var name rejected: ${env_vars[$i]}" >&2
+                return 1
+            fi
+            export "${env_vars[$i]}=${fields[$i]}"
+        fi
+    done
 }
 
 # Save multiple env vars to a JSON config file.
