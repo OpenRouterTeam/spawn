@@ -32,7 +32,7 @@
     "openclaw": {
       "name": "OpenClaw",
       "description": "Personal AI assistant with multi-channel gateway + TUI",
-      "url": "https://github.com/OpenRouterTeam/openclaw",
+      "url": "https://github.com/openclaw/openclaw",
       "install": "bun install -g openclaw",
       "launch": "openclaw tui",
       "pre_launch": "nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &",
@@ -79,8 +79,8 @@
     "opencode": {
       "name": "OpenCode",
       "description": "AI coding agent built for the terminal with TUI",
-      "url": "https://github.com/opencode-ai/opencode",
-      "install": "curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/refs/heads/main/install | bash",
+      "url": "https://github.com/anomalyco/opencode",
+      "install": "curl -fsSL https://opencode.ai/install | bash",
       "launch": "opencode",
       "env": {
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
