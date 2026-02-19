@@ -127,6 +127,7 @@ function getCloudsInStripApiBase(): string[] {
         "api.webdock.io": "webdock",
         "api.serverspace.io": "serverspace",
         "api.gcore.com": "gcore",
+        "api.machines.dev": "fly",
       };
       for (const [domain, cloud] of Object.entries(urlPatterns)) {
         if (trimmed.includes(domain)) {

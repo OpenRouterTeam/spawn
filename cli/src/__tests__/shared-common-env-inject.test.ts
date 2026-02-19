@@ -156,7 +156,6 @@ inject_env_vars_local mock_upload mock_run "MY_KEY=my_value"
     // inject_env_vars_local does NOT pass server_ip - upload gets (local_path, remote_path)
     expect(result.stdout).toContain("UPLOAD_ARGS:");
     expect(result.stdout).toContain("/tmp/spawn_env_");
-    // The run command should append the temp file to bashrc and zshrc
     expect(result.stdout).toMatch(/cat '\/tmp\/spawn_env_[^']+' >> ~\/.bashrc && cat '\/tmp\/spawn_env_[^']+' >> ~\/.zshrc/);
   });
 
