@@ -1682,7 +1682,7 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
   console.log();
 }
 
-function isInteractiveTTY(): boolean {
+export function isInteractiveTTY(): boolean {
   return !!(process.stdin.isTTY && process.stdout.isTTY);
 }
 
