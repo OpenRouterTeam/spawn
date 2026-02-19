@@ -241,10 +241,14 @@ apt-get install -y curl unzip git zsh nodejs npm
 # Upgrade Node.js to v22 LTS (apt has v18, agents like Cline need v20+)
 # n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
 npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
-# Install Bun
-su - $(logname 2>/dev/null || echo "$USER") -c 'curl -fsSL https://bun.sh/install | bash' || true
-# Install Claude Code
-su - $(logname 2>/dev/null || echo "$USER") -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
+# Install Bun and Claude Code as the login user
+GCP_USERNAME=$(logname 2>/dev/null || echo "${USER:-root}")
+if [[ ! "$GCP_USERNAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "ERROR: Invalid username detected" >&2
+    exit 1
+fi
+su - "$GCP_USERNAME" -c 'curl -fsSL https://bun.sh/install | bash' || true
+su - "$GCP_USERNAME" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
 # Configure PATH for all users
 echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /etc/profile.d/spawn.sh
 chmod +x /etc/profile.d/spawn.sh
