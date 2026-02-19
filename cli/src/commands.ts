@@ -17,7 +17,7 @@ import {
 } from "./manifest.js";
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
-import { validateIdentifier, validateScriptContent, validatePrompt, validateConnectionIP, validateUsername, validateServerIdentifier } from "./security.js";
+import { validateIdentifier, validateScriptContent, validatePrompt, validateConnectionIP, validateUsername, validateServerIdentifier, validateMetadataValue } from "./security.js";
 import { saveSpawnRecord, filterHistory, clearHistory, markRecordDeleted, getActiveServers, getHistoryPath, type SpawnRecord, type VMConnection } from "./history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE, type ExitCodeEntry, type SignalEntry } from "./guidance-data.js";
 
@@ -1788,6 +1788,9 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
     case "gcp": {
       const zone = connection.metadata?.zone || "us-central1-a";
       const project = connection.metadata?.project || "";
+      // SECURITY: Validate metadata values to prevent command injection via tampered history
+      validateMetadataValue(zone, "GCP zone");
+      validateMetadataValue(project, "GCP project");
       return `${sourceLib}\nensure_gcloud\nexport GCP_ZONE="${zone}"\nexport GCP_PROJECT="${project}"\ndestroy_server "${id}"`;
     }
     case "aws":
