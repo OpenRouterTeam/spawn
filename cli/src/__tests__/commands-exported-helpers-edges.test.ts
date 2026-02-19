@@ -64,28 +64,28 @@ function createLargeManifest(): Manifest {
         launch: "claude",
         env: { ANTHROPIC_API_KEY: "$OPENROUTER_API_KEY" },
       },
-      aider: {
-        name: "Aider",
-        description: "AI pair programmer",
-        url: "https://aider.chat",
-        install: "pip install aider-chat",
-        launch: "aider",
-        env: { OPENAI_API_KEY: "$OPENROUTER_API_KEY" },
-      },
-      goose: {
-        name: "Goose",
-        description: "AI developer agent",
-        url: "https://goose.ai",
-        install: "pip install goose",
-        launch: "goose",
-        env: {},
-      },
       codex: {
         name: "Codex",
-        description: "OpenAI Codex CLI",
-        url: "https://openai.com",
+        description: "AI pair programmer",
+        url: "https://codex.dev",
         install: "npm install -g codex",
         launch: "codex",
+        env: { OPENAI_API_KEY: "$OPENROUTER_API_KEY" },
+      },
+      cline: {
+        name: "Cline",
+        description: "AI developer agent",
+        url: "https://cline.dev",
+        install: "npm install -g cline",
+        launch: "cline",
+        env: {},
+      },
+      gptme: {
+        name: "GPTMe",
+        description: "AI terminal assistant",
+        url: "https://gptme.dev",
+        install: "pip install gptme",
+        launch: "gptme",
         env: { OPENAI_API_KEY: "$OPENROUTER_API_KEY" },
       },
       "open-claw": {
@@ -151,29 +151,29 @@ function createLargeManifest(): Manifest {
     },
     matrix: {
       "sprite/claude": "implemented",
-      "sprite/aider": "implemented",
-      "sprite/goose": "implemented",
-      "sprite/codex": "missing",
+      "sprite/codex": "implemented",
+      "sprite/cline": "implemented",
+      "sprite/gptme": "missing",
       "sprite/open-claw": "missing",
       "hetzner/claude": "implemented",
-      "hetzner/aider": "missing",
-      "hetzner/goose": "missing",
       "hetzner/codex": "missing",
+      "hetzner/cline": "missing",
+      "hetzner/gptme": "missing",
       "hetzner/open-claw": "missing",
       "upcloud/claude": "implemented",
-      "upcloud/aider": "implemented",
-      "upcloud/goose": "missing",
-      "upcloud/codex": "missing",
+      "upcloud/codex": "implemented",
+      "upcloud/cline": "missing",
+      "upcloud/gptme": "missing",
       "upcloud/open-claw": "missing",
       "vultr/claude": "implemented",
-      "vultr/aider": "missing",
-      "vultr/goose": "missing",
       "vultr/codex": "missing",
+      "vultr/cline": "missing",
+      "vultr/gptme": "missing",
       "vultr/open-claw": "missing",
       "local/claude": "implemented",
-      "local/aider": "implemented",
-      "local/goose": "implemented",
       "local/codex": "implemented",
+      "local/cline": "implemented",
+      "local/gptme": "implemented",
       "local/open-claw": "implemented",
     },
   };
@@ -343,8 +343,8 @@ describe("resolveAgentKey and resolveCloudKey with large manifests", () => {
     });
 
     it("should prefer exact key match over display name match", () => {
-      // If there were a key named "goose" and a display name "Goose", exact key wins
-      expect(resolveAgentKey(manifest, "goose")).toBe("goose");
+      // If there were a key named "cline" and a display name "Cline", exact key wins
+      expect(resolveAgentKey(manifest, "cline")).toBe("cline");
     });
 
     it("should not match a cloud key as an agent", () => {
@@ -378,7 +378,7 @@ describe("resolveAgentKey and resolveCloudKey with large manifests", () => {
 
     it("should not match an agent key as a cloud", () => {
       expect(resolveCloudKey(manifest, "claude")).toBeNull();
-      expect(resolveCloudKey(manifest, "aider")).toBeNull();
+      expect(resolveCloudKey(manifest, "codex")).toBeNull();
     });
   });
 });
@@ -398,8 +398,8 @@ describe("getImplementedClouds with large manifest", () => {
     expect(clouds).toHaveLength(5);
   });
 
-  it("should return partial set for aider", () => {
-    const clouds = getImplementedClouds(manifest, "aider");
+  it("should return partial set for codex", () => {
+    const clouds = getImplementedClouds(manifest, "codex");
     expect(clouds).toContain("sprite");
     expect(clouds).toContain("upcloud");
     expect(clouds).toContain("local");
@@ -424,17 +424,17 @@ describe("getImplementedAgents with large manifest", () => {
   it("should return all implemented agents for sprite", () => {
     const agents = getImplementedAgents(manifest, "sprite");
     expect(agents).toContain("claude");
-    expect(agents).toContain("aider");
-    expect(agents).toContain("goose");
+    expect(agents).toContain("codex");
+    expect(agents).toContain("cline");
     expect(agents).toHaveLength(3);
   });
 
   it("should return all agents for local cloud", () => {
     const agents = getImplementedAgents(manifest, "local");
     expect(agents).toContain("claude");
-    expect(agents).toContain("aider");
-    expect(agents).toContain("goose");
     expect(agents).toContain("codex");
+    expect(agents).toContain("cline");
+    expect(agents).toContain("gptme");
     expect(agents).toContain("open-claw");
     expect(agents).toHaveLength(5);
   });
@@ -457,7 +457,7 @@ describe("getMissingClouds with large manifest", () => {
   const clouds = Object.keys(manifest.clouds);
 
   it("should return missing clouds for partially implemented agent", () => {
-    const missing = getMissingClouds(manifest, "aider", clouds);
+    const missing = getMissingClouds(manifest, "codex", clouds);
     expect(missing).toContain("hetzner");
     expect(missing).toContain("vultr");
     expect(missing).not.toContain("sprite");
@@ -469,8 +469,8 @@ describe("getMissingClouds with large manifest", () => {
     expect(missing).toHaveLength(0);
   });
 
-  it("should return all but local for codex", () => {
-    const missing = getMissingClouds(manifest, "codex", clouds);
+  it("should return all but local for gptme", () => {
+    const missing = getMissingClouds(manifest, "gptme", clouds);
     expect(missing).toContain("sprite");
     expect(missing).toContain("hetzner");
     expect(missing).toContain("upcloud");
@@ -594,8 +594,8 @@ describe("buildAgentPickerHints with large manifest", () => {
 
     // claude has 5 clouds implemented
     expect(hints["claude"]).toContain("5 clouds");
-    // aider has 3 clouds
-    expect(hints["aider"]).toContain("3 clouds");
+    // codex has 3 clouds
+    expect(hints["codex"]).toContain("3 clouds");
     // open-claw has 1 cloud
     expect(hints["open-claw"]).toContain("1 cloud");
   });

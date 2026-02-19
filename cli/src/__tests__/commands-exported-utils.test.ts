@@ -169,10 +169,10 @@ describe("parseAuthEnvVars", () => {
 
 describe("getImplementedAgents", () => {
   it("should return all implemented agents for a cloud with full coverage", () => {
-    // sprite has claude and aider implemented
+    // sprite has claude and codex implemented
     const agents = getImplementedAgents(mockManifest, "sprite");
     expect(agents).toContain("claude");
-    expect(agents).toContain("aider");
+    expect(agents).toContain("codex");
     expect(agents).toHaveLength(2);
   });
 
@@ -180,7 +180,7 @@ describe("getImplementedAgents", () => {
     // hetzner only has claude implemented
     const agents = getImplementedAgents(mockManifest, "hetzner");
     expect(agents).toContain("claude");
-    expect(agents).not.toContain("aider");
+    expect(agents).not.toContain("codex");
     expect(agents).toHaveLength(1);
   });
 
@@ -223,8 +223,8 @@ describe("getMissingClouds", () => {
   const clouds = ["sprite", "hetzner"];
 
   it("should return clouds where the agent is NOT implemented", () => {
-    // aider is missing on hetzner
-    const missing = getMissingClouds(mockManifest, "aider", clouds);
+    // codex is missing on hetzner
+    const missing = getMissingClouds(mockManifest, "codex", clouds);
     expect(missing).toContain("hetzner");
     expect(missing).not.toContain("sprite");
     expect(missing).toHaveLength(1);
@@ -376,7 +376,7 @@ describe("getImplementedClouds (actual export)", () => {
   });
 
   it("should return subset for agent with partial implementation", () => {
-    const clouds = getImplementedClouds(mockManifest, "aider");
+    const clouds = getImplementedClouds(mockManifest, "codex");
     expect(clouds).toContain("sprite");
     expect(clouds).not.toContain("hetzner");
     expect(clouds).toHaveLength(1);

@@ -108,17 +108,17 @@ describe("suggestCloudsForPrompt (--prompt with agent, no cloud)", () => {
     expect(result.exitCode).not.toBe(0);
   });
 
-  it("should work with aider agent", () => {
-    const result = runCli(["aider", "--prompt", "Add tests"]);
+  it("should work with codex agent", () => {
+    const result = runCli(["codex", "--prompt", "Add tests"]);
     const out = output(result);
     expect(out).toContain("--prompt requires both");
-    expect(out).toContain("spawn aider <cloud>");
+    expect(out).toContain("spawn codex <cloud>");
   });
 
-  it("should suggest clouds for aider agent", () => {
-    const result = runCli(["aider", "--prompt", "Refactor"]);
+  it("should suggest clouds for codex agent", () => {
+    const result = runCli(["codex", "--prompt", "Refactor"]);
     const out = output(result);
-    // aider has multiple implemented clouds
+    // codex has multiple implemented clouds
     expect(out).toContain("Available clouds for");
   });
 

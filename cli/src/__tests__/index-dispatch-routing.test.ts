@@ -515,10 +515,10 @@ describe("parseListFilters with error paths", () => {
     });
 
     it("should extract --agent flag", () => {
-      const result = parseListFilters(["--agent", "aider"]);
+      const result = parseListFilters(["--agent", "codex"]);
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.agentFilter).toBe("aider");
+        expect(result.agentFilter).toBe("codex");
       }
     });
 
@@ -566,10 +566,10 @@ describe("parseListFilters with error paths", () => {
     });
 
     it("should not use positional when -a is present", () => {
-      const result = parseListFilters(["-a", "aider", "extra"]);
+      const result = parseListFilters(["-a", "codex", "extra"]);
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.agentFilter).toBe("aider");
+        expect(result.agentFilter).toBe("codex");
       }
     });
 
@@ -668,10 +668,10 @@ describe("parseListFilters with error paths", () => {
     });
 
     it("should extract --agent with -c", () => {
-      const result = parseListFilters(["--agent", "aider", "-c", "sprite"]);
+      const result = parseListFilters(["--agent", "codex", "-c", "sprite"]);
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.agentFilter).toBe("aider");
+        expect(result.agentFilter).toBe("codex");
         expect(result.cloudFilter).toBe("sprite");
       }
     });
@@ -689,10 +689,10 @@ describe("handleDefaultCommand routing", () => {
     });
 
     it("should show info when cloud is -h", () => {
-      const result = handleDefaultCommand("aider", "-h");
+      const result = handleDefaultCommand("codex", "-h");
       expect(result.action).toBe("show_info");
       if (result.action === "show_info") {
-        expect(result.agent).toBe("aider");
+        expect(result.agent).toBe("codex");
       }
     });
 
@@ -734,7 +734,7 @@ describe("handleDefaultCommand routing", () => {
     });
 
     it("should pass both prompt and dryRun", () => {
-      const result = handleDefaultCommand("aider", "hetzner", "Add tests", true);
+      const result = handleDefaultCommand("codex", "hetzner", "Add tests", true);
       expect(result.action).toBe("run");
       if (result.action === "run") {
         expect(result.prompt).toBe("Add tests");
@@ -886,11 +886,11 @@ describe("dispatchCommand routing", () => {
       }
     });
 
-    it('should redirect "agents aider" to info for aider', () => {
-      const result = dispatchCommand("agents", ["agents", "aider"]);
+    it('should redirect "agents codex" to info for codex', () => {
+      const result = dispatchCommand("agents", ["agents", "codex"]);
       expect(result.type).toBe("subcommand_info");
       if (result.type === "subcommand_info") {
-        expect(result.name).toBe("aider");
+        expect(result.name).toBe("codex");
       }
     });
   });
@@ -1044,11 +1044,11 @@ describe("slash notation handling", () => {
       }
     });
 
-    it('should split "aider/sprite" into first=aider, second=sprite', () => {
-      const result = dispatchCommand("aider/sprite", ["aider/sprite"]);
+    it('should split "codex/sprite" into first=codex, second=sprite', () => {
+      const result = dispatchCommand("codex/sprite", ["codex/sprite"]);
       expect(result.type).toBe("slash_notation");
       if (result.type === "slash_notation") {
-        expect(result.first).toBe("aider");
+        expect(result.first).toBe("codex");
         expect(result.second).toBe("sprite");
       }
     });

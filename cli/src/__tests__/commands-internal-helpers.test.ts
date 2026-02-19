@@ -244,24 +244,24 @@ describe("buildAgentLines", () => {
 
   it("includes install command when present", () => {
     const lines = buildAgentLines({
-      name: "Aider",
+      name: "Codex",
       description: "AI pair programmer",
-      install: "pip install aider-chat",
+      install: "npm install -g codex",
     });
     expect(lines).toHaveLength(3);
-    expect(lines[2]).toContain("pip install aider-chat");
+    expect(lines[2]).toContain("npm install -g codex");
     expect(lines[2]).toContain("Install:");
   });
 
   it("includes launch command when present", () => {
     const lines = buildAgentLines({
-      name: "Aider",
+      name: "Codex",
       description: "AI pair programmer",
-      launch: "aider --model openrouter/anthropic/claude-3.5-sonnet",
+      launch: "codex --model openrouter/anthropic/claude-3.5-sonnet",
     });
     expect(lines).toHaveLength(3);
     expect(lines[2]).toContain("Launch:");
-    expect(lines[2]).toContain("aider --model");
+    expect(lines[2]).toContain("codex --model");
   });
 
   it("includes both install and launch when present", () => {
@@ -456,7 +456,7 @@ describe("credentialHints", () => {
 
 describe("mapToSelectOptions", () => {
   it("transforms agent entries to select options", () => {
-    const keys = ["claude", "aider"];
+    const keys = ["claude", "codex"];
     const result = mapToSelectOptions(keys, mockManifest.agents);
 
     expect(result).toHaveLength(2);
@@ -466,8 +466,8 @@ describe("mapToSelectOptions", () => {
       hint: "AI coding assistant",
     });
     expect(result[1]).toEqual({
-      value: "aider",
-      label: "Aider",
+      value: "codex",
+      label: "Codex",
       hint: "AI pair programmer",
     });
   });
@@ -495,9 +495,9 @@ describe("mapToSelectOptions", () => {
   });
 
   it("preserves key order in output", () => {
-    const keys = ["aider", "claude"];
+    const keys = ["codex", "claude"];
     const result = mapToSelectOptions(keys, mockManifest.agents);
-    expect(result[0].value).toBe("aider");
+    expect(result[0].value).toBe("codex");
     expect(result[1].value).toBe("claude");
   });
 
@@ -767,9 +767,9 @@ describe("mapToSelectOptions with key subsets", () => {
   });
 
   it("works when keys are in different order than manifest", () => {
-    const keys = ["aider", "claude"];
+    const keys = ["codex", "claude"];
     const result = mapToSelectOptions(keys, mockManifest.agents);
-    expect(result[0].value).toBe("aider");
+    expect(result[0].value).toBe("codex");
     expect(result[1].value).toBe("claude");
   });
 });

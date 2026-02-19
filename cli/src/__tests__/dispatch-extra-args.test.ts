@@ -352,7 +352,7 @@ describe("dispatchCommand routing", () => {
     });
 
     it("should fall through to default for unknown names", () => {
-      const result = dispatchCommand("aider", ["aider", "hetzner"], undefined);
+      const result = dispatchCommand("codex", ["codex", "hetzner"], undefined);
       expect(result.type).toBe("default");
     });
 
@@ -484,11 +484,11 @@ describe("dispatch end-to-end scenarios", () => {
     }
   });
 
-  it("'spawn aider' falls through to default handler", () => {
-    const result = dispatchCommand("aider", ["aider"], undefined);
+  it("'spawn codex' falls through to default handler", () => {
+    const result = dispatchCommand("codex", ["codex"], undefined);
     expect(result.type).toBe("default");
     if (result.type === "default") {
-      expect(result.agent).toBe("aider");
+      expect(result.agent).toBe("codex");
       expect(result.cloud).toBeUndefined();
     }
   });

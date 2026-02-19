@@ -35,20 +35,20 @@ function createTestManifest(): Manifest {
         launch: "claude",
         env: { ANTHROPIC_API_KEY: "test" },
       },
-      aider: {
-        name: "Aider",
+      codex: {
+        name: "Codex",
         description: "AI pair programmer",
-        url: "https://aider.chat",
-        install: "pip install aider-chat",
-        launch: "aider",
+        url: "https://codex.dev",
+        install: "npm install -g codex",
+        launch: "codex",
         env: { OPENAI_API_KEY: "test" },
       },
-      goose: {
-        name: "Goose",
+      cline: {
+        name: "Cline",
         description: "AI developer agent",
-        url: "https://goose.ai",
-        install: "pip install goose",
-        launch: "goose",
+        url: "https://cline.dev",
+        install: "npm install -g cline",
+        launch: "cline",
         env: {},
       },
     },
@@ -86,14 +86,14 @@ function createTestManifest(): Manifest {
     },
     matrix: {
       "sprite/claude": "implemented",
-      "sprite/aider": "implemented",
-      "sprite/goose": "missing",
+      "sprite/codex": "implemented",
+      "sprite/cline": "missing",
       "hetzner/claude": "implemented",
-      "hetzner/aider": "missing",
-      "hetzner/goose": "missing",
+      "hetzner/codex": "missing",
+      "hetzner/cline": "missing",
       "vultr/claude": "implemented",
-      "vultr/aider": "missing",
-      "vultr/goose": "missing",
+      "vultr/codex": "missing",
+      "vultr/cline": "missing",
     },
   };
 }
@@ -114,12 +114,12 @@ describe("checkEntity", () => {
       expect(checkEntity(manifest, "claude", "agent")).toBe(true);
     });
 
-    it("should return true for agent key 'aider'", () => {
-      expect(checkEntity(manifest, "aider", "agent")).toBe(true);
+    it("should return true for agent key 'codex'", () => {
+      expect(checkEntity(manifest, "codex", "agent")).toBe(true);
     });
 
-    it("should return true for agent key 'goose'", () => {
-      expect(checkEntity(manifest, "goose", "agent")).toBe(true);
+    it("should return true for agent key 'cline'", () => {
+      expect(checkEntity(manifest, "cline", "agent")).toBe(true);
     });
 
     it("should return true for cloud key 'sprite'", () => {
@@ -170,12 +170,12 @@ describe("checkEntity", () => {
       expect(checkEntity(manifest, "claude", "cloud")).toBe(false);
     });
 
-    it("should return false when 'aider' is checked as cloud", () => {
-      expect(checkEntity(manifest, "aider", "cloud")).toBe(false);
+    it("should return false when 'codex' is checked as cloud", () => {
+      expect(checkEntity(manifest, "codex", "cloud")).toBe(false);
     });
 
-    it("should return false when 'goose' is checked as cloud", () => {
-      expect(checkEntity(manifest, "goose", "cloud")).toBe(false);
+    it("should return false when 'cline' is checked as cloud", () => {
+      expect(checkEntity(manifest, "cline", "cloud")).toBe(false);
     });
 
     it("should return false for all three agent keys when checked as cloud", () => {
@@ -221,16 +221,16 @@ describe("checkEntity", () => {
       expect(checkEntity(manifest, "claudee", "agent")).toBe(false);
     });
 
-    it("should return false for 'aidr' (typo of aider, distance 1)", () => {
-      expect(checkEntity(manifest, "aidr", "agent")).toBe(false);
+    it("should return false for 'codx' (typo of codex, distance 1)", () => {
+      expect(checkEntity(manifest, "codx", "agent")).toBe(false);
     });
 
-    it("should return false for 'aiders' (typo of aider, distance 1)", () => {
-      expect(checkEntity(manifest, "aiders", "agent")).toBe(false);
+    it("should return false for 'codexs' (typo of codex, distance 1)", () => {
+      expect(checkEntity(manifest, "codexs", "agent")).toBe(false);
     });
 
-    it("should return false for 'goos' (typo of goose, distance 1)", () => {
-      expect(checkEntity(manifest, "goos", "agent")).toBe(false);
+    it("should return false for 'clin' (typo of cline, distance 1)", () => {
+      expect(checkEntity(manifest, "clin", "agent")).toBe(false);
     });
 
     it("should return false for 'sprit' (typo of sprite, distance 1)", () => {
@@ -290,7 +290,7 @@ describe("checkEntity", () => {
     });
 
     it("should handle input with underscores", () => {
-      expect(checkEntity(manifest, "open_interpreter", "agent")).toBe(false);
+      expect(checkEntity(manifest, "open_gptme", "agent")).toBe(false);
     });
 
     it("should handle numeric input", () => {
@@ -350,9 +350,9 @@ describe("checkEntity", () => {
       expect(checkEntity(manifest, "claude", "cloud")).toBe(false);
     });
 
-    it("should accept aider as agent but reject as cloud", () => {
-      expect(checkEntity(manifest, "aider", "agent")).toBe(true);
-      expect(checkEntity(manifest, "aider", "cloud")).toBe(false);
+    it("should accept codex as agent but reject as cloud", () => {
+      expect(checkEntity(manifest, "codex", "agent")).toBe(true);
+      expect(checkEntity(manifest, "codex", "cloud")).toBe(false);
     });
 
     it("should accept sprite as cloud but reject as agent", () => {
@@ -370,9 +370,9 @@ describe("checkEntity", () => {
       expect(checkEntity(manifest, "vultr", "agent")).toBe(false);
     });
 
-    it("should accept goose as agent but reject as cloud", () => {
-      expect(checkEntity(manifest, "goose", "agent")).toBe(true);
-      expect(checkEntity(manifest, "goose", "cloud")).toBe(false);
+    it("should accept cline as agent but reject as cloud", () => {
+      expect(checkEntity(manifest, "cline", "agent")).toBe(true);
+      expect(checkEntity(manifest, "cline", "cloud")).toBe(false);
     });
   });
 
@@ -431,17 +431,17 @@ describe("checkEntity", () => {
       expect(checkEntity(manifest, "claud", "cloud")).toBe(false);
     });
 
-    it("should return false for 'aidr' as cloud (close to agent 'aider')", () => {
-      expect(checkEntity(manifest, "aidr", "cloud")).toBe(false);
+    it("should return false for 'codx' as cloud (close to agent 'codex')", () => {
+      expect(checkEntity(manifest, "codx", "cloud")).toBe(false);
     });
 
-    it("should return false for 'goos' as cloud (close to agent 'goose')", () => {
-      expect(checkEntity(manifest, "goos", "cloud")).toBe(false);
+    it("should return false for 'clin' as cloud (close to agent 'cline')", () => {
+      expect(checkEntity(manifest, "clin", "cloud")).toBe(false);
     });
 
     it("should prefer same-kind match over cross-kind match", () => {
-      // "goose" checked as agent should match exactly (same-kind), not cross-kind
-      expect(checkEntity(manifest, "goose", "agent")).toBe(true);
+      // "cline" checked as agent should match exactly (same-kind), not cross-kind
+      expect(checkEntity(manifest, "cline", "agent")).toBe(true);
     });
 
     it("should not suggest cross-kind match for values far from any candidate", () => {

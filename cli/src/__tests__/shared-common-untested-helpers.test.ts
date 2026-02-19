@@ -66,26 +66,26 @@ describe("log_install_failed", () => {
 
   it("should show SSH hint when server IP is provided", () => {
     const result = runBash(
-      `log_install_failed "Aider" "" "10.0.0.5" 2>&1`
+      `log_install_failed "Codex" "" "10.0.0.5" 2>&1`
     );
     expect(result.stdout).toContain("ssh root@10.0.0.5");
   });
 
   it("should not show SSH hint when server IP is empty", () => {
-    const result = runBash(`log_install_failed "Aider" "pip install aider" "" 2>&1`);
+    const result = runBash(`log_install_failed "Codex" "npm install -g codex" "" 2>&1`);
     expect(result.stdout).not.toContain("ssh root@");
   });
 
   it("should show install command hint when install_cmd is provided", () => {
     const result = runBash(
-      `log_install_failed "Goose" "pip install goose-ai" 2>&1`
+      `log_install_failed "Cline" "npm install -g cline" 2>&1`
     );
     expect(result.stdout).toContain("Try manual installation");
-    expect(result.stdout).toContain("pip install goose-ai");
+    expect(result.stdout).toContain("npm install -g cline");
   });
 
   it("should not show install hint when install_cmd is empty", () => {
-    const result = runBash(`log_install_failed "Goose" "" 2>&1`);
+    const result = runBash(`log_install_failed "Cline" "" 2>&1`);
     expect(result.stdout).not.toContain("Try the installation manually");
   });
 
@@ -480,10 +480,10 @@ describe("verify_agent_installed", () => {
 
   it("should show how-to-fix guidance on failure", () => {
     const result = runBash(
-      `verify_agent_installed "nonexistent_cmd_12345" "--version" "Aider" 2>&1`
+      `verify_agent_installed "nonexistent_cmd_12345" "--version" "Codex" 2>&1`
     );
     expect(result.stdout).toContain("How to fix");
-    expect(result.stdout).toContain("Aider");
+    expect(result.stdout).toContain("Codex");
   });
 
   it("should use command name as default agent name", () => {

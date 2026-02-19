@@ -62,20 +62,20 @@ const extendedManifest: Manifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
-      description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
-      env: { OPENAI_API_KEY: "test" },
-    },
     codex: {
       name: "Codex",
-      description: "OpenAI CLI agent",
-      url: "https://openai.com",
+      description: "AI pair programmer",
+      url: "https://codex.dev",
       install: "npm install -g codex",
       launch: "codex",
+      env: { OPENAI_API_KEY: "test" },
+    },
+    gptme: {
+      name: "GPTMe",
+      description: "AI terminal assistant",
+      url: "https://gptme.dev",
+      install: "pip install gptme",
+      launch: "gptme",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -113,14 +113,14 @@ const extendedManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
-    "sprite/codex": "missing",
+    "sprite/codex": "implemented",
+    "sprite/gptme": "missing",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
     "hetzner/codex": "missing",
+    "hetzner/gptme": "missing",
     "vultr/claude": "implemented",
-    "vultr/aider": "missing",
-    "vultr/codex": "implemented",
+    "vultr/codex": "missing",
+    "vultr/gptme": "implemented",
   },
 };
 
@@ -129,9 +129,9 @@ const allMissingManifest: Manifest = {
   ...mockManifest,
   matrix: {
     "sprite/claude": "missing",
-    "sprite/aider": "missing",
+    "sprite/codex": "missing",
     "hetzner/claude": "missing",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
@@ -140,9 +140,9 @@ const allImplementedManifest: Manifest = {
   ...mockManifest,
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "implemented",
+    "hetzner/codex": "implemented",
   },
 };
 
@@ -191,7 +191,7 @@ describe("Command Utility Functions", () => {
   describe("getMissingClouds", () => {
     it("should return missing clouds for a partially implemented agent", () => {
       const clouds = Object.keys(mockManifest.clouds);
-      const missing = getMissingClouds(mockManifest, "aider", clouds);
+      const missing = getMissingClouds(mockManifest, "codex", clouds);
       expect(missing).toContain("hetzner");
       expect(missing).not.toContain("sprite");
     });
@@ -215,7 +215,7 @@ describe("Command Utility Functions", () => {
 
     it("should handle extended manifest with multiple missing clouds", () => {
       const clouds = Object.keys(extendedManifest.clouds);
-      const missing = getMissingClouds(extendedManifest, "aider", clouds);
+      const missing = getMissingClouds(extendedManifest, "codex", clouds);
       expect(missing).toContain("hetzner");
       expect(missing).toContain("vultr");
       expect(missing).not.toContain("sprite");
@@ -224,7 +224,7 @@ describe("Command Utility Functions", () => {
 
     it("should only filter from the provided clouds list", () => {
       // Pass only a subset of clouds
-      const missing = getMissingClouds(extendedManifest, "aider", ["sprite"]);
+      const missing = getMissingClouds(extendedManifest, "codex", ["sprite"]);
       expect(missing).toEqual([]);
     });
   });
@@ -235,14 +235,14 @@ describe("Command Utility Functions", () => {
     it("should return all agents for a cloud where all are implemented", () => {
       const agents = getImplementedAgents(mockManifest, "sprite");
       expect(agents).toContain("claude");
-      expect(agents).toContain("aider");
+      expect(agents).toContain("codex");
       expect(agents).toHaveLength(2);
     });
 
     it("should return only implemented agents for partially implemented cloud", () => {
       const agents = getImplementedAgents(mockManifest, "hetzner");
       expect(agents).toContain("claude");
-      expect(agents).not.toContain("aider");
+      expect(agents).not.toContain("codex");
       expect(agents).toHaveLength(1);
     });
 
@@ -259,15 +259,15 @@ describe("Command Utility Functions", () => {
     it("should handle extended manifest correctly", () => {
       const agents = getImplementedAgents(extendedManifest, "vultr");
       expect(agents).toContain("claude");
-      expect(agents).toContain("codex");
-      expect(agents).not.toContain("aider");
+      expect(agents).toContain("gptme");
+      expect(agents).not.toContain("codex");
       expect(agents).toHaveLength(2);
     });
 
     it("should return all agents when all are implemented", () => {
       const agents = getImplementedAgents(allImplementedManifest, "sprite");
       expect(agents).toContain("claude");
-      expect(agents).toContain("aider");
+      expect(agents).toContain("codex");
       expect(agents).toHaveLength(2);
     });
   });
@@ -283,7 +283,7 @@ describe("Command Utility Functions", () => {
     });
 
     it("should return only implemented clouds for partially implemented agent", () => {
-      const clouds = getImplementedClouds(mockManifest, "aider");
+      const clouds = getImplementedClouds(mockManifest, "codex");
       expect(clouds).toContain("sprite");
       expect(clouds).not.toContain("hetzner");
       expect(clouds).toHaveLength(1);
@@ -308,7 +308,7 @@ describe("Command Utility Functions", () => {
     });
 
     it("should handle agent with sparse implementations", () => {
-      const clouds = getImplementedClouds(extendedManifest, "codex");
+      const clouds = getImplementedClouds(extendedManifest, "gptme");
       expect(clouds).toContain("vultr");
       expect(clouds).not.toContain("sprite");
       expect(clouds).not.toContain("hetzner");

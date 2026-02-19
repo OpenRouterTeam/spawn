@@ -419,7 +419,7 @@ interactive_session() {
     local escaped_cmd
     escaped_cmd=$(printf '%q' "$full_cmd")
     local session_exit=0
-    # --pty allocates a pseudo-terminal so interactive TUI agents (aider, claude)
+    # --pty allocates a pseudo-terminal so interactive TUI agents (claude, codex)
     # receive a proper TTY on stdin.  Without it, fly ssh console -C runs the
     # command without a PTY and agents see "Input is not a terminal (fd=0)".
     "$(_get_fly_cmd)" ssh console -a "$FLY_APP_NAME" --pty -C "bash -c $escaped_cmd" || session_exit=$?

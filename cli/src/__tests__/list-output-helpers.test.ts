@@ -54,8 +54,8 @@ describe("buildRetryCommand", () => {
     });
 
     it("should handle various cloud names", () => {
-      expect(buildRetryCommand("aider", "digitalocean")).toBe(
-        "spawn aider digitalocean"
+      expect(buildRetryCommand("codex", "digitalocean")).toBe(
+        "spawn codex digitalocean"
       );
     });
   });
@@ -155,7 +155,7 @@ describe("resolveDisplayName", () => {
     });
 
     it("should resolve another agent", () => {
-      expect(resolveDisplayName(manifest, "aider", "agent")).toBe("Aider");
+      expect(resolveDisplayName(manifest, "codex", "agent")).toBe("Codex");
     });
 
     it("should resolve another cloud", () => {
@@ -207,8 +207,8 @@ describe("buildRecordLabel", () => {
 
   it("should build label with different agent/cloud combo", () => {
     expect(
-      buildRecordLabel({ agent: "aider", cloud: "hetzner" }, manifest)
-    ).toBe("Aider on Hetzner Cloud");
+      buildRecordLabel({ agent: "codex", cloud: "hetzner" }, manifest)
+    ).toBe("Codex on Hetzner Cloud");
   });
 
   it("should fall back to keys when manifest is null", () => {
@@ -502,8 +502,8 @@ describe("getImplementedClouds", () => {
     expect(clouds).toHaveLength(2);
   });
 
-  it("should return subset for aider (only sprite)", () => {
-    const clouds = getImplementedClouds(manifest, "aider");
+  it("should return subset for codex (only sprite)", () => {
+    const clouds = getImplementedClouds(manifest, "codex");
     expect(clouds).toContain("sprite");
     expect(clouds).not.toContain("hetzner");
     expect(clouds).toHaveLength(1);
@@ -529,14 +529,14 @@ describe("getImplementedAgents", () => {
   it("should return all implemented agents for sprite", () => {
     const agents = getImplementedAgents(manifest, "sprite");
     expect(agents).toContain("claude");
-    expect(agents).toContain("aider");
+    expect(agents).toContain("codex");
     expect(agents).toHaveLength(2);
   });
 
   it("should return subset for hetzner (only claude)", () => {
     const agents = getImplementedAgents(manifest, "hetzner");
     expect(agents).toContain("claude");
-    expect(agents).not.toContain("aider");
+    expect(agents).not.toContain("codex");
     expect(agents).toHaveLength(1);
   });
 

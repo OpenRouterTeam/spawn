@@ -654,7 +654,7 @@ describe("getImplementedClouds", () => {
   });
 
   it("should exclude missing matrix entries", () => {
-    const clouds = getImplementedClouds(manifest, "aider");
+    const clouds = getImplementedClouds(manifest, "codex");
     expect(clouds).toContain("sprite");
     expect(clouds).not.toContain("hetzner");
   });

@@ -198,8 +198,8 @@ describe("parseListFilters", () => {
     });
 
     it("should handle -c before -a", () => {
-      const result = parseListFilters(["-c", "sprite", "-a", "aider"]);
-      expect(result.agentFilter).toBe("aider");
+      const result = parseListFilters(["-c", "sprite", "-a", "codex"]);
+      expect(result.agentFilter).toBe("codex");
       expect(result.cloudFilter).toBe("sprite");
     });
   });
@@ -236,9 +236,9 @@ describe("parseListFilters", () => {
     });
 
     it("should use last occurrence when -a is specified twice", () => {
-      const result = parseListFilters(["-a", "claude", "-a", "aider"]);
+      const result = parseListFilters(["-a", "claude", "-a", "codex"]);
       // Second -a overwrites the first
-      expect(result.agentFilter).toBe("aider");
+      expect(result.agentFilter).toBe("codex");
     });
 
     it("should use last occurrence when -c is specified twice", () => {
@@ -270,8 +270,8 @@ describe("parseListFilters", () => {
     });
 
     it("should not use positional arg when -a flag is present", () => {
-      const result = parseListFilters(["-a", "aider", "extra"]);
-      expect(result.agentFilter).toBe("aider");
+      const result = parseListFilters(["-a", "codex", "extra"]);
+      expect(result.agentFilter).toBe("codex");
       expect(result.cloudFilter).toBeUndefined();
     });
 
@@ -367,7 +367,7 @@ describe("cmdList output", () => {
     writeFileSync(
       join(testDir, "history.json"),
       JSON.stringify([
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-10T08:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-10T08:00:00Z" },
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
       ])
     );
@@ -385,7 +385,7 @@ describe("cmdList output", () => {
       join(testDir, "history.json"),
       JSON.stringify([
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-02-11T12:00:00Z" },
       ])
     );
@@ -428,7 +428,7 @@ describe("cmdList output", () => {
       join(testDir, "history.json"),
       JSON.stringify([
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
       ])
     );
     const { cmdList } = await import("../commands.js");
@@ -443,7 +443,7 @@ describe("cmdList output", () => {
       join(testDir, "history.json"),
       JSON.stringify([
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
       ])
     );
     const { cmdList } = await import("../commands.js");
@@ -457,7 +457,7 @@ describe("cmdList output", () => {
     writeFileSync(
       join(testDir, "history.json"),
       JSON.stringify([
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-09T08:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-09T08:00:00Z" },
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-10T10:00:00Z" },
         { agent: "codex", cloud: "vultr", timestamp: "2026-02-11T12:00:00Z" },
       ])
@@ -466,14 +466,12 @@ describe("cmdList output", () => {
     await cmdList();
     const logCalls = consoleMocks.log.mock.calls.map(c => String(c[0] ?? ""));
     // Find lines that contain agent names to verify order
-    const agentLines = logCalls.filter(l => l.includes("codex") || l.includes("claude") || l.includes("aider"));
-    // codex (newest) should come before claude, which should come before aider
-    if (agentLines.length >= 3) {
+    const agentLines = logCalls.filter(l => l.includes("codex") || l.includes("claude"));
+    // codex (newest) should come before claude
+    if (agentLines.length >= 2) {
       const codexIdx = logCalls.findIndex(l => l.includes("codex"));
       const claudeIdx = logCalls.findIndex(l => l.includes("claude"));
-      const aiderIdx = logCalls.findIndex(l => l.includes("aider"));
       expect(codexIdx).toBeLessThan(claudeIdx);
-      expect(claudeIdx).toBeLessThan(aiderIdx);
     }
   });
 
@@ -491,7 +489,7 @@ describe("cmdList output", () => {
       join(testDir, "history.json"),
       JSON.stringify([
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
       ])
     );
     const { cmdList } = await import("../commands.js");
@@ -508,7 +506,7 @@ describe("cmdList output", () => {
       JSON.stringify([
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T12:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-11T12:00:00Z" },
       ])
     );
     const { cmdList } = await import("../commands.js");
@@ -522,7 +520,7 @@ describe("cmdList output", () => {
       join(testDir, "history.json"),
       JSON.stringify([
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-11T11:00:00Z" },
       ])
     );
     const { cmdList } = await import("../commands.js");

@@ -35,12 +35,12 @@ const wideManifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -124,13 +124,13 @@ const wideManifest = {
     "digitalocean/claude": "implemented",
     "aws/claude": "implemented",
     "gcp/claude": "implemented",
-    "sprite/aider": "implemented",
-    "hetzner/aider": "missing",
-    "vultr/aider": "missing",
-    "linode/aider": "implemented",
-    "digitalocean/aider": "missing",
-    "aws/aider": "missing",
-    "gcp/aider": "missing",
+    "sprite/codex": "implemented",
+    "hetzner/codex": "missing",
+    "vultr/codex": "missing",
+    "linode/codex": "implemented",
+    "digitalocean/codex": "missing",
+    "aws/codex": "missing",
+    "gcp/codex": "missing",
   },
 };
 
@@ -317,7 +317,7 @@ describe("Compact List View", () => {
 
       await cmdMatrix();
       const output = getOutput();
-      // aider is implemented on sprite + linode = 2 out of 7
+      // codex is implemented on sprite + linode = 2 out of 7
       expect(output).toContain("2/7");
     });
 
@@ -337,7 +337,7 @@ describe("Compact List View", () => {
       await cmdMatrix();
       const output = getOutput();
       // Both agents should show 7/7
-      // Check that "7/7" appears (for both claude and aider)
+      // Check that "7/7" appears (for both claude and codex)
       const matches = output.match(/7\/7/g);
       expect(matches).not.toBeNull();
       expect(matches!.length).toBe(2);
@@ -363,7 +363,7 @@ describe("Compact List View", () => {
 
       await cmdMatrix();
       const output = getOutput();
-      // aider is missing: hetzner, vultr, digitalocean, aws, gcp
+      // codex is missing: hetzner, vultr, digitalocean, aws, gcp
       expect(output).toContain("Hetzner Cloud");
       expect(output).toContain("Vultr");
       expect(output).toContain("DigitalOcean");
@@ -377,17 +377,17 @@ describe("Compact List View", () => {
 
       await cmdMatrix();
       const output = getOutput();
-      // Find the line containing "Aider" to isolate the aider row
+      // Find the line containing "Codex" to isolate the codex row
       const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
-      const aiderLine = lines.find(
-        (line: string) => line.includes("Aider") && line.includes("/7")
+      const codexLine = lines.find(
+        (line: string) => line.includes("Codex") && line.includes("/7")
       );
-      expect(aiderLine).toBeDefined();
-      // Sprite and Linode are implemented for aider, so they should NOT appear
-      // as missing on the aider line
-      // (But "Sprite" might appear in other lines, so check just the aider line)
-      expect(aiderLine!).not.toContain("Sprite");
-      expect(aiderLine!).not.toContain("Linode");
+      expect(codexLine).toBeDefined();
+      // Sprite and Linode are implemented for codex, so they should NOT appear
+      // as missing on the codex line
+      // (But "Sprite" might appear in other lines, so check just the codex line)
+      expect(codexLine!).not.toContain("Sprite");
+      expect(codexLine!).not.toContain("Linode");
     });
 
     it("should list all clouds as missing when agent has no implementations", async () => {
@@ -429,7 +429,7 @@ describe("Compact List View", () => {
       await cmdMatrix();
       const output = getOutput();
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
   });
 
@@ -442,7 +442,7 @@ describe("Compact List View", () => {
 
       await cmdMatrix();
       const output = getOutput();
-      // claude: 7 implemented, aider: 2 implemented = 9 total out of 14
+      // claude: 7 implemented, codex: 2 implemented = 9 total out of 14
       expect(output).toContain("9/14");
     });
 
@@ -506,12 +506,12 @@ describe("Compact List View", () => {
 
       await cmdMatrix();
       const lines = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
-      const aiderLine = lines.find(
-        (line: string) => line.includes("Aider") && line.includes("/7")
+      const codexLine = lines.find(
+        (line: string) => line.includes("Codex") && line.includes("/7")
       );
-      expect(aiderLine).toBeDefined();
+      expect(codexLine).toBeDefined();
       // Missing clouds should be comma-separated
-      expect(aiderLine!).toContain(", ");
+      expect(codexLine!).toContain(", ");
     });
   });
 });

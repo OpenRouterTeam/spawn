@@ -72,8 +72,8 @@ describe("showInfoOrError - single argument routing", () => {
       expect(result.exitCode).toBe(0);
     });
 
-    it("should show agent info for 'aider'", () => {
-      const result = runCli(["aider"]);
+    it("should show agent info for 'codex'", () => {
+      const result = runCli(["codex"]);
       const output = result.stdout + result.stderr;
       expect(output).toContain("Available clouds");
       expect(result.exitCode).toBe(0);
@@ -166,11 +166,11 @@ describe("showInfoOrError - single argument routing", () => {
 
   describe("fuzzy match suggestions", () => {
     it("should suggest a close agent match for a typo", () => {
-      // "aidr" is close to "aider" (distance 1)
-      const result = runCli(["aidr"]);
+      // "codx" is close to "codex" (distance 1)
+      const result = runCli(["codx"]);
       const output = result.stdout + result.stderr;
       expect(output).toContain("Did you mean");
-      expect(output).toContain("aider");
+      expect(output).toContain("codex");
     });
 
     it("should suggest a close cloud match for a typo", () => {
@@ -190,8 +190,8 @@ describe("showInfoOrError - single argument routing", () => {
     });
 
     it("should label the suggestion type (agent or cloud)", () => {
-      // "aidr" should match "aider" (an agent)
-      const result = runCli(["aidr"]);
+      // "codx" should match "codex" (an agent)
+      const result = runCli(["codx"]);
       const output = result.stdout + result.stderr;
       // showInfoOrError labels suggestions as "(agent: Name)" or "(cloud: Name)"
       expect(output).toMatch(/\(agent:|\(cloud:/);

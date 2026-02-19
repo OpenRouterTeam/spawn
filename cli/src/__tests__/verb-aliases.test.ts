@@ -4,7 +4,7 @@ import { describe, it, expect } from "bun:test";
  * Tests for verb alias handling in CLI dispatch.
  *
  * Users coming from Docker, kubectl, or other CLIs naturally try
- * "spawn run claude sprite", "spawn launch aider hetzner", etc.
+ * "spawn run claude sprite", "spawn launch codex hetzner", etc.
  * The CLI should transparently strip these verb prefixes and forward
  * to the default agent/cloud handler.
  */
@@ -86,10 +86,10 @@ describe("verb alias handling", () => {
     });
 
     it("should strip 'launch' and forward to default handler", () => {
-      const result = dispatchCommand("launch", ["launch", "aider", "hetzner"], undefined);
+      const result = dispatchCommand("launch", ["launch", "codex", "hetzner"], undefined);
       expect(result.type).toBe("verb_alias");
       if (result.type === "verb_alias") {
-        expect(result.agent).toBe("aider");
+        expect(result.agent).toBe("codex");
         expect(result.cloud).toBe("hetzner");
       }
     });
@@ -113,10 +113,10 @@ describe("verb alias handling", () => {
     });
 
     it("should strip 'exec' and forward to default handler", () => {
-      const result = dispatchCommand("exec", ["exec", "aider", "sprite"], undefined);
+      const result = dispatchCommand("exec", ["exec", "codex", "sprite"], undefined);
       expect(result.type).toBe("verb_alias");
       if (result.type === "verb_alias") {
-        expect(result.agent).toBe("aider");
+        expect(result.agent).toBe("codex");
         expect(result.cloud).toBe("sprite");
       }
     });

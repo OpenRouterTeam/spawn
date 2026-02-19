@@ -71,8 +71,8 @@ describe("cmdRun argument swapping", () => {
     expect(output).toContain("spawn claude sprite");
   });
 
-  it("should swap hetzner/aider to aider/hetzner", () => {
-    const result = runCli(["hetzner", "aider"]);
+  it("should swap hetzner/codex to codex/hetzner", () => {
+    const result = runCli(["hetzner", "codex"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("swapped");
   });
@@ -208,7 +208,7 @@ describe("showInfoOrError display name resolution", () => {
   });
 
   it("should resolve mixed case agent key", () => {
-    const result = runCli(["Aider"]);
+    const result = runCli(["Codex"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("Available clouds");
     expect(result.exitCode).toBe(0);

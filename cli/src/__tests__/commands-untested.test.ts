@@ -280,7 +280,7 @@ describe("Commands - Additional Coverage", () => {
       }
 
       expect(validateAgent(mockManifest, "claude")).toBe(true);
-      expect(validateAgent(mockManifest, "aider")).toBe(true);
+      expect(validateAgent(mockManifest, "codex")).toBe(true);
       expect(validateAgent(mockManifest, "nonexistent")).toBe(false);
     });
 
@@ -301,8 +301,8 @@ describe("Commands - Additional Coverage", () => {
       }
 
       expect(validateImplementation(mockManifest, "sprite", "claude")).toBe(true);
-      expect(validateImplementation(mockManifest, "sprite", "aider")).toBe(true);
-      expect(validateImplementation(mockManifest, "hetzner", "aider")).toBe(false);
+      expect(validateImplementation(mockManifest, "sprite", "codex")).toBe(true);
+      expect(validateImplementation(mockManifest, "hetzner", "codex")).toBe(false);
       expect(validateImplementation(mockManifest, "aws", "claude")).toBe(false);
     });
   });
@@ -320,7 +320,7 @@ describe("Commands - Additional Coverage", () => {
     }
 
     it("should calculate for agent names with standard padding", () => {
-      const width = calculateColumnWidth(["Claude Code", "Aider"], 8, 2);
+      const width = calculateColumnWidth(["Claude Code", "Codex"], 8, 2);
       // "Claude Code" (11) + padding (2) = 13
       expect(width).toBe(13);
     });
@@ -365,7 +365,7 @@ describe("Commands - Additional Coverage", () => {
         );
       }
 
-      const clouds = getImplementedClouds(mockManifest, "aider");
+      const clouds = getImplementedClouds(mockManifest, "codex");
       expect(clouds).toContain("sprite");
       expect(clouds).not.toContain("hetzner");
       expect(clouds.length).toBe(1);

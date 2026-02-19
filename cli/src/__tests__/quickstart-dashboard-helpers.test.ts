@@ -769,13 +769,13 @@ describe("cmdCloudInfo agent list and count display", () => {
     const manifest = makeManifest({
       agents: {
         claude: { name: "Claude Code", description: "a", url: "", install: "", launch: "", env: {} },
-        aider: { name: "Aider", description: "b", url: "", install: "", launch: "", env: {} },
-        codex: { name: "Codex", description: "c", url: "", install: "", launch: "", env: {} },
+        codex: { name: "Codex", description: "b", url: "", install: "", launch: "", env: {} },
+        gptme: { name: "GPTMe", description: "c", url: "", install: "", launch: "", env: {} },
       },
       matrix: {
         "sprite/claude": "implemented",
-        "sprite/aider": "implemented",
-        "sprite/codex": "missing",
+        "sprite/codex": "implemented",
+        "sprite/gptme": "missing",
       },
     });
     await setupManifest(manifest);
@@ -789,11 +789,11 @@ describe("cmdCloudInfo agent list and count display", () => {
     const manifest = makeManifest({
       agents: {
         claude: { name: "Claude Code", description: "a", url: "", install: "", launch: "", env: {} },
-        aider: { name: "Aider", description: "b", url: "", install: "", launch: "", env: {} },
+        codex: { name: "Codex", description: "b", url: "", install: "", launch: "", env: {} },
       },
       matrix: {
         "sprite/claude": "implemented",
-        "sprite/aider": "implemented",
+        "sprite/codex": "implemented",
       },
     });
     await setupManifest(manifest);

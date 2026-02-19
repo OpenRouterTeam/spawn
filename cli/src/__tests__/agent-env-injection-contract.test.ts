@@ -102,7 +102,7 @@ function scriptUsesEnvInjectionHelper(content: string): boolean {
 describe("Agent Environment Variable Injection Contract", () => {
   // Sanity: we should be testing a significant number of scripts
   it("should have a meaningful number of implemented scripts to test", () => {
-    expect(implementedScripts.length).toBeGreaterThan(100);
+    expect(implementedScripts.length).toBeGreaterThan(70);
   });
 
   // ── OPENROUTER_API_KEY (mandatory for ALL agents) ──────────────────────
@@ -239,7 +239,7 @@ describe("Agent Environment Variable Injection Contract", () => {
 
       // Extract the primary install tool from the manifest install command
       // e.g., "npm install -g @anthropic-ai/claude-code" -> "npm"
-      // e.g., "pip install aider-chat" -> "pip"
+      // e.g., "npm install -g codex" -> "pip"
       // e.g., "curl -fsSL ..." -> "curl"
       const installTool = installCmd.split(/\s+/)[0];
 
@@ -295,7 +295,7 @@ describe("Agent Environment Variable Injection Contract", () => {
 
       // Extract the primary command from the launch string
       // e.g., "claude" from "claude"
-      // e.g., "aider" from "aider --model openrouter/..."
+      // e.g., "codex" from "codex --model openrouter/..."
       const launchBinary = launchCmd.split(/\s+/)[0];
 
       it(`${agentKey} scripts should reference launch command "${launchBinary}"`, () => {

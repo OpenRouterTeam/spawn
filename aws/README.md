@@ -24,40 +24,10 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/nanoclaw.sh)
 ```
 
-#### Aider
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/aider.sh)
-```
-
-#### Goose
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/goose.sh)
-```
-
 #### Codex CLI
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/codex.sh)
-```
-
-#### Open Interpreter
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/interpreter.sh)
-```
-
-#### Gemini CLI
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/gemini.sh)
-```
-
-#### Amazon Q CLI
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/amazonq.sh)
 ```
 
 #### Cline

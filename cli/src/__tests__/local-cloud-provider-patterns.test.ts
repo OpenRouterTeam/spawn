@@ -141,7 +141,7 @@ describe("local/lib/common.sh API surface", () => {
 
 describe("local agent scripts — shared patterns", () => {
   it("should have multiple implemented local agent scripts", () => {
-    expect(localEntries.length).toBeGreaterThanOrEqual(10);
+    expect(localEntries.length).toBeGreaterThanOrEqual(5);
   });
 
   describe("sources local/lib/common.sh", () => {

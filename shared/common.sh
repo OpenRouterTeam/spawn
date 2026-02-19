@@ -564,7 +564,7 @@ get_validated_server_name() {
 # Interactively prompt for model ID with validation
 # Usage: get_model_id_interactive [default_model] [agent_name]
 # Returns: Model ID via stdout
-# Example: MODEL_ID=$(get_model_id_interactive "openrouter/auto" "Aider")
+# Example: MODEL_ID=$(get_model_id_interactive "openrouter/auto" "gptme")
 get_model_id_interactive() {
     local default_model="${1:-openrouter/auto}"
     local agent_name="${2:-}"
@@ -1439,11 +1439,11 @@ register_cleanup_trap() {
 #   UPLOAD="upload_file ${SERVER_IP}"
 #   SESSION="interactive_session ${SERVER_IP}"
 #
-#   install_agent "Aider" "pip install aider-chat" "$RUN"
-#   verify_agent "Aider" "command -v aider" "pip install aider-chat" "$RUN"
+#   install_agent "Codex" "npm install -g @openai/codex" "$RUN"
+#   verify_agent "Codex" "command -v codex" "npm install -g @openai/codex" "$RUN"
 #   get_or_prompt_api_key
 #   inject_env_vars_cb "$RUN" "$UPLOAD" "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-#   launch_session "Hetzner server" "$SESSION" "source ~/.zshrc && aider"
+#   launch_session "Hetzner server" "$SESSION" "source ~/.zshrc && codex"
 
 # Run an agent's install command on the target machine
 # Usage: install_agent AGENT_NAME INSTALL_CMD RUN_CB
@@ -2205,8 +2205,8 @@ _check_agent_runs() {
 # Usage: verify_agent_installed AGENT_COMMAND [VERIFICATION_ARG] [ERROR_MESSAGE]
 # Examples:
 #   verify_agent_installed "claude" "--version" "Claude Code"
-#   verify_agent_installed "aider" "--help" "Aider"
-#   verify_agent_installed "goose" "--version" "Goose"
+#   verify_agent_installed "codex" "--version" "Codex"
+#   verify_agent_installed "cline" "--version" "Cline"
 # Returns 0 if agent is installed and working, 1 otherwise
 verify_agent_installed() {
     local agent_cmd="${1}"
@@ -2230,8 +2230,8 @@ verify_agent_installed() {
 # Usage: execute_agent_non_interactive SPRITE_NAME AGENT_NAME AGENT_FLAGS PROMPT
 # Arguments:
 #   SPRITE_NAME    - Name of the sprite/server to execute on
-#   AGENT_NAME     - Name of the agent command (e.g., "claude", "aider")
-#   AGENT_FLAGS    - Agent-specific flags for non-interactive execution (e.g., "-p" for claude, "-m" for aider)
+#   AGENT_NAME     - Name of the agent command (e.g., "claude", "codex")
+#   AGENT_FLAGS    - Agent-specific flags for non-interactive execution (e.g., "-p" for claude, "--prompt" for codex)
 #   PROMPT         - User prompt to execute
 #   EXEC_CALLBACK  - Function to execute commands: func(sprite_name, command)
 #
@@ -2239,7 +2239,7 @@ verify_agent_installed() {
 #   execute_agent_non_interactive "$SPRITE_NAME" "claude" "-p" "$PROMPT" "sprite_exec"
 #
 # Example (SSH):
-#   execute_agent_non_interactive "$SERVER_IP" "aider" "-m" "$PROMPT" "ssh_exec"
+#   execute_agent_non_interactive "$SERVER_IP" "codex" "--prompt" "$PROMPT" "ssh_exec"
 execute_agent_non_interactive() {
     local sprite_name="${1}"
     local agent_name="${2}"

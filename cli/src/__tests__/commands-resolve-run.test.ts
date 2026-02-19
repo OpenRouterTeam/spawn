@@ -34,12 +34,12 @@ const manyCloudManifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -101,11 +101,11 @@ const manyCloudManifest = {
     "vultr/claude": "implemented",
     "linode/claude": "implemented",
     "digitalocean/claude": "implemented",
-    "sprite/aider": "implemented",
-    "hetzner/aider": "missing",
-    "vultr/aider": "missing",
-    "linode/aider": "missing",
-    "digitalocean/aider": "missing",
+    "sprite/codex": "implemented",
+    "hetzner/codex": "missing",
+    "vultr/codex": "missing",
+    "linode/codex": "missing",
+    "digitalocean/codex": "missing",
   },
 };
 
@@ -113,7 +113,7 @@ const manyCloudManifest = {
 const noCloudManifest = {
   agents: {
     claude: mockManifest.agents.claude,
-    aider: mockManifest.agents.aider,
+    codex: mockManifest.agents.codex,
   },
   clouds: {
     sprite: mockManifest.clouds.sprite,
@@ -121,9 +121,9 @@ const noCloudManifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "missing",
+    "sprite/codex": "missing",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
@@ -341,8 +341,8 @@ describe("cmdRun - display name resolution", () => {
 
       // claude has 5 implemented clouds; request a cloud that doesn't exist
       // Actually we need a cloud that exists but where the combination is "missing"
-      // In manyCloudManifest, aider is only on sprite; hetzner/aider is missing
-      // But aider only has 1 implemented cloud so it won't trigger "> 3"
+      // In manyCloudManifest, codex is only on sprite; hetzner/codex is missing
+      // But codex only has 1 implemented cloud so it won't trigger "> 3"
       // claude has 5 clouds, but all are implemented so it won't trigger
       // Let's use the manifest differently: request a non-implemented combo
       // We need an agent with > 3 implemented clouds but where a specific cloud is missing
@@ -397,17 +397,17 @@ describe("cmdRun - display name resolution", () => {
 
     it("should not show 'see all' when <= 3 clouds available", async () => {
       // mockManifest has claude on sprite + hetzner = 2 clouds
-      // We need a missing combo: hetzner/aider is missing
+      // We need a missing combo: hetzner/codex is missing
       await setManifestAndScript(mockManifest);
 
       try {
-        await cmdRun("aider", "hetzner");
+        await cmdRun("codex", "hetzner");
       } catch {
         // Expected
       }
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      // aider has 1 implemented cloud (sprite), so no "see all" hint
+      // codex has 1 implemented cloud (sprite), so no "see all" hint
       expect(infoCalls.some((msg: string) => msg.includes("to see all"))).toBe(false);
     });
   });
@@ -419,7 +419,7 @@ describe("cmdRun - display name resolution", () => {
       await setManifestAndScript(noCloudManifest);
 
       try {
-        await cmdRun("aider", "sprite");
+        await cmdRun("codex", "sprite");
       } catch {
         // Expected
       }
@@ -432,7 +432,7 @@ describe("cmdRun - display name resolution", () => {
       await setManifestAndScript(noCloudManifest);
 
       try {
-        await cmdRun("aider", "sprite");
+        await cmdRun("codex", "sprite");
       } catch {
         // Expected
       }

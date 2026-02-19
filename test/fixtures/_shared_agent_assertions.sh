@@ -35,24 +35,9 @@ assert_agent_install() {
         nanoclaw)
             # git clone https://github.com/gavrielc/nanoclaw.git && npm install
             _assert_install_pattern "git.*clone.*nanoclaw" "installs nanoclaw via git clone" ;;
-        aider)
-            # uv tool install --python 3.12 --upgrade aider-chat
-            _assert_install_pattern "uv.*tool.*install.*aider" "installs aider via uv" ;;
-        goose)
-            # curl -fsSL https://github.com/block/goose/releases/.../download_cli.sh | bash
-            _assert_install_pattern "goose.*download_cli" "installs goose via curl installer" ;;
         codex)
             # npm install -g @openai/codex
             _assert_install_pattern "npm.*install.*codex" "installs codex via npm" ;;
-        interpreter)
-            # uv tool install open-interpreter --python 3.12
-            _assert_install_pattern "uv.*tool.*install.*open-interpreter" "installs interpreter via uv" ;;
-        gemini)
-            # npm install -g @google/gemini-cli
-            _assert_install_pattern "npm.*install.*gemini-cli" "installs gemini via npm" ;;
-        amazonq)
-            # curl -fsSL https://...amazonaws.com/.../amazon-q-cli-install.sh | bash
-            _assert_install_pattern "amazon-q.*install" "installs amazonq via curl installer" ;;
         cline)
             # npm install -g cline
             _assert_install_pattern "npm.*install.*cline" "installs cline via npm" ;;

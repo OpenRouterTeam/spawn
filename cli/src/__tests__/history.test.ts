@@ -152,7 +152,7 @@ describe("history", () => {
     it("loads multiple records preserving order", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -200,12 +200,12 @@ describe("history", () => {
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(existing));
 
-      saveSpawnRecord({ agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
+      saveSpawnRecord({ agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
 
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
       expect(data).toHaveLength(2);
       expect(data[0].agent).toBe("claude");
-      expect(data[1].agent).toBe("aider");
+      expect(data[1].agent).toBe("codex");
     });
 
     it("saves record with prompt field", () => {
@@ -269,9 +269,9 @@ describe("history", () => {
   describe("filterHistory", () => {
     const sampleRecords: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
       { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
-      { agent: "aider", cloud: "sprite", timestamp: "2026-01-04T00:00:00.000Z" },
+      { agent: "codex", cloud: "sprite", timestamp: "2026-01-04T00:00:00.000Z" },
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-05T00:00:00.000Z", prompt: "Test" },
     ];
 
@@ -319,9 +319,9 @@ describe("history", () => {
     });
 
     it("is case-insensitive for both filters", () => {
-      const results = filterHistory("AIDER", "SPRITE");
+      const results = filterHistory("CODEX", "SPRITE");
       expect(results).toHaveLength(1);
-      expect(results[0].agent).toBe("aider");
+      expect(results[0].agent).toBe("codex");
       expect(results[0].cloud).toBe("sprite");
     });
 

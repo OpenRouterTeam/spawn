@@ -371,7 +371,7 @@ describe("get_validated_server_name", () => {
 describe("get_model_id_interactive", () => {
   describe("MODEL_ID env var set (bypasses stdin)", () => {
     it("should return MODEL_ID from env var", () => {
-      const result = runBash('get_model_id_interactive "openrouter/auto" "Aider"', {
+      const result = runBash('get_model_id_interactive "openrouter/auto" "Codex"', {
         env: { MODEL_ID: "anthropic/claude-3.5-sonnet" },
       });
       expect(result.exitCode).toBe(0);
@@ -459,7 +459,7 @@ describe("get_model_id_interactive", () => {
   describe("MODEL_ID not set (falls through to stdin)", () => {
     it("should use default model in non-interactive mode without MODEL_ID", () => {
       const result = runBash(
-        'get_model_id_interactive "openrouter/auto" "Aider"',
+        'get_model_id_interactive "openrouter/auto" "Codex"',
       );
       // Falls through to safe_read which fails without tty,
       // but the function catches this and uses the default model
@@ -476,9 +476,9 @@ describe("get_model_id_interactive", () => {
 
     it("should show agent name in prompt text", () => {
       const result = runBashCapture(
-        'get_model_id_interactive "openrouter/auto" "Aider"',
+        'get_model_id_interactive "openrouter/auto" "Codex"',
       );
-      expect(result.stderr).toContain("Aider");
+      expect(result.stderr).toContain("Codex");
     });
   });
 });

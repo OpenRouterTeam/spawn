@@ -57,12 +57,12 @@ function createManifest(): Manifest {
         launch: "claude",
         env: { ANTHROPIC_API_KEY: "test" },
       },
-      aider: {
-        name: "Aider",
+      codex: {
+        name: "Codex",
         description: "AI pair programmer",
-        url: "https://aider.chat",
-        install: "pip install aider-chat",
-        launch: "aider",
+        url: "https://codex.dev",
+        install: "npm install -g codex",
+        launch: "codex",
         env: { OPENAI_API_KEY: "test" },
       },
     },
@@ -90,9 +90,9 @@ function createManifest(): Manifest {
     },
     matrix: {
       "sprite/claude": "implemented",
-      "sprite/aider": "implemented",
+      "sprite/codex": "implemented",
       "hetzner/claude": "implemented",
-      "hetzner/aider": "missing",
+      "hetzner/codex": "missing",
     },
   };
 }

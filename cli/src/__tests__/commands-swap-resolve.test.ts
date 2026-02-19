@@ -178,9 +178,9 @@ describe("detectAndFixSwappedArgs via cmdRun", () => {
 
       try {
         // Both are agents, not a cloud+agent swap
-        await cmdRun("claude", "aider");
+        await cmdRun("claude", "codex");
       } catch {
-        // Expected: will fail since aider is not a cloud
+        // Expected: will fail since codex is not a cloud
       }
 
       const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
@@ -211,9 +211,9 @@ describe("detectAndFixSwappedArgs via cmdRun", () => {
       await setManifestAndScript(mockManifest);
 
       try {
-        // hetzner is a cloud, aider is an agent - swapped
-        // After swap: cmdRun("aider", "hetzner") - but hetzner/aider is "missing"
-        await cmdRun("hetzner", "aider");
+        // hetzner is a cloud, codex is an agent - swapped
+        // After swap: cmdRun("codex", "hetzner") - but hetzner/codex is "missing"
+        await cmdRun("hetzner", "codex");
       } catch {
         // Expected: process.exit from validateImplementation
       }
@@ -338,17 +338,17 @@ describe("resolveAndLog via cmdRun", () => {
   });
 
   describe("display name resolution", () => {
-    it("should resolve 'Aider' display name to 'aider' key", async () => {
+    it("should resolve 'Codex' display name to 'codex' key", async () => {
       await setManifestAndScript(mockManifest);
 
       try {
-        await cmdRun("Aider", "sprite");
+        await cmdRun("Codex", "sprite");
       } catch {
         // May throw from script execution
       }
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("aider"))).toBe(true);
+      expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("codex"))).toBe(true);
     });
 
     it("should resolve 'Sprite' display name to 'sprite' key", async () => {

@@ -195,7 +195,7 @@ describe("CLI Argument Parsing Edge Cases", () => {
       return "unifiedError";
     }
 
-    const agents = { claude: true, aider: true, openclaw: true };
+    const agents = { claude: true, codex: true, openclaw: true };
     const clouds = { sprite: true, hetzner: true, digitalocean: true };
 
     it("should route to run when agent and cloud provided", () => {
@@ -248,26 +248,26 @@ describe("CLI Argument Parsing Edge Cases", () => {
     }
 
     it("should find agent suggestion for near-agent input", () => {
-      const result = findUnifiedSuggestion("claud", ["claude", "aider"], ["sprite", "hetzner"], mockFindClosest);
+      const result = findUnifiedSuggestion("claud", ["claude", "codex"], ["sprite", "hetzner"], mockFindClosest);
       expect(result.agentMatch).toBe("claude");
       expect(result.cloudMatch).toBeNull();
     });
 
     it("should find cloud suggestion for near-cloud input", () => {
-      const result = findUnifiedSuggestion("hetzne", ["claude", "aider"], ["sprite", "hetzner"], mockFindClosest);
+      const result = findUnifiedSuggestion("hetzne", ["claude", "codex"], ["sprite", "hetzner"], mockFindClosest);
       expect(result.agentMatch).toBeNull();
       expect(result.cloudMatch).toBe("hetzner");
     });
 
     it("should find both suggestions when input is ambiguous", () => {
-      // "aid" could match "aider" (agent) and "aide-cloud" (cloud) if it existed
-      const result = findUnifiedSuggestion("aid", ["claude", "aider"], ["aide-cloud", "hetzner"], mockFindClosest);
-      expect(result.agentMatch).toBe("aider");
-      expect(result.cloudMatch).toBe("aide-cloud");
+      // "cod" could match "codex" (agent) and "cod-cloud" (cloud) if it existed
+      const result = findUnifiedSuggestion("cod", ["claude", "codex"], ["cod-cloud", "hetzner"], mockFindClosest);
+      expect(result.agentMatch).toBe("codex");
+      expect(result.cloudMatch).toBe("cod-cloud");
     });
 
     it("should return null for both when no matches found", () => {
-      const result = findUnifiedSuggestion("zzzzz", ["claude", "aider"], ["sprite", "hetzner"], mockFindClosest);
+      const result = findUnifiedSuggestion("zzzzz", ["claude", "codex"], ["sprite", "hetzner"], mockFindClosest);
       expect(result.agentMatch).toBeNull();
       expect(result.cloudMatch).toBeNull();
     });

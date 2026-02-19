@@ -168,7 +168,7 @@ describe("cmdList integration", () => {
     it("should suggest clearing filter when filtered results are empty", async () => {
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00Z" },
       ]);
 
       await cmdList("nonexistent");
@@ -192,7 +192,7 @@ describe("cmdList integration", () => {
   describe("history with records (table rendering)", () => {
     const sampleRecords: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T14:30:00Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T14:30:00Z" },
       { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T09:15:00Z" },
     ];
 
@@ -248,7 +248,7 @@ describe("cmdList integration", () => {
 
       // Find lines with agent names (after header/separator)
       const dataLines = lines.filter(
-        (l: string) => l.includes("Claude Code") || l.includes("Aider") || l.includes("Hetzner")
+        (l: string) => l.includes("Claude Code") || l.includes("Codex") || l.includes("Hetzner")
       );
 
       // The most recent record (Jan 3) should appear before the oldest (Jan 1)
@@ -270,7 +270,7 @@ describe("cmdList integration", () => {
       const output = consoleOutput();
       // Display names from manifest
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
 
     it("should fall back to raw keys when manifest is unavailable", async () => {
@@ -423,9 +423,9 @@ describe("cmdList integration", () => {
   describe("filtering by agent and cloud", () => {
     const records: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00Z" },
       { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00Z" },
-      { agent: "aider", cloud: "sprite", timestamp: "2026-01-04T00:00:00Z" },
+      { agent: "codex", cloud: "sprite", timestamp: "2026-01-04T00:00:00Z" },
     ];
 
     it("should filter by agent name", async () => {
@@ -556,7 +556,7 @@ describe("cmdList integration", () => {
       const manyRecords: SpawnRecord[] = [];
       for (let i = 0; i < 100; i++) {
         manyRecords.push({
-          agent: i % 2 === 0 ? "claude" : "aider",
+          agent: i % 2 === 0 ? "claude" : "codex",
           cloud: i % 3 === 0 ? "sprite" : "hetzner",
           timestamp: `2026-01-${String(1 + (i % 28)).padStart(2, "0")}T00:00:00Z`,
         });

@@ -44,7 +44,7 @@ describe("Command Helpers", () => {
   });
 
   describe("findClosestMatch", () => {
-    const agents = ["claude", "aider", "openclaw", "nanoclaw", "codex", "goose"];
+    const agents = ["claude", "codex", "openclaw", "nanoclaw", "cline", "gptme"];
 
     it("should find exact match (distance 0)", () => {
       expect(findClosestMatch("claude", agents)).toBe("claude");
@@ -53,7 +53,7 @@ describe("Command Helpers", () => {
     it("should find close typo (distance 1)", () => {
       expect(findClosestMatch("cloude", agents)).toBe("claude");
       expect(findClosestMatch("claud", agents)).toBe("claude");
-      expect(findClosestMatch("aidr", agents)).toBe("aider");
+      expect(findClosestMatch("codx", agents)).toBe("codex");
     });
 
     it("should find matches with distance 2", () => {
@@ -70,7 +70,7 @@ describe("Command Helpers", () => {
 
     it("should be case insensitive", () => {
       expect(findClosestMatch("Claude", agents)).toBe("claude");
-      expect(findClosestMatch("AIDER", agents)).toBe("aider");
+      expect(findClosestMatch("AIDER", agents)).toBe("codex");
     });
 
     it("should pick the closest match among multiple candidates", () => {
@@ -236,11 +236,11 @@ describe("Command Helpers", () => {
 
     const mockAgents = {
       claude: { name: "Claude Code", description: "AI assistant" },
-      aider: { name: "Aider", description: "AI pair programmer" },
+      codex: { name: "Codex", description: "AI pair programmer" },
     };
 
     it("should map keys to select options", () => {
-      const options = mapToSelectOptions(["claude", "aider"], mockAgents);
+      const options = mapToSelectOptions(["claude", "codex"], mockAgents);
       expect(options).toHaveLength(2);
       expect(options[0]).toEqual({
         value: "claude",
@@ -250,8 +250,8 @@ describe("Command Helpers", () => {
     });
 
     it("should preserve order", () => {
-      const options = mapToSelectOptions(["aider", "claude"], mockAgents);
-      expect(options[0].value).toBe("aider");
+      const options = mapToSelectOptions(["codex", "claude"], mockAgents);
+      expect(options[0].value).toBe("codex");
       expect(options[1].value).toBe("claude");
     });
 
@@ -318,8 +318,8 @@ describe("Command Helpers", () => {
     const manifest = {
       agents: {
         claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
-        aider: { name: "Aider", description: "AI pair programmer", url: "", install: "", launch: "", env: {} },
-        "open-interpreter": { name: "Open Interpreter", description: "Code interpreter", url: "", install: "", launch: "", env: {} },
+        codex: { name: "Codex", description: "AI pair programmer", url: "", install: "", launch: "", env: {} },
+        "gptme": { name: "GPTMe", description: "AI terminal assistant", url: "", install: "", launch: "", env: {} },
       },
       clouds: {},
       matrix: {},
@@ -331,12 +331,12 @@ describe("Command Helpers", () => {
 
     it("should resolve case-insensitive key", () => {
       expect(resolveAgentKey(manifest, "Claude")).toBe("claude");
-      expect(resolveAgentKey(manifest, "AIDER")).toBe("aider");
+      expect(resolveAgentKey(manifest, "CODEX")).toBe("codex");
     });
 
     it("should resolve display name to key", () => {
       expect(resolveAgentKey(manifest, "Claude Code")).toBe("claude");
-      expect(resolveAgentKey(manifest, "Aider")).toBe("aider");
+      expect(resolveAgentKey(manifest, "Codex")).toBe("codex");
     });
 
     it("should resolve display name case-insensitively", () => {
@@ -344,8 +344,8 @@ describe("Command Helpers", () => {
       expect(resolveAgentKey(manifest, "CLAUDE CODE")).toBe("claude");
     });
 
-    it("should resolve hyphenated key case-insensitively", () => {
-      expect(resolveAgentKey(manifest, "Open-Interpreter")).toBe("open-interpreter");
+    it("should resolve display name for gptme", () => {
+      expect(resolveAgentKey(manifest, "GPTMe")).toBe("gptme");
     });
 
     it("should return null for unknown input", () => {
@@ -402,7 +402,7 @@ describe("Command Helpers", () => {
       const manifest = {
         agents: {
           claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
-          aider: { name: "Aider", description: "AI pair programmer", url: "", install: "", launch: "", env: {} },
+          codex: { name: "Codex", description: "AI pair programmer", url: "", install: "", launch: "", env: {} },
         },
         clouds: {
           sprite: { name: "Sprite", description: "VMs", url: "", type: "vm", auth: "token", provision_method: "", exec_method: "", interactive_method: "" },
@@ -411,14 +411,14 @@ describe("Command Helpers", () => {
         matrix: {
           "sprite/claude": "implemented",
           "hetzner/claude": "implemented",
-          "sprite/aider": "implemented",
-          "hetzner/aider": "missing",
+          "sprite/codex": "implemented",
+          "hetzner/codex": "missing",
         },
       } as unknown as Manifest;
 
       const hints = buildAgentPickerHints(manifest);
       expect(hints["claude"]).toBe("2 clouds");
-      expect(hints["aider"]).toBe("1 cloud");
+      expect(hints["codex"]).toBe("1 cloud");
     });
 
     it("should show 'no clouds available yet' for agents with zero implementations", () => {

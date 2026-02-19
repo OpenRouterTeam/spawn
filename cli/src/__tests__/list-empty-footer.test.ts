@@ -35,12 +35,12 @@ const mockManifest: Manifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -68,9 +68,9 @@ const mockManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
@@ -466,11 +466,11 @@ describe("showListFooter logic", () => {
 
     it("should use the first record (newest) for rerun hint", () => {
       const records: SpawnRecord[] = [
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T12:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-02-11T12:00:00Z" },
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
       ];
       const footer = buildFooter(records, 2);
-      expect(footer.rerunHint).toBe("spawn aider hetzner");
+      expect(footer.rerunHint).toBe("spawn codex hetzner");
     });
   });
 
@@ -530,7 +530,7 @@ describe("showListFooter logic", () => {
     it("should show count of recorded spawns", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
-        { agent: "aider", cloud: "sprite", timestamp: "2026-02-11T09:00:00Z" },
+        { agent: "codex", cloud: "sprite", timestamp: "2026-02-11T09:00:00Z" },
       ];
       const footer = buildFooter(records, 2);
       expect(footer.countInfo).toBe("2 spawns recorded");
@@ -566,7 +566,7 @@ describe("showListFooter logic", () => {
     it("should show showing X of Y spawns with cloud filter", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T10:00:00Z" },
-        { agent: "aider", cloud: "sprite", timestamp: "2026-02-11T09:00:00Z" },
+        { agent: "codex", cloud: "sprite", timestamp: "2026-02-11T09:00:00Z" },
       ];
       const footer = buildFooter(records, 10, undefined, "sprite");
       expect(footer.countInfo).toBe("Showing 2 of 10 spawns");
@@ -610,9 +610,9 @@ describe("showUnknownCommandError logic", () => {
     });
 
     it("should include agent display name in suggestion", () => {
-      const result = buildUnknownCommandError("aidr", mockManifest);
+      const result = buildUnknownCommandError("codx", mockManifest);
       expect(result.hasSuggestion).toBe(true);
-      expect(result.suggestion).toContain("Aider");
+      expect(result.suggestion).toContain("Codex");
     });
   });
 

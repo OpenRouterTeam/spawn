@@ -41,12 +41,12 @@ const singleAuthManifest: Manifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "$OPENROUTER_API_KEY" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "$OPENROUTER_API_KEY" },
     },
   },
@@ -74,9 +74,9 @@ const singleAuthManifest: Manifest = {
   },
   matrix: {
     "hetzner/claude": "implemented",
-    "hetzner/aider": "implemented",
+    "hetzner/codex": "implemented",
     "sprite/claude": "implemented",
-    "sprite/aider": "missing",
+    "sprite/codex": "missing",
   },
 };
 
@@ -963,8 +963,8 @@ describe("printAgentQuickStart - pure logic", () => {
   // ── Launch command format ──────────────────────────────────────────
 
   it("should format launch command as 'spawn agent cloud'", () => {
-    const result = computeQuickStart("HCLOUD_TOKEN", undefined, "aider", "hetzner");
-    expect(result.launchCmd).toBe("spawn aider hetzner");
+    const result = computeQuickStart("HCLOUD_TOKEN", undefined, "codex", "hetzner");
+    expect(result.launchCmd).toBe("spawn codex hetzner");
   });
 
   it("should use provided agent and cloud keys exactly", () => {

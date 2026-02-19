@@ -97,7 +97,7 @@ describe("suggestCloudsForPrompt", () => {
   const manifest = {
     agents: {
       claude: { name: "Claude Code" },
-      aider: { name: "Aider" },
+      codex: { name: "Codex" },
     },
     clouds: {
       sprite: { name: "Sprite" },
@@ -108,9 +108,9 @@ describe("suggestCloudsForPrompt", () => {
       "sprite/claude": "implemented",
       "hetzner/claude": "implemented",
       "vultr/claude": "implemented",
-      "sprite/aider": "implemented",
-      "hetzner/aider": "missing",
-      "vultr/aider": "missing",
+      "sprite/codex": "implemented",
+      "hetzner/codex": "missing",
+      "vultr/codex": "missing",
     },
   };
 
@@ -127,8 +127,8 @@ describe("suggestCloudsForPrompt", () => {
     });
 
     it("should use the actual agent name in usage example", () => {
-      const result = suggestCloudsForPrompt("aider", manifest, resolveAgentKey);
-      expect(result.errorMessages[1]).toContain("spawn aider");
+      const result = suggestCloudsForPrompt("codex", manifest, resolveAgentKey);
+      expect(result.errorMessages[1]).toContain("spawn codex");
     });
   });
 
@@ -142,9 +142,9 @@ describe("suggestCloudsForPrompt", () => {
     });
 
     it("should suggest only implemented clouds for partially implemented agent", () => {
-      const result = suggestCloudsForPrompt("aider", manifest, resolveAgentKey);
+      const result = suggestCloudsForPrompt("codex", manifest, resolveAgentKey);
       expect(result.suggestions).toHaveLength(1);
-      expect(result.suggestions[0]).toContain("spawn aider sprite");
+      expect(result.suggestions[0]).toContain("spawn codex sprite");
     });
 
     it("should include --prompt in each suggestion", () => {
@@ -500,7 +500,7 @@ describe("cmdList prompt display", () => {
       writeFileSync(
         join(testDir, "history.json"),
         JSON.stringify([
-          { agent: "aider", cloud: "hetzner", timestamp: "2026-02-09T08:00:00Z", prompt: "Old prompt" },
+          { agent: "codex", cloud: "hetzner", timestamp: "2026-02-09T08:00:00Z", prompt: "Old prompt" },
           { agent: "claude", cloud: "sprite", timestamp: "2026-02-11T12:00:00Z", prompt: "Latest prompt" },
         ])
       );
@@ -524,17 +524,17 @@ describe("cmdList prompt display", () => {
         join(testDir, "history.json"),
         JSON.stringify([
           { agent: "claude", cloud: "sprite", timestamp: "2026-02-10T10:00:00Z" },
-          { agent: "aider", cloud: "hetzner", timestamp: "2026-02-11T10:00:00Z", prompt: "Add tests" },
+          { agent: "codex", cloud: "hetzner", timestamp: "2026-02-11T10:00:00Z", prompt: "Add tests" },
         ])
       );
       const { cmdList } = await import("../commands.js");
       await cmdList();
       const allLines = consoleMocks.log.mock.calls.map(c => String(c[0] ?? ""));
 
-      // The aider/hetzner record should show prompt
-      const aiderLines = allLines.filter(l => l.includes("aider") && l.includes("hetzner"));
-      expect(aiderLines.some(l => l.includes("--prompt"))).toBe(true);
-      expect(aiderLines.some(l => l.includes("Add tests"))).toBe(true);
+      // The codex/hetzner record should show prompt
+      const codexLines = allLines.filter(l => l.includes("codex") && l.includes("hetzner"));
+      expect(codexLines.some(l => l.includes("--prompt"))).toBe(true);
+      expect(codexLines.some(l => l.includes("Add tests"))).toBe(true);
 
       // The claude/sprite record should NOT show --prompt
       const claudeLines = allLines.filter(l =>

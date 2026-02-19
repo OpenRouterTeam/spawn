@@ -83,8 +83,8 @@ describe("Real manifest data validation", () => {
       expect(allClouds.length).toBeGreaterThanOrEqual(8);
     });
 
-    it("should have at least 100 matrix entries", () => {
-      expect(Object.keys(manifest.matrix).length).toBeGreaterThanOrEqual(100);
+    it("should have at least 80 matrix entries", () => {
+      expect(Object.keys(manifest.matrix).length).toBeGreaterThanOrEqual(80);
     });
 
     it("should have more implemented than missing entries", () => {
@@ -361,9 +361,9 @@ describe("Fuzzy matching with real agent and cloud names", () => {
       const match = findClosestMatch("claud", allAgents);
       expect(match).toBe("claude");
     }
-    if (allAgents.includes("aider")) {
-      const match = findClosestMatch("aidr", allAgents);
-      expect(match).toBe("aider");
+    if (allAgents.includes("codex")) {
+      const match = findClosestMatch("codx", allAgents);
+      expect(match).toBe("codex");
     }
   });
 

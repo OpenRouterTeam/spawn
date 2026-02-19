@@ -556,7 +556,7 @@ describe("Manifest Cache Lifecycle", () => {
       const manifest: Manifest = {
         agents: {
           zulu: mockManifest.agents.claude,
-          alpha: mockManifest.agents.aider,
+          alpha: mockManifest.agents.codex,
           mike: mockManifest.agents.claude,
         },
         clouds: {},

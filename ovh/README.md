@@ -37,12 +37,6 @@ Required API permissions:
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/claude.sh)
 ```
 
-#### Aider
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/aider.sh)
-```
-
 #### OpenClaw
 
 ```bash
@@ -65,30 +59,6 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/cline.sh)
 
 ```bash
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/codex.sh)
-```
-
-#### Goose
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/goose.sh)
-```
-
-#### Open Interpreter
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/interpreter.sh)
-```
-
-#### Gemini CLI
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/gemini.sh)
-```
-
-#### Amazon Q CLI
-
-```bash
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/ovh/amazonq.sh)
 ```
 
 #### OpenCode

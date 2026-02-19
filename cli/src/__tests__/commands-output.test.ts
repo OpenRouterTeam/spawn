@@ -80,7 +80,7 @@ describe("Command Output Functions", () => {
       await cmdMatrix();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
 
     it("should show cloud names in the header", async () => {
@@ -123,20 +123,20 @@ describe("Command Output Functions", () => {
       await cmdAgents();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("claude");
-      expect(output).toContain("aider");
+      expect(output).toContain("codex");
     });
 
     it("should show agent display names", async () => {
       await cmdAgents();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
 
     it("should show cloud count per agent", async () => {
       await cmdAgents();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      // claude has 2 clouds (sprite, hetzner), aider has 1 (sprite)
+      // claude has 2 clouds (sprite, hetzner), codex has 1 (sprite)
       expect(output).toContain("2 clouds");
       expect(output).toContain("1 cloud");
       expect(output).not.toContain("1 clouds");
@@ -187,7 +187,7 @@ describe("Command Output Functions", () => {
     it("should show agent count per cloud", async () => {
       await cmdClouds();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      // sprite has 2 agents (claude, aider), hetzner has 1 (claude) - shown as X/Y ratio
+      // sprite has 2 agents (claude, codex), hetzner has 1 (claude) - shown as X/Y ratio
       expect(output).toContain("2/2");
       expect(output).toContain("1/2");
     });
@@ -242,18 +242,18 @@ describe("Command Output Functions", () => {
       expect(output).toContain("spawn claude hetzner");
     });
 
-    it("should only show implemented clouds for aider", async () => {
-      await cmdAgentInfo("aider");
+    it("should only show implemented clouds for codex", async () => {
+      await cmdAgentInfo("codex");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("sprite");
-      // hetzner/aider is "missing" in mock manifest
-      expect(output).not.toContain("spawn aider hetzner");
+      // hetzner/codex is "missing" in mock manifest
+      expect(output).not.toContain("spawn codex hetzner");
     });
 
-    it("should show aider description", async () => {
-      await cmdAgentInfo("aider");
+    it("should show codex description", async () => {
+      await cmdAgentInfo("codex");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
       expect(output).toContain("AI pair programmer");
     });
   });

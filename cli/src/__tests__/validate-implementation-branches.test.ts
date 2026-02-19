@@ -32,12 +32,12 @@ const manyCloudManifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -110,24 +110,24 @@ const manyCloudManifest = {
     "linode/claude": "implemented",
     "digitalocean/claude": "implemented",
     "broken/claude": "missing",
-    "sprite/aider": "missing",
-    "hetzner/aider": "missing",
-    "vultr/aider": "missing",
-    "linode/aider": "missing",
-    "digitalocean/aider": "missing",
-    "broken/aider": "missing",
+    "sprite/codex": "missing",
+    "hetzner/codex": "missing",
+    "vultr/codex": "missing",
+    "linode/codex": "missing",
+    "digitalocean/codex": "missing",
+    "broken/codex": "missing",
   },
 };
 
-// Manifest where aider has exactly 3 implemented clouds (boundary case)
+// Manifest where codex has exactly 3 implemented clouds (boundary case)
 const threeCloudManifest = {
   agents: {
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -174,22 +174,22 @@ const threeCloudManifest = {
     },
   },
   matrix: {
-    "sprite/aider": "implemented",
-    "hetzner/aider": "implemented",
-    "vultr/aider": "implemented",
-    "broken/aider": "missing",
+    "sprite/codex": "implemented",
+    "hetzner/codex": "implemented",
+    "vultr/codex": "implemented",
+    "broken/codex": "missing",
   },
 };
 
-// Manifest where aider has exactly 4 clouds (first case >3)
+// Manifest where codex has exactly 4 clouds (first case >3)
 const fourCloudManifest = {
   agents: {
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -246,23 +246,23 @@ const fourCloudManifest = {
     },
   },
   matrix: {
-    "sprite/aider": "implemented",
-    "hetzner/aider": "implemented",
-    "vultr/aider": "implemented",
-    "linode/aider": "implemented",
-    "broken/aider": "missing",
+    "sprite/codex": "implemented",
+    "hetzner/codex": "implemented",
+    "vultr/codex": "implemented",
+    "linode/codex": "implemented",
+    "broken/codex": "missing",
   },
 };
 
-// Manifest where aider has 0 clouds implemented
+// Manifest where codex has 0 clouds implemented
 const noCloudManifest = {
   agents: {
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -289,20 +289,20 @@ const noCloudManifest = {
     },
   },
   matrix: {
-    "sprite/aider": "missing",
-    "hetzner/aider": "missing",
+    "sprite/codex": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
-// Manifest where aider has exactly 2 clouds (existing tested case, included for completeness)
+// Manifest where codex has exactly 2 clouds (existing tested case, included for completeness)
 const twoCloudManifest = {
   agents: {
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -339,9 +339,9 @@ const twoCloudManifest = {
     },
   },
   matrix: {
-    "sprite/aider": "implemented",
-    "hetzner/aider": "implemented",
-    "broken/aider": "missing",
+    "sprite/codex": "implemented",
+    "hetzner/codex": "implemented",
+    "broken/codex": "missing",
   },
 };
 
@@ -427,7 +427,7 @@ describe("validateImplementation branching", () => {
     it("should show 'no implemented cloud providers' when agent has 0 clouds", async () => {
       await setManifest(noCloudManifest);
 
-      await expect(cmdRun("aider", "sprite")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "sprite")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       expect(infos.some((msg: string) => msg.includes("no implemented cloud providers"))).toBe(true);
@@ -436,7 +436,7 @@ describe("validateImplementation branching", () => {
     it("should suggest 'spawn matrix' when agent has 0 clouds", async () => {
       await setManifest(noCloudManifest);
 
-      await expect(cmdRun("aider", "hetzner")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       expect(infos.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);
@@ -445,17 +445,17 @@ describe("validateImplementation branching", () => {
     it("should NOT show example spawn commands when agent has 0 clouds", async () => {
       await setManifest(noCloudManifest);
 
-      await expect(cmdRun("aider", "sprite")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "sprite")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
-      // Should not have any "spawn aider <cloud>" examples
-      expect(infos.some((msg: string) => /spawn aider \w+/.test(msg) && !msg.includes("spawn matrix"))).toBe(false);
+      // Should not have any "spawn codex <cloud>" examples
+      expect(infos.some((msg: string) => /spawn codex \w+/.test(msg) && !msg.includes("spawn matrix"))).toBe(false);
     });
 
     it("should show 'not yet implemented' error message", async () => {
       await setManifest(noCloudManifest);
 
-      await expect(cmdRun("aider", "sprite")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "sprite")).rejects.toThrow("process.exit");
 
       const errors = getErrorMessages();
       expect(errors.some((msg: string) => msg.includes("not yet implemented"))).toBe(true);
@@ -464,10 +464,10 @@ describe("validateImplementation branching", () => {
     it("should include agent and cloud display names in error", async () => {
       await setManifest(noCloudManifest);
 
-      await expect(cmdRun("aider", "sprite")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "sprite")).rejects.toThrow("process.exit");
 
       const errors = getErrorMessages();
-      expect(errors.some((msg: string) => msg.includes("Aider") && msg.includes("Sprite"))).toBe(true);
+      expect(errors.some((msg: string) => msg.includes("Codex") && msg.includes("Sprite"))).toBe(true);
     });
   });
 
@@ -477,20 +477,20 @@ describe("validateImplementation branching", () => {
     it("should show 2 example commands when agent has 2 clouds", async () => {
       await setManifest(twoCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
-      const exampleLines = infos.filter((msg: string) => msg.includes("spawn aider"));
+      const exampleLines = infos.filter((msg: string) => msg.includes("spawn codex"));
       // Should show exactly 2 cloud alternatives
       expect(exampleLines.length).toBe(2);
-      expect(infos.some((msg: string) => msg.includes("spawn aider sprite"))).toBe(true);
-      expect(infos.some((msg: string) => msg.includes("spawn aider hetzner"))).toBe(true);
+      expect(infos.some((msg: string) => msg.includes("spawn codex sprite"))).toBe(true);
+      expect(infos.some((msg: string) => msg.includes("spawn codex hetzner"))).toBe(true);
     });
 
     it("should show cloud count with correct singular/plural", async () => {
       await setManifest(twoCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       expect(infos.some((msg: string) => msg.includes("2 clouds"))).toBe(true);
@@ -499,20 +499,20 @@ describe("validateImplementation branching", () => {
     it("should show 3 examples at boundary (exactly 3 clouds)", async () => {
       await setManifest(threeCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
-      const exampleLines = infos.filter((msg: string) => msg.includes("spawn aider"));
+      const exampleLines = infos.filter((msg: string) => msg.includes("spawn codex"));
       expect(exampleLines.length).toBe(3);
-      expect(infos.some((msg: string) => msg.includes("spawn aider sprite"))).toBe(true);
-      expect(infos.some((msg: string) => msg.includes("spawn aider hetzner"))).toBe(true);
-      expect(infos.some((msg: string) => msg.includes("spawn aider vultr"))).toBe(true);
+      expect(infos.some((msg: string) => msg.includes("spawn codex sprite"))).toBe(true);
+      expect(infos.some((msg: string) => msg.includes("spawn codex hetzner"))).toBe(true);
+      expect(infos.some((msg: string) => msg.includes("spawn codex vultr"))).toBe(true);
     });
 
     it("should NOT show 'see all' hint when exactly 3 clouds", async () => {
       await setManifest(threeCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       // Should NOT have the "Run spawn X to see all" message
@@ -525,13 +525,13 @@ describe("validateImplementation branching", () => {
         agents: noCloudManifest.agents,
         clouds: noCloudManifest.clouds,
         matrix: {
-          "sprite/aider": "implemented",
-          "hetzner/aider": "missing",
+          "sprite/codex": "implemented",
+          "hetzner/codex": "missing",
         },
       };
       await setManifest(oneCloudManifest);
 
-      await expect(cmdRun("aider", "hetzner")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       // Should say "1 cloud" (singular) not "1 clouds"
@@ -545,11 +545,11 @@ describe("validateImplementation branching", () => {
     it("should show only 3 example commands when agent has 4 clouds", async () => {
       await setManifest(fourCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       const exampleLines = infos.filter((msg: string) =>
-        /spawn aider (sprite|hetzner|vultr|linode)/.test(msg)
+        /spawn codex (sprite|hetzner|vultr|linode)/.test(msg)
       );
       expect(exampleLines.length).toBe(3);
     });
@@ -557,21 +557,21 @@ describe("validateImplementation branching", () => {
     it("should show 'see all' hint when agent has 4 clouds", async () => {
       await setManifest(fourCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       expect(infos.some((msg: string) => msg.includes("to see all") && msg.includes("4"))).toBe(true);
     });
 
-    it("should include 'spawn aider' in the see-all hint", async () => {
+    it("should include 'spawn codex' in the see-all hint", async () => {
       await setManifest(fourCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       const seeAllLine = infos.find((msg: string) => msg.includes("to see all"));
       expect(seeAllLine).toBeDefined();
-      expect(seeAllLine!).toContain("spawn aider");
+      expect(seeAllLine!).toContain("spawn codex");
     });
 
     it("should show only 3 example commands when agent has 5 clouds", async () => {
@@ -622,13 +622,13 @@ describe("validateImplementation branching", () => {
       expect(errors.some((msg: string) => msg.includes("Claude Code") && msg.includes("Broken Cloud"))).toBe(true);
     });
 
-    it("should show 0 implemented clouds and no examples for aider on broken-cloud manifest", async () => {
+    it("should show 0 implemented clouds and no examples for codex on broken-cloud manifest", async () => {
       await setManifest(manyCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
-      // aider has 0 implemented clouds in this manifest
+      // codex has 0 implemented clouds in this manifest
       expect(infos.some((msg: string) => msg.includes("no implemented cloud providers"))).toBe(true);
       expect(infos.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);
     });
@@ -672,11 +672,11 @@ describe("validateImplementation branching", () => {
     it("should NOT truncate at exactly 3 clouds", async () => {
       await setManifest(threeCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       // All 3 should be shown as examples
-      expect(infos.filter((msg: string) => msg.includes("spawn aider")).length).toBe(3);
+      expect(infos.filter((msg: string) => msg.includes("spawn codex")).length).toBe(3);
       // No truncation hint
       expect(infos.some((msg: string) => msg.includes("to see all"))).toBe(false);
     });
@@ -684,12 +684,12 @@ describe("validateImplementation branching", () => {
     it("should truncate at exactly 4 clouds", async () => {
       await setManifest(fourCloudManifest);
 
-      await expect(cmdRun("aider", "broken")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "broken")).rejects.toThrow("process.exit");
 
       const infos = getInfoMessages();
       // Only 3 examples shown
       const exampleLines = infos.filter((msg: string) =>
-        /spawn aider (sprite|hetzner|vultr|linode)/.test(msg)
+        /spawn codex (sprite|hetzner|vultr|linode)/.test(msg)
       );
       expect(exampleLines.length).toBe(3);
       // Truncation hint present

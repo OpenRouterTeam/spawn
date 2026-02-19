@@ -690,7 +690,7 @@ describe("renderListTable", () => {
         timestamp: new Date().toISOString(),
       },
       {
-        agent: "aider",
+        agent: "codex",
         cloud: "hetzner",
         timestamp: new Date().toISOString(),
       },
@@ -699,7 +699,7 @@ describe("renderListTable", () => {
     // Header line + separator + 2 data lines + 2 blank lines = 6
     expect(lines.length).toBe(6);
     expect(lines.some((l) => l.includes("Claude Code"))).toBe(true);
-    expect(lines.some((l) => l.includes("Aider"))).toBe(true);
+    expect(lines.some((l) => l.includes("Codex"))).toBe(true);
   });
 
   it("should show relative time for recent timestamps", () => {

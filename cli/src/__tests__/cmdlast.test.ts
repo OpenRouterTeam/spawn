@@ -170,7 +170,7 @@ describe("cmdLast", () => {
   describe("history with records (rerunning latest)", () => {
     const sampleRecords: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T14:30:00Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T14:30:00Z" },
       { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T09:15:00Z" },
     ];
 
@@ -572,7 +572,7 @@ describe("cmdLast", () => {
     it("should properly select most recent when records have same day", async () => {
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-03T10:00:00Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-03T15:00:00Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-03T15:00:00Z" },
         { agent: "gptme", cloud: "sprite", timestamp: "2026-01-03T09:00:00Z" },
       ]);
 

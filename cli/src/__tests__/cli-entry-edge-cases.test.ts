@@ -380,7 +380,7 @@ describe("subcommand output format verification", () => {
     const out = output(result);
     expect(out).toContain("Agents");
     expect(out).toContain("claude");
-    expect(out).toContain("aider");
+    expect(out).toContain("codex");
     expect(result.exitCode).toBe(0);
   });
 
@@ -539,7 +539,7 @@ describe("extra positional argument warnings", () => {
 
 describe("mismatched argument type detection", () => {
   it("should detect two agents passed as agent+cloud", () => {
-    const result = runCli(["claude", "aider"]);
+    const result = runCli(["claude", "codex"]);
     const out = output(result);
     expect(out).toContain("is an agent");
     expect(out).toContain("spawn <agent> <cloud>");

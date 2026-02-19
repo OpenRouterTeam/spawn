@@ -36,12 +36,12 @@ const multiAuthManifest: Manifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "$OPENROUTER_API_KEY" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "$OPENROUTER_API_KEY" },
     },
   },
@@ -89,14 +89,14 @@ const multiAuthManifest: Manifest = {
   },
   matrix: {
     "upcloud/claude": "implemented",
-    "upcloud/aider": "implemented",
+    "upcloud/codex": "implemented",
     "oauthcloud/claude": "implemented",
-    "oauthcloud/aider": "missing",
+    "oauthcloud/codex": "missing",
     "nonecloud/claude": "implemented",
-    "nonecloud/aider": "implemented",
+    "nonecloud/codex": "implemented",
     // emptycloud has no implementations
     "emptycloud/claude": "missing",
-    "emptycloud/aider": "missing",
+    "emptycloud/codex": "missing",
   },
 };
 
@@ -104,12 +104,12 @@ const multiAuthManifest: Manifest = {
 const manyAgentManifest: Manifest = {
   agents: {
     claude: { name: "Claude Code", description: "a", url: "", install: "", launch: "", env: {} },
-    aider: { name: "Aider", description: "b", url: "", install: "", launch: "", env: {} },
-    codex: { name: "Codex", description: "c", url: "", install: "", launch: "", env: {} },
-    cline: { name: "Cline", description: "d", url: "", install: "", launch: "", env: {} },
+    codex: { name: "Codex", description: "b", url: "", install: "", launch: "", env: {} },
+    cline: { name: "Cline", description: "c", url: "", install: "", launch: "", env: {} },
+    gptme: { name: "GPTMe", description: "d", url: "", install: "", launch: "", env: {} },
     continue: { name: "Continue", description: "e", url: "", install: "", launch: "", env: {} },
-    goose: { name: "Goose", description: "f", url: "", install: "", launch: "", env: {} },
-    gemini: { name: "Gemini CLI", description: "g", url: "", install: "", launch: "", env: {} },
+    plandex: { name: "Plandex", description: "f", url: "", install: "", launch: "", env: {} },
+    opencode: { name: "OpenCode", description: "g", url: "", install: "", launch: "", env: {} },
   },
   clouds: {
     testcloud: {
@@ -126,12 +126,12 @@ const manyAgentManifest: Manifest = {
   matrix: {
     "testcloud/claude": "implemented",
     // All others are missing - that's 6 missing agents (> 5 threshold)
-    "testcloud/aider": "missing",
     "testcloud/codex": "missing",
     "testcloud/cline": "missing",
+    "testcloud/gptme": "missing",
     "testcloud/continue": "missing",
-    "testcloud/goose": "missing",
-    "testcloud/gemini": "missing",
+    "testcloud/plandex": "missing",
+    "testcloud/opencode": "missing",
   },
 };
 
@@ -139,8 +139,8 @@ const manyAgentManifest: Manifest = {
 const fewMissingManifest: Manifest = {
   agents: {
     claude: { name: "Claude Code", description: "a", url: "", install: "", launch: "", env: {} },
-    aider: { name: "Aider", description: "b", url: "", install: "", launch: "", env: {} },
-    codex: { name: "Codex", description: "c", url: "", install: "", launch: "", env: {} },
+    codex: { name: "Codex", description: "b", url: "", install: "", launch: "", env: {} },
+    gptme: { name: "GPTMe", description: "c", url: "", install: "", launch: "", env: {} },
   },
   clouds: {
     testcloud: {
@@ -156,8 +156,8 @@ const fewMissingManifest: Manifest = {
   },
   matrix: {
     "testcloud/claude": "implemented",
-    "testcloud/aider": "missing",
     "testcloud/codex": "missing",
+    "testcloud/gptme": "missing",
   },
 };
 
@@ -376,7 +376,7 @@ describe("cmdCloudInfo - Quick start with multi-auth", () => {
       expect(output).toContain("Quick start");
       // No agents means no "spawn <agent> emptycloud" example
       expect(output).not.toContain("spawn claude emptycloud");
-      expect(output).not.toContain("spawn aider emptycloud");
+      expect(output).not.toContain("spawn codex emptycloud");
     });
 
     it("should still show auth env var in Quick start", async () => {
@@ -438,7 +438,7 @@ describe("cmdCloudInfo - Not yet available agents", () => {
       await cmdCloudInfo("testcloud");
       const output = getOutput();
       expect(output).toContain("Not yet available");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
       expect(output).toContain("Codex");
     });
 
@@ -480,11 +480,11 @@ describe("cmdCloudInfo - Not yet available agents", () => {
       const fiveMissingManifest: Manifest = {
         agents: {
           claude: { name: "Claude Code", description: "a", url: "", install: "", launch: "", env: {} },
-          aider: { name: "Aider", description: "b", url: "", install: "", launch: "", env: {} },
-          codex: { name: "Codex", description: "c", url: "", install: "", launch: "", env: {} },
-          cline: { name: "Cline", description: "d", url: "", install: "", launch: "", env: {} },
+          codex: { name: "Codex", description: "b", url: "", install: "", launch: "", env: {} },
+          cline: { name: "Cline", description: "c", url: "", install: "", launch: "", env: {} },
+          gptme: { name: "GPTMe", description: "d", url: "", install: "", launch: "", env: {} },
           continue: { name: "Continue", description: "e", url: "", install: "", launch: "", env: {} },
-          goose: { name: "Goose", description: "f", url: "", install: "", launch: "", env: {} },
+          opencode: { name: "OpenCode", description: "f", url: "", install: "", launch: "", env: {} },
         },
         clouds: {
           testcloud: {
@@ -500,11 +500,11 @@ describe("cmdCloudInfo - Not yet available agents", () => {
         },
         matrix: {
           "testcloud/claude": "implemented",
-          "testcloud/aider": "missing",
           "testcloud/codex": "missing",
           "testcloud/cline": "missing",
+          "testcloud/gptme": "missing",
           "testcloud/continue": "missing",
-          "testcloud/goose": "missing",
+          "testcloud/opencode": "missing",
         },
       };
       await setupManifest(fiveMissingManifest);
@@ -517,7 +517,7 @@ describe("cmdCloudInfo - Not yet available agents", () => {
   describe("zero missing agents (all implemented)", () => {
     it("should NOT show 'Not yet available' section", async () => {
       await setupManifest(multiAuthManifest);
-      // upcloud has both claude and aider implemented
+      // upcloud has both claude and codex implemented
       await cmdCloudInfo("upcloud");
       const output = getOutput();
       expect(output).not.toContain("Not yet available");
