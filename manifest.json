@@ -136,11 +136,9 @@
       "install": "npm install -g @google/gemini-cli",
       "launch": "gemini",
       "env": {
-        "GEMINI_API_KEY": "${OPENROUTER_API_KEY}",
-        "GOOGLE_GEMINI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Works with OpenRouter via GOOGLE_GEMINI_BASE_URL override",
+      "notes": "Gemini CLI uses Google's native API format — cannot route through OpenRouter",
       "featured_cloud": "gcp"
     },
     "amazonq": {
