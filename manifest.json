@@ -232,7 +232,7 @@
     "local/openclaw": "implemented",
     "local/zeroclaw": "implemented",
     "local/codex": "implemented",
-    "local/opencode": "missing",
+    "local/opencode": "implemented",
     "local/kilocode": "implemented",
     "hetzner/claude": "implemented",
     "hetzner/openclaw": "implemented",
