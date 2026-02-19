@@ -13,7 +13,7 @@ log_info "Kilo Code on Sprite"
 echo ""
 
 agent_install() {
-    install_agent "Kilo Code" "npm install -g @kilocode/cli" cloud_run
+    install_agent "Kilo Code" "export PATH=\$(npm prefix -g 2>/dev/null)/bin:\$PATH && npm install -g @kilocode/cli" cloud_run
 }
 
 agent_env_vars() {
@@ -24,7 +24,7 @@ agent_env_vars() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; kilocode'
+    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; kilocode'
 }
 
 spawn_agent "Kilo Code"
