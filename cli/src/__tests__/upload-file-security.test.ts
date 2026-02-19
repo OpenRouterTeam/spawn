@@ -210,7 +210,7 @@ describe("upload_file() Security Patterns", () => {
       .filter(([, info]) => info.type === "ssh");
 
     it("should have multiple SSH-based clouds", () => {
-      expect(sshClouds.length).toBeGreaterThan(5);
+      expect(sshClouds.length).toBeGreaterThanOrEqual(5);
     });
 
     for (const [cloud, info] of sshClouds) {

@@ -204,11 +204,13 @@ describe("Agent Environment Variable Injection Contract", () => {
         // 3. Manual prompt: get_openrouter_api_key_manual
         // 4. try_oauth_flow
         // 5. Shared helper: get_or_prompt_api_key (wraps env check + OAuth)
+        // 6. spawn_agent orchestrator (calls get_or_prompt_api_key internally)
         const hasEnvCheck = code.includes("OPENROUTER_API_KEY:-") || code.includes("OPENROUTER_API_KEY:=");
         const hasOAuth = code.includes("get_openrouter_api_key_oauth") || code.includes("try_oauth_flow");
         const hasManual = code.includes("get_openrouter_api_key_manual");
         const hasSharedHelper = code.includes("get_or_prompt_api_key");
-        const hasAnyAcquisition = hasEnvCheck || hasOAuth || hasManual || hasSharedHelper;
+        const hasSpawnAgent = code.includes("spawn_agent");
+        const hasAnyAcquisition = hasEnvCheck || hasOAuth || hasManual || hasSharedHelper || hasSpawnAgent;
 
         if (!hasAnyAcquisition) {
           failures.push(key + ".sh");
