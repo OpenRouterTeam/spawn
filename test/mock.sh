@@ -340,8 +340,6 @@ _strip_api_base() {
             endpoint="${url#https://api.hetzner.cloud/v1}" ;;
         https://api.digitalocean.com/v2*)
             endpoint="${url#https://api.digitalocean.com/v2}" ;;
-        *eu.api.ovh.com*)
-            endpoint=$(echo "$url" | sed 's|https://eu.api.ovh.com/1.0||') ;;
         https://api.machines.dev/v1*)
             endpoint="${url#https://api.machines.dev/v1}" ;;
     esac
@@ -357,7 +355,6 @@ _get_required_fields() {
     case "${cloud}:${endpoint}" in
         hetzner:/servers) echo "name server_type image location" ;;
         digitalocean:/droplets) echo "name region size image" ;;
-        ovh:*/create) echo "name" ;;
         fly:*/machines) echo "name region config" ;;
     esac
 }

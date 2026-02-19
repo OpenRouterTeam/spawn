@@ -61,7 +61,6 @@ _get_name_env_var() {
         digitalocean) echo "DO_DROPLET_NAME" ;;
         aws)          echo "LIGHTSAIL_SERVER_NAME" ;;
         daytona)      echo "DAYTONA_SANDBOX_NAME" ;;
-        ovh)          echo "OVH_SERVER_NAME" ;;
         gcp)          echo "GCP_INSTANCE_NAME" ;;
 
         sprite)       echo "SPRITE_NAME" ;;
@@ -76,7 +75,6 @@ _get_token_env_var() {
         hetzner)      echo "HCLOUD_TOKEN" ;;
         digitalocean) echo "DO_API_TOKEN" ;;
         daytona)      echo "DAYTONA_API_KEY" ;;
-        ovh)          echo "OVH_APP_KEY" ;;
         *)            echo "" ;;
     esac
 }
@@ -378,20 +376,6 @@ for d in data.get('droplets', []):
             source "${REPO_ROOT}/daytona/lib/common.sh" 2>/dev/null || return 0
             destroy_server "$server_name" 2>/dev/null || true
             ;;
-        ovh)
-            source "${REPO_ROOT}/ovh/lib/common.sh" 2>/dev/null || return 0
-            # OVH needs instance ID — list and find by name
-            local instances_json iid
-            instances_json=$(ovh_api GET "/cloud/project/${OVH_PROJECT_ID:-}/instance" 2>/dev/null) || return 0
-            iid=$(printf '%s' "$instances_json" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for i in (data if isinstance(data, list) else []):
-    if i.get('name') == '${server_name}':
-        print(i['id']); break
-" 2>/dev/null) || return 0
-            [[ -n "$iid" ]] && destroy_server "$iid" 2>/dev/null || true
-            ;;
     esac
 }
 
@@ -419,10 +403,6 @@ _setup_noninteractive_env() {
         gcp)
             export GCP_ZONE="${GCP_ZONE:-us-central1-a}"
             export GCP_MACHINE_TYPE="${GCP_MACHINE_TYPE:-e2-micro}"
-            ;;
-        ovh)
-            export OVH_REGION="${OVH_REGION:-GRA7}"
-            export OVH_FLAVOR="${OVH_FLAVOR:-d2-2}"
             ;;
     esac
 }
@@ -1034,7 +1014,7 @@ main() {
     E2E_RESULTS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/e2e-results-XXXXXX")
 
     # Testable clouds (excludes local, sprite which don't provision real servers the same way)
-    local testable_clouds="fly hetzner digitalocean ovh aws daytona gcp"
+    local testable_clouds="fly hetzner digitalocean aws daytona gcp"
 
     # --- Credential collection (interactive) ---
     # Load tokens from config files and prompt for any missing ones

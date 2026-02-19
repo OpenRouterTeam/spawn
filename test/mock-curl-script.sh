@@ -86,7 +86,6 @@ _strip_api_base() {
     case "$URL" in
         https://api.hetzner.cloud/v1*)     ENDPOINT="${URL#https://api.hetzner.cloud/v1}" ;;
         https://api.digitalocean.com/v2*)   ENDPOINT="${URL#https://api.digitalocean.com/v2}" ;;
-        *eu.api.ovh.com*)                   ENDPOINT=$(echo "$URL" | sed 's|https://eu.api.ovh.com/1.0||') ;;
         https://api.machines.dev/v1*)       ENDPOINT="${URL#https://api.machines.dev/v1}" ;;
     esac
     EP_CLEAN=$(echo "$ENDPOINT" | sed 's|?.*||')
@@ -110,7 +109,6 @@ _validate_body() {
     case "${MOCK_CLOUD}" in
         hetzner)     case "$EP_CLEAN" in /servers)          _check_fields "name server_type image location" ;; esac ;;
         digitalocean) case "$EP_CLEAN" in /droplets)        _check_fields "name region size image" ;; esac ;;
-        ovh)         case "$EP_CLEAN" in */create)          _check_fields "name" ;; esac ;;
         fly)         case "$EP_CLEAN" in */machines)        _check_fields "name region config" ;; esac ;;
     esac
 }

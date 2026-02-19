@@ -27,7 +27,7 @@
           "bypassPermissionsModeAccepted": true
         }
       },
-      "featured_cloud": "sprite"
+      "featured_cloud": ["sprite"]
     },
     "openclaw": {
       "name": "OpenClaw",
@@ -47,7 +47,7 @@
           "default": "openrouter/auto"
         }
       },
-      "featured_cloud": "fly"
+      "featured_cloud": ["fly"]
     },
     "nanoclaw": {
       "name": "NanoClaw",
@@ -70,7 +70,7 @@
         }
       },
       "notes": "Requires WhatsApp QR code scan for authentication",
-      "featured_cloud": "fly"
+      "featured_cloud": ["fly"]
     },
     "codex": {
       "name": "Codex CLI",
@@ -84,7 +84,7 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1",
-      "featured_cloud": "fly"
+      "featured_cloud": ["fly"]
     },
     "cline": {
       "name": "Cline",
@@ -98,7 +98,7 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override",
-      "featured_cloud": "fly"
+      "featured_cloud": ["fly"]
     },
     "gptme": {
       "name": "gptme",
@@ -116,7 +116,7 @@
         }
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and -m openrouter/... flag",
-      "featured_cloud": "daytona"
+      "featured_cloud": ["daytona"]
     },
     "opencode": {
       "name": "OpenCode",
@@ -128,7 +128,7 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea.",
-      "featured_cloud": "daytona"
+      "featured_cloud": ["daytona"]
     },
     "plandex": {
       "name": "Plandex",
@@ -140,7 +140,7 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based CLI with sandbox and version control for AI changes.",
-      "featured_cloud": "daytona"
+      "featured_cloud": ["daytona"]
     },
     "kilocode": {
       "name": "Kilo Code",
@@ -154,7 +154,7 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'.",
-      "featured_cloud": "fly"
+      "featured_cloud": ["fly"]
     },
     "continue": {
       "name": "Continue",
@@ -179,7 +179,7 @@
         }
       },
       "notes": "Natively supports OpenRouter via config.json. CLI supports TUI mode (interactive) and headless mode (-p flag). 31K+ GitHub stars.",
-      "featured_cloud": "fly"
+      "featured_cloud": ["fly"]
     }
   },
   "clouds": {
@@ -208,22 +208,6 @@
         "location": "fsn1",
         "image": "ubuntu-24.04"
       }
-    },
-    "ovh": {
-      "name": "OVHcloud",
-      "description": "OVHcloud Public Cloud instances via REST API",
-      "url": "https://www.ovhcloud.com/",
-      "type": "api",
-      "auth": "OVH_APPLICATION_KEY + OVH_APPLICATION_SECRET + OVH_CONSUMER_KEY + OVH_PROJECT_ID",
-      "provision_method": "POST /cloud/project/{projectId}/instance with signature auth",
-      "exec_method": "ssh ubuntu@IP",
-      "interactive_method": "ssh -t ubuntu@IP",
-      "defaults": {
-        "flavor": "d2-2",
-        "region": "GRA7",
-        "image": "Ubuntu 24.04"
-      },
-      "notes": "Major European cloud provider. Uses signature-based auth (Application Key + Secret + Consumer Key). Requires OVH_PROJECT_ID for Public Cloud. Create credentials at https://api.ovh.com/createToken/"
     },
     "fly": {
       "name": "Fly.io",
@@ -373,14 +357,6 @@
     "gcp/plandex": "implemented",
     "fly/plandex": "implemented",
     "daytona/plandex": "implemented",
-    "ovh/claude": "implemented",
-    "ovh/codex": "implemented",
-    "ovh/openclaw": "implemented",
-    "ovh/nanoclaw": "implemented",
-    "ovh/cline": "implemented",
-    "ovh/gptme": "implemented",
-    "ovh/opencode": "implemented",
-    "ovh/plandex": "implemented",
     "sprite/kilocode": "implemented",
     "hetzner/kilocode": "implemented",
     "digitalocean/kilocode": "implemented",
@@ -388,7 +364,6 @@
     "gcp/kilocode": "implemented",
     "fly/kilocode": "implemented",
     "daytona/kilocode": "implemented",
-    "ovh/kilocode": "implemented",
     "sprite/continue": "implemented",
     "hetzner/continue": "implemented",
     "digitalocean/continue": "implemented",
@@ -396,7 +371,6 @@
     "gcp/continue": "implemented",
     "fly/continue": "implemented",
     "daytona/continue": "implemented",
-    "ovh/continue": "implemented",
     "local/claude": "implemented",
     "local/openclaw": "implemented",
     "local/nanoclaw": "implemented",

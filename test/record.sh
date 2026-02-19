@@ -37,7 +37,7 @@ ERRORS=0
 PROMPT_FOR_CREDS=true
 
 # All clouds with REST APIs that we can record from
-ALL_RECORDABLE_CLOUDS="hetzner digitalocean ovh fly"
+ALL_RECORDABLE_CLOUDS="hetzner digitalocean fly"
 
 # --- Endpoint registry ---
 # Declare endpoints as string literal for each cloud
@@ -58,12 +58,6 @@ regions:/regions
 "
 
 
-_ENDPOINTS_ovh="
-flavors:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/flavor
-images:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/image
-ssh_keys:/cloud/project/\${OVH_PROJECT_ID:-MISSING}/sshkey
-"
-
 _ENDPOINTS_fly="
 apps:/apps?org_slug=personal
 "
@@ -82,13 +76,6 @@ get_endpoints() {
 _get_multi_cred_spec() {
     local cloud="$1"
     case "$cloud" in
-        ovh)
-            printf '%s\n' \
-                "application_key:OVH_APPLICATION_KEY" \
-                "application_secret:OVH_APPLICATION_SECRET" \
-                "consumer_key:OVH_CONSUMER_KEY" \
-                "project_id:OVH_PROJECT_ID"
-            ;;
     esac
 }
 
@@ -173,7 +160,6 @@ get_auth_env_var() {
     case "$cloud" in
         hetzner)       printf "HCLOUD_TOKEN" ;;
         digitalocean)  printf "DO_API_TOKEN" ;;
-        ovh)           printf "OVH_APPLICATION_KEY" ;;
         fly)           printf "FLY_API_TOKEN" ;;
     esac
 }
@@ -328,7 +314,6 @@ call_api() {
     case "$cloud" in
         hetzner)       hetzner_api GET "$endpoint" ;;
         digitalocean)  do_api GET "$endpoint" ;;
-        ovh)           ovh_api_call GET "$endpoint" ;;
         fly)           curl -fsSL -H "Authorization: ${FLY_API_TOKEN}" "https://api.machines.dev/v1${endpoint}" ;;
     esac
 }
@@ -353,7 +338,6 @@ success_keys = {'servers','images','ssh_keys','flavors','sizes','regions','count
 error_checks = {
     'hetzner': lambda d: d.get('error') and isinstance(d.get('error'), dict),
     'digitalocean': lambda d: 'id' in d and isinstance(d.get('id'), str) and 'message' in d,
-    'ovh': lambda d: 'message' in d and len(d) <= 3 and not any(k in d for k in success_keys),
     'fly': lambda d: 'error' in d and isinstance(d.get('error'), str),
 }
 
