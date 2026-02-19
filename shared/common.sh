@@ -3582,16 +3582,16 @@ save_vm_connection() {
 
     local conn_file="${spawn_dir}/last-connection.json"
 
-    # Build JSON (handle optional fields)
-    local json="{\"ip\":\"${ip}\",\"user\":\"${user}\""
+    # Build JSON using json_escape to prevent injection via special characters
+    local json="{\"ip\":$(json_escape "${ip}"),\"user\":$(json_escape "${user}")"
     if [[ -n "${server_id}" ]]; then
-        json="${json},\"server_id\":\"${server_id}\""
+        json="${json},\"server_id\":$(json_escape "${server_id}")"
     fi
     if [[ -n "${server_name}" ]]; then
-        json="${json},\"server_name\":\"${server_name}\""
+        json="${json},\"server_name\":$(json_escape "${server_name}")"
     fi
     if [[ -n "${cloud}" ]]; then
-        json="${json},\"cloud\":\"${cloud}\""
+        json="${json},\"cloud\":$(json_escape "${cloud}")"
     fi
     if [[ -n "${metadata}" ]]; then
         json="${json},\"metadata\":${metadata}"

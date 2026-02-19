@@ -139,7 +139,7 @@ ensure_daytona_token() {
 }
 
 get_server_name() {
-    get_resource_name "DAYTONA_SANDBOX_NAME" "Enter sandbox name: "
+    get_validated_server_name "DAYTONA_SANDBOX_NAME" "Enter sandbox name: "
 }
 
 _is_snapshot_conflict() {

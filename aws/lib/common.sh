@@ -130,7 +130,7 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    get_resource_name "LIGHTSAIL_SERVER_NAME" "Enter Lightsail instance name: "
+    get_validated_server_name "LIGHTSAIL_SERVER_NAME" "Enter Lightsail instance name: "
 }
 
 get_cloud_init_userdata() {
