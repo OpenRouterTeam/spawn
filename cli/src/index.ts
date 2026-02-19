@@ -20,6 +20,7 @@ import {
   resolveAgentKey,
   resolveCloudKey,
   loadManifestWithSpinner,
+  isInteractiveTTY,
 } from "./commands.js";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
@@ -27,10 +28,6 @@ import { checkForUpdates } from "./update-check.js";
 import { loadManifest, agentKeys, cloudKeys, getCacheAge } from "./manifest.js";
 
 const VERSION = pkg.version;
-
-function isInteractiveTTY(): boolean {
-  return process.stdin.isTTY && process.stdout.isTTY;
-}
 
 function handleError(err: unknown): never {
   // Use duck typing instead of instanceof to avoid prototype chain issues

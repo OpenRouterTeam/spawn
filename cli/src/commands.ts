@@ -480,13 +480,14 @@ export async function cmdInteractive(): Promise<void> {
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
   const manifest = await loadManifestWithSpinner();
-  const spawnName = await promptSpawnName();
   const agentChoice = await selectAgent(manifest);
 
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, agentChoice);
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
 
   await preflightCredentialCheck(manifest, cloudChoice);
+
+  const spawnName = await promptSpawnName();
 
   const agentName = manifest.agents[agentChoice].name;
   const cloudName = manifest.clouds[cloudChoice].name;
@@ -502,7 +503,6 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   p.intro(pc.inverse(` spawn v${VERSION} `));
 
   const manifest = await loadManifestWithSpinner();
-  const spawnName = await promptSpawnName();
   const resolvedAgent = resolveAgentKey(manifest, agent);
 
   if (!resolvedAgent) {
@@ -519,6 +519,8 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
 
   await preflightCredentialCheck(manifest, cloudChoice);
+
+  const spawnName = await promptSpawnName();
 
   const agentName = manifest.agents[resolvedAgent].name;
   const cloudName = manifest.clouds[cloudChoice].name;
@@ -1682,7 +1684,7 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
   console.log();
 }
 
-function isInteractiveTTY(): boolean {
+export function isInteractiveTTY(): boolean {
   return !!(process.stdin.isTTY && process.stdout.isTTY);
 }
 
