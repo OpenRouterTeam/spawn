@@ -16,7 +16,7 @@ AGENT_MODEL_PROMPT=1
 AGENT_MODEL_DEFAULT="openrouter/auto"
 
 agent_install() {
-    install_agent "openclaw" "export PATH=\$HOME/.bun/bin:/.sprite/languages/bun/bin:\$PATH && bun install -g openclaw" cloud_run
+    install_agent "openclaw" "export PATH=\$HOME/.bun/bin:/.sprite/languages/bun/bin:\$PATH && npm install -g openclaw" cloud_run
 }
 
 agent_env_vars() {
