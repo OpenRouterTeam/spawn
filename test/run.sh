@@ -656,7 +656,7 @@ _run_shellcheck_on_scripts() {
         # SC1090: Can't follow non-constant source
         # SC2312: Consider invoking this command separately to avoid masking its return value
         local output
-        output=$(shellcheck --severity=warning --exclude=SC1090,SC2312 "${script}" 2>&1)
+        output=$(shellcheck --severity=warning --exclude=SC1090,SC2312 "${script}" 2>&1) || true
 
         if [[ -n "${output}" ]]; then
             issue_count=$((issue_count + 1))

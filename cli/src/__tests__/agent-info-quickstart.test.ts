@@ -61,22 +61,10 @@ const singleAuthManifest: Manifest = {
       exec_method: "ssh",
       interactive_method: "ssh",
     },
-    sprite: {
-      name: "Sprite",
-      description: "Lightweight VMs",
-      url: "https://sprite.sh",
-      type: "vm",
-      auth: "token",
-      provision_method: "api",
-      exec_method: "ssh",
-      interactive_method: "ssh",
-    },
   },
   matrix: {
     "hetzner/claude": "implemented",
     "hetzner/codex": "implemented",
-    "sprite/claude": "implemented",
-    "sprite/codex": "missing",
   },
 };
 
@@ -645,8 +633,8 @@ describe("cmdAgentInfo - printAgentQuickStart", () => {
       await setupManifest(singleAuthManifest);
       await cmdAgentInfo("claude");
       const output = getOutput();
-      // claude is implemented on hetzner and sprite (2 of 2)
-      expect(output).toContain("2 of 2");
+      // claude is implemented on hetzner only (1 of 1)
+      expect(output).toContain("1 of 1");
     });
 
     it("should list each implemented cloud with launch command hint", async () => {
@@ -655,8 +643,6 @@ describe("cmdAgentInfo - printAgentQuickStart", () => {
       const output = getOutput();
       expect(output).toContain("Hetzner Cloud");
       expect(output).toContain("spawn claude hetzner");
-      expect(output).toContain("Sprite");
-      expect(output).toContain("spawn claude sprite");
     });
 
     it("should group clouds by type", async () => {

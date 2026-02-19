@@ -533,7 +533,9 @@ describe("prioritizeCloudsByCredentials with env vars", () => {
     const { credCount, hintOverrides } = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(credCount).toBe(0);
-    expect(Object.keys(hintOverrides)).toHaveLength(0);
+    // Only check credential-based overrides (CLI-installed overrides are environment-dependent)
+    const credOverrides = Object.values(hintOverrides).filter(h => h.startsWith("credentials detected"));
+    expect(credOverrides).toHaveLength(0);
   });
 
   it("should handle multi-variable auth (UpCloud)", () => {
