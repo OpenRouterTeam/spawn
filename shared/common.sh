@@ -3208,7 +3208,7 @@ setup_openclaw_config() {
 start_openclaw_gateway() {
     local run_callback="${1}"
     log_step "Starting OpenClaw gateway daemon..."
-    ${run_callback} "source ~/.spawnrc 2>/dev/null; export PATH=\$HOME/.bun/bin:/.sprite/languages/bun/bin:\$HOME/.local/bin:\$PATH; if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi"
+    ${run_callback} "source ~/.spawnrc 2>/dev/null; export PATH=\$(npm prefix -g 2>/dev/null)/bin:\$HOME/.bun/bin:/.sprite/languages/bun/bin:\$HOME/.local/bin:\$PATH; if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi"
 }
 
 # Wait for OpenClaw gateway to be ready
@@ -3221,7 +3221,7 @@ start_openclaw_gateway() {
 #   0 if gateway starts successfully, 1 if timeout
 wait_for_openclaw_gateway() {
     local run_callback="${1}"
-    local max_wait=30
+    local max_wait=60
     local elapsed=0
 
     log_step "Waiting for OpenClaw gateway to start..."

@@ -16,8 +16,8 @@ AGENT_MODEL_PROMPT=1
 AGENT_MODEL_DEFAULT="openrouter/auto"
 
 agent_install() {
-    # npm global bin may not be in PATH on sprites — find it and persist to .spawnrc
-    install_agent "openclaw" "export PATH=\$HOME/.bun/bin:/.sprite/languages/bun/bin:\$PATH && npm install -g openclaw && NPM_BIN=\$(npm bin -g 2>/dev/null) && echo \"export PATH=\$NPM_BIN:\\\$PATH\" >> ~/.spawnrc && export PATH=\$NPM_BIN:\$PATH && command -v openclaw" cloud_run
+    # npm global prefix on sprites is under nvm — bin dir is not in default PATH
+    install_agent "openclaw" "export PATH=\$(npm prefix -g 2>/dev/null)/bin:\$HOME/.bun/bin:/.sprite/languages/bun/bin:\$PATH && npm install -g openclaw && command -v openclaw" cloud_run
 }
 
 agent_env_vars() {
@@ -37,7 +37,7 @@ agent_pre_launch() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; openclaw tui'
+    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; openclaw tui'
 }
 
 spawn_agent "OpenClaw"

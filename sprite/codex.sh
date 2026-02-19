@@ -13,7 +13,7 @@ log_info "Codex CLI on Sprite"
 echo ""
 
 agent_install() {
-    install_agent "Codex CLI" "npm install -g @openai/codex" cloud_run
+    install_agent "Codex CLI" "export PATH=\$(npm prefix -g 2>/dev/null)/bin:\$PATH && npm install -g @openai/codex" cloud_run
 }
 
 agent_env_vars() {
@@ -24,7 +24,7 @@ agent_env_vars() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; codex'
+    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; codex'
 }
 
 spawn_agent "Codex CLI"
