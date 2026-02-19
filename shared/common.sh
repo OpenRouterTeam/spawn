@@ -1359,7 +1359,7 @@ offer_github_auth() {
     if [[ "${SPAWN_GITHUB_AUTH_PROMPTED:-}" == "1" ]]; then
         if [[ "${SPAWN_GITHUB_AUTH_REQUESTED:-}" == "1" ]]; then
             log_step "Installing and authenticating GitHub CLI..."
-            ${run_callback} "${gh_cmd}"
+            ${run_callback} "${gh_cmd}" || log_warn "GitHub CLI setup failed (non-fatal, continuing)"
         fi
         return 0
     fi
@@ -1387,7 +1387,7 @@ offer_github_auth() {
     fi
 
     log_step "Installing and authenticating GitHub CLI..."
-    ${run_callback} "${gh_cmd}"
+    ${run_callback} "${gh_cmd}" || log_warn "GitHub CLI setup failed (non-fatal, continuing)"
 }
 
 # ============================================================
