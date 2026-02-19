@@ -21,9 +21,7 @@ agent_install() {
 }
 agent_env_vars() {
     generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 }
 agent_launch_cmd() { printf 'export PATH="$HOME/.local/bin:$PATH"; source ~/.zshrc && interpreter --model %s --api_key %s' "${MODEL_ID}" "${OPENROUTER_API_KEY}"; }
 

@@ -383,9 +383,12 @@ install_base_deps() {
     # Install Claude Code
     run_ovh "$ip" "curl -fsSL https://claude.ai/install.sh | bash"
 
+    # Configure npm global prefix so non-root user can npm install -g without sudo
+    run_ovh "$ip" "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global"
+
     # Configure PATH
-    run_ovh "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.bashrc"
-    run_ovh "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.zshrc"
+    run_ovh "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.npm-global/bin:\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.bashrc"
+    run_ovh "$ip" "printf '%s\n' 'export PATH=\"\${HOME}/.npm-global/bin:\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.zshrc"
 
     log_info "Base dependencies installed"
 }

@@ -36,7 +36,7 @@ agent_configure() {
 }
 
 agent_pre_launch() {
-    cloud_run "source ~/.zshrc && nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 </dev/null & disown"
+    start_openclaw_gateway cloud_run
     wait_for_openclaw_gateway cloud_run
 }
 

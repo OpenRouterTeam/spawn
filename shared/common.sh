@@ -319,8 +319,10 @@ verify_openrouter_key() {
     if ! command -v curl &>/dev/null; then return 0; fi  # skip if no curl
 
     local response http_code
-    response=$(curl -s --connect-timeout 5 --max-time 10 -w "\n%{http_code}" \
-        -H "Authorization: Bearer ${api_key}" \
+    # Pass auth header via stdin (-K -) so the API key isn't visible in ps output
+    response=$(printf 'header = "Authorization: Bearer %s"\n' "${api_key}" | \
+        curl -s --connect-timeout 5 --max-time 10 -w "\n%{http_code}" \
+        -K - \
         "https://openrouter.ai/api/v1/auth/key" 2>/dev/null) || return 0  # network error = skip
     http_code=$(printf '%s' "${response}" | tail -1)
 
@@ -1342,7 +1344,7 @@ offer_github_auth() {
     # a merge to main. Base64-encode it for safe inline transport.
     local gh_cmd
     local _local_gh="${SCRIPT_DIR:-}/../../shared/github-auth.sh"
-    if [[ -n "${SCRIPT_DIR:-}" && -f "${_local_gh}" ]]; then
+    if [[ -n "${SCRIPT_DIR:-}" && -f "${_local_gh}" && ! -L "${_local_gh}" ]]; then
         local _gh_b64
         _gh_b64=$(base64 < "${_local_gh}" | tr -d '\n')
         gh_cmd="printf '%s' '${_gh_b64}' | base64 -d | bash"
@@ -1720,7 +1722,15 @@ spawn_agent() {
     server_name=$(get_server_name)
     cloud_provision "${server_name}"
 
-    # 6. Wait for readiness
+    # 4. Get API key while server provisions (overlaps with cloud-init)
+    get_or_prompt_api_key
+
+    # 5. Model selection while server provisions (if agent needs it)
+    if [[ -n "${AGENT_MODEL_PROMPT:-}" ]]; then
+        MODEL_ID=$(get_model_id_interactive "${AGENT_MODEL_DEFAULT:-openrouter/auto}" "${agent_name}") || exit 1
+    fi
+
+    # 6. Wait for readiness (may already be done after OAuth)
     cloud_wait_ready
 
     # 7. Install agent
@@ -2239,18 +2249,20 @@ execute_agent_non_interactive() {
 
     log_step "Executing ${agent_name} with prompt in non-interactive mode..."
 
-    # Escape the prompt for safe shell execution
-    # We use printf %q which properly escapes special characters for bash
-    local escaped_prompt
-    escaped_prompt=$(printf '%q' "${prompt}")
+    # Do NOT use printf '%q' here — the run callback (run_server, sprite exec,
+    # ssh) already handles escaping for remote transport. Double-escaping breaks
+    # prompts containing quotes, spaces, or special characters on Fly.io.
+    # Single-quote the prompt to protect it from shell expansion.
+    local safe_prompt
+    safe_prompt="'$(printf '%s' "${prompt}" | sed "s/'/'\\\\''/g")'"
 
     # Build the command based on exec callback type
     if [[ "${exec_callback}" == *"sprite"* ]]; then
         # Sprite execution (no -tty flag for non-interactive)
-        sprite exec -s "${sprite_name}" -- zsh -c "source ~/.zshrc && ${agent_name} ${agent_flags} ${escaped_prompt}"
+        sprite exec -s "${sprite_name}" -- zsh -c "source ~/.zshrc && ${agent_name} ${agent_flags} ${safe_prompt}"
     else
         # Generic SSH execution
-        ${exec_callback} "${sprite_name}" "source ~/.zshrc && ${agent_name} ${agent_flags} ${escaped_prompt}"
+        ${exec_callback} "${sprite_name}" "source ~/.zshrc && ${agent_name} ${agent_flags} ${safe_prompt}"
     fi
 }
 
@@ -2371,7 +2383,8 @@ ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
     # Single-quoted so $HOME/$PATH expand on the remote side, not locally.
-    local path_prefix='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
+    # .npm-global/bin: user-writable npm prefix (AWS Lightsail runs as ubuntu, not root)
+    local path_prefix='export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
         cmd="set -x; ${cmd}"
     fi
@@ -3188,6 +3201,22 @@ setup_openclaw_config() {
     local openclaw_json
     openclaw_json=$(_generate_openclaw_json "${openrouter_key}" "${model_id}" "${gateway_token}")
     upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "\$HOME/.openclaw/openclaw.json"
+}
+
+# Start OpenClaw gateway as a fully detached daemon
+# Usage: start_openclaw_gateway RUN_CALLBACK
+#
+# Arguments:
+#   RUN_CALLBACK - Function to run commands: func(command)
+#
+# SSH/exec channels hang if a backgrounded daemon inherits the session's file
+# descriptors. setsid creates a new session, fully detaching the gateway so
+# the channel can close. Falls back to nohup where setsid is unavailable
+# (e.g. macOS local — no SSH, so the hang doesn't apply).
+start_openclaw_gateway() {
+    local run_callback="${1}"
+    log_step "Starting OpenClaw gateway daemon..."
+    ${run_callback} "source ~/.zshrc 2>/dev/null; if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi"
 }
 
 # Wait for OpenClaw gateway to be ready

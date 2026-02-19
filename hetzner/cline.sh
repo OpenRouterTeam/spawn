@@ -16,9 +16,11 @@ echo ""
 agent_install() { install_agent "Cline" "npm install -g cline" cloud_run; }
 agent_env_vars() {
     generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "OPENAI_API_KEY=${OPENROUTER_API_KEY}" \
-        "OPENAI_BASE_URL=https://openrouter.ai/api/v1"
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
+}
+agent_configure() {
+    log_step "Authenticating Cline with OpenRouter..."
+    cloud_run "source ~/.zshrc && cline auth -p openrouter -k \"${OPENROUTER_API_KEY}\""
 }
 agent_launch_cmd() { echo 'source ~/.zshrc && cline'; }
 

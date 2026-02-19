@@ -33,39 +33,47 @@ SPAWN_DASHBOARD_URL="https://console.cloud.google.com/compute/instances"
 
 # Verify gcloud CLI is installed
 _gcp_check_cli_installed() {
+    if command -v gcloud &>/dev/null; then return 0; fi
+
+    log_step "Installing Google Cloud SDK..."
+    if [[ "$(uname)" == "Darwin" ]] && command -v brew &>/dev/null; then
+        brew install --cask google-cloud-sdk \
+            && log_info "Google Cloud SDK installed via Homebrew" \
+            || {
+                log_error "Auto-install failed. Install manually: brew install --cask google-cloud-sdk"
+                return 1
+            }
+        # Homebrew cask puts gcloud in a non-standard location — source it
+        local _gcloud_path
+        for _gcloud_path in \
+            "$(brew --prefix)/share/google-cloud-sdk/path.bash.inc" \
+            "$(brew --prefix)/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"; do
+            if [[ -f "${_gcloud_path}" ]]; then
+                source "${_gcloud_path}"
+                break
+            fi
+        done
+    else
+        # Linux / macOS without brew: use Google's installer
+        local _gcp_tmp
+        _gcp_tmp=$(mktemp -d)
+        curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" \
+            -o "${_gcp_tmp}/gcloud.tar.gz" \
+            && tar -xzf "${_gcp_tmp}/gcloud.tar.gz" -C "${HOME}" \
+            && "${HOME}/google-cloud-sdk/install.sh" --quiet --path-update true \
+            && export PATH="${HOME}/google-cloud-sdk/bin:${PATH}" \
+            && rm -rf "${_gcp_tmp}" \
+            && log_info "Google Cloud SDK installed" \
+            || {
+                rm -rf "${_gcp_tmp}"
+                log_error "Auto-install failed. Install manually:"
+                log_error "  https://cloud.google.com/sdk/docs/install"
+                return 1
+            }
+    fi
+
     if ! command -v gcloud &>/dev/null; then
-        log_error "Google Cloud SDK (gcloud) is required but not installed"
-        log_error ""
-        log_error "Possible causes:"
-        log_error "  - gcloud CLI has not been installed on this machine"
-        log_error ""
-        log_error "How to fix:"
-        log_error "  1. Install gcloud CLI for your platform:"
-        log_error ""
-        log_error "     ${CYAN}macOS (Homebrew)${NC}"
-        log_error "     brew install google-cloud-sdk"
-        log_error ""
-        log_error "     ${CYAN}Ubuntu/Debian${NC}"
-        log_error "     curl https://sdk.cloud.google.com | bash"
-        log_error "     exec -l \$SHELL  # Restart shell"
-        log_error ""
-        log_error "     ${CYAN}Fedora/RHEL${NC}"
-        log_error "     sudo tee -a /etc/yum.repos.d/google-cloud-sdk.repo << EOM"
-        log_error "     [google-cloud-cli]"
-        log_error "     name=Google Cloud CLI"
-        log_error "     baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64"
-        log_error "     enabled=1"
-        log_error "     gpgcheck=1"
-        log_error "     repo_gpgcheck=0"
-        log_error "     gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
-        log_error "     EOM"
-        log_error "     sudo dnf install google-cloud-cli"
-        log_error ""
-        log_error "  2. Full installation guide: ${CYAN}https://cloud.google.com/sdk/docs/install${NC}"
-        log_error ""
-        log_error "  3. After installation, authenticate:"
-        log_error "     gcloud auth login"
-        log_error "     gcloud config set project YOUR_PROJECT_ID"
+        log_error "gcloud not found after install. You may need to restart your shell."
         return 1
     fi
 }
@@ -249,8 +257,10 @@ if [[ ! "$GCP_USERNAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
 fi
 su - "$GCP_USERNAME" -c 'curl -fsSL https://bun.sh/install | bash' || true
 su - "$GCP_USERNAME" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
+# Configure npm global prefix so non-root user can npm install -g without sudo
+su - "$GCP_USERNAME" -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'
 # Configure PATH for all users
-echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /etc/profile.d/spawn.sh
+echo 'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /etc/profile.d/spawn.sh
 chmod +x /etc/profile.d/spawn.sh
 touch /tmp/.cloud-init-complete
 CLOUD_INIT_EOF
