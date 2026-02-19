@@ -1690,8 +1690,8 @@ _spawn_inject_env_vars() {
     cloud_run "cp '${temp_remote}' ~/.spawnrc && chmod 600 ~/.spawnrc && rm '${temp_remote}'"
 
     # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
-    cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc"
-    cloud_run "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc"
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc" || log_warn "Could not hook .spawnrc into .bashrc"
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc" || log_warn "Could not hook .spawnrc into .zshrc"
 
     offer_github_auth cloud_run
 }
@@ -1705,7 +1705,7 @@ spawn_agent() {
     cloud_authenticate
 
     # 2. Pre-provision hooks (e.g., prompt for GitHub auth)
-    if _fn_exists agent_pre_provision; then agent_pre_provision; fi
+    if _fn_exists agent_pre_provision; then agent_pre_provision || true; fi
 
     # 3. Get API key (before provisioning so user isn't waiting on server)
     get_or_prompt_api_key
@@ -1739,14 +1739,14 @@ spawn_agent() {
     # 8. Inject environment variables
     _spawn_inject_env_vars
 
-    # 9. Agent-specific configuration
-    if _fn_exists agent_configure; then agent_configure; fi
+    # 9. Agent-specific configuration (non-fatal — agent may work with defaults)
+    if _fn_exists agent_configure; then agent_configure || log_warn "Agent configuration failed (continuing with defaults)"; fi
 
-    # 10. Save connection info
-    if _fn_exists agent_save_connection; then agent_save_connection; fi
+    # 10. Save connection info (non-fatal — convenience feature only)
+    if _fn_exists agent_save_connection; then agent_save_connection || log_warn "Could not save connection info"; fi
 
-    # 11. Pre-launch hooks (e.g., start gateway daemon)
-    if _fn_exists agent_pre_launch; then agent_pre_launch; fi
+    # 11. Pre-launch hooks (non-fatal — e.g., gateway daemon may start slowly)
+    if _fn_exists agent_pre_launch; then agent_pre_launch || log_warn "Pre-launch hook failed (continuing)"; fi
 
     # 12. Launch interactive session
     log_info "${agent_name} is ready"
