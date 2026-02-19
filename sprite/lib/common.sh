@@ -13,6 +13,48 @@ fi
 # Configurable timeout/delay constants
 SPRITE_CONNECTIVITY_POLL_DELAY=${SPRITE_CONNECTIVITY_POLL_DELAY:-5}  # Delay between sprite connectivity checks
 
+# Retry wrapper for transient Sprite API errors (TLS timeouts, connection resets, etc.)
+# Usage: _sprite_retry "description" command [args...]
+_sprite_retry() {
+    local desc="$1"
+    shift
+    local attempt=1
+    local max_retries=3
+    local rc=0
+    local stderr_file
+    stderr_file=$(mktemp)
+
+    while true; do
+        rc=0
+        "$@" 2>"${stderr_file}" || rc=$?
+        if [[ "${rc}" -eq 0 ]]; then
+            rm -f "${stderr_file}"
+            return 0
+        fi
+
+        if [[ "${attempt}" -ge "${max_retries}" ]]; then
+            cat "${stderr_file}" >&2 2>/dev/null || true
+            rm -f "${stderr_file}"
+            return "${rc}"
+        fi
+
+        local stderr_content
+        stderr_content=$(cat "${stderr_file}" 2>/dev/null || true)
+        case "${stderr_content}" in
+            *"TLS handshake timeout"*|*"connection closed"*|*"connection reset"*|*"connection refused"*)
+                log_warn "${desc}: Transient error, retrying (${attempt}/${max_retries})..."
+                sleep 3
+                attempt=$((attempt + 1))
+                ;;
+            *)
+                cat "${stderr_file}" >&2 2>/dev/null || true
+                rm -f "${stderr_file}"
+                return "${rc}"
+                ;;
+        esac
+    done
+}
+
 # Log that sprite was found, with version if available
 # $1=optional location context (e.g. "at /path/to/sprite")
 _log_sprite_found() {
@@ -149,7 +191,7 @@ ensure_sprite_exists() {
 
     log_step "Creating sprite '${sprite_name}'..."
     # shellcheck disable=SC2046
-    if ! sprite create $(_sprite_org_flags) -skip-console "${sprite_name}"; then
+    if ! _sprite_retry "sprite create" sprite create $(_sprite_org_flags) -skip-console "${sprite_name}"; then
         log_error "Failed to create sprite '${sprite_name}'"
         log_error ""
         log_error "How to fix:"
@@ -212,7 +254,7 @@ run_sprite() {
     local sprite_name=${1}
     local command=${2}
     # shellcheck disable=SC2046
-    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -- bash -c "${command}"
+    _sprite_retry "sprite exec" sprite $(_sprite_org_flags) exec -s "${sprite_name}" -- bash -c "${command}"
 }
 
 # Configure shell environment (PATH, zsh setup)
@@ -236,7 +278,7 @@ EOF
 
     # Upload and append to .bashrc and .zshrc only
     # shellcheck disable=SC2046
-    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.bashrc && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
+    _sprite_retry "sprite upload path_config" sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.bashrc && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
 
     # Switch bash to zsh only if zsh is available on the sprite
     # shellcheck disable=SC2046
@@ -250,7 +292,7 @@ exec /usr/bin/zsh -l
 EOF
 
         # shellcheck disable=SC2046
-        sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${bash_temp}:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
+        _sprite_retry "sprite upload bash_config" sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${bash_temp}:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
     else
         log_warn "zsh not available on sprite, keeping bash as default shell"
     fi
@@ -286,7 +328,7 @@ upload_file_sprite() {
     local temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_${temp_random}"
 
     # shellcheck disable=SC2046
-    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
+    _sprite_retry "sprite upload" sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
 }
 
 # Destroy a sprite (standardized wrapper for cross-cloud compatibility)
