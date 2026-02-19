@@ -14,11 +14,11 @@ log_info "Gemini CLI on OVHcloud"
 echo ""
 
 agent_install() { install_agent "Gemini CLI" "npm install -g @google/gemini-cli" cloud_run; }
+# Gemini CLI uses Google's native API format (/v1beta/models/:streamGenerateContent),
+# not the OpenAI-compatible format — cannot route through OpenRouter.
 agent_env_vars() {
     generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "GEMINI_API_KEY=${OPENROUTER_API_KEY}" \
-        "GOOGLE_GEMINI_BASE_URL=https://openrouter.ai/api/v1"
+        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 }
 agent_launch_cmd() { echo 'source ~/.zshrc && gemini'; }
 

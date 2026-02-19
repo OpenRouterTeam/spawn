@@ -31,13 +31,38 @@ INSTANCE_STATUS_POLL_DELAY=${INSTANCE_STATUS_POLL_DELAY:-5}  # Delay between ins
 
 ensure_aws_cli() {
     if ! command -v aws &>/dev/null; then
-        _log_diagnostic \
-            "AWS CLI is required but not installed" \
-            "aws command not found in PATH" \
-            --- \
-            "Install the AWS CLI: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html" \
-            "Or on macOS: brew install awscli"
-        return 1
+        log_step "Installing AWS CLI..."
+        if [[ "$(uname)" == "Darwin" ]]; then
+            # macOS: download the .pkg installer
+            local _aws_tmp
+            _aws_tmp=$(mktemp -d)
+            curl -fsSL "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "${_aws_tmp}/AWSCLIV2.pkg" \
+                && sudo installer -pkg "${_aws_tmp}/AWSCLIV2.pkg" -target / \
+                && rm -rf "${_aws_tmp}" \
+                && log_info "AWS CLI installed" \
+                || {
+                    rm -rf "${_aws_tmp}"
+                    log_error "Auto-install failed. Install manually:"
+                    log_error "  brew install awscli"
+                    log_error "  or: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+                    return 1
+                }
+        else
+            # Linux: download the zip installer
+            local _aws_tmp
+            _aws_tmp=$(mktemp -d)
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "${_aws_tmp}/awscliv2.zip" \
+                && unzip -q "${_aws_tmp}/awscliv2.zip" -d "${_aws_tmp}" \
+                && sudo "${_aws_tmp}/aws/install" \
+                && rm -rf "${_aws_tmp}" \
+                && log_info "AWS CLI installed" \
+                || {
+                    rm -rf "${_aws_tmp}"
+                    log_error "Auto-install failed. Install manually:"
+                    log_error "  https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+                    return 1
+                }
+        fi
     fi
     # Verify credentials are configured
     if ! aws sts get-caller-identity &>/dev/null; then
@@ -120,9 +145,11 @@ npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /
 su - ubuntu -c 'curl -fsSL https://bun.sh/install | bash'
 # Install Claude Code
 su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'
+# Configure npm global prefix so ubuntu can npm install -g without sudo
+su - ubuntu -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'
 # Configure PATH
-echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.bashrc
-echo 'export PATH="${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.zshrc
+echo 'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.bashrc
+echo 'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /home/ubuntu/.zshrc
 chown ubuntu:ubuntu /home/ubuntu/.bashrc /home/ubuntu/.zshrc
 touch /home/ubuntu/.cloud-init-complete
 chown ubuntu:ubuntu /home/ubuntu/.cloud-init-complete

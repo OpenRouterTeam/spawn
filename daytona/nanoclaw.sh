@@ -13,6 +13,8 @@ log_info "NanoClaw on Daytona"
 echo ""
 
 agent_install() {
+    log_step "Installing Docker (required by NanoClaw on Linux)..."
+    cloud_run "command -v docker >/dev/null || (curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker \$(whoami))"
     log_step "Installing tsx..."
     cloud_run "source ~/.bashrc && bun install -g tsx"
     log_step "Cloning and building nanoclaw..."
@@ -28,13 +30,9 @@ agent_env_vars() {
 }
 
 agent_configure() {
-    log_step "Configuring nanoclaw..."
-    local dotenv_temp
-    dotenv_temp=$(mktemp)
-    chmod 600 "${dotenv_temp}"
-    track_temp_file "${dotenv_temp}"
-    printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${dotenv_temp}"
-    cloud_upload "${dotenv_temp}" "/root/nanoclaw/.env"
+    local dotenv_content
+    dotenv_content=$(printf 'ANTHROPIC_API_KEY=%s\nANTHROPIC_BASE_URL=https://openrouter.ai/api\n' "${OPENROUTER_API_KEY}")
+    upload_config_file cloud_upload cloud_run "${dotenv_content}" "\$HOME/nanoclaw/.env"
 }
 
 agent_launch_cmd() {

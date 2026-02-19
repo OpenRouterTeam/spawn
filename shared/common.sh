@@ -2247,18 +2247,20 @@ execute_agent_non_interactive() {
 
     log_step "Executing ${agent_name} with prompt in non-interactive mode..."
 
-    # Escape the prompt for safe shell execution
-    # We use printf %q which properly escapes special characters for bash
-    local escaped_prompt
-    escaped_prompt=$(printf '%q' "${prompt}")
+    # Do NOT use printf '%q' here — the run callback (run_server, sprite exec,
+    # ssh) already handles escaping for remote transport. Double-escaping breaks
+    # prompts containing quotes, spaces, or special characters on Fly.io.
+    # Single-quote the prompt to protect it from shell expansion.
+    local safe_prompt
+    safe_prompt="'$(printf '%s' "${prompt}" | sed "s/'/'\\\\''/g")'"
 
     # Build the command based on exec callback type
     if [[ "${exec_callback}" == *"sprite"* ]]; then
         # Sprite execution (no -tty flag for non-interactive)
-        sprite exec -s "${sprite_name}" -- zsh -c "source ~/.zshrc && ${agent_name} ${agent_flags} ${escaped_prompt}"
+        sprite exec -s "${sprite_name}" -- zsh -c "source ~/.zshrc && ${agent_name} ${agent_flags} ${safe_prompt}"
     else
         # Generic SSH execution
-        ${exec_callback} "${sprite_name}" "source ~/.zshrc && ${agent_name} ${agent_flags} ${escaped_prompt}"
+        ${exec_callback} "${sprite_name}" "source ~/.zshrc && ${agent_name} ${agent_flags} ${safe_prompt}"
     fi
 }
 
@@ -2379,7 +2381,8 @@ ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
     # Single-quoted so $HOME/$PATH expand on the remote side, not locally.
-    local path_prefix='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
+    # .npm-global/bin: user-writable npm prefix (AWS Lightsail runs as ubuntu, not root)
+    local path_prefix='export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
         cmd="set -x; ${cmd}"
     fi
@@ -3196,6 +3199,22 @@ setup_openclaw_config() {
     local openclaw_json
     openclaw_json=$(_generate_openclaw_json "${openrouter_key}" "${model_id}" "${gateway_token}")
     upload_config_file "${upload_callback}" "${run_callback}" "${openclaw_json}" "\$HOME/.openclaw/openclaw.json"
+}
+
+# Start OpenClaw gateway as a fully detached daemon
+# Usage: start_openclaw_gateway RUN_CALLBACK
+#
+# Arguments:
+#   RUN_CALLBACK - Function to run commands: func(command)
+#
+# SSH/exec channels hang if a backgrounded daemon inherits the session's file
+# descriptors. setsid creates a new session, fully detaching the gateway so
+# the channel can close. Falls back to nohup where setsid is unavailable
+# (e.g. macOS local — no SSH, so the hang doesn't apply).
+start_openclaw_gateway() {
+    local run_callback="${1}"
+    log_step "Starting OpenClaw gateway daemon..."
+    ${run_callback} "source ~/.zshrc 2>/dev/null; if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi"
 }
 
 # Wait for OpenClaw gateway to be ready
