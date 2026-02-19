@@ -213,20 +213,20 @@ _install_gh_binary() {
 # ============================================================
 
 ensure_gh_auth() {
-    if gh auth status &>/dev/null; then
-        log_info "Authenticated with GitHub CLI"
-        return 0
-    fi
-
-    log_step "Not authenticated with GitHub CLI"
-
-    # Non-interactive: use GITHUB_TOKEN if set
+    # When GITHUB_TOKEN is set, always persist it to disk via gh auth login.
+    # gh auth status succeeds when GITHUB_TOKEN is in the environment, but
+    # that env var is only present in the provisioning SSH command — not in
+    # the interactive session. Without persisting, the user gets
+    # "not logged into any GitHub hosts" after dropping into the session.
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-        log_step "Authenticating with GITHUB_TOKEN..."
+        log_step "Persisting GITHUB_TOKEN to gh credential store..."
         printf '%s\n' "${GITHUB_TOKEN}" | gh auth login --with-token || {
             log_error "Failed to authenticate with GITHUB_TOKEN"
             return 1
         }
+    elif gh auth status &>/dev/null; then
+        log_info "Authenticated with GitHub CLI"
+        return 0
     else
         # Device code flow — works on headless/remote servers
         # Shows a URL + code; user opens URL in local browser and enters the code
