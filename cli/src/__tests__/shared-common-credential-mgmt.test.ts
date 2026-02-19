@@ -571,7 +571,7 @@ describe("_multi_creds_load_config", () => {
 describe("_multi_creds_validate", () => {
   it("should return 0 when no test function provided (empty string)", () => {
     const result = runBash(`
-      _multi_creds_validate "" "TestProvider" VAR_A VAR_B
+      _multi_creds_validate "" "TestProvider" "https://example.com" VAR_A VAR_B
     `);
     expect(result.exitCode).toBe(0);
   });
@@ -580,7 +580,7 @@ describe("_multi_creds_validate", () => {
     const result = runBash(`
       test_ok() { return 0; }
       export VAR_A="a"
-      _multi_creds_validate test_ok "TestProvider" VAR_A
+      _multi_creds_validate test_ok "TestProvider" "https://example.com" VAR_A
     `);
     expect(result.exitCode).toBe(0);
   });
@@ -589,7 +589,7 @@ describe("_multi_creds_validate", () => {
     const result = runBash(`
       test_fail() { return 1; }
       export VAR_A="a"
-      _multi_creds_validate test_fail "TestProvider" VAR_A 2>/dev/null
+      _multi_creds_validate test_fail "TestProvider" "https://example.com" VAR_A 2>/dev/null
     `);
     expect(result.exitCode).toBe(1);
   });
@@ -599,7 +599,7 @@ describe("_multi_creds_validate", () => {
       test_fail() { return 1; }
       export VAR_A="a"
       export VAR_B="b"
-      _multi_creds_validate test_fail "TestProvider" VAR_A VAR_B 2>/dev/null
+      _multi_creds_validate test_fail "TestProvider" "https://example.com" VAR_A VAR_B 2>/dev/null
       echo "A=\${VAR_A:-UNSET}"
       echo "B=\${VAR_B:-UNSET}"
     `);
@@ -612,7 +612,7 @@ describe("_multi_creds_validate", () => {
       test_ok() { return 0; }
       export VAR_A="kept"
       export VAR_B="also-kept"
-      _multi_creds_validate test_ok "TestProvider" VAR_A VAR_B 2>/dev/null
+      _multi_creds_validate test_ok "TestProvider" "https://example.com" VAR_A VAR_B 2>/dev/null
       echo "A=$VAR_A"
       echo "B=$VAR_B"
     `);
@@ -624,7 +624,7 @@ describe("_multi_creds_validate", () => {
     const result = runBash(`
       test_fail() { return 1; }
       export VAR_A="a"
-      _multi_creds_validate test_fail "Contabo" VAR_A 2>&1
+      _multi_creds_validate test_fail "Contabo" "https://example.com" VAR_A 2>&1
     `);
     expect(result.stdout).toContain("Contabo");
     expect(result.stdout).toContain("Invalid");

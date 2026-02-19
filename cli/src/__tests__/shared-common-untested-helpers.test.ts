@@ -266,7 +266,7 @@ describe("_multi_creds_validate", () => {
   it("should return 0 when test function succeeds", () => {
     const result = runBash(`
       test_pass() { return 0; }
-      _multi_creds_validate test_pass "TestProvider"
+      _multi_creds_validate test_pass "TestProvider" "https://example.com"
     `);
     expect(result.exitCode).toBe(0);
   });
@@ -274,13 +274,13 @@ describe("_multi_creds_validate", () => {
   it("should return 1 when test function fails", () => {
     const result = runBash(`
       test_fail() { return 1; }
-      _multi_creds_validate test_fail "TestProvider" 2>/dev/null
+      _multi_creds_validate test_fail "TestProvider" "https://example.com" 2>/dev/null
     `);
     expect(result.exitCode).toBe(1);
   });
 
   it("should return 0 when test function is empty (no validation)", () => {
-    const result = runBash(`_multi_creds_validate "" "TestProvider"`);
+    const result = runBash(`_multi_creds_validate "" "TestProvider" "https://example.com"`);
     expect(result.exitCode).toBe(0);
   });
 
@@ -289,7 +289,7 @@ describe("_multi_creds_validate", () => {
       export MY_VAR1="secret1"
       export MY_VAR2="secret2"
       test_fail() { return 1; }
-      _multi_creds_validate test_fail "TestProvider" MY_VAR1 MY_VAR2 2>/dev/null
+      _multi_creds_validate test_fail "TestProvider" "https://example.com" MY_VAR1 MY_VAR2 2>/dev/null
       echo "VAR1=\${MY_VAR1:-unset}"
       echo "VAR2=\${MY_VAR2:-unset}"
     `);
@@ -302,7 +302,7 @@ describe("_multi_creds_validate", () => {
       export MY_VAR1="secret1"
       export MY_VAR2="secret2"
       test_pass() { return 0; }
-      _multi_creds_validate test_pass "TestProvider" MY_VAR1 MY_VAR2
+      _multi_creds_validate test_pass "TestProvider" "https://example.com" MY_VAR1 MY_VAR2
       echo "VAR1=\${MY_VAR1:-unset}"
       echo "VAR2=\${MY_VAR2:-unset}"
     `);
@@ -313,7 +313,7 @@ describe("_multi_creds_validate", () => {
   it("should show error message with provider name on failure", () => {
     const result = runBash(`
       test_fail() { return 1; }
-      _multi_creds_validate test_fail "Contabo" MY_VAR 2>&1
+      _multi_creds_validate test_fail "Contabo" "https://example.com" MY_VAR 2>&1
     `);
     expect(result.stdout).toContain("Invalid Contabo credentials");
   });
@@ -321,7 +321,7 @@ describe("_multi_creds_validate", () => {
   it("should show actionable guidance on failure", () => {
     const result = runBash(`
       test_fail() { return 1; }
-      _multi_creds_validate test_fail "UpCloud" MY_VAR 2>&1
+      _multi_creds_validate test_fail "UpCloud" "https://example.com" MY_VAR 2>&1
     `);
     expect(result.stdout).toContain("expired");
     expect(result.stdout).toContain("Re-run");
@@ -330,7 +330,7 @@ describe("_multi_creds_validate", () => {
   it("should show testing message during validation", () => {
     const result = runBash(`
       test_pass() { return 0; }
-      _multi_creds_validate test_pass "Hetzner" 2>&1
+      _multi_creds_validate test_pass "Hetzner" "https://example.com" 2>&1
     `);
     expect(result.stdout).toContain("Testing Hetzner credentials");
   });
@@ -339,7 +339,7 @@ describe("_multi_creds_validate", () => {
     const result = runBash(`
       export SINGLE_VAR="value"
       test_fail() { return 1; }
-      _multi_creds_validate test_fail "Provider" SINGLE_VAR 2>/dev/null
+      _multi_creds_validate test_fail "Provider" "https://example.com" SINGLE_VAR 2>/dev/null
       echo "\${SINGLE_VAR:-unset}"
     `);
     expect(result.stdout).toContain("unset");
@@ -349,7 +349,7 @@ describe("_multi_creds_validate", () => {
     const result = runBash(`
       export V1="a" V2="b" V3="c"
       test_fail() { return 1; }
-      _multi_creds_validate test_fail "Provider" V1 V2 V3 2>/dev/null
+      _multi_creds_validate test_fail "Provider" "https://example.com" V1 V2 V3 2>/dev/null
       echo "\${V1:-x}\${V2:-x}\${V3:-x}"
     `);
     expect(result.stdout).toBe("xxx");
