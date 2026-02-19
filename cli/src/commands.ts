@@ -970,27 +970,34 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     const { readFileSync, existsSync } = await import("fs");
     if (existsSync(connPath)) {
       const raw = JSON.parse(readFileSync(connPath, "utf-8"));
-      // SECURITY: Validate connection fields before including in output
-      // Prevents injection via tampered last-connection.json files
-      if (raw.ip) {
-        validateConnectionIP(raw.ip);
-        connectionInfo.ip = raw.ip;
-      }
-      if (raw.user) {
-        validateUsername(raw.user);
-        connectionInfo.user = raw.user;
-      }
-      if (raw.server_id) {
-        validateServerIdentifier(raw.server_id);
-        connectionInfo.server_id = raw.server_id;
-      }
-      if (raw.server_name) {
-        validateServerIdentifier(raw.server_name);
-        connectionInfo.server_name = raw.server_name;
+
+      try {
+        // SECURITY: Validate connection fields before including in output
+        // Prevents injection via tampered last-connection.json files
+        if (raw.ip) {
+          validateConnectionIP(raw.ip);
+          connectionInfo.ip = raw.ip;
+        }
+        if (raw.user) {
+          validateUsername(raw.user);
+          connectionInfo.user = raw.user;
+        }
+        if (raw.server_id) {
+          validateServerIdentifier(raw.server_id);
+          connectionInfo.server_id = raw.server_id;
+        }
+        if (raw.server_name) {
+          validateServerIdentifier(raw.server_name);
+          connectionInfo.server_name = raw.server_name;
+        }
+      } catch (validationErr) {
+        // Validation failure is a security issue - report via headless error
+        headlessError(resolvedAgent, resolvedCloud, "VALIDATION_ERROR",
+          `Connection info validation failed: ${getErrorMessage(validationErr)}`, outputFormat, 1);
       }
     }
   } catch {
-    // Connection info not available - not fatal
+    // File read/parse errors - not fatal, just omit connection info
   }
 
   const result: SpawnResult = {
