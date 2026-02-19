@@ -77,12 +77,51 @@ ensure_sprite_installed() {
     fi
 }
 
+# Detect the currently selected sprite org
+# Sets SPRITE_ORG for use with -o flag in subsequent commands
+_detect_sprite_org() {
+    if [[ -n "${SPRITE_ORG:-}" ]]; then
+        return 0
+    fi
+    # sed works on both macOS and Linux (no grep -P dependency)
+    SPRITE_ORG=$(sprite org list 2>/dev/null | sed -n 's/.*Currently selected org: \([^ ]*\).*/\1/p' || true)
+}
+
+# Get org flags for sprite commands
+_sprite_org_flags() {
+    if [[ -n "${SPRITE_ORG:-}" ]]; then
+        printf '%s' "-o ${SPRITE_ORG}"
+    fi
+}
+
 # Check if already authenticated with sprite
 ensure_sprite_authenticated() {
-    if ! sprite org list &> /dev/null; then
-        log_step "Logging in to sprite..."
-        sprite login || true
+    if sprite org list &> /dev/null; then
+        log_info "Already authenticated with Sprite"
+        _detect_sprite_org
+        return 0
     fi
+
+    log_step "Logging in to Sprite..."
+    if ! sprite login; then
+        log_error "Sprite login failed"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Run 'sprite login' manually and follow the prompts"
+        log_error "  2. Check your internet connection"
+        log_error "  3. Visit https://sprites.dev to create an account if needed"
+        return 1
+    fi
+
+    # Verify login actually succeeded
+    if ! sprite org list &> /dev/null; then
+        log_error "Sprite login completed but authentication check still fails"
+        log_error "Try running 'sprite login' manually"
+        return 1
+    fi
+
+    _detect_sprite_org
+    log_info "Sprite authentication successful"
 }
 
 # Prompt for sprite name
@@ -102,18 +141,29 @@ ensure_sprite_exists() {
     local sprite_name=${1}
     local max_wait=${2:-30}
 
-    if sprite list 2>/dev/null | grep -qE "^${sprite_name}( |$)"; then
+    # shellcheck disable=SC2046
+    if sprite list $(_sprite_org_flags) 2>/dev/null | grep -qE "^${sprite_name}( |$)"; then
         log_info "Sprite '${sprite_name}' already exists"
         return 0
     fi
 
     log_step "Creating sprite '${sprite_name}'..."
-    sprite create -skip-console "${sprite_name}" || true
+    # shellcheck disable=SC2046
+    if ! sprite create $(_sprite_org_flags) -skip-console "${sprite_name}"; then
+        log_error "Failed to create sprite '${sprite_name}'"
+        log_error ""
+        log_error "How to fix:"
+        log_error "  1. Check your Sprite authentication: sprite org list"
+        log_error "  2. Re-login if needed: sprite login"
+        log_error "  3. Check if you have reached your sprite limit: sprite list"
+        return 1
+    fi
 
     log_step "Waiting for sprite to be provisioned..."
     local elapsed=0
     while [[ "${elapsed}" -lt "${max_wait}" ]]; do
-        if sprite list 2>/dev/null | grep -qE "^${sprite_name}( |$)"; then
+        # shellcheck disable=SC2046
+        if sprite list $(_sprite_org_flags) 2>/dev/null | grep -qE "^${sprite_name}( |$)"; then
             log_info "Sprite '${sprite_name}' provisioned"
             return 0
         fi
@@ -133,7 +183,8 @@ verify_sprite_connectivity() {
 
     log_step "Verifying sprite connectivity..."
     while [[ "${attempt}" -le "${max_attempts}" ]]; do
-        if sprite exec -s "${sprite_name}" -- echo "ok" >/dev/null 2>&1; then
+        # shellcheck disable=SC2046
+        if sprite $(_sprite_org_flags) exec -s "${sprite_name}" -- echo "ok" >/dev/null 2>&1; then
             log_info "Sprite '${sprite_name}' is ready"
             return 0
         fi
@@ -160,7 +211,8 @@ verify_sprite_connectivity() {
 run_sprite() {
     local sprite_name=${1}
     local command=${2}
-    sprite exec -s "${sprite_name}" -- bash -c "${command}"
+    # shellcheck disable=SC2046
+    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -- bash -c "${command}"
 }
 
 # Configure shell environment (PATH, zsh setup)
@@ -179,7 +231,8 @@ export PATH="${HOME}/.bun/bin:/.sprite/languages/bun/bin:${PATH}"
 EOF
 
     # Upload and append to .bashrc and .zshrc only
-    sprite exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.bashrc && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
+    # shellcheck disable=SC2046
+    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.bashrc && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
 
     # Switch bash to zsh
     local bash_temp
@@ -190,7 +243,8 @@ EOF
 exec /usr/bin/zsh -l
 EOF
 
-    sprite exec -s "${sprite_name}" -file "${bash_temp}:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
+    # shellcheck disable=SC2046
+    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${bash_temp}:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
 }
 
 # Upload file to sprite (for use with setup_claude_code_config callback)
@@ -222,7 +276,8 @@ upload_file_sprite() {
 
     local temp_remote="/tmp/sprite_upload_$(basename "${remote_path}")_${temp_random}"
 
-    sprite exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
+    # shellcheck disable=SC2046
+    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${local_path}:${temp_remote}" -- bash -c "mkdir -p \$(dirname '${remote_path}') && mv '${temp_remote}' '${remote_path}'"
 }
 
 # Destroy a sprite (standardized wrapper for cross-cloud compatibility)
@@ -230,7 +285,8 @@ destroy_server() {
     local sprite_name="$1"
 
     log_step "Destroying sprite '${sprite_name}'..."
-    if ! sprite destroy "${sprite_name}" 2>&1; then
+    # shellcheck disable=SC2046
+    if ! sprite $(_sprite_org_flags) destroy "${sprite_name}" 2>&1; then
         log_error "Failed to destroy sprite '${sprite_name}'"
         log_error ""
         log_error "The sprite may still be running and incurring charges."
@@ -263,10 +319,11 @@ cloud_run() { run_sprite "${SPRITE_NAME}" "$1"; }
 cloud_upload() { upload_file_sprite "${SPRITE_NAME}" "$1" "$2"; }
 cloud_interactive() {
     local cmd="$1"
+    # shellcheck disable=SC2046
     if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-        sprite exec -s "${SPRITE_NAME}" -- bash -c "${cmd}"
+        sprite $(_sprite_org_flags) exec -s "${SPRITE_NAME}" -- bash -c "${cmd}"
     else
-        sprite exec -s "${SPRITE_NAME}" -tty -- bash -c "${cmd}"
+        sprite $(_sprite_org_flags) exec -s "${SPRITE_NAME}" -tty -- bash -c "${cmd}"
     fi
 }
 cloud_label() { echo "Sprite"; }
