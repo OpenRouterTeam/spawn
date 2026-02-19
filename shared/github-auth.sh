@@ -213,18 +213,36 @@ _install_gh_binary() {
 # ============================================================
 
 ensure_gh_auth() {
-    # When GITHUB_TOKEN is set, always persist it to disk via gh auth login.
-    # gh auth status succeeds when GITHUB_TOKEN is in the environment, but
-    # that env var is only present in the provisioning SSH command — not in
-    # the interactive session. Without persisting, the user gets
-    # "not logged into any GitHub hosts" after dropping into the session.
+    # When GITHUB_TOKEN is set, persist it to gh's credential store so it
+    # survives into the interactive session (where the env var is absent).
+    # NOTE: This writes the token to ~/.config/gh/hosts.yml in plaintext,
+    # which is standard gh CLI behavior (same as `gh auth login`).
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-        log_step "Persisting GITHUB_TOKEN to gh credential store..."
-        # Must unset GITHUB_TOKEN before calling gh auth login --with-token,
-        # otherwise gh refuses: "The value of the GITHUB_TOKEN environment
-        # variable is being used for authentication."
+        # Validate token format: must start with a known GitHub prefix
+        case "${GITHUB_TOKEN}" in
+            ghp_*|gho_*|ghu_*|ghs_*|ghr_*|github_pat_*)
+                ;;
+            *)
+                log_error "GITHUB_TOKEN has unexpected format (expected ghp_, gho_, ghu_, ghs_, ghr_, or github_pat_ prefix)"
+                return 1
+                ;;
+        esac
+
+        # Fast path: skip persistence if gh is already authenticated with
+        # stored credentials (not just the env var). Temporarily unset
+        # GITHUB_TOKEN so gh auth status checks disk credentials only.
         local _gh_token="${GITHUB_TOKEN}"
         unset GITHUB_TOKEN
+        if gh auth status &>/dev/null; then
+            export GITHUB_TOKEN="${_gh_token}"
+            log_info "Authenticated with GitHub CLI (credentials already persisted)"
+            return 0
+        fi
+
+        log_step "Persisting GITHUB_TOKEN to gh credential store..."
+        # GITHUB_TOKEN is already unset above so gh auth login won't refuse
+        # with "The value of the GITHUB_TOKEN environment variable is being
+        # used for authentication."
         printf '%s\n' "${_gh_token}" | gh auth login --with-token || {
             log_error "Failed to authenticate with GITHUB_TOKEN"
             export GITHUB_TOKEN="${_gh_token}"
