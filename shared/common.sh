@@ -319,8 +319,10 @@ verify_openrouter_key() {
     if ! command -v curl &>/dev/null; then return 0; fi  # skip if no curl
 
     local response http_code
-    response=$(curl -s --connect-timeout 5 --max-time 10 -w "\n%{http_code}" \
-        -H "Authorization: Bearer ${api_key}" \
+    # Pass auth header via stdin (-K -) so the API key isn't visible in ps output
+    response=$(printf 'header = "Authorization: Bearer %s"\n' "${api_key}" | \
+        curl -s --connect-timeout 5 --max-time 10 -w "\n%{http_code}" \
+        -K - \
         "https://openrouter.ai/api/v1/auth/key" 2>/dev/null) || return 0  # network error = skip
     http_code=$(printf '%s' "${response}" | tail -1)
 
@@ -1342,7 +1344,7 @@ offer_github_auth() {
     # a merge to main. Base64-encode it for safe inline transport.
     local gh_cmd
     local _local_gh="${SCRIPT_DIR:-}/../../shared/github-auth.sh"
-    if [[ -n "${SCRIPT_DIR:-}" && -f "${_local_gh}" ]]; then
+    if [[ -n "${SCRIPT_DIR:-}" && -f "${_local_gh}" && ! -L "${_local_gh}" ]]; then
         local _gh_b64
         _gh_b64=$(base64 < "${_local_gh}" | tr -d '\n')
         gh_cmd="printf '%s' '${_gh_b64}' | base64 -d | bash"
