@@ -66,19 +66,26 @@ ensure_hcloud_token() {
             log_info "Using hcloud CLI (context: $(hcloud context active))"
             # Export token from CLI context for API fallback compatibility
             if [[ -z "${HCLOUD_TOKEN:-}" ]]; then
-                # SECURITY: Use grep -F for literal string matching to prevent command injection
-                # if the context name contains shell metacharacters
                 local active_context
                 active_context=$(hcloud context active 2>/dev/null || echo "")
                 if [[ -n "${active_context}" ]]; then
-                    # Use -F for literal string matching (no pattern interpretation)
-                    HCLOUD_TOKEN=$(grep -F "[${active_context}]" ~/.config/hcloud/cli.toml 2>/dev/null | grep token | sed 's/.*= *"\(.*\)"/\1/' || true)
+                    # hcloud config uses [[contexts]] array format (lines are indented):
+                    #   [[contexts]]
+                    #     name = "myctx"
+                    #     token = "abc123"
+                    # Find the "name = " line, grab up to 5 lines after it, extract token
+                    HCLOUD_TOKEN=$(grep -FA5 "name = \"${active_context}\"" ~/.config/hcloud/cli.toml 2>/dev/null | grep 'token *=' | sed 's/.*= *"\(.*\)"/\1/' | head -1 || true)
                     if [[ -n "${HCLOUD_TOKEN:-}" ]]; then
                         export HCLOUD_TOKEN
                     fi
                 fi
             fi
-            return 0
+            if [[ -z "${HCLOUD_TOKEN:-}" ]]; then
+                log_warn "Could not extract API token from hcloud CLI config"
+                log_warn "Falling back to manual token entry..."
+            else
+                return 0
+            fi
         else
             log_info "hcloud CLI found but no active context"
             log_info "Run: hcloud context create myproject"

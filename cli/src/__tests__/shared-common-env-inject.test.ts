@@ -69,7 +69,7 @@ inject_env_vars_ssh "192.168.1.1" mock_upload mock_run "MY_KEY=my_value"
 `);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("UPLOAD: 192.168.1.1");
-      expect(result.stdout).toContain("/tmp/env_config");
+      expect(result.stdout).toContain("/tmp/spawn_env_");
       expect(result.stdout).toContain("RUN: 192.168.1.1");
       expect(result.stdout).toContain(".zshrc");
     } finally {
@@ -155,8 +155,8 @@ inject_env_vars_local mock_upload mock_run "MY_KEY=my_value"
     expect(result.exitCode).toBe(0);
     // inject_env_vars_local does NOT pass server_ip - upload gets (local_path, remote_path)
     expect(result.stdout).toContain("UPLOAD_ARGS:");
-    expect(result.stdout).toContain("/tmp/env_config");
-    expect(result.stdout).toContain("cat /tmp/env_config >> ~/.bashrc && cat /tmp/env_config >> ~/.zshrc");
+    expect(result.stdout).toContain("/tmp/spawn_env_");
+    expect(result.stdout).toMatch(/cat '\/tmp\/spawn_env_[^']+' >> ~\/.bashrc && cat '\/tmp\/spawn_env_[^']+' >> ~\/.zshrc/);
   });
 
   it("should generate correct env config content", () => {

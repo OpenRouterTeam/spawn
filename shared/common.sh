@@ -1313,6 +1313,13 @@ prompt_github_auth() {
     choice=$(safe_read "Set up GitHub CLI (gh) on this machine? (y/N): ") || return 0
     if [[ "${choice}" =~ ^[Yy]$ ]]; then
         SPAWN_GITHUB_AUTH_REQUESTED=1
+
+        # Capture local GitHub token for passthrough to remote VM
+        if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+            SPAWN_GITHUB_TOKEN="${GITHUB_TOKEN}"
+        elif command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+            SPAWN_GITHUB_TOKEN="$(gh auth token 2>/dev/null)" || true
+        fi
     fi
 }
 
@@ -1328,11 +1335,19 @@ offer_github_auth() {
         return 0
     fi
 
+    # Build the remote command with optional token export
+    local gh_cmd="curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    if [[ -n "${SPAWN_GITHUB_TOKEN:-}" ]]; then
+        local escaped_token
+        escaped_token=$(printf '%q' "${SPAWN_GITHUB_TOKEN}")
+        gh_cmd="export GITHUB_TOKEN=${escaped_token}; ${gh_cmd}"
+    fi
+
     # If prompt_github_auth was already called, use its stored answer
     if [[ "${SPAWN_GITHUB_AUTH_PROMPTED:-}" == "1" ]]; then
         if [[ "${SPAWN_GITHUB_AUTH_REQUESTED:-}" == "1" ]]; then
             log_step "Installing and authenticating GitHub CLI..."
-            ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+            ${run_callback} "${gh_cmd}"
         fi
         return 0
     fi
@@ -1345,8 +1360,22 @@ offer_github_auth() {
         return 0
     fi
 
+    # Attempt token capture in fallback path too
+    if [[ -z "${SPAWN_GITHUB_TOKEN:-}" ]]; then
+        if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+            SPAWN_GITHUB_TOKEN="${GITHUB_TOKEN}"
+        elif command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+            SPAWN_GITHUB_TOKEN="$(gh auth token 2>/dev/null)" || true
+        fi
+        if [[ -n "${SPAWN_GITHUB_TOKEN:-}" ]]; then
+            local escaped_token
+            escaped_token=$(printf '%q' "${SPAWN_GITHUB_TOKEN}")
+            gh_cmd="export GITHUB_TOKEN=${escaped_token}; ${gh_cmd}"
+        fi
+    fi
+
     log_step "Installing and authenticating GitHub CLI..."
-    ${run_callback} "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    ${run_callback} "${gh_cmd}"
 }
 
 # ============================================================
@@ -1470,8 +1499,8 @@ _ensure_nodejs_runtime() {
     local claude_path="$2"
     if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
         log_step "Installing Node.js runtime (required for claude package)..."
-        if ${run_cb} "curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs" >/dev/null 2>&1; then
-            log_info "Node.js installed via nodesource"
+        if ${run_cb} "apt-get install -y nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1; then
+            log_info "Node.js installed via n"
         else
             log_warn "Could not install Node.js - bun method may fail"
         fi
@@ -1635,12 +1664,17 @@ _spawn_inject_env_vars() {
 
     agent_env_vars > "${env_temp}"
 
-    cloud_upload "${env_temp}" "/tmp/env_config"
+    # SECURITY: Use unpredictable temp file name to prevent symlink attacks
+    local rand_suffix
+    rand_suffix=$(basename "${env_temp}")
+    local temp_remote="/tmp/spawn_env_${rand_suffix}"
+
+    cloud_upload "${env_temp}" "${temp_remote}"
 
     # Write env vars to ~/.spawnrc instead of inlining into .bashrc/.zshrc.
     # Ubuntu's default .bashrc has an interactive-shell guard that exits early —
     # anything appended after the guard is never loaded when SSH runs a command string.
-    cloud_run "cp /tmp/env_config ~/.spawnrc && chmod 600 ~/.spawnrc && rm /tmp/env_config"
+    cloud_run "cp '${temp_remote}' ~/.spawnrc && chmod 600 ~/.spawnrc && rm '${temp_remote}'"
 
     # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
     cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc"
@@ -1660,7 +1694,15 @@ spawn_agent() {
     # 2. Pre-provision hooks (e.g., prompt for GitHub auth)
     if _fn_exists agent_pre_provision; then agent_pre_provision; fi
 
-    # 3. Provision server
+    # 3. Get API key (before provisioning so user isn't waiting on server)
+    get_or_prompt_api_key
+
+    # 4. Model selection (if agent needs it)
+    if [[ -n "${AGENT_MODEL_PROMPT:-}" ]]; then
+        MODEL_ID=$(get_model_id_interactive "${AGENT_MODEL_DEFAULT:-openrouter/auto}" "${agent_name}") || exit 1
+    fi
+
+    # 5. Provision server
     local server_name
     server_name=$(get_server_name)
     cloud_provision "${server_name}"
@@ -1831,6 +1873,8 @@ packages:
   - unzip
   - git
   - zsh
+  - nodejs
+  - npm
 
 runcmd:
   # Set up 2G swap to prevent OOM kills on small VMs
@@ -1838,6 +1882,9 @@ runcmd:
   - chmod 600 /swapfile
   - mkswap /swapfile
   - swapon /swapfile
+  # Upgrade Node.js to v22 LTS (apt has v18, agents like Cline need v20+)
+  # n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
+  - npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
   # Install Bun
   - su - root -c 'curl -fsSL https://bun.sh/install | bash'
   # Install Claude Code
@@ -2311,10 +2358,15 @@ wait_for_cloud_init() {
 # Run a command on a remote server via SSH
 # Usage: ssh_run_server IP COMMAND
 # Requires: SSH_USER (default: root), SSH_OPTS
-# SECURITY: Command is properly quoted to prevent shell injection
+# SECURITY: Command is properly quoted to prevent shell injection.
+# Note: $cmd is always a shell command string (with pipes, semicolons, etc.)
+# that is intentionally interpreted by the remote shell. All callers pass
+# static command strings — never user-controlled input.
 ssh_run_server() {
     local ip="${1}"
     local cmd="${2}"
+    # Single-quoted so $HOME/$PATH expand on the remote side, not locally.
+    local path_prefix='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"'
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
         cmd="set -x; ${cmd}"
     fi
@@ -2322,7 +2374,7 @@ ssh_run_server() {
     # < /dev/null prevents SSH from consuming the parent script's stdin.
     # Without this, sequential SSH calls can steal input meant for later
     # commands (e.g., safe_read prompts), causing hangs.
-    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${cmd}" < /dev/null
+    ssh $SSH_OPTS "${SSH_USER:-root}@${ip}" -- "${path_prefix} && ${cmd}" < /dev/null
 }
 
 # Upload a file to a remote server via SCP
@@ -2863,7 +2915,8 @@ _multi_creds_prompt() {
 _multi_creds_validate() {
     local test_func="${1}"
     local provider_name="${2}"
-    shift 2
+    local help_url="${3}"
+    shift 3
 
     if [[ -z "${test_func}" ]]; then
         return 0
@@ -2934,7 +2987,7 @@ ensure_multi_credentials() {
     _multi_creds_prompt "${provider_name}" "${help_url}" "${n}" "${env_vars[@]}" "${labels[@]}" || return 1
 
     # 4. Validate credentials
-    _multi_creds_validate "${test_func}" "${provider_name}" "${env_vars[@]}" || return 1
+    _multi_creds_validate "${test_func}" "${provider_name}" "${help_url}" "${env_vars[@]}" || return 1
 
     # 5. Save to config file
     local save_args=()

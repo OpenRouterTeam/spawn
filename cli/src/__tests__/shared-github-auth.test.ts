@@ -500,7 +500,7 @@ describe("ensure_gh_auth", () => {
       ensure_gh_auth 2>&1
     `);
     expect(result.exitCode).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("Failed to authenticate");
+    expect(result.stdout + result.stderr).toContain("authentication failed");
   });
 
   it("should fail when post-login auth status check fails", () => {

@@ -242,7 +242,7 @@ _assert_sprite_common_commands() {
     assert_contains "${MOCK_LOG}" "sprite list" "Checks if sprite exists"
     assert_contains "${MOCK_LOG}" "sprite create.*test-sprite-${script_name}" "Creates sprite with correct name"
     assert_contains "${MOCK_LOG}" "sprite exec.*test-sprite-${script_name}" "Runs commands on sprite"
-    assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/env_config" "Uploads env config to sprite"
+    assert_contains "${MOCK_LOG}" "sprite exec.*-file.*/tmp/spawn_" "Uploads env config to sprite"
     assert_contains "${MOCK_LOG}" "sprite exec.*-tty.*" "Launches interactive session"
 }
 

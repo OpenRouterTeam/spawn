@@ -325,8 +325,8 @@ describe("install.sh validation", () => {
     it("should clean up temporary repo directory after sparse checkout", () => {
       const fnStart = content.indexOf("clone_cli()");
       const fnBody = content.slice(fnStart);
-      // Should remove the temporary repo dir
-      expect(fnBody).toContain('rm -rf "${dest}/repo"');
+      // Should remove the temporary repo dir (uses safe canonical path validation)
+      expect(fnBody).toContain('rm -rf "${repo_dir}"');
     });
   });
 

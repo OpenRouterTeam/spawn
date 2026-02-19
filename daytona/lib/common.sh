@@ -50,6 +50,10 @@ _is_daytona_auth_error() {
     printf '%s' "${1}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"
 }
 
+_is_daytona_timeout() {
+    printf '%s' "${1}" | grep -qi "timeout\|timed out\|deadline exceeded\|context canceled"
+}
+
 _daytona_auth_error() {
     log_error "Invalid API key"
     log_error "How to fix:"
@@ -58,13 +62,40 @@ _daytona_auth_error() {
     log_warn "  3. Check key hasn't expired or been revoked"
 }
 
+# Run a daytona CLI command with a timeout to prevent indefinite hangs.
+# Usage: _daytona_with_timeout SECONDS daytona [args...]
+_daytona_with_timeout() {
+    local secs="${1}"; shift
+    local timeout_bin=""
+    if command -v timeout &>/dev/null; then timeout_bin="timeout"
+    elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"
+    fi
+    if [[ -n "${timeout_bin}" ]]; then
+        "${timeout_bin}" "${secs}" "$@"
+    else
+        "$@"
+    fi
+}
+
 test_daytona_token() {
     local test_response
-    # Authenticate CLI with the API key first
-    test_response=$(daytona login --api-key "${DAYTONA_API_KEY}" 2>&1)
-    local exit_code=$?
+    local exit_code=0
+
+    # Authenticate CLI with the API key (30s timeout)
+    # Use --api-key=VALUE syntax per official Daytona docs
+    test_response=$(_daytona_with_timeout 30 daytona login --api-key="${DAYTONA_API_KEY}" 2>&1) || exit_code=$?
+
+    if [[ ${exit_code} -eq 124 ]]; then
+        log_error "Daytona login timed out (Daytona API may be temporarily unavailable)"
+        log_warn "Try again in a minute, or check https://status.daytona.io"
+        return 1
+    fi
 
     if [[ ${exit_code} -ne 0 ]]; then
+        if _is_daytona_timeout "${test_response}"; then
+            log_error "Daytona login timed out: ${test_response}"
+            return 1
+        fi
         if _is_daytona_auth_error "${test_response}"; then
             _daytona_auth_error; return 1
         fi
@@ -72,10 +103,23 @@ test_daytona_token() {
         return 1
     fi
 
-    # Verify by listing sandboxes (lightweight API call)
-    test_response=$(daytona list --limit 1 2>&1)
-    if [[ $? -ne 0 ]] && _is_daytona_auth_error "${test_response}"; then
-        _daytona_auth_error; return 1
+    # Verify by listing sandboxes (30s timeout)
+    exit_code=0
+    test_response=$(_daytona_with_timeout 30 daytona sandbox list --limit 1 2>&1) || exit_code=$?
+
+    if [[ ${exit_code} -eq 124 ]] || _is_daytona_timeout "${test_response:-}"; then
+        log_error "Daytona API timed out (service may be temporarily slow)"
+        log_warn "Try again in a minute, or check https://status.daytona.io"
+        return 1
+    fi
+
+    if [[ ${exit_code} -ne 0 ]]; then
+        if _is_daytona_auth_error "${test_response}"; then
+            _daytona_auth_error
+        else
+            log_error "Daytona API check failed: ${test_response}"
+        fi
+        return 1
     fi
     return 0
 }
@@ -87,6 +131,11 @@ ensure_daytona_token() {
         "${HOME}/.config/spawn/daytona.json" \
         "https://app.daytona.io" \
         "test_daytona_token"
+
+    # Always authenticate CLI — ensure_api_token_with_provider may skip
+    # the test function when loading from env var, so daytona login
+    # would never be called. Re-running login is idempotent and fast.
+    _daytona_with_timeout 30 daytona login --api-key="${DAYTONA_API_KEY}" 2>/dev/null || true
 }
 
 get_server_name() {
@@ -109,7 +158,7 @@ _daytona_create_with_resources() {
     if [[ ! "${disk}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_DISK: must be numeric"; return 1; fi
 
     log_step "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
-    daytona create \
+    _daytona_with_timeout 120 daytona sandbox create \
         --name "${name}" \
         --cpu "${cpu}" \
         --memory "${memory}" \
@@ -130,7 +179,7 @@ _daytona_create_with_class() {
     fi
 
     log_step "Creating Daytona sandbox '${name}' (class: ${sandbox_class})..."
-    daytona create \
+    _daytona_with_timeout 120 daytona sandbox create \
         --name "${name}" \
         --class "${sandbox_class}" \
         --auto-stop 0 \
@@ -143,7 +192,7 @@ _resolve_sandbox_id() {
 
     # Try to get the sandbox ID from `daytona info`
     local info_output
-    info_output=$(daytona info "${name}" --format json 2>/dev/null) || true
+    info_output=$(daytona sandbox info "${name}" --format json 2>/dev/null) || true
 
     if [[ -n "${info_output}" ]]; then
         DAYTONA_SANDBOX_ID=$(printf '%s' "${info_output}" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null) || true
@@ -178,7 +227,11 @@ create_server() {
     fi
 
     if [[ ${exit_code} -ne 0 ]]; then
-        if _is_snapshot_conflict "${output}"; then
+        if [[ ${exit_code} -eq 124 ]] || _is_daytona_timeout "${output:-}"; then
+            log_error "Sandbox creation timed out (Daytona API may be temporarily slow)"
+            log_warn "Try again in a minute, or check https://status.daytona.io"
+            log_warn "You can also try: daytona create --name ${name} --class small"
+        elif _is_snapshot_conflict "${output}"; then
             log_error "Cannot specify resources when using a Daytona snapshot"
             log_error ""
             log_error "Use a sandbox class instead:"
@@ -200,7 +253,8 @@ create_server() {
 
 wait_for_cloud_init() {
     log_step "Installing base tools in sandbox..."
-    run_server "apt-get update -y && apt-get install -y curl unzip git zsh" >/dev/null 2>&1 || true
+    run_server "apt-get update -y && apt-get install -y curl unzip git zsh nodejs npm" >/dev/null 2>&1 || true
+    run_server "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
     run_server "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
     run_server 'echo "export PATH=\"${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true
@@ -259,12 +313,12 @@ destroy_server() {
         return 0
     fi
     log_step "Destroying sandbox ${sandbox_id}..."
-    daytona delete "${sandbox_id}" 2>/dev/null || true
+    daytona sandbox delete "${sandbox_id}" 2>/dev/null || true
     log_info "Sandbox destroyed"
 }
 
 list_servers() {
-    daytona list
+    daytona sandbox list
 }
 
 # ============================================================
