@@ -2562,13 +2562,13 @@ function getHelpExamplesSection(): string {
   spawn                              ${pc.dim("# Pick interactively")}
   spawn openclaw sprite              ${pc.dim("# Launch OpenClaw on Sprite")}
   spawn codex hetzner                ${pc.dim("# Launch Codex CLI on Hetzner Cloud")}
-  spawn cline digitalocean           ${pc.dim("# Launch Cline on DigitalOcean")}
+  spawn kilocode digitalocean        ${pc.dim("# Launch Kilo Code on DigitalOcean")}
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
   spawn codex sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
   spawn openclaw fly -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
-  spawn gptme gcp --dry-run          ${pc.dim("# Preview without provisioning")}
+  spawn opencode gcp --dry-run       ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}
   spawn claude hetzner --output json ${pc.dim("# Structured JSON output on stdout")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
