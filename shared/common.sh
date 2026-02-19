@@ -315,6 +315,7 @@ validate_model_id() {
 verify_openrouter_key() {
     local api_key="${1}"
     if [[ -z "${api_key}" ]]; then return 1; fi
+    if [[ "${SPAWN_SKIP_API_VALIDATION:-}" == "1" ]]; then return 0; fi
     if ! command -v curl &>/dev/null; then return 0; fi  # skip if no curl
 
     local response http_code
@@ -338,6 +339,7 @@ verify_openrouter_key() {
 verify_openrouter_model() {
     local model_id="${1}"
     if [[ -z "${model_id}" ]]; then return 0; fi
+    if [[ "${SPAWN_SKIP_API_VALIDATION:-}" == "1" ]]; then return 0; fi
     if [[ "${model_id}" == "openrouter/auto" || "${model_id}" == "openrouter/free" ]]; then return 0; fi
     if ! command -v curl &>/dev/null; then return 0; fi
     if ! command -v python3 &>/dev/null; then return 0; fi
@@ -1438,7 +1440,7 @@ install_agent() {
     log_step "Installing ${agent_name}..."
     local escaped_cmd
     escaped_cmd=$(printf '%q' "${install_cmd}")
-    local timed_cmd="if command -v timeout >/dev/null 2>&1; then timeout 600 bash -c ${escaped_cmd}; else bash -c ${escaped_cmd}; fi"
+    local timed_cmd="if command -v timeout >/dev/null 2>&1; then timeout 600 bash -c \"${escaped_cmd}\"; else bash -c \"${escaped_cmd}\"; fi"
     if ! ${run_cb} "${timed_cmd}"; then
         log_install_failed "${agent_name}" "${install_cmd}"
         return 1
@@ -3137,9 +3139,10 @@ _generate_openclaw_json() {
     local model_id="${2}"
     local gateway_token="${3}"
 
-    local escaped_key escaped_token
+    local escaped_key escaped_token escaped_model
     escaped_key=$(json_escape "${openrouter_key}")
     escaped_token=$(json_escape "${gateway_token}")
+    escaped_model=$(json_escape "${model_id}")
 
     cat << EOF
 {
@@ -3155,7 +3158,7 @@ _generate_openclaw_json() {
   "agents": {
     "defaults": {
       "model": {
-        "primary": "${model_id}"
+        "primary": ${escaped_model}
       }
     }
   }
