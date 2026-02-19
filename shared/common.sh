@@ -1720,15 +1720,7 @@ spawn_agent() {
     server_name=$(get_server_name)
     cloud_provision "${server_name}"
 
-    # 4. Get API key while server provisions (overlaps with cloud-init)
-    get_or_prompt_api_key
-
-    # 5. Model selection while server provisions (if agent needs it)
-    if [[ -n "${AGENT_MODEL_PROMPT:-}" ]]; then
-        MODEL_ID=$(get_model_id_interactive "${AGENT_MODEL_DEFAULT:-openrouter/auto}" "${agent_name}") || exit 1
-    fi
-
-    # 6. Wait for readiness (may already be done after OAuth)
+    # 6. Wait for readiness
     cloud_wait_ready
 
     # 7. Install agent
