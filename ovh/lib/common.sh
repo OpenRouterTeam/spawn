@@ -425,7 +425,7 @@ for s in data:
 # ============================================================
 
 cloud_authenticate() { ensure_ovh_authenticated; ensure_ssh_key; }
-cloud_provision() { local name="$1"; create_ovh_instance "${name}"; }
+cloud_provision() { local name="$1"; OVH_SERVER_NAME="${name}"; export OVH_SERVER_NAME; create_ovh_instance "${name}"; }
 cloud_wait_ready() {
     wait_for_ovh_instance "${OVH_INSTANCE_ID}"
     save_vm_connection "${OVH_SERVER_IP}" "${OVH_SSH_USER:-ubuntu}" "${OVH_INSTANCE_ID}" "${OVH_SERVER_NAME:-}" "ovh"
