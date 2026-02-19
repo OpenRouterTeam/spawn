@@ -24,7 +24,7 @@ agent_env_vars() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.zshrc && codex'
+    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; codex'
 }
 
 spawn_agent "Codex CLI"
