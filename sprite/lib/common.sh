@@ -234,17 +234,22 @@ EOF
     # shellcheck disable=SC2046
     sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${path_temp}:/tmp/path_config" -- bash -c "cat /tmp/path_config >> ~/.bashrc && cat /tmp/path_config >> ~/.zshrc && rm /tmp/path_config"
 
-    # Switch bash to zsh
-    local bash_temp
-    bash_temp=$(mktemp)
-    trap 'rm -f "${path_temp}" "${bash_temp}"' EXIT
-    cat > "${bash_temp}" << 'EOF'
+    # Switch bash to zsh only if zsh is available on the sprite
+    # shellcheck disable=SC2046
+    if sprite $(_sprite_org_flags) exec -s "${sprite_name}" -- bash -c "command -v zsh" >/dev/null 2>&1; then
+        local bash_temp
+        bash_temp=$(mktemp)
+        trap 'rm -f "${path_temp}" "${bash_temp}"' EXIT
+        cat > "${bash_temp}" << 'EOF'
 # [spawn:bash]
 exec /usr/bin/zsh -l
 EOF
 
-    # shellcheck disable=SC2046
-    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${bash_temp}:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
+        # shellcheck disable=SC2046
+        sprite $(_sprite_org_flags) exec -s "${sprite_name}" -file "${bash_temp}:/tmp/bash_config" -- bash -c "cat /tmp/bash_config > ~/.bash_profile && cat /tmp/bash_config > ~/.bashrc && rm /tmp/bash_config"
+    else
+        log_warn "zsh not available on sprite, keeping bash as default shell"
+    fi
 }
 
 # Upload file to sprite (for use with setup_claude_code_config callback)

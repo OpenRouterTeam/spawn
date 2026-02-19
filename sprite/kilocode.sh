@@ -24,7 +24,7 @@ agent_env_vars() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.zshrc && kilocode'
+    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; kilocode'
 }
 
 spawn_agent "Kilo Code"

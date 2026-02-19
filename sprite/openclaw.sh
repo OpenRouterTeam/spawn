@@ -36,7 +36,7 @@ agent_pre_launch() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.zshrc && openclaw tui'
+    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; openclaw tui'
 }
 
 spawn_agent "OpenClaw"
