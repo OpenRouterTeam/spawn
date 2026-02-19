@@ -220,6 +220,10 @@ setup_shell_environment() {
     local sprite_name=${1}
     log_step "Configuring shell environment..."
 
+    # Clean up stale 'exec zsh' from prior runs that may block .bashrc sourcing
+    # shellcheck disable=SC2046
+    sprite $(_sprite_org_flags) exec -s "${sprite_name}" -- bash -c "sed -i '/exec \/usr\/bin\/zsh/d' ~/.bashrc ~/.bash_profile 2>/dev/null; true"
+
     # Create temp file with path config
     local path_temp
     path_temp=$(mktemp)
