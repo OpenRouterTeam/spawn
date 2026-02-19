@@ -86,38 +86,6 @@
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1",
       "featured_cloud": ["fly"]
     },
-    "cline": {
-      "name": "Cline",
-      "description": "Open-source AI coding agent for the terminal",
-      "url": "https://github.com/cline/cline",
-      "install": "npm install -g cline",
-      "launch": "cline",
-      "env": {
-        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
-        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
-        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
-      },
-      "notes": "Works with OpenRouter via OPENAI_BASE_URL override",
-      "featured_cloud": ["fly"]
-    },
-    "gptme": {
-      "name": "gptme",
-      "description": "Personal AI agent in the terminal with tools for code, terminal, browser, and more",
-      "url": "https://github.com/gptme/gptme",
-      "install": "pip install gptme",
-      "launch": "gptme -m openrouter/${MODEL_ID}",
-      "env": {
-        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
-      },
-      "interactive_prompts": {
-        "model_id": {
-          "prompt": "Enter model ID",
-          "default": "openrouter/auto"
-        }
-      },
-      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY and -m openrouter/... flag",
-      "featured_cloud": ["daytona"]
-    },
     "opencode": {
       "name": "OpenCode",
       "description": "AI coding agent built for the terminal with TUI",
@@ -128,18 +96,6 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea.",
-      "featured_cloud": ["daytona"]
-    },
-    "plandex": {
-      "name": "Plandex",
-      "description": "Open source AI coding agent for complex tasks",
-      "url": "https://github.com/plandex-ai/plandex",
-      "install": "curl -sL https://plandex.ai/install.sh | bash",
-      "launch": "plandex",
-      "env": {
-        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
-      },
-      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based CLI with sandbox and version control for AI changes.",
       "featured_cloud": ["daytona"]
     },
     "kilocode": {
@@ -154,31 +110,6 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'.",
-      "featured_cloud": ["fly"]
-    },
-    "continue": {
-      "name": "Continue",
-      "description": "Open-source AI coding assistant with CLI TUI and headless modes",
-      "url": "https://github.com/continuedev/continue",
-      "install": "npm install -g @continuedev/cli",
-      "launch": "cn",
-      "env": {
-        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
-      },
-      "config_files": {
-        "~/.continue/config.json": {
-          "models": [
-            {
-              "title": "OpenRouter",
-              "provider": "openrouter",
-              "model": "openrouter/auto",
-              "apiBase": "https://openrouter.ai/api/v1",
-              "apiKey": "${OPENROUTER_API_KEY}"
-            }
-          ]
-        }
-      },
-      "notes": "Natively supports OpenRouter via config.json. CLI supports TUI mode (interactive) and headless mode (-p flag). 31K+ GitHub stars.",
       "featured_cloud": ["fly"]
     }
   },
@@ -317,26 +248,14 @@
     "aws/openclaw": "implemented",
     "aws/nanoclaw": "implemented",
     "aws/codex": "implemented",
-    "sprite/cline": "implemented",
-    "hetzner/cline": "implemented",
-    "digitalocean/cline": "implemented",
-    "aws/cline": "implemented",
     "gcp/claude": "implemented",
     "gcp/openclaw": "implemented",
     "gcp/nanoclaw": "implemented",
     "gcp/codex": "implemented",
-    "gcp/cline": "implemented",
-    "sprite/gptme": "implemented",
-    "hetzner/gptme": "implemented",
-    "digitalocean/gptme": "implemented",
-    "aws/gptme": "implemented",
-    "gcp/gptme": "implemented",
     "fly/claude": "implemented",
     "fly/openclaw": "implemented",
     "fly/nanoclaw": "implemented",
     "fly/codex": "implemented",
-    "fly/cline": "implemented",
-    "fly/gptme": "implemented",
     "sprite/opencode": "implemented",
     "hetzner/opencode": "implemented",
     "digitalocean/opencode": "implemented",
@@ -347,16 +266,7 @@
     "daytona/openclaw": "implemented",
     "daytona/nanoclaw": "implemented",
     "daytona/codex": "implemented",
-    "daytona/cline": "implemented",
-    "daytona/gptme": "implemented",
     "daytona/opencode": "implemented",
-    "sprite/plandex": "implemented",
-    "hetzner/plandex": "implemented",
-    "digitalocean/plandex": "implemented",
-    "aws/plandex": "implemented",
-    "gcp/plandex": "implemented",
-    "fly/plandex": "implemented",
-    "daytona/plandex": "implemented",
     "sprite/kilocode": "implemented",
     "hetzner/kilocode": "implemented",
     "digitalocean/kilocode": "implemented",
@@ -364,22 +274,11 @@
     "gcp/kilocode": "implemented",
     "fly/kilocode": "implemented",
     "daytona/kilocode": "implemented",
-    "sprite/continue": "implemented",
-    "hetzner/continue": "implemented",
-    "digitalocean/continue": "implemented",
-    "aws/continue": "implemented",
-    "gcp/continue": "implemented",
-    "fly/continue": "implemented",
-    "daytona/continue": "implemented",
     "local/claude": "implemented",
     "local/openclaw": "implemented",
     "local/nanoclaw": "implemented",
     "local/codex": "implemented",
-    "local/cline": "implemented",
-    "local/gptme": "implemented",
     "local/opencode": "missing",
-    "local/plandex": "implemented",
-    "local/kilocode": "implemented",
-    "local/continue": "implemented"
+    "local/kilocode": "implemented"
   }
 }
