@@ -315,7 +315,10 @@ validate_model_id() {
 verify_openrouter_key() {
     local api_key="${1}"
     if [[ -z "${api_key}" ]]; then return 1; fi
-    if [[ "${SPAWN_SKIP_API_VALIDATION:-}" == "1" ]]; then return 0; fi
+    # Skip validation in test environments
+    if [[ -n "${SPAWN_SKIP_API_VALIDATION:-}" || "${BUN_ENV:-}" == "test" || "${NODE_ENV:-}" == "test" ]]; then
+        return 0
+    fi
     if ! command -v curl &>/dev/null; then return 0; fi  # skip if no curl
 
     local response http_code
@@ -339,7 +342,10 @@ verify_openrouter_key() {
 verify_openrouter_model() {
     local model_id="${1}"
     if [[ -z "${model_id}" ]]; then return 0; fi
-    if [[ "${SPAWN_SKIP_API_VALIDATION:-}" == "1" ]]; then return 0; fi
+    # Skip validation in test environments
+    if [[ -n "${SPAWN_SKIP_API_VALIDATION:-}" || "${BUN_ENV:-}" == "test" || "${NODE_ENV:-}" == "test" ]]; then
+        return 0
+    fi
     if [[ "${model_id}" == "openrouter/auto" || "${model_id}" == "openrouter/free" ]]; then return 0; fi
     if ! command -v curl &>/dev/null; then return 0; fi
     if ! command -v python3 &>/dev/null; then return 0; fi
