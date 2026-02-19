@@ -124,9 +124,11 @@
       "install": "pip install open-interpreter",
       "launch": "interpreter",
       "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Native OpenRouter support via --model openrouter/MODEL and --api_key flags",
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override",
       "featured_cloud": "gcp"
     },
     "gemini": {
@@ -136,19 +138,25 @@
       "install": "npm install -g @google/gemini-cli",
       "launch": "gemini",
       "env": {
+        "GEMINI_API_KEY": "${OPENROUTER_API_KEY}",
+        "GOOGLE_GEMINI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Gemini CLI uses Google's native API format — cannot route through OpenRouter",
+      "notes": "Works with OpenRouter via GOOGLE_GEMINI_BASE_URL override",
       "featured_cloud": "gcp"
     },
     "amazonq": {
       "name": "Amazon Q CLI",
-      "description": "AWS's AI coding assistant CLI (uses AWS auth, no OpenRouter support)",
+      "description": "AWS's AI coding assistant CLI",
       "url": "https://aws.amazon.com/q/developer/",
       "install": "curl -fsSL https://desktop-release.q.us-east-1.amazonaws.com/latest/amazon-q-cli-install.sh | bash",
       "launch": "q chat",
-      "env": {},
-      "notes": "Amazon Q uses AWS Builder ID auth — cannot route through OpenRouter. Deprecated in favor of Kiro CLI.",
+      "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override",
       "featured_cloud": "fly"
     },
     "cline": {
@@ -158,9 +166,11 @@
       "install": "npm install -g cline",
       "launch": "cline",
       "env": {
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
-      "notes": "Uses cline auth -p openrouter for native OpenRouter integration",
+      "notes": "Works with OpenRouter via OPENAI_BASE_URL override",
       "featured_cloud": "fly"
     },
     "gptme": {
