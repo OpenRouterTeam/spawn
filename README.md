@@ -163,10 +163,10 @@ If an agent fails to install or launch on a cloud:
 | | [Local Machine](local/) | [Hetzner Cloud](hetzner/) | [Fly.io](fly/) | [AWS Lightsail](aws/) | [Daytona](daytona/) | [DigitalOcean](digitalocean/) | [GCP Compute Engine](gcp/) | [Sprite](sprite/) |
 |---|---|---|---|---|---|---|---|---|
 | [**Claude Code**](https://claude.ai) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**OpenClaw**](https://github.com/OpenRouterTeam/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [**OpenClaw**](https://github.com/openclaw/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**ZeroClaw**](https://github.com/zeroclaw-labs/zeroclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Codex CLI**](https://github.com/openai/codex) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**OpenCode**](https://github.com/opencode-ai/opencode) |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [**OpenCode**](https://github.com/anomalyco/opencode) |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Kilo Code**](https://github.com/Kilo-Org/kilocode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ### How it works

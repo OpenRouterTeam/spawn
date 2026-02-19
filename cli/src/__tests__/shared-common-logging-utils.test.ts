@@ -608,7 +608,7 @@ describe("opencode_install_cmd", () => {
 
   it("should download from github releases", () => {
     const result = runBash("opencode_install_cmd");
-    expect(result.stdout).toContain("github.com/opencode-ai/opencode");
+    expect(result.stdout).toContain("github.com/anomalyco/opencode");
   });
 
   it("should handle aarch64 to arm64 mapping", () => {

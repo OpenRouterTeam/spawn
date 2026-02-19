@@ -428,7 +428,7 @@ describe("opencode_install_cmd", () => {
 
   it("should download from github releases", () => {
     const result = runBash(`opencode_install_cmd`);
-    expect(result.stdout).toContain("github.com/opencode-ai/opencode/releases");
+    expect(result.stdout).toContain("github.com/anomalyco/opencode/releases");
   });
 
   it("should add to PATH in both .bashrc and .zshrc", () => {
