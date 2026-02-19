@@ -390,13 +390,6 @@ install_base_deps() {
     log_info "Base dependencies installed"
 }
 
-# Inject environment variables using SSH
-inject_env_vars_ovh() {
-    local server_ip="$1"
-    shift
-    inject_env_vars_ssh "${server_ip}" "upload_file_ovh ${server_ip}" "run_ovh ${server_ip}" "$@"
-}
-
 # List all OVH instances
 list_instances() {
     local response
