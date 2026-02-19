@@ -281,6 +281,41 @@ export function validateServerIdentifier(id: string): void {
   }
 }
 
+/**
+ * Validates a metadata value from connection history (e.g., GCP zone, project).
+ * SECURITY-CRITICAL: Prevents command injection via tampered history files.
+ *
+ * Allows lowercase/uppercase alphanumeric, hyphens, underscores, and dots.
+ * Blocks shell metacharacters: ; & | $ ( ) ` ' " \ < > space newline
+ *
+ * @param value - The metadata value to validate
+ * @param fieldName - Human-readable field name for error messages
+ * @throws Error if validation fails
+ */
+export function validateMetadataValue(value: string, fieldName: string): void {
+  if (!value || value.trim() === "") {
+    return; // Empty values are allowed (caller provides defaults)
+  }
+
+  if (value.length > 128) {
+    throw new Error(
+      `${fieldName} is too long: "${value}" (${value.length} characters, maximum is 128)\n\n` +
+      `Your spawn history file may be corrupted or tampered with.\n` +
+      `To fix: remove the invalid entry from ~/.spawn/history.json`
+    );
+  }
+
+  const SAFE_METADATA_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+  if (!SAFE_METADATA_PATTERN.test(value)) {
+    throw new Error(
+      `Invalid ${fieldName}: "${value}"\n\n` +
+      `${fieldName} can only contain letters, digits, hyphens, underscores, and dots.\n\n` +
+      `Your spawn history file may be corrupted or tampered with.\n` +
+      `To fix: remove the invalid entry from ~/.spawn/history.json`
+    );
+  }
+}
+
 // Sensitive path patterns that should never be read as prompt files
 // These protect credentials and system files from accidental exfiltration
 const SENSITIVE_PATH_PATTERNS: ReadonlyArray<{ pattern: RegExp; description: string }> = [
