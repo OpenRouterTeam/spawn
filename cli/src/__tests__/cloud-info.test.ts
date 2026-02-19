@@ -71,9 +71,9 @@ const extendedManifest: Manifest = {
   matrix: {
     ...mockManifest.matrix,
     "railway/claude": "implemented",
-    "railway/aider": "missing",
+    "railway/codex": "missing",
     "local/claude": "implemented",
-    "local/aider": "implemented",
+    "local/codex": "implemented",
     "authcloud/claude": "implemented",
     // emptycloud has no matrix entries at all
   },
@@ -170,22 +170,22 @@ describe("cmdCloudInfo", () => {
       await cmdCloudInfo("sprite");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("claude");
-      expect(output).toContain("aider");
+      expect(output).toContain("codex");
     });
 
     it("should show launch command hint for each agent", async () => {
       await cmdCloudInfo("sprite");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn claude sprite");
-      expect(output).toContain("spawn aider sprite");
+      expect(output).toContain("spawn codex sprite");
     });
 
     it("should only show implemented agents for hetzner", async () => {
       await cmdCloudInfo("hetzner");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("claude");
-      // hetzner/aider is "missing" in mock manifest
-      expect(output).not.toContain("spawn aider hetzner");
+      // hetzner/codex is "missing" in mock manifest
+      expect(output).not.toContain("spawn codex hetzner");
     });
 
     it("should show hetzner name and description", async () => {
@@ -222,7 +222,7 @@ describe("cmdCloudInfo", () => {
       await cmdCloudInfo("railway");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn claude railway");
-      expect(output).not.toContain("spawn aider railway");
+      expect(output).not.toContain("spawn codex railway");
     });
   });
 
@@ -246,7 +246,7 @@ describe("cmdCloudInfo", () => {
       await cmdCloudInfo("emptycloud");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).not.toContain("spawn claude emptycloud");
-      expect(output).not.toContain("spawn aider emptycloud");
+      expect(output).not.toContain("spawn codex emptycloud");
     });
   });
 

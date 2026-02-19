@@ -37,12 +37,12 @@ const standardManifest: Manifest = {
         ANTHROPIC_BASE_URL: "https://openrouter.ai/api",
       },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: {
         OPENAI_API_KEY: "test-key",
       },
@@ -76,9 +76,9 @@ const standardManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
@@ -440,7 +440,7 @@ describe("Dry-run preview (showDryRunPreview via cmdRun)", () => {
     it("should show non-OPENROUTER values as-is", async () => {
       setupManifest(standardManifest);
       await loadManifest(true);
-      await cmdRun("aider", "sprite", undefined, true);
+      await cmdRun("codex", "sprite", undefined, true);
 
       expect(getLogText()).toContain("OPENAI_API_KEY=test-key");
     });
@@ -523,15 +523,15 @@ describe("Dry-run preview (showDryRunPreview via cmdRun)", () => {
   // ── Different combinations ─────────────────────────────────────────
 
   describe("different agent/cloud combinations", () => {
-    it("should work with aider on sprite", async () => {
+    it("should work with codex on sprite", async () => {
       setupManifest(standardManifest);
       await loadManifest(true);
-      await cmdRun("aider", "sprite", undefined, true);
+      await cmdRun("codex", "sprite", undefined, true);
 
       const text = getLogText();
-      expect(text).toContain("Aider");
+      expect(text).toContain("Codex");
       expect(text).toContain("AI pair programmer");
-      expect(text).toContain("sprite/aider.sh");
+      expect(text).toContain("sprite/codex.sh");
       expect(getSuccessCalls().some(c => c.includes("Dry run complete"))).toBe(true);
     });
 
@@ -562,7 +562,7 @@ describe("Dry-run preview (showDryRunPreview via cmdRun)", () => {
     it("should include prompt with different agent/cloud", async () => {
       setupManifest(standardManifest);
       await loadManifest(true);
-      await cmdRun("aider", "sprite", "Add unit tests", true);
+      await cmdRun("codex", "sprite", "Add unit tests", true);
 
       const text = getLogText();
       expect(text).toContain("Add unit tests");

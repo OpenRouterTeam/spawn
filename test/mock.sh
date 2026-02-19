@@ -243,7 +243,7 @@ MOCK
 
 setup_mock_agents() {
     # Agent binaries
-    _create_logging_mock claude aider goose codex interpreter gemini amazonq cline gptme opencode plandex kilocode openclaw nanoclaw q
+    _create_logging_mock claude codex cline gptme opencode plandex kilocode openclaw nanoclaw q
 
     # Tools used during agent install and file upload
     _create_logging_mock pip pip3 npm npx bun node openssl shred cargo go git base64

@@ -183,15 +183,15 @@ describe("cmdInteractive", () => {
 
   describe("no clouds available", () => {
     it("should exit with code 1 when agent has no implemented clouds", async () => {
-      // "aider" is only implemented on "sprite", but we need an agent with zero implementations.
-      // Create a manifest where aider has no implemented clouds.
+      // "codex" is only implemented on "sprite", but we need an agent with zero implementations.
+      // Create a manifest where codex has no implemented clouds.
       const noCloudManifest = {
         ...mockManifest,
         matrix: {
           "sprite/claude": "implemented",
           "hetzner/claude": "implemented",
-          "sprite/aider": "missing",
-          "hetzner/aider": "missing",
+          "sprite/codex": "missing",
+          "hetzner/codex": "missing",
         },
       };
 
@@ -202,7 +202,7 @@ describe("cmdInteractive", () => {
       })) as any;
       await loadManifest(true);
 
-      selectReturnValues = ["aider", "sprite"];
+      selectReturnValues = ["codex", "sprite"];
 
       await expect(cmdInteractive()).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
@@ -214,8 +214,8 @@ describe("cmdInteractive", () => {
         matrix: {
           "sprite/claude": "implemented",
           "hetzner/claude": "implemented",
-          "sprite/aider": "missing",
-          "hetzner/aider": "missing",
+          "sprite/codex": "missing",
+          "hetzner/codex": "missing",
         },
       };
 
@@ -226,7 +226,7 @@ describe("cmdInteractive", () => {
       })) as any;
       await loadManifest(true);
 
-      selectReturnValues = ["aider", "sprite"];
+      selectReturnValues = ["codex", "sprite"];
 
       try {
         await cmdInteractive();
@@ -235,7 +235,7 @@ describe("cmdInteractive", () => {
       }
 
       const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
-      expect(errorCalls.some((msg: string) => msg.includes("Aider"))).toBe(true);
+      expect(errorCalls.some((msg: string) => msg.includes("Codex"))).toBe(true);
     });
 
     it("should suggest 'spawn matrix' when no clouds available", async () => {
@@ -244,8 +244,8 @@ describe("cmdInteractive", () => {
         matrix: {
           "sprite/claude": "implemented",
           "hetzner/claude": "implemented",
-          "sprite/aider": "missing",
-          "hetzner/aider": "missing",
+          "sprite/codex": "missing",
+          "hetzner/codex": "missing",
         },
       };
 
@@ -256,7 +256,7 @@ describe("cmdInteractive", () => {
       })) as any;
       await loadManifest(true);
 
-      selectReturnValues = ["aider", "sprite"];
+      selectReturnValues = ["codex", "sprite"];
 
       try {
         await cmdInteractive();
@@ -376,8 +376,8 @@ describe("cmdInteractive", () => {
       expect(outroArg).toContain("spawn script");
     });
 
-    it("should work with aider agent on sprite cloud", async () => {
-      selectReturnValues = ["aider", "sprite"];
+    it("should work with codex agent on sprite cloud", async () => {
+      selectReturnValues = ["codex", "sprite"];
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
@@ -399,7 +399,7 @@ describe("cmdInteractive", () => {
       const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
       expect(launchMsg).toBeDefined();
-      expect(launchMsg).toContain("Aider");
+      expect(launchMsg).toContain("Codex");
       expect(launchMsg).toContain("Sprite");
     });
   });

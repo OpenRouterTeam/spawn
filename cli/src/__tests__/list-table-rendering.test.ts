@@ -85,7 +85,7 @@ describe("resolveDisplayName", () => {
   });
 
   it("should handle second agent key correctly", () => {
-    expect(resolveDisplayName(mockManifest, "aider", "agent")).toBe("Aider");
+    expect(resolveDisplayName(mockManifest, "codex", "agent")).toBe("Codex");
   });
 
   it("should handle second cloud key correctly", () => {
@@ -247,7 +247,7 @@ describe("cmdList table rendering", () => {
       await setManifest(mockManifest);
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T10:00:00.000Z" },
       ]);
 
@@ -255,7 +255,7 @@ describe("cmdList table rendering", () => {
       const output = getOutput();
       // All agents should appear
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
       // All clouds should appear
       expect(output).toContain("Sprite");
       expect(output).toContain("Hetzner Cloud");
@@ -265,13 +265,13 @@ describe("cmdList table rendering", () => {
       await setManifest(mockManifest);
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
       ]);
 
       await cmdList();
       const output = getOutput();
-      // Most recent is aider/hetzner (reversed = first), so rerun hint should use it
-      expect(output).toContain("spawn aider hetzner");
+      // Most recent is codex/hetzner (reversed = first), so rerun hint should use it
+      expect(output).toContain("spawn codex hetzner");
     });
   });
 
@@ -395,22 +395,22 @@ describe("cmdList table rendering", () => {
       await setManifest(mockManifest);
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T10:00:00.000Z" },
       ]);
 
       await cmdList("claude");
       const output = getOutput();
       expect(output).toContain("Claude Code");
-      // Aider should not appear in filtered results
-      expect(output).not.toContain("Aider");
+      // Codex should not appear in filtered results
+      expect(output).not.toContain("Codex");
     });
 
     it("should show only matching records with cloud filter", async () => {
       await setManifest(mockManifest);
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
       ]);
 
       await cmdList(undefined, "sprite");
@@ -424,7 +424,7 @@ describe("cmdList table rendering", () => {
       await setManifest(mockManifest);
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T10:00:00.000Z" },
       ]);
 
@@ -437,7 +437,7 @@ describe("cmdList table rendering", () => {
       await setManifest(mockManifest);
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
       ]);
 
       await cmdList("claude");
@@ -462,7 +462,7 @@ describe("cmdList table rendering", () => {
       await setManifest(mockManifest);
       writeHistory([
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T10:00:00.000Z" },
       ]);
 
       await cmdList();

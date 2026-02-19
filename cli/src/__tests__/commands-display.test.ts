@@ -29,9 +29,9 @@ const noImplManifest = {
   ...mockManifest,
   matrix: {
     "sprite/claude": "missing",
-    "sprite/aider": "missing",
+    "sprite/codex": "missing",
     "hetzner/claude": "missing",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
@@ -40,9 +40,9 @@ const singleImplManifest = {
   ...mockManifest,
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "missing",
+    "sprite/codex": "missing",
     "hetzner/claude": "missing",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
@@ -199,15 +199,15 @@ describe("Commands Display Output", () => {
       expect(output).toContain("spawn claude hetzner");
     });
 
-    it("should show aider agent info with only sprite cloud", async () => {
-      await cmdAgentInfo("aider");
+    it("should show codex agent info with only sprite cloud", async () => {
+      await cmdAgentInfo("codex");
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
       expect(output).toContain("AI pair programmer");
-      expect(output).toContain("spawn aider sprite");
-      expect(output).not.toContain("spawn aider hetzner");
+      expect(output).toContain("spawn codex sprite");
+      expect(output).not.toContain("spawn codex hetzner");
     });
 
     it("should show no-clouds message when agent has no implementations", async () => {
@@ -250,7 +250,7 @@ describe("Commands Display Output", () => {
         .map((c: any[]) => c.join(" "))
         .join("\n");
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
 
     it("should show implemented count", async () => {
@@ -320,8 +320,8 @@ describe("Commands Display Output", () => {
         .join("\n");
       expect(output).toContain("claude");
       expect(output).toContain("Claude Code");
-      expect(output).toContain("aider");
-      expect(output).toContain("Aider");
+      expect(output).toContain("codex");
+      expect(output).toContain("Codex");
     });
 
     it("should show cloud counts for each agent", async () => {
@@ -329,7 +329,7 @@ describe("Commands Display Output", () => {
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
-      // claude has 2 clouds, aider has 1 cloud
+      // claude has 2 clouds, codex has 1 cloud
       expect(output).toContain("2 clouds");
       expect(output).toContain("1 cloud");
     });
@@ -337,13 +337,13 @@ describe("Commands Display Output", () => {
     it("should show correct singular/plural for cloud count", async () => {
       await cmdAgents();
       const calls = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
-      // Find the line with aider (1 cloud - singular)
-      const aiderLine = calls.find(
-        (line: string) => line.includes("aider") && line.includes("cloud")
+      // Find the line with codex (1 cloud - singular)
+      const codexLine = calls.find(
+        (line: string) => line.includes("codex") && line.includes("cloud")
       );
-      expect(aiderLine).toBeDefined();
-      expect(aiderLine).toContain("1 cloud");
-      expect(aiderLine).not.toContain("1 clouds");
+      expect(codexLine).toBeDefined();
+      expect(codexLine).toContain("1 cloud");
+      expect(codexLine).not.toContain("1 clouds");
     });
 
     it("should show agent descriptions", async () => {
@@ -619,8 +619,8 @@ describe("Commands Display Output", () => {
         ...mockManifest,
         agents: {
           ...mockManifest.agents,
-          aider: {
-            ...mockManifest.agents.aider,
+          codex: {
+            ...mockManifest.agents.codex,
             notes: "Natively supports OpenRouter",
           },
         },
@@ -632,7 +632,7 @@ describe("Commands Display Output", () => {
       })) as any;
       await loadManifest(true);
 
-      await cmdAgentInfo("aider");
+      await cmdAgentInfo("codex");
       const output = consoleMocks.log.mock.calls
         .map((c: any[]) => c.join(" "))
         .join("\n");
@@ -690,7 +690,7 @@ describe("Commands Display Output", () => {
       // Both agents should show 0 clouds
       const agentLines = calls.filter(
         (line: string) =>
-          line.includes("claude") || line.includes("aider")
+          line.includes("claude") || line.includes("codex")
       );
       for (const line of agentLines) {
         if (line.includes("cloud")) {

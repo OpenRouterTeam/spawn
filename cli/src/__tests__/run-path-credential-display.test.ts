@@ -35,12 +35,12 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
           ANTHROPIC_API_KEY: "",
         },
       },
-      aider: {
-        name: "Aider",
+      codex: {
+        name: "Codex",
         description: "AI pair programming in your terminal",
-        url: "https://aider.chat",
-        install: "pip install aider-chat",
-        launch: "aider",
+        url: "https://codex.dev",
+        install: "npm install -g codex",
+        launch: "codex",
         env: {
           OPENROUTER_API_KEY: "$OPENROUTER_API_KEY",
         },
@@ -100,15 +100,15 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
     },
     matrix: {
       "hetzner/claude": "implemented",
-      "hetzner/aider": "implemented",
+      "hetzner/codex": "implemented",
       "sprite/claude": "implemented",
-      "sprite/aider": "missing",
+      "sprite/codex": "missing",
       "digitalocean/claude": "implemented",
-      "digitalocean/aider": "implemented",
+      "digitalocean/codex": "implemented",
       "upcloud/claude": "implemented",
-      "upcloud/aider": "missing",
+      "upcloud/codex": "missing",
       "localcloud/claude": "implemented",
-      "localcloud/aider": "implemented",
+      "localcloud/codex": "implemented",
     },
     ...overrides,
   } as Manifest;
@@ -506,12 +506,12 @@ describe("implementation checks for run path", () => {
     expect(clouds).toContain("localcloud");
   });
 
-  it("should return implemented clouds for aider (fewer)", () => {
-    const clouds = getImplementedClouds(manifest, "aider");
+  it("should return implemented clouds for codex (fewer)", () => {
+    const clouds = getImplementedClouds(manifest, "codex");
     expect(clouds).toContain("hetzner");
     expect(clouds).toContain("digitalocean");
     expect(clouds).toContain("localcloud");
-    // sprite/aider and upcloud/aider are "missing"
+    // sprite/codex and upcloud/codex are "missing"
     expect(clouds).not.toContain("sprite");
     expect(clouds).not.toContain("upcloud");
   });
@@ -519,7 +519,7 @@ describe("implementation checks for run path", () => {
   it("should return implemented agents for hetzner", () => {
     const agents = getImplementedAgents(manifest, "hetzner");
     expect(agents).toContain("claude");
-    expect(agents).toContain("aider");
+    expect(agents).toContain("codex");
   });
 
   it("should return empty for nonexistent agent", () => {

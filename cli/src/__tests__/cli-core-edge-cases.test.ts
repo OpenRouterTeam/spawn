@@ -430,7 +430,7 @@ import type { Manifest } from "../manifest";
 const testManifest: Manifest = {
   agents: {
     claude: { name: "Claude Code", description: "AI assistant", url: "", install: "", launch: "", env: {} },
-    aider: { name: "Aider", description: "AI pair programmer", url: "", install: "", launch: "", env: {} },
+    codex: { name: "Codex", description: "AI pair programmer", url: "", install: "", launch: "", env: {} },
   },
   clouds: {
     sprite: { name: "Sprite", description: "VMs", url: "", type: "vm", auth: "SPRITE_TOKEN", provision_method: "api", exec_method: "ssh", interactive_method: "ssh" },
@@ -438,9 +438,9 @@ const testManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
@@ -788,7 +788,7 @@ describe("history.ts additional edge cases", () => {
     it("should filter by both agent and cloud simultaneously", () => {
       saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2024-01-01" });
       saveSpawnRecord({ agent: "claude", cloud: "hetzner", timestamp: "2024-01-02" });
-      saveSpawnRecord({ agent: "aider", cloud: "sprite", timestamp: "2024-01-03" });
+      saveSpawnRecord({ agent: "codex", cloud: "sprite", timestamp: "2024-01-03" });
 
       const results = filterHistory("claude", "sprite");
       expect(results).toHaveLength(1);
@@ -840,7 +840,7 @@ describe("history.ts additional edge cases", () => {
 
     it("should return correct count and delete file", () => {
       saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2024-01-01" });
-      saveSpawnRecord({ agent: "aider", cloud: "hetzner", timestamp: "2024-01-02" });
+      saveSpawnRecord({ agent: "codex", cloud: "hetzner", timestamp: "2024-01-02" });
       const count = clearHistory();
       expect(count).toBe(2);
       expect(existsSync(join(testDir, "history.json"))).toBe(false);
@@ -849,10 +849,10 @@ describe("history.ts additional edge cases", () => {
     it("should allow saving after clearing", () => {
       saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2024-01-01" });
       clearHistory();
-      saveSpawnRecord({ agent: "aider", cloud: "hetzner", timestamp: "2024-01-02" });
+      saveSpawnRecord({ agent: "codex", cloud: "hetzner", timestamp: "2024-01-02" });
       const history = loadHistory();
       expect(history).toHaveLength(1);
-      expect(history[0].agent).toBe("aider");
+      expect(history[0].agent).toBe("codex");
     });
   });
 });
@@ -1066,7 +1066,7 @@ describe("levenshtein distance additional edge cases", () => {
 // ── commands.ts: findClosestMatch edge cases ────────────────────────────────
 
 describe("findClosestMatch edge cases", () => {
-  const candidates = ["claude", "aider", "goose", "hetzner", "sprite"];
+  const candidates = ["claude", "codex", "cline", "hetzner", "sprite"];
 
   it("should find exact match (distance 0)", () => {
     expect(findClosestMatch("claude", candidates)).toBe("claude");
@@ -1089,8 +1089,8 @@ describe("findClosestMatch edge cases", () => {
   });
 
   it("should find closest among multiple close matches", () => {
-    // "aidr" is distance 1 from "aider", distance 4 from "claude"
-    expect(findClosestMatch("aidr", candidates)).toBe("aider");
+    // "codx" is distance 1 from "codex", distance 4 from "claude"
+    expect(findClosestMatch("codx", candidates)).toBe("codex");
   });
 });
 
@@ -1199,7 +1199,7 @@ describe("getStatusDescription additional cases", () => {
 
 describe("getMissingClouds", () => {
   it("should return clouds where agent is not implemented", () => {
-    const missing = getMissingClouds(testManifest, "aider", ["sprite", "hetzner"]);
+    const missing = getMissingClouds(testManifest, "codex", ["sprite", "hetzner"]);
     expect(missing).toEqual(["hetzner"]);
   });
 

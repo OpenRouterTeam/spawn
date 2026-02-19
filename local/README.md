@@ -12,12 +12,7 @@ If you have the [spawn CLI](https://github.com/OpenRouterTeam/spawn) installed:
 spawn claude local
 spawn openclaw local
 spawn nanoclaw local
-spawn aider local
-spawn goose local
 spawn codex local
-spawn interpreter local
-spawn gemini local
-spawn amazonq local
 spawn cline local
 spawn gptme local
 spawn opencode local
@@ -32,12 +27,7 @@ Or run directly without the CLI:
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/claude.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/nanoclaw.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/aider.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/goose.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/codex.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/interpreter.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/gemini.sh)
-bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/amazonq.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/cline.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/gptme.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/opencode.sh)

@@ -34,7 +34,7 @@ _parse_args() {
 _maybe_inject_error() {
     [ -n "${MOCK_ERROR_SCENARIO:-}" ] || return 1
     case "$URL" in
-        *openrouter.ai*|*raw.githubusercontent.com*|*claude.ai/install*|*bun.sh*|*goose*|*nodesource*|*plandex.ai*|*opencode*|*pip.pypa.io*|*get.docker.com*|*npmjs.org*|*github.com/*/releases*)
+        *openrouter.ai*|*raw.githubusercontent.com*|*claude.ai/install*|*bun.sh*|*nodesource*|*plandex.ai*|*opencode*|*pip.pypa.io*|*get.docker.com*|*npmjs.org*|*github.com/*/releases*)
             return 1 ;;
     esac
     case "${MOCK_ERROR_SCENARIO}" in
@@ -65,8 +65,8 @@ _maybe_inject_error() {
 
 _handle_special_urls() {
     case "$URL" in
-        *claude.ai/install*|*bun.sh*|*goose*download_cli*|*nodesource*|*plandex.ai*|*opencode*install*|\
-        *pip.pypa.io*|*get.docker.com*|*raw.githubusercontent.com/block/goose*|*install.python-poetry.org*|\
+        *claude.ai/install*|*bun.sh*|*nodesource*|*plandex.ai*|*opencode*install*|\
+        *pip.pypa.io*|*get.docker.com*|*install.python-poetry.org*|\
         *npmjs.org*|*deb.nodesource.com*|*github.com/*/releases*|*cli.github.com*)
             printf '#!/bin/bash\nexit 0\n'
             exit 0 ;;

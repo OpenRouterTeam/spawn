@@ -468,9 +468,9 @@ describe("log_install_failed actionable guidance", () => {
 
   it("should include install command when provided", () => {
     const result = runBash(`
-log_install_failed "Aider" "pip install aider-chat" "" 2>&1
+log_install_failed "Codex" "npm install -g codex" "" 2>&1
 `);
-    expect(result.stdout).toContain("pip install aider-chat");
+    expect(result.stdout).toContain("npm install -g codex");
   });
 
   it("should include SSH connection hint when server IP provided", () => {

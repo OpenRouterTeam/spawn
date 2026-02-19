@@ -26,7 +26,7 @@ describe("manifest", () => {
   describe("agentKeys", () => {
     it("should return all agent keys", () => {
       const keys = agentKeys(mockManifest);
-      expect(keys).toEqual(["claude", "aider"]);
+      expect(keys).toEqual(["claude", "codex"]);
     });
 
     it("should return empty array for empty agents", () => {
@@ -56,7 +56,7 @@ describe("manifest", () => {
     });
 
     it("should return 'missing' for existing missing combination", () => {
-      const status = matrixStatus(mockManifest, "hetzner", "aider");
+      const status = matrixStatus(mockManifest, "hetzner", "codex");
       expect(status).toBe("missing");
     });
 
@@ -89,9 +89,9 @@ describe("manifest", () => {
         clouds: mockManifest.clouds,
         matrix: {
           "sprite/claude": "missing",
-          "sprite/aider": "missing",
+          "sprite/codex": "missing",
           "hetzner/claude": "missing",
-          "hetzner/aider": "missing",
+          "hetzner/codex": "missing",
         },
       };
       const count = countImplemented(allMissing);

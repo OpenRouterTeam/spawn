@@ -134,21 +134,21 @@ describe("cmdCloudInfo", () => {
       await cmdCloudInfo("sprite");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("claude");
-      expect(output).toContain("aider");
+      expect(output).toContain("codex");
     });
 
     it("should show launch command hint for each agent", async () => {
       await cmdCloudInfo("sprite");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn claude sprite");
-      expect(output).toContain("spawn aider sprite");
+      expect(output).toContain("spawn codex sprite");
     });
 
     it("should only show implemented agents for hetzner", async () => {
       await cmdCloudInfo("hetzner");
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn claude hetzner");
-      expect(output).not.toContain("spawn aider hetzner");
+      expect(output).not.toContain("spawn codex hetzner");
     });
 
     it("should show hetzner description", async () => {

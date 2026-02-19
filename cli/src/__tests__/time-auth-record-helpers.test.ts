@@ -46,20 +46,20 @@ function createManifest(overrides?: Partial<Manifest>): Manifest {
         launch: "claude",
         env: { ANTHROPIC_API_KEY: "key" },
       },
-      aider: {
-        name: "Aider",
-        description: "AI pair programmer",
-        url: "https://aider.chat",
-        install: "pip install aider-chat",
-        launch: "aider",
-        env: { OPENAI_API_KEY: "key" },
-      },
       codex: {
         name: "Codex",
-        description: "OpenAI Codex CLI",
-        url: "https://github.com/openai/codex",
-        install: "npm i -g @openai/codex",
+        description: "AI pair programmer",
+        url: "https://codex.dev",
+        install: "npm install -g codex",
         launch: "codex",
+        env: { OPENAI_API_KEY: "key" },
+      },
+      gptme: {
+        name: "GPTMe",
+        description: "AI terminal assistant",
+        url: "https://gptme.dev",
+        install: "pip install gptme",
+        launch: "gptme",
         env: { OPENAI_API_KEY: "key" },
       },
     },
@@ -107,17 +107,17 @@ function createManifest(overrides?: Partial<Manifest>): Manifest {
     },
     matrix: {
       "sprite/claude": "implemented",
-      "sprite/aider": "implemented",
-      "sprite/codex": "missing",
+      "sprite/codex": "implemented",
+      "sprite/gptme": "missing",
       "hetzner/claude": "implemented",
-      "hetzner/aider": "missing",
-      "hetzner/codex": "implemented",
+      "hetzner/codex": "missing",
+      "hetzner/gptme": "implemented",
       "upcloud/claude": "implemented",
-      "upcloud/aider": "missing",
       "upcloud/codex": "missing",
+      "upcloud/gptme": "missing",
       "modal/claude": "missing",
-      "modal/aider": "missing",
       "modal/codex": "missing",
+      "modal/gptme": "missing",
     },
     ...overrides,
   };
@@ -255,15 +255,15 @@ describe("getImplementedAgents", () => {
   it("returns implemented agents for sprite", () => {
     const agents = getImplementedAgents(manifest, "sprite");
     expect(agents).toContain("claude");
-    expect(agents).toContain("aider");
-    expect(agents).not.toContain("codex");
+    expect(agents).toContain("codex");
+    expect(agents).not.toContain("gptme");
   });
 
   it("returns implemented agents for hetzner", () => {
     const agents = getImplementedAgents(manifest, "hetzner");
     expect(agents).toContain("claude");
-    expect(agents).toContain("codex");
-    expect(agents).not.toContain("aider");
+    expect(agents).toContain("gptme");
+    expect(agents).not.toContain("codex");
   });
 
   it("returns empty array for cloud with no implementations", () => {
@@ -290,13 +290,13 @@ describe("getImplementedClouds", () => {
     expect(clouds).not.toContain("modal");
   });
 
-  it("returns implemented clouds for aider (only sprite)", () => {
-    const clouds = getImplementedClouds(manifest, "aider");
+  it("returns implemented clouds for codex (only sprite)", () => {
+    const clouds = getImplementedClouds(manifest, "codex");
     expect(clouds).toEqual(["sprite"]);
   });
 
-  it("returns implemented clouds for codex", () => {
-    const clouds = getImplementedClouds(manifest, "codex");
+  it("returns implemented clouds for gptme", () => {
+    const clouds = getImplementedClouds(manifest, "gptme");
     expect(clouds).toContain("hetzner");
     expect(clouds).not.toContain("sprite");
   });
@@ -463,7 +463,7 @@ describe("resolveDisplayName", () => {
   });
 
   it("resolves all agent names correctly", () => {
-    expect(resolveDisplayName(manifest, "aider", "agent")).toBe("Aider");
+    expect(resolveDisplayName(manifest, "codex", "agent")).toBe("Codex");
     expect(resolveDisplayName(manifest, "codex", "agent")).toBe("Codex");
   });
 
@@ -498,8 +498,8 @@ describe("buildRecordLabel", () => {
   });
 
   it("includes both agent and cloud in label", () => {
-    const label = buildRecordLabel({ agent: "aider", cloud: "hetzner", timestamp: "" }, manifest);
-    expect(label).toContain("Aider");
+    const label = buildRecordLabel({ agent: "codex", cloud: "hetzner", timestamp: "" }, manifest);
+    expect(label).toContain("Codex");
     expect(label).toContain("Hetzner Cloud");
   });
 

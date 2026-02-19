@@ -8,7 +8,7 @@ import { loadManifest } from "../manifest";
  *
  * When a user types an unknown agent or cloud, validateAgent/validateCloud:
  *   1. Try findClosestMatch on keys (e.g. "claud" -> "claude")
- *   2. If that fails, try findClosestMatch on display names (e.g. "Aidr" -> "Aider")
+ *   2. If that fails, try findClosestMatch on display names (e.g. "Codx" -> "Codex")
  *      and then look up the corresponding key
  *
  * The key-based suggestion path (step 1) is well tested in commands-error-paths.test.ts.
@@ -36,19 +36,19 @@ const manifestWithDistinctNames = {
       env: { ANTHROPIC_API_KEY: "test" },
     },
     ap: {
-      name: "Aider Pro",
+      name: "Codex Pro",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
     oi: {
-      name: "Open Interpreter",
-      description: "Code interpreter",
-      url: "https://interpreter.com",
-      install: "pip install open-interpreter",
-      launch: "interpreter",
+      name: "GPTMe",
+      description: "AI terminal assistant",
+      url: "https://gptme.dev",
+      install: "pip install gptme",
+      launch: "gptme",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -170,19 +170,19 @@ describe("Display Name Suggestions in Validation Errors", () => {
 
   describe("validateAgent - display name suggestion", () => {
     it("should suggest key via display name when key-based suggestion fails", async () => {
-      // "aider" is far from keys ["cc", "ap", "oi"] (all distance > 3)
-      // But "Aider Pro" display name is close to "aider" via findClosestMatch
-      // on display names: findClosestMatch("aider", ["Claude Code", "Aider Pro", "Open Interpreter"])
-      // "aider" vs "Aider Pro" -> lowercase: "aider" vs "aider pro" -> distance 4 (too far)
-      // Let's use a closer typo: "aider-pro" would match "ap" display name "Aider Pro"
+      // "codex" is far from keys ["cc", "ap", "oi"] (all distance > 3)
+      // But "Codex Pro" display name is close to "codex" via findClosestMatch
+      // on display names: findClosestMatch("codex", ["Claude Code", "Codex Pro", "GPTMe"])
+      // "codex" vs "Codex Pro" -> lowercase: "codex" vs "codex pro" -> distance 4 (too far)
+      // Let's use a closer typo: "codex-pro" would match "ap" display name "Codex Pro"
       // Actually, findClosestMatch is case-insensitive and max distance 3.
       // So we need a name within distance 3 of a display name.
-      // "aider-pr" is 6 chars, "Aider Pro" is 9 chars. Distance too high.
+      // "codex-pr" is 6 chars, "Codex Pro" is 9 chars. Distance too high.
       // Let's try: user types "claude-cod" (10 chars), display name "Claude Code" (11 chars) -> distance 2.
       // But validateIdentifier rejects hyphens... wait no, hyphens are valid in identifiers.
       // User types "claude-code" -> key check fails (no key "claude-code"),
       // findClosestMatch("claude-code", ["cc", "ap", "oi"]) -> all distance > 3 -> null.
-      // findClosestMatch("claude-code", ["Claude Code", "Aider Pro", "Open Interpreter"]):
+      // findClosestMatch("claude-code", ["Claude Code", "Codex Pro", "GPTMe"]):
       //   "claude-code" vs "claude code" -> distance 1 (hyphen vs space)
       //   That's within threshold 3 -> returns "Claude Code"
       // Then it looks up the key for "Claude Code" -> "cc"
@@ -195,13 +195,13 @@ describe("Display Name Suggestions in Validation Errors", () => {
     });
 
     it("should suggest key via display name for close display name typo", async () => {
-      // "open-interp" (11 chars) vs display name "Open Interpreter" (16 chars) -> distance 5 (too far)
-      // Let's try "aider-pro" -> display "Aider Pro":
-      //   "aider-pro" vs "aider pro" -> distance 1 -> match!
-      await expect(cmdRun("aider-pro", "sp")).rejects.toThrow("process.exit");
+      // "gptme-x" (7 chars) vs display name "GPTMe" (5 chars) -> distance 2 (close enough)
+      // Let's try "codex-pro" -> display "Codex Pro":
+      //   "codex-pro" vs "codex pro" -> distance 1 -> match!
+      await expect(cmdRun("codex-pro", "sp")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("ap") && msg.includes("Aider Pro"))).toBe(true);
+      expect(infoCalls.some((msg: string) => msg.includes("ap") && msg.includes("Codex Pro"))).toBe(true);
     });
 
     it("should show 'Unknown agent' error even with display name suggestion", async () => {
@@ -333,7 +333,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
   // ── findClosestMatch with display names ─────────────────────────────
 
   describe("findClosestMatch with display name arrays", () => {
-    const displayNames = ["Claude Code", "Aider Pro", "Open Interpreter"];
+    const displayNames = ["Claude Code", "Codex Pro", "GPTMe"];
 
     it("should match close display name (distance 1)", () => {
       // "claude-code" vs "Claude Code" -> case-insensitive: "claude-code" vs "claude code" -> dist 1
@@ -341,13 +341,13 @@ describe("Display Name Suggestions in Validation Errors", () => {
     });
 
     it("should match close display name with simple typo", () => {
-      // "aider pro" vs "Aider Pro" -> case-insensitive: exact match -> dist 0
-      expect(findClosestMatch("aider pro", displayNames)).toBe("Aider Pro");
+      // "codex pro" vs "Codex Pro" -> case-insensitive: exact match -> dist 0
+      expect(findClosestMatch("codex pro", displayNames)).toBe("Codex Pro");
     });
 
     it("should match close display name with minor typo", () => {
-      // "aider-pro" vs "Aider Pro" -> "aider-pro" vs "aider pro" -> dist 1
-      expect(findClosestMatch("aider-pro", displayNames)).toBe("Aider Pro");
+      // "codex-pro" vs "Codex Pro" -> "codex-pro" vs "codex pro" -> dist 1
+      expect(findClosestMatch("codex-pro", displayNames)).toBe("Codex Pro");
     });
 
     it("should return null for display names too different", () => {
@@ -363,14 +363,14 @@ describe("Display Name Suggestions in Validation Errors", () => {
 
     it("should handle case-insensitive comparison with display names", () => {
       expect(findClosestMatch("CLAUDE CODE", displayNames)).toBe("Claude Code");
-      expect(findClosestMatch("AIDER PRO", displayNames)).toBe("Aider Pro");
+      expect(findClosestMatch("CODEX PRO", displayNames)).toBe("Codex Pro");
     });
 
     it("should pick closest among multiple close display names", () => {
-      const names = ["Aider", "Aider Pro", "Aide"];
-      // "aidr" -> "aider" (dist 1), "aider pro" (dist 5), "aide" (dist 1)
-      // Two tied at dist 1, first wins
-      expect(findClosestMatch("aidr", names)).toBe("Aider");
+      const names = ["Codex", "Codex Pro", "Clin"];
+      // "codx" -> "codex" (dist 1), "codex pro" (dist 5), "clin" (dist 3)
+      // Codex is closest at dist 1
+      expect(findClosestMatch("codx", names)).toBe("Codex");
     });
   });
 

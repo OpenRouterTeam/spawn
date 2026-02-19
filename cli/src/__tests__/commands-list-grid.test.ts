@@ -46,12 +46,12 @@ const multiTypeManifest: Manifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -99,13 +99,13 @@ const multiTypeManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
     "daytona/claude": "implemented",
-    "daytona/aider": "implemented",
+    "daytona/codex": "implemented",
     "e2b/claude": "implemented",
-    "e2b/aider": "missing",
+    "e2b/codex": "missing",
   },
 };
 
@@ -114,9 +114,9 @@ const allImplManifest: Manifest = {
   ...mockManifest,
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "implemented",
+    "hetzner/codex": "implemented",
   },
 };
 
@@ -125,9 +125,9 @@ const allMissingManifest: Manifest = {
   ...mockManifest,
   matrix: {
     "sprite/claude": "missing",
-    "sprite/aider": "missing",
+    "sprite/codex": "missing",
     "hetzner/claude": "missing",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
@@ -151,7 +151,7 @@ const singleCloudManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "missing",
+    "sprite/codex": "missing",
   },
 };
 
@@ -282,7 +282,7 @@ describe("cmdMatrix - grid view rendering", () => {
     it("should show '-' for missing entries", async () => {
       await cmdMatrix();
       const output = getOutput(consoleMocks);
-      // hetzner/aider is missing
+      // hetzner/codex is missing
       expect(output).toContain("-");
     });
 
@@ -292,7 +292,7 @@ describe("cmdMatrix - grid view rendering", () => {
       const lines = getLines(consoleMocks);
       // Find agent rows (contain agent display names)
       const agentRows = lines.filter(
-        (l: string) => l.includes("Claude Code") || l.includes("Aider")
+        (l: string) => l.includes("Claude Code") || l.includes("Codex")
       );
       // Each agent row should have "+" for each cloud and no "-" status markers
       for (const row of agentRows) {
@@ -304,7 +304,7 @@ describe("cmdMatrix - grid view rendering", () => {
       await cmdMatrix();
       const output = getOutput(consoleMocks);
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
 
     it("should render single agent grid correctly", async () => {
@@ -322,7 +322,7 @@ describe("cmdMatrix - grid view rendering", () => {
       const output = getOutput(consoleMocks);
       expect(output).toContain("Sprite");
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
   });
 
@@ -506,7 +506,7 @@ describe("cmdClouds - type grouping", () => {
         },
         matrix: {
           "sprite/claude": "missing",
-          "sprite/aider": "missing",
+          "sprite/codex": "missing",
         },
       };
       await setManifest(noImplManifest);
@@ -552,7 +552,7 @@ describe("cmdClouds - type grouping", () => {
         },
         matrix: {
           "sprite/claude": "implemented",
-          "sprite/aider": "implemented",
+          "sprite/codex": "implemented",
         },
       };
       await setManifest(oneCloudManifest);

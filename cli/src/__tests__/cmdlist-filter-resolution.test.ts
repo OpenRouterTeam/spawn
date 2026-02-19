@@ -73,9 +73,9 @@ describe("cmdList filter resolution via display names", () => {
 
   const sampleRecords: SpawnRecord[] = [
     { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00Z" },
-    { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T14:30:00Z" },
+    { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T14:30:00Z" },
     { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T09:15:00Z" },
-    { agent: "aider", cloud: "sprite", timestamp: "2026-01-04T16:00:00Z" },
+    { agent: "codex", cloud: "sprite", timestamp: "2026-01-04T16:00:00Z" },
   ];
 
   function writeHistory(records: SpawnRecord[]) {
@@ -160,11 +160,11 @@ describe("cmdList filter resolution via display names", () => {
       expect(output).toContain("2 of 4");
     });
 
-    it("should resolve 'Aider' display name and filter correctly", async () => {
+    it("should resolve 'Codex' display name and filter correctly", async () => {
       await setManifest(mockManifest);
       writeHistory(sampleRecords);
 
-      await cmdList("Aider");
+      await cmdList("Codex");
 
       const output = consoleOutput();
       expect(output).toContain("2 of 4");
@@ -192,7 +192,7 @@ describe("cmdList filter resolution via display names", () => {
       await cmdList(undefined, "Hetzner Cloud");
 
       const output = consoleOutput();
-      // 2 records on hetzner (aider + claude)
+      // 2 records on hetzner (codex + claude)
       expect(output).toContain("2 of 4");
     });
 
@@ -247,10 +247,10 @@ describe("cmdList filter resolution via display names", () => {
       await setManifest(mockManifest);
       writeHistory(sampleRecords);
 
-      await cmdList("aider", "Hetzner Cloud");
+      await cmdList("codex", "Hetzner Cloud");
 
       const output = consoleOutput();
-      // 1 record: aider on hetzner
+      // 1 record: codex on hetzner
       expect(output).toContain("1 of 4");
     });
   });
@@ -319,7 +319,7 @@ describe("cmdList filter resolution via display names", () => {
       await cmdList("hetzner");
 
       const output = consoleOutput();
-      // Should find 2 records on hetzner (aider + claude), not 0
+      // Should find 2 records on hetzner (codex + claude), not 0
       expect(output).toContain("2 of 4");
     });
 
@@ -442,10 +442,10 @@ describe("buildRecordLabel", () => {
 
   it("should format second agent/cloud pair correctly", () => {
     const label = buildRecordLabel(
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-01T00:00:00Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-01T00:00:00Z" },
       manifest,
     );
-    expect(label).toBe("Aider on Hetzner Cloud");
+    expect(label).toBe("Codex on Hetzner Cloud");
   });
 
   it("should use raw keys when manifest is null", () => {

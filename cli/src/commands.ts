@@ -2563,20 +2563,20 @@ function getHelpExamplesSection(): string {
   return `${pc.bold("EXAMPLES")}
   spawn                              ${pc.dim("# Pick interactively")}
   spawn openclaw sprite              ${pc.dim("# Launch OpenClaw on Sprite")}
-  spawn aider hetzner                ${pc.dim("# Launch Aider on Hetzner Cloud")}
-  spawn goose digitalocean           ${pc.dim("# Launch Goose on DigitalOcean")}
+  spawn codex hetzner                ${pc.dim("# Launch Codex CLI on Hetzner Cloud")}
+  spawn cline digitalocean           ${pc.dim("# Launch Cline on DigitalOcean")}
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
-  spawn aider sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
+  spawn codex sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
   spawn openclaw ovh -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
-  spawn interpreter gcp --dry-run    ${pc.dim("# Preview without provisioning")}
+  spawn gptme gcp --dry-run          ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}
   spawn claude hetzner --output json ${pc.dim("# Structured JSON output on stdout")}
   spawn claude                       ${pc.dim("# Show which clouds support Claude")}
   spawn hetzner                      ${pc.dim("# Show which agents run on Hetzner")}
   spawn list                         ${pc.dim("# Browse history and pick one to rerun")}
-  spawn list aider                   ${pc.dim("# Filter history by agent name")}
+  spawn list codex                   ${pc.dim("# Filter history by agent name")}
   spawn last                         ${pc.dim("# Instantly rerun the most recent spawn")}
   spawn matrix                       ${pc.dim("# See the full agent x cloud matrix")}`;
 }

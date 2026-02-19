@@ -193,7 +193,7 @@ describe("CLI Argument Parsing", () => {
 
     it("should route unknown commands to default (agent name)", () => {
       expect(routeCommand("claude")).toBe("default");
-      expect(routeCommand("aider")).toBe("default");
+      expect(routeCommand("codex")).toBe("default");
       expect(routeCommand("unknown-agent")).toBe("default");
     });
 

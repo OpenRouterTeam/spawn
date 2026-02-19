@@ -594,15 +594,15 @@ describe("buildRetryCommand", () => {
 
   it("should include full prompt at exactly 80 characters", () => {
     const exactPrompt = "B".repeat(80);
-    const result = buildRetryCommand("aider", "hetzner", exactPrompt);
-    expect(result).toBe(`spawn aider hetzner --prompt "${exactPrompt}"`);
+    const result = buildRetryCommand("codex", "hetzner", exactPrompt);
+    expect(result).toBe(`spawn codex hetzner --prompt "${exactPrompt}"`);
     expect(result).not.toContain("prompt-file");
   });
 
   it("should suggest --prompt-file for prompts over 80 characters", () => {
     const longPrompt = "C".repeat(81);
-    const result = buildRetryCommand("aider", "hetzner", longPrompt);
-    expect(result).toBe("spawn aider hetzner --prompt-file <your-prompt-file>");
+    const result = buildRetryCommand("codex", "hetzner", longPrompt);
+    expect(result).toBe("spawn codex hetzner --prompt-file <your-prompt-file>");
   });
 
   it("should escape double quotes in prompt", () => {
@@ -611,11 +611,11 @@ describe("buildRetryCommand", () => {
   });
 
   it("should return simple command when prompt is undefined", () => {
-    expect(buildRetryCommand("aider", "vultr", undefined)).toBe("spawn aider vultr");
+    expect(buildRetryCommand("codex", "vultr", undefined)).toBe("spawn codex vultr");
   });
 
   it("should return simple command when prompt is empty string", () => {
-    expect(buildRetryCommand("aider", "vultr", "")).toBe("spawn aider vultr");
+    expect(buildRetryCommand("codex", "vultr", "")).toBe("spawn codex vultr");
   });
 });
 

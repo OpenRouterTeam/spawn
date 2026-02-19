@@ -6,7 +6,7 @@ describe("Security Validation", () => {
     it("should accept valid identifiers", () => {
       expect(() => validateIdentifier("claude", "Agent")).not.toThrow();
       expect(() => validateIdentifier("sprite", "Cloud")).not.toThrow();
-      expect(() => validateIdentifier("aider-chat", "Agent")).not.toThrow();
+      expect(() => validateIdentifier("codex", "Agent")).not.toThrow();
       expect(() => validateIdentifier("claude_code", "Agent")).not.toThrow();
       expect(() => validateIdentifier("aws-ec2", "Cloud")).not.toThrow();
     });

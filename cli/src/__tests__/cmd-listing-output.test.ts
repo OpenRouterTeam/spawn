@@ -39,12 +39,12 @@ const smallManifest: Manifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "$OPENROUTER_API_KEY" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "$OPENROUTER_API_KEY" },
     },
   },
@@ -72,16 +72,16 @@ const smallManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
   },
 };
 
 const allImplementedManifest: Manifest = {
   agents: {
     claude: smallManifest.agents.claude,
-    aider: smallManifest.agents.aider,
+    codex: smallManifest.agents.codex,
   },
   clouds: {
     sprite: smallManifest.clouds.sprite,
@@ -89,9 +89,9 @@ const allImplementedManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "implemented",
+    "hetzner/codex": "implemented",
   },
 };
 
@@ -255,7 +255,7 @@ describe("cmdMatrix output", () => {
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
 
     it("should use + icon for implemented combinations", async () => {
@@ -331,7 +331,7 @@ describe("cmdMatrix output", () => {
       Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
 
       const output = captureOutput(consoleMocks.log);
-      // claude: 2/2, aider: 1/2
+      // claude: 2/2, codex: 1/2
       expect(output).toContain("2/2");
       expect(output).toContain("1/2");
     });
@@ -362,7 +362,7 @@ describe("cmdMatrix output", () => {
       Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
 
       const output = captureOutput(consoleMocks.log);
-      // aider is missing on hetzner
+      // codex is missing on hetzner
       expect(output).toContain("Hetzner Cloud");
     });
 
@@ -449,7 +449,7 @@ describe("cmdAgents output", () => {
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("claude");
-      expect(output).toContain("aider");
+      expect(output).toContain("codex");
     });
 
     it("should display agent display names", async () => {
@@ -458,7 +458,7 @@ describe("cmdAgents output", () => {
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("Claude Code");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
 
     it("should display implementation cloud count for each agent", async () => {
@@ -468,7 +468,7 @@ describe("cmdAgents output", () => {
       const output = captureOutput(consoleMocks.log);
       // claude is implemented on 2 clouds
       expect(output).toContain("2 clouds");
-      // aider is implemented on 1 cloud
+      // codex is implemented on 1 cloud
       expect(output).toContain("1 cloud");
     });
 
@@ -477,7 +477,7 @@ describe("cmdAgents output", () => {
       await cmdAgents();
 
       const output = captureOutput(consoleMocks.log);
-      // aider has 1 cloud - should use singular
+      // codex has 1 cloud - should use singular
       expect(output).toMatch(/1 cloud[^s]/);
     });
 
@@ -673,11 +673,11 @@ describe("cmdClouds output", () => {
 
     it("should show 0/N for cloud with no implementations", async () => {
       const noImpl: Manifest = {
-        agents: { claude: smallManifest.agents.claude, aider: smallManifest.agents.aider },
+        agents: { claude: smallManifest.agents.claude, codex: smallManifest.agents.codex },
         clouds: { sprite: smallManifest.clouds.sprite },
         matrix: {
           "sprite/claude": "missing",
-          "sprite/aider": "missing",
+          "sprite/codex": "missing",
         },
       };
 
@@ -745,8 +745,8 @@ describe("listing command consistency", () => {
     await cmdMatrix();
     const output = captureOutput(consoleMocks.log);
 
-    // 3 implemented: sprite/claude, sprite/aider, hetzner/claude
-    // 1 missing: hetzner/aider
+    // 3 implemented: sprite/claude, sprite/codex, hetzner/claude
+    // 1 missing: hetzner/codex
     // Total: 4 combinations
     expect(output).toContain("3/4 combinations implemented");
   });

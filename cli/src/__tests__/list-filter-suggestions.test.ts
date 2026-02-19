@@ -42,12 +42,12 @@ const wideManifest: Manifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -135,21 +135,21 @@ const wideManifest: Manifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "missing",
+    "hetzner/codex": "missing",
     "vultr/claude": "implemented",
-    "vultr/aider": "missing",
+    "vultr/codex": "missing",
     "linode/claude": "implemented",
-    "linode/aider": "missing",
+    "linode/codex": "missing",
     "digitalocean/claude": "implemented",
-    "digitalocean/aider": "missing",
+    "digitalocean/codex": "missing",
     "binarylane/claude": "implemented",
-    "binarylane/aider": "missing",
+    "binarylane/codex": "missing",
     "kamatera/claude": "implemented",
-    "kamatera/aider": "missing",
+    "kamatera/codex": "missing",
     "scaleway/claude": "implemented",
-    "scaleway/aider": "missing",
+    "scaleway/codex": "missing",
   },
 };
 
@@ -674,7 +674,7 @@ describe("cmdMatrix - compact vs grid view", () => {
       await cmdMatrix();
 
       const output = getOutput();
-      // aider is missing on several clouds
+      // codex is missing on several clouds
       expect(output).toContain("Hetzner Cloud");
     });
 
@@ -685,7 +685,7 @@ describe("cmdMatrix - compact vs grid view", () => {
       await cmdMatrix();
 
       const output = getOutput();
-      // claude: 8/8, aider: 1/8
+      // claude: 8/8, codex: 1/8
       expect(output).toContain("8/8");
       expect(output).toContain("1/8");
     });
@@ -722,7 +722,7 @@ describe("cmdMatrix - compact vs grid view", () => {
       await cmdMatrix();
 
       const output = getOutput();
-      // 9 out of 16 (2 agents * 8 clouds, claude=8 + aider=1 = 9)
+      // 9 out of 16 (2 agents * 8 clouds, claude=8 + codex=1 = 9)
       expect(output).toContain("9/16 combinations implemented");
     });
   });
@@ -786,8 +786,8 @@ describe("calculateColumnWidth", () => {
 describe("getMissingClouds", () => {
   it("should return clouds where agent is not implemented", () => {
     const clouds = ["sprite", "hetzner"];
-    const missing = getMissingClouds(mockManifest, "aider", clouds);
-    // aider is missing on hetzner in mock manifest
+    const missing = getMissingClouds(mockManifest, "codex", clouds);
+    // codex is missing on hetzner in mock manifest
     expect(missing).toEqual(["hetzner"]);
   });
 
@@ -803,9 +803,9 @@ describe("getMissingClouds", () => {
       ...mockManifest,
       matrix: {
         "sprite/claude": "missing",
-        "sprite/aider": "missing",
+        "sprite/codex": "missing",
         "hetzner/claude": "missing",
-        "hetzner/aider": "missing",
+        "hetzner/codex": "missing",
       },
     };
     const clouds = ["sprite", "hetzner"];
@@ -835,8 +835,8 @@ describe("getImplementedClouds", () => {
     expect(clouds).toHaveLength(2);
   });
 
-  it("should return only implemented clouds for aider", () => {
-    const clouds = getImplementedClouds(mockManifest, "aider");
+  it("should return only implemented clouds for codex", () => {
+    const clouds = getImplementedClouds(mockManifest, "codex");
     expect(clouds).toContain("sprite");
     expect(clouds).not.toContain("hetzner");
     expect(clouds).toHaveLength(1);
@@ -853,7 +853,7 @@ describe("getImplementedClouds", () => {
   });
 
   it("should return 1 cloud when only one is implemented", () => {
-    const clouds = getImplementedClouds(wideManifest, "aider");
+    const clouds = getImplementedClouds(wideManifest, "codex");
     expect(clouds).toEqual(["sprite"]);
   });
 });

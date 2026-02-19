@@ -416,7 +416,7 @@ describe("getImplementedClouds edge cases", () => {
   });
 
   it("should return only implemented clouds (not missing)", () => {
-    const clouds = getImplementedClouds(mockManifest, "aider");
+    const clouds = getImplementedClouds(mockManifest, "codex");
     expect(clouds).toContain("sprite");
     expect(clouds).not.toContain("hetzner");
   });
@@ -436,13 +436,13 @@ describe("getImplementedAgents edge cases", () => {
   it("should return implemented agents for a cloud", () => {
     const agents = getImplementedAgents(mockManifest, "sprite");
     expect(agents).toContain("claude");
-    expect(agents).toContain("aider");
+    expect(agents).toContain("codex");
   });
 
   it("should exclude non-implemented agents", () => {
     const agents = getImplementedAgents(mockManifest, "hetzner");
     expect(agents).toContain("claude");
-    expect(agents).not.toContain("aider");
+    expect(agents).not.toContain("codex");
   });
 
   it("should return empty for nonexistent cloud", () => {
@@ -454,7 +454,7 @@ describe("getImplementedAgents edge cases", () => {
 
 describe("getMissingClouds", () => {
   it("should return clouds not implemented for the agent", () => {
-    const missing = getMissingClouds(mockManifest, "aider", ["sprite", "hetzner"]);
+    const missing = getMissingClouds(mockManifest, "codex", ["sprite", "hetzner"]);
     expect(missing).toContain("hetzner");
     expect(missing).not.toContain("sprite");
   });
@@ -570,7 +570,7 @@ describe("buildAgentPickerHints edge cases", () => {
   it("should show cloud count for agent with implementations", () => {
     const hints = buildAgentPickerHints(mockManifest);
     expect(hints.claude).toContain("2 clouds");
-    expect(hints.aider).toContain("1 cloud");
+    expect(hints.codex).toContain("1 cloud");
   });
 
   it("should handle empty manifest", () => {
@@ -816,19 +816,19 @@ describe("findClosestMatch edge cases", () => {
   });
 
   it("should return exact match with distance 0", () => {
-    expect(findClosestMatch("claude", ["claude", "aider"])).toBe("claude");
+    expect(findClosestMatch("claude", ["claude", "codex"])).toBe("claude");
   });
 
   it("should return closest within distance 3", () => {
-    expect(findClosestMatch("cloude", ["claude", "aider"])).toBe("claude");
+    expect(findClosestMatch("cloude", ["claude", "codex"])).toBe("claude");
   });
 
   it("should return null when no candidate is within distance 3", () => {
-    expect(findClosestMatch("xxxxxxxxx", ["claude", "aider"])).toBeNull();
+    expect(findClosestMatch("xxxxxxxxx", ["claude", "codex"])).toBeNull();
   });
 
   it("should be case-insensitive", () => {
-    expect(findClosestMatch("CLAUDE", ["claude", "aider"])).toBe("claude");
+    expect(findClosestMatch("CLAUDE", ["claude", "codex"])).toBe("claude");
   });
 });
 
@@ -836,7 +836,7 @@ describe("findClosestMatch edge cases", () => {
 
 describe("findClosestKeyByNameOrKey edge cases", () => {
   it("should match by key", () => {
-    const result = findClosestKeyByNameOrKey("claude", ["claude", "aider"], (k) => k.toUpperCase());
+    const result = findClosestKeyByNameOrKey("claude", ["claude", "codex"], (k) => k.toUpperCase());
     expect(result).toBe("claude");
   });
 

@@ -34,25 +34,25 @@ const mockManifest = createMockManifest();
 describe("findClosestKeyByNameOrKey", () => {
   describe("key-based matching", () => {
     it("should match a key with distance 1 (missing letter)", () => {
-      const keys = ["claude", "aider"];
+      const keys = ["claude", "codex"];
       const result = findClosestKeyByNameOrKey("claud", keys, () => "irrelevant-name");
       expect(result).toBe("claude");
     });
 
     it("should match a key with distance 1 (extra letter)", () => {
-      const keys = ["claude", "aider"];
+      const keys = ["claude", "codex"];
       const result = findClosestKeyByNameOrKey("claudee", keys, () => "irrelevant-name");
       expect(result).toBe("claude");
     });
 
     it("should match a key with distance 1 (substitution)", () => {
-      const keys = ["claude", "aider"];
+      const keys = ["claude", "codex"];
       const result = findClosestKeyByNameOrKey("claudi", keys, () => "irrelevant-name");
       expect(result).toBe("claude");
     });
 
     it("should match a key with distance 2", () => {
-      const keys = ["claude", "aider"];
+      const keys = ["claude", "codex"];
       const result = findClosestKeyByNameOrKey("clad", keys, () => "irrelevant-name");
       expect(result).toBe("claude");
     });
@@ -64,7 +64,7 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should return null when distance > 3 for all keys and names", () => {
-      const keys = ["claude", "aider"];
+      const keys = ["claude", "codex"];
       const result = findClosestKeyByNameOrKey(
         "kubernetes",
         keys,
@@ -74,16 +74,16 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should be case-insensitive for key matching", () => {
-      const keys = ["claude", "aider"];
+      const keys = ["claude", "codex"];
       const result = findClosestKeyByNameOrKey("CLAUDE", keys, () => "irrelevant");
       expect(result).toBe("claude");
     });
 
     it("should pick the closest key among multiple close candidates", () => {
-      const keys = ["aide", "aider", "aided"];
-      const result = findClosestKeyByNameOrKey("aider", keys, () => "irrelevant");
+      const keys = ["codx", "codex", "codec"];
+      const result = findClosestKeyByNameOrKey("codex", keys, () => "irrelevant");
       // Exact match (distance 0) should always win
-      expect(result).toBe("aider");
+      expect(result).toBe("codex");
     });
   });
 
@@ -101,9 +101,9 @@ describe("findClosestKeyByNameOrKey", () => {
 
     it("should match via display name with minor typo", () => {
       const keys = ["ap"];
-      const getName = (k: string) => (k === "ap" ? "Aider Pro" : "Unknown");
-      // "aider-pro" vs "aider pro" -> distance 1
-      const result = findClosestKeyByNameOrKey("aider-pro", keys, getName);
+      const getName = (k: string) => (k === "ap" ? "Codex Pro" : "Unknown");
+      // "codex-pro" vs "codex pro" -> distance 1
+      const result = findClosestKeyByNameOrKey("codex-pro", keys, getName);
       expect(result).toBe("ap");
     });
 
@@ -158,16 +158,16 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should pick better match across keys when both key and name are close", () => {
-      const keys = ["aidr", "aider"];
+      const keys = ["codx", "codex"];
       const getName = (k: string) => {
-        if (k === "aidr") return "Aidr Tool";
-        if (k === "aider") return "Aider";
+        if (k === "codx") return "Codx Tool";
+        if (k === "codex") return "Codex";
         return "Unknown";
       };
-      // "aider" vs key "aidr" -> distance 1, name "Aidr Tool" -> distance 4
-      // "aider" vs key "aider" -> distance 0 (exact match via key)
-      const result = findClosestKeyByNameOrKey("aider", keys, getName);
-      expect(result).toBe("aider");
+      // "codex" vs key "codx" -> distance 1, name "Codx Tool" -> distance 5
+      // "codex" vs key "codex" -> distance 0 (exact match via key)
+      const result = findClosestKeyByNameOrKey("codex", keys, getName);
+      expect(result).toBe("codex");
     });
   });
 
@@ -272,9 +272,9 @@ describe("findClosestKeyByNameOrKey", () => {
       expect(result).toBe("claude");
     });
 
-    it("should find agent 'aider' for typo 'aidr'", () => {
-      const result = findClosestKeyByNameOrKey("aidr", agentKeys, getAgentName);
-      expect(result).toBe("aider");
+    it("should find agent 'codex' for typo 'codx'", () => {
+      const result = findClosestKeyByNameOrKey("codx", agentKeys, getAgentName);
+      expect(result).toBe("codex");
     });
 
     it("should find cloud 'sprite' for typo 'sprit'", () => {
@@ -348,7 +348,7 @@ describe("levenshtein - additional boundary tests", () => {
 // ── findClosestMatch: ensure threshold boundary ─────────────────────────────
 
 describe("findClosestMatch - threshold boundary tests", () => {
-  const candidates = ["claude", "aider", "sprite", "hetzner"];
+  const candidates = ["claude", "codex", "sprite", "hetzner"];
 
   it("should match at exactly distance 3", () => {
     // "clau" -> "claude" distance 2, within threshold
@@ -358,7 +358,7 @@ describe("findClosestMatch - threshold boundary tests", () => {
 
   it("should not match at distance 4", () => {
     // Need a string that is distance 4+ from all candidates
-    // "zzzzz" vs "claude" -> 6, "aider" -> 5, "sprite" -> 6, "hetzner" -> 7
+    // "zzzzz" vs "claude" -> 6, "codex" -> 5, "sprite" -> 6, "hetzner" -> 7
     const result = findClosestMatch("zzzzz", candidates);
     expect(result).toBeNull();
   });
@@ -379,9 +379,9 @@ describe("findClosestMatch - threshold boundary tests", () => {
   });
 
   it("should return the closest when multiple are within threshold", () => {
-    // "aide" is distance 1 from "aider" and distance 5 from "claude"
-    const result = findClosestMatch("aide", candidates);
-    expect(result).toBe("aider");
+    // "codx" is distance 1 from "codex" and distance 5 from "claude"
+    const result = findClosestMatch("codx", candidates);
+    expect(result).toBe("codex");
   });
 
   it("should handle empty candidates", () => {
@@ -389,7 +389,7 @@ describe("findClosestMatch - threshold boundary tests", () => {
   });
 
   it("should handle empty input", () => {
-    // "" vs candidates: "claude"(6), "aider"(5), "sprite"(6), "hetzner"(7)
+    // "" vs candidates: "claude"(6), "codex"(5), "sprite"(6), "hetzner"(7)
     // All > 3, so should return null
     const result = findClosestMatch("", candidates);
     expect(result).toBeNull();

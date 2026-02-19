@@ -67,7 +67,7 @@ describe("clearHistory", () => {
     it("should return count and delete file when history has multiple records", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -130,7 +130,7 @@ describe("clearHistory", () => {
     it("should handle records with prompt field in count", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z", prompt: "Fix bugs" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
@@ -151,15 +151,15 @@ describe("clearHistory", () => {
       expect(loadHistory()).toHaveLength(0);
 
       // Save new records after clearing
-      saveSpawnRecord({ agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
+      saveSpawnRecord({ agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
       const loaded = loadHistory();
       expect(loaded).toHaveLength(1);
-      expect(loaded[0].agent).toBe("aider");
+      expect(loaded[0].agent).toBe("codex");
     });
 
     it("should result in empty filterHistory after clearing", () => {
       saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" });
-      saveSpawnRecord({ agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
+      saveSpawnRecord({ agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
 
       expect(filterHistory()).toHaveLength(2);
       expect(filterHistory("claude")).toHaveLength(1);
@@ -278,7 +278,7 @@ describe("cmdListClear", () => {
   it("should call log.success with count when clearing records", async () => {
     const records: SpawnRecord[] = [
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
     ];
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
@@ -358,10 +358,10 @@ describe("cmdListClear", () => {
     await cmdListClear();
 
     // Save new record after clearing
-    saveSpawnRecord({ agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
+    saveSpawnRecord({ agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
     const loaded = loadHistory();
     expect(loaded).toHaveLength(1);
-    expect(loaded[0].agent).toBe("aider");
+    expect(loaded[0].agent).toBe("codex");
   });
 
   it("should use log.info for zero records and log.success for non-zero", async () => {

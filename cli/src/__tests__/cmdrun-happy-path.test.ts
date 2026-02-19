@@ -372,7 +372,7 @@ describe("cmdRun happy-path pipeline", () => {
     it("should append to existing history", async () => {
       // Pre-populate history
       const existing = [
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-01T00:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-01T00:00:00.000Z" },
       ];
       writeFileSync(join(historyDir, "history.json"), JSON.stringify(existing));
 
@@ -384,7 +384,7 @@ describe("cmdRun happy-path pipeline", () => {
       const historyPath = join(historyDir, "history.json");
       const records = JSON.parse(readFileSync(historyPath, "utf-8"));
       expect(records).toHaveLength(2);
-      expect(records[0].agent).toBe("aider");
+      expect(records[0].agent).toBe("codex");
       expect(records[1].agent).toBe("claude");
     });
   });

@@ -202,7 +202,7 @@ describe("History Trimming and Boundaries", () => {
     it("should return records in reverse chronological order (newest first)", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -218,9 +218,9 @@ describe("History Trimming and Boundaries", () => {
     it("should maintain reverse order after filtering by agent", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
-        { agent: "aider", cloud: "sprite", timestamp: "2026-01-04T00:00:00.000Z" },
+        { agent: "codex", cloud: "sprite", timestamp: "2026-01-04T00:00:00.000Z" },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
@@ -233,7 +233,7 @@ describe("History Trimming and Boundaries", () => {
     it("should maintain reverse order after filtering by cloud", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-03T00:00:00.000Z" },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -248,7 +248,7 @@ describe("History Trimming and Boundaries", () => {
       const records: SpawnRecord[] = [
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
         { agent: "claude", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
-        { agent: "aider", cloud: "sprite", timestamp: "2026-01-03T00:00:00.000Z" },
+        { agent: "codex", cloud: "sprite", timestamp: "2026-01-03T00:00:00.000Z" },
         { agent: "claude", cloud: "sprite", timestamp: "2026-01-04T00:00:00.000Z" },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));

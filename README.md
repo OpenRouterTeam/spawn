@@ -2,7 +2,7 @@
 
 Launch any AI agent on any cloud with a single command. Coding agents, research agents, self-hosted AI tools — Spawn deploys them all. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
-**15 agents. 10 clouds. 149 working combinations. Zero config.**
+**10 agents. 10 clouds. 99 working combinations. Zero config.**
 
 ## Install
 
@@ -29,9 +29,9 @@ spawn matrix                  # Show the full agent x cloud matrix
 ```bash
 spawn                                    # Interactive picker
 spawn claude sprite                      # Claude Code on Sprite
-spawn aider hetzner                      # Aider on Hetzner
+spawn codex hetzner                      # Codex CLI on Hetzner
 spawn claude sprite --prompt "Fix bugs"  # Non-interactive with prompt
-spawn aider sprite -p "Add tests"        # Short form
+spawn codex sprite -p "Add tests"        # Short form
 spawn claude                             # Show clouds available for Claude
 spawn delete                             # Delete a running server
 spawn delete -c hetzner                  # Delete a server on Hetzner
@@ -165,12 +165,7 @@ If an agent fails to install or launch on a cloud:
 | [**Claude Code**](https://claude.ai) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenClaw**](https://github.com/OpenRouterTeam/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**NanoClaw**](https://github.com/gavrielc/nanoclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**Aider**](https://github.com/paul-gauthier/aider) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**Goose**](https://github.com/block/goose) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Codex CLI**](https://github.com/openai/codex) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**Open Interpreter**](https://github.com/OpenInterpreter/open-interpreter) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**Gemini CLI**](https://github.com/google-gemini/gemini-cli) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**Amazon Q CLI**](https://aws.amazon.com/q/developer/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Cline**](https://github.com/cline/cline) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**gptme**](https://github.com/gptme/gptme) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenCode**](https://github.com/opencode-ai/opencode) |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |

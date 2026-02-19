@@ -127,9 +127,9 @@ describe("resolveListFilters", () => {
       expect(result.agentFilter).toBe("claude");
     });
 
-    it("should resolve aider display name", () => {
-      const result = resolveListFilters(mockManifest, "Aider");
-      expect(result.agentFilter).toBe("aider");
+    it("should resolve codex display name", () => {
+      const result = resolveListFilters(mockManifest, "Codex");
+      expect(result.agentFilter).toBe("codex");
     });
   });
 
@@ -218,8 +218,8 @@ describe("resolveListFilters", () => {
     });
 
     it("should resolve case-insensitive for both", () => {
-      const result = resolveListFilters(mockManifest, "AIDER", "SPRITE");
-      expect(result.agentFilter).toBe("aider");
+      const result = resolveListFilters(mockManifest, "CODEX", "SPRITE");
+      expect(result.agentFilter).toBe("codex");
       expect(result.cloudFilter).toBe("sprite");
     });
 
@@ -313,9 +313,9 @@ describe("resolveListFilters", () => {
     });
 
     it("should handle agent display name that starts with same prefix as cloud key", () => {
-      // "Aider" is an agent display name, resolves to "aider"
-      const result = resolveListFilters(mockManifest, "Aider");
-      expect(result.agentFilter).toBe("aider");
+      // "Codex" is an agent display name, resolves to "codex"
+      const result = resolveListFilters(mockManifest, "Codex");
+      expect(result.agentFilter).toBe("codex");
       expect(result.cloudFilter).toBeUndefined();
     });
 
@@ -351,7 +351,7 @@ describe("resolveAgentKey", () => {
 
   it("should return key for case-insensitive display name", () => {
     expect(resolveAgentKey(mockManifest, "claude code")).toBe("claude");
-    expect(resolveAgentKey(mockManifest, "AIDER")).toBe("aider");
+    expect(resolveAgentKey(mockManifest, "CODEX")).toBe("codex");
   });
 
   it("should return null for no match", () => {
@@ -373,7 +373,7 @@ describe("resolveAgentKey", () => {
 
   it("should prefer exact key match over display name", () => {
     // If input matches a key directly, returns immediately
-    expect(resolveAgentKey(mockManifest, "aider")).toBe("aider");
+    expect(resolveAgentKey(mockManifest, "codex")).toBe("codex");
   });
 
   it("should return null for substring of display name", () => {
@@ -525,7 +525,7 @@ describe("cmdList integration with filter resolution", () => {
     setupManifestFetch();
     seedHistory([
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
     ]);
 
     await cmdList("claude");
@@ -545,7 +545,7 @@ describe("cmdList integration with filter resolution", () => {
     ]);
 
     try {
-      await cmdList("aider");
+      await cmdList("codex");
     } catch {
       // May call process.exit
     }
@@ -558,7 +558,7 @@ describe("cmdList integration with filter resolution", () => {
     setupManifestFetch();
     seedHistory([
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
     ]);
 
     await cmdList();
@@ -566,7 +566,7 @@ describe("cmdList integration with filter resolution", () => {
     const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
     // Table should contain both records (display names if manifest loaded, raw keys otherwise)
     expect(output.toLowerCase()).toContain("claude");
-    expect(output.toLowerCase()).toContain("aider");
+    expect(output.toLowerCase()).toContain("codex");
     expect(output).toContain("2 spawn");
   });
 
@@ -614,7 +614,7 @@ describe("cmdList integration with filter resolution", () => {
     setupManifestFetch();
     seedHistory([
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
     ]);
 
     await cmdList("claude");
@@ -628,7 +628,7 @@ describe("cmdList integration with filter resolution", () => {
     setupManifestFetch();
     seedHistory([
       { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-      { agent: "aider", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
+      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
     ]);
 
     await cmdList(undefined, "sprite");
@@ -700,7 +700,7 @@ describe("getImplementedClouds", () => {
   });
 
   it("should exclude clouds where agent is missing", () => {
-    const clouds = getImplementedClouds(mockManifest, "aider");
+    const clouds = getImplementedClouds(mockManifest, "codex");
     expect(clouds).toContain("sprite");
     expect(clouds).not.toContain("hetzner");
   });
@@ -715,13 +715,13 @@ describe("getImplementedAgents", () => {
   it("should return agents implemented on cloud", () => {
     const agents = getImplementedAgents(mockManifest, "sprite");
     expect(agents).toContain("claude");
-    expect(agents).toContain("aider");
+    expect(agents).toContain("codex");
   });
 
   it("should exclude agents not implemented on cloud", () => {
     const agents = getImplementedAgents(mockManifest, "hetzner");
     expect(agents).toContain("claude");
-    expect(agents).not.toContain("aider");
+    expect(agents).not.toContain("codex");
   });
 
   it("should return empty array for unknown cloud", () => {

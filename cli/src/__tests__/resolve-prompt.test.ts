@@ -532,7 +532,7 @@ describe("handleDefaultCommand routing", () => {
     });
 
     it("should route to agentInfo for any agent name", () => {
-      expect(handleDefaultCommand("aider", undefined, undefined)).toBe("agentInfo");
+      expect(handleDefaultCommand("codex", undefined, undefined)).toBe("agentInfo");
       expect(handleDefaultCommand("openclaw", undefined, undefined)).toBe("agentInfo");
       expect(handleDefaultCommand("unknown-agent", undefined, undefined)).toBe("agentInfo");
     });
@@ -560,11 +560,11 @@ describe("handleDefaultCommand routing", () => {
 
     it("should include actual agent name in usage example", () => {
       const stderrMessages: string[] = [];
-      handleDefaultCommand("aider", undefined, "Add tests", {
+      handleDefaultCommand("codex", undefined, "Add tests", {
         stderr: (msg: string) => stderrMessages.push(msg),
         exit: () => {},
       });
-      expect(stderrMessages.some(m => m.includes("spawn aider <cloud>"))).toBe(true);
+      expect(stderrMessages.some(m => m.includes("spawn codex <cloud>"))).toBe(true);
     });
   });
 });

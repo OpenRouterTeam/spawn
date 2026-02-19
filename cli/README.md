@@ -5,7 +5,7 @@ The spawn CLI is a command-line tool for launching AI coding agents on cloud pro
 ## Overview
 
 The spawn CLI provides a unified interface to:
-- Launch any supported AI agent (Claude Code, Aider, etc.) on any supported cloud provider
+- Launch any supported AI agent (Claude Code, Codex, etc.) on any supported cloud provider
 - Interactively browse available agents and clouds
 - View the agent × cloud compatibility matrix
 - Self-update to the latest version
@@ -102,7 +102,7 @@ spawn <agent> <cloud>
 Examples:
 ```bash
 spawn claude sprite    # Launch Claude Code on Sprite
-spawn aider hetzner    # Launch Aider on Hetzner Cloud
+spawn codex hetzner    # Launch Codex CLI on Hetzner Cloud
 ```
 
 ### Agent Information

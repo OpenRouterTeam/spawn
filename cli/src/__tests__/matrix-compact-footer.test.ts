@@ -46,20 +46,20 @@ function createTestManifest(): Manifest {
         launch: "claude",
         env: { ANTHROPIC_API_KEY: "test" },
       },
-      aider: {
-        name: "Aider",
+      codex: {
+        name: "Codex",
         description: "AI pair programmer",
-        url: "https://aider.chat",
-        install: "pip install aider-chat",
-        launch: "aider",
+        url: "https://codex.dev",
+        install: "npm install -g codex",
+        launch: "codex",
         env: { OPENAI_API_KEY: "test" },
       },
-      goose: {
-        name: "Goose",
+      cline: {
+        name: "Cline",
         description: "AI developer agent",
-        url: "https://goose.ai",
-        install: "pip install goose",
-        launch: "goose",
+        url: "https://cline.dev",
+        install: "npm install -g cline",
+        launch: "cline",
         env: {},
       },
     },
@@ -97,14 +97,14 @@ function createTestManifest(): Manifest {
     },
     matrix: {
       "sprite/claude": "implemented",
-      "sprite/aider": "implemented",
-      "sprite/goose": "missing",
+      "sprite/codex": "implemented",
+      "sprite/cline": "missing",
       "hetzner/claude": "implemented",
-      "hetzner/aider": "missing",
-      "hetzner/goose": "missing",
+      "hetzner/codex": "missing",
+      "hetzner/cline": "missing",
       "vultr/claude": "implemented",
-      "vultr/aider": "missing",
-      "vultr/goose": "missing",
+      "vultr/codex": "missing",
+      "vultr/cline": "missing",
     },
   };
 }
@@ -271,15 +271,15 @@ describe("renderCompactList", () => {
     expect(claudeLine).toContain("all clouds supported");
   });
 
-  it("should show correct count for aider (1/3 implemented)", () => {
+  it("should show correct count for codex (1/3 implemented)", () => {
     const manifest = createTestManifest();
     const agents = agentKeys(manifest);
     const clouds = cloudKeys(manifest);
     const lines = renderCompactList(manifest, agents, clouds);
 
-    const aiderLine = lines.find((l) => l.includes("Aider"));
-    expect(aiderLine).toBeDefined();
-    expect(aiderLine).toContain("1/3");
+    const codexLine = lines.find((l) => l.includes("Codex"));
+    expect(codexLine).toBeDefined();
+    expect(codexLine).toContain("1/3");
   });
 
   it("should list missing cloud names for partially implemented agent", () => {
@@ -288,22 +288,22 @@ describe("renderCompactList", () => {
     const clouds = cloudKeys(manifest);
     const lines = renderCompactList(manifest, agents, clouds);
 
-    const aiderLine = lines.find((l) => l.includes("Aider"));
-    expect(aiderLine).toBeDefined();
-    // aider is missing on hetzner and vultr
-    expect(aiderLine).toContain("Hetzner Cloud");
-    expect(aiderLine).toContain("Vultr");
+    const codexLine = lines.find((l) => l.includes("Codex"));
+    expect(codexLine).toBeDefined();
+    // codex is missing on hetzner and vultr
+    expect(codexLine).toContain("Hetzner Cloud");
+    expect(codexLine).toContain("Vultr");
   });
 
-  it("should show correct count for goose (0/3 implemented)", () => {
+  it("should show correct count for cline (0/3 implemented)", () => {
     const manifest = createTestManifest();
     const agents = agentKeys(manifest);
     const clouds = cloudKeys(manifest);
     const lines = renderCompactList(manifest, agents, clouds);
 
-    const gooseLine = lines.find((l) => l.includes("Goose"));
-    expect(gooseLine).toBeDefined();
-    expect(gooseLine).toContain("0/3");
+    const clineLine = lines.find((l) => l.includes("Cline"));
+    expect(clineLine).toBeDefined();
+    expect(clineLine).toContain("0/3");
   });
 
   it("should list all clouds as missing for unimplemented agent", () => {
@@ -312,11 +312,11 @@ describe("renderCompactList", () => {
     const clouds = cloudKeys(manifest);
     const lines = renderCompactList(manifest, agents, clouds);
 
-    const gooseLine = lines.find((l) => l.includes("Goose"));
-    expect(gooseLine).toBeDefined();
-    expect(gooseLine).toContain("Sprite");
-    expect(gooseLine).toContain("Hetzner Cloud");
-    expect(gooseLine).toContain("Vultr");
+    const clineLine = lines.find((l) => l.includes("Cline"));
+    expect(clineLine).toBeDefined();
+    expect(clineLine).toContain("Sprite");
+    expect(clineLine).toContain("Hetzner Cloud");
+    expect(clineLine).toContain("Vultr");
   });
 
   it("should show all agents as fully supported when everything is implemented", () => {
@@ -384,8 +384,8 @@ describe("renderCompactList", () => {
     // Should use "Claude Code" not "claude"
     expect(lines.some((l) => l.includes("Claude Code"))).toBe(true);
     // Missing cloud names should also be display names
-    const aiderLine = lines.find((l) => l.includes("Aider"));
-    expect(aiderLine).toContain("Hetzner Cloud"); // not "hetzner"
+    const codexLine = lines.find((l) => l.includes("Codex"));
+    expect(codexLine).toContain("Hetzner Cloud"); // not "hetzner"
   });
 
   it("should separate missing cloud names with commas", () => {
@@ -394,10 +394,10 @@ describe("renderCompactList", () => {
     const clouds = cloudKeys(manifest);
     const lines = renderCompactList(manifest, agents, clouds);
 
-    const gooseLine = lines.find((l) => l.includes("Goose"));
-    expect(gooseLine).toBeDefined();
+    const clineLine = lines.find((l) => l.includes("Cline"));
+    expect(clineLine).toBeDefined();
     // Should be comma-separated
-    expect(gooseLine).toMatch(/\w+,\s+\w+/);
+    expect(clineLine).toMatch(/\w+,\s+\w+/);
   });
 });
 
@@ -610,7 +610,7 @@ describe("getMissingClouds", () => {
   it("should return clouds where agent is not implemented", () => {
     const manifest = createTestManifest();
     const clouds = cloudKeys(manifest);
-    const missing = getMissingClouds(manifest, "aider", clouds);
+    const missing = getMissingClouds(manifest, "codex", clouds);
     expect(missing).toContain("hetzner");
     expect(missing).toContain("vultr");
     expect(missing).not.toContain("sprite");
@@ -626,7 +626,7 @@ describe("getMissingClouds", () => {
   it("should return all clouds for unimplemented agent", () => {
     const manifest = createTestManifest();
     const clouds = cloudKeys(manifest);
-    const missing = getMissingClouds(manifest, "goose", clouds);
+    const missing = getMissingClouds(manifest, "cline", clouds);
     expect(missing).toHaveLength(3);
     expect(missing).toContain("sprite");
     expect(missing).toContain("hetzner");
@@ -635,7 +635,7 @@ describe("getMissingClouds", () => {
 
   it("should return empty for empty clouds list", () => {
     const manifest = createTestManifest();
-    const missing = getMissingClouds(manifest, "aider", []);
+    const missing = getMissingClouds(manifest, "codex", []);
     expect(missing).toEqual([]);
   });
 
@@ -649,7 +649,7 @@ describe("getMissingClouds", () => {
   it("should preserve cloud order from input", () => {
     const manifest = createTestManifest();
     const clouds = ["vultr", "sprite", "hetzner"];
-    const missing = getMissingClouds(manifest, "goose", clouds);
+    const missing = getMissingClouds(manifest, "cline", clouds);
     expect(missing).toEqual(["vultr", "sprite", "hetzner"]);
   });
 });
@@ -657,7 +657,7 @@ describe("getMissingClouds", () => {
 describe("getImplementedClouds", () => {
   it("should return clouds where agent is implemented", () => {
     const manifest = createTestManifest();
-    const impl = getImplementedClouds(manifest, "aider");
+    const impl = getImplementedClouds(manifest, "codex");
     expect(impl).toEqual(["sprite"]);
   });
 
@@ -672,7 +672,7 @@ describe("getImplementedClouds", () => {
 
   it("should return empty array for unimplemented agent", () => {
     const manifest = createTestManifest();
-    const impl = getImplementedClouds(manifest, "goose");
+    const impl = getImplementedClouds(manifest, "cline");
     expect(impl).toEqual([]);
   });
 
@@ -767,13 +767,13 @@ describe("renderCompactList and getMissingClouds consistency", () => {
     const clouds = cloudKeys(manifest);
 
     const lines = renderCompactList(manifest, agents, clouds);
-    const aiderMissing = getMissingClouds(manifest, "aider", clouds);
+    const codexMissing = getMissingClouds(manifest, "codex", clouds);
 
-    const aiderLine = lines.find((l) => l.includes("Aider"));
-    expect(aiderLine).toBeDefined();
+    const codexLine = lines.find((l) => l.includes("Codex"));
+    expect(codexLine).toBeDefined();
 
-    for (const cloudKey of aiderMissing) {
-      expect(aiderLine).toContain(manifest.clouds[cloudKey].name);
+    for (const cloudKey of codexMissing) {
+      expect(codexLine).toContain(manifest.clouds[cloudKey].name);
     }
   });
 

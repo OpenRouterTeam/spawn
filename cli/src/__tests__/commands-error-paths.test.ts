@@ -177,25 +177,25 @@ describe("Commands Error Paths", () => {
 
   describe("cmdRun - unimplemented combination", () => {
     it("should exit with error for unimplemented agent/cloud combination", async () => {
-      // hetzner/aider is "missing" in mock manifest
-      await expect(cmdRun("aider", "hetzner")).rejects.toThrow("process.exit");
+      // hetzner/codex is "missing" in mock manifest
+      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
 
     it("should suggest available clouds when combination is not implemented", async () => {
-      // hetzner/aider is "missing", but sprite/aider is "implemented"
-      await expect(cmdRun("aider", "hetzner")).rejects.toThrow("process.exit");
+      // hetzner/codex is "missing", but sprite/codex is "implemented"
+      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
       // Should suggest sprite as an alternative
-      expect(infoCalls.some((msg: string) => msg.includes("spawn aider sprite"))).toBe(true);
+      expect(infoCalls.some((msg: string) => msg.includes("spawn codex sprite"))).toBe(true);
     });
 
     it("should show how many clouds are available", async () => {
-      await expect(cmdRun("aider", "hetzner")).rejects.toThrow("process.exit");
+      await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      // aider has 1 implemented cloud (sprite)
+      // codex has 1 implemented cloud (sprite)
       expect(infoCalls.some((msg: string) => msg.includes("1 cloud"))).toBe(true);
     });
   });
@@ -370,14 +370,14 @@ describe("Commands Error Paths", () => {
       expect(infoCalls.some((msg: string) => msg.includes("spawn claude sprite"))).toBe(true);
     });
 
-    it("should suggest correct order for hetzner/aider swap", async () => {
-      await expect(cmdRun("hetzner", "aider")).rejects.toThrow("process.exit");
+    it("should suggest correct order for hetzner/codex swap", async () => {
+      await expect(cmdRun("hetzner", "codex")).rejects.toThrow("process.exit");
 
       const infoCalls2 = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
       expect(infoCalls2.some((msg: string) => msg.includes("swapped"))).toBe(true);
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("spawn aider hetzner"))).toBe(true);
+      expect(infoCalls.some((msg: string) => msg.includes("spawn codex hetzner"))).toBe(true);
     });
 
     it("should NOT trigger swap detection when both args are unknown", async () => {
@@ -412,8 +412,8 @@ describe("Commands Error Paths", () => {
     });
 
     it("should show agent error and cloud-is-actually-agent error together", async () => {
-      // "spawn badagent aider" - badagent is unknown, aider is an agent not a cloud
-      await expect(cmdRun("badagent", "aider")).rejects.toThrow("process.exit");
+      // "spawn badagent codex" - badagent is unknown, codex is an agent not a cloud
+      await expect(cmdRun("badagent", "codex")).rejects.toThrow("process.exit");
 
       const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
       const hasAgentError = errorCalls.some((msg: string) => msg.includes("Unknown agent"));
@@ -437,12 +437,12 @@ describe("Commands Error Paths", () => {
 
   describe("cmdRun - mismatched argument types", () => {
     it("should tell user when cloud arg is actually an agent", async () => {
-      // "spawn claude aider" - both are agents, not cloud
-      await expect(cmdRun("claude", "aider")).rejects.toThrow("process.exit");
+      // "spawn claude codex" - both are agents, not cloud
+      await expect(cmdRun("claude", "codex")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes('"aider" is an agent'))).toBe(true);
+      expect(infoCalls.some((msg: string) => msg.includes('"codex" is an agent'))).toBe(true);
       expect(infoCalls.some((msg: string) => msg.includes("spawn <agent> <cloud>"))).toBe(true);
     });
 

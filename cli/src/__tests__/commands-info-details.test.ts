@@ -25,7 +25,7 @@ import { loadManifest } from "../manifest";
 
 const mockManifest = createMockManifest();
 
-// Manifest where hetzner has 1 missing agent (aider) - triggers "Not yet available"
+// Manifest where hetzner has 1 missing agent (codex) - triggers "Not yet available"
 // This is the same as the base mock manifest
 
 // Manifest with many agents (> 5 missing) to test that "Not yet available" is NOT shown
@@ -39,12 +39,12 @@ const manyAgentsManifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
     openclaw: {
@@ -63,20 +63,20 @@ const manyAgentsManifest = {
       launch: "nanoclaw",
       env: { OPENAI_API_KEY: "test" },
     },
-    codex: {
-      name: "Codex CLI",
-      description: "OpenAI Codex",
-      url: "https://codex.dev",
-      install: "npm install -g codex",
-      launch: "codex",
+    gptme: {
+      name: "GPTMe",
+      description: "AI terminal assistant",
+      url: "https://gptme.dev",
+      install: "pip install gptme",
+      launch: "gptme",
       env: { OPENAI_API_KEY: "test" },
     },
-    goose: {
-      name: "Goose",
+    cline: {
+      name: "Cline",
       description: "AI dev tool",
-      url: "https://goose.dev",
-      install: "pip install goose",
-      launch: "goose",
+      url: "https://cline.dev",
+      install: "npm install -g cline",
+      launch: "cline",
       env: { OPENAI_API_KEY: "test" },
     },
     kilocode: {
@@ -102,11 +102,11 @@ const manyAgentsManifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "missing",
+    "sprite/codex": "missing",
     "sprite/openclaw": "missing",
     "sprite/nanoclaw": "missing",
-    "sprite/codex": "missing",
-    "sprite/goose": "missing",
+    "sprite/gptme": "missing",
+    "sprite/cline": "missing",
     "sprite/kilocode": "missing",
   },
 };
@@ -122,12 +122,12 @@ const fewMissingManifest = {
       launch: "claude",
       env: { ANTHROPIC_API_KEY: "test" },
     },
-    aider: {
-      name: "Aider",
+    codex: {
+      name: "Codex",
       description: "AI pair programmer",
-      url: "https://aider.chat",
-      install: "pip install aider-chat",
-      launch: "aider",
+      url: "https://codex.dev",
+      install: "npm install -g codex",
+      launch: "codex",
       env: { OPENAI_API_KEY: "test" },
     },
     openclaw: {
@@ -146,12 +146,12 @@ const fewMissingManifest = {
       launch: "nanoclaw",
       env: { OPENAI_API_KEY: "test" },
     },
-    codex: {
-      name: "Codex CLI",
-      description: "OpenAI Codex",
-      url: "https://codex.dev",
-      install: "npm install -g codex",
-      launch: "codex",
+    gptme: {
+      name: "GPTMe",
+      description: "AI terminal assistant",
+      url: "https://gptme.dev",
+      install: "pip install gptme",
+      launch: "gptme",
       env: { OPENAI_API_KEY: "test" },
     },
   },
@@ -169,10 +169,10 @@ const fewMissingManifest = {
   },
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "sprite/openclaw": "missing",
     "sprite/nanoclaw": "missing",
-    "sprite/codex": "missing",
+    "sprite/gptme": "missing",
   },
 };
 
@@ -181,9 +181,9 @@ const allImplManifest = {
   ...mockManifest,
   matrix: {
     "sprite/claude": "implemented",
-    "sprite/aider": "implemented",
+    "sprite/codex": "implemented",
     "hetzner/claude": "implemented",
-    "hetzner/aider": "implemented",
+    "hetzner/codex": "implemented",
   },
 };
 
@@ -322,11 +322,11 @@ describe("cmdCloudInfo - missing agents display", () => {
 
   describe("Not yet available text", () => {
     it("should show 'Not yet available' when cloud has 1 missing agent (<=5)", async () => {
-      // hetzner has claude (implemented) but aider (missing) = 1 missing agent
+      // hetzner has claude (implemented) but codex (missing) = 1 missing agent
       await cmdCloudInfo("hetzner");
       const output = getOutput();
       expect(output).toContain("Not yet available");
-      expect(output).toContain("Aider");
+      expect(output).toContain("Codex");
     });
 
     it("should show missing agent display names in 'Not yet available'", async () => {
@@ -336,7 +336,7 @@ describe("cmdCloudInfo - missing agents display", () => {
       expect(output).toContain("Not yet available");
       expect(output).toContain("OpenClaw");
       expect(output).toContain("NanoClaw");
-      expect(output).toContain("Codex CLI");
+      expect(output).toContain("GPTMe");
     });
 
     it("should NOT show 'Not yet available' when missing agents > 5", async () => {
@@ -541,10 +541,10 @@ describe("cmdAgentInfo - URL and count details", () => {
       expect(output).toContain("https://claude.ai");
     });
 
-    it("should display aider URL", async () => {
-      await cmdAgentInfo("aider");
+    it("should display codex URL", async () => {
+      await cmdAgentInfo("codex");
       const output = getOutput();
-      expect(output).toContain("https://aider.chat");
+      expect(output).toContain("https://codex.dev");
     });
 
     it("should display specific URL when agent has custom URL", async () => {
@@ -592,9 +592,9 @@ describe("cmdAgentInfo - URL and count details", () => {
         ...mockManifest,
         matrix: {
           "sprite/claude": "missing",
-          "sprite/aider": "missing",
+          "sprite/codex": "missing",
           "hetzner/claude": "missing",
-          "hetzner/aider": "missing",
+          "hetzner/codex": "missing",
         },
       };
       await setManifest(noImplManifest);
@@ -614,10 +614,10 @@ describe("cmdAgentInfo - URL and count details", () => {
       expect(output).toContain("2 of 2");
     });
 
-    it("should show partial count for aider", async () => {
-      await cmdAgentInfo("aider");
+    it("should show partial count for codex", async () => {
+      await cmdAgentInfo("codex");
       const output = getOutput();
-      // aider has 1 implemented out of 2 total clouds
+      // codex has 1 implemented out of 2 total clouds
       expect(output).toContain("1 of 2");
     });
 
@@ -626,9 +626,9 @@ describe("cmdAgentInfo - URL and count details", () => {
         ...mockManifest,
         matrix: {
           "sprite/claude": "missing",
-          "sprite/aider": "missing",
+          "sprite/codex": "missing",
           "hetzner/claude": "missing",
-          "hetzner/aider": "missing",
+          "hetzner/codex": "missing",
         },
       };
       await setManifest(noImplManifest);
