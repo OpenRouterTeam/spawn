@@ -269,7 +269,7 @@ setup_shell_environment() {
     # Create temp file with path config
     local path_temp
     path_temp=$(mktemp)
-    trap 'rm -f "${path_temp}"' EXIT
+    track_temp_file "${path_temp}"
     cat > "${path_temp}" << 'EOF'
 
 # [spawn:path]
@@ -285,7 +285,7 @@ EOF
     if sprite $(_sprite_org_flags) exec -s "${sprite_name}" -- bash -c "command -v zsh" >/dev/null 2>&1; then
         local bash_temp
         bash_temp=$(mktemp)
-        trap 'rm -f "${path_temp}" "${bash_temp}"' EXIT
+        track_temp_file "${bash_temp}"
         cat > "${bash_temp}" << 'EOF'
 # [spawn:bash]
 exec /usr/bin/zsh -l
