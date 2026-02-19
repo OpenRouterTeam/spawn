@@ -2247,18 +2247,20 @@ execute_agent_non_interactive() {
 
     log_step "Executing ${agent_name} with prompt in non-interactive mode..."
 
-    # Escape the prompt for safe shell execution
-    # We use printf %q which properly escapes special characters for bash
-    local escaped_prompt
-    escaped_prompt=$(printf '%q' "${prompt}")
+    # Do NOT use printf '%q' here — the run callback (run_server, sprite exec,
+    # ssh) already handles escaping for remote transport. Double-escaping breaks
+    # prompts containing quotes, spaces, or special characters on Fly.io.
+    # Single-quote the prompt to protect it from shell expansion.
+    local safe_prompt
+    safe_prompt="'$(printf '%s' "${prompt}" | sed "s/'/'\\\\''/g")'"
 
     # Build the command based on exec callback type
     if [[ "${exec_callback}" == *"sprite"* ]]; then
         # Sprite execution (no -tty flag for non-interactive)
-        sprite exec -s "${sprite_name}" -- zsh -c "source ~/.zshrc && ${agent_name} ${agent_flags} ${escaped_prompt}"
+        sprite exec -s "${sprite_name}" -- zsh -c "source ~/.zshrc && ${agent_name} ${agent_flags} ${safe_prompt}"
     else
         # Generic SSH execution
-        ${exec_callback} "${sprite_name}" "source ~/.zshrc && ${agent_name} ${agent_flags} ${escaped_prompt}"
+        ${exec_callback} "${sprite_name}" "source ~/.zshrc && ${agent_name} ${agent_flags} ${safe_prompt}"
     fi
 }
 

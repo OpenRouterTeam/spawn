@@ -32,7 +32,7 @@ agent_configure() {
     dotenv_temp=$(mktemp)
     trap 'rm -f "${dotenv_temp}"' EXIT
     chmod 600 "${dotenv_temp}"
-    printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${dotenv_temp}"
+    printf 'ANTHROPIC_API_KEY=%s\nANTHROPIC_BASE_URL=https://openrouter.ai/api\n' "${OPENROUTER_API_KEY}" > "${dotenv_temp}"
     cloud_upload "${dotenv_temp}" "/root/nanoclaw/.env"
 }
 agent_launch_cmd() { echo 'cd ~/nanoclaw && source ~/.zshrc && npm run dev'; }

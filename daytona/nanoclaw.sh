@@ -33,7 +33,7 @@ agent_configure() {
     dotenv_temp=$(mktemp)
     chmod 600 "${dotenv_temp}"
     track_temp_file "${dotenv_temp}"
-    printf 'ANTHROPIC_API_KEY=%s\n' "${OPENROUTER_API_KEY}" > "${dotenv_temp}"
+    printf 'ANTHROPIC_API_KEY=%s\nANTHROPIC_BASE_URL=https://openrouter.ai/api\n' "${OPENROUTER_API_KEY}" > "${dotenv_temp}"
     cloud_upload "${dotenv_temp}" "/root/nanoclaw/.env"
 }
 
