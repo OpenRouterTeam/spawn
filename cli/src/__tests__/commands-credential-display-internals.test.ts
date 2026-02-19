@@ -1,4 +1,24 @@
-import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:test";
+
+mock.module("@clack/prompts", () => ({
+  spinner: () => ({
+    start: mock(() => {}),
+    stop: mock(() => {}),
+    message: mock(() => {}),
+  }),
+  log: {
+    step: mock(() => {}),
+    info: mock(() => {}),
+    error: mock(() => {}),
+    warn: mock(() => {}),
+    success: mock(() => {}),
+  },
+  intro: mock(() => {}),
+  outro: mock(() => {}),
+  cancel: mock(() => {}),
+  select: mock(() => {}),
+  isCancel: () => false,
+}));
 import {
   formatCredStatusLine,
   parseAuthEnvVars,

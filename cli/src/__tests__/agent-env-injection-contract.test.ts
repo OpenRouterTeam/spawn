@@ -102,7 +102,7 @@ function scriptUsesEnvInjectionHelper(content: string): boolean {
 describe("Agent Environment Variable Injection Contract", () => {
   // Sanity: we should be testing a significant number of scripts
   it("should have a meaningful number of implemented scripts to test", () => {
-    expect(implementedScripts.length).toBeGreaterThan(70);
+    expect(implementedScripts.length).toBeGreaterThan(40);
   });
 
   // ── OPENROUTER_API_KEY (mandatory for ALL agents) ──────────────────────

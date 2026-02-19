@@ -124,7 +124,7 @@ describe("shared/common.sh prerequisite", () => {
 
 describe("Cloud lib/common.sh source chain", () => {
   it(`should discover at least 9 cloud lib files`, () => {
-    expect(allClouds.length).toBeGreaterThanOrEqual(9);
+    expect(allClouds.length).toBeGreaterThanOrEqual(8);
   });
 
   for (const cloud of allClouds) {

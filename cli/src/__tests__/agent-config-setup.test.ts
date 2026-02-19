@@ -507,7 +507,7 @@ describe("setup_openclaw_config", () => {
       expect(opClawFile).toBeDefined();
       const content = readFileSync(opClawFile, "utf-8");
       const parsed = JSON.parse(content);
-      expect(parsed.agents.defaults.model.primary).toBe("openrouter/anthropic/claude-3.5-sonnet");
+      expect(parsed.agents.defaults.model.primary).toBe("anthropic/claude-3.5-sonnet");
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -562,7 +562,7 @@ describe("setup_openclaw_config", () => {
       setup_openclaw_config "key" "auto" "mock_upload" "mock_run"
     `);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("CMD:rm -rf ~/.openclaw && mkdir -p ~/.openclaw");
+    expect(result.stdout).toContain("CMD:mkdir -p ~/.openclaw");
   });
 });
 
