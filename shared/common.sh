@@ -1337,8 +1337,18 @@ offer_github_auth() {
         return 0
     fi
 
-    # Build the remote command with optional token export
-    local gh_cmd="curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    # Build the remote command with optional token export.
+    # Prefer the local copy (running from a checkout) so fixes don't wait for
+    # a merge to main. Base64-encode it for safe inline transport.
+    local gh_cmd
+    local _local_gh="${SCRIPT_DIR:-}/../../shared/github-auth.sh"
+    if [[ -n "${SCRIPT_DIR:-}" && -f "${_local_gh}" ]]; then
+        local _gh_b64
+        _gh_b64=$(base64 < "${_local_gh}" | tr -d '\n')
+        gh_cmd="printf '%s' '${_gh_b64}' | base64 -d | bash"
+    else
+        gh_cmd="curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash"
+    fi
     if [[ -n "${SPAWN_GITHUB_TOKEN:-}" ]]; then
         local escaped_token
         escaped_token=$(printf '%q' "${SPAWN_GITHUB_TOKEN}")
@@ -1349,7 +1359,7 @@ offer_github_auth() {
     if [[ "${SPAWN_GITHUB_AUTH_PROMPTED:-}" == "1" ]]; then
         if [[ "${SPAWN_GITHUB_AUTH_REQUESTED:-}" == "1" ]]; then
             log_step "Installing and authenticating GitHub CLI..."
-            ${run_callback} "${gh_cmd}"
+            ${run_callback} "${gh_cmd}" || log_warn "GitHub CLI setup failed (non-fatal, continuing)"
         fi
         return 0
     fi
@@ -1377,7 +1387,7 @@ offer_github_auth() {
     fi
 
     log_step "Installing and authenticating GitHub CLI..."
-    ${run_callback} "${gh_cmd}"
+    ${run_callback} "${gh_cmd}" || log_warn "GitHub CLI setup failed (non-fatal, continuing)"
 }
 
 # ============================================================
@@ -1680,8 +1690,8 @@ _spawn_inject_env_vars() {
     cloud_run "cp '${temp_remote}' ~/.spawnrc && chmod 600 ~/.spawnrc && rm '${temp_remote}'"
 
     # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
-    cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc"
-    cloud_run "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc"
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc" || log_warn "Could not hook .spawnrc into .bashrc"
+    cloud_run "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc" || log_warn "Could not hook .spawnrc into .zshrc"
 
     offer_github_auth cloud_run
 }
@@ -1695,7 +1705,7 @@ spawn_agent() {
     cloud_authenticate
 
     # 2. Pre-provision hooks (e.g., prompt for GitHub auth)
-    if _fn_exists agent_pre_provision; then agent_pre_provision; fi
+    if _fn_exists agent_pre_provision; then agent_pre_provision || true; fi
 
     # 3. Get API key (before provisioning so user isn't waiting on server)
     get_or_prompt_api_key
@@ -1729,14 +1739,14 @@ spawn_agent() {
     # 8. Inject environment variables
     _spawn_inject_env_vars
 
-    # 9. Agent-specific configuration
-    if _fn_exists agent_configure; then agent_configure; fi
+    # 9. Agent-specific configuration (non-fatal — agent may work with defaults)
+    if _fn_exists agent_configure; then agent_configure || log_warn "Agent configuration failed (continuing with defaults)"; fi
 
-    # 10. Save connection info
-    if _fn_exists agent_save_connection; then agent_save_connection; fi
+    # 10. Save connection info (non-fatal — convenience feature only)
+    if _fn_exists agent_save_connection; then agent_save_connection || log_warn "Could not save connection info"; fi
 
-    # 11. Pre-launch hooks (e.g., start gateway daemon)
-    if _fn_exists agent_pre_launch; then agent_pre_launch; fi
+    # 11. Pre-launch hooks (non-fatal — e.g., gateway daemon may start slowly)
+    if _fn_exists agent_pre_launch; then agent_pre_launch || log_warn "Pre-launch hook failed (continuing)"; fi
 
     # 12. Launch interactive session
     log_info "${agent_name} is ready"
