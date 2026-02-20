@@ -90,9 +90,9 @@ print(v)
                 log "SECURITY: Invalid characters in config value for ${var_name}"
                 return 1
             fi
-            # SECURITY: Use printf to safely assign value without command injection risk
-            # Direct export with = operator doesn't quote the value, allowing injection via $()
-            printf -v "${var_name}" '%s' "${val}"
+            # SECURITY: val is already validated against ^[a-zA-Z0-9._/@-]+$ above,
+            # and var_name is validated against ^[A-Z_][A-Z0-9_]*$ by the caller.
+            eval "${var_name}=\${val}"
             export "${var_name}"
             return 0
         fi

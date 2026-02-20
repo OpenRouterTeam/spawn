@@ -1991,12 +1991,6 @@ calculate_retry_backoff() {
         return 0
     fi
 
-    # Calculate next interval with exponential backoff
-    local next_interval=$((interval * 2))
-    if [[ "${next_interval}" -gt "${max_interval}" ]]; then
-        next_interval="${max_interval}"
-    fi
-
     # Add jitter: ±20% randomization to prevent thundering herd
     # Fallback to no-jitter interval if python3 is unavailable
     python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || printf '%s' "${interval}"
@@ -2040,7 +2034,7 @@ _update_retry_interval() {
         current_interval="${max_interval}"
     fi
 
-    printf -v "${interval_var}" '%s' "${current_interval}"
+    eval "${interval_var}=\${current_interval}"
 }
 
 # Helper to extract HTTP status code and response body from curl output
