@@ -68,12 +68,34 @@ get_server_name() {
 create_server() {
     local name="${1}"
 
-    log_step "Creating Daytona sandbox '${name}'..."
+    # Configurable resources — defaults are much larger than Daytona's built-in
+    # defaults (1 vCPU / 1 GiB / 3 GiB) which are too small for installing
+    # Node.js, Bun, and agent packages. Max: 4 vCPU / 8 GiB / 10 GiB.
+    local cpu="${DAYTONA_CPU:-2}"
+    local memory="${DAYTONA_MEMORY:-4}"
+    local disk="${DAYTONA_DISK:-30}"
 
-    # Build create body — jq for safe JSON encoding
+    log_step "Creating Daytona sandbox '${name}' (${cpu} vCPU, ${memory} GiB RAM, ${disk} GiB disk)..."
+
+    # Build create body — jq for safe JSON encoding.
+    # Resource overrides (cpu/memory/disk) only work for IMAGE-based sandboxes,
+    # not snapshot-based. The API requires buildInfo.dockerfileContent instead of
+    # an image field — this is how the SDK translates image-based creation.
+    # daytonaio/sandbox:latest has python, node, pip pre-installed.
+    local image="${DAYTONA_IMAGE:-daytonaio/sandbox:latest}"
+    if [[ "${image}" =~ [^a-zA-Z0-9./:_-] ]]; then
+        log_error "Invalid image name: ${image}"
+        return 1
+    fi
+    local dockerfile="FROM ${image}"
     local body
-    body=$(jq -n --arg name "${name}" '{
+    body=$(jq -n --arg name "${name}" --arg dockerfile "${dockerfile}" \
+        --argjson cpu "${cpu}" --argjson memory "${memory}" --argjson disk "${disk}" '{
         name: $name,
+        buildInfo: { dockerfileContent: $dockerfile },
+        cpu: $cpu,
+        memory: $memory,
+        disk: $disk,
         autoStopInterval: 0,
         autoArchiveInterval: 0
     }')
@@ -161,16 +183,16 @@ _setup_ssh_access() {
     # validates the token during the SSH "none" auth exchange.
     #   BatchMode=yes        — never prompt for passwords/passphrases (prevents hangs)
     #   PubkeyAuthentication — skip trying local SSH keys against the gateway
-    #   ControlMaster/Path   — multiplex all SSH/SCP over one persistent connection
-    #                          (avoids repeated auth negotiation + gateway rate limits)
+    # NOTE: No ControlMaster — Daytona's gateway has a low connection limit
+    # (~10-15 connections per token). We use -o Port= instead of -p so the
+    # port works for both ssh and scp (scp interprets -p as "preserve timestamps").
     SSH_USER="${DAYTONA_SSH_TOKEN}"
-    DAYTONA_SSH_CONTROL="/tmp/spawn-daytona-ssh-${DAYTONA_SANDBOX_ID}"
-    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -o BatchMode=yes -o PubkeyAuthentication=no -o ControlMaster=auto -o ControlPath=${DAYTONA_SSH_CONTROL} -o ControlPersist=300"
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -o BatchMode=yes -o PubkeyAuthentication=no"
     if [[ -n "${DAYTONA_SSH_PORT}" ]]; then
-        SSH_OPTS="${SSH_OPTS} -p ${DAYTONA_SSH_PORT}"
+        SSH_OPTS="${SSH_OPTS} -o Port=${DAYTONA_SSH_PORT}"
     fi
 
-    export DAYTONA_SSH_TOKEN DAYTONA_SSH_HOST DAYTONA_SSH_CONTROL SSH_USER SSH_OPTS
+    export DAYTONA_SSH_TOKEN DAYTONA_SSH_HOST SSH_USER SSH_OPTS
     log_info "SSH access ready"
 }
 
@@ -178,39 +200,74 @@ wait_for_cloud_init() {
     # Verify SSH connectivity
     ssh_verify_connectivity "${DAYTONA_SSH_HOST}"
 
+    # IMPORTANT: Daytona's SSH gateway has a low connection limit (~10-15 per token).
+    # Each ssh_run_server/scp call opens a new TCP connection. The full spawn_agent
+    # flow needs ~20+ connections (install, env injection, config upload, etc.),
+    # so we MUST consolidate commands here to stay under the limit.
+    # This single SSH call replaces what was 6 separate connections.
     log_step "Installing base tools in sandbox..."
-    ssh_run_server "${DAYTONA_SSH_HOST}" "apt-get update -y && apt-get install -y curl unzip git zsh nodejs npm" >/dev/null 2>&1 || true
-    ssh_run_server "${DAYTONA_SSH_HOST}" "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1 || true
-    ssh_run_server "${DAYTONA_SSH_HOST}" "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
-    ssh_run_server "${DAYTONA_SSH_HOST}" "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
-    ssh_run_server "${DAYTONA_SSH_HOST}" 'echo "export PATH=\"${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true
-    ssh_run_server "${DAYTONA_SSH_HOST}" 'echo "export PATH=\"${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.zshrc' >/dev/null 2>&1 || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" "apt-get update -y && apt-get install -y curl unzip git zsh nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx && curl -fsSL https://bun.sh/install | bash && echo 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.bashrc && echo 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.zshrc" >/dev/null 2>&1 || true
     log_info "Base tools installed"
 }
 
 # SSH operations — delegates to shared helpers (same as Hetzner, DigitalOcean, etc.)
-run_server() { ssh_run_server "${DAYTONA_SSH_HOST}" "$1"; }
-upload_file() { ssh_upload_file "${DAYTONA_SSH_HOST}" "$1" "$2"; }
-
-# Interactive session needs BatchMode=no so the PTY works.
-# Close the multiplexed master first — ssh -t and ControlMaster don't mix well.
-interactive_session() {
-    # Tear down the connection-multiplexing master before handing off to the
-    # interactive session.  The -t flag (allocated by ssh_interactive_session)
-    # and ControlMaster can conflict, causing "mux_client: master did not
-    # respond" errors.
-    local exit_opts="-o ControlPath=${DAYTONA_SSH_CONTROL}"
-    if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
-        exit_opts="${exit_opts} -p ${DAYTONA_SSH_PORT}"
+# Brief sleep after each SSH call gives Daytona's gateway time to release the
+# connection slot. Without this, rapid-fire SSH calls exhaust the gateway's
+# connection limit and subsequent calls hang indefinitely.
+run_server() {
+    if [[ -n "${SPAWN_DEBUG:-}" ]]; then
+        log_info "[ssh-run] ${1:0:80}..."
     fi
-    # shellcheck disable=SC2086
-    ssh -O exit ${exit_opts} "${SSH_USER}@${DAYTONA_SSH_HOST}" 2>/dev/null || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" "$1"
+    local rc=$?
+    if [[ -n "${SPAWN_DEBUG:-}" ]]; then
+        log_info "[ssh-run] exit=$rc"
+    fi
+    sleep 1
+    return "${rc}"
+}
 
+# Daytona's SSH gateway doesn't support SCP/SFTP (HTTP 404) and doesn't
+# propagate stdin EOF (cat < file hangs). Base64-encode file content and
+# send it as a command argument through the SSH command channel instead.
+# Safety notes:
+#   - base64 output contains only [A-Za-z0-9+/=] — no shell metacharacters,
+#     safe for single-quote embedding (no single quotes in that alphabet)
+#   - remote_path is escaped with printf %q to prevent path traversal / injection
+upload_file() {
+    local local_path="${1}"
+    local remote_path="${2}"
+    if [[ -n "${SPAWN_DEBUG:-}" ]]; then
+        log_info "[upload] ${local_path} -> ${remote_path} ($(wc -c < "${local_path}") bytes)"
+    fi
+    local b64
+    b64=$(base64 < "${local_path}" | tr -d '\n')
+    # Validate that b64 only contains safe base64 characters [A-Za-z0-9+/=]
+    if [[ "${b64}" =~ [^A-Za-z0-9+/=] ]]; then
+        log_error "upload_file: base64 output contains unexpected characters"
+        return 1
+    fi
+    # Use printf %q to safely escape remote_path for the remote shell
+    local safe_path
+    safe_path=$(printf '%q' "${remote_path}")
+    # b64 is validated above — safe to embed in single quotes (no ' in base64 alphabet).
+    # We use < /dev/null because the gateway does not propagate stdin EOF.
+    # shellcheck disable=SC2086
+    ssh ${SSH_OPTS} "${SSH_USER}@${DAYTONA_SSH_HOST}" -- "printf '%s' '${b64}' | base64 -d > ${safe_path}" < /dev/null
+    local rc=$?
+    if [[ -n "${SPAWN_DEBUG:-}" ]]; then
+        log_info "[upload] exit=$rc"
+    fi
+    sleep 1
+    return "${rc}"
+}
+
+# Interactive session — drop BatchMode so the PTY works
+interactive_session() {
     local saved_opts="${SSH_OPTS}"
-    # Strip multiplexing and BatchMode for the interactive session
     SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -o PubkeyAuthentication=no"
     if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
-        SSH_OPTS="${SSH_OPTS} -p ${DAYTONA_SSH_PORT}"
+        SSH_OPTS="${SSH_OPTS} -o Port=${DAYTONA_SSH_PORT}"
     fi
     ssh_interactive_session "${DAYTONA_SSH_HOST}" "$1"
     local rc=$?
@@ -224,15 +281,6 @@ destroy_server() {
     if [[ -z "${sandbox_id}" ]]; then
         log_warn "No sandbox ID to destroy"
         return 0
-    fi
-    # Close SSH multiplexing master if still open
-    if [[ -n "${DAYTONA_SSH_CONTROL:-}" ]]; then
-        local exit_opts="-o ControlPath=${DAYTONA_SSH_CONTROL}"
-        if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
-            exit_opts="${exit_opts} -p ${DAYTONA_SSH_PORT}"
-        fi
-        # shellcheck disable=SC2086
-        ssh -O exit ${exit_opts} "${SSH_USER}@${DAYTONA_SSH_HOST}" 2>/dev/null || true
     fi
     log_step "Destroying sandbox ${sandbox_id}..."
     daytona_api DELETE "/sandbox/${sandbox_id}" >/dev/null 2>&1 || true
