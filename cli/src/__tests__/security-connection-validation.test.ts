@@ -26,6 +26,13 @@ describe("validateConnectionIP", () => {
       expect(() => validateConnectionIP("sprite-console")).not.toThrow();
       expect(() => validateConnectionIP("fly-ssh")).not.toThrow();
       expect(() => validateConnectionIP("daytona-sandbox")).not.toThrow();
+      expect(() => validateConnectionIP("localhost")).not.toThrow();
+    });
+
+    it("should accept valid hostnames", () => {
+      expect(() => validateConnectionIP("ssh.app.daytona.io")).not.toThrow();
+      expect(() => validateConnectionIP("example.com")).not.toThrow();
+      expect(() => validateConnectionIP("sub.domain.example.com")).not.toThrow();
     });
   });
 
@@ -45,7 +52,11 @@ describe("validateConnectionIP", () => {
     it("should reject invalid IP formats", () => {
       expect(() => validateConnectionIP("not-an-ip")).toThrow(/Invalid connection IP/);
       expect(() => validateConnectionIP("256.256.256.256")).toThrow(/Invalid connection IP/);
-      expect(() => validateConnectionIP("localhost")).toThrow(/Invalid connection IP/);
+    });
+
+    it("should reject hostnames with shell metacharacters", () => {
+      expect(() => validateConnectionIP("host.com; rm -rf /")).toThrow(/Invalid connection IP/);
+      expect(() => validateConnectionIP("$(evil).com")).toThrow(/Invalid connection IP/);
     });
 
     it("should reject path-like values", () => {

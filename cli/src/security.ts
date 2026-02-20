@@ -13,12 +13,17 @@ const IPV4_PATTERN = /^(\d{1,3}\.){3}\d{1,3}$/;
 // IPv6 address pattern (simplified - catches most valid IPv6 addresses)
 const IPV6_PATTERN = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
 
+// Hostname pattern: valid DNS hostnames (e.g., ssh.app.daytona.io)
+// Only allows safe characters: lowercase alphanumeric, hyphens, dots
+// Must have at least two labels (e.g., "host.domain")
+const HOSTNAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
 // Unix username pattern: starts with lowercase letter or underscore,
 // followed by lowercase letters, digits, underscores, hyphens, optional $ suffix
 const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]*\$?$/;
 
 // Special connection sentinel values (not actual IPs)
-const CONNECTION_SENTINELS = ["sprite-console", "fly-ssh", "daytona-sandbox"];
+const CONNECTION_SENTINELS = ["sprite-console", "fly-ssh", "daytona-sandbox", "localhost"];
 
 /**
  * Validates an identifier (agent or cloud name) against security constraints.
@@ -146,7 +151,8 @@ export function validateScriptContent(script: string): void {
  * Allows:
  * - Valid IPv4 addresses (e.g., "192.168.1.1")
  * - Valid IPv6 addresses (e.g., "::1", "2001:db8::1")
- * - Special sentinel values ("sprite-console", "fly-ssh", "daytona-sandbox")
+ * - Valid hostnames (e.g., "ssh.app.daytona.io")
+ * - Special sentinel values ("sprite-console", "fly-ssh", "daytona-sandbox", "localhost")
  *
  * @param ip - The IP address or sentinel to validate
  * @throws Error if validation fails
@@ -187,10 +193,15 @@ export function validateConnectionIP(ip: string): void {
     return;
   }
 
-  // Neither IPv4 nor IPv6
+  // Validate as hostname (e.g., ssh.app.daytona.io)
+  if (HOSTNAME_PATTERN.test(ip)) {
+    return;
+  }
+
+  // Neither IPv4, IPv6, nor valid hostname
   throw new Error(
     `Invalid connection IP address: "${ip}"\n\n` +
-    `Expected a valid IPv4 or IPv6 address, or one of: ${CONNECTION_SENTINELS.join(", ")}\n\n` +
+    `Expected a valid IPv4 or IPv6 address, hostname, or one of: ${CONNECTION_SENTINELS.join(", ")}\n\n` +
     `Your spawn history file may be corrupted or tampered with.\n` +
     `To fix: run 'spawn list --clear' to reset history`
   );
