@@ -151,13 +151,12 @@ _gcp_resolve_project() {
     local project="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
     if [[ "${project}" == "(unset)" ]]; then project=""; fi
 
-    # When a project is already set, ask whether to keep or change it
+    # When a project is already set, confirm before using it
     if [[ -n "${project}" && "${SPAWN_NON_INTERACTIVE:-}" != "1" ]]; then
-        log_info "Current GCP project: ${project}"
-        local keep
-        keep=$(safe_read "Keep this project? [Y/n]: ") || keep=""
-        keep="${keep:-y}"
-        if [[ "${keep}" =~ ^[nN] ]]; then
+        local confirm
+        confirm=$(safe_read "Use project '${project}'? [Y/n]: ") || confirm=""
+        confirm="${confirm:-y}"
+        if [[ "${confirm}" =~ ^[nN] ]]; then
             project=""
         fi
     fi
