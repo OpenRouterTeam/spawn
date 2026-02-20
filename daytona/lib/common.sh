@@ -156,14 +156,21 @@ _setup_ssh_access() {
         DAYTONA_SSH_HOST="ssh.app.daytona.io"
     fi
 
-    # Configure SSH for token-based auth (no key file needed)
+    # Configure SSH for Daytona's token-based auth.
+    # The token IS the username — no key or password needed. The gateway
+    # validates the token during the SSH "none" auth exchange.
+    #   BatchMode=yes        — never prompt for passwords/passphrases (prevents hangs)
+    #   PubkeyAuthentication — skip trying local SSH keys against the gateway
+    #   ControlMaster/Path   — multiplex all SSH/SCP over one persistent connection
+    #                          (avoids repeated auth negotiation + gateway rate limits)
     SSH_USER="${DAYTONA_SSH_TOKEN}"
-    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10"
+    DAYTONA_SSH_CONTROL="/tmp/spawn-daytona-ssh-${DAYTONA_SANDBOX_ID}"
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -o BatchMode=yes -o PubkeyAuthentication=no -o ControlMaster=auto -o ControlPath=${DAYTONA_SSH_CONTROL} -o ControlPersist=300"
     if [[ -n "${DAYTONA_SSH_PORT}" ]]; then
         SSH_OPTS="${SSH_OPTS} -p ${DAYTONA_SSH_PORT}"
     fi
 
-    export DAYTONA_SSH_TOKEN DAYTONA_SSH_HOST SSH_USER SSH_OPTS
+    export DAYTONA_SSH_TOKEN DAYTONA_SSH_HOST DAYTONA_SSH_CONTROL SSH_USER SSH_OPTS
     log_info "SSH access ready"
 }
 
@@ -184,7 +191,32 @@ wait_for_cloud_init() {
 # SSH operations — delegates to shared helpers (same as Hetzner, DigitalOcean, etc.)
 run_server() { ssh_run_server "${DAYTONA_SSH_HOST}" "$1"; }
 upload_file() { ssh_upload_file "${DAYTONA_SSH_HOST}" "$1" "$2"; }
-interactive_session() { ssh_interactive_session "${DAYTONA_SSH_HOST}" "$1"; }
+
+# Interactive session needs BatchMode=no so the PTY works.
+# Close the multiplexed master first — ssh -t and ControlMaster don't mix well.
+interactive_session() {
+    # Tear down the connection-multiplexing master before handing off to the
+    # interactive session.  The -t flag (allocated by ssh_interactive_session)
+    # and ControlMaster can conflict, causing "mux_client: master did not
+    # respond" errors.
+    local exit_opts="-o ControlPath=${DAYTONA_SSH_CONTROL}"
+    if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
+        exit_opts="${exit_opts} -p ${DAYTONA_SSH_PORT}"
+    fi
+    # shellcheck disable=SC2086
+    ssh -O exit ${exit_opts} "${SSH_USER}@${DAYTONA_SSH_HOST}" 2>/dev/null || true
+
+    local saved_opts="${SSH_OPTS}"
+    # Strip multiplexing and BatchMode for the interactive session
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -o PubkeyAuthentication=no"
+    if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
+        SSH_OPTS="${SSH_OPTS} -p ${DAYTONA_SSH_PORT}"
+    fi
+    ssh_interactive_session "${DAYTONA_SSH_HOST}" "$1"
+    local rc=$?
+    SSH_OPTS="${saved_opts}"
+    return "${rc}"
+}
 
 # Destroy a Daytona sandbox
 destroy_server() {
@@ -192,6 +224,15 @@ destroy_server() {
     if [[ -z "${sandbox_id}" ]]; then
         log_warn "No sandbox ID to destroy"
         return 0
+    fi
+    # Close SSH multiplexing master if still open
+    if [[ -n "${DAYTONA_SSH_CONTROL:-}" ]]; then
+        local exit_opts="-o ControlPath=${DAYTONA_SSH_CONTROL}"
+        if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
+            exit_opts="${exit_opts} -p ${DAYTONA_SSH_PORT}"
+        fi
+        # shellcheck disable=SC2086
+        ssh -O exit ${exit_opts} "${SSH_USER}@${DAYTONA_SSH_HOST}" 2>/dev/null || true
     fi
     log_step "Destroying sandbox ${sandbox_id}..."
     daytona_api DELETE "/sandbox/${sandbox_id}" >/dev/null 2>&1 || true
