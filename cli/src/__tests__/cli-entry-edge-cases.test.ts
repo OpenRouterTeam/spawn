@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { execSync } from "child_process";
+import { spawnSync } from "child_process";
 import { resolve } from "path";
 
 /**
@@ -27,10 +27,10 @@ function runCli(
   args: string[],
   env: Record<string, string> = {}
 ): { stdout: string; stderr: string; exitCode: number } {
-  const quotedArgs = args.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-  const cmd = `bun run ${CLI_DIR}/src/index.ts ${quotedArgs}`;
-  try {
-    const stdout = execSync(cmd, {
+  const result = spawnSync(
+    `${process.env.HOME}/.bun/bin/bun`,
+    ["run", `${CLI_DIR}/src/index.ts`, ...args],
+    {
       cwd: PROJECT_ROOT,
       env: {
         PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`,
@@ -46,17 +46,14 @@ function runCli(
         BUN_ENV: "",
       },
       encoding: "utf-8",
-      timeout: 15000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return { stdout, stderr: "", exitCode: 0 };
-  } catch (err: any) {
-    return {
-      stdout: err.stdout || "",
-      stderr: err.stderr || "",
-      exitCode: err.status ?? 1,
-    };
-  }
+      timeout: 5000,
+    }
+  );
+  return {
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
+    exitCode: result.status ?? 1,
+  };
 }
 
 function output(result: { stdout: string; stderr: string }): string {
@@ -109,21 +106,21 @@ describe("error output formatting", () => {
 
 describe("flag ordering edge cases", () => {
   it("should handle --prompt before positional args", () => {
-    const result = runCli(["--prompt", "Fix bugs", "claude", "sprite"]);
+    const result = runCli(["--prompt", "Fix bugs", "claude", "sprite", "--dry-run"]);
     const out = output(result);
     // Should attempt to run (not error about prompt)
     expect(out).not.toContain("--prompt requires both");
   });
 
   it("should handle -p between positional args", () => {
-    const result = runCli(["claude", "-p", "Fix bugs", "sprite"]);
+    const result = runCli(["claude", "-p", "Fix bugs", "sprite", "--dry-run"]);
     const out = output(result);
     // Should attempt to run
     expect(out).not.toContain("--prompt requires both");
   });
 
   it("should handle --prompt after positional args", () => {
-    const result = runCli(["claude", "sprite", "--prompt", "Fix bugs"]);
+    const result = runCli(["claude", "sprite", "--prompt", "Fix bugs", "--dry-run"]);
     const out = output(result);
     expect(out).not.toContain("--prompt requires both");
   });
@@ -347,21 +344,21 @@ describe("--prompt-file with real files", () => {
 
 describe("agent and cloud display name resolution in cmdRun", () => {
   it("should resolve uppercase agent key and show resolution message", () => {
-    const result = runCli(["CLAUDE", "sprite"]);
+    const result = runCli(["CLAUDE", "sprite", "--dry-run"]);
     const out = output(result);
     expect(out).toContain("Resolved");
     expect(out).not.toContain("Unknown agent");
   });
 
   it("should resolve uppercase cloud key and show resolution message", () => {
-    const result = runCli(["claude", "SPRITE"]);
+    const result = runCli(["claude", "SPRITE", "--dry-run"]);
     const out = output(result);
     expect(out).toContain("Resolved");
     expect(out).not.toContain("Unknown cloud");
   });
 
   it("should resolve both uppercase agent and cloud", () => {
-    const result = runCli(["CLAUDE", "SPRITE"]);
+    const result = runCli(["CLAUDE", "SPRITE", "--dry-run"]);
     const out = output(result);
     // Both should be resolved
     expect(out).toContain("Resolved");
@@ -369,7 +366,7 @@ describe("agent and cloud display name resolution in cmdRun", () => {
   });
 
   it("should not show resolution for exact lowercase keys", () => {
-    const result = runCli(["claude", "sprite"]);
+    const result = runCli(["claude", "sprite", "--dry-run"]);
     const out = output(result);
     expect(out).not.toContain("Resolved");
   });
@@ -493,7 +490,7 @@ describe("SPAWN_NO_UPDATE_CHECK behavior", () => {
 
 describe("extra positional argument warnings", () => {
   it("should warn when 3 positional args given (agent cloud extra)", () => {
-    const result = runCli(["claude", "sprite", "hetzner"]);
+    const result = runCli(["claude", "sprite", "hetzner", "--dry-run"]);
     const out = output(result);
     expect(out).toContain("Extra argument ignored");
     expect(out).toContain("hetzner");
@@ -501,7 +498,7 @@ describe("extra positional argument warnings", () => {
   });
 
   it("should warn about multiple extra args", () => {
-    const result = runCli(["claude", "sprite", "foo", "bar"]);
+    const result = runCli(["claude", "sprite", "foo", "bar", "--dry-run"]);
     const out = output(result);
     expect(out).toContain("Extra arguments ignored");
     expect(out).toContain("foo");
@@ -526,7 +523,7 @@ describe("extra positional argument warnings", () => {
   });
 
   it("should NOT warn when exactly 2 positional args given", () => {
-    const result = runCli(["claude", "sprite"]);
+    const result = runCli(["claude", "sprite", "--dry-run"]);
     const out = output(result);
     expect(out).not.toContain("extra argument");
   });
