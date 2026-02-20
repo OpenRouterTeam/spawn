@@ -147,6 +147,10 @@ while IFS= read -r _f; do
     grep_rule "error" "MC012" "'|&' (pipe stderr) requires bash 4.0+ — use 2>&1 | instead" \
         "$_f" "$_r" '\|&[^&]'
 
+    # MC013: printf -v (variable assignment via printf)
+    grep_rule "error" "MC013" "'printf -v' requires bash 4.0+ — use eval or stdout capture" \
+        "$_f" "$_r" 'printf[[:space:]]+-v[[:space:]]'
+
 done <<FILELIST
 $_all_files
 FILELIST
