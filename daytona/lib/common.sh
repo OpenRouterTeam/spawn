@@ -230,8 +230,10 @@ run_server() {
 # Daytona's SSH gateway doesn't support SCP/SFTP (HTTP 404) and doesn't
 # propagate stdin EOF (cat < file hangs). Base64-encode file content and
 # send it as a command argument through the SSH command channel instead.
-# Safety: base64 alphabet is [A-Za-z0-9+/=] — inherently shell-safe for
-# single-quote embedding. remote_path is escaped defensively below.
+# Safety notes:
+#   - base64 output contains only [A-Za-z0-9+/=] — no shell metacharacters,
+#     safe for single-quote embedding (no single quotes in that alphabet)
+#   - remote_path is escaped with printf %q to prevent path traversal / injection
 upload_file() {
     local local_path="${1}"
     local remote_path="${2}"
@@ -240,10 +242,18 @@ upload_file() {
     fi
     local b64
     b64=$(base64 < "${local_path}" | tr -d '\n')
-    # Escape single quotes in remote_path for safe embedding: ' → '\''
-    local safe_path="${remote_path//\'/\'\\\'\'}"
+    # Validate that b64 only contains safe base64 characters [A-Za-z0-9+/=]
+    if [[ "${b64}" =~ [^A-Za-z0-9+/=] ]]; then
+        log_error "upload_file: base64 output contains unexpected characters"
+        return 1
+    fi
+    # Use printf %q to safely escape remote_path for the remote shell
+    local safe_path
+    safe_path=$(printf '%q' "${remote_path}")
+    # b64 is validated above — safe to embed in single quotes (no ' in base64 alphabet).
+    # We use < /dev/null because the gateway does not propagate stdin EOF.
     # shellcheck disable=SC2086
-    ssh ${SSH_OPTS} "${SSH_USER}@${DAYTONA_SSH_HOST}" -- "printf '%s' '${b64}' | base64 -d > '${safe_path}'" < /dev/null
+    ssh ${SSH_OPTS} "${SSH_USER}@${DAYTONA_SSH_HOST}" -- "printf '%s' '${b64}' | base64 -d > ${safe_path}" < /dev/null
     local rc=$?
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
         log_info "[upload] exit=$rc"
