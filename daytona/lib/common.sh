@@ -83,6 +83,10 @@ create_server() {
     # an image field — this is how the SDK translates image-based creation.
     # daytonaio/sandbox:latest has python, node, pip pre-installed.
     local image="${DAYTONA_IMAGE:-daytonaio/sandbox:latest}"
+    if [[ "${image}" =~ [^a-zA-Z0-9./:_-] ]]; then
+        log_error "Invalid image name: ${image}"
+        return 1
+    fi
     local dockerfile="FROM ${image}"
     local body
     body=$(jq -n --arg name "${name}" --arg dockerfile "${dockerfile}" \
@@ -226,6 +230,8 @@ run_server() {
 # Daytona's SSH gateway doesn't support SCP/SFTP (HTTP 404) and doesn't
 # propagate stdin EOF (cat < file hangs). Base64-encode file content and
 # send it as a command argument through the SSH command channel instead.
+# Safety: base64 alphabet is [A-Za-z0-9+/=] — inherently shell-safe for
+# single-quote embedding. remote_path is escaped defensively below.
 upload_file() {
     local local_path="${1}"
     local remote_path="${2}"
@@ -234,8 +240,10 @@ upload_file() {
     fi
     local b64
     b64=$(base64 < "${local_path}" | tr -d '\n')
+    # Escape single quotes in remote_path for safe embedding: ' → '\''
+    local safe_path="${remote_path//\'/\'\\\'\'}"
     # shellcheck disable=SC2086
-    ssh ${SSH_OPTS} "${SSH_USER}@${DAYTONA_SSH_HOST}" -- "printf '%s' '${b64}' | base64 -d > '${remote_path}'" < /dev/null
+    ssh ${SSH_OPTS} "${SSH_USER}@${DAYTONA_SSH_HOST}" -- "printf '%s' '${b64}' | base64 -d > '${safe_path}'" < /dev/null
     local rc=$?
     if [[ -n "${SPAWN_DEBUG:-}" ]]; then
         log_info "[upload] exit=$rc"
