@@ -236,6 +236,13 @@ describe("Cloud optional field types (when present)", () => {
         expect(cloud.notes!.length).toBeGreaterThan(0);
       });
     }
+
+    if (cloud.icon !== undefined) {
+      it(`cloud "${key}" icon should be a valid URL string`, () => {
+        expect(typeof cloud.icon).toBe("string");
+        expect(cloud.icon).toMatch(/^https?:\/\//);
+      });
+    }
   }
 });
 

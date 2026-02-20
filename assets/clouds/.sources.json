@@ -1,0 +1,9 @@
+{
+  "hetzner":      { "url": "https://www.hetzner.com/_resources/themes/hetzner/images/favicons/ms-icon-310x310.png",              "ext": "png" },
+  "fly":          { "url": "https://fly.io/phx/ui/images/favicon/android-chrome-512x512.png",                                    "ext": "png" },
+  "aws":          { "url": "https://a0.awsstatic.com/libra-css/images/site/touch-icon-ipad-144-smile.png",                       "ext": "png" },
+  "daytona":      { "url": "https://avatars.githubusercontent.com/u/130513197?s=400&v=4",                                        "ext": "png" },
+  "digitalocean": { "url": "https://www.digitalocean.com/_next/static/media/android-chrome-512x512.5f2e6221.png",                "ext": "png" },
+  "gcp":          { "url": "https://www.gstatic.com/cgc/super_cloud.png",                                                       "ext": "png" },
+  "sprite":       { "url": "https://sprites.dev/images/favicon/apple-touch-icon.png",                                            "ext": "png" }
+}
