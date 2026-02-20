@@ -707,10 +707,10 @@ _prompt_and_validate_api_key() {
 }
 
 get_openrouter_api_key_manual() {
-    echo ""
+    echo "" >&2
     log_info "Manual API Key Entry"
-    printf '%b\n' "${GREEN}Get your API key from: https://openrouter.ai/settings/keys${NC}"
-    echo ""
+    printf '%b\n' "${GREEN}Get your API key from: https://openrouter.ai/settings/keys${NC}" >&2
+    echo "" >&2
 
     _prompt_and_validate_api_key
 }
@@ -1219,11 +1219,11 @@ get_openrouter_api_key_oauth() {
     fi
 
     # OAuth failed, offer manual entry
-    echo ""
+    echo "" >&2
     log_warn "Browser-based OAuth login was not completed."
     log_warn "This is normal on remote servers, SSH sessions, or headless environments."
     log_info "You can paste an API key instead. Create one at: https://openrouter.ai/settings/keys"
-    echo ""
+    echo "" >&2
     local manual_choice
     manual_choice=$(safe_read "Paste your API key manually? (Y/n): ") || {
         log_error "Cannot prompt for manual entry in non-interactive mode"
@@ -2772,10 +2772,10 @@ _prompt_for_api_token() {
     local provider_name="${1}"
     local help_url="${2}"
 
-    echo ""
+    echo "" >&2
     log_step "${provider_name} API Token Required"
     log_step "Get your token from: ${help_url}"
-    echo ""
+    echo "" >&2
 
     validated_read "Enter your ${provider_name} API token: " validate_api_token
 }

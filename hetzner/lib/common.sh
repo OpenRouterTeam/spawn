@@ -1,6 +1,8 @@
 #!/bin/bash
-set -eo pipefail
 # Common bash functions for Hetzner Cloud spawn scripts
+
+# Bash safety flags
+set -eo pipefail
 
 # ============================================================
 # Provider-agnostic functions
@@ -14,25 +16,12 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
 fi
 
-# Note: Provider-agnostic functions (logging, OAuth, browser, nc_listen) are now in shared/common.sh
-
 # ============================================================
 # Hetzner Cloud specific functions
 # ============================================================
 
-# Detect hcloud CLI availability
-_hcloud_cli_available() {
-    command -v hcloud &>/dev/null
-}
-
-# Check if hcloud CLI has an active context (authenticated)
-_hcloud_cli_authenticated() {
-    _hcloud_cli_available && hcloud context active &>/dev/null 2>&1
-}
-
 readonly HETZNER_API_BASE="https://api.hetzner.cloud/v1"
 SPAWN_DASHBOARD_URL="https://console.hetzner.cloud/"
-# SSH_OPTS is now defined in shared/common.sh
 
 # Centralized curl wrapper for Hetzner API
 hetzner_api() {
@@ -43,56 +32,23 @@ hetzner_api() {
     generic_cloud_api "$HETZNER_API_BASE" "$HCLOUD_TOKEN" "$method" "$endpoint" "$body"
 }
 
+# Test that the API token works
 test_hcloud_token() {
     local response
     response=$(hetzner_api GET "/servers?per_page=1")
     if echo "$response" | grep -q '"error"'; then
         log_error "API Error: $(extract_api_error_message "$response" "Unable to parse error")"
-        log_error ""
         log_error "How to fix:"
-        log_error "  1. Verify your token at: https://console.hetzner.cloud/projects → API Tokens"
-        log_error "  2. Ensure the token has read/write permissions"
-        log_error "  3. Check the token hasn't expired"
+        log_warn "  1. Verify your token at: https://console.hetzner.cloud/projects → API Tokens"
+        log_warn "  2. Ensure the token has read/write permissions"
+        log_warn "  3. Check the token hasn't expired"
         return 1
     fi
     return 0
 }
 
-# Ensure Hetzner auth is available (hcloud CLI → env var → config file → prompt+save)
+# Ensure HCLOUD_TOKEN is available (env var -> config file -> prompt+save)
 ensure_hcloud_token() {
-    # If hcloud CLI is available, prefer it for authentication
-    if _hcloud_cli_available; then
-        if _hcloud_cli_authenticated; then
-            log_info "Using hcloud CLI (context: $(hcloud context active))"
-            # Export token from CLI context for API fallback compatibility
-            if [[ -z "${HCLOUD_TOKEN:-}" ]]; then
-                local active_context
-                active_context=$(hcloud context active 2>/dev/null || echo "")
-                if [[ -n "${active_context}" ]]; then
-                    # hcloud config uses [[contexts]] array format (lines are indented):
-                    #   [[contexts]]
-                    #     name = "myctx"
-                    #     token = "abc123"
-                    # Find the "name = " line, grab up to 5 lines after it, extract token
-                    HCLOUD_TOKEN=$(grep -FA5 "name = \"${active_context}\"" ~/.config/hcloud/cli.toml 2>/dev/null | grep 'token *=' | sed 's/.*= *"\(.*\)"/\1/' | head -1 || true)
-                    if [[ -n "${HCLOUD_TOKEN:-}" ]]; then
-                        export HCLOUD_TOKEN
-                    fi
-                fi
-            fi
-            if [[ -z "${HCLOUD_TOKEN:-}" ]]; then
-                log_warn "Could not extract API token from hcloud CLI config"
-                log_warn "Falling back to manual token entry..."
-            else
-                return 0
-            fi
-        else
-            log_info "hcloud CLI found but no active context"
-            log_info "Run: hcloud context create myproject"
-            log_info "Falling back to API token authentication..."
-        fi
-    fi
-
     ensure_api_token_with_provider \
         "Hetzner Cloud" \
         "HCLOUD_TOKEN" \
@@ -103,16 +59,6 @@ ensure_hcloud_token() {
 
 # Check if SSH key is registered with Hetzner
 hetzner_check_ssh_key() {
-    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
-        # Use hcloud CLI to check by fingerprint
-        local fingerprint="$1"
-        local result
-        result=$(hcloud ssh-key list -o json 2>/dev/null || true)
-        if [[ -n "$result" ]] && printf '%s' "$result" | jq -e --arg fp "$fingerprint" '.[] | select(.fingerprint == $fp)' &>/dev/null; then
-            return 0
-        fi
-        return 1
-    fi
     check_ssh_key_by_fingerprint hetzner_api "/ssh_keys" "$1"
 }
 
@@ -120,16 +66,6 @@ hetzner_check_ssh_key() {
 hetzner_register_ssh_key() {
     local key_name="$1"
     local pub_path="$2"
-
-    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
-        # Use hcloud CLI to register
-        if hcloud ssh-key create --name "$key_name" --public-key-from-file "$pub_path" &>/dev/null; then
-            return 0
-        fi
-        # Fall through to API on CLI failure
-        log_warn "hcloud ssh-key create failed, falling back to API"
-    fi
-
     local pub_key
     pub_key=$(cat "$pub_path")
     local json_pub_key json_name
@@ -141,14 +77,12 @@ hetzner_register_ssh_key() {
 
     if echo "$register_response" | grep -q '"error"'; then
         log_error "API Error: $(extract_api_error_message "$register_response" "$register_response")"
-        log_error ""
-        log_error "Common causes:"
-        log_error "  - SSH key already registered with this name"
-        log_error "  - Invalid SSH key format (must be valid ed25519 public key)"
-        log_error "  - API token lacks write permissions"
+        log_warn "Common causes:"
+        log_warn "  - SSH key already registered with this name"
+        log_warn "  - Invalid SSH key format (must be valid ed25519 public key)"
+        log_warn "  - API token lacks write permissions"
         return 1
     fi
-
     return 0
 }
 
@@ -162,198 +96,31 @@ get_server_name() {
     get_validated_server_name "HETZNER_SERVER_NAME" "Enter server name: "
 }
 
-# get_cloud_init_userdata is now defined in shared/common.sh
+# Create a Hetzner server with cloud-init
+create_server() {
+    local name="$1"
+    local server_type="${HETZNER_SERVER_TYPE:-cx23}"
+    local location="${HETZNER_LOCATION:-nbg1}"
+    local image="ubuntu-24.04"
 
-# Fetch available server types for a given location, sorted by price
-# Uses /datacenters for authoritative availability, /server_types for specs+pricing
-# Outputs: "name|vcpus|ram|disk|cpu_type|price" lines
-_list_server_types_for_location() {
-    local location="$1"
+    # Validate inputs
+    validate_resource_name "$server_type" || { log_error "Invalid HETZNER_SERVER_TYPE"; return 1; }
+    validate_region_name "$location" || { log_error "Invalid HETZNER_LOCATION"; return 1; }
 
-    ensure_jq || return 1
+    log_step "Creating Hetzner server '$name' (type: $server_type, location: $location)..."
 
-    local dc_response types_response
-    dc_response=$(hetzner_api GET "/datacenters")
-    types_response=$(hetzner_api GET "/server_types?per_page=50")
+    # Get all SSH key IDs
+    local ssh_keys_response
+    ssh_keys_response=$(hetzner_api GET "/ssh_keys")
+    local ssh_key_ids
+    ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
 
-    # Get available type IDs from /datacenters for this location
-    local available_ids
-    available_ids=$(printf '%s' "$dc_response" | jq -c \
-        --arg loc "$location" \
-        '[.datacenters[] | select(.location.name == $loc) | .server_types.available[]] | unique')
-
-    # Cross-reference with /server_types for specs and pricing, sorted by price
-    printf '%s' "$types_response" | jq -r \
-        --arg loc "$location" \
-        --argjson ids "$available_ids" \
-        '[.server_types[]
-          | select(.deprecation == null)
-          | select(.id as $id | $ids | index($id))
-          | { name, cores, memory, disk, cpu_type,
-              price: (.prices[] | select(.location == $loc) | .price_hourly.gross) }]
-         | sort_by(.price | tonumber)
-         | .[]
-         | "\(.name)|\(.cores) vCPU|\(.memory) GB RAM|\(.disk) GB disk|\(.cpu_type)|$  \(.price)/hr"'
-}
-
-# Fetch available locations from /datacenters API
-# Outputs: "name|city|country" lines
-_list_locations() {
-    ensure_jq || return 1
-
-    local dc_response
-    dc_response=$(hetzner_api GET "/datacenters")
-
-    printf '%s' "$dc_response" | jq -r \
-        '[.datacenters[].location | {name, city, country}] | unique_by(.name) | sort_by(.name) | .[] | "\(.name)|\(.city)|\(.country)"'
-}
-
-# Interactive location picker (skipped if HETZNER_LOCATION is set)
-_pick_location() {
-    interactive_pick "HETZNER_LOCATION" "fsn1" "locations" _list_locations
-}
-
-# Interactive server type picker (skipped if HETZNER_SERVER_TYPE is set)
-_pick_server_type() {
-    local location="$1"
-    # Wrap the location-specific list function for interactive_pick
-    _list_server_types_for_current_location() { _list_server_types_for_location "$location"; }
-    interactive_pick "HETZNER_SERVER_TYPE" "cx23" "server types" _list_server_types_for_current_location "cx23"
-    unset -f _list_server_types_for_current_location
-}
-
-# Find cheapest available server type matching spec constraints
-# $1=types_response $2=location $3=available_ids_json $4=extra_jq_filter
-# Outputs "price|name" lines sorted by price, empty if none match
-_hetzner_find_candidates() {
-    local types_response="$1" location="$2" ids_json="$3" extra_filter="$4"
-    printf '%s' "$types_response" | jq -r \
-        --arg loc "$location" \
-        --argjson ids "$ids_json" \
-        "[.server_types[]
-          | select(.deprecation == null)
-          | select(.id as \$id | \$ids | index(\$id))
-          | ${extra_filter}
-          | { name, price: (.prices[] | select(.location == \$loc) | .price_hourly.gross) }]
-         | sort_by(.price | tonumber)
-         | .[]
-         | \"\\(.price)|\\(.name)\""
-}
-
-# Get available server type IDs for a location from /datacenters API
-# Prints one ID per line; returns 1 if no datacenter found for the location
-_hetzner_get_available_ids() {
-    local location="$1"
-    local dc_response
-    dc_response=$(hetzner_api GET "/datacenters")
-
-    local available_ids
-    available_ids=$(printf '%s' "$dc_response" | jq -r \
-        --arg loc "$location" \
-        '[.datacenters[] | select(.location.name == $loc) | .server_types.available[]] | unique | .[]')
-
-    if [[ -z "$available_ids" ]]; then
-        printf 'ERROR:no_datacenter_for_location\n' >&2
-        return 1
-    fi
-    printf '%s\n' "$available_ids"
-}
-
-# Search for a compatible fallback server type when the requested one is unavailable
-# Tries: 1) same CPU family with >= specs, 2) any family with >= specs, 3) cheapest available
-# Prints the fallback type name on success; emits FALLBACK: info on stderr
-_hetzner_find_fallback_type() {
-    local server_type="$1" types_response="$2" location="$3" available_ids="$4"
-
-    local wanted_specs
-    wanted_specs=$(printf '%s' "$types_response" | jq -r \
-        --arg name "$server_type" \
-        '.server_types[] | select(.name == $name) | "\(.cpu_type) \(.cores) \(.memory)"')
-    local wanted_cpu wanted_cores wanted_memory
-    read -r wanted_cpu wanted_cores wanted_memory <<< "$wanted_specs"
-
-    local ids_json
-    ids_json=$(printf '%s\n' "$available_ids" | jq -Rn '[inputs | tonumber]')
-
-    local family candidates replacement
-    for family in "same" "any" "cheapest"; do
-        local filter
-        if [[ "$family" == "same" ]]; then
-            filter="select(.cpu_type == \"${wanted_cpu}\" and .cores >= ${wanted_cores} and .memory >= ${wanted_memory})"
-        elif [[ "$family" == "any" ]]; then
-            filter="select(.cores >= ${wanted_cores} and .memory >= ${wanted_memory})"
-        else
-            # Last resort: any available non-deprecated type (cheapest)
-            filter="."
-        fi
-
-        candidates=$(_hetzner_find_candidates "$types_response" "$location" "$ids_json" "$filter")
-        if [[ -n "$candidates" ]]; then
-            replacement=$(printf '%s\n' "$candidates" | head -1 | cut -d'|' -f2)
-            local label="${wanted_cpu}"
-            [[ "$family" == "any" ]] && label="any"
-            [[ "$family" == "cheapest" ]] && label="cheapest"
-            printf 'FALLBACK:%s:%s:%s:%s\n' "$server_type" "$replacement" "$location" "$label" >&2
-            printf '%s' "$replacement"
-            return 0
-        fi
-    done
-
-    printf 'ERROR:no_compatible_type\n' >&2
-    return 1
-}
-
-# Validate that a server type is available at a given location.
-# Uses /datacenters API for authoritative availability + /server_types for specs.
-# If not available, finds the cheapest equivalent (same CPU family, >= specs).
-# Returns 0 and prints a valid server type; returns 1 on failure.
-_validate_server_type_for_location() {
-    local server_type="$1"
-    local location="$2"
-
-    ensure_jq || return 1
-
-    local available_ids
-    available_ids=$(_hetzner_get_available_ids "$location") || return 1
-
-    local types_response
-    types_response=$(hetzner_api GET "/server_types?per_page=50")
-
-    # Check if the requested type exists (including deprecated) for spec lookup
-    local wanted_id
-    wanted_id=$(printf '%s' "$types_response" | jq -r \
-        --arg name "$server_type" \
-        '.server_types[] | select(.name == $name and .deprecation == null) | .id')
-
-    if [[ -n "$wanted_id" ]] && printf '%s\n' "$available_ids" | grep -qx "$wanted_id"; then
-        printf '%s' "$server_type"
-        return 0
-    fi
-
-    # Type is unavailable (not in available list or deprecated) — find a fallback.
-    # If the type exists but is deprecated, we can still read its specs for fallback matching.
-    if [[ -z "$wanted_id" ]]; then
-        # Check if it exists at all (even deprecated) so we can read specs for fallback
-        wanted_id=$(printf '%s' "$types_response" | jq -r \
-            --arg name "$server_type" \
-            '.server_types[] | select(.name == $name) | .id')
-        if [[ -z "$wanted_id" ]]; then
-            printf 'ERROR:unknown_type\n' >&2
-            return 1
-        fi
-    fi
-
-    _hetzner_find_fallback_type "$server_type" "$types_response" "$location" "$available_ids"
-}
-
-# Build JSON body for Hetzner server creation
-_hetzner_build_create_body() {
-    local name="$1" server_type="$2" location="$3" image="$4" ssh_key_ids="$5"
-
+    # Build request body
     local userdata
     userdata=$(get_cloud_init_userdata)
 
-    jq -n \
+    local body
+    body=$(jq -n \
         --arg name "$name" \
         --arg server_type "$server_type" \
         --arg location "$location" \
@@ -362,230 +129,50 @@ _hetzner_build_create_body() {
         --arg user_data "$userdata" \
         '{name: $name, server_type: $server_type, location: $location,
           image: $image, ssh_keys: $ssh_keys, user_data: $user_data,
-          start_after_create: true}'
-}
-
-# Check if a Hetzner API error is an account-level issue (limit, funds, etc.)
-# These errors won't be fixed by retrying — the user needs a different account/key.
-# Returns 0 if account-level, 1 otherwise.
-_is_hetzner_account_error() {
-    local error_code="${1}" error_msg="${2}"
-    # Hetzner error codes for account-level issues
-    case "${error_code}" in
-        server_limit_exceeded|limit_exceeded|rate_limit_exceeded) return 0 ;;
-    esac
-    # Also match on message text for codes we may not know about
-    if printf '%s' "${error_msg}" | grep -qi "limit.*reached\|limit.*exceeded\|insufficient.*funds\|payment.*required\|quota.*exceeded\|account.*suspended"; then
-        return 0
-    fi
-    return 1
-}
-
-# Check Hetzner API response for errors and log diagnostics
-# Hetzner success responses contain "error": null in the action,
-# so we must check if the top-level error is a real object (not null)
-# Returns 0 if error detected (sets HETZNER_LAST_ERROR_IS_ACCOUNT=1 for account errors), 1 if no error
-_hetzner_check_create_error() {
-    local response="$1"
-    HETZNER_LAST_ERROR_IS_ACCOUNT=0
-
-    # Check if .error is a non-null object (not the "error": null in action responses)
-    local has_error
-    has_error=$(printf '%s' "$response" | jq -r \
-        'if (.error != null and (.error | type) == "object") then "yes" else "no" end' 2>/dev/null || echo "unknown")
-
-    if [[ "$has_error" != "no" ]] && ! printf '%s' "$response" | jq -e '.server' &>/dev/null; then
-        log_error "Failed to create Hetzner server"
-        local error_msg error_code
-        error_msg=$(printf '%s' "$response" | jq -r '.error.message // "Unknown error"' 2>/dev/null || echo "$response")
-        error_code=$(printf '%s' "$response" | jq -r '.error.code // ""' 2>/dev/null || echo "")
-        log_error "API Error: $error_msg"
-
-        if _is_hetzner_account_error "${error_code}" "${error_msg}"; then
-            HETZNER_LAST_ERROR_IS_ACCOUNT=1
-            log_error ""
-            log_error "This looks like an account-level limit."
-            log_error "You may need to use a different Hetzner account/API token."
-        else
-            log_error ""
-            log_error "Common issues:"
-            log_error "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
-            log_error "  - Invalid cloud-init userdata"
-        fi
-        log_error ""
-        log_error "Check your account status: https://console.hetzner.cloud/"
-        return 0
-    fi
-    return 1
-}
-
-# Helper: Log validation error details
-_hetzner_log_validation_error() {
-    local err_info="$1" server_type="$2" location="$3"
-    if echo "$err_info" | grep -q "unknown_type"; then
-        log_error "Server type '$server_type' does not exist"
-    else
-        log_error "Server type '$server_type' is not available in '$location' and no compatible alternative was found"
-    fi
-    log_error "Run without HETZNER_SERVER_TYPE to see available types for this location"
-}
-
-# Helper: Handle fallback type swap logging
-_hetzner_log_type_change() {
-    local fallback_info="$1" server_type="$2" location="$3" validated_type="$4"
-    if echo "$fallback_info" | grep -q "^FALLBACK:"; then
-        log_warn "'$server_type' is not available in '$location'"
-        log_warn "Using compatible alternative: $validated_type"
-    fi
-}
-
-# Validate server type at location, handling errors and fallback logging.
-# On success, prints the (possibly replaced) server type name.
-# On failure, logs user-friendly errors and returns 1.
-_hetzner_resolve_server_type() {
-    local server_type="$1" location="$2"
-
-    local stderr_output validated_type
-    stderr_output=$(mktemp)
-    validated_type=$(_validate_server_type_for_location "$server_type" "$location" 2>"$stderr_output") || {
-        local err_info
-        err_info=$(cat "$stderr_output")
-        rm -f "$stderr_output"
-        _hetzner_log_validation_error "$err_info" "$server_type" "$location"
-        return 1
-    }
-    local fallback_info
-    fallback_info=$(cat "$stderr_output")
-    rm -f "$stderr_output"
-    _hetzner_log_type_change "$fallback_info" "$server_type" "$location" "$validated_type"
-    printf '%s' "$validated_type"
-}
-
-# Create a Hetzner server with cloud-init (hcloud CLI preferred, API fallback)
-create_server() {
-    local name="$1"
-
-    # Interactive location + server type selection (skipped if env vars are set)
-    local location
-    location=$(_pick_location)
-
-    local server_type
-    server_type=$(_pick_server_type "$location")
-
-    local image="ubuntu-24.04"
-
-    # Validate inputs
-    validate_resource_name "$server_type" || { log_error "Invalid HETZNER_SERVER_TYPE"; return 1; }
-    validate_region_name "$location" || { log_error "Invalid HETZNER_LOCATION"; return 1; }
-
-    # Validate server type at location; auto-fallback if unavailable
-    server_type=$(_hetzner_resolve_server_type "$server_type" "$location") || return 1
-
-    log_step "Creating Hetzner server '$name' (type: $server_type, location: $location)..."
-
-    # Try hcloud CLI first
-    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
-        local userdata_file
-        userdata_file=$(mktemp)
-        get_cloud_init_userdata > "$userdata_file"
-
-        local cli_response
-        if cli_response=$(hcloud server create \
-            --name "$name" \
-            --type "$server_type" \
-            --location "$location" \
-            --image "$image" \
-            --ssh-key all \
-            --user-data-from-file "$userdata_file" \
-            -o json 2>&1); then
-            rm -f "$userdata_file"
-
-            HETZNER_SERVER_ID=$(printf '%s' "$cli_response" | jq -r '.server.id')
-            HETZNER_SERVER_IP=$(printf '%s' "$cli_response" | jq -r '.server.public_net.ipv4.ip')
-
-            if [[ -n "$HETZNER_SERVER_ID" && "$HETZNER_SERVER_ID" != "null" && -n "$HETZNER_SERVER_IP" && "$HETZNER_SERVER_IP" != "null" ]]; then
-                export HETZNER_SERVER_ID HETZNER_SERVER_IP
-                log_info "Server created via hcloud CLI: ID=$HETZNER_SERVER_ID, IP=$HETZNER_SERVER_IP"
-                save_vm_connection "${HETZNER_SERVER_IP}" "root" "${HETZNER_SERVER_ID}" "$name" "hetzner"
-                return 0
-            fi
-        else
-            # Check CLI error output for account-level issues
-            if _is_hetzner_account_error "" "${cli_response}"; then
-                rm -f "$userdata_file"
-                log_error "Failed to create Hetzner server"
-                log_error "API Error: ${cli_response}"
-                log_error ""
-                log_error "This looks like an account-level limit."
-                log_error "You may need to use a different Hetzner account/API token."
-                return 2
-            fi
-        fi
-        rm -f "$userdata_file"
-        log_warn "hcloud CLI server create failed, falling back to API"
-    fi
-
-    # Fallback: REST API
-    # Get all SSH key IDs
-    local ssh_keys_response
-    ssh_keys_response=$(hetzner_api GET "/ssh_keys")
-    local ssh_key_ids
-    ssh_key_ids=$(extract_ssh_key_ids "$ssh_keys_response" "ssh_keys")
-
-    local body
-    body=$(_hetzner_build_create_body "$name" "$server_type" "$location" "$image" "$ssh_key_ids")
+          start_after_create: true}')
 
     local response
     response=$(hetzner_api POST "/servers" "$body")
 
-    if _hetzner_check_create_error "$response"; then
-        # Exit code 2 signals an account-level error (caller can reprompt)
-        if [[ "${HETZNER_LAST_ERROR_IS_ACCOUNT:-0}" -eq 1 ]]; then
-            return 2
-        fi
+    # Check for errors — Hetzner success responses contain "error": null in the action,
+    # so we check for a real error object AND missing server object
+    if ! printf '%s' "$response" | jq -e '.server' &>/dev/null; then
+        log_error "Failed to create Hetzner server"
+        log_error "API Error: $(extract_api_error_message "$response" "Unknown error")"
+        log_warn "Common issues:"
+        log_warn "  - Insufficient account balance or payment method required"
+        log_warn "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
+        log_warn "  - Server limit reached for your account"
+        log_warn "Check your dashboard: https://console.hetzner.cloud/"
         return 1
     fi
 
-    # Extract server ID and IP
     HETZNER_SERVER_ID=$(printf '%s' "$response" | jq -r '.server.id')
     HETZNER_SERVER_IP=$(printf '%s' "$response" | jq -r '.server.public_net.ipv4.ip')
     if [[ -z "$HETZNER_SERVER_ID" || "$HETZNER_SERVER_ID" == "null" ]]; then
         log_error "Failed to extract server ID from API response"
-        log_error "Response: $response"
         return 1
     fi
     if [[ -z "$HETZNER_SERVER_IP" || "$HETZNER_SERVER_IP" == "null" ]]; then
         log_error "Failed to extract server IP from API response"
-        log_error "Response: $response"
         return 1
     fi
     export HETZNER_SERVER_ID HETZNER_SERVER_IP
 
     log_info "Server created: ID=$HETZNER_SERVER_ID, IP=$HETZNER_SERVER_IP"
-
     save_vm_connection "${HETZNER_SERVER_IP}" "root" "${HETZNER_SERVER_ID}" "$name" "hetzner"
 }
 
-# SSH operations — delegates to shared helpers (SSH_USER defaults to root)
+# SSH operations — delegates to shared helpers
 verify_server_connectivity() { ssh_verify_connectivity "$@"; }
 run_server() { ssh_run_server "$@"; }
 upload_file() { ssh_upload_file "$@"; }
 interactive_session() { ssh_interactive_session "$@"; }
 
-# Destroy a Hetzner server (hcloud CLI preferred, API fallback)
+# Destroy a Hetzner server
 destroy_server() {
     local server_id="$1"
-
     log_step "Destroying server $server_id..."
-
-    # Try hcloud CLI first
-    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
-        if hcloud server delete "$server_id" 2>/dev/null; then
-            log_info "Server $server_id destroyed via hcloud CLI"
-            return 0
-        fi
-        log_warn "hcloud CLI delete failed, falling back to API"
-    fi
 
     local response
     response=$(hetzner_api DELETE "/servers/$server_id")
@@ -593,39 +180,16 @@ destroy_server() {
     if echo "$response" | grep -q '"error"'; then
         log_error "Failed to destroy server $server_id"
         log_error "API Error: $(extract_api_error_message "$response" "$response")"
-        log_error ""
-        log_error "The server may still be running and incurring charges."
-        log_error "Delete it manually at: https://console.hetzner.cloud/"
+        log_warn "The server may still be running and incurring charges."
+        log_warn "Delete it manually at: https://console.hetzner.cloud/"
         return 1
     fi
 
     log_info "Server $server_id destroyed"
 }
 
-# List all Hetzner servers (hcloud CLI preferred, API fallback)
+# List all Hetzner servers
 list_servers() {
-    # Try hcloud CLI first
-    if _hcloud_cli_available && [[ -n "${HCLOUD_TOKEN:-}" || "$(_hcloud_cli_authenticated && echo y)" == "y" ]]; then
-        local cli_response
-        if cli_response=$(hcloud server list -o json 2>/dev/null); then
-            local count
-            count=$(printf '%s' "$cli_response" | jq 'length')
-            if [[ "$count" -eq 0 ]]; then
-                printf 'No servers found\n'
-                return 0
-            fi
-            printf '%-25s %-12s %-12s %-16s %-10s\n' "NAME" "ID" "STATUS" "IP" "TYPE"
-            printf '%s\n' "---------------------------------------------------------------------------"
-            printf '%s' "$cli_response" | jq -r \
-                '.[] | "\(.name)|\(.id)|\(.status)|\(.public_net.ipv4.ip // "N/A")|\(.server_type.name)"' \
-                | while IFS='|' read -r name sid status ip stype; do
-                    printf '%-25s %-12s %-12s %-16s %-10s\n' "$name" "$sid" "$status" "$ip" "$stype"
-                done
-            return 0
-        fi
-    fi
-
-    # Fallback: REST API
     local response
     response=$(hetzner_api GET "/servers")
 
@@ -650,37 +214,8 @@ list_servers() {
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { prompt_spawn_name; ensure_hcloud_token; ensure_ssh_key; }
-cloud_provision() {
-    local exit_code=0
-    create_server "$1" || exit_code=$?
-
-    # Exit code 2 = account-level error (limit reached, insufficient funds, etc.)
-    # Offer to switch to a different API key and retry
-    if [[ "${exit_code}" -eq 2 ]]; then
-        log_warn ""
-        log_warn "Would you like to try with a different Hetzner API token?"
-        local answer=""
-        answer=$(safe_read "Try a different account? (y/N): ") || true
-        if [[ "${answer}" =~ ^[Yy] ]]; then
-            # Clear existing token so ensure_api_token_with_provider re-prompts
-            unset HCLOUD_TOKEN
-            ensure_api_token_with_provider \
-                "Hetzner Cloud" \
-                "HCLOUD_TOKEN" \
-                "$HOME/.config/spawn/hetzner.json" \
-                "https://console.hetzner.cloud/projects → API Tokens" \
-                "test_hcloud_token" || return 1
-            # Re-register SSH key with new account
-            ensure_ssh_key || return 1
-            create_server "$1"
-            return $?
-        fi
-        return 1
-    fi
-
-    return "${exit_code}"
-}
+cloud_authenticate() { ensure_hcloud_token; ensure_ssh_key; }
+cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { verify_server_connectivity "${HETZNER_SERVER_IP}"; wait_for_cloud_init "${HETZNER_SERVER_IP}" 60; }
 cloud_run() { run_server "${HETZNER_SERVER_IP}" "$1"; }
 cloud_upload() { upload_file "${HETZNER_SERVER_IP}" "$1" "$2"; }
