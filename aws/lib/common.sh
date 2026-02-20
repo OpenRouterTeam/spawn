@@ -266,7 +266,7 @@ list_servers() {
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { ensure_aws_cli; ensure_ssh_key; }
+cloud_authenticate() { prompt_spawn_name; ensure_aws_cli; ensure_ssh_key; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { verify_server_connectivity "${LIGHTSAIL_SERVER_IP}"; wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}" 60; }
 cloud_run() { run_server "${LIGHTSAIL_SERVER_IP}" "$1"; }

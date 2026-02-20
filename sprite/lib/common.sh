@@ -358,7 +358,7 @@ destroy_server() {
 # Wrapper for spawn_agent compatibility (sprite uses get_sprite_name)
 get_server_name() { get_sprite_name; }
 
-cloud_authenticate() { ensure_sprite_installed; ensure_sprite_authenticated; }
+cloud_authenticate() { prompt_spawn_name; ensure_sprite_installed; ensure_sprite_authenticated; }
 cloud_provision() {
     SPRITE_NAME="$1"
     ensure_sprite_exists "${SPRITE_NAME}"

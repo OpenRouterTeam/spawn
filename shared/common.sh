@@ -511,6 +511,46 @@ validated_read() {
     done
 }
 
+# Convert a display name to a valid kebab-case resource identifier.
+# "My Dev Box" → "my-dev-box"   "Claude 2024!" → "claude-2024"
+_to_kebab_case() {
+    printf '%s' "${1}" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed 's/[^a-z0-9-]/-/g' \
+        | sed 's/-\{2,\}/-/g' \
+        | sed 's/^-//;s/-$//'
+}
+
+# Ask for a human-readable spawn name upfront, then derive a kebab-case
+# default used for resource naming on every cloud.
+# Idempotent — safe to call multiple times; skips prompt if already done.
+# Respects SPAWN_NAME when set by the CLI (e.g. spawn gcp claude --name "My Box").
+# Exports: SPAWN_NAME_DISPLAY, SPAWN_NAME_KEBAB
+prompt_spawn_name() {
+    # Already prompted this session — nothing to do
+    if [[ -n "${SPAWN_NAME_KEBAB:-}" ]]; then
+        return 0
+    fi
+
+    local display_name
+    if [[ -n "${SPAWN_NAME:-}" ]]; then
+        display_name="${SPAWN_NAME}"
+        log_info "Spawn name: ${display_name}"
+    else
+        echo "" >&2
+        display_name=$(safe_read 'Spawn name (e.g. "My Dev Box"): ') || display_name=""
+        [[ -z "${display_name}" ]] && display_name="spawn"
+    fi
+
+    local kebab
+    kebab=$(_to_kebab_case "${display_name}")
+    [[ -z "${kebab}" ]] && kebab="spawn"
+
+    export SPAWN_NAME_DISPLAY="${display_name}"
+    export SPAWN_NAME_KEBAB="${kebab}"
+    log_info "Resource name: ${kebab}"
+}
+
 # Generic function to get resource name from environment or prompt
 # Usage: get_resource_name ENV_VAR_NAME PROMPT_TEXT
 # Returns: Resource name via stdout
@@ -520,22 +560,24 @@ get_resource_name() {
     local prompt_text="${2}"
     local resource_value="${!env_var_name}"
 
-    # First check platform-specific env var
+    # Platform-specific env var takes absolute precedence
     if [[ -n "${resource_value}" ]]; then
         log_info "Using ${prompt_text%:*} from environment: ${resource_value}"
         echo "${resource_value}"
         return 0
     fi
 
-    # Then check for SPAWN_NAME (set by CLI)
-    if [[ -n "${SPAWN_NAME:-}" ]]; then
-        log_info "Using spawn name: ${SPAWN_NAME}"
-        echo "${SPAWN_NAME}"
-        return 0
+    # Show spawn name kebab as a pre-filled default (press Enter to accept)
+    local default_name="${SPAWN_NAME_KEBAB:-}"
+    local effective_prompt="${prompt_text}"
+    if [[ -n "${default_name}" ]]; then
+        effective_prompt="${prompt_text%:*} [${default_name}]: "
     fi
 
     local name
-    name=$(safe_read "${prompt_text}")
+    name=$(safe_read "${effective_prompt}") || name=""
+    [[ -z "${name}" && -n "${default_name}" ]] && name="${default_name}"
+
     if [[ -z "${name}" ]]; then
         log_error "${prompt_text%:*} is required but not provided"
         log_error ""

@@ -145,15 +145,25 @@ _gcp_pick_project() {
     interactive_pick "GCP_PROJECT" "" "GCP projects" _gcp_project_options
 }
 
-# Resolve and export GCP_PROJECT — prompt interactively if not already set
+# Resolve and export GCP_PROJECT — confirm existing or pick interactively
 _gcp_resolve_project() {
     # Check env var and gcloud config
     local project="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
     if [[ "${project}" == "(unset)" ]]; then project=""; fi
 
-    # If not set, offer an interactive project picker
+    # When a project is already set, confirm before using it
+    if [[ -n "${project}" && "${SPAWN_NON_INTERACTIVE:-}" != "1" ]]; then
+        local confirm
+        confirm=$(safe_read "Use project '${project}'? [Y/n]: ") || confirm=""
+        confirm="${confirm:-y}"
+        if [[ "${confirm}" =~ ^[nN] ]]; then
+            project=""
+        fi
+    fi
+
+    # If not set (or user chose to change), offer an interactive project picker
     if [[ -z "${project}" ]]; then
-        log_info "No GCP project configured — fetching your projects..."
+        log_info "Fetching your GCP projects..."
         project=$(_gcp_pick_project)
     fi
 
@@ -373,7 +383,7 @@ list_servers() {
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { ensure_gcloud; ensure_ssh_key; }
+cloud_authenticate() { prompt_spawn_name; ensure_gcloud; ensure_ssh_key; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { verify_server_connectivity "${GCP_SERVER_IP}"; wait_for_cloud_init "${GCP_SERVER_IP}" 60; }
 cloud_run() { run_server "${GCP_SERVER_IP}" "$1"; }
