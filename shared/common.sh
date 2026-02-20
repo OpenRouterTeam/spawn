@@ -546,9 +546,17 @@ prompt_spawn_name() {
     kebab=$(_to_kebab_case "${display_name}")
     [[ -z "${kebab}" ]] && kebab="spawn"
 
+    # Confirm the kebab-case resource name — user can press Enter to accept or type a custom value
+    local confirmed
+    confirmed=$(safe_read "Resource name [${kebab}]: ") || confirmed=""
+    if [[ -n "${confirmed}" ]]; then
+        kebab=$(_to_kebab_case "${confirmed}")
+        [[ -z "${kebab}" ]] && kebab="spawn"
+    fi
+
     export SPAWN_NAME_DISPLAY="${display_name}"
     export SPAWN_NAME_KEBAB="${kebab}"
-    log_info "Resource name: ${kebab}"
+    log_info "Using resource name: ${kebab}"
 }
 
 # Generic function to get resource name from environment or prompt

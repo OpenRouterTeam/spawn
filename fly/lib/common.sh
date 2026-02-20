@@ -168,9 +168,13 @@ _try_fly_browser_auth() {
         return 1
     fi
 
-    log_info "Opening browser for Fly.io login..."
-    log_warn "If the browser doesn't open, visit: $auth_url"
-    open_browser "$auth_url"
+    # Show the URL prominently so sandbox users can copy it
+    log_step "Fly.io login required. Open this URL in your browser:"
+    printf '\n  %s\n\n' "$auth_url" >&2
+    open_browser "$auth_url" 2>/dev/null || true
+
+    log_info "Waiting for browser authentication (up to 120s)..."
+    log_warn "Running in a sandbox? Copy the URL above into your local browser."
 
     # Poll for the access token (max 120 seconds, 2s intervals)
     local attempt=0
@@ -191,7 +195,16 @@ _try_fly_browser_auth() {
         fi
     done
 
-    log_warn "Browser login timed out after 120 seconds"
+    # Polling timed out — offer manual token entry as last resort
+    log_warn "Browser login timed out. You can paste a token manually."
+    log_warn "Generate one at: https://fly.io/dashboard → Tokens → Create token"
+    local manual_token
+    manual_token=$(safe_read "Paste Fly.io API token (or press Enter to skip): ") || return 1
+    if [[ -n "${manual_token}" ]]; then
+        echo "${manual_token}"
+        return 0
+    fi
+
     return 1
 }
 
