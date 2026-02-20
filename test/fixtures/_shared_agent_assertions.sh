@@ -32,30 +32,18 @@ assert_agent_install() {
         openclaw)
             # npm install -g openclaw OR bun install -g openclaw (varies by cloud)
             _assert_install_pattern "install.*openclaw" "installs openclaw via npm/bun" ;;
-        nanoclaw)
-            # git clone https://github.com/gavrielc/nanoclaw.git && npm install
-            _assert_install_pattern "git.*clone.*nanoclaw" "installs nanoclaw via git clone" ;;
         codex)
             # npm install -g @openai/codex
             _assert_install_pattern "npm.*install.*codex" "installs codex via npm" ;;
-        cline)
-            # npm install -g cline
-            _assert_install_pattern "npm.*install.*cline" "installs cline via npm" ;;
-        gptme)
-            # uv tool install gptme
-            _assert_install_pattern "uv.*tool.*install.*gptme" "installs gptme via uv" ;;
         opencode)
             # curl to download opencode tarball (via opencode_install_cmd)
             _assert_install_pattern "opencode" "installs opencode" ;;
-        plandex)
-            # curl -sL https://plandex.ai/install.sh | bash
-            _assert_install_pattern "plandex.ai/install" "installs plandex via curl installer" ;;
         kilocode)
             # npm install -g @kilocode/cli
             _assert_install_pattern "npm.*install.*kilocode" "installs kilocode via npm" ;;
-        continue)
-            # npm install -g @continuedev/cli
-            _assert_install_pattern "npm.*install.*continuedev" "installs continue via npm" ;;
+        zeroclaw)
+            # curl installer from zeroclaw-labs/zeroclaw repo
+            _assert_install_pattern "zeroclaw" "installs zeroclaw" ;;
         *)
             # Unknown agent — skip assertion (no failure)
             return 0 ;;

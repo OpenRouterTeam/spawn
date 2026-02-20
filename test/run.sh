@@ -260,10 +260,6 @@ _assert_agent_specific() {
             assert_contains "${MOCK_LOG}" "sprite exec.*bun.*openclaw" "Installs openclaw via bun"
             assert_contains "${MOCK_LOG}" "sprite exec.*openclaw gateway" "Starts openclaw gateway"
             ;;
-        nanoclaw)
-            assert_contains "${MOCK_LOG}" "sprite exec.*git.*nanoclaw" "Clones nanoclaw repo"
-            assert_contains "${MOCK_LOG}" "sprite exec.*nanoclaw/\.env" "Uploads nanoclaw .env"
-            ;;
     esac
 }
 
@@ -296,6 +292,8 @@ run_script_test() {
     TEST_DIR="${TEST_DIR}" \
     SPRITE_NAME="test-sprite-${script_name}" \
     OPENROUTER_API_KEY="sk-or-v1-0000000000000000000000000000000000000000000000000000000000000000" \
+    SPAWN_SKIP_API_VALIDATION=1 \
+    SPAWN_SKIP_GITHUB_AUTH=1 \
     PATH="${TEST_DIR}:${PATH}" \
     HOME="${TEST_DIR}/fakehome" \
         timeout 30 bash "${script_path}" > "${output_file}" 2>&1 || exit_code=$?
@@ -638,7 +636,7 @@ test_source_detection() {
     echo ""
     printf '%b\n' "${YELLOW}━━━ Testing source detection ━━━${NC}"
 
-    for script in claude openclaw nanoclaw; do
+    for script in claude openclaw codex opencode kilocode zeroclaw; do
         local script_path="${REPO_ROOT}/sprite/${script}.sh"
         [[ -f "${script_path}" ]] || continue
 
@@ -743,7 +741,7 @@ test_shared_common
 test_source_detection
 
 # Run per-script tests
-for script in claude openclaw nanoclaw; do
+for script in claude openclaw codex opencode kilocode zeroclaw; do
     if [[ -n "${FILTER}" && "${FILTER}" != "${script}" && "${FILTER}" != "--remote" ]]; then
         continue
     fi
