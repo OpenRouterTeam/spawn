@@ -177,7 +177,7 @@ export function validateConnectionIP(ip: string): void {
         `Invalid connection IP address: "${ip}"\n\n` +
         `IPv4 addresses must have octets in the range 0-255.\n\n` +
         `Your spawn history file may be corrupted or tampered with.\n` +
-        `To fix: remove the invalid entry from ~/.spawn/history.json`
+        `To fix: run 'spawn list --clear' to reset history`
       );
     }
     return;
@@ -192,7 +192,7 @@ export function validateConnectionIP(ip: string): void {
     `Invalid connection IP address: "${ip}"\n\n` +
     `Expected a valid IPv4 or IPv6 address, or one of: ${CONNECTION_SENTINELS.join(", ")}\n\n` +
     `Your spawn history file may be corrupted or tampered with.\n` +
-    `To fix: remove the invalid entry from ~/.spawn/history.json`
+    `To fix: run 'spawn list --clear' to reset history`
   );
 }
 
@@ -215,7 +215,7 @@ export function validateUsername(username: string): void {
     throw new Error(
       `Username is too long: "${username}" (${username.length} characters, maximum is 32)\n\n` +
       `Your spawn history file may be corrupted or tampered with.\n` +
-      `To fix: remove the invalid entry from ~/.spawn/history.json`
+      `To fix: run 'spawn list --clear' to reset history`
     );
   }
 
@@ -228,7 +228,7 @@ export function validateUsername(username: string): void {
       `  • Optionally end with $ (for system accounts)\n\n` +
       `Examples of valid usernames: root, ubuntu, user-123, _system\n\n` +
       `Your spawn history file may be corrupted or tampered with.\n` +
-      `To fix: remove the invalid entry from ~/.spawn/history.json`
+      `To fix: run 'spawn list --clear' to reset history`
     );
   }
 }
@@ -252,7 +252,7 @@ export function validateServerIdentifier(id: string): void {
     throw new Error(
       `Server identifier is too long: "${id}" (${id.length} characters, maximum is 128)\n\n` +
       `Your spawn history file may be corrupted or tampered with.\n` +
-      `To fix: remove the invalid entry from ~/.spawn/history.json`
+      `To fix: run 'spawn list --clear' to reset history`
     );
   }
 
@@ -262,7 +262,7 @@ export function validateServerIdentifier(id: string): void {
       `Invalid server identifier: "${id}"\n\n` +
       `Server identifiers cannot contain path-like patterns (/, \\, ..)\n\n` +
       `Your spawn history file may be corrupted or tampered with.\n` +
-      `To fix: remove the invalid entry from ~/.spawn/history.json`
+      `To fix: run 'spawn list --clear' to reset history`
     );
   }
 
@@ -276,7 +276,7 @@ export function validateServerIdentifier(id: string): void {
       `  • Letters and digits (a-z, A-Z, 0-9)\n` +
       `  • Hyphens (-), underscores (_), dots (.)\n\n` +
       `Your spawn history file may be corrupted or tampered with.\n` +
-      `To fix: remove the invalid entry from ~/.spawn/history.json`
+      `To fix: run 'spawn list --clear' to reset history`
     );
   }
 }
@@ -301,7 +301,7 @@ export function validateMetadataValue(value: string, fieldName: string): void {
     throw new Error(
       `${fieldName} is too long: "${value}" (${value.length} characters, maximum is 128)\n\n` +
       `Your spawn history file may be corrupted or tampered with.\n` +
-      `To fix: remove the invalid entry from ~/.spawn/history.json`
+      `To fix: run 'spawn list --clear' to reset history`
     );
   }
 
@@ -311,7 +311,7 @@ export function validateMetadataValue(value: string, fieldName: string): void {
       `Invalid ${fieldName}: "${value}"\n\n` +
       `${fieldName} can only contain letters, digits, hyphens, underscores, and dots.\n\n` +
       `Your spawn history file may be corrupted or tampered with.\n` +
-      `To fix: remove the invalid entry from ~/.spawn/history.json`
+      `To fix: run 'spawn list --clear' to reset history`
     );
   }
 }
