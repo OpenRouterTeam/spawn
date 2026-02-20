@@ -1,5 +1,5 @@
 import "./unicode-detect.js"; // Ensure TERM is set before using symbols
-import { execSync as nodeExecSync, execFileSync as nodeExecFileSync } from "child_process";
+import { execSync as nodeExecSync, execFileSync as nodeExecFileSync, type ExecSyncOptions, type ExecFileSyncOptions } from "child_process";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE } from "./manifest.js";
@@ -8,8 +8,8 @@ const VERSION = pkg.version;
 
 // Internal executor for testability - can be replaced in tests
 export const executor = {
-  execSync: (cmd: string, options?: any) => nodeExecSync(cmd, options),
-  execFileSync: (file: string, args: string[], options?: any) => nodeExecFileSync(file, args, options),
+  execSync: (cmd: string, options?: ExecSyncOptions) => nodeExecSync(cmd, options),
+  execFileSync: (file: string, args: string[], options?: ExecFileSyncOptions) => nodeExecFileSync(file, args, options),
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -79,19 +79,39 @@ function printUpdateBanner(latestVersion: string): void {
   console.error();
 }
 
+/**
+ * Find the spawn binary to re-exec after an update.
+ *
+ * Prefers `which spawn` (PATH resolution) over process.argv[1] because the
+ * installer may place the new binary in a different directory than where the
+ * currently running binary lives, causing re-exec to run the stale old binary.
+ */
+function findUpdatedBinary(): string {
+  try {
+    const result = executor.execSync("which spawn 2>/dev/null", {
+      encoding: "utf8",
+      shell: "/bin/bash",
+    });
+    const found = result ? result.toString().trim() : "";
+    if (found) return found;
+  } catch {
+    // fall through to argv fallback
+  }
+  return process.argv[1] || "spawn";
+}
+
 /** Re-exec the updated binary with the original CLI arguments, forwarding the exit code */
 function reExecWithArgs(): void {
   const args = process.argv.slice(2);
-  if (args.length === 0) {
-    console.error(pc.dim("  Run your spawn command again to use the new version."));
-    console.error();
-    process.exit(0);
-    return; // unreachable in production, but needed when process.exit is mocked in tests
-  }
+  const binPath = findUpdatedBinary();
 
-  const binPath = process.argv[1] || "spawn";
-  console.error(pc.dim(`  Rerunning: spawn ${args.join(" ")}`));
+  if (args.length === 0) {
+    console.error(pc.dim("  Restarting spawn with updated version..."));
+  } else {
+    console.error(pc.dim(`  Rerunning: spawn ${args.join(" ")}`));
+  }
   console.error();
+
   try {
     executor.execFileSync(binPath, args, {
       stdio: "inherit",

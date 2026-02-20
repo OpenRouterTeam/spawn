@@ -269,7 +269,7 @@ function setupManifest(manifest: Manifest) {
     ok: true,
     json: async () => manifest,
     text: async () => JSON.stringify(manifest),
-  })) as any;
+  })) as unknown as typeof global.fetch;
   return loadManifest(true);
 }
 
@@ -283,11 +283,11 @@ describe("cmdAgentInfo - printAgentQuickStart", () => {
   let savedEnv: Record<string, string | undefined>;
 
   function getOutput(): string {
-    return consoleSpy.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    return consoleSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
   }
 
   function getOutputLines(): string[] {
-    return consoleSpy.mock.calls.map((c: any[]) => c.join(" "));
+    return consoleSpy.mock.calls.map((c: unknown[]) => c.join(" "));
   }
 
   beforeEach(async () => {
@@ -302,7 +302,7 @@ describe("cmdAgentInfo - printAgentQuickStart", () => {
 
     processExitSpy = spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit");
-    }) as any);
+    }) as unknown as (code?: number) => never);
 
     originalFetch = global.fetch;
 

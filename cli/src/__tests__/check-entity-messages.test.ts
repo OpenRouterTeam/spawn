@@ -98,11 +98,11 @@ function createManifest(): Manifest {
 }
 
 function infoCalls(): string[] {
-  return mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+  return mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
 }
 
 function errorCalls(): string[] {
-  return mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+  return mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
