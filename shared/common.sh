@@ -2469,6 +2469,8 @@ _show_post_session_summary() {
         log_warn "Check your cloud provider dashboard to stop or delete the server."
     fi
     log_warn ""
+    log_info "To delete from CLI:"
+    log_info "  spawn delete"
     log_info "To reconnect:"
     log_info "  ssh ${SSH_USER:-root}@${ip}"
 }
@@ -2499,8 +2501,10 @@ _show_exec_post_session_summary() {
     else
         log_warn "Check your cloud provider dashboard to stop or delete the service."
     fi
+    log_warn ""
+    log_info "To delete from CLI:"
+    log_info "  spawn delete"
     if [[ -n "${reconnect_cmd}" ]]; then
-        log_warn ""
         log_info "To reconnect:"
         log_info "  ${reconnect_cmd}"
     fi
