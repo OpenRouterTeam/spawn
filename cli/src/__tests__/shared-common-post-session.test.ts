@@ -455,8 +455,9 @@ describe("custom interactive_session implementations", () => {
 describe("SPAWN_DASHBOARD_URL convention for exec-based clouds", () => {
   // Exec-based clouds that should have SPAWN_DASHBOARD_URL and call
   // _show_exec_post_session_summary after session ends
+  // Daytona uses SSH-based interactive_session, not exec-based,
+  // so it doesn't call _show_exec_post_session_summary
   const EXEC_CLOUDS_WITH_BILLING = [
-    "daytona",
     "fly",
   ];
 

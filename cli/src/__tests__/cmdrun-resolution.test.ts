@@ -63,26 +63,26 @@ describe("cmdRun argument swapping", () => {
     // "spawn sprite claude" should be detected as swapped -> "spawn claude sprite"
     // cmdRun will swap and try to launch, which will fail at download (no network)
     // but the swap message should appear in output
-    const result = runCli(["sprite", "claude"]);
+    const result = runCli(["sprite", "claude", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("swapped");
   });
 
   it("should show corrected command after swap detection", () => {
-    const result = runCli(["sprite", "claude"]);
+    const result = runCli(["sprite", "claude", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("spawn claude sprite");
   });
 
   it("should swap hetzner/codex to codex/hetzner", () => {
-    const result = runCli(["hetzner", "codex"]);
+    const result = runCli(["hetzner", "codex", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("swapped");
   });
 
   it("should not swap when arguments are in correct order", () => {
     // "spawn claude sprite" is correct order - no swap message
-    const result = runCli(["claude", "sprite"]);
+    const result = runCli(["claude", "sprite", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).not.toContain("swapped");
   });
@@ -99,7 +99,7 @@ describe("cmdRun argument swapping", () => {
 describe("cmdRun display name resolution", () => {
   it("should resolve case-insensitive agent key", () => {
     // "Claude" should resolve to "claude"
-    const result = runCli(["Claude", "sprite"]);
+    const result = runCli(["Claude", "sprite", "--dry-run"]);
     const output = result.stdout + result.stderr;
     // Should resolve and proceed (may show "Resolved" message)
     // Should NOT show "Unknown agent" error
@@ -108,14 +108,14 @@ describe("cmdRun display name resolution", () => {
 
   it("should resolve case-insensitive cloud key", () => {
     // "Sprite" should resolve to "sprite"
-    const result = runCli(["claude", "Sprite"]);
+    const result = runCli(["claude", "Sprite", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).not.toContain("Unknown cloud");
   });
 
   it("should show resolution message when name is resolved", () => {
     // "CLAUDE" -> "claude" should trigger "Resolved" message
-    const result = runCli(["CLAUDE", "sprite"]);
+    const result = runCli(["CLAUDE", "sprite", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("Resolved");
     expect(output).toContain("claude");
@@ -123,7 +123,7 @@ describe("cmdRun display name resolution", () => {
 
   it("should resolve agent display name to key", () => {
     // "Claude Code" is the display name for agent key "claude"
-    const result = runCli(["Claude Code", "sprite"]);
+    const result = runCli(["Claude Code", "sprite", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("Resolved");
     expect(output).toContain("claude");
@@ -131,7 +131,7 @@ describe("cmdRun display name resolution", () => {
 
   it("should resolve cloud display name to key", () => {
     // "Hetzner Cloud" is the display name for cloud key "hetzner"
-    const result = runCli(["claude", "Hetzner Cloud"]);
+    const result = runCli(["claude", "Hetzner Cloud", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).toContain("Resolved");
     expect(output).toContain("hetzner");
@@ -139,7 +139,7 @@ describe("cmdRun display name resolution", () => {
 
   it("should not show resolution message for exact key match", () => {
     // "claude" is already the exact key - no resolution needed
-    const result = runCli(["claude", "sprite"]);
+    const result = runCli(["claude", "sprite", "--dry-run"]);
     const output = result.stdout + result.stderr;
     expect(output).not.toContain("Resolved");
   });

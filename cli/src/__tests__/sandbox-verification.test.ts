@@ -112,6 +112,11 @@ describe("Test Sandbox Verification", () => {
     });
 
     it("should prevent subprocesses from writing to real home", () => {
+      // Clean up any stale artifact from previous unsandboxed test runs
+      if (existsSync("/root/subprocess-test.txt")) {
+        rmSync("/root/subprocess-test.txt");
+      }
+
       // Create a test file in the sandboxed home via subprocess
       const testFile = join(process.env.HOME!, "subprocess-test.txt");
       const result = spawnSync(
