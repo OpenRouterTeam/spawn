@@ -2061,18 +2061,34 @@ _parse_api_response() {
 # Usage: _curl_api URL METHOD BODY AUTH_ARGS...
 # Returns: 0 on curl success, 1 on curl failure
 # Sets: API_HTTP_CODE and API_RESPONSE_BODY globals
+# SECURITY: Authorization headers are passed via curl's -K (config from stdin)
+# instead of command-line args, so tokens don't appear in `ps` output.
 _curl_api() {
     local url="${1}"
     local method="${2}"
     local body="${3:-}"
     shift 3
 
+    # SECURITY: Separate Authorization headers from other args so we can pass
+    # them via stdin (-K -) instead of command-line, hiding tokens from `ps`.
+    local auth_header=""
+    local extra_args=()
+    while [[ $# -gt 0 ]]; do
+        if [[ "$1" == "-H" && "${2:-}" == Authorization:* ]]; then
+            auth_header="$2"
+            shift 2
+        else
+            extra_args+=("$1")
+            shift
+        fi
+    done
+
     local args=(
         -s
         -w "\n%{http_code}"
         -X "${method}"
         -H "Content-Type: application/json"
-        "$@"
+        "${extra_args[@]}"
     )
 
     if [[ -n "${body}" ]]; then
@@ -2080,7 +2096,12 @@ _curl_api() {
     fi
 
     local response
-    response=$(curl "${args[@]}" "${url}" 2>&1)
+    if [[ -n "${auth_header}" ]]; then
+        # Pass auth header via stdin to keep it out of process argument list
+        response=$(printf 'header = "%s"\n' "${auth_header}" | curl "${args[@]}" -K - "${url}" 2>&1)
+    else
+        response=$(curl "${args[@]}" "${url}" 2>&1)
+    fi
     local curl_exit_code=$?
 
     _parse_api_response "${response}"

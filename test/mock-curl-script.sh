@@ -21,10 +21,10 @@ _parse_args() {
                 prev_flag=""; continue
                 ;;
             -d) BODY="$arg"; prev_flag=""; continue ;;
-            -H|-o|-u|--connect-timeout|--max-time|--retry|--retry-delay) prev_flag=""; continue ;;
+            -H|-o|-u|-K|--connect-timeout|--max-time|--retry|--retry-delay) prev_flag=""; continue ;;
         esac
         case "$arg" in
-            -X|-w|-d|-H|-o|-u|--connect-timeout|--max-time|--retry|--retry-delay) prev_flag="$arg"; continue ;;
+            -X|-w|-d|-H|-o|-u|-K|--connect-timeout|--max-time|--retry|--retry-delay) prev_flag="$arg"; continue ;;
             -s|-f|-S|-L|-k|-#|-fsSL|-fsS|-sS) continue ;;
             http://*|https://*) URL="$arg" ;;
         esac
