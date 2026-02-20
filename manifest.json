@@ -27,8 +27,10 @@
           "bypassPermissionsModeAccepted": true
         }
       },
-      "icon": "https://avatars.githubusercontent.com/u/76263028?s=200&v=4",
-      "featured_cloud": ["sprite"]
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/claude.png",
+      "featured_cloud": [
+        "sprite"
+      ]
     },
     "openclaw": {
       "name": "OpenClaw",
@@ -48,12 +50,14 @@
           "default": "openrouter/auto"
         }
       },
-      "icon": "https://openclaw.ai/apple-touch-icon.png",
-      "featured_cloud": ["fly"]
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/openclaw.png",
+      "featured_cloud": [
+        "fly"
+      ]
     },
     "zeroclaw": {
       "name": "ZeroClaw",
-      "description": "Fast, small, fully autonomous AI assistant infrastructure — deploy anywhere, swap anything",
+      "description": "Fast, small, fully autonomous AI assistant infrastructure \u2014 deploy anywhere, swap anything",
       "url": "https://github.com/zeroclaw-labs/zeroclaw",
       "install": "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install.sh | bash -s -- --install-rust --install-system-deps",
       "launch": "zeroclaw agent",
@@ -62,8 +66,11 @@
         "ZEROCLAW_PROVIDER": "openrouter"
       },
       "notes": "Rust-based agent framework built by Harvard/MIT/Sundai.Club communities. Natively supports OpenRouter via OPENROUTER_API_KEY + ZEROCLAW_PROVIDER=openrouter. Requires compilation from source (~5-10 min).",
-      "icon": "https://avatars.githubusercontent.com/u/261820148?s=200&v=4",
-      "featured_cloud": ["hetzner", "fly"]
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/zeroclaw.png",
+      "featured_cloud": [
+        "hetzner",
+        "fly"
+      ]
     },
     "codex": {
       "name": "Codex CLI",
@@ -77,8 +84,10 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1",
-      "icon": "https://avatars.githubusercontent.com/u/14957082?s=200&v=4",
-      "featured_cloud": ["fly"]
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/codex.png",
+      "featured_cloud": [
+        "fly"
+      ]
     },
     "opencode": {
       "name": "OpenCode",
@@ -90,8 +99,10 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea.",
-      "icon": "https://opencode.ai/favicon.svg",
-      "featured_cloud": ["daytona"]
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/opencode.png",
+      "featured_cloud": [
+        "daytona"
+      ]
     },
     "kilocode": {
       "name": "Kilo Code",
@@ -105,8 +116,10 @@
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"
       },
       "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'.",
-      "icon": "https://avatars.githubusercontent.com/u/201822503?s=200&v=4",
-      "featured_cloud": ["fly"]
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/kilocode.png",
+      "featured_cloud": [
+        "fly"
+      ]
     }
   },
   "clouds": {
