@@ -1358,23 +1358,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
   }
 }
 
-function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<void> {
-  // SECURITY: Validate script content before execution
-  validateScriptContent(script);
-
-  // Set environment variables for non-interactive mode
-  const env = { ...process.env };
-  if (prompt) {
-    env.SPAWN_PROMPT = prompt;
-    env.SPAWN_MODE = "non-interactive";
-  }
-  if (debug) {
-    env.SPAWN_DEBUG = "1";
-  }
-  if (spawnName) {
-    env.SPAWN_NAME = spawnName;
-  }
-
+function spawnBash(script: string, env: Record<string, string | undefined>): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const child = spawn("bash", ["-c", script], {
       stdio: "inherit",
@@ -1395,6 +1379,33 @@ function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: s
     });
     child.on("error", reject);
   });
+}
+
+function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<void> {
+  // SECURITY: Validate script content before execution
+  validateScriptContent(script);
+
+  // Set environment variables for non-interactive mode
+  const env = { ...process.env };
+  if (prompt) {
+    env.SPAWN_PROMPT = prompt;
+    env.SPAWN_MODE = "non-interactive";
+  }
+  if (debug) {
+    env.SPAWN_DEBUG = "1";
+  }
+  if (spawnName) {
+    env.SPAWN_NAME = spawnName;
+  }
+
+  return spawnBash(script, env);
+}
+
+/** Run a locally-generated bash snippet without validateScriptContent.
+ *  Only safe for scripts built by buildDeleteScript, which validates all
+ *  dynamic values (server IDs, metadata) before interpolation. */
+function runBashTrusted(script: string): Promise<void> {
+  return spawnBash(script, { ...process.env });
 }
 
 // ── List ───────────────────────────────────────────────────────────────────────
@@ -1843,7 +1854,7 @@ async function execDeleteServer(
   }
 
   try {
-    await runBash(script);
+    await runBashTrusted(script);
     markRecordDeleted(record);
     return true;
   } catch (err) {

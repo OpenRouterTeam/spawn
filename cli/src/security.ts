@@ -248,8 +248,8 @@ export function validateUsername(username: string): void {
  * Validates a server identifier (server_id or server_name from cloud provider).
  * SECURITY-CRITICAL: Prevents command injection via malicious server IDs in history.
  *
- * Pattern: alphanumeric, hyphens, underscores, dots, colons (for namespaced IDs)
- * Examples: hetzner-12345, i-0abcd1234, my-server.example, sprite:my-vm
+ * Pattern: alphanumeric, hyphens, underscores, dots
+ * Examples: hetzner-12345, i-0abcd1234, my-server.example
  *
  * @param id - The server identifier to validate
  * @throws Error if validation fails
@@ -277,7 +277,7 @@ export function validateServerIdentifier(id: string): void {
     );
   }
 
-  // Allowlist: alphanumeric, hyphens, underscores, dots, colons
+  // Allowlist: alphanumeric, hyphens, underscores, dots
   // Reject shell metacharacters: ; & | $ ( ) ` ' " \ < > space newline
   const serverIdPattern = /^[a-zA-Z0-9_.-]+$/;
   if (!serverIdPattern.test(id)) {

@@ -82,7 +82,8 @@ function cacheAge(): number {
 }
 
 function logError(message: string, err?: unknown): void {
-  const errMsg = err instanceof Error ? err.message : String(err);
+  // Use duck typing instead of instanceof to avoid prototype chain issues
+  const errMsg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
   console.error(err ? `${message}: ${errMsg}` : message);
 }
 

@@ -124,7 +124,8 @@ export function mergeLastConnection(): void {
       }
     } catch (err) {
       // Log validation failure and skip merging
-      console.error(`Warning: Invalid connection data from bash script, skipping merge: ${err instanceof Error ? err.message : String(err)}`);
+      // Use duck typing instead of instanceof to avoid prototype chain issues
+      console.error(`Warning: Invalid connection data from bash script, skipping merge: ${err && typeof err === "object" && "message" in err ? String(err.message) : String(err)}`);
       unlinkSync(connPath);
       return;
     }
