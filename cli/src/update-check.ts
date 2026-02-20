@@ -16,6 +16,12 @@ export const executor = {
 
 const FETCH_TIMEOUT = 5000; // 5 seconds
 
+// Validate RAW_BASE matches expected GitHub raw content URL pattern (defense-in-depth, CWE-78)
+const GITHUB_RAW_URL_PATTERN = /^https:\/\/raw\.githubusercontent\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+if (!GITHUB_RAW_URL_PATTERN.test(RAW_BASE)) {
+  throw new Error(`RAW_BASE URL does not match expected GitHub raw URL pattern: ${RAW_BASE}`);
+}
+
 // Use ASCII-safe symbols when unicode is disabled (SSH, dumb terminals)
 const isAscii = process.env.TERM === "linux";
 const CHECK_MARK = isAscii ? "*" : "\u2713";

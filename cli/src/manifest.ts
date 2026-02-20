@@ -56,7 +56,7 @@ export interface Manifest {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const REPO = "OpenRouterTeam/spawn";
-const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/main`;
+const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/main` as const;
 // Dynamic getters so tests can override XDG_CACHE_HOME at runtime
 function getCacheDir(): string {
   return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "spawn");
