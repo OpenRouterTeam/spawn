@@ -206,16 +206,14 @@ ensure_fly_token() {
     fi
 
     # 2. Try config file (sanitize in case it was saved with display name)
-    local saved_token
-    saved_token=$(_load_token_from_config "$HOME/.config/spawn/fly.json") && {
-        saved_token=$(_sanitize_fly_token "$saved_token")
-        export FLY_API_TOKEN="$saved_token"
+    if _load_token_from_config "$HOME/.config/spawn/fly.json" "FLY_API_TOKEN" "Fly.io"; then
+        FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
+        export FLY_API_TOKEN
         if _validate_fly_token 2>/dev/null; then
-            log_info "Using saved Fly.io API token"
             return 0
         fi
         unset FLY_API_TOKEN
-    }
+    fi
 
     # 3. Try flyctl CLI auth
     local token
