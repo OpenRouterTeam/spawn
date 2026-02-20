@@ -194,12 +194,19 @@ async function refreshIconsFor(
 
 // ── GitHub metadata refresh (agents only) ───────────────────────────
 
+// SECURITY: Validate GitHub repo format to prevent command injection via manifest.json
+const GITHUB_REPO_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/;
+
 async function refreshAgentStats() {
   console.log("── Refreshing agent GitHub stats ──");
   for (const id of agentIds) {
     const agent = agents[id];
     if (!agent.repo) {
       console.log(`  ⚠  ${id}: no repo field, skipping GitHub metadata`);
+      continue;
+    }
+    if (!GITHUB_REPO_PATTERN.test(agent.repo)) {
+      console.log(`  ⚠  ${id}: invalid repo format '${agent.repo}', skipping`);
       continue;
     }
     try {
