@@ -259,7 +259,7 @@ for d in droplets:
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { prompt_spawn_name; register_cleanup_trap; ensure_do_token; ensure_ssh_key; }
+cloud_authenticate() { prompt_spawn_name; ensure_do_token; ensure_ssh_key; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { verify_server_connectivity "${DO_SERVER_IP}"; wait_for_cloud_init "${DO_SERVER_IP}" 60; }
 cloud_run() { run_server "${DO_SERVER_IP}" "$1"; }

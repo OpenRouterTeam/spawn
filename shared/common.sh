@@ -2802,9 +2802,13 @@ ensure_api_token_with_provider() {
 
     check_python_available || return 1
 
-    # Try environment variable
+    # Try environment variable (validate if test function provided)
     if _load_token_from_env "${env_var_name}" "${provider_name}"; then
-        return 0
+        if [[ -z "${test_func}" ]] || "${test_func}" 2>/dev/null; then
+            return 0
+        fi
+        log_warn "${provider_name} token from environment is invalid or expired"
+        unset "${env_var_name}"
     fi
 
     # Try config file (validate if test function provided, fall through to prompt on failure)
