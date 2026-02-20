@@ -66,46 +66,68 @@ _daytona_auth_error() {
 # Usage: _daytona_with_timeout SECONDS daytona [args...]
 _daytona_with_timeout() {
     local secs="${1}"; shift
-    local timeout_bin=""
-    if command -v timeout &>/dev/null; then timeout_bin="timeout"
-    elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"
+    if command -v timeout &>/dev/null; then
+        timeout "${secs}" "$@"; return $?
+    elif command -v gtimeout &>/dev/null; then
+        gtimeout "${secs}" "$@"; return $?
     fi
-    if [[ -n "${timeout_bin}" ]]; then
-        "${timeout_bin}" "${secs}" "$@"
-    else
-        "$@"
-    fi
+    # Portable fallback for macOS: run in background, kill if too slow
+    "$@" &
+    local pid=$!
+    local elapsed=0
+    while kill -0 "${pid}" 2>/dev/null; do
+        if [[ "${elapsed}" -ge "${secs}" ]]; then
+            kill "${pid}" 2>/dev/null || true
+            wait "${pid}" 2>/dev/null || true
+            return 124
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    wait "${pid}" 2>/dev/null
+}
+
+# Write API key to Daytona CLI config so `daytona` commands work.
+# This bypasses `daytona login --api-key` which corrupts the auth header
+# on some CLI versions. Config format from apps/cli/config/config.go.
+_write_daytona_cli_config() {
+    # Strip ALL control characters — Daytona's TUI login saves newlines in
+    # the key, and Go's net/http rejects \n/\r in Authorization header values.
+    local key
+    key=$(printf '%s' "${1}" | tr -d '[:cntrl:]')
+    local config_dir="${HOME}/.config/daytona"
+    local config_file="${config_dir}/config.json"
+
+    mkdir -p "${config_dir}"
+    cat > "${config_file}" << JSONEOF
+{
+  "activeProfile": "default",
+  "profiles": [
+    {
+      "id": "default",
+      "name": "default",
+      "api": {
+        "url": "https://app.daytona.io/api",
+        "key": "${key}",
+        "token": null
+      },
+      "activeOrganizationId": null
+    }
+  ]
+}
+JSONEOF
+    chmod 600 "${config_file}"
 }
 
 test_daytona_token() {
+    # Write the key to Daytona CLI config and verify via `daytona sandbox list`.
+    # Do NOT use `daytona login --api-key` — it corrupts the auth header.
+    # Do NOT use curl — the API rejects Bearer tokens for some key types.
+    _write_daytona_cli_config "${DAYTONA_API_KEY}"
+
     local test_response
     local exit_code=0
-
-    # Authenticate CLI with the API key (30s timeout)
-    # Use --api-key=VALUE syntax per official Daytona docs
-    test_response=$(_daytona_with_timeout 30 daytona login --api-key="${DAYTONA_API_KEY}" 2>&1) || exit_code=$?
-
-    if [[ ${exit_code} -eq 124 ]]; then
-        log_error "Daytona login timed out (Daytona API may be temporarily unavailable)"
-        log_warn "Try again in a minute, or check https://status.daytona.io"
-        return 1
-    fi
-
-    if [[ ${exit_code} -ne 0 ]]; then
-        if _is_daytona_timeout "${test_response}"; then
-            log_error "Daytona login timed out: ${test_response}"
-            return 1
-        fi
-        if _is_daytona_auth_error "${test_response}"; then
-            _daytona_auth_error; return 1
-        fi
-        log_error "Daytona login failed: ${test_response}"
-        return 1
-    fi
-
-    # Verify by listing sandboxes (30s timeout)
-    exit_code=0
-    test_response=$(_daytona_with_timeout 30 daytona sandbox list --limit 1 2>&1) || exit_code=$?
+    test_response=$(_daytona_with_timeout 15 daytona sandbox list --limit 1 2>&1) || exit_code=$?
 
     if [[ ${exit_code} -eq 124 ]] || _is_daytona_timeout "${test_response:-}"; then
         log_error "Daytona API timed out (service may be temporarily slow)"
@@ -125,17 +147,32 @@ test_daytona_token() {
 }
 
 ensure_daytona_token() {
+    # If daytona CLI already works (user ran `daytona login`), skip everything.
+    if _daytona_with_timeout 10 daytona sandbox list --limit 1 &>/dev/null; then
+        log_info "Already authenticated with Daytona"
+        # Still need DAYTONA_API_KEY for env injection on the remote sandbox
+        if [[ -z "${DAYTONA_API_KEY:-}" ]]; then
+            if [[ -f "${HOME}/.config/spawn/daytona.json" ]]; then
+                check_python_available || true
+                DAYTONA_API_KEY=$(python3 -c "
+import json,sys,re
+with open(sys.argv[1]) as f: d=json.loads(f.read(),strict=False)
+print(re.sub(r'[\x00-\x1f\x7f]','',d.get('api_key','') or d.get('token','')))
+" "${HOME}/.config/spawn/daytona.json" 2>/dev/null) || true
+                export DAYTONA_API_KEY
+            fi
+        fi
+        return 0
+    fi
+
+    # Get DAYTONA_API_KEY from env, config file, or prompt.
+    # test_daytona_token writes the key to CLI config and verifies via CLI.
     ensure_api_token_with_provider \
         "Daytona" \
         "DAYTONA_API_KEY" \
         "${HOME}/.config/spawn/daytona.json" \
         "https://app.daytona.io" \
         "test_daytona_token"
-
-    # Always authenticate CLI — ensure_api_token_with_provider may skip
-    # the test function when loading from env var, so daytona login
-    # would never be called. Re-running login is idempotent and fast.
-    _daytona_with_timeout 30 daytona login --api-key="${DAYTONA_API_KEY}" 2>/dev/null || true
 }
 
 get_server_name() {

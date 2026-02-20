@@ -498,6 +498,11 @@ validated_read() {
     while true; do
         value=$(safe_read "${prompt}") || return 1
 
+        # Strip ALL control characters (0x00-0x1F, 0x7F) and leading/trailing whitespace.
+        # Browser/TUI paste can include \r, \n, or other control chars that
+        # Go/curl HTTP clients reject in header values ("invalid header field value").
+        value=$(printf '%s' "${value}" | tr -d '[:cntrl:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
         if [[ -z "${value}" ]]; then
             return 1
         fi
@@ -2660,7 +2665,16 @@ _load_token_from_config() {
     fi
 
     local saved_token
-    saved_token=$(python3 -c "import json, sys; data=json.load(open(sys.argv[1])); print(data.get('api_key','') or data.get('token',''))" "${config_file}" 2>/dev/null)
+    # Use strict=False to tolerate literal control chars in JSON (Daytona's TUI
+    # login writes raw newlines into config values). Then strip ALL control chars
+    # from the result — Go/curl HTTP clients reject \n/\r in header values.
+    saved_token=$(python3 -c "
+import json, sys, re
+with open(sys.argv[1]) as f:
+    data = json.loads(f.read(), strict=False)
+tok = data.get('api_key','') or data.get('token','')
+print(re.sub(r'[\x00-\x1f\x7f]', '', tok))
+" "${config_file}" 2>/dev/null)
     if [[ -z "${saved_token}" ]]; then
         return 1
     fi
@@ -2767,23 +2781,33 @@ ensure_api_token_with_provider() {
         unset "${env_var_name}"
     fi
 
-    # Prompt for new token
-    local token
-    token=$(_prompt_for_api_token "${provider_name}" "${help_url}") || return 1
-
     # SECURITY: Validate env_var_name to prevent command injection
     _validate_env_var_name "${env_var_name}" || return 1
 
-    export "${env_var_name}=${token}"
+    # Prompt for new token (retry up to 3 times on validation failure)
+    local attempts=0
+    local max_attempts=3
+    while [[ "${attempts}" -lt "${max_attempts}" ]]; do
+        local token
+        token=$(_prompt_for_api_token "${provider_name}" "${help_url}") || return 1
 
-    # Validate with provider API
-    if ! _validate_token_with_provider "${test_func}" "${env_var_name}" "${provider_name}" "${help_url}"; then
-        return 1
-    fi
+        export "${env_var_name}=${token}"
 
-    # Save to config file
-    _save_token_to_config "${config_file}" "${token}"
-    return 0
+        # Validate with provider API
+        if _validate_token_with_provider "${test_func}" "${env_var_name}" "${provider_name}" "${help_url}"; then
+            # Save to config file
+            _save_token_to_config "${config_file}" "${token}"
+            return 0
+        fi
+
+        attempts=$((attempts + 1))
+        if [[ "${attempts}" -lt "${max_attempts}" ]]; then
+            log_warn "Let's try again (attempt $((attempts + 1))/${max_attempts})..."
+        fi
+    done
+
+    log_error "Failed after ${max_attempts} attempts"
+    return 1
 }
 
 # ============================================================
