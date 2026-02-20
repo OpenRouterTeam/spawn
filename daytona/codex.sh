@@ -13,7 +13,7 @@ log_info "Codex CLI on Daytona"
 echo ""
 
 agent_install() {
-    install_agent "Codex CLI" "npm install -g @openai/codex" cloud_run
+    install_agent "Codex CLI" "npm install -g @openai/codex@0.94.0" cloud_run
 }
 
 agent_env_vars() {

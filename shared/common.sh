@@ -2491,6 +2491,8 @@ _show_post_session_summary() {
         log_warn "Check your cloud provider dashboard to stop or delete the server."
     fi
     log_warn ""
+    log_info "To delete from CLI:"
+    log_info "  spawn delete"
     log_info "To reconnect:"
     log_info "  ssh ${SSH_USER:-root}@${ip}"
 }
@@ -2521,8 +2523,10 @@ _show_exec_post_session_summary() {
     else
         log_warn "Check your cloud provider dashboard to stop or delete the service."
     fi
+    log_warn ""
+    log_info "To delete from CLI:"
+    log_info "  spawn delete"
     if [[ -n "${reconnect_cmd}" ]]; then
-        log_warn ""
         log_info "To reconnect:"
         log_info "  ${reconnect_cmd}"
     fi
@@ -2820,9 +2824,13 @@ ensure_api_token_with_provider() {
 
     check_python_available || return 1
 
-    # Try environment variable
+    # Try environment variable (validate if test function provided)
     if _load_token_from_env "${env_var_name}" "${provider_name}"; then
-        return 0
+        if [[ -z "${test_func}" ]] || "${test_func}" 2>/dev/null; then
+            return 0
+        fi
+        log_warn "${provider_name} token from environment is invalid or expired"
+        unset "${env_var_name}"
     fi
 
     # Try config file (validate if test function provided, fall through to prompt on failure)
@@ -3313,8 +3321,12 @@ wait_for_openclaw_gateway() {
 # ============================================================
 
 # Setup Codex CLI config.toml for OpenRouter
-# Uses the native model_provider config instead of OPENAI_BASE_URL env var,
-# which fixes "Invalid Responses API request" errors with OpenRouter.
+# Uses wire_api="chat" (Chat Completions) because OpenRouter's Responses API
+# proxy drops required fields (id, content) from conversation-history items on
+# multi-turn requests, causing "Invalid Responses API request" errors.
+# Codex >=0.97.0 removed "chat" support, so scripts pin @openai/codex@0.94.0.
+# TODO: unpin once OpenRouter's /responses proxy handles round-trip correctly.
+# Tracking: https://github.com/openai/codex/issues/12114
 # Usage: setup_codex_config OPENROUTER_KEY UPLOAD_CALLBACK RUN_CALLBACK
 setup_codex_config() {
     local openrouter_key="${1}"
@@ -3332,7 +3344,7 @@ model_provider = "openrouter"
 name = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
 env_key = "OPENROUTER_API_KEY"
-wire_api = "responses"
+wire_api = "chat"
 TOML
 )
 
