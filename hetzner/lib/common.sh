@@ -365,12 +365,29 @@ _hetzner_build_create_body() {
           start_after_create: true}'
 }
 
+# Check if a Hetzner API error is an account-level issue (limit, funds, etc.)
+# These errors won't be fixed by retrying — the user needs a different account/key.
+# Returns 0 if account-level, 1 otherwise.
+_is_hetzner_account_error() {
+    local error_code="${1}" error_msg="${2}"
+    # Hetzner error codes for account-level issues
+    case "${error_code}" in
+        server_limit_exceeded|limit_exceeded|rate_limit_exceeded) return 0 ;;
+    esac
+    # Also match on message text for codes we may not know about
+    if printf '%s' "${error_msg}" | grep -qi "limit.*reached\|limit.*exceeded\|insufficient.*funds\|payment.*required\|quota.*exceeded\|account.*suspended"; then
+        return 0
+    fi
+    return 1
+}
+
 # Check Hetzner API response for errors and log diagnostics
 # Hetzner success responses contain "error": null in the action,
 # so we must check if the top-level error is a real object (not null)
-# Returns 0 if error detected, 1 if no error
+# Returns 0 if error detected (sets HETZNER_LAST_ERROR_IS_ACCOUNT=1 for account errors), 1 if no error
 _hetzner_check_create_error() {
     local response="$1"
+    HETZNER_LAST_ERROR_IS_ACCOUNT=0
 
     # Check if .error is a non-null object (not the "error": null in action responses)
     local has_error
@@ -379,15 +396,22 @@ _hetzner_check_create_error() {
 
     if [[ "$has_error" != "no" ]] && ! printf '%s' "$response" | jq -e '.server' &>/dev/null; then
         log_error "Failed to create Hetzner server"
-        local error_msg
+        local error_msg error_code
         error_msg=$(printf '%s' "$response" | jq -r '.error.message // "Unknown error"' 2>/dev/null || echo "$response")
+        error_code=$(printf '%s' "$response" | jq -r '.error.code // ""' 2>/dev/null || echo "")
         log_error "API Error: $error_msg"
-        log_error ""
-        log_error "Common issues:"
-        log_error "  - Insufficient account balance or payment method required"
-        log_error "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
-        log_error "  - Server limit reached for your account"
-        log_error "  - Invalid cloud-init userdata"
+
+        if _is_hetzner_account_error "${error_code}" "${error_msg}"; then
+            HETZNER_LAST_ERROR_IS_ACCOUNT=1
+            log_error ""
+            log_error "This looks like an account-level limit."
+            log_error "You may need to use a different Hetzner account/API token."
+        else
+            log_error ""
+            log_error "Common issues:"
+            log_error "  - Server type/location unavailable (try different HETZNER_SERVER_TYPE or HETZNER_LOCATION)"
+            log_error "  - Invalid cloud-init userdata"
+        fi
         log_error ""
         log_error "Check your account status: https://console.hetzner.cloud/"
         return 0
@@ -485,6 +509,17 @@ create_server() {
                 save_vm_connection "${HETZNER_SERVER_IP}" "root" "${HETZNER_SERVER_ID}" "$name" "hetzner"
                 return 0
             fi
+        else
+            # Check CLI error output for account-level issues
+            if _is_hetzner_account_error "" "${cli_response}"; then
+                rm -f "$userdata_file"
+                log_error "Failed to create Hetzner server"
+                log_error "API Error: ${cli_response}"
+                log_error ""
+                log_error "This looks like an account-level limit."
+                log_error "You may need to use a different Hetzner account/API token."
+                return 2
+            fi
         fi
         rm -f "$userdata_file"
         log_warn "hcloud CLI server create failed, falling back to API"
@@ -504,6 +539,10 @@ create_server() {
     response=$(hetzner_api POST "/servers" "$body")
 
     if _hetzner_check_create_error "$response"; then
+        # Exit code 2 signals an account-level error (caller can reprompt)
+        if [[ "${HETZNER_LAST_ERROR_IS_ACCOUNT:-0}" -eq 1 ]]; then
+            return 2
+        fi
         return 1
     fi
 
@@ -612,7 +651,36 @@ list_servers() {
 # ============================================================
 
 cloud_authenticate() { ensure_hcloud_token; ensure_ssh_key; }
-cloud_provision() { create_server "$1"; }
+cloud_provision() {
+    local exit_code=0
+    create_server "$1" || exit_code=$?
+
+    # Exit code 2 = account-level error (limit reached, insufficient funds, etc.)
+    # Offer to switch to a different API key and retry
+    if [[ "${exit_code}" -eq 2 ]]; then
+        log_warn ""
+        log_warn "Would you like to try with a different Hetzner API token?"
+        local answer=""
+        answer=$(safe_read "Try a different account? (y/N): ") || true
+        if [[ "${answer}" =~ ^[Yy] ]]; then
+            # Clear existing token so ensure_api_token_with_provider re-prompts
+            unset HCLOUD_TOKEN
+            ensure_api_token_with_provider \
+                "Hetzner Cloud" \
+                "HCLOUD_TOKEN" \
+                "$HOME/.config/spawn/hetzner.json" \
+                "https://console.hetzner.cloud/projects → API Tokens" \
+                "test_hcloud_token" || return 1
+            # Re-register SSH key with new account
+            ensure_ssh_key || return 1
+            create_server "$1"
+            return $?
+        fi
+        return 1
+    fi
+
+    return "${exit_code}"
+}
 cloud_wait_ready() { verify_server_connectivity "${HETZNER_SERVER_IP}"; wait_for_cloud_init "${HETZNER_SERVER_IP}" 60; }
 cloud_run() { run_server "${HETZNER_SERVER_IP}" "$1"; }
 cloud_upload() { upload_file "${HETZNER_SERVER_IP}" "$1" "$2"; }
