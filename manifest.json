@@ -28,7 +28,11 @@
         }
       },
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/claude.png",
-      "featured_cloud": ["sprite"],
+      "featured_cloud": [
+        "sprite",
+        "gcp",
+        "aws"
+      ],
       "creator": "Anthropic",
       "repo": "anthropics/claude-code",
       "license": "Proprietary",
@@ -40,7 +44,11 @@
       "runtime": "node",
       "category": "cli",
       "tagline": "Agentic coding from the terminal",
-      "tags": ["coding", "terminal", "agentic"]
+      "tags": [
+        "coding",
+        "terminal",
+        "agentic"
+      ]
     },
     "openclaw": {
       "name": "OpenClaw",
@@ -61,7 +69,11 @@
         }
       },
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/openclaw.png",
-      "featured_cloud": ["fly"],
+      "featured_cloud": [
+        "fly",
+        "gcp",
+        "aws"
+      ],
       "creator": "OpenClaw",
       "repo": "openclaw/openclaw",
       "license": "MIT",
@@ -73,7 +85,11 @@
       "runtime": "bun",
       "category": "tui",
       "tagline": "Personal AI assistant with multi-channel gateway",
-      "tags": ["coding", "tui", "gateway"]
+      "tags": [
+        "coding",
+        "tui",
+        "gateway"
+      ]
     },
     "zeroclaw": {
       "name": "ZeroClaw",
@@ -87,7 +103,11 @@
       },
       "notes": "Rust-based agent framework built by Harvard/MIT/Sundai.Club communities. Natively supports OpenRouter via OPENROUTER_API_KEY + ZEROCLAW_PROVIDER=openrouter. Requires compilation from source (~5-10 min).",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/zeroclaw.png",
-      "featured_cloud": ["hetzner", "fly"],
+      "featured_cloud": [
+        "hetzner",
+        "gcp",
+        "aws"
+      ],
       "creator": "Sundai.Club",
       "repo": "zeroclaw-labs/zeroclaw",
       "license": "NOASSERTION",
@@ -99,7 +119,12 @@
       "runtime": "binary",
       "category": "cli",
       "tagline": "Fast, autonomous AI infrastructure \u2014 deploy anywhere",
-      "tags": ["coding", "terminal", "rust", "autonomous"]
+      "tags": [
+        "coding",
+        "terminal",
+        "rust",
+        "autonomous"
+      ]
     },
     "codex": {
       "name": "Codex CLI",
@@ -114,7 +139,11 @@
       },
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/codex.png",
-      "featured_cloud": ["fly"],
+      "featured_cloud": [
+        "fly",
+        "gcp",
+        "aws"
+      ],
       "creator": "OpenAI",
       "repo": "openai/codex",
       "license": "Apache-2.0",
@@ -126,7 +155,11 @@
       "runtime": "binary",
       "category": "cli",
       "tagline": "Lightweight coding agent from OpenAI",
-      "tags": ["coding", "terminal", "openai"]
+      "tags": [
+        "coding",
+        "terminal",
+        "openai"
+      ]
     },
     "opencode": {
       "name": "OpenCode",
@@ -139,7 +172,11 @@
       },
       "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY env var. Go-based TUI using Bubble Tea.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/opencode.png",
-      "featured_cloud": ["daytona"],
+      "featured_cloud": [
+        "daytona",
+        "gcp",
+        "aws"
+      ],
       "creator": "Anomaly",
       "repo": "anomalyco/opencode",
       "license": "MIT",
@@ -151,7 +188,11 @@
       "runtime": "go",
       "category": "tui",
       "tagline": "AI coding agent built for the terminal",
-      "tags": ["coding", "tui", "go"]
+      "tags": [
+        "coding",
+        "tui",
+        "go"
+      ]
     },
     "kilocode": {
       "name": "Kilo Code",
@@ -166,7 +207,11 @@
       },
       "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/kilocode.png",
-      "featured_cloud": ["fly"],
+      "featured_cloud": [
+        "fly",
+        "gcp",
+        "aws"
+      ],
       "creator": "Kilo-Org",
       "repo": "Kilo-Org/kilocode",
       "license": "Apache-2.0",
@@ -178,7 +223,12 @@
       "runtime": "node",
       "category": "cli",
       "tagline": "All-in-one agentic engineering platform",
-      "tags": ["coding", "terminal", "agentic", "engineering"]
+      "tags": [
+        "coding",
+        "terminal",
+        "agentic",
+        "engineering"
+      ]
     }
   },
   "clouds": {
