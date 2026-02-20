@@ -91,6 +91,45 @@ _gcp_check_auth() {
 }
 
 # ============================================================
+# Spawn name → kebab-case conversion
+# ============================================================
+
+# Convert a display name to a valid GCP resource identifier (kebab-case).
+# "My Dev Box" → "my-dev-box"   "Claude 2024!" → "claude-2024"
+_to_kebab_case() {
+    printf '%s' "${1}" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed 's/[^a-z0-9-]/-/g' \
+        | sed 's/-\{2,\}/-/g' \
+        | sed 's/^-//;s/-$//'
+}
+
+# Ask for a human-readable spawn name upfront, then derive a kebab-case
+# default for GCP instance naming.  Respects SPAWN_NAME when already set
+# (e.g. `spawn gcp claude --name "My Box"`).
+# Exports: GCP_SPAWN_DISPLAY_NAME, GCP_INSTANCE_NAME_KEBAB
+_gcp_prompt_spawn_name() {
+    local display_name
+
+    if [[ -n "${SPAWN_NAME:-}" ]]; then
+        display_name="${SPAWN_NAME}"
+        log_info "Spawn name: ${display_name}"
+    else
+        echo "" >&2
+        display_name=$(safe_read "Spawn name (e.g. \"My Dev Box\"): ") || display_name=""
+        [[ -z "${display_name}" ]] && display_name="spawn"
+    fi
+
+    local kebab
+    kebab=$(_to_kebab_case "${display_name}")
+    [[ -z "${kebab}" ]] && kebab="spawn"
+
+    export GCP_SPAWN_DISPLAY_NAME="${display_name}"
+    export GCP_INSTANCE_NAME_KEBAB="${kebab}"
+    log_info "Instance name will default to: ${kebab}"
+}
+
+# ============================================================
 # Interactive pickers for GCP project, zone, and machine type
 # ============================================================
 
@@ -145,15 +184,26 @@ _gcp_pick_project() {
     interactive_pick "GCP_PROJECT" "" "GCP projects" _gcp_project_options
 }
 
-# Resolve and export GCP_PROJECT — prompt interactively if not already set
+# Resolve and export GCP_PROJECT — confirm existing or pick interactively
 _gcp_resolve_project() {
     # Check env var and gcloud config
     local project="${GCP_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
     if [[ "${project}" == "(unset)" ]]; then project=""; fi
 
-    # If not set, offer an interactive project picker
+    # When a project is already set, ask whether to keep or change it
+    if [[ -n "${project}" && "${SPAWN_NON_INTERACTIVE:-}" != "1" ]]; then
+        log_info "Current GCP project: ${project}"
+        local keep
+        keep=$(safe_read "Keep this project? [Y/n]: ") || keep=""
+        keep="${keep:-y}"
+        if [[ "${keep}" =~ ^[nN] ]]; then
+            project=""
+        fi
+    fi
+
+    # If not set (or user chose to change), offer an interactive project picker
     if [[ -z "${project}" ]]; then
-        log_info "No GCP project configured — fetching your projects..."
+        log_info "Fetching your GCP projects..."
         project=$(_gcp_pick_project)
     fi
 
@@ -192,7 +242,22 @@ ensure_ssh_key() {
 }
 
 get_server_name() {
-    get_validated_server_name "GCP_INSTANCE_NAME" "Enter instance name: "
+    # Honour an explicit env var override (non-interactive / CI)
+    if [[ -n "${GCP_INSTANCE_NAME:-}" ]]; then
+        echo "${GCP_INSTANCE_NAME}"
+        return 0
+    fi
+
+    # Use the kebab-case spawn name as the default, shown in the prompt
+    local default_name="${GCP_INSTANCE_NAME_KEBAB:-${SPAWN_NAME:-spawn}}"
+    local name
+    name=$(safe_read "Instance name [${default_name}]: ") || name=""
+    [[ -z "${name}" ]] && name="${default_name}"
+
+    if ! validate_server_name "${name}"; then
+        return 1
+    fi
+    echo "${name}"
 }
 
 get_cloud_init_userdata() {
@@ -373,7 +438,7 @@ list_servers() {
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { ensure_gcloud; ensure_ssh_key; }
+cloud_authenticate() { _gcp_prompt_spawn_name; ensure_gcloud; ensure_ssh_key; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { verify_server_connectivity "${GCP_SERVER_IP}"; wait_for_cloud_init "${GCP_SERVER_IP}" 60; }
 cloud_run() { run_server "${GCP_SERVER_IP}" "$1"; }
