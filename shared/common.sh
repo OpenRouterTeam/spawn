@@ -3227,7 +3227,7 @@ wait_for_openclaw_gateway() {
     log_step "Waiting for OpenClaw gateway to start..."
 
     while [ $elapsed -lt $max_wait ]; do
-        if ${run_callback} "nc -z 127.0.0.1 18789 2>/dev/null || (command -v telnet >/dev/null && timeout 1 telnet 127.0.0.1 18789 2>&1 | grep -q Connected)"; then
+        if ${run_callback} "nc -z 127.0.0.1 18789 2>/dev/null || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || (command -v curl >/dev/null && curl -sf http://127.0.0.1:18789/ -o /dev/null 2>/dev/null)"; then
             log_info "Gateway ready after ${elapsed}s"
             return 0
         fi
