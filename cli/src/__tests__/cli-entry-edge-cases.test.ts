@@ -28,7 +28,7 @@ function runCli(
   env: Record<string, string> = {}
 ): { stdout: string; stderr: string; exitCode: number } {
   const result = spawnSync(
-    `${process.env.HOME}/.bun/bin/bun`,
+    "bun",
     ["run", `${CLI_DIR}/src/index.ts`, ...args],
     {
       cwd: PROJECT_ROOT,
