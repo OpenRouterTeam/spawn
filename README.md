@@ -2,7 +2,7 @@
 
 Launch any AI agent on any cloud with a single command. Coding agents, research agents, self-hosted AI tools — Spawn deploys them all. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
-**10 agents. 10 clouds. 99 working combinations. Zero config.**
+**6 agents. 8 clouds. 48 working combinations. Zero config.**
 
 ## Install
 
@@ -166,7 +166,7 @@ If an agent fails to install or launch on a cloud:
 | [**OpenClaw**](https://github.com/openclaw/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**ZeroClaw**](https://github.com/zeroclaw-labs/zeroclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Codex CLI**](https://github.com/openai/codex) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [**OpenCode**](https://github.com/anomalyco/opencode) |   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [**OpenCode**](https://github.com/anomalyco/opencode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Kilo Code**](https://github.com/Kilo-Org/kilocode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ### How it works
