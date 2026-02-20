@@ -364,6 +364,7 @@ cloud_provision() {
     ensure_sprite_exists "${SPRITE_NAME}"
     verify_sprite_connectivity "${SPRITE_NAME}"
     setup_shell_environment "${SPRITE_NAME}"
+    save_vm_connection "sprite-console" "${USER:-root}" "" "${SPRITE_NAME}" "sprite"
 }
 cloud_wait_ready() { :; }
 cloud_run() { run_sprite "${SPRITE_NAME}" "$1"; }
