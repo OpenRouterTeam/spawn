@@ -1839,9 +1839,12 @@ get_ssh_fingerprint() {
 json_escape() {
     local string="${1}"
     python3 -c "import json, sys; print(json.dumps(sys.stdin.read().rstrip('\n')))" <<< "${string}" 2>/dev/null || {
-        # Fallback: manually escape quotes and backslashes
+        # Fallback: manually escape backslashes, quotes, and JSON control characters
         local escaped="${string//\\/\\\\}"
         escaped="${escaped//\"/\\\"}"
+        escaped="${escaped//$'\n'/\\n}"
+        escaped="${escaped//$'\r'/\\r}"
+        escaped="${escaped//$'\t'/\\t}"
         echo "\"${escaped}\""
     }
 }
