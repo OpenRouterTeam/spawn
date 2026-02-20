@@ -19,6 +19,18 @@ export interface AgentDef {
   notes?: string;
   icon?: string;
   featured_cloud?: string[];
+  creator?: string;
+  repo?: string;
+  license?: string;
+  created?: string;
+  added?: string;
+  github_stars?: number;
+  stars_updated?: string;
+  language?: string;
+  runtime?: string;
+  category?: string;
+  tagline?: string;
+  tags?: string[];
 }
 
 export interface CloudDef {
