@@ -408,6 +408,37 @@ _test_json_escape() {
     result=$(bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && json_escape "test\"quote"' 2>/dev/null)
     # json_escape should produce escaped quotes (\\") in the output
     assert_match "${result}" '*\\"*' "json_escape handles special characters"
+
+    # Test the bash fallback path (without python3) escapes control characters
+    # The fallback must escape newlines, carriage returns, and tabs to produce valid JSON
+    result=$(bash -c '
+        json_escape_fallback() {
+            local string="${1}"
+            local escaped="${string//\\/\\\\}"
+            escaped="${escaped//\"/\\\"}"
+            escaped="${escaped//$'"'"'\n'"'"'/\\n}"
+            escaped="${escaped//$'"'"'\r'"'"'/\\r}"
+            escaped="${escaped//$'"'"'\t'"'"'/\\t}"
+            echo "\"${escaped}\""
+        }
+        json_escape_fallback "line1
+line2"
+    ' 2>/dev/null)
+    assert_match "${result}" '*\\n*' "json_escape fallback escapes newlines"
+
+    result=$(bash -c '
+        json_escape_fallback() {
+            local string="${1}"
+            local escaped="${string//\\/\\\\}"
+            escaped="${escaped//\"/\\\"}"
+            escaped="${escaped//$'"'"'\n'"'"'/\\n}"
+            escaped="${escaped//$'"'"'\r'"'"'/\\r}"
+            escaped="${escaped//$'"'"'\t'"'"'/\\t}"
+            echo "\"${escaped}\""
+        }
+        json_escape_fallback $'"'"'hello\tworld'"'"'
+    ' 2>/dev/null)
+    assert_match "${result}" '*\\t*' "json_escape fallback escapes tabs"
 }
 
 _test_ssh_key_utils() {
