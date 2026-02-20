@@ -455,19 +455,17 @@ async function selectCloud(manifest: Manifest, cloudList: string[], hintOverride
   return cloudChoice;
 }
 
-// Prompt user to enter a spawn name for the instance
+// Prompt user to enter a display name for the spawn instance.
+// Any string is allowed (spaces, uppercase, etc.) — the shell scripts
+// derive a kebab-case slug for the actual cloud resource name.
 async function promptSpawnName(): Promise<string | undefined> {
   const spawnName = await p.text({
-    message: "Enter a name for this spawn (optional)",
-    placeholder: "my-spawn",
+    message: "Name your spawn",
+    placeholder: "My Spawn",
     validate: (value) => {
-      if (!value) return undefined; // Optional field
-      // Validate name format (alphanumeric, hyphens, underscores)
-      if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
-        return "Name must contain only letters, numbers, hyphens, and underscores";
-      }
-      if (value.length > 63) {
-        return "Name must be 63 characters or less";
+      if (!value) return undefined;
+      if (value.length > 128) {
+        return "Name must be 128 characters or less";
       }
       return undefined;
     },
