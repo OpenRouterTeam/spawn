@@ -166,7 +166,7 @@ _gcp_interactive_pick() {
     if command -v spawn >/dev/null 2>&1; then
         local picked
         picked=$(printf '%s\n' "${options_text}" | \
-            spawn pick --prompt "Select ${display}" --default "${default_val}" 2>/dev/tty) && {
+            spawn pick --prompt "Select ${display}" --default "${default_val}") && {
             echo "${picked}"
             return
         }
