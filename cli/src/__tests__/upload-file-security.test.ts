@@ -88,7 +88,8 @@ function classifyUploadFile(body: string): string {
   if (body.includes("gh codespace cp")) return "gh-cp";
   if (/\bcp\b.*\$\{?local_path/.test(body) && !body.includes("run_server") && !body.includes("exec")) return "cp";
   // Sprite uses its own CLI's -file flag for native file transfer (not exec-based)
-  if (body.includes("-file") && body.includes("sprite exec")) return "sprite-cli";
+  // Match "sprite exec" or "sprite $(...) exec" (with org flags interpolated)
+  if (body.includes("-file") && body.includes("sprite") && body.includes("exec")) return "sprite-cli";
   return "exec-based";
 }
 
@@ -250,7 +251,8 @@ describe("upload_file() Security Patterns", () => {
   // ── Regression: specific clouds fixed in PR #453 & #989 ─────────────
 
   describe("PR #453/#989 regression: fixed clouds have strict path validation", () => {
-    const fixedClouds = ["fly", "northflank", "daytona", "e2b", "koyeb"];
+    // daytona uses SSH + printf '%q' escaping (validated by general exec-based tests above)
+    const fixedClouds = ["fly", "northflank", "e2b", "koyeb"];
 
     for (const cloud of fixedClouds) {
       const info = cloudUploadTypes.get(cloud);
@@ -329,7 +331,8 @@ describe("upload_file() Security Patterns", () => {
     for (const [cloud, info] of spriteClouds) {
       it(`${cloud} should use sprite exec with -file flag`, () => {
         expect(info.body).toContain("-file");
-        expect(info.body).toContain("sprite exec");
+        // Match "sprite exec" or "sprite $(...) exec" (with org flags interpolated)
+        expect(info.body).toMatch(/sprite\b.*\bexec\b/);
       });
 
       it(`${cloud} should use strict allowlist regex for path validation`, () => {
