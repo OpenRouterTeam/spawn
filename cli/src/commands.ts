@@ -1685,6 +1685,9 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
       pc.green(agentDisplay.padEnd(20)) +
       cloudDisplay.padEnd(20) +
       pc.dim(relative);
+    if (r.name) {
+      line += pc.cyan(`  "${r.name}"`);
+    }
     if (r.connection) {
       if (r.connection.ip === "sprite-console" && r.connection.server_name) {
         line += pc.green(`  sprite console -s ${r.connection.server_name}`);
@@ -1709,7 +1712,9 @@ export function isInteractiveTTY(): boolean {
 export function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): string {
   const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
   const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
-  return `${agentDisplay} on ${cloudDisplay}`;
+  let label = `${agentDisplay} on ${cloudDisplay}`;
+  if (r.name) label += ` -- ${r.name}`;
+  return label;
 }
 
 /** Build a hint string (relative timestamp + connection status + optional prompt preview) for the interactive picker */
