@@ -1,8 +1,8 @@
 #!/bin/bash
 # Common bash functions for Daytona sandbox spawn scripts
-# Uses Daytona CLI (daytona) — https://www.daytona.io
-# Sandboxes are cloud dev environments with true SSH access
-# Default: --class small (override with DAYTONA_CLASS or explicit DAYTONA_CPU/MEMORY/DISK)
+# Uses Daytona REST API + direct SSH — no CLI required
+# Sandboxes are cloud dev environments with token-based SSH access
+# API docs: https://www.daytona.io/docs/en/
 
 # Bash safety flags
 set -eo pipefail
@@ -19,313 +19,254 @@ else
     eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
 fi
 
-# Note: Provider-agnostic functions (logging, OAuth, browser, nc_listen) are now in shared/common.sh
-
 # ============================================================
 # Daytona specific functions
 # ============================================================
 
+readonly DAYTONA_API_BASE="https://app.daytona.io/api"
 SPAWN_DASHBOARD_URL="https://app.daytona.io/"
 
-ensure_daytona_cli() {
-    if ! command -v daytona &>/dev/null; then
-        log_step "Installing Daytona CLI..."
-        if command -v brew &>/dev/null; then
-            brew install daytonaio/cli/daytona 2>/dev/null || {
-                log_error "Failed to install Daytona CLI via Homebrew"
-                log_error "Install manually: brew install daytonaio/cli/daytona"
-                return 1
-            }
-        else
-            log_error "Daytona CLI not found and Homebrew is not available"
-            log_error "Install manually: brew install daytonaio/cli/daytona"
-            log_error "See: https://www.daytona.io/docs/en/getting-started"
-            return 1
-        fi
-    fi
-    log_info "Daytona CLI available"
+# Centralized curl wrapper for Daytona API
+daytona_api() {
+    local method="${1}"
+    local endpoint="${2}"
+    local body="${3:-}"
+    generic_cloud_api "${DAYTONA_API_BASE}" "${DAYTONA_API_KEY}" "${method}" "${endpoint}" "${body}"
 }
 
-_is_daytona_auth_error() {
-    printf '%s' "${1}" | grep -qi "unauthorized\|invalid.*key\|authentication\|forbidden"
-}
-
-_is_daytona_timeout() {
-    printf '%s' "${1}" | grep -qi "timeout\|timed out\|deadline exceeded\|context canceled"
-}
-
-_daytona_auth_error() {
-    log_error "Invalid API key"
-    log_error "How to fix:"
-    log_warn "  1. Verify API key at: https://app.daytona.io"
-    log_warn "  2. Ensure the key has sandbox permissions"
-    log_warn "  3. Check key hasn't expired or been revoked"
-}
-
-# Run a daytona CLI command with a timeout to prevent indefinite hangs.
-# Usage: _daytona_with_timeout SECONDS daytona [args...]
-_daytona_with_timeout() {
-    local secs="${1}"; shift
-    local timeout_bin=""
-    if command -v timeout &>/dev/null; then timeout_bin="timeout"
-    elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"
-    fi
-    if [[ -n "${timeout_bin}" ]]; then
-        "${timeout_bin}" "${secs}" "$@"
-    else
-        "$@"
-    fi
-}
-
+# Test that the API key works
 test_daytona_token() {
-    local test_response
-    local exit_code=0
-
-    # Authenticate CLI with the API key (30s timeout)
-    # Use --api-key=VALUE syntax per official Daytona docs
-    test_response=$(_daytona_with_timeout 30 daytona login --api-key="${DAYTONA_API_KEY}" 2>&1) || exit_code=$?
-
-    if [[ ${exit_code} -eq 124 ]]; then
-        log_error "Daytona login timed out (Daytona API may be temporarily unavailable)"
-        log_warn "Try again in a minute, or check https://status.daytona.io"
-        return 1
-    fi
-
-    if [[ ${exit_code} -ne 0 ]]; then
-        if _is_daytona_timeout "${test_response}"; then
-            log_error "Daytona login timed out: ${test_response}"
-            return 1
-        fi
-        if _is_daytona_auth_error "${test_response}"; then
-            _daytona_auth_error; return 1
-        fi
-        log_error "Daytona login failed: ${test_response}"
-        return 1
-    fi
-
-    # Verify by listing sandboxes (30s timeout)
-    exit_code=0
-    test_response=$(_daytona_with_timeout 30 daytona sandbox list --limit 1 2>&1) || exit_code=$?
-
-    if [[ ${exit_code} -eq 124 ]] || _is_daytona_timeout "${test_response:-}"; then
-        log_error "Daytona API timed out (service may be temporarily slow)"
-        log_warn "Try again in a minute, or check https://status.daytona.io"
-        return 1
-    fi
-
-    if [[ ${exit_code} -ne 0 ]]; then
-        if _is_daytona_auth_error "${test_response}"; then
-            _daytona_auth_error
-        else
-            log_error "Daytona API check failed: ${test_response}"
-        fi
+    local response
+    response=$(daytona_api GET "/sandbox?page=1&limit=1")
+    if printf '%s' "${response}" | grep -qi '"statusCode"\s*:\s*4\|"unauthorized"\|"forbidden"'; then
+        log_error "Invalid API key"
+        log_error "How to fix:"
+        log_warn "  1. Get or verify your API key at: https://app.daytona.io/dashboard/keys"
+        log_warn "  2. Ensure the key has sandbox permissions"
+        log_warn "  3. Check the key hasn't expired or been revoked"
         return 1
     fi
     return 0
 }
 
+# Ensure DAYTONA_API_KEY is available (env var -> config file -> prompt+save)
 ensure_daytona_token() {
     ensure_api_token_with_provider \
         "Daytona" \
         "DAYTONA_API_KEY" \
         "${HOME}/.config/spawn/daytona.json" \
-        "https://app.daytona.io" \
+        "https://app.daytona.io/dashboard/keys" \
         "test_daytona_token"
-
-    # Always authenticate CLI — ensure_api_token_with_provider may skip
-    # the test function when loading from env var, so daytona login
-    # would never be called. Re-running login is idempotent and fast.
-    _daytona_with_timeout 30 daytona login --api-key="${DAYTONA_API_KEY}" 2>/dev/null || true
 }
 
+# Get sandbox name from env var or prompt
 get_server_name() {
     get_validated_server_name "DAYTONA_SANDBOX_NAME" "Enter sandbox name: "
 }
 
-_is_snapshot_conflict() {
-    printf '%s' "${1}" | grep -qi "cannot specify.*resources.*snapshot\|cannot specify.*sandbox.*resources"
-}
-
-_daytona_create_with_resources() {
-    local name="${1}"
-    local cpu="${DAYTONA_CPU:-2}"
-    local memory="${DAYTONA_MEMORY:-4096}"
-    local disk="${DAYTONA_DISK:-5}"
-
-    # Validate numeric env vars to prevent command injection
-    if [[ ! "${cpu}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_CPU: must be numeric"; return 1; fi
-    if [[ ! "${memory}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_MEMORY: must be numeric"; return 1; fi
-    if [[ ! "${disk}" =~ ^[0-9]+$ ]]; then log_error "Invalid DAYTONA_DISK: must be numeric"; return 1; fi
-
-    log_step "Creating Daytona sandbox '${name}' (${cpu} vCPU / ${memory}MB RAM / ${disk}GB disk)..."
-    _daytona_with_timeout 120 daytona sandbox create \
-        --name "${name}" \
-        --cpu "${cpu}" \
-        --memory "${memory}" \
-        --disk "${disk}" \
-        --auto-stop 0 \
-        --auto-archive 0 \
-        2>&1
-}
-
-_daytona_create_with_class() {
-    local name="${1}"
-    local sandbox_class="${DAYTONA_CLASS:-small}"
-
-    # Validate class to prevent injection (alphanumeric, hyphens, underscores)
-    if [[ ! "${sandbox_class}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        log_error "Invalid DAYTONA_CLASS: must be alphanumeric (with hyphens/underscores)"
-        return 1
-    fi
-
-    log_step "Creating Daytona sandbox '${name}' (class: ${sandbox_class})..."
-    _daytona_with_timeout 120 daytona sandbox create \
-        --name "${name}" \
-        --class "${sandbox_class}" \
-        --auto-stop 0 \
-        --auto-archive 0 \
-        2>&1
-}
-
-_resolve_sandbox_id() {
-    local name="${1}"
-
-    # Try to get the sandbox ID from `daytona info`
-    local info_output
-    info_output=$(daytona sandbox info "${name}" --format json 2>/dev/null) || true
-
-    if [[ -n "${info_output}" ]]; then
-        DAYTONA_SANDBOX_ID=$(printf '%s' "${info_output}" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null) || true
-    fi
-
-    # Fall back to using the name as the identifier (Daytona accepts both)
-    if [[ -z "${DAYTONA_SANDBOX_ID:-}" ]]; then
-        DAYTONA_SANDBOX_ID="${name}"
-    fi
-
-    export DAYTONA_SANDBOX_ID
-    export DAYTONA_SANDBOX_NAME_ACTUAL="${name}"
-}
-
+# Create a Daytona sandbox via REST API and set up SSH access
 create_server() {
     local name="${1}"
-    local output
-    local exit_code=0
 
-    # Try explicit resources first if any resource env vars are set
-    if [[ -n "${DAYTONA_CPU:-}" || -n "${DAYTONA_MEMORY:-}" || -n "${DAYTONA_DISK:-}" ]]; then
-        output=$(_daytona_create_with_resources "${name}") && exit_code=0 || exit_code=$?
+    log_step "Creating Daytona sandbox '${name}'..."
 
-        # Detect snapshot/resource conflict and fall back to --class
-        if [[ ${exit_code} -ne 0 ]] && _is_snapshot_conflict "${output}"; then
-            log_warn "Daytona rejected explicit resource flags (snapshot in use)"
-            log_step "Retrying with --class small..."
-            output=$(_daytona_create_with_class "${name}") && exit_code=0 || exit_code=$?
-        fi
-    else
-        output=$(_daytona_create_with_class "${name}") && exit_code=0 || exit_code=$?
-    fi
+    # Build create body — jq for safe JSON encoding
+    local body
+    body=$(jq -n --arg name "${name}" '{
+        name: $name,
+        autoStopInterval: 0,
+        autoArchiveInterval: 0
+    }')
 
-    if [[ ${exit_code} -ne 0 ]]; then
-        if [[ ${exit_code} -eq 124 ]] || _is_daytona_timeout "${output:-}"; then
-            log_error "Sandbox creation timed out (Daytona API may be temporarily slow)"
-            log_warn "Try again in a minute, or check https://status.daytona.io"
-            log_warn "You can also try: daytona create --name ${name} --class small"
-        elif _is_snapshot_conflict "${output}"; then
-            log_error "Cannot specify resources when using a Daytona snapshot"
-            log_error ""
-            log_error "Use a sandbox class instead:"
-            log_error "  DAYTONA_CLASS=small spawn <agent> daytona"
-            log_error ""
-            log_error "Or unset explicit resource variables:"
-            log_error "  unset DAYTONA_CPU DAYTONA_MEMORY DAYTONA_DISK"
-        else
-            log_error "Failed to create sandbox: ${output}"
-        fi
+    local response
+    response=$(daytona_api POST "/sandbox" "${body}")
+
+    # Extract sandbox ID
+    DAYTONA_SANDBOX_ID=$(_extract_json_field "${response}" "d.get('id','')")
+    if [[ -z "${DAYTONA_SANDBOX_ID}" || "${DAYTONA_SANDBOX_ID}" == "null" ]]; then
+        log_error "Failed to create sandbox: $(extract_api_error_message "${response}" "Unknown error")"
         return 1
     fi
 
-    _resolve_sandbox_id "${name}"
     log_info "Sandbox created: ${DAYTONA_SANDBOX_ID}"
 
-    save_vm_connection "daytona-sandbox" "daytona" "${DAYTONA_SANDBOX_ID}" "$name" "daytona"
+    # Wait for sandbox to reach started state
+    log_step "Waiting for sandbox to start..."
+    local max_wait=120 waited=0
+    while [[ ${waited} -lt ${max_wait} ]]; do
+        local status_resp
+        status_resp=$(daytona_api GET "/sandbox/${DAYTONA_SANDBOX_ID}")
+        local state
+        state=$(_extract_json_field "${status_resp}" "d.get('state','')")
+
+        if [[ "${state}" == "started" || "${state}" == "running" ]]; then
+            break
+        fi
+        if [[ "${state}" == "error" || "${state}" == "failed" ]]; then
+            local err_reason
+            err_reason=$(_extract_json_field "${status_resp}" "d.get('errorReason','unknown')")
+            log_error "Sandbox entered error state: ${err_reason}"
+            return 1
+        fi
+
+        sleep 3
+        waited=$((waited + 3))
+    done
+
+    if [[ ${waited} -ge ${max_wait} ]]; then
+        log_error "Sandbox did not start within ${max_wait}s"
+        log_warn "Check sandbox status at: ${SPAWN_DASHBOARD_URL}"
+        return 1
+    fi
+
+    # Create SSH access token (8 hours)
+    _setup_ssh_access
+
+    export DAYTONA_SANDBOX_ID
+    save_vm_connection "${DAYTONA_SSH_HOST}" "${SSH_USER}" "${DAYTONA_SANDBOX_ID}" "${name}" "daytona"
+}
+
+# Request an SSH access token and configure SSH connection variables
+_setup_ssh_access() {
+    log_step "Setting up SSH access..."
+
+    local ssh_resp
+    ssh_resp=$(daytona_api POST "/sandbox/${DAYTONA_SANDBOX_ID}/ssh-access?expiresInMinutes=480")
+
+    DAYTONA_SSH_TOKEN=$(_extract_json_field "${ssh_resp}" "d.get('token','')")
+    local ssh_cmd
+    ssh_cmd=$(_extract_json_field "${ssh_resp}" "d.get('sshCommand','')")
+
+    if [[ -z "${DAYTONA_SSH_TOKEN}" || "${DAYTONA_SSH_TOKEN}" == "null" ]]; then
+        log_error "Failed to get SSH access: $(extract_api_error_message "${ssh_resp}" "Unknown error")"
+        return 1
+    fi
+
+    # Parse host and port from sshCommand (e.g., "ssh -p 2222 TOKEN@HOST" or "ssh TOKEN@HOST")
+    DAYTONA_SSH_HOST=$(printf '%s' "${ssh_cmd}" | grep -oE '[^@ ]+$')
+
+    # Check for explicit port (-p PORT)
+    DAYTONA_SSH_PORT=""
+    if printf '%s' "${ssh_cmd}" | grep -q '\-p '; then
+        DAYTONA_SSH_PORT=$(printf '%s' "${ssh_cmd}" | sed -n 's/.*-p \([0-9]*\).*/\1/p')
+    fi
+
+    # Default host if parsing fails
+    if [[ -z "${DAYTONA_SSH_HOST:-}" ]]; then
+        DAYTONA_SSH_HOST="ssh.app.daytona.io"
+    fi
+
+    # Configure SSH for Daytona's token-based auth.
+    # The token IS the username — no key or password needed. The gateway
+    # validates the token during the SSH "none" auth exchange.
+    #   BatchMode=yes        — never prompt for passwords/passphrases (prevents hangs)
+    #   PubkeyAuthentication — skip trying local SSH keys against the gateway
+    #   ControlMaster/Path   — multiplex all SSH/SCP over one persistent connection
+    #                          (avoids repeated auth negotiation + gateway rate limits)
+    SSH_USER="${DAYTONA_SSH_TOKEN}"
+    DAYTONA_SSH_CONTROL="/tmp/spawn-daytona-ssh-${DAYTONA_SANDBOX_ID}"
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -o BatchMode=yes -o PubkeyAuthentication=no -o ControlMaster=auto -o ControlPath=${DAYTONA_SSH_CONTROL} -o ControlPersist=300"
+    if [[ -n "${DAYTONA_SSH_PORT}" ]]; then
+        SSH_OPTS="${SSH_OPTS} -p ${DAYTONA_SSH_PORT}"
+    fi
+
+    export DAYTONA_SSH_TOKEN DAYTONA_SSH_HOST DAYTONA_SSH_CONTROL SSH_USER SSH_OPTS
+    log_info "SSH access ready"
 }
 
 wait_for_cloud_init() {
+    # Verify SSH connectivity
+    ssh_verify_connectivity "${DAYTONA_SSH_HOST}"
+
     log_step "Installing base tools in sandbox..."
-    run_server "apt-get update -y && apt-get install -y curl unzip git zsh nodejs npm" >/dev/null 2>&1 || true
-    run_server "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1 || true
-    run_server "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
-    run_server "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true
-    run_server 'echo "export PATH=\"${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.zshrc' >/dev/null 2>&1 || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" "apt-get update -y && apt-get install -y curl unzip git zsh nodejs npm" >/dev/null 2>&1 || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1 || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" "curl -fsSL https://bun.sh/install | bash" >/dev/null 2>&1 || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" "curl -fsSL https://claude.ai/install.sh | bash" >/dev/null 2>&1 || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" 'echo "export PATH=\"${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.bashrc' >/dev/null 2>&1 || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" 'echo "export PATH=\"${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"" >> ~/.zshrc' >/dev/null 2>&1 || true
     log_info "Base tools installed"
 }
 
-# Daytona uses `daytona exec` for running commands in sandboxes.
-# The command string is passed directly to bash -c as a single argument.
-# All callers pass trusted, hardcoded command strings (not user input).
-# Do NOT use printf '%q' here — it escapes shell operators like && and ||
-# into literal characters, breaking multi-part commands.
-run_server() {
-    local cmd="${1}"
-    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${cmd}"
-}
+# SSH operations — delegates to shared helpers (same as Hetzner, DigitalOcean, etc.)
+run_server() { ssh_run_server "${DAYTONA_SSH_HOST}" "$1"; }
+upload_file() { ssh_upload_file "${DAYTONA_SSH_HOST}" "$1" "$2"; }
 
-upload_file() {
-    local local_path="${1}"
-    local remote_path="${2}"
-
-    # SECURITY: Strict allowlist validation — only safe path characters
-    if [[ ! "${remote_path}" =~ ^[a-zA-Z0-9/_.~-]+$ ]]; then
-        log_error "Invalid remote path (must contain only alphanumeric, /, _, ., ~, -): ${remote_path}"
-        return 1
-    fi
-
-    # base64 output is safe (alphanumeric + /+=) so no injection risk
-    local content
-    content=$(base64 -w0 < "${local_path}" 2>/dev/null || base64 < "${local_path}")
-
-    daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "printf '%s' '${content}' | base64 -d > '${remote_path}'"
-}
-
-# Daytona has true SSH support — much better than exec-only providers
+# Interactive session needs BatchMode=no so the PTY works.
+# Close the multiplexed master first — ssh -t and ControlMaster don't mix well.
 interactive_session() {
-    local cmd="${1}"
-    local session_exit=0
-    if [[ -z "${cmd}" ]]; then
-        # Pure interactive shell via SSH
-        daytona ssh "${DAYTONA_SANDBOX_ID}" || session_exit=$?
-    else
-        # Run a specific command interactively via exec.
-        # Pass directly to bash -c — do NOT use printf '%q' (see run_server comment).
-        daytona exec "${DAYTONA_SANDBOX_ID}" -- bash -c "${cmd}" || session_exit=$?
+    # Tear down the connection-multiplexing master before handing off to the
+    # interactive session.  The -t flag (allocated by ssh_interactive_session)
+    # and ControlMaster can conflict, causing "mux_client: master did not
+    # respond" errors.
+    local exit_opts="-o ControlPath=${DAYTONA_SSH_CONTROL}"
+    if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
+        exit_opts="${exit_opts} -p ${DAYTONA_SSH_PORT}"
     fi
-    SERVER_NAME="${DAYTONA_SANDBOX_ID:-}" SPAWN_RECONNECT_CMD="daytona ssh ${DAYTONA_SANDBOX_ID:-}" \
-        _show_exec_post_session_summary
-    return "${session_exit}"
+    # shellcheck disable=SC2086
+    ssh -O exit ${exit_opts} "${SSH_USER}@${DAYTONA_SSH_HOST}" 2>/dev/null || true
+
+    local saved_opts="${SSH_OPTS}"
+    # Strip multiplexing and BatchMode for the interactive session
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -o PubkeyAuthentication=no"
+    if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
+        SSH_OPTS="${SSH_OPTS} -p ${DAYTONA_SSH_PORT}"
+    fi
+    ssh_interactive_session "${DAYTONA_SSH_HOST}" "$1"
+    local rc=$?
+    SSH_OPTS="${saved_opts}"
+    return "${rc}"
 }
 
+# Destroy a Daytona sandbox
 destroy_server() {
     local sandbox_id="${1:-${DAYTONA_SANDBOX_ID:-}}"
     if [[ -z "${sandbox_id}" ]]; then
         log_warn "No sandbox ID to destroy"
         return 0
     fi
+    # Close SSH multiplexing master if still open
+    if [[ -n "${DAYTONA_SSH_CONTROL:-}" ]]; then
+        local exit_opts="-o ControlPath=${DAYTONA_SSH_CONTROL}"
+        if [[ -n "${DAYTONA_SSH_PORT:-}" ]]; then
+            exit_opts="${exit_opts} -p ${DAYTONA_SSH_PORT}"
+        fi
+        # shellcheck disable=SC2086
+        ssh -O exit ${exit_opts} "${SSH_USER}@${DAYTONA_SSH_HOST}" 2>/dev/null || true
+    fi
     log_step "Destroying sandbox ${sandbox_id}..."
-    daytona sandbox delete "${sandbox_id}" 2>/dev/null || true
+    daytona_api DELETE "/sandbox/${sandbox_id}" >/dev/null 2>&1 || true
     log_info "Sandbox destroyed"
 }
 
+# List all Daytona sandboxes
 list_servers() {
-    daytona sandbox list
+    local response
+    response=$(daytona_api GET "/sandbox")
+
+    printf '%s' "${response}" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    items = data if isinstance(data, list) else data.get('items', data.get('sandboxes', []))
+    if not items:
+        print('No sandboxes found')
+        sys.exit(0)
+    fmt = '%-25s %-40s %-12s'
+    print(fmt % ('NAME', 'ID', 'STATE'))
+    print('-' * 77)
+    for s in items:
+        print(fmt % (s.get('name','N/A')[:25], s.get('id','N/A')[:40], s.get('state','N/A')[:12]))
+except Exception as e:
+    print('Error listing sandboxes: %s' % e, file=sys.stderr)
+" 2>/dev/null || printf 'Error parsing sandbox list\n'
 }
 
 # ============================================================
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { prompt_spawn_name; ensure_daytona_cli; ensure_daytona_token; }
+cloud_authenticate() { ensure_daytona_token; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { wait_for_cloud_init; }
 cloud_run() { run_server "$1"; }
