@@ -1816,7 +1816,7 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
       return `${sourceLib}\nensure_aws_cli\ndestroy_server "${id}"`;
 
     case "daytona":
-      return `${sourceLib}\nensure_daytona_cli\nensure_daytona_token\ndestroy_server "${id}"`;
+      return `${sourceLib}\nensure_daytona_token\ndestroy_server "${id}"`;
     case "sprite":
       return `${sourceLib}\nensure_sprite_installed\nsprite destroy "${id}"`;
     default:
@@ -2159,6 +2159,17 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
       ["console", "-s", connection.server_name],
       "Sprite console connection failed",
       `sprite console -s ${connection.server_name}`
+    );
+  }
+
+  // Handle Fly.io SSH connections (uses flyctl, not direct SSH)
+  if (connection.ip === "fly-ssh" && connection.server_name) {
+    p.log.step(`Connecting to Fly.io app ${pc.bold(connection.server_name)}...`);
+    return runInteractiveCommand(
+      "fly",
+      ["ssh", "console", "-a", connection.server_name, "--pty"],
+      "Fly.io SSH connection failed",
+      `fly ssh console -a ${connection.server_name}`
     );
   }
 
