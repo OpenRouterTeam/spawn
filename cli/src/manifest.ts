@@ -44,6 +44,7 @@ export interface CloudDef {
   interactive_method: string;
   defaults?: Record<string, unknown>;
   notes?: string;
+  icon?: string;
 }
 
 export interface Manifest {

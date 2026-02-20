@@ -206,7 +206,8 @@
         "server_type": "cx23",
         "location": "fsn1",
         "image": "ubuntu-24.04"
-      }
+      },
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/hetzner.png"
     },
     "fly": {
       "name": "Fly.io",
@@ -223,7 +224,8 @@
         "vm_memory": 1024,
         "image": "ubuntu:24.04"
       },
-      "notes": "Uses Machines API for provisioning and flyctl SSH for exec. Docker-based, pay-per-second pricing. Requires flyctl CLI."
+      "notes": "Uses Machines API for provisioning and flyctl SSH for exec. Docker-based, pay-per-second pricing. Requires flyctl CLI.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/fly.png"
     },
     "aws": {
       "name": "AWS Lightsail",
@@ -239,7 +241,8 @@
         "region": "us-east-1",
         "blueprint": "ubuntu_24_04"
       },
-      "notes": "Uses 'ubuntu' user instead of 'root'. Requires AWS CLI installed and configured."
+      "notes": "Uses 'ubuntu' user instead of 'root'. Requires AWS CLI installed and configured.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/aws.png"
     },
     "daytona": {
       "name": "Daytona",
@@ -255,7 +258,8 @@
         "memory": 2048,
         "disk": 5
       },
-      "notes": "Sub-90ms sandbox creation. True SSH support via daytona ssh. Requires DAYTONA_API_KEY from https://app.daytona.io."
+      "notes": "Sub-90ms sandbox creation. True SSH support via daytona ssh. Requires DAYTONA_API_KEY from https://app.daytona.io.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/daytona.png"
     },
     "digitalocean": {
       "name": "DigitalOcean",
@@ -270,7 +274,8 @@
         "size": "s-2vcpu-2gb",
         "region": "nyc3",
         "image": "ubuntu-24-04-x64"
-      }
+      },
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/digitalocean.png"
     },
     "gcp": {
       "name": "GCP Compute Engine",
@@ -286,7 +291,8 @@
         "zone": "us-central1-a",
         "image_family": "ubuntu-2404-lts-amd64"
       },
-      "notes": "Uses current username for SSH. Requires gcloud CLI installed and configured."
+      "notes": "Uses current username for SSH. Requires gcloud CLI installed and configured.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/gcp.png"
     },
     "sprite": {
       "name": "Sprite",
@@ -296,7 +302,8 @@
       "auth": "sprite login",
       "provision_method": "sprite create",
       "exec_method": "sprite exec",
-      "interactive_method": "sprite exec -tty"
+      "interactive_method": "sprite exec -tty",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/sprite.png"
     }
   },
   "matrix": {
