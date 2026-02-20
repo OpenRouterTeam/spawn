@@ -320,6 +320,7 @@ describe("Version Comparison Logic", () => {
 
       const { executor } = await import("../update-check.js");
       const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
@@ -328,6 +329,7 @@ describe("Version Comparison Logic", () => {
       expect(processExitSpy).toHaveBeenCalledWith(0);
 
       execSyncSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
     });
 
     it("should handle fetch returning null version gracefully", async () => {
