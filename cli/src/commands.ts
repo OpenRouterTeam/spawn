@@ -1794,7 +1794,7 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
       `Invalid server identifier in history: ${getErrorMessage(err)}\n\n` +
       `Your spawn history file may be corrupted or tampered with.\n` +
       `Location: ${getHistoryPath()}\n` +
-      `To fix: edit the file and remove the invalid entry, or run 'spawn clear-history'`
+      `To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'`
     );
   }
 
@@ -2149,7 +2149,7 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
     p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
     p.log.info(`Your spawn history file may be corrupted or tampered with.`);
     p.log.info(`Location: ${getHistoryPath()}`);
-    p.log.info(`To fix: edit the file and remove the invalid entry, or run 'spawn clear-history'`);
+    p.log.info(`To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'`);
     process.exit(1);
   }
 
