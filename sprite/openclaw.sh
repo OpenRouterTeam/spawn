@@ -31,13 +31,10 @@ agent_configure() {
     setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run
 }
 
-agent_pre_launch() {
-    start_openclaw_gateway cloud_run
-    wait_for_openclaw_gateway cloud_run
-}
-
 agent_launch_cmd() {
-    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; openclaw tui'
+    # Sprite exec kills backgrounded processes when the session closes, so we
+    # start the gateway inline in the same session as the TUI.
+    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; openclaw gateway > /tmp/openclaw-gateway.log 2>&1 & for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null && break; sleep 2; done && openclaw tui'
 }
 
 spawn_agent "OpenClaw"
