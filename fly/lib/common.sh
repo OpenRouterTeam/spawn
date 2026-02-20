@@ -87,7 +87,8 @@ ensure_fly_cli() {
     log_info "flyctl CLI installed"
 }
 
-# Ensure FLY_API_TOKEN is available (env var -> config file -> flyctl CLI -> prompt+save)
+# Ensure FLY_API_TOKEN is available
+# Auth chain: env var → config file → flyctl CLI → browser OAuth → manual prompt
 
 # Try to get token from flyctl CLI if available
 _try_flyctl_auth() {
@@ -103,8 +104,32 @@ _try_flyctl_auth() {
     return 1
 }
 
+# Sanitize a Fly.io token — the dashboard copy button may include the
+# display name before the actual token (e.g. "Deploy Token FlyV1 fm2_...")
+# Strip everything before "FlyV1" or "fm2_", and trim whitespace/newlines.
+_sanitize_fly_token() {
+    local raw="$1"
+    # Trim leading/trailing whitespace and newlines
+    raw=$(printf '%s' "$raw" | tr -d '\n\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    # If it contains "FlyV1 ", strip everything before it (display name prefix)
+    if [[ "$raw" == *"FlyV1 "* ]]; then
+        raw="FlyV1 ${raw##*FlyV1 }"
+    # If it contains a bare "fm2_" token without FlyV1 prefix, extract it
+    elif [[ "$raw" == *"fm2_"* ]]; then
+        raw=$(printf '%s' "$raw" | sed 's/.*\(fm2_[^ ]*\).*/\1/')
+        raw="FlyV1 $raw"
+    fi
+    printf '%s' "$raw"
+}
+
 # Validate a Fly.io token by making a test API call
+# Also sanitizes the token in-place (strips display name prefix from dashboard copy)
 _validate_fly_token() {
+    # Sanitize before validating — dashboard copy button may include display name
+    if [[ -n "${FLY_API_TOKEN:-}" ]]; then
+        FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
+        export FLY_API_TOKEN
+    fi
     local response
     response=$(fly_api GET "/apps?org_slug=personal")
     if echo "$response" | grep -q '"error"'; then
@@ -119,24 +144,114 @@ _validate_fly_token() {
     return 0
 }
 
-ensure_fly_token() {
-    # Try flyctl CLI auth first (unique to Fly.io), then fall through to generic flow
-    if [[ -z "${FLY_API_TOKEN:-}" ]]; then
-        local token
-        token=$(_try_flyctl_auth 2>/dev/null) && {
-            export FLY_API_TOKEN="$token"
-            log_info "Using Fly.io API token from flyctl auth"
-            _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
-            return 0
-        }
+# Browser-based auth using Fly.io CLI Sessions API
+# Mimics `fly auth login`: creates a session, opens browser, polls for token
+_try_fly_browser_auth() {
+    local fly_api_base="https://api.fly.io"
+
+    # Create a CLI session
+    local hostname
+    hostname=$(hostname 2>/dev/null || echo "spawn")
+    local session_body
+    session_body=$(printf '{"name":%s,"signup":false,"target":"auth"}' "$(json_escape "$hostname")")
+
+    local response
+    response=$(curl -fsSL -X POST "${fly_api_base}/api/v1/cli_sessions" \
+        -H "Content-Type: application/json" \
+        -d "$session_body" 2>/dev/null) || return 1
+
+    local session_id auth_url
+    session_id=$(_extract_json_field "$response" "d.get('id','')")
+    auth_url=$(_extract_json_field "$response" "d.get('auth_url','')")
+
+    if [[ -z "$session_id" || -z "$auth_url" ]]; then
+        return 1
     fi
 
+    log_info "Opening browser for Fly.io login..."
+    log_warn "If the browser doesn't open, visit: $auth_url"
+    open_browser "$auth_url"
+
+    # Poll for the access token (max 120 seconds, 2s intervals)
+    local attempt=0
+    local max_attempts=60
+    while [[ "$attempt" -lt "$max_attempts" ]]; do
+        sleep 2
+        attempt=$((attempt + 1))
+
+        local poll_response
+        poll_response=$(curl -fsSL "${fly_api_base}/api/v1/cli_sessions/${session_id}" 2>/dev/null) || continue
+
+        local access_token
+        access_token=$(_extract_json_field "$poll_response" "d.get('access_token','')")
+
+        if [[ -n "$access_token" ]]; then
+            echo "$access_token"
+            return 0
+        fi
+    done
+
+    log_warn "Browser login timed out after 120 seconds"
+    return 1
+}
+
+ensure_fly_token() {
+    # 1. Try env var (sanitize — dashboard copy button may include display name)
+    if [[ -n "${FLY_API_TOKEN:-}" ]]; then
+        FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
+        export FLY_API_TOKEN
+        _validate_fly_token && return 0
+        log_warn "FLY_API_TOKEN is set but invalid, trying other methods..."
+        unset FLY_API_TOKEN
+    fi
+
+    # 2. Try config file (sanitize in case it was saved with display name)
+    local saved_token
+    saved_token=$(_load_token_from_config "$HOME/.config/spawn/fly.json") && {
+        saved_token=$(_sanitize_fly_token "$saved_token")
+        export FLY_API_TOKEN="$saved_token"
+        if _validate_fly_token 2>/dev/null; then
+            log_info "Using saved Fly.io API token"
+            return 0
+        fi
+        unset FLY_API_TOKEN
+    }
+
+    # 3. Try flyctl CLI auth
+    local token
+    token=$(_try_flyctl_auth 2>/dev/null) && {
+        export FLY_API_TOKEN="$token"
+        log_info "Using Fly.io API token from flyctl auth"
+        _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
+        return 0
+    }
+
+    # 4. Try browser-based OAuth (like `fly auth login`)
+    log_step "Authenticating with Fly.io via browser..."
+    token=$(_try_fly_browser_auth 2>/dev/null) && {
+        export FLY_API_TOKEN="$token"
+        if _validate_fly_token 2>/dev/null; then
+            log_info "Authenticated with Fly.io via browser"
+            _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
+            return 0
+        fi
+        unset FLY_API_TOKEN
+    }
+
+    # 5. Last resort: manual token entry
+    log_warn "Browser login unavailable or failed"
     ensure_api_token_with_provider \
         "Fly.io" \
         "FLY_API_TOKEN" \
         "$HOME/.config/spawn/fly.json" \
         "https://fly.io/dashboard → Tokens" \
         "_validate_fly_token"
+
+    # Sanitize whatever the manual prompt gave us (may include display name)
+    if [[ -n "${FLY_API_TOKEN:-}" ]]; then
+        FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
+        export FLY_API_TOKEN
+    fi
 }
 
 # Get the Fly.io org slug (default: personal)
