@@ -650,7 +650,7 @@ list_servers() {
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { ensure_hcloud_token; ensure_ssh_key; }
+cloud_authenticate() { prompt_spawn_name; ensure_hcloud_token; ensure_ssh_key; }
 cloud_provision() {
     local exit_code=0
     create_server "$1" || exit_code=$?

@@ -486,7 +486,7 @@ for a in apps:
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { ensure_fly_cli; ensure_fly_token; }
+cloud_authenticate() { prompt_spawn_name; ensure_fly_cli; ensure_fly_token; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { wait_for_cloud_init; }
 cloud_run() { run_server "$1"; }
