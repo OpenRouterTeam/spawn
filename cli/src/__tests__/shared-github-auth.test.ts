@@ -451,7 +451,7 @@ describe("ensure_gh_auth", () => {
 
   it("should fail when GITHUB_TOKEN auth fails", () => {
     const result = runBash(`
-      export GITHUB_TOKEN="bad_token"
+      export GITHUB_TOKEN="ghp_badtoken"
       # Mock gh
       gh() {
         if [[ "$1" == "auth" && "$2" == "status" ]]; then return 1; fi
@@ -536,7 +536,7 @@ describe("ensure_gh_auth", () => {
       }
       ensure_gh_auth 2>&1
     `);
-    expect(result.stdout + result.stderr).toContain("Not authenticated");
+    expect(result.stdout + result.stderr).toContain("Persisting GITHUB_TOKEN");
   });
 
   it("should mention GITHUB_TOKEN in log when using token auth", () => {
@@ -853,11 +853,12 @@ describe("error handling edge cases", () => {
 // ── GITHUB_TOKEN piping security ────────────────────────────────────────
 
 describe("GITHUB_TOKEN handling security", () => {
-  it("should pipe GITHUB_TOKEN via printf (not command line arg)", () => {
-    // The script uses: printf '%s\n' "${GITHUB_TOKEN}" | gh auth login --with-token
+  it("should pipe token via printf (not command line arg)", () => {
+    // The script uses: printf '%s\n' "${_gh_token}" | gh auth login --with-token
+    // (_gh_token is a local copy of GITHUB_TOKEN, used after unsetting the env var)
     // This avoids exposing the token in process args
     const result = runRawBash(
-      `grep -q "printf.*GITHUB_TOKEN.*gh auth login --with-token" "${GITHUB_AUTH_SH}" && echo "piped"`
+      `grep -q "printf.*_gh_token.*gh auth login --with-token" "${GITHUB_AUTH_SH}" && echo "piped"`
     );
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("piped");

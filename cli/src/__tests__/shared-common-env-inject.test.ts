@@ -416,7 +416,7 @@ describe("opencode_install_cmd", () => {
   it("should contain OS detection", () => {
     const result = runBash(`opencode_install_cmd`);
     expect(result.stdout).toContain("uname -s");
-    expect(result.stdout).toContain("darwin");
+    expect(result.stdout).toContain("tr A-Z a-z");
   });
 
   it("should download to a temp file instead of piping curl|tar", () => {

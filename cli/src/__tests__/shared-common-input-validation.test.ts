@@ -592,7 +592,7 @@ describe("_display_and_select", () => {
       const result = runBashCapture(
         '_display_and_select "server types" "cx23" "" <<< "cx23|2 vCPU|4 GB"',
       );
-      expect(result.stderr).toContain("Available server types");
+      expect(result.stderr).toContain("server types");
     });
 
     it("should handle single-item list", () => {

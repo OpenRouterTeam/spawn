@@ -1033,7 +1033,9 @@ describe("_curl_api (core curl wrapper)", () => {
     expect(args[args.length - 1]).toBe("https://api.example.com/v1/endpoint");
   });
 
-  it("should pass extra auth args to curl", () => {
+  it("should pass extra non-auth args to curl", () => {
+    // Authorization headers are now passed via -K (stdin) for security,
+    // so we test with a non-Authorization header that passes through directly
     const argsFile = join(testDir, "curl-args");
     const result = runBash(`
       curl() {
@@ -1041,12 +1043,12 @@ describe("_curl_api (core curl wrapper)", () => {
         printf 'ok\n200'
         return 0
       }
-      _curl_api "https://example.com" "GET" "" -H "Authorization: Bearer my-token"
+      _curl_api "https://example.com" "GET" "" -H "X-Custom: my-value"
     `);
     expect(result.exitCode).toBe(0);
     const args = readFileSync(argsFile, "utf-8");
     expect(args).toContain("-H");
-    expect(args).toContain("Authorization: Bearer my-token");
+    expect(args).toContain("X-Custom: my-value");
   });
 
   it("should use specified HTTP method", () => {

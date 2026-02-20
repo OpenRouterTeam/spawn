@@ -284,7 +284,7 @@ describe("--prompt-file success with real files", () => {
     // The CLI will proceed to download the script for claude/sprite
     // and will either succeed or fail at the network level.
     // We just verify it doesn't error about the prompt file itself.
-    const result = runCli(["claude", "sprite", "--prompt-file", validFile]);
+    const result = runCli(["claude", "sprite", "--prompt-file", validFile, "--dry-run"]);
     const out = output(result);
     // Should NOT show any prompt-file related errors
     expect(out).not.toContain("Prompt file not found");
@@ -299,6 +299,7 @@ describe("--prompt-file success with real files", () => {
       "sprite",
       "--prompt-file",
       multilineFile,
+      "--dry-run",
     ]);
     const out = output(result);
     expect(out).not.toContain("Prompt file not found");
@@ -326,6 +327,7 @@ describe("--prompt-file edge cases", () => {
       "sprite",
       "--prompt-file",
       fileWithSpaces,
+      "--dry-run",
     ]);
     const out = output(result);
     expect(out).not.toContain("Prompt file not found");
@@ -340,6 +342,7 @@ describe("--prompt-file edge cases", () => {
       "sprite",
       "--prompt-file",
       fileWithDots,
+      "--dry-run",
     ]);
     const out = output(result);
     expect(out).not.toContain("Prompt file not found");
