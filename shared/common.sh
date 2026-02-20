@@ -3291,8 +3291,12 @@ wait_for_openclaw_gateway() {
 # ============================================================
 
 # Setup Codex CLI config.toml for OpenRouter
-# Uses the native model_provider config instead of OPENAI_BASE_URL env var,
-# which fixes "Invalid Responses API request" errors with OpenRouter.
+# Uses wire_api="chat" (Chat Completions) because OpenRouter's Responses API
+# proxy drops required fields (id, content) from conversation-history items on
+# multi-turn requests, causing "Invalid Responses API request" errors.
+# Codex >=0.97.0 removed "chat" support, so scripts pin @openai/codex@0.94.0.
+# TODO: unpin once OpenRouter's /responses proxy handles round-trip correctly.
+# Tracking: https://github.com/openai/codex/issues/12114
 # Usage: setup_codex_config OPENROUTER_KEY UPLOAD_CALLBACK RUN_CALLBACK
 setup_codex_config() {
     local openrouter_key="${1}"
@@ -3310,7 +3314,7 @@ model_provider = "openrouter"
 name = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
 env_key = "OPENROUTER_API_KEY"
-wire_api = "responses"
+wire_api = "chat"
 TOML
 )
 
