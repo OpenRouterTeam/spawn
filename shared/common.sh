@@ -3459,7 +3459,26 @@ _display_and_select() {
         return
     fi
 
-    # Fallback to numbered list when fzf is not available
+    # Try spawn pick for an arrow-key UI (available when the user ran `spawn`)
+    if command -v spawn >/dev/null 2>&1; then
+        # Convert pipe-delimited "id|label|extra..." → "id\tid\tlabel · extra · ..."
+        # so spawn pick shows the id as label and all detail fields as hint.
+        local spawn_input
+        spawn_input=$(printf '%s\n' "${items_array[@]}" | awk -F'|' '{
+            val=$1; hint="";
+            for (i=2; i<=NF; i++) { hint = hint (hint ? " \xc2\xb7 " : "") $i }
+            printf "%s\t%s\t%s\n", val, val, hint
+        }')
+        local picked
+        local spawn_default="${default_id:-${default_value}}"
+        picked=$(printf '%s\n' "${spawn_input}" | \
+            spawn pick --prompt "Select ${prompt_text}" --default "${spawn_default}") && {
+            echo "${picked}"
+            return
+        }
+    fi
+
+    # Fallback to numbered list when neither fzf nor spawn pick is available
     _numbered_list_select "${prompt_text}" "${default_value}" "${default_id}" "${items_array[@]}"
 }
 
