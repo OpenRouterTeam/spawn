@@ -32,10 +32,6 @@ agent_configure() {
     setup_claude_code_config "${OPENROUTER_API_KEY}" cloud_upload cloud_run
 }
 
-agent_save_connection() {
-    save_vm_connection "sprite-console" "${USER:-root}" "" "${SPRITE_NAME}" "sprite"
-}
-
 agent_launch_cmd() {
     if [[ -n "${SPAWN_PROMPT:-}" ]]; then
         local escaped; escaped=$(printf '%q' "${SPAWN_PROMPT}")
