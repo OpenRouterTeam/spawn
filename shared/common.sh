@@ -1564,10 +1564,27 @@ _ensure_nodejs_runtime() {
     fi
 }
 
+_install_via_npm() {
+    local run_cb="$1"
+    local claude_path="$2"
+    log_step "Installing Claude Code (method 2/3: npm)..."
+    if ${run_cb} "${claude_path} && npm install -g @anthropic-ai/claude-code 2>&1" 2>&1; then
+        if _verify_claude_installed "$run_cb" "$claude_path"; then
+            log_info "Claude Code installed via npm"
+            _finalize_claude_install "$run_cb" "$claude_path"
+            return 0
+        fi
+        log_warn "npm install exited 0 but claude binary not found"
+    else
+        log_warn "npm install failed"
+    fi
+    return 1
+}
+
 _install_via_bun() {
     local run_cb="$1"
     local claude_path="$2"
-    log_step "Installing Claude Code (method 2/2: bun)..."
+    log_step "Installing Claude Code (method 3/3: bun)..."
     if ${run_cb} "${claude_path} && bun i -g @anthropic-ai/claude-code 2>&1" 2>&1; then
         if _verify_claude_installed "$run_cb" "$claude_path"; then
             log_info "Claude Code installed via bun"
@@ -1583,7 +1600,7 @@ _install_via_bun() {
 
 install_claude_code() {
     local run_cb="$1"
-    local claude_path='export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
+    local claude_path='export PATH=$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH'
 
     # Clean up ~/.bash_profile if it was created by a previous broken deployment.
     ${run_cb} "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\|Claude Code PATH\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi" >/dev/null 2>&1 || true
@@ -1600,16 +1617,21 @@ install_claude_code() {
         return 0
     fi
 
-    # Ensure Node.js runtime for bun method
+    # Ensure Node.js runtime for npm/bun methods
     _ensure_nodejs_runtime "$run_cb" "$claude_path"
 
-    # Try bun installer
+    # Try npm (most reliable for global installs)
+    if _install_via_npm "$run_cb" "$claude_path"; then
+        return 0
+    fi
+
+    # Try bun as last resort
     if _install_via_bun "$run_cb" "$claude_path"; then
         return 0
     fi
 
     # All methods failed
-    log_install_failed "Claude Code" "curl -fsSL https://claude.ai/install.sh | bash"
+    log_install_failed "Claude Code" "npm install -g @anthropic-ai/claude-code"
     exit 1
 }
 
