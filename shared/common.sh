@@ -3291,8 +3291,9 @@ wait_for_openclaw_gateway() {
 # ============================================================
 
 # Setup Codex CLI config.toml for OpenRouter
-# Uses the native model_provider config instead of OPENAI_BASE_URL env var,
-# which fixes "Invalid Responses API request" errors with OpenRouter.
+# Uses the native model_provider config with wire_api="chat" (Chat Completions
+# format) instead of "responses" (Responses API), which avoids conversation
+# history serialisation errors on multi-turn sessions through OpenRouter.
 # Usage: setup_codex_config OPENROUTER_KEY UPLOAD_CALLBACK RUN_CALLBACK
 setup_codex_config() {
     local openrouter_key="${1}"
@@ -3310,7 +3311,7 @@ model_provider = "openrouter"
 name = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
 env_key = "OPENROUTER_API_KEY"
-wire_api = "responses"
+wire_api = "chat"
 TOML
 )
 
