@@ -650,20 +650,18 @@ describe("credential roundtrip integration", () => {
     expect(result.stdout).toBe("abc123");
   });
 
-  it("should save and reload a token with special JSON characters", () => {
+  it("should reject a token with backslashes (not valid in API tokens)", () => {
     const dir = trackTempDir();
     const configFile = join(dir, "special.json");
 
-    // Save a token with backslash and newline-like content
+    // Save a token with backslashes
     runBash(`_save_token_to_config "${configFile}" 'token\\with\\slashes' 2>/dev/null`);
 
-    // Load it back
-    const result = runBash(`
-      _load_token_from_config "${configFile}" LOADED "Test" 2>/dev/null
-      echo "$LOADED"
-    `);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("token");
+    // Load should fail — backslashes are not in the allowed character set
+    const result = runBash(
+      `_load_token_from_config "${configFile}" LOADED "Test" 2>/dev/null`,
+    );
+    expect(result.exitCode).not.toBe(0);
   });
 
   it("should validate after loading from config", () => {
