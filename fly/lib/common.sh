@@ -190,16 +190,23 @@ _fly_list_orgs() {
 import json, sys
 try:
     data = json.loads(sys.stdin.read())
-    orgs = data if isinstance(data, list) else data.get('nodes', data.get('organizations', []))
-    if not orgs:
-        sys.exit(1)
-    for o in orgs:
-        slug = o.get('slug') or o.get('name') or ''
-        name = o.get('name') or slug
-        otype = o.get('type') or ''
-        suffix = ' (' + otype + ')' if otype else ''
-        if slug:
-            print(slug + '|' + name + suffix)
+    if isinstance(data, dict) and not any(k in data for k in ('nodes', 'organizations')):
+        # Flat dict format: {'slug': 'Display Name', ...}
+        if not data:
+            sys.exit(1)
+        for slug, name in data.items():
+            print(slug + '|' + str(name))
+    else:
+        orgs = data if isinstance(data, list) else data.get('nodes', data.get('organizations', []))
+        if not orgs:
+            sys.exit(1)
+        for o in orgs:
+            slug = o.get('slug') or o.get('name') or ''
+            name = o.get('name') or slug
+            otype = o.get('type') or ''
+            suffix = ' (' + otype + ')' if otype else ''
+            if slug:
+                print(slug + '|' + name + suffix)
 except Exception:
     sys.exit(1)
 " 2>/dev/null
