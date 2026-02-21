@@ -749,9 +749,9 @@ export async function waitForCloudInit(): Promise<void> {
   const setupScript = [
     `echo "==> Installing base packages..."`,
     `export DEBIAN_FRONTEND=noninteractive`,
-    `apt-get update -y && apt-get install -y curl unzip git || true`,
+    `apt-get update -y && apt-get install -y --no-install-recommends curl unzip git ca-certificates || true`,
     `echo "==> Checking Node.js..."`,
-    `if ! command -v node >/dev/null 2>&1; then { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs; } || apt-get install -y nodejs || true; fi`,
+    `if ! command -v node >/dev/null 2>&1; then { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y --no-install-recommends nodejs; } || apt-get install -y --no-install-recommends nodejs || true; fi`,
     `echo "node: $(node --version 2>/dev/null || echo not installed)"`,
     `echo "==> Checking bun..."`,
     `if ! command -v bun >/dev/null 2>&1 && [ ! -f "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash || true; fi`,
