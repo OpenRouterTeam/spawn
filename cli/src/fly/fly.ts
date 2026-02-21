@@ -615,9 +615,11 @@ export async function runServer(
   // 408 deadline_exceeded on long-running commands.
   const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
-  // Pipe /dev/null to stdin so commands that try to read input (e.g. claude
-  // install, npm postinstall hooks) don't hang waiting on the terminal.
-  const proc = Bun.spawn(args, { stdio: ["ignore", "inherit", "inherit"], env: process.env });
+  // Don't inherit stdin — commands like `claude install` try to read input and
+  // hang. Use "pipe" + immediate close so flyctl gets a clean EOF signal.
+  // ("ignore" maps to /dev/null which some flyctl versions don't handle well.)
+  const proc = Bun.spawn(args, { stdio: ["pipe", "inherit", "inherit"], env: process.env });
+  proc.stdin!.end();
   // Local safety timer — WireGuard has no HTTP deadline but we still want a ceiling.
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
@@ -639,7 +641,8 @@ export async function runServerCapture(
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
-  const proc = Bun.spawn(args, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+  const proc = Bun.spawn(args, { stdio: ["pipe", "pipe", "pipe"], env: process.env });
+  proc.stdin!.end();
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
 
@@ -665,8 +668,9 @@ export async function uploadFile(
   const b64 = content.toString("base64");
   const proc = Bun.spawn(
     [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c 'printf "%s" ${b64} | base64 -d > ${remotePath}'`],
-    { stdio: ["ignore", "ignore", "ignore"], env: process.env },
+    { stdio: ["pipe", "ignore", "ignore"], env: process.env },
   );
+  proc.stdin!.end();
   const exitCode = await proc.exited;
   if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
 }
