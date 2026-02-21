@@ -528,10 +528,20 @@ destroy_server() {
     local name="${1}"
     log_step "Destroying Lightsail instance ${name}..."
     if [[ "${LIGHTSAIL_MODE}" == "cli" ]]; then
-        aws lightsail delete-instance --instance-name "${name}" >/dev/null
+        if ! aws lightsail delete-instance --instance-name "${name}" >/dev/null; then
+            log_error "Failed to destroy Lightsail instance '${name}'"
+            log_warn "The instance may still be running and incurring charges."
+            log_warn "Delete it manually: ${SPAWN_DASHBOARD_URL}"
+            return 1
+        fi
     else
-        _lightsail_rest "Lightsail_20161128.DeleteInstance" \
-            "{\"instanceName\":\"${name}\",\"forceDeleteAddOns\":false}" >/dev/null
+        if ! _lightsail_rest "Lightsail_20161128.DeleteInstance" \
+            "{\"instanceName\":\"${name}\",\"forceDeleteAddOns\":false}" >/dev/null; then
+            log_error "Failed to destroy Lightsail instance '${name}'"
+            log_warn "The instance may still be running and incurring charges."
+            log_warn "Delete it manually: ${SPAWN_DASHBOARD_URL}"
+            return 1
+        fi
     fi
     log_info "Instance ${name} destroyed"
 }
