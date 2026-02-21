@@ -182,16 +182,9 @@ ensure_fly_token() {
     _fly_prompt_org
 }
 
-# List Fly.io organizations via flyctl — emit pipe-delimited "slug|name" lines.
-_fly_list_orgs() {
-    local fly_cmd
-    fly_cmd=$(_get_fly_cmd 2>/dev/null) || return 1
-
-    local json
-    json=$("$fly_cmd" orgs list --json 2>/dev/null)
-    [[ -z "$json" ]] && return 1
-
-    printf '%s' "$json" | bun -e '
+# Parse flyctl / GraphQL org JSON into pipe-delimited "slug|name" lines.
+_fly_parse_orgs_json() {
+    bun -e '
 const data = JSON.parse(await Bun.stdin.text());
 if (typeof data === "object" && !Array.isArray(data) && !("nodes" in data) && !("organizations" in data)) {
     if (!Object.keys(data).length) process.exit(1);
@@ -205,6 +198,55 @@ if (typeof data === "object" && !Array.isArray(data) && !("nodes" in data) && !(
         const suffix = o.type ? " (" + o.type + ")" : "";
         if (slug) console.log(slug + "|" + name + suffix);
     }
+}
+' 2>/dev/null
+}
+
+# List Fly.io organizations — tries flyctl first, falls back to GraphQL API.
+# Emits pipe-delimited "slug|name" lines.
+_fly_list_orgs() {
+    # 1. Try flyctl CLI
+    local fly_cmd json
+    fly_cmd=$(_get_fly_cmd 2>/dev/null) || fly_cmd=""
+    if [[ -n "$fly_cmd" ]]; then
+        json=$("$fly_cmd" orgs list --json 2>/dev/null) || json=""
+        if [[ -n "$json" ]]; then
+            local result
+            result=$(printf '%s' "$json" | _fly_parse_orgs_json) || result=""
+            if [[ -n "$result" ]]; then
+                printf '%s\n' "$result"
+                return 0
+            fi
+        fi
+    fi
+
+    # 2. Fall back to Fly.io GraphQL API (works with any token type)
+    [[ -z "${FLY_API_TOKEN:-}" ]] && return 1
+
+    local auth_header
+    if [[ "$FLY_API_TOKEN" == FlyV1\ * ]]; then
+        auth_header="$FLY_API_TOKEN"
+    else
+        auth_header="Bearer $FLY_API_TOKEN"
+    fi
+
+    local gql_body='{"query":"{ organizations { nodes { slug name type } } }"}'
+    json=$(curl -sS -X POST "https://api.fly.io/graphql" \
+        -H "Authorization: ${auth_header}" \
+        -H "Content-Type: application/json" \
+        -d "$gql_body" 2>/dev/null) || return 1
+    [[ -z "$json" ]] && return 1
+
+    # Extract organizations.nodes from GraphQL response
+    printf '%s' "$json" | bun -e '
+const resp = JSON.parse(await Bun.stdin.text());
+const nodes = resp?.data?.organizations?.nodes ?? [];
+if (!nodes.length) process.exit(1);
+for (const o of nodes) {
+    const slug = o.slug || o.name || "";
+    const name = o.name || slug;
+    const suffix = o.type ? " (" + o.type + ")" : "";
+    if (slug) console.log(slug + "|" + name + suffix);
 }
 ' 2>/dev/null
 }
