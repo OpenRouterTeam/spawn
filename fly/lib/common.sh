@@ -149,6 +149,8 @@ _validate_fly_token() {
 _try_fly_browser_auth() {
     local fly_api_base="https://api.fly.io"
 
+    log_step "Fetching Fly.io login URL..."
+
     # Create a CLI session
     local hostname
     hostname=$(hostname 2>/dev/null || echo "spawn")
@@ -239,7 +241,7 @@ ensure_fly_token() {
 
     # 4. Try browser-based OAuth (like `fly auth login`)
     log_step "Authenticating with Fly.io via browser..."
-    token=$(_try_fly_browser_auth 2>/dev/null) && {
+    token=$(_try_fly_browser_auth) && {
         export FLY_API_TOKEN="$token"
         if _validate_fly_token 2>/dev/null; then
             log_info "Authenticated with Fly.io via browser"
