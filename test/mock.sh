@@ -256,23 +256,38 @@ setup_mock_agents() {
     cat > "${TEST_DIR}/bun" << 'MOCKBUN'
 #!/bin/bash
 echo "bun $*" >> "${MOCK_LOG}"
-if [[ "$1" == "-e" ]]; then
-    _code="$2"
-    shift 2  # remove -e and the code, leaving extra args (e.g. -- field default)
-    # Walk PATH, skip our own directory, find the real bun
+
+# Find the real bun binary (skip our mock directory)
+_find_real_bun() {
+    local _self_dir
     _self_dir="$(cd "$(dirname "$0")" && pwd)"
-    _real_bun=""
     IFS=: read -ra _path_dirs <<< "$PATH"
     for _d in "${_path_dirs[@]}"; do
         if [[ "$_d" != "$_self_dir" && -x "$_d/bun" ]]; then
-            _real_bun="$_d/bun"
-            break
+            echo "$_d/bun"
+            return 0
         fi
     done
+    return 1
+}
+
+# Delegate `bun run <file>` and `bun test <file>` to the real bun.
+# fly/ agent shims use `bun run main.ts` — must pass through.
+if [[ "$1" == "run" || "$1" == "test" ]]; then
+    _real_bun=$(_find_real_bun) || { echo "real bun not found" >&2; exit 1; }
+    exec "$_real_bun" "$@"
+fi
+
+if [[ "$1" == "-e" ]]; then
+    _code="$2"
+    shift 2  # remove -e and the code, leaving extra args (e.g. -- field default)
+    _real_bun=$(_find_real_bun)
     if [[ -n "$_real_bun" ]]; then
         exec "$_real_bun" -e "$_code" "$@"
     fi
     # No real bun found — try node with a Bun.stdin polyfill
+    _self_dir="$(cd "$(dirname "$0")" && pwd)"
+    IFS=: read -ra _path_dirs <<< "$PATH"
     _real_node=""
     for _d in "${_path_dirs[@]}"; do
         if [[ "$_d" != "$_self_dir" && -x "$_d/node" ]]; then
@@ -749,6 +764,15 @@ run_test() {
         return 0
     fi
 
+    # fly/ scripts use TypeScript (bun) with native fetch() for API calls.
+    # Fixture-based mock tests (which intercept curl) don't apply.
+    # Fly coverage comes from: bun test (44 tests) + fly failure mode tests (4 tests).
+    if [[ "$cloud" == "fly" && -z "${MOCK_ERROR_SCENARIO:-}" ]]; then
+        printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}/${agent}.sh — TS provider (tested via bun test + failure modes)"
+        SKIPPED=$((SKIPPED + 1))
+        return 0
+    fi
+
     printf '%b\n' "  ${CYAN}test${NC} ${cloud}/${agent}.sh"
 
     local _pre_failed="${FAILED}"
@@ -813,11 +837,12 @@ _run_fly_error_test() {
     MOCK_REPO_ROOT="${REPO_ROOT}" \
     MOCK_ERROR_SCENARIO="${scenario}" \
     MOCK_STATE_FILE="${state_file}" \
+    SPAWN_NON_INTERACTIVE=1 \
     PATH="${TEST_DIR}:${PATH}" \
     HOME="${fake_home}" \
         bash "${script_path}" < /dev/null > "${TEST_DIR}/output.log" 2>&1 &
     local pid=$!
-    _wait_with_timeout "$pid" 4 "exit_code"
+    _wait_with_timeout "$pid" 10 "exit_code"
 
     if [[ "${exit_code}" -ne 0 ]]; then
         printf '%b\n' "    ${GREEN}✓${NC} fails on ${scenario} (exit code ${exit_code})"

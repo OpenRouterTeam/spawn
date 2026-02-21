@@ -1,47 +1,31 @@
 #!/bin/bash
 set -eo pipefail
 
-# Source common functions - try local file first, fall back to remote
+# Thin shim: ensures bun is available, downloads TS sources if needed, runs main.ts
+
+_ensure_bun() {
+    if command -v bun &>/dev/null; then return 0; fi
+    printf '\033[0;36mInstalling bun...\033[0m\n' >&2
+    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1 || { printf '\033[0;31mFailed to install bun\033[0m\n' >&2; exit 1; }
+    export PATH="$HOME/.bun/bin:$PATH"
+    command -v bun &>/dev/null || { printf '\033[0;31mbun not found after install\033[0m\n' >&2; exit 1; }
+}
+
+_ensure_bun
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
-else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/fly/lib/common.sh)"
+
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/main.ts" openclaw "$@"
 fi
 
-log_info "OpenClaw on Fly.io"
-echo ""
+REMOTE_BASE="https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/fly"
+TMPDIR_TS=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_TS"' EXIT
 
-# OpenClaw is heavy (52 deps + native modules) — needs more resources
-FLY_VM_MEMORY="${FLY_VM_MEMORY:-2048}"
-FLY_VM_SIZE="${FLY_VM_SIZE:-shared-cpu-2x}"
+mkdir -p "$TMPDIR_TS/lib"
+for f in main.ts lib/fly.ts lib/oauth.ts lib/agents.ts lib/ui.ts; do
+    curl -fsSL "$REMOTE_BASE/$f" -o "$TMPDIR_TS/$f" || { printf '\033[0;31mFailed to download %s\033[0m\n' "$f" >&2; exit 1; }
+done
 
-AGENT_MODEL_PROMPT=1
-AGENT_MODEL_DEFAULT="openrouter/auto"
-
-agent_install() {
-    # Try bun first (much faster), fall back to npm if it fails
-    install_agent "openclaw" "source ~/.bashrc && { bun install -g openclaw 2>/dev/null || npm install -g openclaw@latest; }" cloud_run
-}
-
-agent_env_vars() {
-    generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-}
-
-agent_configure() {
-    setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run
-}
-
-agent_pre_launch() {
-    start_openclaw_gateway cloud_run
-    wait_for_openclaw_gateway cloud_run
-}
-
-agent_launch_cmd() {
-    echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; openclaw tui'
-}
-
-spawn_agent "OpenClaw"
+exec bun run "$TMPDIR_TS/main.ts" openclaw "$@"

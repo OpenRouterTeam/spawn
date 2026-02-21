@@ -1,39 +1,34 @@
 #!/bin/bash
 set -eo pipefail
 
-# Source common functions - try local file first, fall back to remote
+# Thin shim: ensures bun is available, downloads TS sources if needed, runs main.ts
+# Supports both local checkout and bash <(curl ...) remote execution.
+
+_ensure_bun() {
+    if command -v bun &>/dev/null; then return 0; fi
+    printf '\033[0;36mInstalling bun...\033[0m\n' >&2
+    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1 || { printf '\033[0;31mFailed to install bun\033[0m\n' >&2; exit 1; }
+    export PATH="$HOME/.bun/bin:$PATH"
+    command -v bun &>/dev/null || { printf '\033[0;31mbun not found after install\033[0m\n' >&2; exit 1; }
+}
+
+_ensure_bun
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-    source "$SCRIPT_DIR/lib/common.sh"
-else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/fly/lib/common.sh)"
+
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/main.ts" ]]; then
+    # Local checkout — run directly
+    exec bun run "$SCRIPT_DIR/main.ts" claude "$@"
 fi
 
-log_info "Claude Code on Fly.io"
-echo ""
+# Remote execution — download TS files to temp dir
+REMOTE_BASE="https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/fly"
+TMPDIR_TS=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_TS"' EXIT
 
-agent_pre_provision() { prompt_github_auth; }
+mkdir -p "$TMPDIR_TS/lib"
+for f in main.ts lib/fly.ts lib/oauth.ts lib/agents.ts lib/ui.ts; do
+    curl -fsSL "$REMOTE_BASE/$f" -o "$TMPDIR_TS/$f" || { printf '\033[0;31mFailed to download %s\033[0m\n' "$f" >&2; exit 1; }
+done
 
-agent_install() {
-    install_claude_code cloud_run
-}
-
-agent_env_vars() {
-    generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "ANTHROPIC_BASE_URL=https://openrouter.ai/api" \
-        "ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}" \
-        "ANTHROPIC_API_KEY=" \
-        "CLAUDE_CODE_SKIP_ONBOARDING=1" \
-        "CLAUDE_CODE_ENABLE_TELEMETRY=0"
-}
-
-agent_configure() {
-    setup_claude_code_config "${OPENROUTER_API_KEY}" cloud_upload cloud_run
-}
-
-agent_launch_cmd() {
-    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude'
-}
-
-spawn_agent "Claude Code"
+exec bun run "$TMPDIR_TS/main.ts" claude "$@"
