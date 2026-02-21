@@ -20,6 +20,6 @@ agent_env_vars() {
 agent_configure() {
     setup_codex_config "${OPENROUTER_API_KEY}" cloud_upload cloud_run
 }
-agent_launch_cmd() { echo 'source ~/.zshrc && codex'; }
+agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex'; }
 
 spawn_agent "Codex CLI"

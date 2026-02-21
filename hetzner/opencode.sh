@@ -14,6 +14,6 @@ echo ""
 
 agent_install() { install_agent "OpenCode" "$(opencode_install_cmd)" cloud_run; }
 agent_env_vars() { generate_env_config "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"; }
-agent_launch_cmd() { echo 'source ~/.zshrc && opencode'; }
+agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode'; }
 
 spawn_agent "OpenCode"

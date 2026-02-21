@@ -28,6 +28,6 @@ agent_pre_launch() {
     start_openclaw_gateway cloud_run
     wait_for_openclaw_gateway cloud_run
 }
-agent_launch_cmd() { echo 'source ~/.zshrc && openclaw tui'; }
+agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; openclaw tui'; }
 
 spawn_agent "OpenClaw"
