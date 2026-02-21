@@ -24,7 +24,13 @@ fi
 # ============================================================
 
 # Cache username to avoid repeated subprocess calls
-GCP_USERNAME=$(whoami)
+# Validate before assigning to prevent command injection if whoami is tampered
+_gcp_username=$(whoami)
+if [[ ! "$_gcp_username" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "ERROR: Invalid username detected from whoami" >&2
+    exit 1
+fi
+GCP_USERNAME="$_gcp_username"
 SSH_USER="${GCP_USERNAME}"
 
 SPAWN_DASHBOARD_URL="https://console.cloud.google.com/compute/instances"
@@ -214,15 +220,16 @@ apt-get install -y curl unzip git zsh nodejs npm
 # n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
 npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
 # Install Bun and Claude Code as the login user
-GCP_USERNAME=$(logname 2>/dev/null || echo "${USER:-root}")
-if [[ ! "$GCP_USERNAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+_username=$(logname 2>/dev/null || echo "${USER:-root}")
+if [[ ! "$_username" =~ ^[a-zA-Z0-9_-]+$ ]]; then
     echo "ERROR: Invalid username detected" >&2
     exit 1
 fi
-su - "$GCP_USERNAME" -c 'curl -fsSL https://bun.sh/install | bash' || true
-su - "$GCP_USERNAME" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
+GCP_USERNAME="$_username"
+su - "${GCP_USERNAME}" -c 'curl -fsSL https://bun.sh/install | bash' || true
+su - "${GCP_USERNAME}" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
 # Configure npm global prefix so non-root user can npm install -g without sudo
-su - "$GCP_USERNAME" -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'
+su - "${GCP_USERNAME}" -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'
 # Configure PATH for all users
 echo 'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"' >> /etc/profile.d/spawn.sh
 chmod +x /etc/profile.d/spawn.sh
