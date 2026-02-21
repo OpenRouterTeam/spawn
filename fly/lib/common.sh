@@ -182,16 +182,22 @@ ensure_fly_token() {
     _fly_prompt_org
 }
 
-# Parse flyctl / GraphQL org JSON into pipe-delimited "slug|name" lines.
+# Parse fly CLI / GraphQL org JSON into pipe-delimited "slug|name" lines.
+# On failure, prints diagnostic info to stderr and returns 1.
 _fly_parse_orgs_json() {
-    bun -e '
+    local input
+    input=$(cat)
+    local parse_stderr
+    parse_stderr=$(mktemp)
+    local result
+    result=$(printf '%s' "$input" | bun -e '
 const data = JSON.parse(await Bun.stdin.text());
 if (typeof data === "object" && !Array.isArray(data) && !("nodes" in data) && !("organizations" in data)) {
-    if (!Object.keys(data).length) process.exit(1);
+    if (!Object.keys(data).length) { console.error("JSON object has no keys"); process.exit(1); }
     for (const [slug, name] of Object.entries(data)) console.log(slug + "|" + String(name));
 } else {
     const orgs: any[] = Array.isArray(data) ? data : ((data as any).nodes ?? (data as any).organizations ?? []);
-    if (!orgs.length) process.exit(1);
+    if (!orgs.length) { console.error("No organizations found in response"); process.exit(1); }
     for (const o of orgs) {
         const slug = o.slug || o.name || "";
         const name = o.name || slug;
@@ -199,29 +205,67 @@ if (typeof data === "object" && !Array.isArray(data) && !("nodes" in data) && !(
         if (slug) console.log(slug + "|" + name + suffix);
     }
 }
-' 2>/dev/null
+' 2>"$parse_stderr") || {
+        local parse_err
+        parse_err=$(cat "$parse_stderr" 2>/dev/null)
+        rm -f "$parse_stderr"
+        printf 'Failed to parse org JSON\n' >&2
+        if [[ -n "$parse_err" ]]; then
+            printf 'parse error: %s\n' "$parse_err" >&2
+        fi
+        printf 'raw JSON (first 500 chars): %.500s\n' "$input" >&2
+        return 1
+    }
+    rm -f "$parse_stderr"
+    if [[ -z "$result" ]]; then
+        printf 'Parsed org list is empty (JSON had data but no valid orgs)\n' >&2
+        printf 'raw JSON (first 500 chars): %.500s\n' "$input" >&2
+        return 1
+    fi
+    printf '%s\n' "$result"
 }
 
-# List Fly.io organizations — tries flyctl first, falls back to GraphQL API.
-# Emits pipe-delimited "slug|name" lines.
+# List Fly.io organizations — tries fly CLI first, falls back to GraphQL API.
+# Emits pipe-delimited "slug|name" lines on stdout.
+# On failure, prints diagnostic info to stderr and returns 1.
 _fly_list_orgs() {
-    # 1. Try flyctl CLI
-    local fly_cmd json
+    local fly_cmd json cli_err=""
+
+    # 1. Try fly CLI
     fly_cmd=$(_get_fly_cmd 2>/dev/null) || fly_cmd=""
     if [[ -n "$fly_cmd" ]]; then
+        local cli_stderr
+        cli_stderr=$("$fly_cmd" orgs list --json 2>&1 1>/dev/null) || true
         json=$("$fly_cmd" orgs list --json 2>/dev/null) || json=""
         if [[ -n "$json" ]]; then
-            local result
-            result=$(printf '%s' "$json" | _fly_parse_orgs_json) || result=""
+            local result parse_diag
+            parse_diag=$(mktemp)
+            result=$(printf '%s' "$json" | _fly_parse_orgs_json 2>"$parse_diag") || result=""
             if [[ -n "$result" ]]; then
+                rm -f "$parse_diag"
                 printf '%s\n' "$result"
                 return 0
             fi
+            cli_err="fly orgs list --json returned data but parsing failed"
+            local pd
+            pd=$(cat "$parse_diag" 2>/dev/null)
+            rm -f "$parse_diag"
+            [[ -n "$pd" ]] && cli_err="${cli_err}; ${pd}"
+        elif [[ -n "$cli_stderr" ]]; then
+            cli_err="fly orgs list --json failed: ${cli_stderr}"
+        else
+            cli_err="fly orgs list --json returned empty output"
         fi
+    else
+        cli_err="fly CLI not found in PATH"
     fi
 
     # 2. Fall back to Fly.io GraphQL API (works with any token type)
-    [[ -z "${FLY_API_TOKEN:-}" ]] && return 1
+    if [[ -z "${FLY_API_TOKEN:-}" ]]; then
+        printf '%s\n' "$cli_err" >&2
+        printf 'GraphQL fallback skipped: FLY_API_TOKEN is not set\n' >&2
+        return 1
+    fi
 
     local auth_header
     if [[ "$FLY_API_TOKEN" == FlyV1\ * ]]; then
@@ -231,48 +275,93 @@ _fly_list_orgs() {
     fi
 
     local gql_body='{"query":"{ organizations { nodes { slug name type } } }"}'
+    local gql_stderr
+    gql_stderr=$(mktemp)
     json=$(curl -sS -X POST "https://api.fly.io/graphql" \
         -H "Authorization: ${auth_header}" \
         -H "Content-Type: application/json" \
-        -d "$gql_body" 2>/dev/null) || return 1
-    [[ -z "$json" ]] && return 1
+        -d "$gql_body" 2>"$gql_stderr") || json=""
+
+    if [[ -z "$json" ]]; then
+        local curl_err
+        curl_err=$(cat "$gql_stderr" 2>/dev/null)
+        rm -f "$gql_stderr"
+        printf '%s\n' "$cli_err" >&2
+        printf 'GraphQL fallback also failed: curl returned empty response\n' >&2
+        [[ -n "$curl_err" ]] && printf 'curl stderr: %s\n' "$curl_err" >&2
+        return 1
+    fi
+    rm -f "$gql_stderr"
 
     # Extract organizations.nodes from GraphQL response
-    printf '%s' "$json" | bun -e '
+    local gql_parse_stderr
+    gql_parse_stderr=$(mktemp)
+    local gql_result
+    gql_result=$(printf '%s' "$json" | bun -e '
 const resp = JSON.parse(await Bun.stdin.text());
+const errs = resp?.errors;
+if (errs?.length) { console.error("GraphQL errors: " + JSON.stringify(errs)); process.exit(1); }
 const nodes = resp?.data?.organizations?.nodes ?? [];
-if (!nodes.length) process.exit(1);
+if (!nodes.length) { console.error("No organizations in GraphQL response"); process.exit(1); }
 for (const o of nodes) {
     const slug = o.slug || o.name || "";
     const name = o.name || slug;
     const suffix = o.type ? " (" + o.type + ")" : "";
     if (slug) console.log(slug + "|" + name + suffix);
 }
-' 2>/dev/null
+' 2>"$gql_parse_stderr") || {
+        local gql_err
+        gql_err=$(cat "$gql_parse_stderr" 2>/dev/null)
+        rm -f "$gql_parse_stderr"
+        printf '%s\n' "$cli_err" >&2
+        printf 'GraphQL fallback also failed\n' >&2
+        [[ -n "$gql_err" ]] && printf 'GraphQL: %s\n' "$gql_err" >&2
+        printf 'raw GraphQL response (first 500 chars): %.500s\n' "$json" >&2
+        return 1
+    }
+    rm -f "$gql_parse_stderr"
+
+    if [[ -z "$gql_result" ]]; then
+        printf '%s\n' "$cli_err" >&2
+        printf 'GraphQL returned data but no valid orgs parsed\n' >&2
+        printf 'raw GraphQL response (first 500 chars): %.500s\n' "$json" >&2
+        return 1
+    fi
+    printf '%s\n' "$gql_result"
 }
 
 # Prompt user to select their Fly.io organization.
-# Always confirms with user — never silently defaults.
+# Fails loudly if org list cannot be fetched — surfaces root cause for debugging.
 _fly_prompt_org() {
     if [[ -n "${FLY_ORG:-}" || "${SPAWN_NON_INTERACTIVE:-}" == "1" ]]; then
         return 0
     fi
 
     log_step "Fetching available Fly.io organizations..."
-    local items=""
-    items=$(_fly_list_orgs 2>/dev/null) || true
+    local items="" diag_output
+    diag_output=$(mktemp)
+    items=$(_fly_list_orgs 2>"$diag_output") || true
 
-    if [[ -n "$items" ]]; then
-        local org
-        org=$(_display_and_select "Fly.io organizations" "personal" "personal" <<< "$items")
-        export FLY_ORG="${org:-personal}"
-    else
-        # Could not fetch org list — ask user directly instead of silently defaulting
-        log_warn "Could not fetch Fly.io organizations automatically."
-        local org
-        org=$(safe_read "Enter Fly.io org slug (default: personal): ") || true
-        export FLY_ORG="${org:-personal}"
+    if [[ -z "$items" ]]; then
+        local diag
+        diag=$(cat "$diag_output" 2>/dev/null)
+        rm -f "$diag_output"
+        log_error "Failed to fetch Fly.io organizations"
+        if [[ -n "$diag" ]]; then
+            log_error "Root cause: $diag"
+        fi
+        log_warn "Debug hints:"
+        log_warn "  1. Is fly installed?     Run: fly version"
+        log_warn "  2. Is your token valid?  Run: fly auth whoami"
+        log_warn "  3. Can you list orgs?    Run: fly orgs list --json"
+        log_warn "  4. Is bun available?     Run: bun --version"
+        return 1
     fi
+    rm -f "$diag_output"
+
+    local org
+    org=$(_display_and_select "Fly.io organizations" "personal" "personal" <<< "$items")
+    export FLY_ORG="${org:-personal}"
     log_info "Using Fly.io org: ${FLY_ORG}"
 }
 
