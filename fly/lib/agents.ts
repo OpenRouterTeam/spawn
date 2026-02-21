@@ -364,7 +364,7 @@ export const agents: Record<string, AgentConfig> = {
 
   codex: {
     name: "Codex CLI",
-    install: () => installAgent("Codex CLI", "npm install -g @openai/codex@0.94.0"),
+    install: () => installAgent("Codex CLI", "npm install -g @openai/codex"),
     envVars: (apiKey) => [`OPENROUTER_API_KEY=${apiKey}`],
     configure: (apiKey) => setupCodexConfig(apiKey),
     launchCmd: () =>
