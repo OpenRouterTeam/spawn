@@ -52,26 +52,26 @@ _get_fly_cmd() {
     fi
 }
 
-# Extract a field from a JSON string.
-# Usage: _fly_json JSON_STRING PYTHON_EXPR [DEFAULT]
-# Example: _fly_json "$resp" "d.get('id')" ""
-# Example: _fly_json "$resp" "[m['id'] for m in (d if isinstance(d,list) else [])]" ""
+# Extract a top-level field from a JSON string via stdin.
+# Uses bun for JSON parsing — no eval, no env var size limits.
+# Usage: printf '%s' "$json" | _fly_json FIELD [DEFAULT]
 _fly_json() {
-    local json="$1" expr="$2" default="${3:-}"
-    _FLY_JSON="$json" _FLY_EXPR="$expr" _FLY_DEFAULT="$default" python3 -c "
-import json, os, sys
-try:
-    d = json.loads(os.environ['_FLY_JSON'])
-    v = eval(os.environ['_FLY_EXPR'])
-    if v is None:
-        print(os.environ.get('_FLY_DEFAULT',''), end='')
-    elif isinstance(v, list):
-        print('\n'.join(str(x) for x in v), end='')
-    else:
-        print(str(v), end='')
-except Exception:
-    print(os.environ.get('_FLY_DEFAULT',''), end='')
-" 2>/dev/null || printf '%s' "$default"
+    local field="$1" default="${2:-}"
+    bun -e '
+const d = JSON.parse(await Bun.stdin.text());
+const v = d[process.argv[1]];
+process.stdout.write(v != null ? String(v) : (process.argv[2] ?? ""));
+' -- "$field" "$default" 2>/dev/null || printf '%s' "$default"
+}
+
+# Extract machine IDs from a JSON array of machine objects via stdin.
+# Usage: printf '%s' "$json" | _fly_json_ids
+# Outputs one ID per line.
+_fly_json_ids() {
+    bun -e '
+const d = JSON.parse(await Bun.stdin.text());
+for (const m of (Array.isArray(d) ? d : [])) process.stdout.write(m.id + "\n");
+' 2>/dev/null || true
 }
 
 # ============================================================
@@ -95,22 +95,31 @@ _sanitize_fly_token() {
 }
 
 # Validate a Fly.io token by making a test API call.
-# Sanitizes the token first, then tests against the Machines API.
+# Sanitizes the token first. Tries Machines API (for deploy tokens),
+# falls back to api.fly.io/v1/user (for OAuth/personal tokens).
 _test_fly_token() {
     if [[ -n "${FLY_API_TOKEN:-}" ]]; then
         FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
         export FLY_API_TOKEN
     fi
+    # Try Machines API first (deploy tokens — most common)
     local response
     response=$(fly_api GET "/apps?org_slug=${FLY_ORG:-personal}")
-    if printf '%s' "$response" | grep -q '"error"\|"errors"'; then
-        log_error "Authentication failed: Invalid Fly.io API token"
-        log_error "How to fix:"
-        log_warn "  1. Run: fly tokens deploy"
-        log_warn "  2. Or generate a token at: https://fly.io/dashboard"
-        return 1
+    if ! printf '%s' "$response" | grep -q '"error"\|"errors"'; then
+        return 0
     fi
-    return 0
+    # Fallback: user API (OAuth/personal tokens)
+    response=$(curl -sS \
+        -H "Authorization: Bearer ${FLY_API_TOKEN}" \
+        "https://api.fly.io/v1/user" 2>/dev/null) || true
+    if [[ -n "$response" ]] && ! printf '%s' "$response" | grep -q '"error"\|"errors"'; then
+        return 0
+    fi
+    log_error "Authentication failed: Invalid Fly.io API token"
+    log_error "How to fix:"
+    log_warn "  1. Run: fly tokens deploy"
+    log_warn "  2. Or generate a token at: https://fly.io/dashboard"
+    return 1
 }
 
 # Ensure flyctl CLI is installed
@@ -182,39 +191,46 @@ _fly_list_orgs() {
     json=$("$fly_cmd" orgs list --json 2>/dev/null)
     [[ -z "$json" ]] && return 1
 
-    printf '%s' "$json" | python3 -c "
-import json, sys
-try:
-    data = json.loads(sys.stdin.read())
-    if isinstance(data, dict) and not any(k in data for k in ('nodes', 'organizations')):
-        if not data:
-            sys.exit(1)
-        for slug, name in data.items():
-            print(slug + '|' + str(name))
-    else:
-        orgs = data if isinstance(data, list) else data.get('nodes', data.get('organizations', []))
-        if not orgs:
-            sys.exit(1)
-        for o in orgs:
-            slug = o.get('slug') or o.get('name') or ''
-            name = o.get('name') or slug
-            otype = o.get('type') or ''
-            suffix = ' (' + otype + ')' if otype else ''
-            if slug:
-                print(slug + '|' + name + suffix)
-except Exception:
-    sys.exit(1)
-" 2>/dev/null
+    printf '%s' "$json" | bun -e '
+const data = JSON.parse(await Bun.stdin.text());
+if (typeof data === "object" && !Array.isArray(data) && !("nodes" in data) && !("organizations" in data)) {
+    if (!Object.keys(data).length) process.exit(1);
+    for (const [slug, name] of Object.entries(data)) console.log(slug + "|" + String(name));
+} else {
+    const orgs: any[] = Array.isArray(data) ? data : ((data as any).nodes ?? (data as any).organizations ?? []);
+    if (!orgs.length) process.exit(1);
+    for (const o of orgs) {
+        const slug = o.slug || o.name || "";
+        const name = o.name || slug;
+        const suffix = o.type ? " (" + o.type + ")" : "";
+        if (slug) console.log(slug + "|" + name + suffix);
+    }
+}
+' 2>/dev/null
 }
 
 # Prompt user to select their Fly.io organization.
+# Always confirms with user — never silently defaults.
 _fly_prompt_org() {
     if [[ -n "${FLY_ORG:-}" || "${SPAWN_NON_INTERACTIVE:-}" == "1" ]]; then
         return 0
     fi
-    local org
-    org=$(interactive_pick "FLY_ORG" "personal" "Fly.io organizations" _fly_list_orgs "personal")
-    export FLY_ORG="${org:-personal}"
+
+    log_step "Fetching available Fly.io organizations..."
+    local items=""
+    items=$(_fly_list_orgs 2>/dev/null) || true
+
+    if [[ -n "$items" ]]; then
+        local org
+        org=$(_display_and_select "Fly.io organizations" "personal" "personal" <<< "$items")
+        export FLY_ORG="${org:-personal}"
+    else
+        # Could not fetch org list — ask user directly instead of silently defaulting
+        log_warn "Could not fetch Fly.io organizations automatically."
+        local org
+        org=$(safe_read "Enter Fly.io org slug (default: personal): ") || true
+        export FLY_ORG="${org:-personal}"
+    fi
     log_info "Using Fly.io org: ${FLY_ORG}"
 }
 
@@ -240,7 +256,7 @@ _fly_create_app() {
 
     if printf '%s' "$response" | grep -q '"error"'; then
         local error_msg
-        error_msg=$(_fly_json "$response" "d.get('error')" "Unknown error")
+        error_msg=$(printf '%s' "$response" | _fly_json "error" "Unknown error")
         if printf '%s' "$error_msg" | grep -qi "already exists"; then
             log_info "App '$name' already exists, reusing it"
             return 0
@@ -278,12 +294,12 @@ _fly_create_machine() {
     response=$(fly_api POST "/apps/$name/machines" "$machine_body")
 
     if printf '%s' "$response" | grep -q '"error"'; then
-        log_error "Failed to create Fly.io machine: $(_fly_json "$response" "d.get('error')" "Unknown error")"
+        log_error "Failed to create Fly.io machine: $(printf '%s' "$response" | _fly_json "error" "Unknown error")"
         log_warn "Check your dashboard: https://fly.io/dashboard"
         return 1
     fi
 
-    FLY_MACHINE_ID=$(_fly_json "$response" "d.get('id')")
+    FLY_MACHINE_ID=$(printf '%s' "$response" | _fly_json "id")
     if [[ -z "$FLY_MACHINE_ID" ]]; then
         log_error "Failed to extract machine ID from API response"
         return 1
@@ -303,7 +319,7 @@ _fly_wait_for_machine_start() {
     response=$(fly_api GET "/apps/$name/machines/$machine_id/wait?state=started&timeout=$timeout")
 
     if printf '%s' "$response" | grep -q '"error"'; then
-        log_error "Machine did not reach 'started' state: $(_fly_json "$response" "d.get('error')" "timeout")"
+        log_error "Machine did not reach 'started' state: $(printf '%s' "$response" | _fly_json "error" "timeout")"
         log_error "Try a new region: FLY_REGION=ord spawn fly <agent>"
         return 1
     fi
@@ -486,7 +502,7 @@ destroy_server() {
     machines=$(fly_api GET "/apps/$app_name/machines")
 
     local machine_ids
-    machine_ids=$(_fly_json "$machines" "[m['id'] for m in (d if isinstance(d,list) else [])]")
+    machine_ids=$(printf '%s' "$machines" | _fly_json_ids)
 
     local failed=0
     for mid in $machine_ids; do
@@ -500,7 +516,7 @@ destroy_server() {
     local delete_response
     delete_response=$(fly_api DELETE "/apps/$app_name" 2>&1)
     if printf '%s' "$delete_response" | grep -q '"error"'; then
-        log_error "Failed to delete app '$app_name': $(_fly_json "$delete_response" "d.get('error')" "Unknown error")"
+        log_error "Failed to delete app '$app_name': $(printf '%s' "$delete_response" | _fly_json "error" "Unknown error")"
         return 1
     fi
 
@@ -514,23 +530,16 @@ list_servers() {
     local response
     response=$(fly_api GET "/apps?org_slug=$org")
 
-    _FLY_JSON="$response" python3 -c "
-import json, os, sys
-try:
-    d = json.loads(os.environ['_FLY_JSON'])
-    apps = d if isinstance(d, list) else d.get('apps', [])
-    if not apps:
-        print('No apps found')
-        sys.exit(0)
-    print('{:<25}{:<20}{:<12}{:<20}'.format('NAME','ID','STATUS','NETWORK'))
-    print('-' * 77)
-    for a in apps:
-        print('{:<25}{:<20}{:<12}{:<20}'.format(
-            a.get('name','N/A')[:24], a.get('id','N/A')[:19],
-            a.get('status','N/A')[:11], a.get('network','N/A')[:19]))
-except Exception as e:
-    print('Error listing apps:', e)
-" 2>/dev/null
+    printf '%s' "$response" | bun -e '
+const d = JSON.parse(await Bun.stdin.text());
+const apps: any[] = Array.isArray(d) ? d : (d.apps ?? []);
+if (!apps.length) { console.log("No apps found"); process.exit(0); }
+const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
+console.log(pad("NAME",25) + pad("ID",20) + pad("STATUS",12) + pad("NETWORK",20));
+console.log("-".repeat(77));
+for (const a of apps)
+    console.log(pad((a.name??"N/A").slice(0,24),25) + pad((a.id??"N/A").slice(0,19),20) + pad((a.status??"N/A").slice(0,11),12) + pad((a.network??"N/A").slice(0,19),20));
+' 2>/dev/null
 }
 
 # ============================================================
