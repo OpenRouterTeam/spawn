@@ -244,6 +244,11 @@ mock.module("@clack/prompts", () => ({
 // Import commands after mock setup
 const { cmdCloudInfo, cmdAgentInfo, parseAuthEnvVars } = await import("../commands.js");
 
+/** Strip ANSI escape codes from a string so assertions work regardless of color support. */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
 describe("parseAuthEnvVars", () => {
   it("should extract single env var", () => {
     expect(parseAuthEnvVars("HCLOUD_TOKEN")).toEqual(["HCLOUD_TOKEN"]);
@@ -301,7 +306,7 @@ describe("cmdCloudInfo - missing agents display", () => {
   }
 
   function getOutput(): string {
-    return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    return stripAnsi(consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n"));
   }
 
   beforeEach(async () => {
@@ -507,7 +512,7 @@ describe("cmdAgentInfo - URL and count details", () => {
   }
 
   function getOutput(): string {
-    return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    return stripAnsi(consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n"));
   }
 
   beforeEach(async () => {

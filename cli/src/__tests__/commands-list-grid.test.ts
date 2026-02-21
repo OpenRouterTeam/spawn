@@ -186,6 +186,11 @@ const { cmdMatrix, cmdClouds } = await import("../commands.js");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Strip ANSI escape codes from a string so assertions work regardless of color support. */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
 function setManifest(manifest: any) {
   global.fetch = mock(async () => ({
     ok: true,
@@ -196,11 +201,11 @@ function setManifest(manifest: any) {
 }
 
 function getOutput(consoleMocks: ReturnType<typeof createConsoleMocks>): string {
-  return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+  return stripAnsi(consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n"));
 }
 
 function getLines(consoleMocks: ReturnType<typeof createConsoleMocks>): string[] {
-  return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
+  return consoleMocks.log.mock.calls.map((c: any[]) => stripAnsi(c.join(" ")));
 }
 
 // ── cmdList Grid View ────────────────────────────────────────────────────────

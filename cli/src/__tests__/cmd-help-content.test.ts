@@ -41,6 +41,11 @@ mock.module("@clack/prompts", () => ({
 
 const { cmdHelp } = await import("../commands.js");
 
+/** Strip ANSI escape codes from a string so assertions work regardless of color support. */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
 describe("cmdHelp - content completeness", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
 
@@ -54,7 +59,7 @@ describe("cmdHelp - content completeness", () => {
 
   function getHelpOutput(): string {
     cmdHelp();
-    return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    return stripAnsi(consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n"));
   }
 
   // ── Required sections ──────────────────────────────────────────────

@@ -34,6 +34,7 @@ function runBash(script: string): { exitCode: number; stdout: string; stderr: st
       encoding: "utf-8",
       timeout: 10000,
       stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, NO_COLOR: "1" },
     });
     return { exitCode: 0, stdout: stdout.trim(), stderr: "" };
   } catch (err: any) {

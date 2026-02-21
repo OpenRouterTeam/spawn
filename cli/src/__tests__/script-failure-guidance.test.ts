@@ -1,5 +1,20 @@
 import { describe, it, expect } from "bun:test";
-import { getScriptFailureGuidance, getSignalGuidance, getStatusDescription, buildRetryCommand } from "../commands";
+import { getScriptFailureGuidance as _getScriptFailureGuidance, getSignalGuidance as _getSignalGuidance, getStatusDescription, buildRetryCommand } from "../commands";
+
+/** Strip ANSI escape codes from a string so assertions work regardless of color support. */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+/** Wrapper that strips ANSI codes from all returned lines. */
+function getScriptFailureGuidance(...args: Parameters<typeof _getScriptFailureGuidance>): string[] {
+  return _getScriptFailureGuidance(...args).map(stripAnsi);
+}
+
+/** Wrapper that strips ANSI codes from all returned lines. */
+function getSignalGuidance(...args: Parameters<typeof _getSignalGuidance>): string[] {
+  return _getSignalGuidance(...args).map(stripAnsi);
+}
 
 /**
  * Tests for getScriptFailureGuidance() in commands.ts.
