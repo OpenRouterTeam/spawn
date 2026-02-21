@@ -319,6 +319,29 @@ _create_fly_mock() {
     cat > "${TEST_DIR}/fly" << 'MOCK'
 #!/bin/bash
 echo "fly $*" >> "${MOCK_LOG}"
+
+# Simulate fly CLI failures when MOCK_ERROR_SCENARIO is set
+case "${MOCK_ERROR_SCENARIO:-}" in
+    ssh_tunnel_failure)
+        case "$1" in
+            ssh)
+                echo "Error: failed to connect to tunnel: context deadline exceeded" >&2
+                exit 1 ;;
+            machine)
+                case "${2:-}" in
+                    exec)
+                        echo "Error: machine not reachable" >&2
+                        exit 1 ;;
+                esac ;;
+        esac ;;
+    ssh_timeout)
+        case "$1" in
+            ssh|machine)
+                # Never return "ok" — simulates SSH not becoming ready
+                exit 1 ;;
+        esac ;;
+esac
+
 case "$1" in
     auth)
         case "${2:-}" in
@@ -753,6 +776,81 @@ run_test() {
 }
 
 # ============================================================
+# Fly.io failure-mode tests (#1579)
+# ============================================================
+
+# Run a single Fly.io agent script under a specific error scenario.
+# Expects MOCK_ERROR_SCENARIO to trigger error injection in mock curl and/or fly CLI.
+# Args: scenario agent
+_run_fly_error_test() {
+    local scenario="$1"
+    local agent="$2"
+    local script_path="${REPO_ROOT}/fly/${agent}.sh"
+
+    [[ -f "$script_path" ]] || return 0
+
+    printf '%b\n' "  ${CYAN}test${NC} fly/${agent}.sh [${scenario}]"
+
+    local fake_home
+    fake_home=$(setup_fake_home)
+    local state_file="${TEST_DIR}/state_fly_${agent}_${scenario}.log"
+
+    : > "${MOCK_LOG}"
+    setup_env_for_cloud "fly"
+    : > "${state_file}"
+
+    # Re-create fly mock so it picks up the error scenario
+    _create_fly_mock
+
+    local exit_code=0
+    MOCK_LOG="${MOCK_LOG}" \
+    MOCK_FIXTURE_DIR="${FIXTURES_DIR}/fly" \
+    MOCK_CLOUD="fly" \
+    MOCK_REPO_ROOT="${REPO_ROOT}" \
+    MOCK_ERROR_SCENARIO="${scenario}" \
+    MOCK_STATE_FILE="${state_file}" \
+    PATH="${TEST_DIR}:${PATH}" \
+    HOME="${fake_home}" \
+        bash "${script_path}" < /dev/null > "${TEST_DIR}/output.log" 2>&1 &
+    local pid=$!
+    _wait_with_timeout "$pid" 4 "exit_code"
+
+    if [[ "${exit_code}" -ne 0 ]]; then
+        printf '%b\n' "    ${GREEN}✓${NC} fails on ${scenario} (exit code ${exit_code})"
+        PASSED=$((PASSED + 1))
+    else
+        printf '%b\n' "    ${RED}✗${NC} should fail on ${scenario} but exited 0"
+        FAILED=$((FAILED + 1))
+    fi
+    printf '\n'
+}
+
+# Run all Fly.io failure-mode tests using a single representative agent.
+# Uses claude.sh as the test subject since it exercises the full provisioning path.
+run_fly_failure_tests() {
+    printf '%b\n' "${CYAN}━━━ fly failure modes (#1579) ━━━${NC}"
+
+    local test_agent="claude"
+    if [[ ! -f "${REPO_ROOT}/fly/${test_agent}.sh" ]]; then
+        printf '%b\n' "  ${YELLOW}skip${NC} fly/${test_agent}.sh not found"
+        SKIPPED=$((SKIPPED + 1))
+        return 0
+    fi
+
+    # 1. API rate limit (429) — mock curl returns 429 for cloud API calls
+    _run_fly_error_test "rate_limit" "$test_agent"
+
+    # 2. Machine creation failure (422) — mock curl returns 422 for POST to */machines*
+    _run_fly_error_test "create_failure" "$test_agent"
+
+    # 3. SSH tunnel failure — fly ssh console / fly machine exec exit non-zero
+    _run_fly_error_test "ssh_tunnel_failure" "$test_agent"
+
+    # 4. SSH timeout — fly CLI never returns "ok", _fly_wait_for_ssh exhausts retries
+    _run_fly_error_test "ssh_timeout" "$test_agent"
+}
+
+# ============================================================
 # Main
 # ============================================================
 
@@ -864,6 +962,38 @@ for cloud in $CLOUDS; do
         SKIPPED=$((SKIPPED + s))
     fi
 done
+
+# --- Fly.io failure-mode tests (#1579) ---
+# Run only when fly fixtures exist and no agent filter is active
+if [[ -d "${FIXTURES_DIR}/fly" && ( -z "$FILTER_CLOUD" || "$FILTER_CLOUD" == "fly" ) && -z "$FILTER_AGENT" ]]; then
+    (
+        FLY_FAIL_TEST_DIR=$(mktemp -d)
+        TEST_DIR="${FLY_FAIL_TEST_DIR}"
+        MOCK_LOG="${FLY_FAIL_TEST_DIR}/mock_calls.log"
+        PASSED=0
+        FAILED=0
+        SKIPPED=0
+
+        setup_mock_curl
+        setup_mock_ssh
+        setup_mock_agents
+
+        run_fly_failure_tests
+
+        printf '%d %d %d\n' "$PASSED" "$FAILED" "$SKIPPED" > "${CLOUD_RESULTS_DIR}/fly_failures.counts"
+        rm -rf "${FLY_FAIL_TEST_DIR}"
+    ) > "${CLOUD_RESULTS_DIR}/fly_failures.log" 2>&1
+
+    if [[ -f "${CLOUD_RESULTS_DIR}/fly_failures.log" ]]; then
+        cat "${CLOUD_RESULTS_DIR}/fly_failures.log"
+    fi
+    if [[ -f "${CLOUD_RESULTS_DIR}/fly_failures.counts" ]]; then
+        read -r p f s < "${CLOUD_RESULTS_DIR}/fly_failures.counts"
+        PASSED=$((PASSED + p))
+        FAILED=$((FAILED + f))
+        SKIPPED=$((SKIPPED + s))
+    fi
+fi
 
 # --- Summary ---
 printf '%b\n' "${CYAN}===============================${NC}"
