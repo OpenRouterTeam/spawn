@@ -251,6 +251,15 @@ When shell scripts need JSON processing, HTTP calls, crypto, or any non-trivial 
 - Pass data to bun via environment variables (e.g., `_DATA="${var}" bun eval "..."`) or temp files — never interpolate untrusted values into JS strings
 - For complex operations (SigV4 signing, API calls with retries), write a heredoc `.ts` file and `bun run` it
 
+### ESM Only — NEVER use require() or CommonJS
+All TypeScript code in `cli/src/` MUST use ESM (`import`/`export`):
+- **NEVER** use `require()` — always use `import` (static or dynamic `await import()`)
+- **NEVER** use `module.exports` — always use `export` / `export default`
+- **NEVER** use `createRequire` — it's a CJS compatibility hack that triggers Bun bugs
+- The project is `"type": "module"` in `package.json` — CJS is not supported
+- For Node.js built-ins: `import fs from "fs"`, `import path from "path"`, etc.
+- For dynamic imports: `const mod = await import("./module.ts")`
+
 ## Testing
 
 - **NEVER use vitest** — use Bun's built-in test runner (`bun:test`) exclusively
