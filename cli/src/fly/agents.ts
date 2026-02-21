@@ -350,7 +350,7 @@ export const agents: Record<string, AgentConfig> = {
     install: () =>
       installAgent(
         "openclaw",
-        "source ~/.bashrc && { bun install -g openclaw 2>/dev/null || npm install -g openclaw@latest; }",
+        "source ~/.bashrc && { (bun install -g openclaw >/dev/null 2>&1) || npm install -g openclaw@latest; }",
       ),
     envVars: (apiKey) => [
       `OPENROUTER_API_KEY=${apiKey}`,
