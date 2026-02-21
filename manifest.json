@@ -130,7 +130,7 @@
       "name": "Codex CLI",
       "description": "OpenAI's open-source coding agent",
       "url": "https://github.com/openai/codex",
-      "install": "npm install -g @openai/codex@0.94.0",
+      "install": "npm install -g @openai/codex",
       "launch": "codex",
       "env": {
         "OPENAI_API_KEY": "${OPENROUTER_API_KEY}",
