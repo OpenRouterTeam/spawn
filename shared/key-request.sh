@@ -85,12 +85,16 @@ print(v)
         if [[ -n "${val}" ]]; then
             # SECURITY: Defense-in-depth — prevent malicious values from being misused
             # downstream in unquoted expansions, eval contexts, or logging
-            # Block ALL non-alphanumeric except safe chars: - _ . / @ (for API keys/tokens)
-            if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@-]+$ ]]; then
+            # Allow alphanumeric plus safe chars needed by real tokens:
+            #   - _ . / @  (standard API key chars)
+            #   : + =      (base64 segments, URL-style formats)
+            #   space       (Fly.io "FlyV1 <macaroon>" prefixed tokens)
+            # Must match shared/common.sh _load_token_from_config regex
+            if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
                 log "SECURITY: Invalid characters in config value for ${var_name}"
                 return 1
             fi
-            # SECURITY: val is already validated against ^[a-zA-Z0-9._/@-]+$ above,
+            # SECURITY: val is already validated against ^[a-zA-Z0-9._/@:+=\ -]+$ above,
             # and var_name is validated against ^[A-Z_][A-Z0-9_]*$ by the caller.
             # Use export NAME=VALUE (bash 3.2 compatible; printf -v requires bash 4.0+).
             export "${var_name}=${val}"
