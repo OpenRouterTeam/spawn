@@ -2766,10 +2766,11 @@ _load_token_from_config() {
     # SECURITY: Validate token characters to prevent curl config injection via -K -
     # Similar to key-request.sh _try_load_env_var (^[a-zA-Z0-9._/@-]+$) but also
     # allows colon (:) for Fly.io FlyV1 tokens and URL-style formats,
-    # plus (+) / equals (=) for base64-encoded token segments, and
+    # plus (+) / equals (=) for base64-encoded token segments,
+    # comma (,) for multi-segment macaroon tokens (fm2_...,fm2_...,fo1_...), and
     # space ( ) for Fly.io "FlyV1 <macaroon>" prefixed tokens.
-    # Space is safe inside curl -K double-quoted values: header = "Authorization: FlyV1 fm2_..."
-    if [[ ! "${saved_token}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
+    # Space and comma are safe inside curl -K double-quoted values.
+    if [[ ! "${saved_token}" =~ ^[a-zA-Z0-9._/@:+=,\ -]+$ ]]; then
         log_warn "Saved ${provider_name} token is malformed — clearing cached credentials."
         rm -f "${config_file}" 2>/dev/null || true
         return 1
