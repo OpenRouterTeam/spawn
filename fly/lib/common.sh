@@ -56,15 +56,19 @@ _get_fly_cmd() {
 # Extract a top-level field from a Fly.io JSON response piped to stdin.
 # Usage: echo "$json" | _fly_json_get FIELD [DEFAULT]
 # Null / missing values return DEFAULT (empty string by default).
+# Extract a top-level JSON field from stdin using python3 (universally available).
+# Usage: echo "$json" | _fly_json_get FIELD [DEFAULT]
 _fly_json_get() {
     local field="$1" default="${2:-}"
-    _FLY_FIELD="$field" _FLY_DEFAULT="$default" \
-    bun -e "
-const text = await Bun.stdin.text();
-const d = JSON.parse(text);
-const v = d[process.env._FLY_FIELD] ?? process.env._FLY_DEFAULT ?? '';
-process.stdout.write(String(v) + '\n');
-" 2>/dev/null || echo "$default"
+    _FIELD="$field" _DEFAULT="$default" python3 -c "
+import json, sys, os
+try:
+    d = json.loads(sys.stdin.read())
+    v = d.get(os.environ['_FIELD'])
+    print(str(v) if v is not None else os.environ.get('_DEFAULT',''), end='')
+except Exception:
+    print(os.environ.get('_DEFAULT',''), end='')
+" 2>/dev/null || printf '%s' "$default"
 }
 
 # Parse the "error" field from a Fly.io API JSON response
@@ -182,17 +186,23 @@ _fly_list_orgs() {
     [[ -z "$json" ]] && return 1
 
     # Pass JSON as an argument (not stdin pipe) to avoid bun stdin buffering issues.
-    bun -e "
-const orgs = JSON.parse(process.argv[1]);
-const list = Array.isArray(orgs) ? orgs : (orgs.nodes ?? orgs.organizations ?? []);
-if (!list.length) process.exit(1);
-list.forEach(o => {
-    const slug = o.slug ?? o.name ?? '';
-    const name = o.name ?? slug;
-    const type = o.type ?? '';
-    if (slug) process.stdout.write(slug + '|' + name + (type ? ' (' + type + ')' : '') + '\n');
-});
-" "$json" 2>/dev/null
+    printf '%s' "$json" | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    orgs = data if isinstance(data, list) else data.get('nodes', data.get('organizations', []))
+    if not orgs:
+        sys.exit(1)
+    for o in orgs:
+        slug = o.get('slug') or o.get('name') or ''
+        name = o.get('name') or slug
+        otype = o.get('type') or ''
+        suffix = ' (' + otype + ')' if otype else ''
+        if slug:
+            print(slug + '|' + name + suffix)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null
 }
 
 # Prompt user to select their Fly.io organization using the shared picker.
@@ -355,23 +365,19 @@ _fly_create_app() {
 # SECURITY: Pass values via environment variables to prevent Python injection
 _fly_build_machine_body() {
     local name="$1" region="$2" vm_memory="$3"
-    _FLY_NAME="$name" _FLY_REGION="$region" _FLY_MEM="$vm_memory" \
-    bun -e "
-const body = {
-    name: process.env._FLY_NAME,
-    region: process.env._FLY_REGION,
-    config: {
-        image: 'ubuntu:24.04',
-        guest: {
-            cpu_kind: 'shared',
-            cpus: 1,
-            memory_mb: Number(process.env._FLY_MEM),
-        },
-        init: { exec: ['/bin/sleep', 'inf'] },
-        auto_destroy: false,
+    _FLY_NAME="$name" _FLY_REGION="$region" _FLY_MEM="$vm_memory" python3 -c "
+import json, os
+body = {
+    'name': os.environ['_FLY_NAME'],
+    'region': os.environ['_FLY_REGION'],
+    'config': {
+        'image': 'ubuntu:24.04',
+        'guest': {'cpu_kind': 'shared', 'cpus': 1, 'memory_mb': int(os.environ['_FLY_MEM'])},
+        'init': {'exec': ['/bin/sleep', 'inf']},
+        'auto_destroy': False,
     },
-};
-process.stdout.write(JSON.stringify(body) + '\n');
+}
+print(json.dumps(body))
 "
 }
 
@@ -411,36 +417,26 @@ _fly_create_machine() {
     log_info "Machine created: ID=$FLY_MACHINE_ID, App=$name"
 }
 
-# Wait for a Fly.io machine to reach "started" state
-# Usage: _fly_wait_for_machine_start APP_NAME MACHINE_ID [MAX_ATTEMPTS]
+# Wait for a Fly.io machine to reach "started" state using the /wait endpoint.
+# Blocks server-side — one API call instead of a polling loop (#1569).
+# Usage: _fly_wait_for_machine_start APP_NAME MACHINE_ID [TIMEOUT_SECS]
 _fly_wait_for_machine_start() {
     local name="$1"
     local machine_id="$2"
-    local max_attempts="${3:-30}"
-    local attempt=1
+    local timeout="${3:-90}"
 
-    log_step "Waiting for machine to start..."
-    while [[ "$attempt" -le "$max_attempts" ]]; do
-        local state
-        state=$(fly_api GET "/apps/$name/machines/$machine_id" | _fly_json_get "state" "unknown")
+    log_step "Waiting for machine to start (timeout: ${timeout}s)..."
+    local response
+    response=$(fly_api GET "/apps/$name/machines/$machine_id/wait?state=started&timeout=$timeout")
 
-        if [[ "$state" == "started" ]]; then
-            log_info "Machine is running"
-            return 0
-        fi
-
-        log_step "Machine state: $state ($attempt/$max_attempts)"
-        sleep 3
-        attempt=$((attempt + 1))
-    done
-
-    log_error "Machine did not start after $max_attempts attempts"
-    log_error ""
-    log_error "The machine may still be starting. You can:"
-    log_error "  1. Check status: fly machines list -a $name"
-    log_error "  2. Try a different region: FLY_REGION=ord (Chicago), FLY_REGION=ams (Amsterdam)"
-    log_error "  3. View in dashboard: https://fly.io/dashboard"
-    return 1
+    if echo "$response" | grep -q '"error"'; then
+        log_error "Machine did not reach 'started' state: $(echo "$response" | _fly_parse_error)"
+        log_error "Check status:     fly machines list -a $name"
+        log_error "Try a new region: FLY_REGION=ord spawn fly <agent>"
+        log_error "Dashboard:        https://fly.io/dashboard"
+        return 1
+    fi
+    log_info "Machine is running"
 }
 
 # Create a Fly.io app and machine
@@ -455,11 +451,17 @@ create_server() {
     validate_resource_name "$vm_size" || { log_error "Invalid FLY_VM_SIZE"; return 1; }
     if [[ ! "$vm_memory" =~ ^[0-9]+$ ]]; then log_error "Invalid FLY_VM_MEMORY: must be numeric"; return 1; fi
 
-    local create_rc=0
+    local create_rc=0 collision_attempts=0
     _fly_create_app "$name" || create_rc=$?
     while [[ "$create_rc" -eq 2 ]]; do
-        log_warn "Try a different name (Fly.io app names are globally unique)"
-        name=$(safe_read "Enter app name: ") || return 1
+        collision_attempts=$((collision_attempts + 1))
+        if [[ "$collision_attempts" -ge 5 ]]; then
+            log_error "Too many name collisions. Set a unique name with: FLY_APP_NAME=my-unique-name"
+            return 1
+        fi
+        log_warn "App name '$name' is taken — Fly.io app names are globally unique."
+        name=$(safe_read "Enter a different app name: ") || return 1
+        [[ -z "$name" ]] && { log_error "App name cannot be empty"; return 1; }
         create_rc=0
         _fly_create_app "$name" || create_rc=$?
     done
@@ -511,43 +513,49 @@ wait_for_cloud_init() {
     log_info "Base tools installed"
 }
 
-# Run a command on the Fly.io machine via flyctl ssh
-# Optional second arg: timeout in seconds (used with timeout/gtimeout if available)
+# Run a command on the Fly.io machine.
+# Uses 'fly machine exec' (direct API, no WireGuard tunnel) when FLY_MACHINE_ID
+# is set (#1570). Falls back to 'fly ssh console -C' otherwise.
+# Optional second arg: timeout in seconds.
 run_server() {
     local cmd="$1"
     local timeout_secs="${2:-}"
-    # Prepend PATH so tools installed by wait_for_cloud_init are always available.
-    # Ubuntu's default .bashrc returns early for non-interactive shells, so
-    # "source ~/.bashrc && bun ..." fails — bun's PATH line is never reached.
     local full_cmd="export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\" && $cmd"
-    # printf '%q' escapes the command so it becomes a single shell word.
-    # The remote shell parses "bash -c <escaped>" — the backslash escapes
-    # are consumed during word parsing, reconstructing the original command
-    # as the sole argument to bash -c.
-    # NOTE: Do NOT wrap $escaped_cmd in additional quotes — double-quoting
-    # preserves the backslashes literally, breaking operators like && and |.
-    local escaped_cmd
-    escaped_cmd=$(printf '%q' "$full_cmd")
 
     local fly_cmd
     fly_cmd=$(_get_fly_cmd)
 
-    # Use timeout if available and requested (fly ssh console must run in foreground)
-    if [[ -n "${timeout_secs}" ]]; then
-        local timeout_bin=""
-        if command -v timeout &>/dev/null; then timeout_bin="timeout"
-        elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"
-        fi
-        if [[ -n "${timeout_bin}" ]]; then
-            "${timeout_bin}" "${timeout_secs}" "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet
+    local timeout_bin=""
+    if command -v timeout &>/dev/null; then timeout_bin="timeout"
+    elif command -v gtimeout &>/dev/null; then timeout_bin="gtimeout"; fi
+
+    # fly machine exec: direct API execution, no WireGuard tunnel overhead
+    if [[ -n "${FLY_MACHINE_ID:-}" ]]; then
+        if [[ -n "${timeout_secs}" && -n "${timeout_bin}" ]]; then
+            "${timeout_bin}" "${timeout_secs}" \
+                "$fly_cmd" machine exec "$FLY_MACHINE_ID" --app "$FLY_APP_NAME" \
+                -- bash -c "$full_cmd"
             return $?
         fi
+        "$fly_cmd" machine exec "$FLY_MACHINE_ID" --app "$FLY_APP_NAME" \
+            -- bash -c "$full_cmd"
+        return $?
     fi
 
+    # Fallback: fly ssh console (WireGuard tunnel)
+    local escaped_cmd
+    escaped_cmd=$(printf '%q' "$full_cmd")
+    if [[ -n "${timeout_secs}" && -n "${timeout_bin}" ]]; then
+        "${timeout_bin}" "${timeout_secs}" \
+            "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet
+        return $?
+    fi
     "$fly_cmd" ssh console -a "$FLY_APP_NAME" -C "bash -c $escaped_cmd" --quiet
 }
 
-# Upload a file to the machine via base64 encoding through exec
+# Upload a file to the machine via stdin pipe — avoids embedding file content
+# in a shell command string (#1580). Uses fly machine exec with stdin when
+# FLY_MACHINE_ID is available; falls back to base64 via ssh console.
 upload_file() {
     local local_path="$1"
     local remote_path="$2"
@@ -558,15 +566,24 @@ upload_file() {
         return 1
     fi
 
+    local fly_cmd
+    fly_cmd=$(_get_fly_cmd)
+
+    # Preferred: stream file via stdin to fly machine exec (no size limit, no injection)
+    if [[ -n "${FLY_MACHINE_ID:-}" ]]; then
+        "$fly_cmd" machine exec "$FLY_MACHINE_ID" --app "$FLY_APP_NAME" \
+            -- bash -c "cat > $(printf '%q' "$remote_path")" \
+            < "$local_path"
+        return $?
+    fi
+
+    # Fallback: base64 encode and decode via ssh console
     local content
     content=$(base64 -w0 < "$local_path" 2>/dev/null || base64 < "$local_path")
-
-    # SECURITY: Validate base64 output contains only safe characters (defense-in-depth)
     if [[ "${content}" =~ [^A-Za-z0-9+/=] ]]; then
         log_error "upload_file: base64 output contains unexpected characters"
         return 1
     fi
-
     run_server "printf '%s' '${content}' | base64 -d > '${remote_path}'"
 }
 
@@ -591,32 +608,47 @@ interactive_session() {
     return "${session_exit}"
 }
 
-# Destroy a Fly.io machine and app
+# Destroy a Fly.io machine and app (#1577: errors are now reported, not swallowed)
 destroy_server() {
     local app_name="${1:-$FLY_APP_NAME}"
+    if [[ -z "$app_name" ]]; then
+        log_error "destroy_server: no app name provided"
+        return 1
+    fi
 
-    log_step "Destroying Fly.io app and machines for '$app_name'..."
+    log_step "Destroying Fly.io app '$app_name'..."
 
-    # List and destroy all machines in the app
     local machines
     machines=$(fly_api GET "/apps/$app_name/machines")
+
     local machine_ids
-    machine_ids=$(echo "$machines" | bun -e "
-const data = JSON.parse(await Bun.stdin.text());
-const ids = Array.isArray(data) ? data.map((m: {id: string}) => m.id).join('\n') : '';
-if (ids) process.stdout.write(ids + '\n');
+    machine_ids=$(printf '%s' "$machines" | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    for m in (data if isinstance(data, list) else []):
+        print(m['id'])
+except Exception:
+    pass
 " 2>/dev/null || true)
 
+    local failed=0
     for mid in $machine_ids; do
         log_step "Stopping machine $mid..."
-        fly_api POST "/apps/$app_name/machines/$mid/stop" '{}' >/dev/null 2>&1 || true
+        fly_api POST "/apps/$app_name/machines/$mid/stop" '{}' >/dev/null || true
         sleep 2
         log_step "Destroying machine $mid..."
-        fly_api DELETE "/apps/$app_name/machines/$mid?force=true" >/dev/null 2>&1 || true
+        fly_api DELETE "/apps/$app_name/machines/$mid?force=true" >/dev/null || failed=1
     done
 
-    # Delete the app
-    fly_api DELETE "/apps/$app_name" >/dev/null 2>&1 || true
+    local delete_response
+    delete_response=$(fly_api DELETE "/apps/$app_name" 2>&1)
+    if echo "$delete_response" | grep -q '"error"'; then
+        log_error "Failed to delete app '$app_name': $(echo "$delete_response" | _fly_parse_error)"
+        return 1
+    fi
+
+    [[ "$failed" -eq 1 ]] && log_warn "Some machines may not have been fully destroyed — check: fly machines list -a $app_name"
     log_info "App '$app_name' destroyed"
 }
 
@@ -625,21 +657,22 @@ list_servers() {
     local org=$(get_fly_org)
     local response=$(fly_api GET "/apps?org_slug=$org")
 
-    echo "$response" | bun -e "
-const data = JSON.parse(await Bun.stdin.text());
-const apps: {name?:string;id?:string;status?:string;network?:string}[] =
-    Array.isArray(data) ? data : (data.apps ?? []);
-if (!apps.length) { console.log('No apps found'); process.exit(0); }
-console.log('NAME'.padEnd(25) + 'ID'.padEnd(20) + 'STATUS'.padEnd(12) + 'NETWORK'.padEnd(20));
-console.log('-'.repeat(77));
-for (const a of apps) {
-    console.log(
-        String(a.name ?? 'N/A').padEnd(25) +
-        String(a.id ?? 'N/A').padEnd(20) +
-        String(a.status ?? 'N/A').padEnd(12) +
-        String(a.network ?? 'N/A').padEnd(20)
-    );
-}
+    printf '%s' "$response" | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    apps = data if isinstance(data, list) else data.get('apps', [])
+    if not apps:
+        print('No apps found')
+        sys.exit(0)
+    print('{:<25}{:<20}{:<12}{:<20}'.format('NAME','ID','STATUS','NETWORK'))
+    print('-' * 77)
+    for a in apps:
+        print('{:<25}{:<20}{:<12}{:<20}'.format(
+            a.get('name','N/A')[:24], a.get('id','N/A')[:19],
+            a.get('status','N/A')[:11], a.get('network','N/A')[:19]))
+except Exception as e:
+    print('Error listing apps:', e)
 " 2>/dev/null
 }
 

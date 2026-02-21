@@ -324,6 +324,17 @@ case "$1" in
         case "${2:-}" in
             token) echo "test-token-fly" ;;
         esac ;;
+    machine)
+        case "${2:-}" in
+            exec)
+                # fly machine exec MACHINE_ID --app APP -- bash -c CMD
+                all_args="$*"
+                if [[ "$all_args" == *"echo ok"* ]] || [[ "$all_args" == *'echo\ ok'* ]]; then
+                    echo "ok"
+                fi
+                ;;
+            list) echo "[]" ;;
+        esac ;;
     ssh)
         # fly ssh console -a APP -C "bash -c CMD" --quiet
         # Extract the command and simulate its output
