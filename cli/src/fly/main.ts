@@ -10,7 +10,6 @@ import {
   getServerName,
   waitForCloudInit,
   runServer,
-  uploadFile,
   interactiveSession,
 } from "./fly";
 import { getOrPromptApiKey, getModelIdInteractive } from "./oauth";
@@ -76,29 +75,19 @@ async function main() {
   await agent.install();
 
   // 8. Inject environment variables via .spawnrc
+  // Inline base64 write + shell hook in a single remote call instead of
+  // separate uploadFile + mv + 2× shell hook calls.
   logStep("Setting up environment variables...");
   const envContent = generateEnvConfig(agent.envVars(apiKey));
-  const fs = require("fs");
-  const os = require("os");
-  const path = require("path");
-  const tmpFile = path.join(os.tmpdir(), `spawn_env_${Date.now()}`);
-  fs.writeFileSync(tmpFile, envContent, { mode: 0o600 });
-
-  const tempRemote = `/tmp/spawn_env_${Date.now()}`;
+  const envB64 = Buffer.from(envContent).toString("base64");
   try {
-    await uploadFile(tmpFile, tempRemote);
     await runServer(
-      `cp '${tempRemote}' ~/.spawnrc && chmod 600 ~/.spawnrc; rm -f '${tempRemote}'`,
+      `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
+      `grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc; ` +
+      `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc`,
     );
-    // Hook .spawnrc into shell configs
-    await runServer(
-      "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc",
-    ).catch(() => logWarn("Could not hook .spawnrc into .bashrc"));
-    await runServer(
-      "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc",
-    ).catch(() => logWarn("Could not hook .spawnrc into .zshrc"));
-  } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+  } catch {
+    logWarn("Environment setup had errors");
   }
 
   // GitHub CLI setup

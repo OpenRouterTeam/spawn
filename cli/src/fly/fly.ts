@@ -610,23 +610,17 @@ export async function runServer(
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const flyCmd = getCmd()!;
 
-  const args = [flyCmd, "machine", "exec", flyMachineId, "--app", flyAppName, "--", "bash", "-c", fullCmd];
+  const escapedCmd = fullCmd.replace(/'/g, "'\\''");
+  // Use fly ssh console (WireGuard) instead of fly machine exec (HTTP) to avoid
+  // 408 deadline_exceeded on long-running commands.
+  const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
-  if (timeoutSecs) {
-    // Look for timeout/gtimeout
-    const timeoutBin = Bun.spawnSync(["which", "timeout"], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0
-      ? "timeout"
-      : Bun.spawnSync(["which", "gtimeout"], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0
-        ? "gtimeout"
-        : null;
-
-    if (timeoutBin) {
-      args.unshift(timeoutBin, String(timeoutSecs));
-    }
-  }
-
-  const proc = Bun.spawn(args, { stdio: ["inherit", "inherit", "inherit"] });
+  const proc = Bun.spawn(args, { stdio: ["inherit", "inherit", "inherit"], env: process.env });
+  // Local safety timer — WireGuard has no HTTP deadline but we still want a ceiling.
+  const timeout = (timeoutSecs || 300) * 1000;
+  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
   const exitCode = await proc.exited;
+  clearTimeout(timer);
   if (exitCode !== 0) {
     throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
   }
@@ -640,18 +634,16 @@ export async function runServerCapture(
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const flyCmd = getCmd()!;
 
-  const args = [flyCmd, "machine", "exec", flyMachineId, "--app", flyAppName, "--", "bash", "-c", fullCmd];
+  const escapedCmd = fullCmd.replace(/'/g, "'\\''");
+  const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
-  const proc = Bun.spawn(args, { stdio: ["ignore", "pipe", "pipe"] });
-
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  if (timeoutSecs) {
-    timer = setTimeout(() => proc.kill(), timeoutSecs * 1000);
-  }
+  const proc = Bun.spawn(args, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+  const timeout = (timeoutSecs || 300) * 1000;
+  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
 
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
-  if (timer) clearTimeout(timer);
+  clearTimeout(timer);
 
   if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
   return stdout.trim();
@@ -667,13 +659,12 @@ export async function uploadFile(
   }
   const flyCmd = getCmd()!;
   const fs = require("fs");
-  const content = fs.readFileSync(localPath);
+  const content: Buffer = fs.readFileSync(localPath);
+  const b64 = content.toString("base64");
   const proc = Bun.spawn(
-    [flyCmd, "machine", "exec", flyMachineId, "--app", flyAppName, "--", "bash", "-c", `cat > ${remotePath}`],
-    { stdio: ["pipe", "ignore", "ignore"] },
+    [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c 'printf "%s" ${b64} | base64 -d > ${remotePath}'`],
+    { stdio: ["ignore", "ignore", "ignore"], env: process.env },
   );
-  proc.stdin!.write(content);
-  proc.stdin!.end();
   const exitCode = await proc.exited;
   if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
 }
@@ -686,7 +677,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
 
   const proc = Bun.spawn(
     [flyCmd, "ssh", "console", "-a", flyAppName, "--pty", "-C", `bash -c '${escapedCmd}'`],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    { stdio: ["inherit", "inherit", "inherit"], env: process.env },
   );
   const exitCode = await proc.exited;
 
@@ -750,57 +741,25 @@ export async function waitForSsh(maxAttempts = 20): Promise<void> {
 export async function waitForCloudInit(): Promise<void> {
   await waitForSsh();
 
-  logStep("Installing packages...");
-  try {
-    await runWithRetry(3, 10, 300, "apt-get update -y && apt-get install -y curl unzip git");
-  } catch {
-    logWarn("Package install failed, continuing anyway...");
-  }
+  logStep("Installing packages (Node.js, bun)...");
+  // Batch all package installs into a single remote script to avoid multiple
+  // round-trips (each of which was previously a separate fly machine exec call).
+  const setupScript = [
+    `echo "==> Installing base packages..."`,
+    `apt-get update -y && apt-get install -y curl unzip git || true`,
+    `echo "==> Checking Node.js..."`,
+    `if ! command -v node >/dev/null 2>&1; then { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs; } || apt-get install -y nodejs || true; fi`,
+    `echo "node: $(node --version 2>/dev/null || echo not installed)"`,
+    `echo "==> Checking bun..."`,
+    `if ! command -v bun >/dev/null 2>&1 && [ ! -f "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash || true; fi`,
+    `for rc in ~/.bashrc ~/.zshrc; do grep -q '.bun/bin' "$rc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' >> "$rc"; done`,
+  ].join('\n');
 
-  logStep("Installing Node.js...");
   try {
-    await runWithRetry(
-      3,
-      10,
-      180,
-      "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs",
-    );
+    await runWithRetry(3, 10, 300, setupScript);
   } catch {
-    // ignore
+    logWarn("Package install had errors, continuing...");
   }
-
-  // Verify node
-  try {
-    await runServerCapture("which node && node --version", 15);
-    const ver = await runServerCapture("node --version", 10);
-    logInfo(`Node.js installed: ${ver}`);
-  } catch {
-    logWarn("Node.js not found after nodesource install, falling back to default Debian package...");
-    try {
-      await runWithRetry(2, 5, 120, "apt-get install -y nodejs");
-      const ver = await runServerCapture("node --version", 10);
-      logInfo(`Node.js installed from default Debian repos: ${ver}`);
-    } catch {
-      logError("Node.js is NOT installed — npm-based agents will not work");
-    }
-  }
-
-  logStep("Installing bun...");
-  try {
-    await runWithRetry(2, 5, 120, "curl -fsSL https://bun.sh/install | bash");
-  } catch {
-    // ignore
-  }
-
-  // Add to PATH in shell configs
-  const pathLine = 'echo "export PATH=\\"\\$HOME/.local/bin:\\$HOME/.bun/bin:\\$PATH\\"" >> ~/.bashrc';
-  const pathLineZsh = 'echo "export PATH=\\"\\$HOME/.local/bin:\\$HOME/.bun/bin:\\$PATH\\"" >> ~/.zshrc';
-  try {
-    await runServer(pathLine, 30);
-  } catch { /* ignore */ }
-  try {
-    await runServer(pathLineZsh, 30);
-  } catch { /* ignore */ }
   logInfo("Base tools installed");
 }
 
