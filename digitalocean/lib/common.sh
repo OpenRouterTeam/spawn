@@ -223,7 +223,16 @@ destroy_server() {
     local response
     response=$(do_api DELETE "/droplets/$droplet_id")
 
-    # DELETE returns 204 No Content on success (empty body)
+    # DELETE returns 204 No Content on success (empty body).
+    # Non-empty response with error fields indicates failure.
+    if [[ -n "$response" ]] && echo "$response" | grep -q '"message"'; then
+        log_error "Failed to destroy droplet $droplet_id"
+        log_error "API Error: $(extract_api_error_message "$response" "$response")"
+        log_warn "The droplet may still be running and incurring charges."
+        log_warn "Delete it manually at: ${SPAWN_DASHBOARD_URL}"
+        return 1
+    fi
+
     log_info "Droplet $droplet_id destroyed"
 }
 
