@@ -53,11 +53,25 @@ _get_fly_cmd() {
     fi
 }
 
+# Extract a top-level field from a Fly.io JSON response piped to stdin.
+# Usage: echo "$json" | _fly_json_get FIELD [DEFAULT]
+# Null / missing values return DEFAULT (empty string by default).
+_fly_json_get() {
+    local field="$1" default="${2:-}"
+    _FLY_FIELD="$field" _FLY_DEFAULT="$default" \
+    bun -e "
+const text = await Bun.stdin.text();
+const d = JSON.parse(text);
+const v = d[process.env._FLY_FIELD] ?? process.env._FLY_DEFAULT ?? '';
+process.stdout.write(String(v) + '\n');
+" 2>/dev/null || echo "$default"
+}
+
 # Parse the "error" field from a Fly.io API JSON response
 # Usage: echo "$response" | _fly_parse_error [DEFAULT]
 _fly_parse_error() {
     local default="${1:-Unknown error}"
-    python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('error',sys.argv[1]))" "$default" 2>/dev/null || cat
+    _fly_json_get "error" "$default"
 }
 
 # Ensure flyctl CLI is installed
@@ -163,8 +177,8 @@ _try_fly_browser_auth() {
         -d "$session_body" 2>/dev/null) || return 1
 
     local session_id auth_url
-    session_id=$(_extract_json_field "$response" "d.get('id','')")
-    auth_url=$(_extract_json_field "$response" "d.get('auth_url','')")
+    session_id=$(echo "$response" | _fly_json_get "id")
+    auth_url=$(echo "$response" | _fly_json_get "auth_url")
 
     if [[ -z "$session_id" || -z "$auth_url" ]]; then
         return 1
@@ -189,7 +203,7 @@ _try_fly_browser_auth() {
         poll_response=$(curl -fsSL "${fly_api_base}/api/v1/cli_sessions/${session_id}" 2>/dev/null) || continue
 
         local access_token
-        access_token=$(_extract_json_field "$poll_response" "d.get('access_token','')")
+        access_token=$(echo "$poll_response" | _fly_json_get "access_token")
 
         if [[ -n "$access_token" ]]; then
             echo "$access_token"
@@ -323,25 +337,23 @@ _fly_create_app() {
 # SECURITY: Pass values via environment variables to prevent Python injection
 _fly_build_machine_body() {
     local name="$1" region="$2" vm_memory="$3"
-    _FLY_NAME="$name" _FLY_REGION="$region" _FLY_MEM="$vm_memory" python3 -c "
-import json, os
-body = {
-    'name': os.environ['_FLY_NAME'],
-    'region': os.environ['_FLY_REGION'],
-    'config': {
-        'image': 'ubuntu:24.04',
-        'guest': {
-            'cpu_kind': 'shared',
-            'cpus': 1,
-            'memory_mb': int(os.environ['_FLY_MEM'])
+    _FLY_NAME="$name" _FLY_REGION="$region" _FLY_MEM="$vm_memory" \
+    bun -e "
+const body = {
+    name: process.env._FLY_NAME,
+    region: process.env._FLY_REGION,
+    config: {
+        image: 'ubuntu:24.04',
+        guest: {
+            cpu_kind: 'shared',
+            cpus: 1,
+            memory_mb: Number(process.env._FLY_MEM),
         },
-        'init': {
-            'exec': ['/bin/sleep', 'inf']
-        },
-        'auto_destroy': False
-    }
-}
-print(json.dumps(body))
+        init: { exec: ['/bin/sleep', 'inf'] },
+        auto_destroy: false,
+    },
+};
+process.stdout.write(JSON.stringify(body) + '\n');
 "
 }
 
@@ -371,7 +383,7 @@ _fly_create_machine() {
         return 1
     fi
 
-    FLY_MACHINE_ID=$(_extract_json_field "$response" "d['id']")
+    FLY_MACHINE_ID=$(echo "$response" | _fly_json_get "id")
     if [[ -z "$FLY_MACHINE_ID" ]]; then
         log_error "Failed to extract machine ID from API response"
         log_error "Response: $response"
@@ -392,7 +404,7 @@ _fly_wait_for_machine_start() {
     log_step "Waiting for machine to start..."
     while [[ "$attempt" -le "$max_attempts" ]]; do
         local state
-        state=$(_extract_json_field "$(fly_api GET "/apps/$name/machines/$machine_id")" "d.get('state','unknown')")
+        state=$(fly_api GET "/apps/$name/machines/$machine_id" | _fly_json_get "state" "unknown")
 
         if [[ "$state" == "started" ]]; then
             log_info "Machine is running"
@@ -566,12 +578,10 @@ destroy_server() {
     local machines
     machines=$(fly_api GET "/apps/$app_name/machines")
     local machine_ids
-    machine_ids=$(echo "$machines" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-if isinstance(data, list):
-    for m in data:
-        print(m['id'])
+    machine_ids=$(echo "$machines" | bun -e "
+const data = JSON.parse(await Bun.stdin.text());
+const ids = Array.isArray(data) ? data.map((m: {id: string}) => m.id).join('\n') : '';
+if (ids) process.stdout.write(ids + '\n');
 " 2>/dev/null || true)
 
     for mid in $machine_ids; do
@@ -592,22 +602,22 @@ list_servers() {
     local org=$(get_fly_org)
     local response=$(fly_api GET "/apps?org_slug=$org")
 
-    python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-apps = data if isinstance(data, list) else data.get('apps', [])
-if not apps:
-    print('No apps found')
-    sys.exit(0)
-print(f\"{'NAME':<25} {'ID':<20} {'STATUS':<12} {'NETWORK':<20}\")
-print('-' * 77)
-for a in apps:
-    name = a.get('name', 'N/A')
-    aid = a.get('id', 'N/A')
-    status = a.get('status', 'N/A')
-    network = a.get('network', 'N/A')
-    print(f'{name:<25} {aid:<20} {status:<12} {network:<20}')
-" <<< "$response"
+    echo "$response" | bun -e "
+const data = JSON.parse(await Bun.stdin.text());
+const apps: {name?:string;id?:string;status?:string;network?:string}[] =
+    Array.isArray(data) ? data : (data.apps ?? []);
+if (!apps.length) { console.log('No apps found'); process.exit(0); }
+console.log('NAME'.padEnd(25) + 'ID'.padEnd(20) + 'STATUS'.padEnd(12) + 'NETWORK'.padEnd(20));
+console.log('-'.repeat(77));
+for (const a of apps) {
+    console.log(
+        String(a.name ?? 'N/A').padEnd(25) +
+        String(a.id ?? 'N/A').padEnd(20) +
+        String(a.status ?? 'N/A').padEnd(12) +
+        String(a.network ?? 'N/A').padEnd(20)
+    );
+}
+" 2>/dev/null
 }
 
 # ============================================================
