@@ -59,14 +59,11 @@ _get_fly_cmd() {
 _fly_json_get() {
     local field="$1" default="${2:-}"
     _FLY_FIELD="$field" _FLY_DEFAULT="$default" \
-    python3 -c "
-import json, sys, os
-d = json.loads(sys.stdin.read())
-v = d.get(os.environ['_FLY_FIELD'])
-if v is None:
-    print(os.environ.get('_FLY_DEFAULT', ''))
-else:
-    print(str(v))
+    bun -e "
+const text = await Bun.stdin.text();
+const d = JSON.parse(text);
+const v = d[process.env._FLY_FIELD] ?? process.env._FLY_DEFAULT ?? '';
+process.stdout.write(String(v) + '\n');
 " 2>/dev/null || echo "$default"
 }
 
@@ -341,23 +338,22 @@ _fly_create_app() {
 _fly_build_machine_body() {
     local name="$1" region="$2" vm_memory="$3"
     _FLY_NAME="$name" _FLY_REGION="$region" _FLY_MEM="$vm_memory" \
-    python3 -c "
-import json, os, sys
-body = {
-    'name': os.environ['_FLY_NAME'],
-    'region': os.environ['_FLY_REGION'],
-    'config': {
-        'image': 'ubuntu:24.04',
-        'guest': {
-            'cpu_kind': 'shared',
-            'cpus': 1,
-            'memory_mb': int(os.environ['_FLY_MEM']),
+    bun -e "
+const body = {
+    name: process.env._FLY_NAME,
+    region: process.env._FLY_REGION,
+    config: {
+        image: 'ubuntu:24.04',
+        guest: {
+            cpu_kind: 'shared',
+            cpus: 1,
+            memory_mb: Number(process.env._FLY_MEM),
         },
-        'init': {'exec': ['/bin/sleep', 'inf']},
-        'auto_destroy': False,
+        init: { exec: ['/bin/sleep', 'inf'] },
+        auto_destroy: false,
     },
-}
-print(json.dumps(body))
+};
+process.stdout.write(JSON.stringify(body) + '\n');
 "
 }
 
@@ -582,11 +578,10 @@ destroy_server() {
     local machines
     machines=$(fly_api GET "/apps/$app_name/machines")
     local machine_ids
-    machine_ids=$(echo "$machines" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-ids = [m['id'] for m in data if isinstance(data, list) and 'id' in m] if isinstance(data, list) else []
-print('\n'.join(ids))
+    machine_ids=$(echo "$machines" | bun -e "
+const data = JSON.parse(await Bun.stdin.text());
+const ids = Array.isArray(data) ? data.map((m: {id: string}) => m.id).join('\n') : '';
+if (ids) process.stdout.write(ids + '\n');
 " 2>/dev/null || true)
 
     for mid in $machine_ids; do
@@ -607,22 +602,21 @@ list_servers() {
     local org=$(get_fly_org)
     local response=$(fly_api GET "/apps?org_slug=$org")
 
-    echo "$response" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-apps = data if isinstance(data, list) else data.get('apps', [])
-if not apps:
-    print('No apps found')
-    sys.exit(0)
-print('NAME'.ljust(25) + 'ID'.ljust(20) + 'STATUS'.ljust(12) + 'NETWORK'.ljust(20))
-print('-' * 77)
-for a in apps:
-    print(
-        str(a.get('name', 'N/A')).ljust(25) +
-        str(a.get('id', 'N/A')).ljust(20) +
-        str(a.get('status', 'N/A')).ljust(12) +
-        str(a.get('network', 'N/A')).ljust(20)
-    )
+    echo "$response" | bun -e "
+const data = JSON.parse(await Bun.stdin.text());
+const apps: {name?:string;id?:string;status?:string;network?:string}[] =
+    Array.isArray(data) ? data : (data.apps ?? []);
+if (!apps.length) { console.log('No apps found'); process.exit(0); }
+console.log('NAME'.padEnd(25) + 'ID'.padEnd(20) + 'STATUS'.padEnd(12) + 'NETWORK'.padEnd(20));
+console.log('-'.repeat(77));
+for (const a of apps) {
+    console.log(
+        String(a.name ?? 'N/A').padEnd(25) +
+        String(a.id ?? 'N/A').padEnd(20) +
+        String(a.status ?? 'N/A').padEnd(12) +
+        String(a.network ?? 'N/A').padEnd(20)
+    );
+}
 " 2>/dev/null
 }
 
