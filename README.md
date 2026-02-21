@@ -6,14 +6,14 @@ Launch any AI agent on any cloud with a single command. Coding agents, research 
 
 ## Install
 
+**macOS / Linux — and Windows users inside a WSL2 terminal (Ubuntu, Debian, etc.):**
 ```bash
 curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash
 ```
 
-Or install directly from GitHub:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
+**Windows PowerShell (outside WSL):**
+```powershell
+irm https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.ps1 | iex
 ```
 
 ## Usage

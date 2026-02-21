@@ -208,13 +208,17 @@ build_and_install() {
     ensure_in_path "${INSTALL_DIR}"
 }
 
-# --- Install bun if not present ---
+# --- Locate or install bun ---
+# When running via `curl | bash`, subshells may not inherit PATH updates,
+# so we always prepend the standard bun install locations explicitly.
+export BUN_INSTALL="${BUN_INSTALL:-${HOME}/.bun}"
+export PATH="${BUN_INSTALL}/bin:${HOME}/.local/bin:${PATH}"
+
 if ! command -v bun &>/dev/null; then
     log_step "bun not found. Installing bun..."
     curl -fsSL https://bun.sh/install | bash
 
-    # Source the updated PATH so bun is available immediately
-    export BUN_INSTALL="${HOME}/.bun"
+    # Re-export so bun is available in this session immediately
     export PATH="${BUN_INSTALL}/bin:${PATH}"
 
     if ! command -v bun &>/dev/null; then
@@ -223,7 +227,7 @@ if ! command -v bun &>/dev/null; then
         echo "Please install bun manually:"
         echo "  curl -fsSL https://bun.sh/install | bash"
         echo ""
-        echo "Then re-run:"
+        echo "Then reopen your terminal and re-run:"
         echo "  curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash"
         exit 1
     fi
