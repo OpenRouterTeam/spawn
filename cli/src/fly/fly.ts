@@ -1,5 +1,6 @@
 // fly/lib/fly.ts — Core Fly.io provider: API, auth, orgs, provisioning, execution
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import {
   logInfo,
   logWarn,
@@ -97,10 +98,18 @@ function hasError(text: string): boolean {
 }
 
 function getCmd(): string | null {
+  // Check PATH first
   for (const name of ["fly", "flyctl"]) {
     if (Bun.spawnSync(["which", name], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0) {
       return name;
     }
+  }
+  // Bun.spawnSync inherits the original PATH, not process.env mutations.
+  // Check the default install location directly.
+  const flyBin = `${process.env.HOME}/.fly/bin`;
+  for (const name of ["fly", "flyctl"]) {
+    const fullPath = `${flyBin}/${name}`;
+    if (existsSync(fullPath)) return fullPath;
   }
   return null;
 }
@@ -168,10 +177,17 @@ async function saveTokenToConfig(token: string): Promise<void> {
   );
 }
 
+/** Sync the resolved token to process.env so fly CLI subprocesses (ssh console) can authenticate. */
+function syncTokenToEnv(): void {
+  if (flyApiToken) {
+    process.env.FLY_API_TOKEN = flyApiToken;
+  }
+}
+
 function loadTokenFromConfig(): string | null {
   try {
     const data = JSON.parse(
-      require("fs").readFileSync(FLY_CONFIG_PATH, "utf-8"),
+      readFileSync(FLY_CONFIG_PATH, "utf-8"),
     );
     const token = data.api_key || data.token || "";
     if (!token) return null;
@@ -193,13 +209,12 @@ export function saveVmConnection(
   cloud: string,
 ): void {
   const dir = `${process.env.HOME}/.spawn`;
-  const fs = require("fs");
-  fs.mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
   const json: Record<string, string> = { ip, user };
   if (serverId) json.server_id = serverId;
   if (serverName) json.server_name = serverName;
   if (cloud) json.cloud = cloud;
-  fs.writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
+  writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
 // ─── Authentication ──────────────────────────────────────────────────────────
@@ -275,6 +290,7 @@ export async function ensureFlyToken(): Promise<void> {
     if (await testFlyToken()) {
       logInfo("Using Fly.io API token from environment");
       await saveTokenToConfig(flyApiToken);
+      syncTokenToEnv();
       return;
     }
     logWarn("FLY_API_TOKEN from environment is invalid or expired");
@@ -287,6 +303,7 @@ export async function ensureFlyToken(): Promise<void> {
     flyApiToken = sanitizeFlyToken(saved);
     if (await testFlyToken()) {
       logInfo("Using saved Fly.io API token");
+      syncTokenToEnv();
       return;
     }
     logWarn("Saved Fly.io token is invalid or expired");
@@ -308,6 +325,7 @@ export async function ensureFlyToken(): Promise<void> {
         if (await testFlyToken()) {
           logInfo("Using Fly.io API token from fly CLI");
           await saveTokenToConfig(flyApiToken);
+          syncTokenToEnv();
           return;
         }
         flyApiToken = "";
@@ -334,6 +352,7 @@ export async function ensureFlyToken(): Promise<void> {
       if (token) {
         flyApiToken = sanitizeFlyToken(token);
         await saveTokenToConfig(flyApiToken);
+        syncTokenToEnv();
         logInfo("Authenticated with Fly.io via OAuth");
         return;
       }
@@ -354,6 +373,7 @@ export async function ensureFlyToken(): Promise<void> {
     throw new Error("Invalid Fly.io token");
   }
   await saveTokenToConfig(flyApiToken);
+  syncTokenToEnv();
   logInfo("Using manually entered Fly.io API token");
 }
 
@@ -664,8 +684,7 @@ export async function uploadFile(
     throw new Error("Invalid remote path");
   }
   const flyCmd = getCmd()!;
-  const fs = require("fs");
-  const content: Buffer = fs.readFileSync(localPath);
+  const content: Buffer = readFileSync(localPath);
   const b64 = content.toString("base64");
   const proc = Bun.spawn(
     [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c 'printf "%s" ${b64} | base64 -d > ${remotePath}'`],
