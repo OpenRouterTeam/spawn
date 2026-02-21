@@ -155,10 +155,54 @@ TS_EOF
 # Authentication / mode detection
 # ============================================================
 
+# Install the AWS CLI v2.
+# macOS: uses the official .pkg installer (requires sudo).
+# Linux: downloads the zip installer (requires unzip + sudo).
+# Returns 0 on success, 1 on failure.
+_install_aws_cli() {
+    log_step "Installing AWS CLI v2..."
+
+    if [[ "$(uname)" == "Darwin" ]]; then
+        local _aws_tmp
+        _aws_tmp=$(mktemp -d)
+        curl -fsSL "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "${_aws_tmp}/AWSCLIV2.pkg" \
+            && sudo installer -pkg "${_aws_tmp}/AWSCLIV2.pkg" -target / \
+            && rm -rf "${_aws_tmp}" \
+            || {
+                rm -rf "${_aws_tmp}"
+                log_error "AWS CLI install failed."
+                log_error "  Try manually: brew install awscli"
+                return 1
+            }
+    else
+        if ! command -v unzip &>/dev/null; then
+            log_info "Installing unzip (required for AWS CLI)..."
+            sudo apt-get update -y && sudo apt-get install -y unzip || {
+                log_error "Could not install unzip. Install it manually, then re-run."
+                return 1
+            }
+        fi
+        local _aws_tmp
+        _aws_tmp=$(mktemp -d)
+        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
+            -o "${_aws_tmp}/awscliv2.zip" \
+            && unzip -q "${_aws_tmp}/awscliv2.zip" -d "${_aws_tmp}" \
+            && sudo "${_aws_tmp}/aws/install" \
+            && rm -rf "${_aws_tmp}" \
+            || {
+                rm -rf "${_aws_tmp}"
+                log_error "AWS CLI install failed."
+                log_error "  See: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+                return 1
+            }
+    fi
+    log_info "AWS CLI v2 installed"
+}
+
 ensure_aws_cli() {
     local region="${AWS_DEFAULT_REGION:-${LIGHTSAIL_REGION:-us-east-1}}"
 
-    # Try CLI path first
+    # ── 1. Try existing CLI ───────────────────────────────────
     if command -v aws &>/dev/null; then
         if aws sts get-caller-identity &>/dev/null 2>&1; then
             LIGHTSAIL_MODE="cli"
@@ -171,35 +215,76 @@ ensure_aws_cli() {
         fi
     fi
 
-    # Fall back to REST if raw credentials are available
+    # ── 2. Fall back to REST if raw credentials are set ───────
     if [[ -n "${AWS_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
-        if ! command -v bun &>/dev/null; then
-            _log_diagnostic \
-                "Bun is required for REST API mode but was not found" \
-                "AWS CLI is unavailable, so spawn needs Bun to call the Lightsail API directly" \
-                --- \
-                "Install Bun:  curl -fsSL https://bun.sh/install | bash" \
-                "Or install and configure the AWS CLI instead: aws configure"
-            return 1
+        if command -v bun &>/dev/null; then
+            LIGHTSAIL_MODE="rest"
+            export AWS_DEFAULT_REGION="${region}"
+            export LIGHTSAIL_MODE
+            log_info "AWS CLI not available — using Lightsail REST API directly (via Bun)"
+            log_info "Using region: ${region}"
+            return 0
         fi
-        LIGHTSAIL_MODE="rest"
-        export AWS_DEFAULT_REGION="${region}"
-        export LIGHTSAIL_MODE
-        log_info "AWS CLI not available — using Lightsail REST API directly (via Bun)"
-        log_info "Using region: ${region}"
-        return 0
+        log_warn "Bun not found — cannot use REST API mode. Will try to install AWS CLI instead."
     fi
 
-    # Neither available — show instructions
+    # ── 3. Offer to install the AWS CLI ───────────────────────
+    if ! command -v aws &>/dev/null; then
+        log_warn "AWS CLI is not installed."
+        local install_choice
+        safe_read "Install AWS CLI now? [Y/n] " install_choice || install_choice="y"
+        install_choice="${install_choice:-y}"
+
+        case "${install_choice}" in
+            [nN]*)
+                log_info "Skipping AWS CLI install."
+                ;;
+            *)
+                if _install_aws_cli; then
+                    # Installed — now prompt for credentials
+                    log_info "Run 'aws configure' to set your AWS credentials."
+                    local access_key secret_key
+                    safe_read "AWS Access Key ID: " access_key || return 1
+                    safe_read "AWS Secret Access Key: " secret_key || return 1
+                    export AWS_ACCESS_KEY_ID="${access_key}"
+                    export AWS_SECRET_ACCESS_KEY="${secret_key}"
+                    export AWS_DEFAULT_REGION="${region}"
+
+                    if aws sts get-caller-identity &>/dev/null 2>&1; then
+                        LIGHTSAIL_MODE="cli"
+                        export LIGHTSAIL_MODE
+                        log_info "AWS CLI configured, using region: ${region}"
+                        return 0
+                    else
+                        log_warn "Credentials did not validate — falling through to REST mode"
+                    fi
+                fi
+                ;;
+        esac
+    fi
+
+    # ── 4. Last resort: REST mode with whatever creds we have ─
+    if [[ -n "${AWS_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+        if command -v bun &>/dev/null; then
+            LIGHTSAIL_MODE="rest"
+            export AWS_DEFAULT_REGION="${region}"
+            export LIGHTSAIL_MODE
+            log_info "Using Lightsail REST API directly (via Bun)"
+            log_info "Using region: ${region}"
+            return 0
+        fi
+    fi
+
+    # ── 5. Nothing worked — show manual instructions ──────────
     _log_diagnostic \
         "AWS credentials not found" \
-        "Neither AWS CLI (configured) nor raw credentials (env vars) are available" \
+        "Could not configure AWS access via CLI or environment variables" \
         --- \
-        "Option 1 — AWS CLI:" \
+        "Option 1 — Install + configure the AWS CLI:" \
         "  brew install awscli  (macOS)" \
         "  or: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html" \
         "  then: aws configure" \
-        "Option 2 — Environment variables (no CLI needed):" \
+        "Option 2 — Environment variables (no CLI needed, requires bun):" \
         "  export AWS_ACCESS_KEY_ID=AKIA..." \
         "  export AWS_SECRET_ACCESS_KEY=..."
     return 1
