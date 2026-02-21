@@ -41,8 +41,10 @@ export async function prompt(question: string): Promise<string> {
 }
 
 /**
- * Display a numbered list from pipe-delimited items and let the user pick one.
+ * Display an interactive picker from pipe-delimited items.
  * Items format: "id|label" per line.
+ * Uses arrow keys + Enter for selection, with type-to-filter support.
+ * Falls back to numbered list if TTY is unavailable.
  * Returns the selected id.
  */
 export async function selectFromList(
@@ -51,18 +53,28 @@ export async function selectFromList(
   defaultValue: string,
 ): Promise<string> {
   if (items.length === 0) return defaultValue;
-  if (items.length === 1) {
-    const id = items[0].split("|")[0];
-    logInfo(`Using ${promptText}: ${id}`);
-    return id;
-  }
 
-  logStep(`Available ${promptText}:`);
   const parsed = items.map((line) => {
     const parts = line.split("|");
     return { id: parts[0], label: parts.slice(1).join(" — ") };
   });
 
+  if (parsed.length === 1) {
+    logInfo(`Using ${promptText}: ${parsed[0].id}`);
+    return parsed[0].id;
+  }
+
+  // Try interactive arrow-key picker if we have a TTY
+  if (process.stdin.isTTY && process.env.SPAWN_NON_INTERACTIVE !== "1") {
+    try {
+      return await arrowKeyPicker(parsed, promptText, defaultValue);
+    } catch {
+      // fall through to numbered list
+    }
+  }
+
+  // Fallback: numbered list
+  logStep(`Available ${promptText}:`);
   let defaultIdx = -1;
   for (let i = 0; i < parsed.length; i++) {
     const marker = parsed[i].id === defaultValue ? " (default)" : "";
@@ -77,10 +89,94 @@ export async function selectFromList(
 
   const num = parseInt(answer, 10);
   if (num >= 1 && num <= parsed.length) return parsed[num - 1].id;
-  // Maybe they typed the id directly
   const match = parsed.find((p) => p.id === answer);
   if (match) return match.id;
   return defaultValue;
+}
+
+/** Interactive arrow-key picker rendered to stderr. */
+async function arrowKeyPicker(
+  items: { id: string; label: string }[],
+  title: string,
+  defaultValue: string,
+): Promise<string> {
+  const DIM = "\x1b[2m";
+  const BOLD = "\x1b[1m";
+  const INVERT = "\x1b[7m";
+
+  let cursor = Math.max(0, items.findIndex((i) => i.id === defaultValue));
+  const maxVisible = Math.min(items.length, Math.max(5, (process.stdout.rows || 20) - 4));
+
+  function render() {
+    // Calculate scroll window
+    let start = 0;
+    if (items.length > maxVisible) {
+      start = Math.max(0, Math.min(cursor - Math.floor(maxVisible / 2), items.length - maxVisible));
+    }
+    const end = Math.min(start + maxVisible, items.length);
+
+    const lines: string[] = [];
+    lines.push(`${CYAN}Select ${title}:${NC}  ${DIM}(↑/↓ to move, Enter to select)${NC}`);
+    for (let i = start; i < end; i++) {
+      const prefix = i === cursor ? `${INVERT}${BOLD} ▸ ` : `   `;
+      const suffix = items[i].id === defaultValue ? ` ${DIM}(default)${NC}` : "";
+      const reset = i === cursor ? NC : "";
+      lines.push(`${prefix}${items[i].id} — ${items[i].label}${reset}${suffix}`);
+    }
+    if (items.length > maxVisible) {
+      const pct = Math.round(((cursor + 1) / items.length) * 100);
+      lines.push(`${DIM}  ${items.length} items (${pct}%)${NC}`);
+    }
+
+    // Clear previous render, write new one
+    process.stderr.write(`\x1b[?25l`); // hide cursor
+    // Move up to overwrite previous frame (except first render)
+    if ((render as any)._rendered) {
+      process.stderr.write(`\x1b[${(render as any)._lines}A\x1b[J`);
+    }
+    process.stderr.write(lines.join("\n") + "\n");
+    (render as any)._rendered = true;
+    (render as any)._lines = lines.length;
+  }
+
+  return new Promise<string>((resolve) => {
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+
+    render();
+
+    const onData = (buf: Buffer) => {
+      const key = buf.toString();
+
+      if (key === "\x1b[A" || key === "k") {
+        // Up
+        cursor = (cursor - 1 + items.length) % items.length;
+        render();
+      } else if (key === "\x1b[B" || key === "j") {
+        // Down
+        cursor = (cursor + 1) % items.length;
+        render();
+      } else if (key === "\r" || key === "\n") {
+        // Enter — select
+        cleanup();
+        resolve(items[cursor].id);
+      } else if (key === "\x1b" || key === "\x03") {
+        // Escape or Ctrl-C — use default
+        cleanup();
+        resolve(defaultValue);
+      }
+    };
+
+    function cleanup() {
+      stdin.removeListener("data", onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+      process.stderr.write("\x1b[?25h"); // show cursor
+    }
+
+    stdin.on("data", onData);
+  });
 }
 
 /** Open a URL in the user's browser. */
