@@ -283,7 +283,25 @@ destroy_server() {
         return 0
     fi
     log_step "Destroying sandbox ${sandbox_id}..."
-    daytona_api DELETE "/sandbox/${sandbox_id}" >/dev/null 2>&1 || true
+
+    local response
+    response=$(daytona_api DELETE "/sandbox/${sandbox_id}" 2>&1) || {
+        log_error "Failed to destroy sandbox ${sandbox_id}"
+        log_error "API Error: $(extract_api_error_message "${response}" "Network or API error")"
+        log_warn "The sandbox may still be running and incurring charges."
+        log_warn "Delete it manually at: https://app.daytona.io/"
+        return 1
+    }
+
+    # Daytona returns error JSON (non-empty with error fields) on failure
+    if [[ -n "${response}" ]] && printf '%s' "${response}" | grep -qi '"statusCode"\s*:\s*4\|"unauthorized"\|"forbidden"'; then
+        log_error "Failed to destroy sandbox ${sandbox_id}"
+        log_error "API Error: $(extract_api_error_message "${response}" "${response}")"
+        log_warn "The sandbox may still be running and incurring charges."
+        log_warn "Delete it manually at: https://app.daytona.io/"
+        return 1
+    fi
+
     log_info "Sandbox destroyed"
 }
 

@@ -177,9 +177,12 @@ destroy_server() {
     local response
     response=$(hetzner_api DELETE "/servers/$server_id")
 
-    if echo "$response" | grep -q '"error"'; then
+    # Hetzner success responses contain "error": null in the action object,
+    # so grep for "error" would false-positive on every successful delete.
+    # Check for a real action object instead (present on success).
+    if ! printf '%s' "$response" | jq -e '.action' &>/dev/null; then
         log_error "Failed to destroy server $server_id"
-        log_error "API Error: $(extract_api_error_message "$response" "$response")"
+        log_error "API Error: $(extract_api_error_message "$response" "Unknown error")"
         log_warn "The server may still be running and incurring charges."
         log_warn "Delete it manually at: https://console.hetzner.cloud/"
         return 1
