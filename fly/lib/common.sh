@@ -483,6 +483,26 @@ create_server() {
     save_vm_connection "fly-ssh" "root" "${FLY_MACHINE_ID}" "$name" "fly"
 }
 
+# Retry a run_server command up to N times with sleep between attempts.
+# Usage: _fly_run_with_retry MAX_ATTEMPTS SLEEP_SEC TIMEOUT CMD
+_fly_run_with_retry() {
+    local max_attempts="${1:-3}"
+    local sleep_sec="${2:-5}"
+    local timeout_secs="${3:-120}"
+    local cmd="${4}"
+    local attempt=1
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if run_server "$cmd" "$timeout_secs"; then
+            return 0
+        fi
+        log_warn "Command failed (attempt $attempt/$max_attempts): $cmd"
+        attempt=$((attempt + 1))
+        [ "$attempt" -le "$max_attempts" ] && sleep "$sleep_sec"
+    done
+    log_error "Command failed after $max_attempts attempts: $cmd"
+    return 1
+}
+
 # Wait for SSH to be reachable on the Fly.io machine
 _fly_wait_for_ssh() {
     local max_attempts="${1:-20}"
@@ -509,16 +529,16 @@ wait_for_cloud_init() {
     _fly_wait_for_ssh || return 1
 
     log_step "Installing packages (this may take 1-2 minutes)..."
-    run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 python3-pip build-essential" 600 || {
-        log_warn "Package install timed out or failed, retrying..."
-        run_server "apt-get install -y curl unzip git zsh python3 python3-pip build-essential" 300 || true
+    _fly_run_with_retry 3 10 600 "apt-get update -y && apt-get install -y curl unzip git zsh python3 python3-pip build-essential" || {
+        log_warn "Full package install failed after retries, trying minimal set..."
+        _fly_run_with_retry 2 5 300 "apt-get install -y curl git" || true
     }
     log_step "Installing Node.js..."
-    run_server "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs" 120 || {
-        log_warn "Node.js install failed, npm-based agents may not work"
+    _fly_run_with_retry 3 10 120 "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs" || {
+        log_warn "Node.js install failed after retries, npm-based agents may not work"
     }
     log_step "Installing bun..."
-    run_server "curl -fsSL https://bun.sh/install | bash" 120 || true
+    _fly_run_with_retry 2 5 120 "curl -fsSL https://bun.sh/install | bash" || true
     run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' 30 || true
     run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' 30 || true
     log_info "Base tools installed"
