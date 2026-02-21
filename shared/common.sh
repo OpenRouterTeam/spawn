@@ -2759,6 +2759,13 @@ _load_token_from_config() {
         return 1
     fi
 
+    # SECURITY: Validate token characters to prevent curl config injection via -K -
+    # Matches the allowlist used in key-request.sh _try_load_env_var
+    if [[ ! "${saved_token}" =~ ^[a-zA-Z0-9._/@:-]+$ ]]; then
+        log_error "SECURITY: Invalid characters in saved token for ${provider_name}"
+        return 1
+    fi
+
     export "${env_var_name}=${saved_token}"
     log_info "Using ${provider_name} API token from ${config_file}"
     return 0
