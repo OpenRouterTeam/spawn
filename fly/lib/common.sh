@@ -448,9 +448,19 @@ wait_for_cloud_init() {
         log_warn "Package install failed, continuing anyway..."
     }
     log_step "Installing Node.js..."
-    _fly_run_with_retry 3 10 120 "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs" || {
-        log_warn "Node.js install failed after retries, npm-based agents may not work"
-    }
+    _fly_run_with_retry 3 10 180 "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs" || true
+    # Verify node is actually installed — nodesource setup can succeed but leave node missing (#1581)
+    if ! run_server "which node && node --version" 15 >/dev/null 2>&1; then
+        log_warn "Node.js not found after nodesource install, falling back to default Debian package..."
+        _fly_run_with_retry 2 5 120 "apt-get install -y nodejs" || true
+        if ! run_server "which node && node --version" 15 >/dev/null 2>&1; then
+            log_error "Node.js is NOT installed — npm-based agents will not work"
+        else
+            log_info "Node.js installed from default Debian repos: $(run_server 'node --version' 10 2>/dev/null)"
+        fi
+    else
+        log_info "Node.js installed: $(run_server 'node --version' 10 2>/dev/null)"
+    fi
     log_step "Installing bun..."
     _fly_run_with_retry 2 5 120 "curl -fsSL https://bun.sh/install | bash" || true
     run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' 30 || true
