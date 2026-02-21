@@ -1278,7 +1278,9 @@ generate_env_config() {
         fi
 
         # Escape any single quotes in the value: replace ' with '\''
-        local escaped_value="${value//\'/\'\\\'\'}"
+        # Use sed instead of ${//} for bash 3.2 compatibility (macOS)
+        local escaped_value
+        escaped_value=$(printf '%s' "$value" | sed "s/'/'\\\\''/g")
         echo "export ${key}='${escaped_value}'"
     done
 }
@@ -1309,7 +1311,8 @@ inject_env_vars_ssh() {
 
     # Append to .bashrc and .zshrc only — do NOT write to .profile or .bash_profile
     "${upload_func}" "${server_ip}" "${env_temp}" "${temp_remote}"
-    "${run_func}" "${server_ip}" "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
+    # Use ; instead of && so rm always runs even if .zshrc append fails
+    "${run_func}" "${server_ip}" "cat '${temp_remote}' >> ~/.bashrc; cat '${temp_remote}' >> ~/.zshrc; rm -f '${temp_remote}'"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1342,7 +1345,8 @@ inject_env_vars_local() {
 
     # Append to .bashrc and .zshrc only
     "${upload_func}" "${env_temp}" "${temp_remote}"
-    "${run_func}" "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
+    # Use ; instead of && so rm always runs even if .zshrc append fails
+    "${run_func}" "cat '${temp_remote}' >> ~/.bashrc; cat '${temp_remote}' >> ~/.zshrc; rm -f '${temp_remote}'"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1693,7 +1697,8 @@ inject_env_vars_cb() {
     local temp_remote="/tmp/spawn_env_${rand_suffix}"
 
     ${upload_cb} "${env_temp}" "${temp_remote}"
-    ${run_cb} "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
+    # Use ; instead of && so rm always runs even if .zshrc append fails
+    ${run_cb} "cat '${temp_remote}' >> ~/.bashrc; cat '${temp_remote}' >> ~/.zshrc; rm -f '${temp_remote}'"
 
     # Offer optional GitHub CLI setup
     offer_github_auth "${run_cb}"
@@ -1911,13 +1916,10 @@ get_ssh_fingerprint() {
 json_escape() {
     local string="${1}"
     python3 -c "import json, sys; print(json.dumps(sys.stdin.read().rstrip('\n')))" <<< "${string}" 2>/dev/null || {
-        # Fallback: manually escape backslashes, quotes, and JSON control characters
-        local escaped="${string//\\/\\\\}"
-        escaped="${escaped//\"/\\\"}"
-        escaped="${escaped//$'\n'/\\n}"
-        escaped="${escaped//$'\r'/\\r}"
-        escaped="${escaped//$'\t'/\\t}"
-        echo "\"${escaped}\""
+        # Fallback: manually escape using sed for bash 3.2 compatibility (macOS)
+        local escaped
+        escaped=$(printf '%s' "$string" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g' | sed ':a;N;$!ba;s/\n/\\n/g; s/\r/\\r/g')
+        printf '"%s"\n' "${escaped}"
     }
 }
 

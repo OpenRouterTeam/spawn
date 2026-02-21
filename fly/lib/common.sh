@@ -251,6 +251,7 @@ _try_fly_browser_auth() {
 
 ensure_fly_token() {
     # 1. Try env var (sanitize — dashboard copy button may include display name)
+    log_step "Checking FLY_API_TOKEN env var..."
     if [[ -n "${FLY_API_TOKEN:-}" ]]; then
         FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
         export FLY_API_TOKEN
@@ -260,32 +261,40 @@ ensure_fly_token() {
     fi
 
     # 2. Try config file (sanitize in case it was saved with display name)
+    log_step "Checking saved token..."
     if _load_token_from_config "$HOME/.config/spawn/fly.json" "FLY_API_TOKEN" "Fly.io"; then
         FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
         export FLY_API_TOKEN
         if _validate_fly_token; then
             return 0
         fi
+        log_warn "Saved token invalid, clearing..."
         unset FLY_API_TOKEN
     fi
 
     # 3. Try flyctl CLI auth
+    log_step "Trying flyctl CLI auth..."
     local token
     token=$(_try_flyctl_auth 2>/dev/null) && {
         export FLY_API_TOKEN="$token"
-        log_info "Using Fly.io API token from flyctl auth"
-        _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
-        _fly_prompt_org
-        return 0
+        if _validate_fly_token; then
+            log_info "Using Fly.io API token from flyctl auth"
+            _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
+            _fly_prompt_org
+            return 0
+        fi
+        log_warn "flyctl token invalid, trying browser auth..."
+        unset FLY_API_TOKEN
     }
 
     # 4. Try browser-based OAuth via flyctl
-    # Token from 'fly auth login' + 'fly auth token' is definitionally valid —
-    # skip _validate_fly_token to avoid false failures on the Machines API.
     log_step "Authenticating with Fly.io via browser..."
     token=$(_try_fly_browser_auth) && {
         FLY_API_TOKEN=$(_sanitize_fly_token "$token")
         export FLY_API_TOKEN
+        if ! _validate_fly_token; then
+            log_warn "Browser token could not be validated (may still work with Machines API)"
+        fi
         log_info "Authenticated with Fly.io via browser"
         _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
         _fly_prompt_org
@@ -494,22 +503,27 @@ _fly_wait_for_ssh() {
 }
 
 # Wait for base tools to be installed (Fly.io uses bare Ubuntu image)
+# Batches all setup into a single run_server call to avoid 6 sequential SSH/exec
+# sessions (~15-20s of connection overhead saved). Uses set -e for error propagation.
 wait_for_cloud_init() {
     _fly_wait_for_ssh || return 1
 
-    log_step "Installing packages (this may take 1-2 minutes)..."
-    run_server "apt-get update -y && apt-get install -y curl unzip git zsh python3 python3-pip build-essential" 600 || {
-        log_warn "Package install timed out or failed, retrying..."
-        run_server "apt-get install -y curl unzip git zsh python3 python3-pip build-essential" 300 || true
+    log_step "Installing packages (this may take 2-3 minutes)..."
+    run_server "$(cat <<'SETUP'
+set -e
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y curl unzip git zsh python3 python3-pip build-essential
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs
+curl -fsSL https://bun.sh/install | bash
+echo 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' >> ~/.bashrc
+echo 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' >> ~/.zshrc
+SETUP
+)" 600 || {
+        log_error "Cloud init failed"
+        return 1
     }
-    log_step "Installing Node.js..."
-    run_server "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs" 120 || {
-        log_warn "Node.js install failed, npm-based agents may not work"
-    }
-    log_step "Installing bun..."
-    run_server "curl -fsSL https://bun.sh/install | bash" 120 || true
-    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.bashrc' 30 || true
-    run_server 'echo "export PATH=\"\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH\"" >> ~/.zshrc' 30 || true
     log_info "Base tools installed"
 }
 

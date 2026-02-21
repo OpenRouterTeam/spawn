@@ -136,6 +136,11 @@ _respond_get() {
     LAST_SEG=$(echo "$EP_CLEAN" | sed 's|.*/||')
     case "$LAST_SEG" in *[0-9]*) HAS_ID_SUFFIX=true ;; esac
 
+    # Handle /wait endpoint — return fixture or synthetic OK
+    case "$EP_CLEAN" in
+        */wait) _try_fixture "wait" || printf '{"ok":true}' ; return ;;
+    esac
+
     if _try_fixture "$FIXTURE_NAME"; then
         :
     elif [ "$HAS_ID_SUFFIX" = "false" ]; then
