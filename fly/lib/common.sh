@@ -148,9 +148,17 @@ _validate_fly_token() {
         FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
         export FLY_API_TOKEN
     fi
+    # Use api.fly.io for validation — OAuth user tokens work there.
+    # The Machines API (api.machines.dev) only accepts deploy tokens.
     local response
-    response=$(fly_api GET "/apps?org_slug=personal")
-    if echo "$response" | grep -q '"error"'; then
+    response=$(curl -fsSL \
+        -H "Authorization: Bearer ${FLY_API_TOKEN}" \
+        "https://api.fly.io/v1/user" 2>/dev/null)
+    if echo "$response" | grep -q '"error"\|"errors"'; then
+        # Fallback: try machines API (for deploy tokens)
+        response=$(fly_api GET "/apps?org_slug=${FLY_ORG:-personal}")
+    fi
+    if echo "$response" | grep -q '"error"\|"errors"'; then
         log_error "Authentication failed: Invalid Fly.io API token"
         log_error "API Error: $(echo "$response" | _fly_parse_error "No details available")"
         log_error "How to fix:"
@@ -272,17 +280,16 @@ ensure_fly_token() {
     }
 
     # 4. Try browser-based OAuth via flyctl
+    # Token from 'fly auth login' + 'fly auth token' is definitionally valid —
+    # skip _validate_fly_token to avoid false failures on the Machines API.
     log_step "Authenticating with Fly.io via browser..."
     token=$(_try_fly_browser_auth) && {
         FLY_API_TOKEN=$(_sanitize_fly_token "$token")
         export FLY_API_TOKEN
-        if _validate_fly_token; then
-            log_info "Authenticated with Fly.io via browser"
-            _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
-            _fly_prompt_org
-            return 0
-        fi
-        unset FLY_API_TOKEN
+        log_info "Authenticated with Fly.io via browser"
+        _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
+        _fly_prompt_org
+        return 0
     }
 
     # 5. Last resort: manual token entry
