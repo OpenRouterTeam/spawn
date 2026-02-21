@@ -230,6 +230,7 @@ Do NOT create proactive PRs for:
 - Refactoring working code that has no bugs or maintainability issues
 - "Improvements" that are subjective preferences
 - Adding error handling for scenarios that can't realistically happen
+- **Bulk test generation** — tests that copy-paste source functions inline instead of importing them are WORSE than no tests (they create false confidence). Quality over quantity, always.
 
 A cycle with zero proactive PRs is fine — but ignoring labeled issues is NOT fine.
 
@@ -272,6 +273,7 @@ As team lead, REJECT proactive plans that:
 - Target code that is working correctly
 - Duplicate an existing open or recently-closed PR
 - Touch off-limits files
+- **Add tests that re-implement source functions inline** instead of importing them — this is the #1 cause of worthless test bloat
 
 APPROVE proactive plans that:
 - Fix something actually broken (crash, security hole, failing test)
@@ -319,7 +321,14 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
 1. **security-auditor** (Sonnet) — Best match for `security` labeled issues. Proactive: scan .sh for injection/path traversal/credential leaks, .ts for XSS/prototype pollution.
 2. **ux-engineer** (Sonnet) — Best match for `cli` or UX-related issues. Proactive: test e2e flows, improve error messages, fix UX papercuts.
 3. **complexity-hunter** (Sonnet) — Best match for `maintenance` issues. Proactive: find functions >50 lines (bash) / >80 lines (ts), refactor top 2-3.
-4. **test-engineer** (Sonnet) — Best match for test-related issues. Proactive: add missing tests, verify shellcheck, run `bun test`, fix failures.
+4. **test-engineer** (Sonnet) — Best match for test-related issues. Proactive: fix failing tests, verify shellcheck, run `bun test`.
+   **STRICT TEST QUALITY RULES** (non-negotiable):
+   - **NEVER copy-paste functions into test files.** Every test MUST import from the real source module. If a function is not exported, the answer is to NOT test it — not to re-implement it inline. A test that defines its own replica of a function tests NOTHING.
+   - **NEVER create tests that would still pass if the source code were deleted.** If a test doesn't break when the real implementation changes, it is worthless.
+   - **Prioritize fixing failing tests over writing new ones.** A green test suite with 100 real tests beats 1,000 fake tests.
+   - **Maximum 1 new test file per cycle.** Quality over quantity. Each new test file must test real imports.
+   - **Before writing ANY new test**, verify: (1) the function is exported, (2) it is not already tested in an existing file, (3) the test will actually fail if the source function breaks.
+   - Run `bun test` after every change. If new tests pass without importing real source, DELETE them.
 
 5. **code-health** (Sonnet) — Best match for `bug` labeled issues. Proactive: codebase health scan. ONE PR max.
    Scan for:
