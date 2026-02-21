@@ -206,7 +206,7 @@ wait_for_cloud_init() {
     # so we MUST consolidate commands here to stay under the limit.
     # This single SSH call replaces what was 6 separate connections.
     log_step "Installing base tools in sandbox..."
-    ssh_run_server "${DAYTONA_SSH_HOST}" "apt-get update -y && apt-get install -y curl unzip git zsh nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx && curl -fsSL https://bun.sh/install | bash && echo 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.bashrc && echo 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.zshrc" >/dev/null 2>&1 || true
+    ssh_run_server "${DAYTONA_SSH_HOST}" "export DEBIAN_FRONTEND=noninteractive && apt-get update -y && apt-get install -y --no-install-recommends curl unzip git zsh nodejs npm ca-certificates && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx && curl -fsSL https://bun.sh/install | bash && echo 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.bashrc && echo 'export PATH=\"\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}\"' >> ~/.zshrc" >/dev/null 2>&1 || true
     log_info "Base tools installed"
 }
 

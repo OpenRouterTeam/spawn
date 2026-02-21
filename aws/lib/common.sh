@@ -177,7 +177,7 @@ _install_aws_cli() {
     else
         if ! command -v unzip &>/dev/null; then
             log_info "Installing unzip (required for AWS CLI)..."
-            sudo apt-get update -y && sudo apt-get install -y unzip || {
+            sudo DEBIAN_FRONTEND=noninteractive apt-get update -y && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends unzip || {
                 log_error "Could not install unzip. Install it manually, then re-run."
                 return 1
             }
@@ -378,8 +378,9 @@ get_server_name() {
 get_cloud_init_userdata() {
     cat << 'CLOUD_INIT_EOF'
 #!/bin/bash
+export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y curl unzip git zsh nodejs npm
+apt-get install -y --no-install-recommends curl unzip git zsh nodejs npm ca-certificates
 # Upgrade Node.js to v22 LTS (apt has v18, agents like Cline need v20+)
 # n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
 npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
