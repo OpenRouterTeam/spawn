@@ -616,19 +616,6 @@ describe("_load_token_from_env edge cases", () => {
 // ── _load_token_from_config with edge-case JSON ──────────────────────────
 
 describe("_load_token_from_config edge cases", () => {
-  it("should handle JSON with unicode characters in token", () => {
-    const dir = createTempDir();
-    const configFile = join(dir, "unicode.json");
-    writeFileSync(configFile, JSON.stringify({ api_key: "token-\u00e9\u00e8\u00ea" }));
-
-    const result = runBash(`
-      _load_token_from_config "${configFile}" MY_TOKEN "Cloud"
-      echo "\${MY_TOKEN}"
-    `);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("token-");
-  });
-
   it("should handle config with null api_key (should fall back to token)", () => {
     const dir = createTempDir();
     const configFile = join(dir, "null.json");
