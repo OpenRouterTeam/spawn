@@ -98,7 +98,7 @@ while IFS= read -r _f; do
     _mc002_msg="'echo"
     _mc002_msg="${_mc002_msg} -e' is not portable — use printf instead"
     grep_rule "error" "MC002" "$_mc002_msg" \
-        "$_f" "$_r" 'echo[[:space:]]+-[en]+[[:space:]]'
+        "$_f" "$_r" 'echo[[:space:]]+-[en]*e[en]*[[:space:]]'
 
     # MC003: source <(...) or . <(...)
     grep_rule "error" "MC003" "'source <(...)' fails in bash <(curl...) — use eval instead" \
