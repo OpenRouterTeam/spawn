@@ -14,6 +14,8 @@ mock.module("@clack/prompts", () => ({
   intro: mock(() => {}),
   outro: mock(() => {}),
   select: mock(() => Promise.resolve("")),
+  autocomplete: mock(async () => "claude"),
+  text: mock(async () => undefined),
   spinner: mock(() => ({ start: mock(() => {}), stop: mock(() => {}), message: mock(() => {}) })),
 }));
 
