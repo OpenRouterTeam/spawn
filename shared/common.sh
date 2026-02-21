@@ -1278,7 +1278,9 @@ generate_env_config() {
         fi
 
         # Escape any single quotes in the value: replace ' with '\''
-        local escaped_value="${value//\'/\'\\\'\'}"
+        # Use sed instead of ${//} pattern substitution for bash 3.2 (macOS) compat
+        local escaped_value
+        escaped_value=$(printf '%s' "$value" | sed "s/'/'\\\\''/g")
         echo "export ${key}='${escaped_value}'"
     done
 }

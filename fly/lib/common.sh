@@ -654,8 +654,10 @@ except Exception:
 
 # List all Fly.io apps and machines
 list_servers() {
-    local org=$(get_fly_org)
-    local response=$(fly_api GET "/apps?org_slug=$org")
+    local org
+    org=$(get_fly_org)
+    local response
+    response=$(fly_api GET "/apps?org_slug=$org")
 
     printf '%s' "$response" | python3 -c "
 import json, sys
