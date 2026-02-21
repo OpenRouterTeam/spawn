@@ -11,11 +11,11 @@ import {
   validateRegionName,
   validateModelId,
   toKebabCase,
-} from "../../../fly/lib/ui";
+} from "../fly/ui";
 
-import { sanitizeFlyToken } from "../../../fly/lib/fly";
+import { sanitizeFlyToken } from "../fly/fly";
 
-import { generateEnvConfig, resolveAgent, agents } from "../../../fly/lib/agents";
+import { generateEnvConfig, resolveAgent, agents } from "../fly/agents";
 
 // ─── ui.ts tests ─────────────────────────────────────────────────────────────
 

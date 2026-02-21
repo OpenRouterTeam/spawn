@@ -457,9 +457,14 @@ describe("SPAWN_DASHBOARD_URL convention for exec-based clouds", () => {
   // _show_exec_post_session_summary after session ends
   // Daytona uses SSH-based interactive_session, not exec-based,
   // so it doesn't call _show_exec_post_session_summary
-  const EXEC_CLOUDS_WITH_BILLING = [
-    "fly",
-  ];
+  // fly is now TS-based and handles dashboard URLs in TypeScript (cli/src/fly/fly.ts)
+  const EXEC_CLOUDS_WITH_BILLING: string[] = [];
+
+  if (EXEC_CLOUDS_WITH_BILLING.length === 0) {
+    it("no bash exec-based clouds with billing to check (fly moved to TS)", () => {
+      expect(true).toBe(true);
+    });
+  }
 
   for (const cloudName of EXEC_CLOUDS_WITH_BILLING) {
     describe(cloudName, () => {

@@ -136,12 +136,14 @@ describe("upload_file() Security Patterns", () => {
       }
     });
 
-    it("should have at least 2 exec-based upload_file implementations to test", () => {
-      expect(execBasedClouds.length).toBeGreaterThanOrEqual(2);
+    it("should have at least 1 exec-based upload_file implementations to test", () => {
+      // Note: fly moved to TS, reducing exec-based count by 1
+      expect(execBasedClouds.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("should check at least 8 clouds total", () => {
-      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(8);
+    it("should check at least 7 clouds total", () => {
+      // Note: TS-based clouds (e.g. fly) don't have bash lib/common.sh with upload_file
+      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(7);
     });
   });
 

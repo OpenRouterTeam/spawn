@@ -27,6 +27,9 @@ const agents = Object.keys(manifest.agents);
 const clouds = Object.keys(manifest.clouds);
 const matrixEntries = Object.entries(manifest.matrix);
 
+// Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
+const TS_CLOUDS = new Set(["fly"]);
+
 describe("Manifest Integrity", () => {
   // ── Basic structure ─────────────────────────────────────────────────
 
@@ -215,6 +218,8 @@ describe("Manifest Integrity", () => {
 
       const missing: string[] = [];
       for (const cloud of cloudsWithImpls) {
+        // TS-based clouds don't use bash lib/common.sh
+        if (TS_CLOUDS.has(cloud)) continue;
         const libPath = join(REPO_ROOT, cloud, "lib", "common.sh");
         if (!existsSync(libPath)) {
           missing.push(`${cloud}/lib/common.sh`);
@@ -284,6 +289,8 @@ describe("Manifest Integrity", () => {
 
       for (const [key] of sample) {
         const cloud = key.split("/")[0];
+        // TS-based clouds use thin .sh shims that don't source lib/common.sh
+        if (TS_CLOUDS.has(cloud)) continue;
         const scriptPath = join(REPO_ROOT, key + ".sh");
         if (existsSync(scriptPath)) {
           const content = readFileSync(scriptPath, "utf-8");

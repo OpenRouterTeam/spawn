@@ -28,6 +28,9 @@ jobs:
           bun install
           bun run build
 
+      - name: Build cloud bundles
+        run: bun run cli/build-clouds.ts
+
       - name: Get version
         id: version
         working-directory: cli
@@ -53,3 +56,27 @@ jobs:
           **Built:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --prerelease \
             cli/cli.js
+
+      - name: Upload cloud bundles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Upload each cloud bundle as a separate release (fly-latest/fly.js, etc.)
+          for bundle in cli/*.js; do
+            name=$(basename "$bundle" .js)
+            [[ "$name" == "cli" ]] && continue  # skip cli.js, already uploaded above
+
+            gh release delete "${name}-latest" --yes 2>/dev/null || true
+            git tag -d "${name}-latest" 2>/dev/null || true
+            git push origin ":refs/tags/${name}-latest" 2>/dev/null || true
+
+            gh release create "${name}-latest" \
+              --title "${name} bundle v${{ steps.version.outputs.version }}" \
+              --notes "Pre-built ${name} cloud provider bundle.
+
+          Downloaded by \`${name}/*.sh\` shims for \`bash <(curl ...)\` execution.
+
+          **Built:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --prerelease \
+              "$bundle"
+          done
