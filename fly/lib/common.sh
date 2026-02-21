@@ -170,48 +170,61 @@ _validate_fly_token() {
     return 0
 }
 
-# Prompt user to select (or confirm) their Fly.io organization.
+# Fetch Fly.io orgs via the API and emit pipe-delimited "slug|name (type)" lines
+# for use with _display_and_select. Returns 1 if API call fails or token absent.
+_fly_list_orgs() {
+    [[ -z "${FLY_API_TOKEN:-}" ]] && return 1
+
+    local response
+    response=$(curl -fsSL \
+        -H "Authorization: Bearer ${FLY_API_TOKEN}" \
+        "https://api.fly.io/v1/organizations" 2>/dev/null) || return 1
+
+    echo "$response" | bun -e "
+const data = JSON.parse(await Bun.stdin.text());
+const orgs = Array.isArray(data) ? data : (data.organizations ?? data.nodes ?? []);
+orgs.forEach(o => {
+    const slug = o.slug ?? o.name ?? '';
+    const name = o.name ?? slug;
+    const type = o.type ?? '';
+    if (slug) process.stdout.write(slug + '|' + name + (type ? ' (' + type + ')' : '') + '\n');
+});
+" 2>/dev/null
+}
+
+# Prompt user to select their Fly.io organization via API picker.
 # Exports FLY_ORG. Skipped when FLY_ORG is already set or SPAWN_NON_INTERACTIVE=1.
 _fly_prompt_org() {
     if [[ -n "${FLY_ORG:-}" || "${SPAWN_NON_INTERACTIVE:-}" == "1" ]]; then
         return 0
     fi
 
-    local fly_cmd orgs_response org_choice
-    fly_cmd=$(_get_fly_cmd 2>/dev/null) || { export FLY_ORG="personal"; return 0; }
+    local org_items
+    org_items=$(_fly_list_orgs 2>/dev/null) || org_items=""
 
-    # Try to list orgs for a picker; fall back to a simple prompt on failure
-    orgs_response=$("$fly_cmd" orgs list --json 2>/dev/null) || orgs_response=""
-
-    local org_names=()
-    if [[ -n "$orgs_response" ]]; then
-        while IFS= read -r name; do
-            [[ -n "$name" ]] && org_names+=("$name")
-        done < <(echo "$orgs_response" | bun -e "
-const orgs = JSON.parse(await Bun.stdin.text());
-const list = Array.isArray(orgs) ? orgs : (orgs.nodes ?? orgs.organizations ?? []);
-list.forEach(o => process.stdout.write((o.slug ?? o.name ?? '') + '\n'));
-" 2>/dev/null)
-    fi
-
-    if [[ "${#org_names[@]}" -gt 1 ]]; then
-        log_info "Available Fly.io organizations:"
-        local i=1
-        for org in "${org_names[@]}"; do
-            printf "  %d) %s\n" "$i" "$org" >&2
-            i=$((i + 1))
-        done
-        local choice
-        choice=$(safe_read "Select organization [1]: ") || choice=""
-        choice="${choice:-1}"
-        if [[ "$choice" -ge 1 && "$choice" -le "${#org_names[@]}" ]] 2>/dev/null; then
-            export FLY_ORG="${org_names[$((choice - 1))]}"
+    if [[ -n "$org_items" ]]; then
+        local org_count
+        org_count=$(printf '%s\n' "$org_items" | grep -c .)
+        if [[ "$org_count" -eq 1 ]]; then
+            # Only one org — use it without prompting
+            FLY_ORG="${org_items%%|*}"
+            export FLY_ORG
+            log_info "Using Fly.io org: ${FLY_ORG}"
+            return 0
+        fi
+        # Multiple orgs — show picker (defaults to "personal" if present)
+        log_step "Select your Fly.io organization:"
+        local selected
+        selected=$(_display_and_select "Fly.io organization" "personal" "personal" <<< "$org_items")
+        if [[ -n "$selected" ]]; then
+            export FLY_ORG="$selected"
             log_info "Using Fly.io org: ${FLY_ORG}"
             return 0
         fi
     fi
 
-    # Single org or list failed — prompt with default "personal"
+    # API unavailable or empty — fall back to prompted default
+    local org_choice
     org_choice=$(safe_read "Fly.io organization slug [personal]: ") || org_choice=""
     export FLY_ORG="${org_choice:-personal}"
     log_info "Using Fly.io org: ${FLY_ORG}"
