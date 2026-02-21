@@ -224,7 +224,7 @@ ensure_fly_token() {
     if _load_token_from_config "$HOME/.config/spawn/fly.json" "FLY_API_TOKEN" "Fly.io"; then
         FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
         export FLY_API_TOKEN
-        if _validate_fly_token 2>/dev/null; then
+        if _validate_fly_token; then
             return 0
         fi
         unset FLY_API_TOKEN
@@ -243,7 +243,7 @@ ensure_fly_token() {
     log_step "Authenticating with Fly.io via browser..."
     token=$(_try_fly_browser_auth) && {
         export FLY_API_TOKEN="$token"
-        if _validate_fly_token 2>/dev/null; then
+        if _validate_fly_token; then
             log_info "Authenticated with Fly.io via browser"
             _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
             return 0
