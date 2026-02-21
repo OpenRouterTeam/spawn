@@ -194,8 +194,13 @@ list.forEach(o => {
 # Prompt user to select their Fly.io organization using the shared picker.
 # Follows the same interactive_pick pattern as Hetzner/GCP pickers.
 _fly_prompt_org() {
-    interactive_pick "FLY_ORG" "personal" "Fly.io organizations" _fly_list_orgs "personal"
-    log_info "Using Fly.io org: ${FLY_ORG:-personal}"
+    if [[ -n "${FLY_ORG:-}" || "${SPAWN_NON_INTERACTIVE:-}" == "1" ]]; then
+        return 0
+    fi
+    local org
+    org=$(interactive_pick "FLY_ORG" "personal" "Fly.io organizations" _fly_list_orgs "personal")
+    export FLY_ORG="${org:-personal}"
+    log_info "Using Fly.io org: ${FLY_ORG}"
 }
 
 # Browser-based auth — delegates to flyctl when available (correct token exchange),
