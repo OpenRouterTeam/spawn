@@ -14,6 +14,7 @@ import type { Manifest } from "../manifest";
  * - Clouds missing from get_auth_env_var() in test/record.sh
  * - Clouds missing from call_api() in test/record.sh
  * - Clouds missing from _strip_api_base() in test/mock.sh
+ * - mock-curl-script.sh out of sync with mock.sh (_strip_api_base, _validate_body)
  * - Fixture directories missing _env.sh for setup_env_for_cloud()
  * - Fixture directories missing _metadata.json
  * - Auth env var consistency between manifest.json and test/record.sh
@@ -28,6 +29,10 @@ const manifest: Manifest = JSON.parse(
 );
 
 const mockShContent = readFileSync(join(REPO_ROOT, "test/mock.sh"), "utf-8");
+const mockCurlContent = readFileSync(
+  join(REPO_ROOT, "test/mock-curl-script.sh"),
+  "utf-8"
+);
 const recordShContent = readFileSync(join(REPO_ROOT, "test/record.sh"), "utf-8");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -91,10 +96,34 @@ function getCloudsInCase(content: string, funcName: string): string[] {
   return clouds;
 }
 
-/** Extract cloud names from _strip_api_base's URL case patterns */
-function getCloudsInStripApiBase(): string[] {
+/** Map of known API domain patterns to cloud names */
+const URL_PATTERNS: Record<string, string> = {
+  "api.hetzner.cloud": "hetzner",
+  "api.digitalocean.com": "digitalocean",
+  "api.vultr.com": "vultr",
+  "api.linode.com": "linode",
+  "cloud.lambdalabs.com": "lambda",
+  "api.civo.com": "civo",
+  "api.upcloud.com": "upcloud",
+  "api.binarylane.com.au": "binarylane",
+  "api.scaleway.com": "scaleway",
+  "api.genesiscloud.com": "genesiscloud",
+  "console.kamatera.com": "kamatera",
+  "api.latitude.sh": "latitude",
+  "infrahub-api.nexgencloud.com": "hyperstack",
+  "cloudapi.atlantic.net": "atlanticnet",
+  "invapi.hostkey.com": "hostkey",
+  "cloudsigma.com": "cloudsigma",
+  "api.webdock.io": "webdock",
+  "api.serverspace.io": "serverspace",
+  "api.gcore.com": "gcore",
+  "api.machines.dev": "fly",
+};
+
+/** Extract cloud names from _strip_api_base's URL case patterns in given content */
+function getCloudsInStripApiBase(content: string): string[] {
   const clouds: string[] = [];
-  const lines = mockShContent.split("\n");
+  const lines = content.split("\n");
 
   let inStripApiBase = false;
   for (const line of lines) {
@@ -105,32 +134,42 @@ function getCloudsInStripApiBase(): string[] {
     }
     if (inStripApiBase) {
       if (trimmed === "}") break;
-      // Map known API domain patterns to cloud names
-      const urlPatterns: Record<string, string> = {
-        "api.hetzner.cloud": "hetzner",
-        "api.digitalocean.com": "digitalocean",
-        "api.vultr.com": "vultr",
-        "api.linode.com": "linode",
-        "cloud.lambdalabs.com": "lambda",
-        "api.civo.com": "civo",
-        "api.upcloud.com": "upcloud",
-        "api.binarylane.com.au": "binarylane",
-        "api.scaleway.com": "scaleway",
-        "api.genesiscloud.com": "genesiscloud",
-        "console.kamatera.com": "kamatera",
-        "api.latitude.sh": "latitude",
-        "infrahub-api.nexgencloud.com": "hyperstack",
-        "cloudapi.atlantic.net": "atlanticnet",
-        "invapi.hostkey.com": "hostkey",
-        "cloudsigma.com": "cloudsigma",
-        "api.webdock.io": "webdock",
-        "api.serverspace.io": "serverspace",
-        "api.gcore.com": "gcore",
-        "api.machines.dev": "fly",
-      };
-      for (const [domain, cloud] of Object.entries(urlPatterns)) {
+      for (const [domain, cloud] of Object.entries(URL_PATTERNS)) {
         if (trimmed.includes(domain)) {
           clouds.push(cloud);
+        }
+      }
+    }
+  }
+  return clouds;
+}
+
+/**
+ * Extract cloud names covered by POST body validation in the given content.
+ * Handles two patterns:
+ * - mock.sh: clouds in _get_required_fields() as "cloud:endpoint)" case patterns
+ * - mock-curl-script.sh: clouds inline in _validate_body() as "cloud)" case patterns
+ */
+function getCloudsWithBodyValidation(content: string): string[] {
+  const clouds: string[] = [];
+  for (const funcName of ["_get_required_fields", "_validate_body"]) {
+    const lines = content.split("\n");
+    let inFunc = false;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith(`${funcName}()`)) {
+        inFunc = true;
+        continue;
+      }
+      if (inFunc) {
+        if (trimmed === "}") {
+          inFunc = false;
+          continue;
+        }
+        // Match "cloud:/endpoint)" or "cloud)" patterns
+        const match = trimmed.match(/^\s*([a-z][a-z0-9_-]*)(?::[^)]+)?\)\s/);
+        if (match && !clouds.includes(match[1])) {
+          clouds.push(match[1]);
         }
       }
     }
@@ -277,7 +316,7 @@ describe("Test Infrastructure Sync", () => {
   });
 
   describe("test/mock.sh: _strip_api_base() coverage", () => {
-    const stripApiBaseClouds = getCloudsInStripApiBase();
+    const stripApiBaseClouds = getCloudsInStripApiBase(mockShContent);
 
     it("should handle URLs for every cloud with fixtures", () => {
       const missing = fixtureClouds.filter(
@@ -530,6 +569,83 @@ describe("Test Infrastructure Sync", () => {
         (c) => !recordableClouds.includes(c) && c !== "*"
       );
       expect(extraEndpoints).toEqual([]);
+    });
+  });
+
+  // ── mock.sh <-> mock-curl-script.sh sync ─────────────────────────
+
+  describe("mock.sh <-> mock-curl-script.sh sync", () => {
+    it("mock-curl-script.sh should exist", () => {
+      expect(
+        existsSync(join(REPO_ROOT, "test/mock-curl-script.sh"))
+      ).toBe(true);
+    });
+
+    it("_strip_api_base() in mock-curl-script.sh should handle the same clouds as mock.sh", () => {
+      const mockShClouds = getCloudsInStripApiBase(mockShContent).sort();
+      const curlScriptClouds = getCloudsInStripApiBase(mockCurlContent).sort();
+
+      const inMockShOnly = mockShClouds.filter(
+        (c) => !curlScriptClouds.includes(c)
+      );
+      const inCurlOnly = curlScriptClouds.filter(
+        (c) => !mockShClouds.includes(c)
+      );
+
+      if (inMockShOnly.length > 0 || inCurlOnly.length > 0) {
+        const parts: string[] = [];
+        if (inMockShOnly.length > 0) {
+          parts.push(
+            `In mock.sh but missing from mock-curl-script.sh:\n` +
+            inMockShOnly.map((c) => `  - ${c}`).join("\n")
+          );
+        }
+        if (inCurlOnly.length > 0) {
+          parts.push(
+            `In mock-curl-script.sh but missing from mock.sh:\n` +
+            inCurlOnly.map((c) => `  - ${c}`).join("\n")
+          );
+        }
+        throw new Error(
+          `_strip_api_base() is out of sync between mock.sh and mock-curl-script.sh.\n` +
+          `mock-curl-script.sh is the runtime copy used by mock tests; mock.sh is validated by this test.\n` +
+          `Both must handle the same cloud URL patterns.\n\n` +
+          parts.join("\n\n")
+        );
+      }
+    });
+
+    it("_validate_body() clouds in mock-curl-script.sh should match mock.sh", () => {
+      const mockShClouds = getCloudsWithBodyValidation(mockShContent).sort();
+      const curlScriptClouds = getCloudsWithBodyValidation(mockCurlContent).sort();
+
+      const inMockShOnly = mockShClouds.filter(
+        (c) => !curlScriptClouds.includes(c)
+      );
+      const inCurlOnly = curlScriptClouds.filter(
+        (c) => !mockShClouds.includes(c)
+      );
+
+      if (inMockShOnly.length > 0 || inCurlOnly.length > 0) {
+        const parts: string[] = [];
+        if (inMockShOnly.length > 0) {
+          parts.push(
+            `In mock.sh but missing from mock-curl-script.sh:\n` +
+            inMockShOnly.map((c) => `  - ${c}`).join("\n")
+          );
+        }
+        if (inCurlOnly.length > 0) {
+          parts.push(
+            `In mock-curl-script.sh but missing from mock.sh:\n` +
+            inCurlOnly.map((c) => `  - ${c}`).join("\n")
+          );
+        }
+        throw new Error(
+          `_validate_body() is out of sync between mock.sh and mock-curl-script.sh.\n` +
+          `Both must handle the same cloud POST body validation patterns.\n\n` +
+          parts.join("\n\n")
+        );
+      }
     });
   });
 
