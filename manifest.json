@@ -2,7 +2,7 @@
   "agents": {
     "claude": {
       "name": "Claude Code",
-      "description": "Anthropic's CLI coding agent",
+      "description": "Anthropic's AI coding agent \u2014 reads your codebase, writes code, runs commands, and ships features",
       "url": "https://claude.ai",
       "install": "curl -fsSL https://claude.ai/install.sh | bash",
       "launch": "claude",
@@ -43,7 +43,7 @@
       "language": "TypeScript",
       "runtime": "node",
       "category": "cli",
-      "tagline": "Agentic coding from the terminal",
+      "tagline": "Anthropic's AI coding agent \u2014 plan, build, and ship code across your entire codebase",
       "tags": [
         "coding",
         "terminal",
@@ -84,7 +84,7 @@
       "language": "TypeScript",
       "runtime": "bun",
       "category": "tui",
-      "tagline": "Personal AI assistant with multi-channel gateway",
+      "tagline": "Your personal AI \u2014 any channel, any model, from the terminal",
       "tags": [
         "coding",
         "tui",
@@ -118,7 +118,7 @@
       "language": "Rust",
       "runtime": "binary",
       "category": "cli",
-      "tagline": "Fast, autonomous AI infrastructure \u2014 deploy anywhere",
+      "tagline": "Fast, small, fully autonomous AI infrastructure \u2014 deploy anywhere, swap anything",
       "tags": [
         "coding",
         "terminal",
@@ -154,7 +154,7 @@
       "language": "Rust",
       "runtime": "binary",
       "category": "cli",
-      "tagline": "Lightweight coding agent from OpenAI",
+      "tagline": "OpenAI's lightweight coding agent for the terminal",
       "tags": [
         "coding",
         "terminal",
@@ -187,7 +187,7 @@
       "language": "TypeScript",
       "runtime": "go",
       "category": "tui",
-      "tagline": "AI coding agent built for the terminal",
+      "tagline": "The open-source AI coding agent",
       "tags": [
         "coding",
         "tui",
@@ -222,7 +222,7 @@
       "language": "TypeScript",
       "runtime": "node",
       "category": "cli",
-      "tagline": "All-in-one agentic engineering platform",
+      "tagline": "All-in-one AI coding platform \u2014 100+ providers, one CLI",
       "tags": [
         "coding",
         "terminal",
@@ -234,7 +234,7 @@
   "clouds": {
     "local": {
       "name": "Local Machine",
-      "description": "Run agents on your own machine — no cloud needed",
+      "description": "Run agents on your own machine \u2014 no cloud needed",
       "url": "https://github.com/OpenRouterTeam/spawn",
       "type": "local",
       "auth": "none",
@@ -245,7 +245,7 @@
     },
     "hetzner": {
       "name": "Hetzner Cloud",
-      "description": "Affordable European cloud servers from ~€3/mo",
+      "description": "Affordable European cloud servers from ~\u20ac3/mo",
       "url": "https://www.hetzner.com/cloud/",
       "type": "api",
       "auth": "HCLOUD_TOKEN",
@@ -346,7 +346,7 @@
     },
     "sprite": {
       "name": "Sprite",
-      "description": "Managed cloud VMs — one command to deploy",
+      "description": "Managed cloud VMs \u2014 one command to deploy",
       "url": "https://sprites.dev",
       "type": "cli",
       "auth": "sprite login",
