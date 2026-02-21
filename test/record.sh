@@ -317,10 +317,10 @@ has_api_error() {
     local cloud="$1"
     local response="$2"
 
-    echo "$response" | python3 << VALIDATION_EOF 2>/dev/null
-import json, sys
-d = json.loads(sys.stdin.read())
-cloud = '$cloud'
+    _RESPONSE="$response" _CLOUD="$cloud" python3 << 'VALIDATION_EOF' 2>/dev/null
+import json, sys, os
+d = json.loads(os.environ['_RESPONSE'])
+cloud = os.environ['_CLOUD']
 
 # Helper: data keys that indicate success responses (not errors)
 success_keys = {'servers','images','ssh_keys','flavors','sizes','regions','count','results','id','name','slug','status','ipv4'}
