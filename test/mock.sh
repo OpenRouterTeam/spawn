@@ -250,8 +250,9 @@ setup_mock_agents() {
 
     # bun: pass `bun -e "..."` (JSON processing) through to the real binary;
     # log all other invocations as no-ops.
-    # Uses single-quoted heredoc so PATH is resolved at runtime, not at
-    # mock-creation time — avoids finding this mock script itself.
+    # Fallback chain: real bun → node (with Bun.stdin polyfill) → exit 0
+    # CI (GitHub Actions ubuntu-latest) has node but not bun, so the node
+    # fallback is essential for `_fly_json_get` / `_fly_build_machine_body`.
     cat > "${TEST_DIR}/bun" << 'MOCKBUN'
 #!/bin/bash
 echo "bun $*" >> "${MOCK_LOG}"
@@ -268,6 +269,20 @@ if [[ "$1" == "-e" ]]; then
     done
     if [[ -n "$_real_bun" ]]; then
         exec "$_real_bun" "$@"
+    fi
+    # No real bun found — try node with a Bun.stdin polyfill
+    _real_node=""
+    for _d in "${_path_dirs[@]}"; do
+        if [[ "$_d" != "$_self_dir" && -x "$_d/node" ]]; then
+            _real_node="$_d/node"
+            break
+        fi
+    done
+    if [[ -n "$_real_node" ]]; then
+        # Polyfill Bun.stdin.text() for node: read all of stdin as a string.
+        # --input-type=module enables top-level await (used by fly/lib scripts).
+        _polyfill='globalThis.Bun={stdin:{text:()=>new Promise(r=>{let d="";process.stdin.setEncoding("utf8");process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>r(d))})}};'
+        exec "$_real_node" --input-type=module -e "${_polyfill}${2}"
     fi
 fi
 exit 0
