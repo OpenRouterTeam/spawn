@@ -109,82 +109,48 @@ async function uploadConfigFile(
 // ─── Claude Code ─────────────────────────────────────────────────────────────
 
 async function installClaudeCode(): Promise<void> {
-  const claudePath =
-    'export PATH=$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH';
+  logStep("Installing Claude Code...");
 
-  // Clean up broken ~/.bash_profile from previous deployments
-  try {
-    await runServer(
-      "if [ -f ~/.bash_profile ] && grep -q 'spawn:env\\|Claude Code PATH\\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi",
-    );
-  } catch { /* ignore */ }
+  // Batch the entire install into a single remote script to avoid multiple
+  // round-trips that each risked 408 deadline_exceeded via fly machine exec.
+  const claudePath = '$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin';
+  const pathSetup = `for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' "$rc" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH="$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"\\n' >> "$rc"; done`;
+  const finalize = `claude install --force 2>/dev/null || true; ${pathSetup}`;
 
-  // Already installed?
-  try {
-    await runServerCapture(`${claudePath} && command -v claude`, 15);
-    logInfo("Claude Code already installed");
-    await finalizeClaudeInstall(claudePath);
-    return;
-  } catch { /* not installed */ }
+  const script = [
+    `export PATH="${claudePath}:$PATH"`,
+    // Clean up broken ~/.bash_profile from previous deployments
+    `if [ -f ~/.bash_profile ] && grep -q 'spawn:env\\|Claude Code PATH\\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi`,
+    // Already installed?
+    `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
+    // Method 1: curl installer
+    `echo "==> Installing Claude Code (method 1/2: curl installer)..."`,
+    `curl -fsSL https://claude.ai/install.sh | bash || true`,
+    `export PATH="${claudePath}:$PATH"`,
+    `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
+    // Ensure Node.js for npm method
+    `if ! command -v node >/dev/null 2>&1; then apt-get install -y nodejs npm 2>/dev/null && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true; fi`,
+    // Method 2: npm
+    `echo "==> Installing Claude Code (method 2/2: npm)..."`,
+    `npm install -g @anthropic-ai/claude-code || true`,
+    `export PATH="${claudePath}:$PATH"`,
+    `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
+    // All methods failed
+    `exit 1`,
+  ].join('\n');
 
-  // Method 1: curl installer
-  logStep("Installing Claude Code (method 1/2: curl installer)...");
   try {
-    await runServer("curl -fsSL https://claude.ai/install.sh | bash");
-    await runServerCapture(`${claudePath} && command -v claude`, 15);
-    logInfo("Claude Code installed via curl installer");
-    await finalizeClaudeInstall(claudePath);
-    return;
+    await runServer(script, 300);
+    logInfo("Claude Code installed");
   } catch {
-    logWarn("curl installer failed");
+    logError("Claude Code installation failed");
+    throw new Error("Claude Code install failed");
   }
-
-  // Ensure Node.js for npm/bun methods
-  try {
-    await runServerCapture(`${claudePath} && command -v node`, 15);
-  } catch {
-    logStep("Installing Node.js runtime (required for claude package)...");
-    try {
-      await runServer(
-        "apt-get install -y nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx",
-      );
-    } catch {
-      logWarn("Could not install Node.js");
-    }
-  }
-
-  // Method 2: npm
-  logStep("Installing Claude Code (method 2/2: npm)...");
-  try {
-    await runServer(`${claudePath} && npm install -g @anthropic-ai/claude-code`);
-    await runServerCapture(`${claudePath} && command -v claude`, 15);
-    logInfo("Claude Code installed via npm");
-    await finalizeClaudeInstall(claudePath);
-    return;
-  } catch {
-    logWarn("npm install failed");
-  }
-
-  logError("Claude Code installation failed");
-  throw new Error("Claude Code install failed");
-}
-
-async function finalizeClaudeInstall(claudePath: string): Promise<void> {
-  logStep("Setting up Claude Code shell integration...");
-  try {
-    await runServer(`${claudePath} && claude install --force`);
-  } catch { /* ignore */ }
-  try {
-    await runServer(
-      `for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' "$rc" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH="$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"\\n' >> "$rc"; done`,
-    );
-  } catch { /* ignore */ }
 }
 
 function setupClaudeCodeConfig(apiKey: string): Promise<void> {
   return (async () => {
     logStep("Configuring Claude Code...");
-    await runServer("mkdir -p ~/.claude");
 
     const escapedKey = jsonEscape(apiKey);
     const settingsJson = `{
@@ -200,14 +166,19 @@ function setupClaudeCodeConfig(apiKey: string): Promise<void> {
     "dangerouslySkipPermissions": true
   }
 }`;
-    await uploadConfigFile(settingsJson, "$HOME/.claude/settings.json");
-
     const globalState = `{
   "hasCompletedOnboarding": true,
   "bypassPermissionsModeAccepted": true
 }`;
-    await uploadConfigFile(globalState, "$HOME/.claude.json");
-    await runServer("touch ~/.claude/CLAUDE.md");
+    // Inline base64 file writes in a single remote call instead of
+    // separate mkdir + uploadFile + mv calls for each config file.
+    const settingsB64 = Buffer.from(settingsJson).toString("base64");
+    const stateB64 = Buffer.from(globalState).toString("base64");
+
+    await runServer(
+      `mkdir -p ~/.claude && printf '%s' '${settingsB64}' | base64 -d > ~/.claude/settings.json && chmod 600 ~/.claude/settings.json && printf '%s' '${stateB64}' | base64 -d > ~/.claude.json && chmod 600 ~/.claude.json && touch ~/.claude/CLAUDE.md`,
+    );
+    logInfo("Claude Code configured");
   })();
 }
 

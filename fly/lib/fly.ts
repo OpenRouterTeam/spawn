@@ -97,10 +97,19 @@ function hasError(text: string): boolean {
 }
 
 function getCmd(): string | null {
+  // Check PATH first
   for (const name of ["fly", "flyctl"]) {
     if (Bun.spawnSync(["which", name], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0) {
       return name;
     }
+  }
+  // Bun.spawnSync inherits the original PATH, not process.env mutations.
+  // Check the default install location directly.
+  const fs = require("fs");
+  const flyBin = `${process.env.HOME}/.fly/bin`;
+  for (const name of ["fly", "flyctl"]) {
+    const fullPath = `${flyBin}/${name}`;
+    if (fs.existsSync(fullPath)) return fullPath;
   }
   return null;
 }
@@ -166,6 +175,13 @@ async function saveTokenToConfig(token: string): Promise<void> {
   );
 }
 
+/** Sync the resolved token to process.env so fly CLI subprocesses (machine exec, ssh) can authenticate. */
+function syncTokenToEnv(): void {
+  if (flyApiToken) {
+    process.env.FLY_API_TOKEN = flyApiToken;
+  }
+}
+
 function loadTokenFromConfig(): string | null {
   try {
     const data = JSON.parse(
@@ -209,7 +225,7 @@ export async function ensureFlyCli(): Promise<void> {
   }
   logStep("Installing flyctl CLI...");
   const proc = Bun.spawn(["sh", "-c", "curl -L https://fly.io/install.sh | sh"], {
-    stdio: ["ignore", "ignore", "pipe"],
+    stdio: ["ignore", "inherit", "inherit"],
   });
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
@@ -222,7 +238,11 @@ export async function ensureFlyCli(): Promise<void> {
   if (!process.env.PATH?.includes(flyBin)) {
     process.env.PATH = `${flyBin}:${process.env.PATH}`;
   }
-  if (!getCmd()) {
+  // Verify by checking the filesystem directly — `which` in a subprocess may not
+  // pick up in-process PATH mutations made via process.env.PATH.
+  const fs = require("fs");
+  const hasBin = ["fly", "flyctl"].some((n) => fs.existsSync(`${flyBin}/${n}`));
+  if (!hasBin && !getCmd()) {
     logError("flyctl not found in PATH after installation");
     throw new Error("flyctl not in PATH");
   }
@@ -273,6 +293,7 @@ export async function ensureFlyToken(): Promise<void> {
     if (await testFlyToken()) {
       logInfo("Using Fly.io API token from environment");
       await saveTokenToConfig(flyApiToken);
+      syncTokenToEnv();
       return;
     }
     logWarn("FLY_API_TOKEN from environment is invalid or expired");
@@ -285,6 +306,7 @@ export async function ensureFlyToken(): Promise<void> {
     flyApiToken = sanitizeFlyToken(saved);
     if (await testFlyToken()) {
       logInfo("Using saved Fly.io API token");
+      syncTokenToEnv();
       return;
     }
     logWarn("Saved Fly.io token is invalid or expired");
@@ -306,6 +328,7 @@ export async function ensureFlyToken(): Promise<void> {
         if (await testFlyToken()) {
           logInfo("Using Fly.io API token from fly CLI");
           await saveTokenToConfig(flyApiToken);
+          syncTokenToEnv();
           return;
         }
         flyApiToken = "";
@@ -332,6 +355,7 @@ export async function ensureFlyToken(): Promise<void> {
       if (token) {
         flyApiToken = sanitizeFlyToken(token);
         await saveTokenToConfig(flyApiToken);
+        syncTokenToEnv();
         logInfo("Authenticated with Fly.io via OAuth");
         return;
       }
@@ -352,6 +376,7 @@ export async function ensureFlyToken(): Promise<void> {
     throw new Error("Invalid Fly.io token");
   }
   await saveTokenToConfig(flyApiToken);
+  syncTokenToEnv();
   logInfo("Using manually entered Fly.io API token");
 }
 
@@ -531,22 +556,40 @@ async function createMachine(
 async function waitForMachineStart(
   name: string,
   machineId: string,
-  timeout = 90,
+  totalTimeout = 90,
 ): Promise<void> {
-  logStep(`Waiting for machine to start (timeout: ${timeout}s)...`);
-  const resp = await flyApi(
-    "GET",
-    `/apps/${name}/machines/${machineId}/wait?state=started&timeout=${timeout}`,
-  );
-  if (hasError(resp)) {
-    const data = parseJson(resp);
-    logError(
-      `Machine did not reach 'started' state: ${data?.error || "timeout"}`,
+  logStep(`Waiting for machine to start (timeout: ${totalTimeout}s)...`);
+  // Fly.io /wait endpoint requires timeout in range [1, 60] seconds.
+  const chunkSecs = 30;
+  const deadline = Date.now() + totalTimeout * 1000;
+
+  while (Date.now() < deadline) {
+    const remaining = Math.ceil((deadline - Date.now()) / 1000);
+    const pollSecs = Math.min(chunkSecs, remaining);
+    if (pollSecs <= 0) break;
+
+    const resp = await flyApi(
+      "GET",
+      `/apps/${name}/machines/${machineId}/wait?state=started&timeout=${pollSecs}`,
     );
-    logError("Try a new region: FLY_REGION=ord spawn fly <agent>");
-    throw new Error("Machine start timeout");
+    if (!hasError(resp)) {
+      logInfo("Machine is running");
+      return;
+    }
+    const data = parseJson(resp);
+    const errMsg: string = data?.error || "";
+    // A timeout error means the machine hasn't started yet — keep polling.
+    // Any other error (invalid_argument, etc.) is a hard failure.
+    if (!/timeout/i.test(errMsg) && errMsg) {
+      logError(`Machine did not reach 'started' state: ${errMsg}`);
+      logError("Try a new region: FLY_REGION=ord spawn fly <agent>");
+      throw new Error("Machine start failed");
+    }
   }
-  logInfo("Machine is running");
+
+  logError("Machine did not reach 'started' state: timeout");
+  logError("Try a new region: FLY_REGION=ord spawn fly <agent>");
+  throw new Error("Machine start timeout");
 }
 
 async function cleanupOnFailure(appName: string): Promise<void> {
@@ -598,23 +641,17 @@ export async function runServer(
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const flyCmd = getCmd()!;
 
-  const args = [flyCmd, "machine", "exec", flyMachineId, "--app", flyAppName, "--", "bash", "-c", fullCmd];
+  const escapedCmd = fullCmd.replace(/'/g, "'\\''");
+  // Use fly ssh console (WireGuard) instead of fly machine exec (HTTP) to avoid
+  // 408 deadline_exceeded on long-running commands.
+  const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
-  if (timeoutSecs) {
-    // Look for timeout/gtimeout
-    const timeoutBin = Bun.spawnSync(["which", "timeout"], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0
-      ? "timeout"
-      : Bun.spawnSync(["which", "gtimeout"], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0
-        ? "gtimeout"
-        : null;
-
-    if (timeoutBin) {
-      args.unshift(timeoutBin, String(timeoutSecs));
-    }
-  }
-
-  const proc = Bun.spawn(args, { stdio: ["inherit", "inherit", "inherit"] });
+  const proc = Bun.spawn(args, { stdio: ["inherit", "inherit", "inherit"], env: process.env });
+  // Local safety timer — WireGuard has no HTTP deadline but we still want a ceiling.
+  const timeout = (timeoutSecs || 300) * 1000;
+  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
   const exitCode = await proc.exited;
+  clearTimeout(timer);
   if (exitCode !== 0) {
     throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
   }
@@ -628,18 +665,16 @@ export async function runServerCapture(
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const flyCmd = getCmd()!;
 
-  const args = [flyCmd, "machine", "exec", flyMachineId, "--app", flyAppName, "--", "bash", "-c", fullCmd];
+  const escapedCmd = fullCmd.replace(/'/g, "'\\''");
+  const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
-  const proc = Bun.spawn(args, { stdio: ["ignore", "pipe", "pipe"] });
-
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  if (timeoutSecs) {
-    timer = setTimeout(() => proc.kill(), timeoutSecs * 1000);
-  }
+  const proc = Bun.spawn(args, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+  const timeout = (timeoutSecs || 300) * 1000;
+  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
 
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
-  if (timer) clearTimeout(timer);
+  clearTimeout(timer);
 
   if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
   return stdout.trim();
@@ -655,13 +690,12 @@ export async function uploadFile(
   }
   const flyCmd = getCmd()!;
   const fs = require("fs");
-  const content = fs.readFileSync(localPath);
+  const content: Buffer = fs.readFileSync(localPath);
+  const b64 = content.toString("base64");
   const proc = Bun.spawn(
-    [flyCmd, "machine", "exec", flyMachineId, "--app", flyAppName, "--", "bash", "-c", `cat > ${remotePath}`],
-    { stdio: ["pipe", "ignore", "ignore"] },
+    [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c 'printf "%s" ${b64} | base64 -d > ${remotePath}'`],
+    { stdio: ["ignore", "ignore", "ignore"], env: process.env },
   );
-  proc.stdin!.write(content);
-  proc.stdin!.end();
   const exitCode = await proc.exited;
   if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
 }
@@ -674,7 +708,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
 
   const proc = Bun.spawn(
     [flyCmd, "ssh", "console", "-a", flyAppName, "--pty", "-C", `bash -c '${escapedCmd}'`],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    { stdio: ["inherit", "inherit", "inherit"], env: process.env },
   );
   const exitCode = await proc.exited;
 
@@ -738,57 +772,25 @@ export async function waitForSsh(maxAttempts = 20): Promise<void> {
 export async function waitForCloudInit(): Promise<void> {
   await waitForSsh();
 
-  logStep("Installing packages...");
-  try {
-    await runWithRetry(3, 10, 300, "apt-get update -y && apt-get install -y curl unzip git");
-  } catch {
-    logWarn("Package install failed, continuing anyway...");
-  }
+  logStep("Installing packages (Node.js, bun)...");
+  // Batch all package installs into a single remote script to avoid multiple
+  // round-trips (each of which was previously a separate fly machine exec call).
+  const setupScript = [
+    `echo "==> Installing base packages..."`,
+    `apt-get update -y && apt-get install -y curl unzip git || true`,
+    `echo "==> Checking Node.js..."`,
+    `if ! command -v node >/dev/null 2>&1; then { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs; } || apt-get install -y nodejs || true; fi`,
+    `echo "node: $(node --version 2>/dev/null || echo not installed)"`,
+    `echo "==> Checking bun..."`,
+    `if ! command -v bun >/dev/null 2>&1 && [ ! -f "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash || true; fi`,
+    `for rc in ~/.bashrc ~/.zshrc; do grep -q '.bun/bin' "$rc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' >> "$rc"; done`,
+  ].join('\n');
 
-  logStep("Installing Node.js...");
   try {
-    await runWithRetry(
-      3,
-      10,
-      180,
-      "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs",
-    );
+    await runWithRetry(3, 10, 300, setupScript);
   } catch {
-    // ignore
+    logWarn("Package install had errors, continuing...");
   }
-
-  // Verify node
-  try {
-    await runServerCapture("which node && node --version", 15);
-    const ver = await runServerCapture("node --version", 10);
-    logInfo(`Node.js installed: ${ver}`);
-  } catch {
-    logWarn("Node.js not found after nodesource install, falling back to default Debian package...");
-    try {
-      await runWithRetry(2, 5, 120, "apt-get install -y nodejs");
-      const ver = await runServerCapture("node --version", 10);
-      logInfo(`Node.js installed from default Debian repos: ${ver}`);
-    } catch {
-      logError("Node.js is NOT installed — npm-based agents will not work");
-    }
-  }
-
-  logStep("Installing bun...");
-  try {
-    await runWithRetry(2, 5, 120, "curl -fsSL https://bun.sh/install | bash");
-  } catch {
-    // ignore
-  }
-
-  // Add to PATH in shell configs
-  const pathLine = 'echo "export PATH=\\"\\$HOME/.local/bin:\\$HOME/.bun/bin:\\$PATH\\"" >> ~/.bashrc';
-  const pathLineZsh = 'echo "export PATH=\\"\\$HOME/.local/bin:\\$HOME/.bun/bin:\\$PATH\\"" >> ~/.zshrc';
-  try {
-    await runServer(pathLine, 30);
-  } catch { /* ignore */ }
-  try {
-    await runServer(pathLineZsh, 30);
-  } catch { /* ignore */ }
   logInfo("Base tools installed");
 }
 
