@@ -214,8 +214,9 @@ get_server_name() {
 get_cloud_init_userdata() {
     cat << 'CLOUD_INIT_EOF'
 #!/bin/bash
+export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y curl unzip git zsh nodejs npm
+apt-get install -y --no-install-recommends curl unzip git zsh nodejs npm ca-certificates
 # Upgrade Node.js to v22 LTS (apt has v18, agents like Cline need v20+)
 # n installs to /usr/local/bin but apt's v18 at /usr/bin can shadow it, so symlink over
 npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx

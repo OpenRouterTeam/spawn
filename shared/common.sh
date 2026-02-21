@@ -152,7 +152,7 @@ _install_jq_brew() {
 }
 
 _install_jq_apt() {
-    sudo apt-get update -qq && sudo apt-get install -y jq || {
+    sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq || {
         log_error "Failed to install jq via apt. Run 'sudo apt-get install -y jq' manually."
         return 1
     }
@@ -1566,7 +1566,7 @@ _ensure_nodejs_runtime() {
     local claude_path="$2"
     if ! ${run_cb} "${claude_path} && command -v node" >/dev/null 2>&1; then
         log_step "Installing Node.js runtime (required for claude package)..."
-        if ${run_cb} "apt-get install -y nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1; then
+        if ${run_cb} "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx" >/dev/null 2>&1; then
             log_info "Node.js installed via n"
         else
             log_warn "Could not install Node.js - bun method may fail"

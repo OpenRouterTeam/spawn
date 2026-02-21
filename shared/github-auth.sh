@@ -61,7 +61,7 @@ _install_gh_apt() {
         "$(dpkg --print-architecture)" \
         | ${SUDO} tee /etc/apt/sources.list.d/github-cli.list > /dev/null
     ${SUDO} apt-get update -qq
-    ${SUDO} apt-get install -y gh || {
+    DEBIAN_FRONTEND=noninteractive ${SUDO} apt-get install -y --no-install-recommends gh || {
         log_error "Failed to install gh via apt"
         return 1
     }
