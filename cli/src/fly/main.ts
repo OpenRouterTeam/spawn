@@ -102,13 +102,9 @@ async function main() {
     }
   }
 
-  // 10. Pre-launch hooks
+  // 10. Pre-launch hooks (e.g. OpenClaw gateway — must succeed before TUI)
   if (agent.preLaunch) {
-    try {
-      await agent.preLaunch();
-    } catch {
-      logWarn("Pre-launch hook failed (continuing)");
-    }
+    await agent.preLaunch();
   }
 
   // 11. Launch interactive session

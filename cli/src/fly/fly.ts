@@ -615,7 +615,9 @@ export async function runServer(
   // 408 deadline_exceeded on long-running commands.
   const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
-  const proc = Bun.spawn(args, { stdio: ["inherit", "inherit", "inherit"], env: process.env });
+  // Pipe /dev/null to stdin so commands that try to read input (e.g. claude
+  // install, npm postinstall hooks) don't hang waiting on the terminal.
+  const proc = Bun.spawn(args, { stdio: ["ignore", "inherit", "inherit"], env: process.env });
   // Local safety timer — WireGuard has no HTTP deadline but we still want a ceiling.
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
