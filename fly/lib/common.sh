@@ -210,13 +210,27 @@ if (typeof data === "object" && !Array.isArray(data) && !("nodes" in data) && !(
 }
 
 # Prompt user to select their Fly.io organization.
+# Always confirms with user — never silently defaults.
 _fly_prompt_org() {
     if [[ -n "${FLY_ORG:-}" || "${SPAWN_NON_INTERACTIVE:-}" == "1" ]]; then
         return 0
     fi
-    local org
-    org=$(interactive_pick "FLY_ORG" "personal" "Fly.io organizations" _fly_list_orgs "personal")
-    export FLY_ORG="${org:-personal}"
+
+    log_step "Fetching available Fly.io organizations..."
+    local items=""
+    items=$(_fly_list_orgs 2>/dev/null) || true
+
+    if [[ -n "$items" ]]; then
+        local org
+        org=$(_display_and_select "Fly.io organizations" "personal" "personal" <<< "$items")
+        export FLY_ORG="${org:-personal}"
+    else
+        # Could not fetch org list — ask user directly instead of silently defaulting
+        log_warn "Could not fetch Fly.io organizations automatically."
+        local org
+        org=$(safe_read "Enter Fly.io org slug (default: personal): ") || true
+        export FLY_ORG="${org:-personal}"
+    fi
     log_info "Using Fly.io org: ${FLY_ORG}"
 }
 
