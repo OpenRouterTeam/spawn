@@ -120,17 +120,21 @@ _try_flyctl_auth() {
 
 # Sanitize a Fly.io token — the dashboard copy button may include the
 # display name before the actual token (e.g. "Deploy Token FlyV1 fm2_...")
-# Strip everything before "FlyV1" or "fm2_", and trim whitespace/newlines.
+# Also handles raw macaroon tokens returned by the CLI Sessions API
+# (e.g. "m2.XXXX" or "fm2_XXXX" without the "FlyV1 " prefix).
 _sanitize_fly_token() {
     local raw="$1"
     # Trim leading/trailing whitespace and newlines
     raw=$(printf '%s' "$raw" | tr -d '\n\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    # If it contains "FlyV1 ", strip everything before it (display name prefix)
+    # If it already contains "FlyV1 ", strip any display name prefix before it
     if [[ "$raw" == *"FlyV1 "* ]]; then
         raw="FlyV1 ${raw##*FlyV1 }"
-    # If it contains a bare "fm2_" token without FlyV1 prefix, extract it
+    # Raw fm2_ macaroon (no FlyV1 prefix) — extract and wrap
     elif [[ "$raw" == *"fm2_"* ]]; then
         raw=$(printf '%s' "$raw" | sed 's/.*\(fm2_[^ ]*\).*/\1/')
+        raw="FlyV1 $raw"
+    # Raw m2. macaroon returned by CLI Sessions API — wrap with FlyV1 prefix
+    elif [[ "$raw" == m2.* ]]; then
         raw="FlyV1 $raw"
     fi
     printf '%s' "$raw"
