@@ -1,5 +1,8 @@
 // fly/lib/agents.ts — Agent configs + shared install/config helpers
 
+import { writeFileSync, unlinkSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import {
   logInfo,
   logWarn,
@@ -87,12 +90,8 @@ async function uploadConfigFile(
   content: string,
   remotePath: string,
 ): Promise<void> {
-  const fs = require("fs");
-  const os = require("os");
-  const path = require("path");
-
-  const tmpFile = path.join(os.tmpdir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-  fs.writeFileSync(tmpFile, content, { mode: 0o600 });
+  const tmpFile = join(tmpdir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  writeFileSync(tmpFile, content, { mode: 0o600 });
 
   const tempRemote = `/tmp/spawn_config_${Date.now()}`;
   try {
@@ -102,7 +101,7 @@ async function uploadConfigFile(
       `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
     );
   } finally {
-    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    try { unlinkSync(tmpFile); } catch { /* ignore */ }
   }
 }
 
