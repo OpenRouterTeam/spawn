@@ -616,14 +616,15 @@ export async function runServer(
   const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
   // Don't inherit stdin — commands like `claude install` try to read input and
-  // hang. Use "pipe" + immediate close so flyctl gets a clean EOF signal.
-  // ("ignore" maps to /dev/null which some flyctl versions don't handle well.)
+  // hang. Use "pipe" but keep it open until the process exits — closing stdin
+  // early causes flyctl to tear down the WireGuard transport ("session forcibly
+  // closed") before long-running commands like `bun install` finish.
   const proc = Bun.spawn(args, { stdio: ["pipe", "inherit", "inherit"], env: process.env });
-  proc.stdin!.end();
   // Local safety timer — WireGuard has no HTTP deadline but we still want a ceiling.
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
   const exitCode = await proc.exited;
+  try { proc.stdin!.end(); } catch { /* already closed */ }
   clearTimeout(timer);
   if (exitCode !== 0) {
     throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
@@ -642,12 +643,12 @@ export async function runServerCapture(
   const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
 
   const proc = Bun.spawn(args, { stdio: ["pipe", "pipe", "pipe"], env: process.env });
-  proc.stdin!.end();
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
 
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
+  try { proc.stdin!.end(); } catch { /* already closed */ }
   clearTimeout(timer);
 
   if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
@@ -670,8 +671,8 @@ export async function uploadFile(
     [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c 'printf "%s" ${b64} | base64 -d > ${remotePath}'`],
     { stdio: ["pipe", "ignore", "ignore"], env: process.env },
   );
-  proc.stdin!.end();
   const exitCode = await proc.exited;
+  try { proc.stdin!.end(); } catch { /* already closed */ }
   if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
 }
 
