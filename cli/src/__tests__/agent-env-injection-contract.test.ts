@@ -84,6 +84,14 @@ function scriptReferencesEnvVar(content: string, varName: string): boolean {
 }
 
 /**
+ * Check if a script is a TypeScript shim (delegates to bun run main.ts).
+ * These scripts don't contain bash env var logic -- it's handled in TypeScript.
+ */
+function isTypeScriptShim(content: string): boolean {
+  return content.includes("bun run") && content.includes("main.ts");
+}
+
+/**
  * Some env vars are injected indirectly through helper functions like
  * inject_env_vars_ssh, generate_env_config, or setup_*_config.
  * Check if the script delegates to one of these helpers.
