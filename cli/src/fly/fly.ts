@@ -533,14 +533,25 @@ async function createMachine(
 async function waitForMachineStart(
   name: string,
   machineId: string,
-  timeout = 90,
+  timeout = 60,
+  retries = 3,
 ): Promise<void> {
-  logStep(`Waiting for machine to start (timeout: ${timeout}s)...`);
-  const resp = await flyApi(
-    "GET",
-    `/apps/${name}/machines/${machineId}/wait?state=started&timeout=${timeout}`,
-  );
-  if (hasError(resp)) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    logStep(
+      `Waiting for machine to start (timeout: ${timeout}s, attempt ${attempt}/${retries})...`,
+    );
+    const resp = await flyApi(
+      "GET",
+      `/apps/${name}/machines/${machineId}/wait?state=started&timeout=${timeout}`,
+    );
+    if (!hasError(resp)) {
+      logInfo("Machine is running");
+      return;
+    }
+    if (attempt < retries) {
+      logWarn(`Machine not ready yet, retrying...`);
+      continue;
+    }
     const data = parseJson(resp);
     logError(
       `Machine did not reach 'started' state: ${data?.error || "timeout"}`,
@@ -548,7 +559,6 @@ async function waitForMachineStart(
     logError("Try a new region: FLY_REGION=ord spawn fly <agent>");
     throw new Error("Machine start timeout");
   }
-  logInfo("Machine is running");
 }
 
 async function cleanupOnFailure(appName: string): Promise<void> {
