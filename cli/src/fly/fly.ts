@@ -746,6 +746,7 @@ export async function waitForCloudInit(): Promise<void> {
   // round-trips (each of which was previously a separate fly machine exec call).
   const setupScript = [
     `echo "==> Installing base packages..."`,
+    `export DEBIAN_FRONTEND=noninteractive`,
     `apt-get update -y && apt-get install -y curl unzip git || true`,
     `echo "==> Checking Node.js..."`,
     `if ! command -v node >/dev/null 2>&1; then { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs; } || apt-get install -y nodejs || true; fi`,
