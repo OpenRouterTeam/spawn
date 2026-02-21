@@ -44,6 +44,12 @@ for (const [key, status] of matrixEntries) {
   }
 }
 
+/** Check if a script is a TypeScript shim (delegates to bun run main.ts) */
+function isTypeScriptShim(filePath: string): boolean {
+  const content = readFileSync(filePath, "utf-8");
+  return content.includes("bun run") && content.includes("main.ts");
+}
+
 /** Read file content, stripping comment-only lines for pattern checks */
 function readScript(filePath: string): string {
   return readFileSync(filePath, "utf-8");
