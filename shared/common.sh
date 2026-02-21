@@ -1927,12 +1927,14 @@ json_escape() {
 extract_ssh_key_ids() {
     local api_response="${1}"
     local key_field="${2:-ssh_keys}"
+    # SECURITY: Pass key_field via sys.argv to prevent Python code injection.
+    # Previously interpolated directly into Python source as '${key_field}'.
     python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
-ids = [k['id'] for k in data.get('${key_field}', [])]
+ids = [k['id'] for k in data.get(sys.argv[1], [])]
 print(json.dumps(ids))
-" <<< "${api_response}" 2>/dev/null || {
+" "${key_field}" <<< "${api_response}" 2>/dev/null || {
         log_error "Failed to parse SSH key IDs from API response"
         log_error "The API response may be malformed or python3 is unavailable"
         return 1
@@ -2896,16 +2898,14 @@ _load_json_config_fields() {
     local config_file="${1}"; shift
     [[ -f "${config_file}" ]] || return 1
 
-    local py_fields=""
-    for field in "$@"; do
-        py_fields="${py_fields}print(d.get('${field}', ''));"
-    done
-
+    # SECURITY: Pass field names via sys.argv to prevent Python code injection.
+    # Previously built Python source by interpolating field names as '${field}'.
     python3 -c "
 import json, sys
 d = json.load(open(sys.argv[1]))
-${py_fields}
-" "${config_file}" 2>/dev/null || return 1
+for field in sys.argv[2:]:
+    print(d.get(field, ''))
+" "${config_file}" "$@" 2>/dev/null || return 1
 }
 
 # Save key-value pairs to a JSON config file using json_escape for safe encoding.
