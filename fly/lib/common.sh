@@ -149,37 +149,78 @@ ensure_fly_cli() {
 }
 
 # Ensure FLY_API_TOKEN is available.
-# Auth chain: (1) fly auth token from CLI, (2) ensure_api_token_with_provider
+# Auth chain: (1) env var, (2) saved config, (3) fly auth token, (4) fly auth login (OAuth)
 ensure_fly_token() {
-    # 1. Try flyctl CLI auth (quick, no validation needed — CLI is authoritative)
     local fly_cmd
-    if fly_cmd=$(_get_fly_cmd 2>/dev/null); then
+    fly_cmd=$(_get_fly_cmd 2>/dev/null) || fly_cmd=""
+
+    # 1. Env var — already set by user
+    if [[ -n "${FLY_API_TOKEN:-}" ]]; then
+        FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
+        export FLY_API_TOKEN
+        if _test_fly_token; then
+            log_info "Using Fly.io API token from environment"
+            _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
+            _fly_prompt_org
+            return 0
+        fi
+        log_warn "FLY_API_TOKEN from environment is invalid or expired"
+        unset FLY_API_TOKEN
+    fi
+
+    # 2. Saved config
+    if _load_token_from_config "$HOME/.config/spawn/fly.json" "FLY_API_TOKEN" "Fly.io"; then
+        FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
+        export FLY_API_TOKEN
+        if _test_fly_token; then
+            log_info "Using saved Fly.io API token"
+            _fly_prompt_org
+            return 0
+        fi
+        log_warn "Saved Fly.io token is invalid or expired"
+        unset FLY_API_TOKEN
+    fi
+
+    # 3. Try existing fly CLI session (fly auth token)
+    if [[ -n "$fly_cmd" ]]; then
         local token
         token=$("$fly_cmd" auth token 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g' || true)
         if [[ -n "$token" ]]; then
             FLY_API_TOKEN=$(_sanitize_fly_token "$token")
             export FLY_API_TOKEN
-            log_info "Using Fly.io API token from flyctl"
-            _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
-            _fly_prompt_org
-            return 0
+            if _test_fly_token; then
+                log_info "Using Fly.io API token from fly CLI"
+                _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
+                _fly_prompt_org
+                return 0
+            fi
+            log_warn "Fly CLI session token is invalid or expired"
+            unset FLY_API_TOKEN
         fi
     fi
 
-    # 2. Env var / config file / manual prompt — same pattern as Hetzner
-    ensure_api_token_with_provider \
-        "Fly.io" \
-        "FLY_API_TOKEN" \
-        "$HOME/.config/spawn/fly.json" \
-        "https://fly.io/dashboard → Tokens" \
-        "_test_fly_token"
-
-    # Sanitize whatever we got (may include display name prefix)
-    if [[ -n "${FLY_API_TOKEN:-}" ]]; then
-        FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
-        export FLY_API_TOKEN
+    # 4. OAuth login via fly auth login
+    if [[ -n "$fly_cmd" ]]; then
+        log_step "Launching Fly.io OAuth login..."
+        if "$fly_cmd" auth login 2>&1; then
+            local token
+            token=$("$fly_cmd" auth token 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g' || true)
+            if [[ -n "$token" ]]; then
+                FLY_API_TOKEN=$(_sanitize_fly_token "$token")
+                export FLY_API_TOKEN
+                _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
+                log_info "Authenticated with Fly.io via OAuth"
+                _fly_prompt_org
+                return 0
+            fi
+        fi
+        log_error "fly auth login failed"
+    else
+        log_error "fly CLI not installed — cannot authenticate"
+        log_warn "Install it: curl -L https://fly.io/install.sh | sh"
     fi
-    _fly_prompt_org
+
+    return 1
 }
 
 # Parse fly CLI / GraphQL org JSON into pipe-delimited "slug|name" lines.
