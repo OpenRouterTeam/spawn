@@ -16,6 +16,14 @@ _ensure_bun
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 
+# Source cloud lib (provides shared helpers, OPENROUTER_API_KEY passthrough)
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/lib/common.sh" ]]; then
+    source "$SCRIPT_DIR/lib/common.sh"
+else
+    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/fly/lib/common.sh)"
+fi
+export OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
+
 if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/main.ts" ]]; then
     # Local checkout — run directly
     exec bun run "$SCRIPT_DIR/main.ts" claude "$@"
