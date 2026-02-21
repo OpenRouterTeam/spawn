@@ -92,7 +92,8 @@ print(v)
             fi
             # SECURITY: val is already validated against ^[a-zA-Z0-9._/@-]+$ above,
             # and var_name is validated against ^[A-Z_][A-Z0-9_]*$ by the caller.
-            eval "${var_name}=\${val}"
+            # Use printf -v for safe variable assignment (no command substitution/expansion).
+            printf -v "${var_name}" '%s' "${val}"
             export "${var_name}"
             return 0
         fi
