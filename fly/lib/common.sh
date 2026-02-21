@@ -553,9 +553,14 @@ upload_file() {
         return 1
     fi
 
-    # base64 output is safe (alphanumeric + /+=) so no injection risk
     local content
     content=$(base64 -w0 < "$local_path" 2>/dev/null || base64 < "$local_path")
+
+    # SECURITY: Validate base64 output contains only safe characters (defense-in-depth)
+    if [[ "${content}" =~ [^A-Za-z0-9+/=] ]]; then
+        log_error "upload_file: base64 output contains unexpected characters"
+        return 1
+    fi
 
     run_server "printf '%s' '${content}' | base64 -d > '${remote_path}'"
 }
