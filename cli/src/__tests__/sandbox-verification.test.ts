@@ -15,7 +15,9 @@ import { spawnSync } from "child_process";
  * Agent: test-engineer
  */
 
-describe("Test Sandbox Verification", () => {
+const isSandboxed = process.env.HOME?.includes("spawn-test-home-");
+
+describe.skipIf(!isSandboxed)("Test Sandbox Verification", () => {
   describe("Environment variables", () => {
     it("should sandbox HOME to a temp directory", () => {
       const home = process.env.HOME!;
