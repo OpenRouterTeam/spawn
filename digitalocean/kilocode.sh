@@ -20,6 +20,6 @@ agent_env_vars() {
         "KILO_PROVIDER_TYPE=openrouter" \
         "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
 }
-agent_launch_cmd() { echo 'source ~/.zshrc && kilocode'; }
+agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode'; }
 
 spawn_agent "Kilo Code"

@@ -26,7 +26,7 @@ agent_configure() {
 }
 
 agent_launch_cmd() {
-    echo 'source ~/.zshrc && codex'
+    echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex'
 }
 
 spawn_agent "Codex CLI"
