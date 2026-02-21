@@ -20,6 +20,7 @@ const VERSION = pkg.version;
 import { validateIdentifier, validateScriptContent, validatePrompt, validateConnectionIP, validateUsername, validateServerIdentifier, validateMetadataValue } from "./security.js";
 import { saveSpawnRecord, filterHistory, clearHistory, markRecordDeleted, getActiveServers, getHistoryPath, type SpawnRecord, type VMConnection } from "./history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE, type ExitCodeEntry, type SignalEntry } from "./guidance-data.js";
+import { destroyServer as flyDestroyServer, ensureFlyCli, ensureFlyToken } from "./fly/fly.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -1821,8 +1822,6 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
       return `${sourceLib}\nensure_hcloud_token\ndestroy_server "${id}"`;
     case "digitalocean":
       return `${sourceLib}\nensure_do_token\ndestroy_server "${id}"`;
-    case "fly":
-      return `${sourceLib}\nensure_fly_cli\nensure_fly_token\ndestroy_server "${id}"`;
     case "gcp": {
       const zone = connection.metadata?.zone || "us-central1-a";
       const project = connection.metadata?.project || "";
@@ -1849,6 +1848,37 @@ async function execDeleteServer(
 ): Promise<boolean> {
   const conn = record.connection;
   if (!conn?.cloud || conn.cloud === "local") return false;
+
+  // Fly.io uses a TypeScript module — no bash script exists after the TS rewrite
+  if (conn.cloud === "fly") {
+    const id = conn.server_id || conn.server_name || "";
+    try {
+      validateServerIdentifier(id);
+    } catch (err) {
+      throw new Error(
+        `Invalid server identifier in history: ${getErrorMessage(err)}\n\n` +
+        `Your spawn history file may be corrupted or tampered with.\n` +
+        `Location: ${getHistoryPath()}\n` +
+        `To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'`
+      );
+    }
+    try {
+      await ensureFlyCli();
+      await ensureFlyToken();
+      await flyDestroyServer(id);
+      markRecordDeleted(record);
+      return true;
+    } catch (err) {
+      const errMsg = getErrorMessage(err);
+      if (errMsg.includes("404") || errMsg.includes("not found") || errMsg.includes("Not Found") || errMsg.includes("Could not find")) {
+        p.log.warn("Server already deleted or not found. Marking as deleted.");
+        markRecordDeleted(record);
+        return true;
+      }
+      p.log.error(`Failed to delete Fly.io app: ${errMsg}`);
+      return false;
+    }
+  }
 
   const script = buildDeleteScript(conn.cloud, conn);
   if (!script) {
