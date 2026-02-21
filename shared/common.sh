@@ -2851,7 +2851,7 @@ ensure_api_token_with_provider() {
 
     # Try environment variable (validate if test function provided)
     if _load_token_from_env "${env_var_name}" "${provider_name}"; then
-        if [[ -z "${test_func}" ]] || "${test_func}" 2>/dev/null; then
+        if [[ -z "${test_func}" ]] || "${test_func}"; then
             return 0
         fi
         log_warn "${provider_name} token from environment is invalid or expired"
@@ -2860,7 +2860,7 @@ ensure_api_token_with_provider() {
 
     # Try config file (validate if test function provided, fall through to prompt on failure)
     if _load_token_from_config "${config_file}" "${env_var_name}" "${provider_name}"; then
-        if [[ -z "${test_func}" ]] || "${test_func}" 2>/dev/null; then
+        if [[ -z "${test_func}" ]] || "${test_func}"; then
             return 0
         fi
         log_warn "Saved ${provider_name} token is invalid or expired, requesting a new one..."
