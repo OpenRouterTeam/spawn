@@ -748,20 +748,21 @@ export async function waitForSsh(maxAttempts = 20): Promise<void> {
 export async function waitForCloudInit(): Promise<void> {
   await waitForSsh();
 
-  logStep("Installing packages (Node.js, bun)...");
+  logStep("Installing packages (bun, Node.js)...");
   // Batch all package installs into a single remote script to avoid multiple
   // round-trips (each of which was previously a separate fly machine exec call).
+  // Install bun first (single binary, no deps), then Node.js as a direct binary
+  // download from nodejs.org — no apt nodejs/npm/python3, no NodeSource, no n.
   const setupScript = [
     `echo "==> Installing base packages..."`,
     `export DEBIAN_FRONTEND=noninteractive`,
-    `apt-get update -y && apt-get install -y --no-install-recommends curl unzip git ca-certificates || true`,
-    `echo "==> Checking Node.js..."`,
-    `if ! command -v node >/dev/null 2>&1; then apt-get install -y --no-install-recommends nodejs npm || true; fi`,
-    `npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true`,
-    `echo "node: $(node --version 2>/dev/null || echo not installed)"`,
+    `apt-get update -y && apt-get install -y --no-install-recommends curl unzip git ca-certificates xz-utils || true`,
     `echo "==> Checking bun..."`,
     `if ! command -v bun >/dev/null 2>&1 && [ ! -f "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash || true; fi`,
     `for rc in ~/.bashrc ~/.zshrc; do grep -q '.bun/bin' "$rc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' >> "$rc"; done`,
+    `echo "==> Checking Node.js..."`,
+    `if ! command -v node >/dev/null 2>&1; then curl -fsSL https://nodejs.org/dist/v22.15.0/node-v22.15.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1 || true; fi`,
+    `echo "node: $(node --version 2>/dev/null || echo not installed)"`,
   ].join('\n');
 
   try {
