@@ -110,7 +110,7 @@ _try_flyctl_auth() {
     fly_cmd=$(_get_fly_cmd) || return 1
 
     local token
-    token=$("$fly_cmd" auth token 2>/dev/null || true)
+    token=$("$fly_cmd" auth token 2>/dev/null | head -1 || true)
     if [[ -n "$token" ]]; then
         echo "$token"
         return 0
@@ -227,7 +227,7 @@ _try_fly_browser_auth() {
         log_step "Opening Fly.io browser login via flyctl..."
         if "$fly_cmd" auth login </dev/tty >/dev/tty 2>&1; then
             local token
-            token=$("$fly_cmd" auth token 2>/dev/null) || true
+            token=$("$fly_cmd" auth token 2>/dev/null | head -1) || true
             if [[ -n "$token" ]]; then
                 echo "$token"
                 return 0
