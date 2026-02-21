@@ -110,9 +110,12 @@ function getCmd(): string | null {
 export function sanitizeFlyToken(raw: string): string {
   let t = raw.replace(/[\n\r]/g, "").trim();
   if (t.includes("FlyV1 ")) {
+    // Already prefixed — extract everything after "FlyV1 "
     t = "FlyV1 " + t.split("FlyV1 ").pop()!;
   } else if (t.includes("fm2_")) {
-    const m = t.match(/(fm2_[^ ,]*)/);
+    // Macaroon token — may have comma-separated discharge tokens (fm2_xxx,fm2_yyy,fo1_zzz).
+    // Extract from the first fm2_ to end-of-string, preserving all segments.
+    const m = t.match(/(fm2_\S+)/);
     if (m) t = "FlyV1 " + m[1];
   } else if (t.startsWith("m2.")) {
     t = "FlyV1 " + t;
@@ -131,10 +134,13 @@ async function testFlyToken(): Promise<boolean> {
   } catch {
     // fall through
   }
-  // Fallback: user API
+  // Fallback: user API (OAuth/personal tokens)
   try {
+    const authHeader = flyApiToken.startsWith("FlyV1 ")
+      ? flyApiToken
+      : `Bearer ${flyApiToken}`;
     const resp = await fetch("https://api.fly.io/v1/user", {
-      headers: { Authorization: `Bearer ${flyApiToken}` },
+      headers: { Authorization: authHeader },
       signal: AbortSignal.timeout(10_000),
     });
     const text = await resp.text();
@@ -223,6 +229,41 @@ export async function ensureFlyCli(): Promise<void> {
   logInfo("flyctl CLI installed");
 }
 
+/**
+ * Extract a token from fly CLI output.
+ * Runs the given command, strips ANSI codes, and finds a line that looks like a token.
+ * Token formats: "FlyV1 fm2_...", "fm2_...", "m2...." or a bare alphanumeric string.
+ * `fly tokens create` outputs the token prefixed with "FlyV1 " (~650-700 chars).
+ */
+function extractTokenFromCli(flyCmd: string, args: string[]): string {
+  try {
+    const proc = Bun.spawnSync([flyCmd, ...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const stdout = new TextDecoder().decode(proc.stdout);
+    const stderr = new TextDecoder().decode(proc.stderr);
+    // Try stdout first, then stderr
+    for (const output of [stdout, stderr]) {
+      for (const line of output.split("\n")) {
+        const cleaned = line.replace(/\x1b\[[0-9;]*m/g, "").trim();
+        if (!cleaned) continue;
+        // Match "FlyV1 fm2_..." (the standard output format)
+        if (/^FlyV1\s+\S+/.test(cleaned)) return cleaned;
+        // Match bare macaroon tokens: fm2_..., m2....
+        if (/^(fm2_|m2\.)\S+/.test(cleaned)) return cleaned;
+        // Skip deprecation notices, help text, error messages
+        if (/deprecated|command|usage|error|failed|help|available|flags/i.test(cleaned)) continue;
+        if (cleaned.startsWith("-") || cleaned.startsWith("The ") || cleaned.startsWith("Use ")) continue;
+        // A long alphanumeric string is likely a token
+        if (/^[a-zA-Z0-9_.,+/=: -]{40,}$/.test(cleaned)) return cleaned;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return "";
+}
+
 export async function ensureFlyToken(): Promise<void> {
   const flyCmd = getCmd();
 
@@ -250,17 +291,16 @@ export async function ensureFlyToken(): Promise<void> {
     flyApiToken = "";
   }
 
-  // 3. fly auth token
+  // 3. Try existing fly CLI session — try multiple token commands
+  //    "fly auth token" is deprecated in newer flyctl; "fly tokens create org" is the replacement.
+  //    Org tokens are needed (not deploy tokens) since spawn creates new apps.
   if (flyCmd) {
-    try {
-      const proc = Bun.spawnSync([flyCmd, "auth", "token"], {
-        stdio: ["ignore", "pipe", "ignore"],
-      });
-      const token = new TextDecoder()
-        .decode(proc.stdout)
-        .split("\n")[0]
-        .replace(/\x1b\[[0-9;]*m/g, "")
-        .trim();
+    const tokenCmds: string[][] = [
+      ["tokens", "create", "org", "--expiry", "24h"],
+      ["auth", "token"],
+    ];
+    for (const args of tokenCmds) {
+      const token = extractTokenFromCli(flyCmd, args);
       if (token) {
         flyApiToken = sanitizeFlyToken(token);
         if (await testFlyToken()) {
@@ -268,12 +308,10 @@ export async function ensureFlyToken(): Promise<void> {
           await saveTokenToConfig(flyApiToken);
           return;
         }
-        logWarn("Fly CLI session token is invalid or expired");
         flyApiToken = "";
       }
-    } catch {
-      // ignore
     }
+    logWarn("No valid token from fly CLI session");
   }
 
   // 4. OAuth login via fly auth login
@@ -283,23 +321,20 @@ export async function ensureFlyToken(): Promise<void> {
       stdio: ["inherit", "inherit", "inherit"],
     });
     await proc.exited;
-    try {
-      const result = Bun.spawnSync([flyCmd, "auth", "token"], {
-        stdio: ["ignore", "pipe", "ignore"],
-      });
-      const token = new TextDecoder()
-        .decode(result.stdout)
-        .split("\n")[0]
-        .replace(/\x1b\[[0-9;]*m/g, "")
-        .trim();
+
+    // After login, try to get an org token (needed for creating apps)
+    const tokenCmds: string[][] = [
+      ["tokens", "create", "org", "--expiry", "24h"],
+      ["auth", "token"],
+    ];
+    for (const args of tokenCmds) {
+      const token = extractTokenFromCli(flyCmd, args);
       if (token) {
         flyApiToken = sanitizeFlyToken(token);
         await saveTokenToConfig(flyApiToken);
         logInfo("Authenticated with Fly.io via OAuth");
         return;
       }
-    } catch {
-      // fall through
     }
     logWarn("fly auth login did not succeed");
   }
@@ -307,6 +342,7 @@ export async function ensureFlyToken(): Promise<void> {
   // 5. Manual token paste
   logStep("Manual token entry (last resort)");
   logWarn("Get a token from: https://fly.io/dashboard -> Tokens");
+  logWarn("Or run: fly tokens create org");
   const token = await prompt("Enter your Fly.io API token: ");
   if (!token) throw new Error("No token provided");
   flyApiToken = sanitizeFlyToken(token);

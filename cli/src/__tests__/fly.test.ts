@@ -119,9 +119,14 @@ describe("fly/lib/fly", () => {
     it("wraps fm2_ tokens with FlyV1", () => {
       expect(sanitizeFlyToken("fm2_abc123")).toBe("FlyV1 fm2_abc123");
     });
-    it("wraps fm2_ tokens with prefix text", () => {
-      expect(sanitizeFlyToken("deploy token fm2_abc123 extra")).toBe(
-        "FlyV1 fm2_abc123",
+    it("preserves comma-separated macaroon discharge tokens", () => {
+      expect(sanitizeFlyToken("fm2_abc,fm2_def,fo1_ghi")).toBe(
+        "FlyV1 fm2_abc,fm2_def,fo1_ghi",
+      );
+    });
+    it("extracts full macaroon from noisy input", () => {
+      expect(sanitizeFlyToken("deploy token fm2_abc,fm2_def extra")).toBe(
+        "FlyV1 fm2_abc,fm2_def",
       );
     });
     it("wraps m2. tokens with FlyV1", () => {
