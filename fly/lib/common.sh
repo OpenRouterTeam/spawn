@@ -251,25 +251,35 @@ _try_fly_browser_auth() {
 
 ensure_fly_token() {
     # 1. Try env var (sanitize — dashboard copy button may include display name)
+    log_info "Checking FLY_API_TOKEN env var..."
     if [[ -n "${FLY_API_TOKEN:-}" ]]; then
         FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
         export FLY_API_TOKEN
+        log_info "Validating token from env var..."
         _validate_fly_token && return 0
-        log_warn "FLY_API_TOKEN is set but invalid, trying other methods..."
+        log_warn "FLY_API_TOKEN is set but invalid, trying next method..."
         unset FLY_API_TOKEN
+    else
+        log_info "FLY_API_TOKEN not set, trying next method..."
     fi
 
     # 2. Try config file (sanitize in case it was saved with display name)
+    log_info "Checking config file ~/.config/spawn/fly.json..."
     if _load_token_from_config "$HOME/.config/spawn/fly.json" "FLY_API_TOKEN" "Fly.io"; then
         FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
         export FLY_API_TOKEN
+        log_info "Validating token from config file..."
         if _validate_fly_token; then
             return 0
         fi
+        log_warn "Token from config file is invalid, trying next method..."
         unset FLY_API_TOKEN
+    else
+        log_info "No token found in config file, trying next method..."
     fi
 
     # 3. Try flyctl CLI auth
+    log_info "Trying fly auth token..."
     local token
     token=$(_try_flyctl_auth 2>/dev/null) && {
         export FLY_API_TOKEN="$token"
@@ -278,11 +288,12 @@ ensure_fly_token() {
         _fly_prompt_org
         return 0
     }
+    log_warn "flyctl auth token not available, trying next method..."
 
     # 4. Try browser-based OAuth via flyctl
     # Token from 'fly auth login' + 'fly auth token' is definitionally valid —
     # skip _validate_fly_token to avoid false failures on the Machines API.
-    log_step "Authenticating with Fly.io via browser..."
+    log_info "Opening browser for Fly.io OAuth..."
     token=$(_try_fly_browser_auth) && {
         FLY_API_TOKEN=$(_sanitize_fly_token "$token")
         export FLY_API_TOKEN
@@ -293,7 +304,7 @@ ensure_fly_token() {
     }
 
     # 5. Last resort: manual token entry
-    log_warn "Browser login unavailable or failed"
+    log_warn "Browser login unavailable or failed, falling back to manual token entry..."
     ensure_api_token_with_provider \
         "Fly.io" \
         "FLY_API_TOKEN" \
