@@ -129,7 +129,7 @@ async function installClaudeCode(): Promise<void> {
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
     // Ensure Node.js for npm method
-    `if ! command -v node >/dev/null 2>&1; then apt-get install -y nodejs npm 2>/dev/null && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true; fi`,
+    `if ! command -v node >/dev/null 2>&1; then DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm 2>/dev/null && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true; fi`,
     // Method 2: npm
     `echo "==> Installing Claude Code (method 2/2: npm)..."`,
     `npm install -g @anthropic-ai/claude-code || true`,
