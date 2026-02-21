@@ -162,69 +162,82 @@ _validate_fly_token() {
     return 0
 }
 
-# Browser-based auth using Fly.io CLI Sessions API
-# Mimics `fly auth login`: creates a session, opens browser, polls for token
+# Prompt user to select (or confirm) their Fly.io organization.
+# Exports FLY_ORG. Skipped when FLY_ORG is already set or SPAWN_NON_INTERACTIVE=1.
+_fly_prompt_org() {
+    if [[ -n "${FLY_ORG:-}" || "${SPAWN_NON_INTERACTIVE:-}" == "1" ]]; then
+        return 0
+    fi
+
+    local fly_cmd orgs_response org_choice
+    fly_cmd=$(_get_fly_cmd 2>/dev/null) || { export FLY_ORG="personal"; return 0; }
+
+    # Try to list orgs for a picker; fall back to a simple prompt on failure
+    orgs_response=$("$fly_cmd" orgs list --json 2>/dev/null) || orgs_response=""
+
+    local org_names=()
+    if [[ -n "$orgs_response" ]]; then
+        while IFS= read -r name; do
+            [[ -n "$name" ]] && org_names+=("$name")
+        done < <(echo "$orgs_response" | bun -e "
+const orgs = JSON.parse(await Bun.stdin.text());
+const list = Array.isArray(orgs) ? orgs : (orgs.nodes ?? orgs.organizations ?? []);
+list.forEach(o => process.stdout.write((o.slug ?? o.name ?? '') + '\n'));
+" 2>/dev/null)
+    fi
+
+    if [[ "${#org_names[@]}" -gt 1 ]]; then
+        log_info "Available Fly.io organizations:"
+        local i=1
+        for org in "${org_names[@]}"; do
+            printf "  %d) %s\n" "$i" "$org" >&2
+            i=$((i + 1))
+        done
+        local choice
+        choice=$(safe_read "Select organization [1]: ") || choice=""
+        choice="${choice:-1}"
+        if [[ "$choice" -ge 1 && "$choice" -le "${#org_names[@]}" ]] 2>/dev/null; then
+            export FLY_ORG="${org_names[$((choice - 1))]}"
+            log_info "Using Fly.io org: ${FLY_ORG}"
+            return 0
+        fi
+    fi
+
+    # Single org or list failed — prompt with default "personal"
+    org_choice=$(safe_read "Fly.io organization slug [personal]: ") || org_choice=""
+    export FLY_ORG="${org_choice:-personal}"
+    log_info "Using Fly.io org: ${FLY_ORG}"
+}
+
+# Browser-based auth — delegates to flyctl when available (correct token exchange),
+# falls back to a direct API prompt when flyctl is absent.
 _try_fly_browser_auth() {
-    local fly_api_base="https://api.fly.io"
-
-    log_step "Fetching Fly.io login URL..."
-
-    # Create a CLI session
-    local hostname
-    hostname=$(hostname 2>/dev/null || echo "spawn")
-    local session_body
-    session_body=$(printf '{"name":%s,"signup":false,"target":"auth"}' "$(json_escape "$hostname")")
-
-    local response
-    response=$(curl -fsSL -X POST "${fly_api_base}/api/v1/cli_sessions" \
-        -H "Content-Type: application/json" \
-        -d "$session_body" 2>/dev/null) || return 1
-
-    local session_id auth_url
-    session_id=$(echo "$response" | _fly_json_get "id")
-    auth_url=$(echo "$response" | _fly_json_get "auth_url")
-
-    if [[ -z "$session_id" || -z "$auth_url" ]]; then
+    local fly_cmd
+    if fly_cmd=$(_get_fly_cmd 2>/dev/null); then
+        # flyctl handles the full browser-flow + token exchange internally.
+        # It outputs the auth URL to the terminal so sandbox users can copy it.
+        log_step "Opening Fly.io browser login via flyctl..."
+        if "$fly_cmd" auth login </dev/tty >/dev/tty 2>&1; then
+            local token
+            token=$("$fly_cmd" auth token 2>/dev/null) || true
+            if [[ -n "$token" ]]; then
+                echo "$token"
+                return 0
+            fi
+        fi
+        log_warn "flyctl browser login failed."
         return 1
     fi
 
-    # Show the URL prominently so sandbox users can copy it
-    log_step "Fly.io login required. Open this URL in your browser:"
-    printf '\n  %s\n\n' "$auth_url" >&2
-    open_browser "$auth_url" 2>/dev/null || true
-
-    log_info "Waiting for browser authentication (up to 120s)..."
-    log_warn "Running in a sandbox? Copy the URL above into your local browser."
-
-    # Poll for the access token (max 120 seconds, 2s intervals)
-    local attempt=0
-    local max_attempts=60
-    while [[ "$attempt" -lt "$max_attempts" ]]; do
-        sleep 2
-        attempt=$((attempt + 1))
-
-        local poll_response
-        poll_response=$(curl -fsSL "${fly_api_base}/api/v1/cli_sessions/${session_id}" 2>/dev/null) || continue
-
-        local access_token
-        access_token=$(echo "$poll_response" | _fly_json_get "access_token")
-
-        if [[ -n "$access_token" ]]; then
-            echo "$access_token"
-            return 0
-        fi
-    done
-
-    # Polling timed out — offer manual token entry as last resort
-    log_warn "Browser login timed out. You can paste a token manually."
-    log_warn "Generate one at: https://fly.io/dashboard → Tokens → Create token"
+    # Fallback when flyctl is not installed: direct token entry
+    log_warn "flyctl not found — cannot open browser flow automatically."
+    log_warn "Generate a token at: https://fly.io/dashboard → Tokens → Create token"
     local manual_token
-    manual_token=$(safe_read "Paste Fly.io API token (or press Enter to skip): ") || return 1
+    manual_token=$(safe_read "Paste Fly.io API token: ") || return 1
     if [[ -n "${manual_token}" ]]; then
         echo "${manual_token}"
         return 0
     fi
-
     return 1
 }
 
@@ -254,16 +267,19 @@ ensure_fly_token() {
         export FLY_API_TOKEN="$token"
         log_info "Using Fly.io API token from flyctl auth"
         _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
+        _fly_prompt_org
         return 0
     }
 
-    # 4. Try browser-based OAuth (like `fly auth login`)
+    # 4. Try browser-based OAuth via flyctl
     log_step "Authenticating with Fly.io via browser..."
     token=$(_try_fly_browser_auth) && {
-        export FLY_API_TOKEN="$token"
+        FLY_API_TOKEN=$(_sanitize_fly_token "$token")
+        export FLY_API_TOKEN
         if _validate_fly_token; then
             log_info "Authenticated with Fly.io via browser"
-            _save_token_to_config "$HOME/.config/spawn/fly.json" "$token"
+            _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
+            _fly_prompt_org
             return 0
         fi
         unset FLY_API_TOKEN
@@ -282,6 +298,7 @@ ensure_fly_token() {
     if [[ -n "${FLY_API_TOKEN:-}" ]]; then
         FLY_API_TOKEN=$(_sanitize_fly_token "$FLY_API_TOKEN")
         export FLY_API_TOKEN
+        _fly_prompt_org
     fi
 }
 
