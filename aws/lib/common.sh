@@ -47,8 +47,8 @@ _ls_json() {
         local _ls_data
         _ls_data=$(cat)
         _JSON_INPUT="${_ls_data}" bun eval \
-            "const d=JSON.parse(process.env._JSON_INPUT);const v='${path}'.replace(/^\./,'').split('.').reduce((o,k)=>o?.[k],d);if(v!=null)process.stdout.write(String(v));" \
-            2>/dev/null || true
+            "const path=process.argv[2];const d=JSON.parse(process.env._JSON_INPUT);const v=path.replace(/^\./,'').split('.').reduce((o,k)=>o?.[k],d);if(v!=null)process.stdout.write(String(v));" \
+            "${path}" 2>/dev/null || true
     fi
 }
 
@@ -354,7 +354,8 @@ ensure_ssh_key() {
         # Build JSON body with bun so the key content is properly escaped
         local import_body
         import_body=$(bun eval \
-            "const k=require('fs').readFileSync('${pub_path}','utf8').trim();process.stdout.write(JSON.stringify({keyPairName:'${key_name}',publicKeyBase64:k}));")
+            "const k=require('fs').readFileSync(process.argv[2],'utf8').trim();process.stdout.write(JSON.stringify({keyPairName:process.argv[3],publicKeyBase64:k}));" \
+            "${pub_path}" "${key_name}")
 
         _lightsail_rest "Lightsail_20161128.ImportKeyPair" "${import_body}" >/dev/null || {
             # Race condition check
@@ -480,16 +481,8 @@ create_server() {
         local ud_tmp create_body
         ud_tmp=$(mktemp)
         printf '%s' "${userdata}" > "${ud_tmp}"
-        create_body=$(bun eval "
-const ud = require('fs').readFileSync('${ud_tmp}', 'utf8');
-process.stdout.write(JSON.stringify({
-    instanceNames:    ['${name}'],
-    availabilityZone: '${az}',
-    blueprintId:      'ubuntu_24_04',
-    bundleId:         '${bundle}',
-    keyPairName:      'spawn-key',
-    userData:         ud,
-}));")
+        create_body=$(bun eval "const ud=require('fs').readFileSync(process.argv[2],'utf8');process.stdout.write(JSON.stringify({instanceNames:[process.argv[3]],availabilityZone:process.argv[4],blueprintId:'ubuntu_24_04',bundleId:process.argv[5],keyPairName:'spawn-key',userData:ud}));" \
+            "${ud_tmp}" "${name}" "${az}" "${bundle}")
         rm -f "${ud_tmp}"
 
         _lightsail_rest "Lightsail_20161128.CreateInstances" "${create_body}" >/dev/null || {
