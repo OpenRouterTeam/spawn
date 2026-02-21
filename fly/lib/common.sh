@@ -176,19 +176,23 @@ _fly_list_orgs() {
     local fly_cmd
     fly_cmd=$(_get_fly_cmd 2>/dev/null) || return 1
 
+    # Some flyctl versions exit non-zero even on success — capture regardless.
     local json
-    json=$("$fly_cmd" orgs list --json 2>/dev/null) || return 1
+    json=$("$fly_cmd" orgs list --json 2>/dev/null)
+    [[ -z "$json" ]] && return 1
 
-    echo "$json" | bun -e "
-const orgs = JSON.parse(await Bun.stdin.text());
+    # Pass JSON as an argument (not stdin pipe) to avoid bun stdin buffering issues.
+    bun -e "
+const orgs = JSON.parse(process.argv[1]);
 const list = Array.isArray(orgs) ? orgs : (orgs.nodes ?? orgs.organizations ?? []);
+if (!list.length) process.exit(1);
 list.forEach(o => {
     const slug = o.slug ?? o.name ?? '';
     const name = o.name ?? slug;
     const type = o.type ?? '';
     if (slug) process.stdout.write(slug + '|' + name + (type ? ' (' + type + ')' : '') + '\n');
 });
-" 2>/dev/null
+" "$json" 2>/dev/null
 }
 
 # Prompt user to select their Fly.io organization using the shared picker.
