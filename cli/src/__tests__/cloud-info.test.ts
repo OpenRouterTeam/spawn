@@ -102,6 +102,8 @@ mock.module("@clack/prompts", () => ({
   outro: mock(() => {}),
   cancel: mock(() => {}),
   select: mock(() => {}),
+  autocomplete: mock(async () => "claude"),
+  text: mock(async () => undefined),
   isCancel: () => false,
 }));
 
