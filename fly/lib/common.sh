@@ -123,23 +123,17 @@ _try_flyctl_auth() {
 
 # Sanitize a Fly.io token — the dashboard copy button may include the
 # display name before the actual token (e.g. "Deploy Token FlyV1 fm2_...")
-# Also handles raw macaroon tokens returned by the CLI Sessions API
-# (e.g. "m2.XXXX" or "fm2_XXXX" without the "FlyV1 " prefix).
-# All Fly.io v2 macaroon tokens must be sent as "Authorization: FlyV1 <token>"
-# regardless of whether the raw value already includes the prefix.
+# Strip everything before "FlyV1" or "fm2_", and trim whitespace/newlines.
 _sanitize_fly_token() {
     local raw="$1"
     # Trim leading/trailing whitespace and newlines
     raw=$(printf '%s' "$raw" | tr -d '\n\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    # If it already contains "FlyV1 ", strip any display name prefix before it
+    # If it contains "FlyV1 ", strip everything before it (display name prefix)
     if [[ "$raw" == *"FlyV1 "* ]]; then
         raw="FlyV1 ${raw##*FlyV1 }"
-    # Raw fm2_ macaroon (no FlyV1 prefix) — extract and wrap
+    # If it contains a bare "fm2_" token without FlyV1 prefix, extract it
     elif [[ "$raw" == *"fm2_"* ]]; then
         raw=$(printf '%s' "$raw" | sed 's/.*\(fm2_[^ ]*\).*/\1/')
-        raw="FlyV1 $raw"
-    # Raw m2. macaroon returned by CLI Sessions API — wrap with FlyV1 prefix
-    elif [[ "$raw" == m2.* ]]; then
         raw="FlyV1 $raw"
     fi
     printf '%s' "$raw"
@@ -215,9 +209,6 @@ _try_fly_browser_auth() {
         access_token=$(echo "$poll_response" | _fly_json_get "access_token")
 
         if [[ -n "$access_token" ]]; then
-            # Wrap raw macaroons in FlyV1 format at the source so fly_api
-            # uses the correct Authorization header (not Bearer).
-            [[ "$access_token" != FlyV1\ * ]] && access_token="FlyV1 $access_token"
             echo "$access_token"
             return 0
         fi
