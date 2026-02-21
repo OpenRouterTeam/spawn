@@ -143,8 +143,10 @@ async function testFlyToken(): Promise<boolean> {
       headers: { Authorization: authHeader },
       signal: AbortSignal.timeout(10_000),
     });
-    const text = await resp.text();
-    if (text && !hasError(text)) return true;
+    if (resp.ok) {
+      const text = await resp.text();
+      if (text && !hasError(text)) return true;
+    }
   } catch {
     // fall through
   }
