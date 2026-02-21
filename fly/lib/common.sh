@@ -110,7 +110,7 @@ _try_flyctl_auth() {
     fly_cmd=$(_get_fly_cmd) || return 1
 
     local token
-    token=$("$fly_cmd" auth token 2>/dev/null | head -1 || true)
+    token=$("$fly_cmd" auth token 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g' || true)
     if [[ -n "$token" ]]; then
         echo "$token"
         return 0
@@ -170,20 +170,19 @@ _validate_fly_token() {
     return 0
 }
 
-# Fetch Fly.io orgs via the API and emit pipe-delimited "slug|name (type)" lines
-# for use with _display_and_select. Returns 1 if API call fails or token absent.
+# List Fly.io organizations via flyctl and emit pipe-delimited "slug|name (type)" lines.
+# Used as the LIST_CALLBACK for interactive_pick.
 _fly_list_orgs() {
-    [[ -z "${FLY_API_TOKEN:-}" ]] && return 1
+    local fly_cmd
+    fly_cmd=$(_get_fly_cmd 2>/dev/null) || return 1
 
-    local response
-    response=$(curl -fsSL \
-        -H "Authorization: Bearer ${FLY_API_TOKEN}" \
-        "https://api.fly.io/v1/organizations" 2>/dev/null) || return 1
+    local json
+    json=$("$fly_cmd" orgs list --json 2>/dev/null) || return 1
 
-    echo "$response" | bun -e "
-const data = JSON.parse(await Bun.stdin.text());
-const orgs = Array.isArray(data) ? data : (data.organizations ?? data.nodes ?? []);
-orgs.forEach(o => {
+    echo "$json" | bun -e "
+const orgs = JSON.parse(await Bun.stdin.text());
+const list = Array.isArray(orgs) ? orgs : (orgs.nodes ?? orgs.organizations ?? []);
+list.forEach(o => {
     const slug = o.slug ?? o.name ?? '';
     const name = o.name ?? slug;
     const type = o.type ?? '';
@@ -192,42 +191,11 @@ orgs.forEach(o => {
 " 2>/dev/null
 }
 
-# Prompt user to select their Fly.io organization via API picker.
-# Exports FLY_ORG. Skipped when FLY_ORG is already set or SPAWN_NON_INTERACTIVE=1.
+# Prompt user to select their Fly.io organization using the shared picker.
+# Follows the same interactive_pick pattern as Hetzner/GCP pickers.
 _fly_prompt_org() {
-    if [[ -n "${FLY_ORG:-}" || "${SPAWN_NON_INTERACTIVE:-}" == "1" ]]; then
-        return 0
-    fi
-
-    local org_items
-    org_items=$(_fly_list_orgs 2>/dev/null) || org_items=""
-
-    if [[ -n "$org_items" ]]; then
-        local org_count
-        org_count=$(printf '%s\n' "$org_items" | grep -c .)
-        if [[ "$org_count" -eq 1 ]]; then
-            # Only one org — use it without prompting
-            FLY_ORG="${org_items%%|*}"
-            export FLY_ORG
-            log_info "Using Fly.io org: ${FLY_ORG}"
-            return 0
-        fi
-        # Multiple orgs — show picker (defaults to "personal" if present)
-        log_step "Select your Fly.io organization:"
-        local selected
-        selected=$(_display_and_select "Fly.io organization" "personal" "personal" <<< "$org_items")
-        if [[ -n "$selected" ]]; then
-            export FLY_ORG="$selected"
-            log_info "Using Fly.io org: ${FLY_ORG}"
-            return 0
-        fi
-    fi
-
-    # API unavailable or empty — fall back to prompted default
-    local org_choice
-    org_choice=$(safe_read "Fly.io organization slug [personal]: ") || org_choice=""
-    export FLY_ORG="${org_choice:-personal}"
-    log_info "Using Fly.io org: ${FLY_ORG}"
+    interactive_pick "FLY_ORG" "personal" "Fly.io organizations" _fly_list_orgs "personal"
+    log_info "Using Fly.io org: ${FLY_ORG:-personal}"
 }
 
 # Browser-based auth — delegates to flyctl when available (correct token exchange),
@@ -240,7 +208,7 @@ _try_fly_browser_auth() {
         log_step "Opening Fly.io browser login via flyctl..."
         if "$fly_cmd" auth login </dev/tty >/dev/tty 2>&1; then
             local token
-            token=$("$fly_cmd" auth token 2>/dev/null | head -1) || true
+            token=$("$fly_cmd" auth token 2>/dev/null | head -1 | sed 's/\x1b\[[0-9;]*m//g') || true
             if [[ -n "$token" ]]; then
                 echo "$token"
                 return 0
