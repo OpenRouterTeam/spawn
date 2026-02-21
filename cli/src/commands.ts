@@ -459,9 +459,12 @@ async function selectCloud(manifest: Manifest, cloudList: string[], hintOverride
 // Any string is allowed (spaces, uppercase, etc.) — the shell scripts
 // derive a kebab-case slug for the actual cloud resource name.
 async function promptSpawnName(): Promise<string | undefined> {
+  const suffix = Math.random().toString(36).slice(2, 6);
+  const defaultName = `spawn-${suffix}`;
   const spawnName = await p.text({
     message: "Name your spawn",
-    placeholder: "My Spawn",
+    placeholder: defaultName,
+    defaultValue: defaultName,
     validate: (value) => {
       if (!value) return undefined;
       if (value.length > 128) {
