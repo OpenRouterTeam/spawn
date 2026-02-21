@@ -2768,7 +2768,8 @@ _load_token_from_config() {
     # space ( ) for Fly.io "FlyV1 <macaroon>" prefixed tokens.
     # Space is safe inside curl -K double-quoted values: header = "Authorization: FlyV1 fm2_..."
     if [[ ! "${saved_token}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
-        log_error "SECURITY: Invalid characters in saved token for ${provider_name}"
+        log_warn "Saved ${provider_name} token is malformed — clearing cached credentials."
+        rm -f "${config_file}" 2>/dev/null || true
         return 1
     fi
 
