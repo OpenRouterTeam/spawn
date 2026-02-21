@@ -24,7 +24,13 @@ fi
 # ============================================================
 
 # Cache username to avoid repeated subprocess calls
-GCP_USERNAME=$(whoami)
+# Validate before assigning to prevent command injection if whoami is tampered
+_gcp_username=$(whoami)
+if [[ ! "$_gcp_username" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "ERROR: Invalid username detected from whoami" >&2
+    exit 1
+fi
+GCP_USERNAME="$_gcp_username"
 SSH_USER="${GCP_USERNAME}"
 
 SPAWN_DASHBOARD_URL="https://console.cloud.google.com/compute/instances"
