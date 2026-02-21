@@ -299,7 +299,7 @@ describe("extract_api_error_message in destroy_server", () => {
 
 describe("provider-specific error URL format", () => {
   for (const cloud of allClouds) {
-    const urls = cloud.content.match(/https?:\/\/[^\s"')]+/g) || [];
+    const urls = cloud.content.match(/https?:\/\/[^\s"')`]+/g) || [];
     if (urls.length === 0) continue;
 
     it(`${cloud.name} URLs should be well-formed (no trailing punctuation)`, () => {
