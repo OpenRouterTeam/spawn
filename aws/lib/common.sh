@@ -232,7 +232,7 @@ ensure_aws_cli() {
     if ! command -v aws &>/dev/null; then
         log_warn "AWS CLI is not installed."
         local install_choice
-        safe_read "Install AWS CLI now? [Y/n] " install_choice || install_choice="y"
+        install_choice=$(safe_read "Install AWS CLI now? [Y/n] ") || install_choice="y"
         install_choice="${install_choice:-y}"
 
         case "${install_choice}" in
@@ -244,8 +244,8 @@ ensure_aws_cli() {
                     # Installed — now prompt for credentials
                     log_info "Run 'aws configure' to set your AWS credentials."
                     local access_key secret_key
-                    safe_read "AWS Access Key ID: " access_key || return 1
-                    safe_read "AWS Secret Access Key: " secret_key || return 1
+                    access_key=$(safe_read "AWS Access Key ID: ") || return 1
+                    secret_key=$(safe_read "AWS Secret Access Key: ") || return 1
                     export AWS_ACCESS_KEY_ID="${access_key}"
                     export AWS_SECRET_ACCESS_KEY="${secret_key}"
                     export AWS_DEFAULT_REGION="${region}"
