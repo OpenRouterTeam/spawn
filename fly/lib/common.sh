@@ -214,13 +214,26 @@ ensure_fly_token() {
                 return 0
             fi
         fi
-        log_error "fly auth login failed"
+        log_warn "fly auth login did not succeed"
     else
-        log_error "fly CLI not installed — cannot authenticate"
-        log_warn "Install it: curl -L https://fly.io/install.sh | sh"
+        log_warn "fly CLI not installed — skipping OAuth login"
     fi
 
-    return 1
+    # 5. Last resort — manual token paste
+    log_step "Manual token entry (last resort)"
+    log_warn "Get a token from: https://fly.io/dashboard → Tokens"
+    local token
+    token=$(validated_read "Enter your Fly.io API token: " validate_api_token) || return 1
+    FLY_API_TOKEN=$(_sanitize_fly_token "$token")
+    export FLY_API_TOKEN
+    if ! _test_fly_token; then
+        log_error "Token is invalid"
+        unset FLY_API_TOKEN
+        return 1
+    fi
+    _save_token_to_config "$HOME/.config/spawn/fly.json" "$FLY_API_TOKEN"
+    log_info "Using manually entered Fly.io API token"
+    _fly_prompt_org
 }
 
 # Parse fly CLI / GraphQL org JSON into pipe-delimited "slug|name" lines.
