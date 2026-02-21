@@ -2,6 +2,26 @@
 
 Fly.io Machines via REST API and flyctl CLI. [Fly.io](https://fly.io)
 
+## Architecture
+
+The Fly.io provider is implemented in TypeScript (Bun runtime). Each `.sh` agent
+script is a thin shim that ensures bun is installed, downloads the TS sources if
+running via `bash <(curl ...)`, and delegates to `main.ts`.
+
+```
+fly/
+  main.ts               # Orchestrator: auth → provision → install → launch
+  lib/
+    fly.ts              # Core provider: API client, auth, orgs, provisioning
+    agents.ts           # Agent configs (all 6) + shared install/config helpers
+    oauth.ts            # OpenRouter OAuth flow (Bun.serve), key validation
+    ui.ts               # Logging (ANSI), prompts (readline), browser open
+  {agent}.sh            # Thin bash shim → bun run main.ts {agent}
+```
+
+**No external dependencies** — all modules use built-in Bun/Node APIs only.
+The `fly/` directory has no `package.json`.
+
 ## Agents
 
 #### Claude Code
