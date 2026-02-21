@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-# Thin shim: ensures bun is available, downloads TS sources if needed, runs main.ts
+# Thin shim: ensures bun is available, runs bundled fly.js (local or from GitHub release)
 
 _ensure_bun() {
     if command -v bun &>/dev/null; then return 0; fi
@@ -15,17 +15,15 @@ _ensure_bun
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/main.ts" ]]; then
-    exec bun run "$SCRIPT_DIR/main.ts" openclaw "$@"
+# Local checkout — run from source
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/fly/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../cli/src/fly/main.ts" openclaw "$@"
 fi
 
-REMOTE_BASE="https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/fly"
-TMPDIR_TS=$(mktemp -d)
-trap 'rm -rf "$TMPDIR_TS"' EXIT
+# Remote — download bundled fly.js from GitHub release
+FLY_JS=$(mktemp)
+trap 'rm -f "$FLY_JS"' EXIT
+curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/fly-latest/fly.js" -o "$FLY_JS" \
+    || { printf '\033[0;31mFailed to download fly.js\033[0m\n' >&2; exit 1; }
 
-mkdir -p "$TMPDIR_TS/lib"
-for f in main.ts lib/fly.ts lib/oauth.ts lib/agents.ts lib/ui.ts; do
-    curl -fsSL "$REMOTE_BASE/$f" -o "$TMPDIR_TS/$f" || { printf '\033[0;31mFailed to download %s\033[0m\n' "$f" >&2; exit 1; }
-done
-
-exec bun run "$TMPDIR_TS/main.ts" openclaw "$@"
+exec bun run "$FLY_JS" openclaw "$@"

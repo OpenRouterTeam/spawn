@@ -25,6 +25,9 @@ const REPO_ROOT = resolve(import.meta.dir, "../../..");
 const manifestPath = join(REPO_ROOT, "manifest.json");
 const manifest: Manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 
+// Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
+const TS_CLOUDS = new Set(["fly"]);
+
 // Collect all unique clouds with at least one implementation
 const cloudsWithImpls = new Set<string>();
 for (const [key, status] of Object.entries(manifest.matrix)) {
@@ -424,9 +427,11 @@ describe("coverage stats", () => {
     expect(cloudsWithImpls.size).toBeGreaterThanOrEqual(8);
   });
 
-  it("should have lib/common.sh for every implemented cloud", () => {
+  it("should have lib/common.sh for every implemented cloud (except TS-based)", () => {
     const missing: string[] = [];
     for (const cloud of cloudsWithImpls) {
+      // TS-based clouds don't have bash lib/common.sh
+      if (TS_CLOUDS.has(cloud)) continue;
       const libPath = join(REPO_ROOT, cloud, "lib", "common.sh");
       if (!existsSync(libPath)) {
         missing.push(cloud);

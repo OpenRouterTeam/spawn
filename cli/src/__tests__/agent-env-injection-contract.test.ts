@@ -27,6 +27,9 @@ const manifestPath = join(REPO_ROOT, "manifest.json");
 const manifestRaw = readFileSync(manifestPath, "utf-8");
 const manifest: Manifest = JSON.parse(manifestRaw);
 
+// Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
+const TS_CLOUDS = new Set(["fly"]);
+
 const matrixEntries = Object.entries(manifest.matrix);
 const implementedEntries = matrixEntries.filter(([, status]) => status === "implemented");
 
@@ -111,7 +114,9 @@ describe("Agent Environment Variable Injection Contract", () => {
     it("every implemented script should reference OPENROUTER_API_KEY", () => {
       const failures: string[] = [];
 
-      for (const { key, content } of implementedScripts) {
+      for (const { key, cloud, content } of implementedScripts) {
+        // TS-based clouds handle env injection in TypeScript, not in the .sh shim
+        if (TS_CLOUDS.has(cloud)) continue;
         if (!scriptReferencesEnvVar(content, "OPENROUTER_API_KEY")) {
           failures.push(key + ".sh");
         }
@@ -194,7 +199,9 @@ describe("Agent Environment Variable Injection Contract", () => {
     it("every script should acquire OPENROUTER_API_KEY via env, OAuth, or manual prompt", () => {
       const failures: string[] = [];
 
-      for (const { key, content } of implementedScripts) {
+      for (const { key, cloud, content } of implementedScripts) {
+        // TS-based clouds handle API key acquisition in TypeScript
+        if (TS_CLOUDS.has(cloud)) continue;
         const codeLines = getCodeLines(content);
         const code = codeLines.join("\n");
 
@@ -326,6 +333,8 @@ describe("Agent Environment Variable Injection Contract", () => {
 
   describe("cloud lib/common.sh env injection infrastructure", () => {
     for (const cloud of cloudsWithImpls) {
+      // TS-based clouds don't use bash lib/common.sh
+      if (TS_CLOUDS.has(cloud)) continue;
       const libPath = join(REPO_ROOT, cloud, "lib", "common.sh");
 
       it(`${cloud}/lib/common.sh should exist`, () => {

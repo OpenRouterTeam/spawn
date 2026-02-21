@@ -12,14 +12,14 @@ import {
   runServer,
   uploadFile,
   interactiveSession,
-} from "./lib/fly";
-import { getOrPromptApiKey, getModelIdInteractive } from "./lib/oauth";
+} from "./fly";
+import { getOrPromptApiKey, getModelIdInteractive } from "./oauth";
 import {
   resolveAgent,
   generateEnvConfig,
   offerGithubAuth,
-} from "./lib/agents";
-import { logInfo, logStep, logWarn } from "./lib/ui";
+} from "./agents";
+import { logInfo, logStep, logWarn } from "./ui";
 
 async function main() {
   const agentName = process.argv[2];

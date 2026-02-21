@@ -33,6 +33,9 @@ const manifest: Manifest = JSON.parse(manifestRaw);
 const matrixEntries = Object.entries(manifest.matrix);
 const implementedEntries = matrixEntries.filter(([, status]) => status === "implemented");
 
+// Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
+const TS_CLOUDS = new Set(["fly"]);
+
 /** Run `bash -n` on a script file. Returns null on success, error message on failure. */
 function bashSyntaxCheck(filePath: string): string | null {
   try {
@@ -77,6 +80,8 @@ describe("Shell Script Syntax Validation (bash -n)", () => {
     }
 
     for (const cloud of cloudsWithImpls) {
+      // TS-based clouds don't have bash lib/common.sh
+      if (TS_CLOUDS.has(cloud)) continue;
       const libPath = join(REPO_ROOT, cloud, "lib", "common.sh");
 
       it(`${cloud}/lib/common.sh should pass bash -n`, () => {

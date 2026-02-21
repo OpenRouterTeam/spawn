@@ -27,6 +27,9 @@ const manifestPath = join(REPO_ROOT, "manifest.json");
 const manifestRaw = readFileSync(manifestPath, "utf-8");
 const manifest: Manifest = JSON.parse(manifestRaw);
 
+// Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
+const TS_CLOUDS = new Set(["fly"]);
+
 const matrixEntries = Object.entries(manifest.matrix);
 const implementedEntries = matrixEntries.filter(([, status]) => status === "implemented");
 const implementedScripts = implementedEntries
@@ -125,8 +128,10 @@ describe("Shell Script Convention Compliance", () => {
       const failures: string[] = [];
 
       for (const { key, path } of implementedScripts) {
-        const content = readScript(path);
         const cloud = key.split("/")[0];
+        // TS-based clouds use thin .sh shims that don't source lib/common.sh
+        if (TS_CLOUDS.has(cloud)) continue;
+        const content = readScript(path);
         if (!content.includes("lib/common.sh") && !content.includes(`${cloud}/lib/common.sh`)) {
           failures.push(key + ".sh");
         }
@@ -219,6 +224,8 @@ describe("Shell Script Convention Compliance", () => {
 
   describe("cloud lib/common.sh files source shared/common.sh", () => {
     for (const cloud of cloudsWithImpls) {
+      // TS-based clouds don't use bash lib/common.sh
+      if (TS_CLOUDS.has(cloud)) continue;
       const libPath = join(REPO_ROOT, cloud, "lib", "common.sh");
 
       it(`${cloud}/lib/common.sh should reference shared/common.sh`, () => {
@@ -258,6 +265,8 @@ describe("Shell Script Convention Compliance", () => {
     });
 
     for (const cloud of cloudsWithImpls) {
+      // TS-based clouds don't use bash lib/common.sh
+      if (TS_CLOUDS.has(cloud)) continue;
       const libPath = join(REPO_ROOT, cloud, "lib", "common.sh");
 
       it(`${cloud}/lib/common.sh should have remote fallback for shared/common.sh`, () => {
