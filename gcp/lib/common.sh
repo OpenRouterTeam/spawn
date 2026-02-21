@@ -378,7 +378,12 @@ destroy_server() {
     local name="${1}"
     local zone="${GCP_ZONE:-us-central1-a}"
     log_step "Destroying GCP instance ${name}..."
-    gcloud compute instances delete "${name}" --zone="${zone}" --project="${GCP_PROJECT}" --quiet >/dev/null 2>&1
+    if ! gcloud compute instances delete "${name}" --zone="${zone}" --project="${GCP_PROJECT}" --quiet >/dev/null; then
+        log_error "Failed to destroy GCP instance '${name}'"
+        log_warn "The instance may still be running and incurring charges."
+        log_warn "Delete it manually: ${SPAWN_DASHBOARD_URL}"
+        return 1
+    fi
     log_info "Instance ${name} destroyed"
 }
 
