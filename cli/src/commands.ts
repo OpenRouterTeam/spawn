@@ -1834,7 +1834,7 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
     case "daytona":
       return `${sourceLib}\nensure_daytona_token\ndestroy_server "${id}"`;
     case "sprite":
-      return `${sourceLib}\nensure_sprite_installed\nsprite destroy "${id}"`;
+      return `${sourceLib}\nensure_sprite_installed\nensure_sprite_authenticated\ndestroy_server "${id}"`;
     default:
       return "";
   }
