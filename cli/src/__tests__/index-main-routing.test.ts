@@ -38,6 +38,8 @@ function runCli(
         // Prevent local manifest.json from being used
         NODE_ENV: "test",
         BUN_ENV: "test",
+        // Prevent ANSI color codes in output (CI sets FORCE_COLOR/CI vars)
+        NO_COLOR: "1",
       },
       encoding: "utf-8",
       timeout: 15000,
