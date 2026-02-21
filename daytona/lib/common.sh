@@ -314,7 +314,7 @@ except Exception as e:
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { prompt_spawn_name; ensure_daytona_token; }
+cloud_authenticate() { prompt_spawn_name; ensure_jq; ensure_daytona_token; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { wait_for_cloud_init; }
 cloud_run() { run_server "$1"; }

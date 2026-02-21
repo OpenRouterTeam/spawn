@@ -214,7 +214,7 @@ list_servers() {
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { prompt_spawn_name; ensure_hcloud_token; ensure_ssh_key; }
+cloud_authenticate() { prompt_spawn_name; ensure_jq; ensure_hcloud_token; ensure_ssh_key; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { verify_server_connectivity "${HETZNER_SERVER_IP}"; wait_for_cloud_init "${HETZNER_SERVER_IP}" 60; }
 cloud_run() { run_server "${HETZNER_SERVER_IP}" "$1"; }
