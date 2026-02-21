@@ -1309,7 +1309,7 @@ inject_env_vars_ssh() {
 
     # Append to .bashrc and .zshrc only — do NOT write to .profile or .bash_profile
     "${upload_func}" "${server_ip}" "${env_temp}" "${temp_remote}"
-    "${run_func}" "${server_ip}" "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
+    "${run_func}" "${server_ip}" "cat '${temp_remote}' >> ~/.bashrc; cat '${temp_remote}' >> ~/.zshrc; rm -f '${temp_remote}'"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1342,7 +1342,7 @@ inject_env_vars_local() {
 
     # Append to .bashrc and .zshrc only
     "${upload_func}" "${env_temp}" "${temp_remote}"
-    "${run_func}" "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
+    "${run_func}" "cat '${temp_remote}' >> ~/.bashrc; cat '${temp_remote}' >> ~/.zshrc; rm -f '${temp_remote}'"
 
     # Note: temp file will be cleaned up by trap handler
 
@@ -1693,7 +1693,7 @@ inject_env_vars_cb() {
     local temp_remote="/tmp/spawn_env_${rand_suffix}"
 
     ${upload_cb} "${env_temp}" "${temp_remote}"
-    ${run_cb} "cat '${temp_remote}' >> ~/.bashrc && cat '${temp_remote}' >> ~/.zshrc && rm '${temp_remote}'"
+    ${run_cb} "cat '${temp_remote}' >> ~/.bashrc; cat '${temp_remote}' >> ~/.zshrc; rm -f '${temp_remote}'"
 
     # Offer optional GitHub CLI setup
     offer_github_auth "${run_cb}"
@@ -1761,7 +1761,7 @@ _spawn_inject_env_vars() {
     # Write env vars to ~/.spawnrc instead of inlining into .bashrc/.zshrc.
     # Ubuntu's default .bashrc has an interactive-shell guard that exits early —
     # anything appended after the guard is never loaded when SSH runs a command string.
-    cloud_run "cp '${temp_remote}' ~/.spawnrc && chmod 600 ~/.spawnrc && rm '${temp_remote}'"
+    cloud_run "cp '${temp_remote}' ~/.spawnrc && chmod 600 ~/.spawnrc; rm -f '${temp_remote}'"
 
     # Hook .spawnrc into .bashrc and .zshrc so interactive shells pick up the vars too
     cloud_run "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc" || log_warn "Could not hook .spawnrc into .bashrc"
