@@ -257,6 +257,7 @@ When shell scripts need JSON processing, HTTP calls, crypto, or any non-trivial 
 - Test files go in `cli/src/__tests__/`
 - Run tests with `bun test`
 - Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
+- **NEVER run `bash test/mock.sh` locally** — it opens the browser (OAuth flow) and is disruptive. `test/mock.sh` is for CI only. Locally, only run `bun test` and `bash test/run.sh`.
 
 ### Mock Test Infrastructure (MANDATORY for new clouds)
 
