@@ -2763,9 +2763,11 @@ _load_token_from_config() {
 
     # SECURITY: Validate token characters to prevent curl config injection via -K -
     # Similar to key-request.sh _try_load_env_var (^[a-zA-Z0-9._/@-]+$) but also
-    # allows colon (:) for Fly.io FlyV1 tokens and URL-style formats, and
-    # plus (+) / equals (=) for base64-encoded token segments.
-    if [[ ! "${saved_token}" =~ ^[a-zA-Z0-9._/@:+=-]+$ ]]; then
+    # allows colon (:) for Fly.io FlyV1 tokens and URL-style formats,
+    # plus (+) / equals (=) for base64-encoded token segments, and
+    # space ( ) for Fly.io "FlyV1 <macaroon>" prefixed tokens.
+    # Space is safe inside curl -K double-quoted values: header = "Authorization: FlyV1 fm2_..."
+    if [[ ! "${saved_token}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
         log_error "SECURITY: Invalid characters in saved token for ${provider_name}"
         return 1
     fi
