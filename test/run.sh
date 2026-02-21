@@ -270,6 +270,9 @@ _assert_no_temp_leaks() {
     if [[ "${leaked_temps}" -eq 0 ]]; then
         printf '%b\n' "  ${GREEN}✓${NC} No temp files leaked"
         PASSED=$((PASSED + 1))
+    else
+        printf '%b\n' "  ${RED}✗${NC} Temp files leaked (${leaked_temps} found in /tmp)"
+        FAILED=$((FAILED + 1))
     fi
 }
 
