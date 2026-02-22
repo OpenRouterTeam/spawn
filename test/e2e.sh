@@ -339,8 +339,7 @@ _destroy_e2e_server() {
             destroy_server "$server_name" 2>/dev/null || true
             ;;
         aws)
-            source "${REPO_ROOT}/aws/lib/common.sh" 2>/dev/null || return 0
-            destroy_server "$server_name" 2>/dev/null || true
+            return 0
             ;;
         gcp)
             source "${REPO_ROOT}/gcp/lib/common.sh" 2>/dev/null || return 0
