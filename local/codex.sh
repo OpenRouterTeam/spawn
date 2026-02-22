@@ -29,4 +29,4 @@ agent_launch_cmd() {
     echo 'source ~/.zshrc 2>/dev/null; codex'
 }
 
-spawn_agent "Codex CLI"
+spawn_agent "Codex CLI" "codex" "local"

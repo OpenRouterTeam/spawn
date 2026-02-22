@@ -29,4 +29,4 @@ agent_launch_cmd() {
     echo 'source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; codex'
 }
 
-spawn_agent "Codex CLI"
+spawn_agent "Codex CLI" "codex" "sprite"

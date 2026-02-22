@@ -25,4 +25,4 @@ agent_launch_cmd() {
     echo 'source ~/.zshrc 2>/dev/null; opencode'
 }
 
-spawn_agent "OpenCode"
+spawn_agent "OpenCode" "opencode" "local"

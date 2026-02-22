@@ -39,4 +39,4 @@ agent_launch_cmd() {
     fi
 }
 
-spawn_agent "ZeroClaw"
+spawn_agent "ZeroClaw" "zeroclaw" "local"

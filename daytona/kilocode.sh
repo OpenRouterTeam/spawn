@@ -27,4 +27,4 @@ agent_launch_cmd() {
     echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode'
 }
 
-spawn_agent "Kilo Code"
+spawn_agent "Kilo Code" "kilocode" "daytona"

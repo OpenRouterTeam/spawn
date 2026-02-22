@@ -40,4 +40,4 @@ agent_launch_cmd() {
     echo 'source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; openclaw tui'
 }
 
-spawn_agent "OpenClaw"
+spawn_agent "OpenClaw" "openclaw" "sprite"

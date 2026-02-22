@@ -120,7 +120,7 @@ async function main() {
   }
 
   // 3. Get API key (before provisioning so user isn't waiting)
-  const apiKey = await getOrPromptApiKey();
+  const apiKey = await getOrPromptApiKey(agentName, "fly");
 
   // 4. Model selection (if agent needs it)
   let modelId: string | undefined;

@@ -1128,9 +1128,13 @@ _await_oauth_callback() {
     local oauth_dir="${3}"
     local actual_port="${4}"
     local csrf_state="${5}"
+    local spawn_agent_slug="${6:-}"
+    local spawn_cloud_slug="${7:-}"
 
     local callback_url="http://localhost:${actual_port}/callback"
     local auth_url="https://openrouter.ai/auth?callback_url=${callback_url}&state=${csrf_state}"
+    if [[ -n "${spawn_agent_slug}" ]]; then auth_url="${auth_url}&spawn_agent=${spawn_agent_slug}"; fi
+    if [[ -n "${spawn_cloud_slug}" ]]; then auth_url="${auth_url}&spawn_cloud=${spawn_cloud_slug}"; fi
     log_step "Opening browser to authenticate with OpenRouter..."
     open_browser "${auth_url}"
 
@@ -1183,6 +1187,8 @@ _start_oauth_session_with_server() {
 
 try_oauth_flow() {
     local callback_port=${1:-5180}
+    local spawn_agent_slug="${2:-}"
+    local spawn_cloud_slug="${3:-}"
 
     log_step "Attempting OAuth authentication..."
 
@@ -1201,7 +1207,7 @@ try_oauth_flow() {
 
     # Open browser and wait for callback
     local oauth_code
-    oauth_code=$(_await_oauth_callback "${oauth_dir}/code" "${server_pid}" "${oauth_dir}" "${actual_port}" "${csrf_state}") || return 1
+    oauth_code=$(_await_oauth_callback "${oauth_dir}/code" "${server_pid}" "${oauth_dir}" "${actual_port}" "${csrf_state}" "${spawn_agent_slug}" "${spawn_cloud_slug}") || return 1
     cleanup_oauth_session "${server_pid}" "${oauth_dir}"
 
     # Exchange code for API key
@@ -1216,10 +1222,12 @@ try_oauth_flow() {
 # Main function: Try OAuth, fallback to manual entry
 get_openrouter_api_key_oauth() {
     local callback_port=${1:-5180}
+    local spawn_agent_slug="${2:-}"
+    local spawn_cloud_slug="${3:-}"
 
     # Try OAuth flow first
     local api_key
-    api_key=$(try_oauth_flow "${callback_port}")
+    api_key=$(try_oauth_flow "${callback_port}" "${spawn_agent_slug}" "${spawn_cloud_slug}")
 
     if [[ -n "${api_key}" ]]; then
         echo "${api_key}"
@@ -1664,7 +1672,7 @@ get_or_prompt_api_key() {
             log_error "No valid API key after ${max_attempts} attempts"
             exit 1
         fi
-        OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180) || true
+        OPENROUTER_API_KEY=$(get_openrouter_api_key_oauth 5180 "${SPAWN_AGENT_SLUG:-}" "${SPAWN_CLOUD_SLUG:-}") || true
         if [[ -n "${OPENROUTER_API_KEY:-}" ]] && ! verify_openrouter_key "${OPENROUTER_API_KEY}"; then
             OPENROUTER_API_KEY=""
         fi
@@ -1776,6 +1784,8 @@ _spawn_inject_env_vars() {
 # Usage: spawn_agent AGENT_DISPLAY_NAME
 spawn_agent() {
     local agent_name="$1"
+    SPAWN_AGENT_SLUG="${2:-}"
+    SPAWN_CLOUD_SLUG="${3:-}"
 
     # 1. Authenticate with cloud provider
     cloud_authenticate

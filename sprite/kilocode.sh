@@ -27,4 +27,4 @@ agent_launch_cmd() {
     echo 'source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; kilocode'
 }
 
-spawn_agent "Kilo Code"
+spawn_agent "Kilo Code" "kilocode" "sprite"
