@@ -7,7 +7,7 @@ import {
   logError,
   logStep,
   prompt,
-  jsonEscape,
+  openBrowser,
   validateServerName,
   validateRegionName,
   toKebabCase,
@@ -15,6 +15,27 @@ import {
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
 const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
+
+// ─── DO OAuth Constants ─────────────────────────────────────────────────────
+
+const DO_OAUTH_AUTHORIZE = "https://cloud.digitalocean.com/v1/oauth/authorize";
+const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
+
+// OAuth application credentials (embedded, same pattern as gh CLI / doctl).
+// Public clients cannot keep secrets confidential — security comes from the
+// authorization code flow itself (user consent, localhost redirect, CSRF state).
+const DO_CLIENT_ID = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
+const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
+
+// Fine-grained scopes for spawn (minimum required)
+const DO_SCOPES = [
+  "droplet:create", "droplet:delete", "droplet:read",
+  "ssh_key:create", "ssh_key:read",
+  "regions:read", "sizes:read",
+  "image:read", "actions:read",
+].join(" ");
+
+const DO_OAUTH_CALLBACK_PORT = 5190;
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let doToken = "";
@@ -86,27 +107,68 @@ function parseJson(text: string): any {
 
 const DO_CONFIG_PATH = `${process.env.HOME}/.config/spawn/digitalocean.json`;
 
-async function saveTokenToConfig(token: string): Promise<void> {
+interface DoConfig {
+  api_key?: string;
+  token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+  auth_method?: "oauth" | "manual";
+}
+
+function loadConfig(): DoConfig | null {
+  try {
+    return JSON.parse(readFileSync(DO_CONFIG_PATH, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+async function saveConfig(config: DoConfig): Promise<void> {
   const dir = DO_CONFIG_PATH.replace(/\/[^/]+$/, "");
   await Bun.spawn(["mkdir", "-p", dir]).exited;
-  const escaped = jsonEscape(token);
   await Bun.write(
     DO_CONFIG_PATH,
-    `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`,
+    JSON.stringify(config, null, 2) + "\n",
     { mode: 0o600 },
   );
 }
 
-function loadTokenFromConfig(): string | null {
-  try {
-    const data = JSON.parse(readFileSync(DO_CONFIG_PATH, "utf-8"));
-    const token = data.api_key || data.token || "";
-    if (!token) return null;
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) return null;
-    return token;
-  } catch {
-    return null;
+async function saveTokenToConfig(token: string, refreshToken?: string, expiresIn?: number): Promise<void> {
+  const config: DoConfig = {
+    api_key: token,
+    token,
+  };
+  if (refreshToken) {
+    config.refresh_token = refreshToken;
+    config.auth_method = "oauth";
   }
+  if (expiresIn) {
+    config.expires_at = Math.floor(Date.now() / 1000) + expiresIn;
+  }
+  await saveConfig(config);
+}
+
+function loadTokenFromConfig(): string | null {
+  const data = loadConfig();
+  if (!data) return null;
+  const token = data.api_key || data.token || "";
+  if (!token) return null;
+  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) return null;
+  return token;
+}
+
+function loadRefreshToken(): string | null {
+  const data = loadConfig();
+  if (!data?.refresh_token) return null;
+  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(data.refresh_token)) return null;
+  return data.refresh_token;
+}
+
+function isTokenExpired(): boolean {
+  const data = loadConfig();
+  if (!data?.expires_at) return false;
+  // Consider expired 5 minutes before actual expiry
+  return Math.floor(Date.now() / 1000) >= data.expires_at - 300;
 }
 
 // ─── Token Validation ────────────────────────────────────────────────────────
@@ -118,6 +180,236 @@ async function testDoToken(): Promise<boolean> {
     return text.includes('"uuid"');
   } catch {
     return false;
+  }
+}
+
+// ─── DO OAuth Flow ──────────────────────────────────────────────────────────
+
+const OAUTH_CSS = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}`;
+
+const OAUTH_SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>DigitalOcean Authorization Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
+
+const OAUTH_ERROR_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}h1{color:#dc2626}@media(prefers-color-scheme:dark){h1{color:#ef4444}}</style></head><body><div class="card"><div class="icon">&#10007;</div><h1>Authorization Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>`;
+
+function generateCsrfState(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function isOAuthConfigured(): boolean {
+  return true;
+}
+
+async function tryRefreshDoToken(): Promise<string | null> {
+  if (!isOAuthConfigured()) return null;
+
+  const refreshToken = loadRefreshToken();
+  if (!refreshToken) return null;
+
+  logStep("Attempting to refresh DigitalOcean token...");
+
+  try {
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: DO_CLIENT_ID,
+      client_secret: DO_CLIENT_SECRET,
+    });
+
+    const resp = await fetch(DO_OAUTH_TOKEN, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!resp.ok) {
+      logWarn("Token refresh failed — refresh token may be expired");
+      return null;
+    }
+
+    const data = await resp.json() as any;
+    if (!data.access_token) {
+      logWarn("Token refresh returned no access token");
+      return null;
+    }
+
+    await saveTokenToConfig(
+      data.access_token,
+      data.refresh_token || refreshToken,
+      data.expires_in,
+    );
+    logInfo("DigitalOcean token refreshed successfully");
+    return data.access_token;
+  } catch {
+    logWarn("Token refresh request failed");
+    return null;
+  }
+}
+
+async function tryDoOAuth(): Promise<string | null> {
+  if (!isOAuthConfigured()) {
+    return null;
+  }
+
+  logStep("Attempting DigitalOcean OAuth authentication...");
+
+  // Check connectivity to DigitalOcean
+  try {
+    await fetch("https://cloud.digitalocean.com", {
+      method: "HEAD",
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch {
+    logWarn("Cannot reach cloud.digitalocean.com — network may be unavailable");
+    return null;
+  }
+
+  const csrfState = generateCsrfState();
+  let oauthCode: string | null = null;
+  let server: ReturnType<typeof Bun.serve> | null = null;
+
+  // Try ports in range
+  let actualPort = DO_OAUTH_CALLBACK_PORT;
+  for (let p = DO_OAUTH_CALLBACK_PORT; p < DO_OAUTH_CALLBACK_PORT + 10; p++) {
+    try {
+      server = Bun.serve({
+        port: p,
+        hostname: "127.0.0.1",
+        fetch(req) {
+          const url = new URL(req.url);
+          if (url.pathname === "/callback") {
+            // Check for error response from DO
+            const error = url.searchParams.get("error");
+            if (error) {
+              const desc = url.searchParams.get("error_description") || error;
+              logError(`DigitalOcean authorization denied: ${desc}`);
+              return new Response(OAUTH_ERROR_HTML, {
+                status: 403,
+                headers: { "Content-Type": "text/html", Connection: "close" },
+              });
+            }
+
+            const code = url.searchParams.get("code");
+            if (!code) {
+              return new Response(OAUTH_ERROR_HTML, {
+                status: 400,
+                headers: { "Content-Type": "text/html", Connection: "close" },
+              });
+            }
+
+            // CSRF state validation
+            if (url.searchParams.get("state") !== csrfState) {
+              return new Response(OAUTH_ERROR_HTML, {
+                status: 403,
+                headers: { "Content-Type": "text/html", Connection: "close" },
+              });
+            }
+
+            // Validate code format (alphanumeric + common delimiters)
+            if (!/^[a-zA-Z0-9_-]{8,256}$/.test(code)) {
+              return new Response(
+                "<html><body><h1>Invalid Authorization Code</h1></body></html>",
+                { status: 400, headers: { "Content-Type": "text/html" } },
+              );
+            }
+
+            oauthCode = code;
+            return new Response(OAUTH_SUCCESS_HTML, {
+              headers: { "Content-Type": "text/html", Connection: "close" },
+            });
+          }
+          return new Response("Waiting for DigitalOcean OAuth callback...", {
+            headers: { "Content-Type": "text/html" },
+          });
+        },
+      });
+      actualPort = p;
+      break;
+    } catch {
+      continue;
+    }
+  }
+
+  if (!server) {
+    logWarn(`Failed to start OAuth server — ports ${DO_OAUTH_CALLBACK_PORT}-${DO_OAUTH_CALLBACK_PORT + 9} may be in use`);
+    return null;
+  }
+
+  logInfo(`OAuth server listening on port ${actualPort}`);
+
+  const redirectUri = `http://localhost:${actualPort}/callback`;
+  const authParams = new URLSearchParams({
+    client_id: DO_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: DO_SCOPES,
+    state: csrfState,
+  });
+  const authUrl = `${DO_OAUTH_AUTHORIZE}?${authParams.toString()}`;
+
+  logStep("Opening browser to authorize with DigitalOcean...");
+  logStep(`If the browser doesn't open, visit: ${authUrl}`);
+  openBrowser(authUrl);
+
+  // Wait up to 120 seconds
+  logStep("Waiting for authorization in browser (timeout: 120s)...");
+  const deadline = Date.now() + 120_000;
+  while (!oauthCode && Date.now() < deadline) {
+    await sleep(500);
+  }
+
+  server.stop(true);
+
+  if (!oauthCode) {
+    logError("OAuth authentication timed out after 120 seconds");
+    logError("Alternative: Use a manual API token instead");
+    logError("  export DO_API_TOKEN=dop_v1_...");
+    return null;
+  }
+
+  // Exchange code for token
+  logStep("Exchanging authorization code for access token...");
+  try {
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: oauthCode,
+      client_id: DO_CLIENT_ID,
+      client_secret: DO_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+    });
+
+    const resp = await fetch(DO_OAUTH_TOKEN, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      logError(`Token exchange failed (HTTP ${resp.status})`);
+      logWarn(`Response: ${errText.slice(0, 200)}`);
+      return null;
+    }
+
+    const data = await resp.json() as any;
+    if (!data.access_token) {
+      logError("Token exchange returned no access token");
+      return null;
+    }
+
+    await saveTokenToConfig(
+      data.access_token,
+      data.refresh_token,
+      data.expires_in,
+    );
+    logInfo("Successfully obtained DigitalOcean access token via OAuth!");
+    return data.access_token;
+  } catch (err) {
+    logError("Failed to exchange authorization code");
+    return null;
   }
 }
 
@@ -136,19 +428,52 @@ export async function ensureDoToken(): Promise<void> {
     doToken = "";
   }
 
-  // 2. Saved config
+  // 2. Saved config (check expiry first, try refresh if needed)
   const saved = loadTokenFromConfig();
   if (saved) {
-    doToken = saved;
-    if (await testDoToken()) {
-      logInfo("Using saved DigitalOcean API token");
-      return;
+    if (isTokenExpired()) {
+      logWarn("Saved DigitalOcean token has expired, trying refresh...");
+      const refreshed = await tryRefreshDoToken();
+      if (refreshed) {
+        doToken = refreshed;
+        if (await testDoToken()) {
+          logInfo("Using refreshed DigitalOcean token");
+          return;
+        }
+      }
+    } else {
+      doToken = saved;
+      if (await testDoToken()) {
+        logInfo("Using saved DigitalOcean API token");
+        return;
+      }
+      logWarn("Saved DigitalOcean token is invalid or expired");
+      // Try refresh as fallback
+      const refreshed = await tryRefreshDoToken();
+      if (refreshed) {
+        doToken = refreshed;
+        if (await testDoToken()) {
+          logInfo("Using refreshed DigitalOcean token");
+          return;
+        }
+      }
     }
-    logWarn("Saved DigitalOcean token is invalid or expired");
     doToken = "";
   }
 
-  // 3. Manual entry
+  // 3. Try OAuth browser flow
+  const oauthToken = await tryDoOAuth();
+  if (oauthToken) {
+    doToken = oauthToken;
+    if (await testDoToken()) {
+      logInfo("Using DigitalOcean token from OAuth");
+      return;
+    }
+    logWarn("OAuth token failed validation");
+    doToken = "";
+  }
+
+  // 4. Manual entry (fallback)
   logStep("DigitalOcean API Token Required");
   logWarn("Get a token from: https://cloud.digitalocean.com/account/api/tokens");
 
