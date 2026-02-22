@@ -101,6 +101,7 @@ const VALID_REASONS = new Set([
   "triage",
   "review_all",
   "hygiene",
+  "fixtures",
 ]);
 
 /** Check if a process is still alive via kill(0) */

@@ -11,7 +11,7 @@ Update the trigger server and wrapper scripts with the latest configuration from
 
 ## Arguments
 
-- `service-name` (optional) — Update only this service (e.g., `discovery`, `refactor`, `security`, `qa-cycle`). If omitted, updates all services.
+- `service-name` (optional) — Update only this service (e.g., `discovery`, `refactor`, `security`, `qa`). If omitted, updates all services.
 - `--check-only` — Show what would be updated without making changes or restarting services.
 
 **$ARGUMENTS**
@@ -91,7 +91,7 @@ Match wrappers to systemd units:
 - `start-discovery.sh` → `discovery-trigger.service`
 - `start-refactor.sh` → `refactor.service`
 - `start-security.sh` → `spawn-security.service`
-- `start-qa-cycle.sh` → `spawn-qa.service` (if exists)
+- `start-qa.sh` → `spawn-qa.service` (if exists)
 
 ## Step 4: Check wrapper script compliance
 
