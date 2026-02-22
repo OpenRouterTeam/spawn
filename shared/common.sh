@@ -114,7 +114,7 @@ POLL_INTERVAL="${SPAWN_POLL_INTERVAL:-1}"
 # ============================================================
 
 # Check if a JSON processor is available (jq or bun, required for JSON parsing throughout Spawn)
-check_python_available() {
+check_json_processor_available() {
     if command -v jq &>/dev/null || command -v bun &>/dev/null; then
         return 0
     fi
@@ -2611,10 +2611,9 @@ ssh_verify_connectivity() {
     generic_ssh_wait "${SSH_USER:-root}" "${ip}" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "${max_attempts}" "${initial_interval}"
 }
 
-# Extract a value from a JSON response using a JS expression
+# Extract a value from a JSON response using bracket-notation path
 # Usage: _extract_json_field JSON_STRING JS_EXPR [DEFAULT]
-# The JS expression receives 'd' as the parsed JSON object.
-# Uses Python-compatible dict access syntax: d['key1']['key2']
+# The JS expression uses bracket access syntax: d['key1']['key2'][0]
 # Returns DEFAULT (or empty string) on parse failure.
 _extract_json_field() {
     local json="${1}"
@@ -2624,7 +2623,26 @@ _extract_json_field() {
     _DATA="${json}" _EXPR="${js_expr}" bun -e "
 try {
   const d = JSON.parse(process.env._DATA);
-  const result = eval(process.env._EXPR);
+  const expr = process.env._EXPR || '';
+  // Parse bracket-notation path: d['key1']['key2'][0]
+  // Extract segments from ['...'] or [N] patterns
+  const segments = [];
+  const re = /\[(\d+|'[^']*'|\"[^\"]*\")\]/g;
+  let m;
+  while ((m = re.exec(expr)) !== null) {
+    let key = m[1];
+    if ((key.startsWith(\"'\") && key.endsWith(\"'\")) || (key.startsWith('\"') && key.endsWith('\"'))) {
+      key = key.slice(1, -1);
+    } else {
+      key = Number(key);
+    }
+    segments.push(key);
+  }
+  let result = d;
+  for (const seg of segments) {
+    if (result === null || result === undefined) { process.exit(1); }
+    result = result[seg];
+  }
   if (result !== undefined && result !== null) process.stdout.write(String(result) + '\n');
   else process.exit(1);
 } catch { process.exit(1); }
@@ -2906,7 +2924,7 @@ ensure_api_token_with_provider() {
     local help_url="${4}"
     local test_func="${5:-}"
 
-    check_python_available || return 1
+    check_json_processor_available || return 1
 
     # Try environment variable (validate if test function provided)
     if _load_token_from_env "${env_var_name}" "${provider_name}"; then
@@ -3132,7 +3150,7 @@ ensure_multi_credentials() {
     local test_func="${4:-}"
     shift 4
 
-    check_python_available || return 1
+    check_json_processor_available || return 1
 
     # Parse credential specs into parallel arrays
     local env_vars=() config_keys=() labels=()
