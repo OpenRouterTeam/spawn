@@ -1851,7 +1851,7 @@ async function execDeleteServer(
 
   // Fly.io uses a TypeScript module — no bash script exists after the TS rewrite
   if (conn.cloud === "fly") {
-    const id = conn.server_id || conn.server_name || "";
+    const id = conn.server_name || conn.server_id || "";
     try {
       validateServerIdentifier(id);
     } catch (err) {
