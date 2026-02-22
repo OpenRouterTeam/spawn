@@ -3,6 +3,8 @@
  * SECURITY-CRITICAL: These functions protect against injection attacks
  */
 
+import { resolve } from "path";
+
 // Allowlist pattern for agent and cloud identifiers
 // Only lowercase alphanumeric, hyphens, and underscores allowed
 const IDENTIFIER_PATTERN = /^[a-z0-9_-]+$/;
@@ -365,7 +367,6 @@ export function validatePromptFilePath(filePath: string): void {
   }
 
   // Normalize the path to resolve .. and symlink-like textual tricks
-  const { resolve } = require("path");
   const resolved = resolve(filePath);
 
   // Check against sensitive path patterns
