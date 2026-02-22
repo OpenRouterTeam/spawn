@@ -202,16 +202,16 @@ clone_cli() {
         git sparse-checkout set cli 2>/dev/null
         mv cli "${dest}/cli"
         cd "${dest}"
-        # Safety check: only delete if path is canonically within dest directory
+        # Safety check: resolve symlinks with pwd -P, then delete via canonical path
         local repo_dir="${dest}/repo"
         if [[ -d "${repo_dir}" ]]; then
             local canonical_repo
-            canonical_repo=$(cd "${repo_dir}" 2>/dev/null && pwd) || true
+            canonical_repo=$(cd "${repo_dir}" 2>/dev/null && pwd -P) || true
             local canonical_dest
-            canonical_dest=$(cd "${dest}" 2>/dev/null && pwd) || true
+            canonical_dest=$(cd "${dest}" 2>/dev/null && pwd -P) || true
 
             if [[ -n "${canonical_repo}" ]] && [[ -n "${canonical_dest}" ]] && [[ "${canonical_repo}" == "${canonical_dest}/repo" ]]; then
-                rm -rf "${repo_dir}"
+                rm -rf "${canonical_repo}"
             else
                 log_warn "Skipping cleanup: path validation failed"
             fi
@@ -228,16 +228,14 @@ clone_cli() {
         curl -fsSL "${SPAWN_RAW_BASE}/cli/bun.lock"       -o "${dest}/cli/bun.lock"
         curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"  -o "${dest}/cli/tsconfig.json"
         for f in $files; do
-            # SECURITY: Validate filename to prevent path traversal attacks
-            # Block parent directory references (..) and directory separators (/)
-            if [[ "$f" =~ \.\. ]] || [[ "$f" =~ / ]] || [[ "$f" =~ \\ ]]; then
-                log_error "Security: Invalid filename from API (path traversal attempt): $f"
-                log_error "This may indicate a compromised network connection or API response."
+            # SECURITY: Strict allowlist — only alphanumeric, underscore, hyphen, .ts extension
+            if [[ ! "$f" =~ ^[a-zA-Z0-9_-]+\.ts$ ]]; then
+                log_error "Security: Invalid filename from API: $f"
+                log_error "Only alphanumeric .ts filenames are allowed."
                 log_error "Installation aborted for safety."
                 exit 1
             fi
 
-            # Filename is safe - proceed with download
             curl -fsSL "${SPAWN_RAW_BASE}/cli/src/${f}" -o "${dest}/cli/src/${f}"
         done
     fi
