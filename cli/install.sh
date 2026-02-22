@@ -159,7 +159,7 @@ ensure_in_path() {
             ;; esac
         else
             case "${SHELL:-}" in */fish)
-                fish -c "fish_add_path ${dir}" 2>/dev/null || true
+                fish -c "fish_add_path \"${dir}\"" 2>/dev/null || true
             ;; esac
         fi
     }
