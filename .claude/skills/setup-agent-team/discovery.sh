@@ -113,9 +113,9 @@ _cleanup_stale_artifacts() {
 
 _prepare_prompt_file() {
     local output_file="$1"
-    local prompt_template="${SCRIPT_DIR}/discovery-team-prompt.txt"
+    local prompt_template="${SCRIPT_DIR}/discovery-team-prompt.md"
     if [[ ! -f "$prompt_template" ]]; then
-        log_error "discovery-team-prompt.txt not found at $prompt_template"
+        log_error "discovery-team-prompt.md not found at $prompt_template"
         exit 1
     fi
     cat "$prompt_template" > "${output_file}"
