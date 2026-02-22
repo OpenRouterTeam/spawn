@@ -386,7 +386,7 @@ export const agents: Record<string, AgentConfig> = {
     install: () =>
       installAgent(
         "ZeroClaw",
-        "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install.sh | bash -s -- --install-rust --install-system-deps",
+        "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/install.sh | bash -s -- --install-rust --install-system-deps",
       ),
     envVars: (apiKey) => [
       `OPENROUTER_API_KEY=${apiKey}`,

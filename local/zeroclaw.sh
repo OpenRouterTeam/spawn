@@ -16,7 +16,7 @@ echo ""
 
 agent_install() {
     install_agent "ZeroClaw" \
-        "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install.sh | bash -s -- --install-rust" \
+        "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/install.sh | bash -s -- --install-rust" \
         cloud_run
 }
 
