@@ -259,6 +259,7 @@ Follow this exact shutdown sequence:
 
 - **NEVER close a PR.** No teammate, including team-lead and pr-maintainer, may close any PR — not even PRs created by refactor teammates. Closing PRs is the **security team's responsibility exclusively**. The only exception is if you are immediately opening a superseding PR (state the replacement PR number in the close comment). If a PR is stale, broken, or should not be merged, **leave it open** and comment explaining the issue — the security team will close it during review.
 - **NEVER close or modify PRs created by humans.** If a PR was not created by a `-- refactor/` agent, do not touch it at all (no close, no rebase, no force-push, no comment). Only interact with PRs that have `-- refactor/` in their description.
+- **DEDUP before every comment (ALL teammates).** Before posting ANY comment on a PR or issue, fetch existing comments and check for `-- refactor/` signatures. If ANY refactor teammate has already commented with the same intent (acknowledgment, status update, fix description, close reason), do NOT post a duplicate. Only comment if you have genuinely new information (a new PR link, a concrete resolution, or addressing different feedback). Run: `gh api repos/OpenRouterTeam/spawn/issues/NUMBER/comments --jq '.[] | select(.body | test("-- refactor/")) | "\(.body[-80:])"'`
 - Run tests after every change. If 3 consecutive failures, pause and investigate.
 - **SIGN-OFF**: Every comment MUST end with `-- refactor/AGENT-NAME`
 
