@@ -123,9 +123,9 @@ describe("shared/common.sh prerequisite", () => {
 // ── Cloud lib source chain ──────────────────────────────────────────────────
 
 describe("Cloud lib/common.sh source chain", () => {
-  it(`should discover at least 7 cloud lib files`, () => {
-    // Note: TS-based clouds (e.g. fly) don't have bash lib/common.sh
-    expect(allClouds.length).toBeGreaterThanOrEqual(7);
+  it(`should discover at least 6 cloud lib files`, () => {
+    // Note: TS-based clouds (e.g. fly, daytona) don't have bash lib/common.sh
+    expect(allClouds.length).toBeGreaterThanOrEqual(6);
   });
 
   for (const cloud of allClouds) {
