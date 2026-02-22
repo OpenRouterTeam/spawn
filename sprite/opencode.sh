@@ -1,28 +1,29 @@
 #!/bin/bash
 set -eo pipefail
 
-# Source common functions - try local file first, fall back to remote
+# Thin shim: ensures bun is available, runs bundled sprite.js (local or from GitHub release)
+
+_ensure_bun() {
+    if command -v bun &>/dev/null; then return 0; fi
+    printf '\033[0;36mInstalling bun...\033[0m\n' >&2
+    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1 || { printf '\033[0;31mFailed to install bun\033[0m\n' >&2; exit 1; }
+    export PATH="$HOME/.bun/bin:$PATH"
+    command -v bun &>/dev/null || { printf '\033[0;31mbun not found after install\033[0m\n' >&2; exit 1; }
+}
+
+_ensure_bun
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
-    source "${SCRIPT_DIR}/lib/common.sh"
-else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)"
+
+# Local checkout — run from source
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/sprite/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../cli/src/sprite/main.ts" opencode "$@"
 fi
 
-log_info "OpenCode on Sprite"
-echo ""
+# Remote — download bundled sprite.js from GitHub release
+SPRITE_JS=$(mktemp)
+trap 'rm -f "$SPRITE_JS"' EXIT
+curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/sprite-latest/sprite.js" -o "$SPRITE_JS" \
+    || { printf '\033[0;31mFailed to download sprite.js\033[0m\n' >&2; exit 1; }
 
-agent_install() {
-    install_agent "OpenCode" "$(opencode_install_cmd)" cloud_run
-}
-
-agent_env_vars() {
-    generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
-}
-
-agent_launch_cmd() {
-    echo 'source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.opencode/bin:$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:/.sprite/languages/bun/bin:$PATH; opencode'
-}
-
-spawn_agent "OpenCode" "opencode" "sprite"
+exec bun run "$SPRITE_JS" opencode "$@"
