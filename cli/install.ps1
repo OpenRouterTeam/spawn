@@ -21,7 +21,7 @@ function Write-Info  { param($msg) Write-Host "[spawn] $msg" -ForegroundColor Gr
 function Write-Warn  { param($msg) Write-Host "[spawn] $msg" -ForegroundColor Yellow }
 function Write-Err   { param($msg) Write-Host "[spawn] $msg" -ForegroundColor Red }
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 
 function Test-BunAvailable {
     try { $null = Get-Command bun -ErrorAction Stop; return $true } catch { return $false }
@@ -54,7 +54,7 @@ function Find-InstallDir {
     # Prefer %USERPROFILE%\.local\bin (mirrors unix behaviour) or bun's global bin
     $candidates = @(
         "$env:USERPROFILE\.local\bin",
-        (& bun pm bin -g 2>$null)
+        $(try { & bun pm bin -g 2>$null } catch { $null })
     )
     $pathDirs = $env:Path -split ";"
 
@@ -62,7 +62,7 @@ function Find-InstallDir {
         if ($dir -and $pathDirs -contains $dir) { return $dir }
     }
 
-    # Default — will be added to PATH below
+    # Default -- will be added to PATH below
     return "$env:USERPROFILE\.local\bin"
 }
 
@@ -111,10 +111,10 @@ function Install-SpawnCli {
             foreach ($f in $files) {
                 # SECURITY: block path traversal
                 if ($f -match '\.\.' -or $f -match '[/\\]') {
-                    Write-Err "Security: invalid filename from API: $f — aborting."
+                    Write-Err "Security: invalid filename from API: $f -- aborting."
                     exit 1
                 }
-                Invoke-WebRequest "$SPAWN_RAW_BASE/cli/src/$f" -OutFile (Join-Path $cliDir "src" $f)
+                Invoke-WebRequest "$SPAWN_RAW_BASE/cli/src/$f" -OutFile (Join-Path (Join-Path $cliDir "src") $f)
             }
         }
 
@@ -123,9 +123,10 @@ function Install-SpawnCli {
         Push-Location $cliDir
         bun install
         $buildOk = $false
-        try { bun run build; $buildOk = $true } catch { }
+        try { bun run build 2>$null } catch { }
+        if ($LASTEXITCODE -eq 0) { $buildOk = $true }
         if (-not $buildOk) {
-            Write-Warn "Local build failed — downloading pre-built binary..."
+            Write-Warn "Local build failed -- downloading pre-built binary..."
             Invoke-WebRequest "https://github.com/$SPAWN_REPO/releases/download/cli-latest/cli.js" `
                 -OutFile "cli.js"
             if ((Get-Item "cli.js").Length -eq 0) {
@@ -145,7 +146,7 @@ function Install-SpawnCli {
 
         Copy-Item (Join-Path $cliDir "cli.js") $cliJs -Force
 
-        # spawn.cmd — lets users run `spawn` from cmd.exe and PowerShell without specifying bun
+        # spawn.cmd -- lets users run `spawn` from cmd.exe and PowerShell without specifying bun
         Set-Content $cliCmd "@bun `"%~dp0spawn`" %*"
 
         Write-Info "Installed spawn to $installDir"
@@ -163,7 +164,7 @@ function Install-SpawnCli {
     }
 }
 
-# ── Main ───────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 Write-Host ""
 
@@ -178,7 +179,7 @@ if (-not (Test-BunAvailable)) {
 
 $bunVer = Get-BunVersion
 if ($bunVer -lt $MIN_BUN_VERSION) {
-    Write-Warn "bun $bunVer is below minimum $MIN_BUN_VERSION — upgrading..."
+    Write-Warn "bun $bunVer is below minimum $MIN_BUN_VERSION -- upgrading..."
     bun upgrade
     $bunVer = Get-BunVersion
     if ($bunVer -lt $MIN_BUN_VERSION) {
