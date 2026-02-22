@@ -29,11 +29,11 @@ async function promptVmOptions(): Promise<ServerOptions> {
   if (process.env.FLY_VM_MEMORY) {
     const memoryMb = parseInt(process.env.FLY_VM_MEMORY, 10);
     const tier = FLY_VM_TIERS.find((t) => t.memoryMb === memoryMb) || DEFAULT_VM_TIER;
-    return { cpus: tier.cpus, memoryMb: tier.memoryMb };
+    return { cpuKind: tier.cpuKind, cpus: tier.cpus, memoryMb: tier.memoryMb };
   }
 
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    return { cpus: DEFAULT_VM_TIER.cpus, memoryMb: DEFAULT_VM_TIER.memoryMb };
+    return { cpuKind: DEFAULT_VM_TIER.cpuKind, cpus: DEFAULT_VM_TIER.cpus, memoryMb: DEFAULT_VM_TIER.memoryMb };
   }
 
   // VM size prompt
@@ -42,7 +42,7 @@ async function promptVmOptions(): Promise<ServerOptions> {
   const tierId = await selectFromList(tierItems, "VM size", DEFAULT_VM_TIER.id);
   const selectedTier = FLY_VM_TIERS.find((t) => t.id === tierId) || DEFAULT_VM_TIER;
 
-  return { cpus: selectedTier.cpus, memoryMb: selectedTier.memoryMb };
+  return { cpuKind: selectedTier.cpuKind, cpus: selectedTier.cpus, memoryMb: selectedTier.memoryMb };
 }
 
 async function main() {

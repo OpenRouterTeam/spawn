@@ -19,24 +19,31 @@ const FLY_DASHBOARD_URL = "https://fly.io/dashboard";
 
 // ─── VM Size Tiers ──────────────────────────────────────────────────────────
 
+export type CpuKind = "shared" | "performance";
+
 export interface VmTier {
   id: string;
+  cpuKind: CpuKind;
   cpus: number;
   memoryMb: number;
   label: string;
 }
 
 export const FLY_VM_TIERS: VmTier[] = [
-  { id: "shared-cpu-1x", cpus: 1, memoryMb: 1024, label: "1 shared vCPU, 1 GB (~$3/mo)" },
-  { id: "shared-cpu-2x", cpus: 2, memoryMb: 4096, label: "2 shared vCPUs, 4 GB (~$12/mo)" },
-  { id: "shared-cpu-4x", cpus: 4, memoryMb: 8192, label: "4 shared vCPUs, 8 GB (~$51/mo)" },
+  { id: "shared-cpu-1x", cpuKind: "shared", cpus: 1, memoryMb: 1024, label: "1 shared vCPU, 1 GB (~$3/mo)" },
+  { id: "shared-cpu-2x", cpuKind: "shared", cpus: 2, memoryMb: 4096, label: "2 shared vCPUs, 4 GB (~$12/mo)" },
+  { id: "shared-cpu-4x", cpuKind: "shared", cpus: 4, memoryMb: 8192, label: "4 shared vCPUs, 8 GB (~$51/mo)" },
+  { id: "performance-1x", cpuKind: "performance", cpus: 1, memoryMb: 2048, label: "1 dedicated vCPU, 2 GB (~$32/mo)" },
+  { id: "performance-2x", cpuKind: "performance", cpus: 2, memoryMb: 4096, label: "2 dedicated vCPUs, 4 GB (~$63/mo)" },
+  { id: "performance-4x", cpuKind: "performance", cpus: 4, memoryMb: 8192, label: "4 dedicated vCPUs, 8 GB (~$126/mo)" },
 ];
 
-export const DEFAULT_VM_TIER = FLY_VM_TIERS[1]; // shared-cpu-2x
+export const DEFAULT_VM_TIER = FLY_VM_TIERS[4]; // performance-2x
 
 // ─── Server Options ─────────────────────────────────────────────────────────
 
 export interface ServerOptions {
+  cpuKind: CpuKind;
   cpus: number;
   memoryMb: number;
   volumeId?: string;
@@ -556,14 +563,16 @@ async function createApp(name: string): Promise<void> {
 async function createMachine(
   name: string,
   region: string,
+  cpuKind: CpuKind,
   cpus: number,
   vmMemory: number,
   volumeId?: string,
 ): Promise<string> {
-  logStep(`Creating Fly.io machine (region: ${region}, ${cpus} vCPU, ${vmMemory}MB)...`);
+  const kindLabel = cpuKind === "performance" ? "dedicated" : "shared";
+  logStep(`Creating Fly.io machine (region: ${region}, ${cpus} ${kindLabel} vCPU, ${vmMemory}MB)...`);
   const config: Record<string, unknown> = {
     image: "ubuntu:24.04",
-    guest: { cpu_kind: "shared", cpus, memory_mb: vmMemory },
+    guest: { cpu_kind: cpuKind, cpus, memory_mb: vmMemory },
     init: { exec: ["/bin/sleep", "inf"] },
     auto_destroy: false,
   };
@@ -689,7 +698,7 @@ export async function createServer(name: string, opts: ServerOptions): Promise<v
 
   let machineId: string;
   try {
-    machineId = await createMachine(name, region, opts.cpus, opts.memoryMb, volumeId);
+    machineId = await createMachine(name, region, opts.cpuKind, opts.cpus, opts.memoryMb, volumeId);
   } catch (err) {
     await cleanupOnFailure(name);
     throw err;

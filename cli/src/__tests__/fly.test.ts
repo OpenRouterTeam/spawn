@@ -142,26 +142,23 @@ describe("fly/lib/fly", () => {
   });
 
   describe("FLY_VM_TIERS", () => {
-    it("has 3 tiers", () => {
-      expect(FLY_VM_TIERS.length).toBe(3);
+    it("has shared and dedicated tiers", () => {
+      expect(FLY_VM_TIERS.length).toBe(6);
+      expect(FLY_VM_TIERS.filter((t) => t.cpuKind === "shared").length).toBe(3);
+      expect(FLY_VM_TIERS.filter((t) => t.cpuKind === "performance").length).toBe(3);
     });
 
-    it("default tier is shared-cpu-2x", () => {
-      expect(DEFAULT_VM_TIER.id).toBe("shared-cpu-2x");
+    it("default tier is performance-2x", () => {
+      expect(DEFAULT_VM_TIER.id).toBe("performance-2x");
+      expect(DEFAULT_VM_TIER.cpuKind).toBe("performance");
       expect(DEFAULT_VM_TIER.cpus).toBe(2);
       expect(DEFAULT_VM_TIER.memoryMb).toBe(4096);
-    });
-
-    it("tiers have increasing resources", () => {
-      for (let i = 1; i < FLY_VM_TIERS.length; i++) {
-        expect(FLY_VM_TIERS[i].cpus).toBeGreaterThan(FLY_VM_TIERS[i - 1].cpus);
-        expect(FLY_VM_TIERS[i].memoryMb).toBeGreaterThan(FLY_VM_TIERS[i - 1].memoryMb);
-      }
     });
 
     it("all tiers have required fields", () => {
       for (const tier of FLY_VM_TIERS) {
         expect(tier.id).toBeTruthy();
+        expect(tier.cpuKind === "shared" || tier.cpuKind === "performance").toBe(true);
         expect(tier.cpus).toBeGreaterThan(0);
         expect(tier.memoryMb).toBeGreaterThan(0);
         expect(tier.label).toBeTruthy();
