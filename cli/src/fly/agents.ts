@@ -127,8 +127,8 @@ async function installClaudeCode(): Promise<void> {
     `curl -fsSL https://claude.ai/install.sh | bash || true`,
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
-    // Ensure Node.js for npm method
-    `if ! command -v node >/dev/null 2>&1; then curl -fsSL https://nodejs.org/dist/v22.15.0/node-v22.15.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1 || true; fi`,
+    // Ensure Node.js for npm method (should already be installed by cloud-init)
+    `if ! command -v node >/dev/null 2>&1; then apt-get update -y && apt-get install -y --no-install-recommends nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true; fi`,
     // Method 2: npm
     `echo "==> Installing Claude Code (method 2/2: npm)..."`,
     `npm install -g @anthropic-ai/claude-code || true`,
