@@ -1,19 +1,19 @@
 #!/bin/bash
 set -eo pipefail
 
+_ensure_bun() {
+    if command -v bun &>/dev/null; then return 0; fi
+    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1
+    export PATH="$HOME/.bun/bin:$PATH"
+}
+_ensure_bun
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-# shellcheck source=hetzner/lib/common.sh
-if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
-    source "${SCRIPT_DIR}/lib/common.sh"
-else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hetzner/lib/common.sh)"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/hetzner/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../cli/src/hetzner/main.ts" opencode "$@"
 fi
 
-log_info "OpenCode on Hetzner Cloud"
-echo ""
-
-agent_install() { install_agent "OpenCode" "$(opencode_install_cmd)" cloud_run; }
-agent_env_vars() { generate_env_config "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"; }
-agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode'; }
-
-spawn_agent "OpenCode" "opencode" "hetzner"
+HETZNER_JS=$(mktemp)
+trap 'rm -f "$HETZNER_JS"' EXIT
+curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/hetzner-latest/hetzner.js" -o "$HETZNER_JS"
+exec bun run "$HETZNER_JS" opencode "$@"

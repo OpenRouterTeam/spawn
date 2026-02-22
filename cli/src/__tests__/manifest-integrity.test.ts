@@ -28,7 +28,7 @@ const clouds = Object.keys(manifest.clouds);
 const matrixEntries = Object.entries(manifest.matrix);
 
 // Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
-const TS_CLOUDS = new Set(["fly", "local"]);
+const TS_CLOUDS = new Set(["fly", "local", "hetzner"]);
 
 describe("Manifest Integrity", () => {
   // ── Basic structure ─────────────────────────────────────────────────
