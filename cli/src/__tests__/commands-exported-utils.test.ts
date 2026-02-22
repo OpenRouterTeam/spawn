@@ -41,15 +41,21 @@ const mockManifest = createMockManifest();
 describe("parseAuthEnvVars", () => {
   describe("single env var", () => {
     it("should extract a single uppercase env var", () => {
-      expect(parseAuthEnvVars("HCLOUD_TOKEN")).toEqual(["HCLOUD_TOKEN"]);
+      expect(parseAuthEnvVars("HCLOUD_TOKEN")).toEqual([
+        "HCLOUD_TOKEN",
+      ]);
     });
 
     it("should extract env var with digits", () => {
-      expect(parseAuthEnvVars("API_KEY_V2")).toEqual(["API_KEY_V2"]);
+      expect(parseAuthEnvVars("API_KEY_V2")).toEqual([
+        "API_KEY_V2",
+      ]);
     });
 
     it("should extract env var starting with letter followed by digits", () => {
-      expect(parseAuthEnvVars("DO_API_TOKEN")).toEqual(["DO_API_TOKEN"]);
+      expect(parseAuthEnvVars("DO_API_TOKEN")).toEqual([
+        "DO_API_TOKEN",
+      ]);
     });
   });
 
@@ -111,7 +117,9 @@ describe("parseAuthEnvVars", () => {
 
     it("should accept env vars at exactly 4 characters", () => {
       // [A-Z] (1 char) + [A-Z0-9_]{3,} (3 chars) = 4 total
-      expect(parseAuthEnvVars("ABCD")).toEqual(["ABCD"]);
+      expect(parseAuthEnvVars("ABCD")).toEqual([
+        "ABCD",
+      ]);
     });
 
     it("should filter out strings starting with a digit", () => {
@@ -218,7 +226,10 @@ describe("getImplementedAgents", () => {
 // ── getMissingClouds ──────────────────────────────────────────────────────────
 
 describe("getMissingClouds", () => {
-  const clouds = ["sprite", "hetzner"];
+  const clouds = [
+    "sprite",
+    "hetzner",
+  ];
 
   it("should return clouds where the agent is NOT implemented", () => {
     // codex is missing on hetzner
@@ -246,8 +257,12 @@ describe("getMissingClouds", () => {
 
   it("should handle empty manifest", () => {
     const empty = createEmptyManifest();
-    const missing = getMissingClouds(empty, "claude", ["sprite"]);
-    expect(missing).toEqual(["sprite"]);
+    const missing = getMissingClouds(empty, "claude", [
+      "sprite",
+    ]);
+    expect(missing).toEqual([
+      "sprite",
+    ]);
   });
 });
 
@@ -259,7 +274,11 @@ describe("getErrorMessage", () => {
   });
 
   it("should extract message from plain object with message property", () => {
-    expect(getErrorMessage({ message: "custom error" })).toBe("custom error");
+    expect(
+      getErrorMessage({
+        message: "custom error",
+      }),
+    ).toBe("custom error");
   });
 
   it("should convert string to string", () => {
@@ -284,7 +303,11 @@ describe("getErrorMessage", () => {
   });
 
   it("should handle object without message property", () => {
-    expect(getErrorMessage({ code: "ENOENT" })).toBe("[object Object]");
+    expect(
+      getErrorMessage({
+        code: "ENOENT",
+      }),
+    ).toBe("[object Object]");
   });
 
   it("should handle empty Error message", () => {
@@ -296,7 +319,11 @@ describe("getErrorMessage", () => {
   });
 
   it("should handle object with numeric message", () => {
-    expect(getErrorMessage({ message: 123 })).toBe("123");
+    expect(
+      getErrorMessage({
+        message: 123,
+      }),
+    ).toBe("123");
   });
 });
 
@@ -324,12 +351,25 @@ describe("getStatusDescription", () => {
 
 describe("calculateColumnWidth (actual export)", () => {
   it("should return minimum width when items are shorter", () => {
-    expect(calculateColumnWidth(["a", "b"], 15)).toBe(15);
+    expect(
+      calculateColumnWidth(
+        [
+          "a",
+          "b",
+        ],
+        15,
+      ),
+    ).toBe(15);
   });
 
   it("should expand beyond minimum for long items", () => {
     // COL_PADDING is 2 in commands.ts
-    const result = calculateColumnWidth(["long-item-name"], 5);
+    const result = calculateColumnWidth(
+      [
+        "long-item-name",
+      ],
+      5,
+    );
     expect(result).toBe(14 + 2); // "long-item-name" (14) + COL_PADDING (2)
   });
 
@@ -339,11 +379,25 @@ describe("calculateColumnWidth (actual export)", () => {
 
   it("should handle single item exactly at minimum width", () => {
     // "12345678" (8) + COL_PADDING (2) = 10; minWidth = 10
-    expect(calculateColumnWidth(["12345678"], 10)).toBe(10);
+    expect(
+      calculateColumnWidth(
+        [
+          "12345678",
+        ],
+        10,
+      ),
+    ).toBe(10);
   });
 
   it("should use the longest item for width", () => {
-    const result = calculateColumnWidth(["short", "a-much-longer-name", "mid"], 5);
+    const result = calculateColumnWidth(
+      [
+        "short",
+        "a-much-longer-name",
+        "mid",
+      ],
+      5,
+    );
     expect(result).toBe(18 + 2); // "a-much-longer-name" (18) + COL_PADDING (2)
   });
 });

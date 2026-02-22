@@ -71,7 +71,34 @@ describe("Security Edge Cases", () => {
     });
 
     it("should reject shell metacharacters individually", () => {
-      const shellChars = ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "=", "+", "{", "}", "[", "]", "<", ">", "?", "~", "`", "'", "\"", ";", ",", "."];
+      const shellChars = [
+        "!",
+        "@",
+        "#",
+        "$",
+        "%",
+        "^",
+        "&",
+        "*",
+        "(",
+        ")",
+        "=",
+        "+",
+        "{",
+        "}",
+        "[",
+        "]",
+        "<",
+        ">",
+        "?",
+        "~",
+        "`",
+        "'",
+        '"',
+        ";",
+        ",",
+        ".",
+      ];
       for (const char of shellChars) {
         expect(() => validateIdentifier(`test${char}name`, "Test")).toThrow("can only contain");
       }
@@ -146,7 +173,12 @@ dd if=/dev/urandom of=/tmp/random.bin bs=1M count=1
     });
 
     it("should detect mkfs commands with various filesystems", () => {
-      for (const fs of ["ext4", "xfs", "btrfs", "vfat"]) {
+      for (const fs of [
+        "ext4",
+        "xfs",
+        "btrfs",
+        "vfat",
+      ]) {
         const script = `#!/bin/bash\nmkfs.${fs} /dev/sda1\n`;
         expect(() => validateScriptContent(script)).toThrow("filesystem formatting");
       }

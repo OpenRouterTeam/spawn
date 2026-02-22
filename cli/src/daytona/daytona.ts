@@ -27,7 +27,13 @@ let sshHost = "";
 let sshPort = "";
 
 export function getState() {
-  return { daytonaApiKey, sandboxId, sshToken, sshHost, sshPort };
+  return {
+    daytonaApiKey,
+    sandboxId,
+    sshToken,
+    sshHost,
+    sshPort,
+  };
 }
 
 // ─── API Client ──────────────────────────────────────────────────────────────
@@ -44,12 +50,7 @@ function parseJson(text: string): any {
   }
 }
 
-async function daytonaApi(
-  method: string,
-  endpoint: string,
-  body?: string,
-  maxRetries = 3,
-): Promise<string> {
+async function daytonaApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
   const url = `${DAYTONA_API_BASE}${endpoint}`;
 
   let interval = 2;
@@ -59,7 +60,10 @@ async function daytonaApi(
         "Content-Type": "application/json",
         Authorization: `Bearer ${daytonaApiKey}`,
       };
-      const opts: RequestInit = { method, headers };
+      const opts: RequestInit = {
+        method,
+        headers,
+      };
       if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
         opts.body = body;
       }
@@ -67,16 +71,16 @@ async function daytonaApi(
       const text = await resp.text();
 
       if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {
-        logWarn(
-          `API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`,
-        );
+        logWarn(`API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`);
         await sleep(interval * 1000);
         interval = Math.min(interval * 2, 30);
         continue;
       }
       return text;
     } catch (err) {
-      if (attempt >= maxRetries) { throw err; }
+      if (attempt >= maxRetries) {
+        throw err;
+      }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
       await sleep(interval * 1000);
       interval = Math.min(interval * 2, 30);
@@ -91,7 +95,9 @@ function hasApiError(text: string): boolean {
 
 function extractApiError(text: string, fallback = "Unknown error"): string {
   const data = parseJson(text);
-  if (!data) { return fallback; }
+  if (!data) {
+    return fallback;
+  }
   return data.message || data.error || data.detail || fallback;
 }
 
@@ -101,21 +107,27 @@ const DAYTONA_CONFIG_PATH = `${process.env.HOME}/.config/spawn/daytona.json`;
 
 async function saveTokenToConfig(token: string): Promise<void> {
   const dir = DAYTONA_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn(["mkdir", "-p", dir]).exited;
+  await Bun.spawn([
+    "mkdir",
+    "-p",
+    dir,
+  ]).exited;
   const escaped = jsonEscape(token);
-  await Bun.write(
-    DAYTONA_CONFIG_PATH,
-    `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`,
-    { mode: 0o600 },
-  );
+  await Bun.write(DAYTONA_CONFIG_PATH, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
+    mode: 0o600,
+  });
 }
 
 function loadTokenFromConfig(): string | null {
   try {
     const data = JSON.parse(readFileSync(DAYTONA_CONFIG_PATH, "utf-8"));
     const token = data.api_key || data.token || "";
-    if (!token) { return null; }
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) { return null; }
+    if (!token) {
+      return null;
+    }
+    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
+      return null;
+    }
     return token;
   } catch {
     return null;
@@ -123,10 +135,14 @@ function loadTokenFromConfig(): string | null {
 }
 
 async function testDaytonaToken(): Promise<boolean> {
-  if (!daytonaApiKey) { return false; }
+  if (!daytonaApiKey) {
+    return false;
+  }
   try {
     const resp = await daytonaApi("GET", "/sandbox?page=1&limit=1", undefined, 1);
-    if (hasApiError(resp)) { return false; }
+    if (hasApiError(resp)) {
+      return false;
+    }
     return true;
   } catch {
     return false;
@@ -162,7 +178,9 @@ export async function ensureDaytonaToken(): Promise<void> {
   logStep("Manual token entry");
   logWarn("Get your API key from: https://app.daytona.io/dashboard/keys");
   const token = await prompt("Enter your Daytona API key: ");
-  if (!token) { throw new Error("No token provided"); }
+  if (!token) {
+    throw new Error("No token provided");
+  }
   daytonaApiKey = token.trim();
   if (!(await testDaytonaToken())) {
     logError("Token is invalid");
@@ -184,12 +202,25 @@ function saveVmConnection(
   launchCmd?: string,
 ): void {
   const dir = `${process.env.HOME}/.spawn`;
-  mkdirSync(dir, { recursive: true });
-  const json: Record<string, string> = { ip, user };
-  if (serverId) { json.server_id = serverId; }
-  if (serverName) { json.server_name = serverName; }
-  if (cloud) { json.cloud = cloud; }
-  if (launchCmd) { json.launch_cmd = launchCmd; }
+  mkdirSync(dir, {
+    recursive: true,
+  });
+  const json: Record<string, string> = {
+    ip,
+    user,
+  };
+  if (serverId) {
+    json.server_id = serverId;
+  }
+  if (serverName) {
+    json.server_name = serverName;
+  }
+  if (cloud) {
+    json.cloud = cloud;
+  }
+  if (launchCmd) {
+    json.launch_cmd = launchCmd;
+  }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -210,13 +241,20 @@ export function saveLaunchCmd(launchCmd: string): void {
 function sshBaseArgs(): string[] {
   const args = [
     "ssh",
-    "-o", "StrictHostKeyChecking=no",
-    "-o", "UserKnownHostsFile=/dev/null",
-    "-o", "LogLevel=ERROR",
-    "-o", "ServerAliveInterval=15",
-    "-o", "ServerAliveCountMax=3",
-    "-o", "ConnectTimeout=10",
-    "-o", "PubkeyAuthentication=no",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+    "-o",
+    "LogLevel=ERROR",
+    "-o",
+    "ServerAliveInterval=15",
+    "-o",
+    "ServerAliveCountMax=3",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "PubkeyAuthentication=no",
   ];
   if (sshPort) {
     args.push("-o", `Port=${sshPort}`);
@@ -229,10 +267,7 @@ function sshBaseArgs(): string[] {
 async function setupSshAccess(): Promise<void> {
   logStep("Setting up SSH access...");
 
-  const sshResp = await daytonaApi(
-    "POST",
-    `/sandbox/${sandboxId}/ssh-access?expiresInMinutes=480`,
-  );
+  const sshResp = await daytonaApi("POST", `/sandbox/${sandboxId}/ssh-access?expiresInMinutes=480`);
   const data = parseJson(sshResp);
   if (!data) {
     logError("Failed to parse SSH access response");
@@ -274,7 +309,9 @@ export async function createServer(name: string): Promise<void> {
 
   const body = JSON.stringify({
     name,
-    buildInfo: { dockerfileContent: dockerfile },
+    buildInfo: {
+      dockerfileContent: dockerfile,
+    },
     cpu,
     memory,
     disk,
@@ -337,17 +374,26 @@ export async function runServer(cmd: string): Promise<void> {
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const args = [
     ...sshBaseArgs(),
-    "-o", "BatchMode=yes",
+    "-o",
+    "BatchMode=yes",
     `${sshToken}@${sshHost}`,
     "--",
     fullCmd,
   ];
 
   const proc = Bun.spawn(args, {
-    stdio: ["pipe", "inherit", "inherit"],
+    stdio: [
+      "pipe",
+      "inherit",
+      "inherit",
+    ],
   });
   // Close stdin but keep process alive (Daytona gateway doesn't propagate stdin EOF)
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   const exitCode = await proc.exited;
 
   // Brief sleep to let gateway release connection slot
@@ -363,22 +409,33 @@ export async function runServerCapture(cmd: string): Promise<string> {
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const args = [
     ...sshBaseArgs(),
-    "-o", "BatchMode=yes",
+    "-o",
+    "BatchMode=yes",
     `${sshToken}@${sshHost}`,
     "--",
     fullCmd,
   ];
 
   const proc = Bun.spawn(args, {
-    stdio: ["pipe", "pipe", "pipe"],
+    stdio: [
+      "pipe",
+      "pipe",
+      "pipe",
+    ],
   });
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
 
   await sleep(1000);
 
-  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
+  if (exitCode !== 0) {
+    throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  }
   return stdout.trim();
 }
 
@@ -386,10 +443,7 @@ export async function runServerCapture(cmd: string): Promise<string> {
  * Upload a file to the remote sandbox via base64-encoded SSH command channel.
  * Daytona's SSH gateway doesn't support SCP/SFTP.
  */
-export async function uploadFile(
-  localPath: string,
-  remotePath: string,
-): Promise<void> {
+export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
   if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
@@ -406,21 +460,32 @@ export async function uploadFile(
 
   const args = [
     ...sshBaseArgs(),
-    "-o", "BatchMode=yes",
+    "-o",
+    "BatchMode=yes",
     `${sshToken}@${sshHost}`,
     "--",
     `printf '%s' '${b64}' | base64 -d > '${remotePath}'`,
   ];
 
   const proc = Bun.spawn(args, {
-    stdio: ["pipe", "ignore", "ignore"],
+    stdio: [
+      "pipe",
+      "ignore",
+      "ignore",
+    ],
   });
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   const exitCode = await proc.exited;
 
   await sleep(1000);
 
-  if (exitCode !== 0) { throw new Error(`upload_file failed for ${remotePath}`); }
+  if (exitCode !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
+  }
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
@@ -437,7 +502,11 @@ export async function interactiveSession(cmd: string): Promise<number> {
   ];
 
   const proc = Bun.spawn(args, {
-    stdio: ["inherit", "inherit", "inherit"],
+    stdio: [
+      "inherit",
+      "inherit",
+      "inherit",
+    ],
   });
   const exitCode = await proc.exited;
 
@@ -498,7 +567,7 @@ export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<vo
   );
 
   try {
-    await runServer(parts.join(' && '));
+    await runServer(parts.join(" && "));
   } catch {
     logWarn("Base tools install had errors, continuing...");
   }
@@ -518,13 +587,14 @@ export async function getServerName(): Promise<string> {
     return name;
   }
 
-  const kebab = process.env.SPAWN_NAME_KEBAB
-    || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
+  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
   return kebab || defaultSpawnName();
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) { return; }
+  if (process.env.SPAWN_NAME_KEBAB) {
+    return;
+  }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {
@@ -569,7 +639,7 @@ export async function destroyServer(id?: string): Promise<void> {
 export async function listServers(): Promise<void> {
   const response = await daytonaApi("GET", "/sandbox");
   const data = parseJson(response);
-  const items: any[] = Array.isArray(data) ? data : data?.items ?? data?.sandboxes ?? [];
+  const items: any[] = Array.isArray(data) ? data : (data?.items ?? data?.sandboxes ?? []);
 
   if (items.length === 0) {
     console.log("No sandboxes found");
@@ -577,9 +647,7 @@ export async function listServers(): Promise<void> {
   }
 
   const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-  console.log(
-    pad("NAME", 25) + pad("ID", 40) + pad("STATE", 12),
-  );
+  console.log(pad("NAME", 25) + pad("ID", 40) + pad("STATE", 12));
   console.log("-".repeat(77));
   for (const s of items) {
     console.log(

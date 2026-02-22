@@ -20,9 +20,7 @@ const lines = content.split("\n");
 
 /** Get non-comment, non-empty lines */
 function codeLines(): string[] {
-  return lines.filter(
-    (line) => line.trim() !== "" && !line.trimStart().startsWith("#")
-  );
+  return lines.filter((line) => line.trim() !== "" && !line.trimStart().startsWith("#"));
 }
 
 describe("install.sh validation", () => {
@@ -48,9 +46,7 @@ describe("install.sh validation", () => {
     it("should not use set -u or set -o nounset", () => {
       const code = codeLines();
       const hasSetU = code.some(
-        (l) =>
-          (/\bset\s+.*-.*u\b/.test(l) && !l.includes("pipefail")) ||
-          /set\s+-o\s+nounset/.test(l)
+        (l) => (/\bset\s+.*-.*u\b/.test(l) && !l.includes("pipefail")) || /set\s+-o\s+nounset/.test(l),
       );
       expect(hasSetU).toBe(false);
     });
@@ -159,9 +155,7 @@ describe("install.sh validation", () => {
 
     it("should show error and exit if bun installation fails", () => {
       // After installing bun, should check again and show error if still not found
-      const afterInstall = content.slice(
-        content.indexOf("https://bun.sh/install")
-      );
+      const afterInstall = content.slice(content.indexOf("https://bun.sh/install"));
       expect(afterInstall).toContain("command -v bun");
       expect(afterInstall).toContain("log_error");
       expect(afterInstall).toContain("exit 1");
@@ -277,7 +271,7 @@ describe("install.sh validation", () => {
     it("should show helpful message after installation", () => {
       const fnStart = content.indexOf("ensure_in_path()");
       const fnBody = content.slice(fnStart);
-      expect(fnBody).toContain("spawn\" version");
+      expect(fnBody).toContain('spawn" version');
       expect(fnBody).toContain("to get started");
     });
   });
@@ -361,7 +355,7 @@ describe("install.sh validation", () => {
 
   describe("ensure_in_path", () => {
     it("should run spawn version after install", () => {
-      expect(content).toContain("/spawn\" version");
+      expect(content).toContain('/spawn" version');
     });
 
     it("should patch zsh rc file for zsh users", () => {
@@ -402,12 +396,7 @@ describe("install.sh validation", () => {
       const code = codeLines();
       // eval should not be used to run arbitrary downloaded scripts
       // (bun.sh/install is piped to bash, which is standard practice)
-      const evalLines = code.filter(
-        (l) =>
-          l.includes("eval") &&
-          !l.includes("2>/dev/null") &&
-          !l.includes("#")
-      );
+      const evalLines = code.filter((l) => l.includes("eval") && !l.includes("2>/dev/null") && !l.includes("#"));
       expect(evalLines).toEqual([]);
     });
 
@@ -429,19 +418,13 @@ describe("install.sh validation", () => {
 
   describe("consistency with package.json", () => {
     it("should reference same repo as package.json", () => {
-      const pkgContent = readFileSync(
-        join(REPO_ROOT, "cli", "package.json"),
-        "utf-8"
-      );
+      const pkgContent = readFileSync(join(REPO_ROOT, "cli", "package.json"), "utf-8");
       const pkg = JSON.parse(pkgContent);
       // install.sh uses OpenRouterTeam/spawn
       expect(content).toContain("OpenRouterTeam/spawn");
       // package.json should reference same repo
       if (pkg.repository) {
-        const repo =
-          typeof pkg.repository === "string"
-            ? pkg.repository
-            : pkg.repository.url || "";
+        const repo = typeof pkg.repository === "string" ? pkg.repository : pkg.repository.url || "";
         expect(repo.toLowerCase()).toContain("openrouterteam/spawn");
       }
     });

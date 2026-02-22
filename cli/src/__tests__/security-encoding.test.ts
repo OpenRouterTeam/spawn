@@ -176,28 +176,63 @@ describe("stripDangerousKeys", () => {
   });
 
   it("strips constructor key", () => {
-    const input = Object.assign(Object.create(null), { name: "test", constructor: { evil: true } });
+    const input = Object.assign(Object.create(null), {
+      name: "test",
+      constructor: {
+        evil: true,
+      },
+    });
     const result = stripDangerousKeys(input);
-    expect(Object.keys(result)).toEqual(["name"]);
+    expect(Object.keys(result)).toEqual([
+      "name",
+    ]);
     expect(result.name).toBe("test");
   });
 
   it("strips prototype key", () => {
-    const input = Object.assign(Object.create(null), { data: 1, prototype: { inject: true } });
+    const input = Object.assign(Object.create(null), {
+      data: 1,
+      prototype: {
+        inject: true,
+      },
+    });
     const result = stripDangerousKeys(input);
-    expect(Object.keys(result)).toEqual(["data"]);
+    expect(Object.keys(result)).toEqual([
+      "data",
+    ]);
     expect(result.data).toBe(1);
   });
 
   it("strips dangerous keys from nested objects", () => {
-    const input = { agents: { claude: { __proto__: { evil: true }, name: "Claude" } } };
+    const input = {
+      agents: {
+        claude: {
+          __proto__: {
+            evil: true,
+          },
+          name: "Claude",
+        },
+      },
+    };
     const result = stripDangerousKeys(input);
     expect(result.agents.claude.name).toBe("Claude");
-    expect(Object.keys(result.agents.claude)).toEqual(["name"]);
+    expect(Object.keys(result.agents.claude)).toEqual([
+      "name",
+    ]);
   });
 
   it("handles arrays correctly", () => {
-    const input = { items: [{ name: "a" }, { name: "b", __proto__: {} }] };
+    const input = {
+      items: [
+        {
+          name: "a",
+        },
+        {
+          name: "b",
+          __proto__: {},
+        },
+      ],
+    };
     const result = stripDangerousKeys(input);
     expect(result.items).toHaveLength(2);
     expect(result.items[0].name).toBe("a");
@@ -212,15 +247,36 @@ describe("stripDangerousKeys", () => {
   });
 
   it("preserves normal keys", () => {
-    const input = { agents: { a: 1 }, clouds: { b: 2 }, matrix: { c: 3 } };
+    const input = {
+      agents: {
+        a: 1,
+      },
+      clouds: {
+        b: 2,
+      },
+      matrix: {
+        c: 3,
+      },
+    };
     const result = stripDangerousKeys(input);
     expect(result).toEqual(input);
   });
 
   it("handles deeply nested dangerous keys", () => {
-    const input = { a: { b: { c: { constructor: "bad", value: "good" } } } };
+    const input = {
+      a: {
+        b: {
+          c: {
+            constructor: "bad",
+            value: "good",
+          },
+        },
+      },
+    };
     const result = stripDangerousKeys(input);
     expect(result.a.b.c.value).toBe("good");
-    expect(Object.keys(result.a.b.c)).toEqual(["value"]);
+    expect(Object.keys(result.a.b.c)).toEqual([
+      "value",
+    ]);
   });
 });

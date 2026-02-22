@@ -12,7 +12,10 @@ import { generateEnvConfig } from "../shared/agents";
 export type { AgentConfig };
 export { generateEnvConfig };
 
-const runner = { runServer: runSprite, uploadFile: uploadFileSprite };
+const runner = {
+  runServer: runSprite,
+  uploadFile: uploadFileSprite,
+};
 
 export const agents = createAgents(runner);
 

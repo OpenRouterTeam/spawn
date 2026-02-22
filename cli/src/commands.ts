@@ -17,13 +17,35 @@ import {
 } from "./manifest.js";
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
-import { validateIdentifier, validateScriptContent, validatePrompt, validateConnectionIP, validateUsername, validateServerIdentifier, validateMetadataValue } from "./security.js";
-import { saveSpawnRecord, filterHistory, clearHistory, markRecordDeleted, getActiveServers, getHistoryPath, type SpawnRecord, type VMConnection } from "./history.js";
-import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE, } from "./guidance-data.js";
+import {
+  validateIdentifier,
+  validateScriptContent,
+  validatePrompt,
+  validateConnectionIP,
+  validateUsername,
+  validateServerIdentifier,
+  validateMetadataValue,
+} from "./security.js";
+import {
+  saveSpawnRecord,
+  filterHistory,
+  clearHistory,
+  markRecordDeleted,
+  getActiveServers,
+  getHistoryPath,
+  type SpawnRecord,
+  type VMConnection,
+} from "./history.js";
+import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "./guidance-data.js";
 import { destroyServer as flyDestroyServer, ensureFlyCli, ensureFlyToken } from "./fly/fly.js";
 import { destroyServer as hetznerDestroyServer, ensureHcloudToken } from "./hetzner/hetzner.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "./digitalocean/digitalocean.js";
-import { destroyInstance as gcpDestroyInstance, ensureGcloudCli as gcpEnsureGcloudCli, authenticate as gcpAuthenticate, resolveProject as gcpResolveProject } from "./gcp/gcp.js";
+import {
+  destroyInstance as gcpDestroyInstance,
+  ensureGcloudCli as gcpEnsureGcloudCli,
+  authenticate as gcpAuthenticate,
+  resolveProject as gcpResolveProject,
+} from "./gcp/gcp.js";
 import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAuthenticate } from "./aws/aws.js";
 import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "./daytona/daytona.js";
 import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "./sprite/sprite.js";
@@ -71,11 +93,20 @@ function validateNonEmptyString(value: string, fieldName: string, helpCommand: s
   }
 }
 
-function mapToSelectOptions<T extends { name: string; description: string }>(
+function mapToSelectOptions<
+  T extends {
+    name: string;
+    description: string;
+  },
+>(
   keys: string[],
   items: Record<string, T>,
-  hintOverrides?: Record<string, string>
-): Array<{ value: string; label: string; hint: string }> {
+  hintOverrides?: Record<string, string>,
+): Array<{
+  value: string;
+  label: string;
+  hint: string;
+}> {
   return keys.map((key) => ({
     value: key,
     label: items[key].name,
@@ -84,23 +115,28 @@ function mapToSelectOptions<T extends { name: string; description: string }>(
 }
 
 export function getImplementedClouds(manifest: Manifest, agent: string): string[] {
-  return cloudKeys(manifest).filter(
-    (c: string): boolean => matrixStatus(manifest, c, agent) === "implemented"
-  );
+  return cloudKeys(manifest).filter((c: string): boolean => matrixStatus(manifest, c, agent) === "implemented");
 }
 
 /** Levenshtein distance between two strings */
 export function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) { dp[i][0] = i; }
-  for (let j = 0; j <= n; j++) { dp[0][j] = j; }
+  const dp: number[][] = Array.from(
+    {
+      length: m + 1,
+    },
+    () => Array(n + 1).fill(0),
+  );
+  for (let i = 0; i <= m; i++) {
+    dp[i][0] = i;
+  }
+  for (let j = 0; j <= n; j++) {
+    dp[0][j] = j;
+  }
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
     }
   }
   return dp[m][n];
@@ -127,7 +163,7 @@ export function findClosestMatch(input: string, candidates: string[]): string | 
 export function findClosestKeyByNameOrKey(
   input: string,
   keys: string[],
-  getName: (key: string) => string
+  getName: (key: string) => string,
 ): string | null {
   let bestKey: string | null = null;
   let bestDist = Number.POSITIVE_INFINITY;
@@ -155,14 +191,20 @@ export function findClosestKeyByNameOrKey(
  */
 function resolveEntityKey(manifest: Manifest, input: string, kind: "agent" | "cloud"): string | null {
   const collection = getEntityCollection(manifest, kind);
-  if (collection[input]) { return input; }
+  if (collection[input]) {
+    return input;
+  }
   const keys = getEntityKeys(manifest, kind);
   const lower = input.toLowerCase();
   for (const key of keys) {
-    if (key.toLowerCase() === lower) { return key; }
+    if (key.toLowerCase() === lower) {
+      return key;
+    }
   }
   for (const key of keys) {
-    if (collection[key].name.toLowerCase() === lower) { return key; }
+    if (collection[key].name.toLowerCase() === lower) {
+      return key;
+    }
   }
   return null;
 }
@@ -175,10 +217,25 @@ export function resolveCloudKey(manifest: Manifest, input: string): string | nul
   return resolveEntityKey(manifest, input, "cloud");
 }
 
-interface EntityDef { label: string; labelPlural: string; listCmd: string; opposite: string }
+interface EntityDef {
+  label: string;
+  labelPlural: string;
+  listCmd: string;
+  opposite: string;
+}
 const ENTITY_DEFS: Record<"agent" | "cloud", EntityDef> = {
-  agent: { label: "agent", labelPlural: "agents", listCmd: "spawn agents", opposite: "cloud provider" },
-  cloud: { label: "cloud", labelPlural: "clouds", listCmd: "spawn clouds", opposite: "agent" },
+  agent: {
+    label: "agent",
+    labelPlural: "agents",
+    listCmd: "spawn agents",
+    opposite: "cloud provider",
+  },
+  cloud: {
+    label: "cloud",
+    labelPlural: "clouds",
+    listCmd: "spawn clouds",
+    opposite: "agent",
+  },
 };
 
 function getEntityCollection(manifest: Manifest, kind: "agent" | "cloud") {
@@ -190,23 +247,14 @@ function getEntityKeys(manifest: Manifest, kind: "agent" | "cloud") {
 }
 
 /** Suggest a typo correction by fuzzy-matching against a set of keys */
-function suggestTypoCorrection(
-  value: string,
-  manifest: Manifest,
-  kind: "agent" | "cloud"
-): string | null {
+function suggestTypoCorrection(value: string, manifest: Manifest, kind: "agent" | "cloud"): string | null {
   const collection = getEntityCollection(manifest, kind);
   const keys = getEntityKeys(manifest, kind);
   return findClosestKeyByNameOrKey(value, keys, (k) => collection[k].name);
 }
 
 /** Check if user provided an entity of the wrong kind and suggest correction */
-function checkWrongKind(
-  value: string,
-  kind: "agent" | "cloud",
-  manifest: Manifest,
-  def: EntityDef
-): boolean {
+function checkWrongKind(value: string, kind: "agent" | "cloud", manifest: Manifest, def: EntityDef): boolean {
   const oppositeKind = kind === "agent" ? "cloud" : "agent";
   const oppositeCollection = getEntityCollection(manifest, oppositeKind);
 
@@ -227,7 +275,12 @@ function checkSameKindTypo(
   kind: "agent" | "cloud",
   manifest: Manifest,
   def: EntityDef,
-  collection: Record<string, { name: string }>
+  collection: Record<
+    string,
+    {
+      name: string;
+    }
+  >,
 ): boolean {
   const match = suggestTypoCorrection(value, manifest, kind);
   if (match) {
@@ -240,18 +293,16 @@ function checkSameKindTypo(
 }
 
 /** Check for typo in opposite kind (swapped arguments) and suggest correction */
-function checkOppositeKindTypo(
-  value: string,
-  kind: "agent" | "cloud",
-  manifest: Manifest
-): boolean {
+function checkOppositeKindTypo(value: string, kind: "agent" | "cloud", manifest: Manifest): boolean {
   const oppositeKind = kind === "agent" ? "cloud" : "agent";
   const oppositeMatch = suggestTypoCorrection(value, manifest, oppositeKind);
 
   if (oppositeMatch) {
     const oppositeDef = ENTITY_DEFS[oppositeKind];
     const oppositeCollection = getEntityCollection(manifest, oppositeKind);
-    p.log.info(`"${pc.bold(value)}" looks like ${oppositeDef.label} ${pc.cyan(oppositeMatch)} (${oppositeCollection[oppositeMatch].name}).`);
+    p.log.info(
+      `"${pc.bold(value)}" looks like ${oppositeDef.label} ${pc.cyan(oppositeMatch)} (${oppositeCollection[oppositeMatch].name}).`,
+    );
     p.log.info("Did you swap the agent and cloud arguments?");
     p.log.info(`Usage: ${pc.cyan("spawn <agent> <cloud>")}`);
     return true;
@@ -263,14 +314,22 @@ function checkOppositeKindTypo(
 export function checkEntity(manifest: Manifest, value: string, kind: "agent" | "cloud"): boolean {
   const def = ENTITY_DEFS[kind];
   const collection = getEntityCollection(manifest, kind);
-  if (collection[value]) { return true; }
+  if (collection[value]) {
+    return true;
+  }
 
   p.log.error(`Unknown ${def.label}: ${pc.bold(value)}`);
 
   // Try different correction strategies
-  if (checkWrongKind(value, kind, manifest, def)) { return false; }
-  if (checkSameKindTypo(value, kind, manifest, def, collection)) { return false; }
-  if (checkOppositeKindTypo(value, kind, manifest)) { return false; }
+  if (checkWrongKind(value, kind, manifest, def)) {
+    return false;
+  }
+  if (checkSameKindTypo(value, kind, manifest, def, collection)) {
+    return false;
+  }
+  if (checkOppositeKindTypo(value, kind, manifest)) {
+    return false;
+  }
 
   p.log.info(`Run ${pc.cyan(def.listCmd)} to see available ${def.labelPlural}.`);
   return false;
@@ -282,7 +341,15 @@ function validateEntity(manifest: Manifest, value: string, kind: "agent" | "clou
   }
 }
 
-async function validateAndGetEntity(value: string, kind: "agent" | "cloud"): Promise<[manifest: Manifest, key: string]> {
+async function validateAndGetEntity(
+  value: string,
+  kind: "agent" | "cloud",
+): Promise<
+  [
+    manifest: Manifest,
+    key: string,
+  ]
+> {
   const def = ENTITY_DEFS[kind];
   const capitalLabel = def.label.charAt(0).toUpperCase() + def.label.slice(1);
   try {
@@ -296,7 +363,10 @@ async function validateAndGetEntity(value: string, kind: "agent" | "cloud"): Pro
   const manifest = await loadManifestWithSpinner();
   validateEntity(manifest, value, kind);
 
-  return [manifest, value];
+  return [
+    manifest,
+    value,
+  ];
 }
 
 function validateImplementation(manifest: Manifest, cloud: string, agent: string): void {
@@ -315,7 +385,9 @@ function validateImplementation(manifest: Manifest, cloud: string, agent: string
         return `spawn ${agent} ${c}${hasCredsMarker}`;
       });
       console.log();
-      p.log.info(`${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these:`);
+      p.log.info(
+        `${agentName} is available on ${availableClouds.length} cloud${availableClouds.length > 1 ? "s" : ""}. Try one of these:`,
+      );
       for (const cmd of examples) {
         p.log.info(`  ${pc.cyan(cmd)}`);
       }
@@ -351,7 +423,9 @@ const CLOUD_CLI_MAP: Record<string, string> = {
 /** Check if the relevant CLI tool for a cloud provider is installed */
 export function hasCloudCli(cloud: string): boolean {
   const cli = CLOUD_CLI_MAP[cloud];
-  if (!cli) { return false; }
+  if (!cli) {
+    return false;
+  }
   return Bun.which(cli) !== null;
 }
 
@@ -360,8 +434,13 @@ export function hasCloudCli(cloud: string): boolean {
 export function prioritizeCloudsByCredentials(
   clouds: string[],
   manifest: Manifest,
-  featuredCloud?: string[]
-): { sortedClouds: string[]; hintOverrides: Record<string, string>; credCount: number; cliCount: number } {
+  featuredCloud?: string[],
+): {
+  sortedClouds: string[];
+  hintOverrides: Record<string, string>;
+  credCount: number;
+  cliCount: number;
+} {
   const withCreds: string[] = [];
   const featured: string[] = [];
   const withCli: string[] = [];
@@ -389,7 +468,17 @@ export function prioritizeCloudsByCredentials(
     hintOverrides[c] = `CLI installed -- ${manifest.clouds[c].description}`;
   }
 
-  return { sortedClouds: [...withCreds, ...featured, ...withCli, ...rest], hintOverrides, credCount: withCreds.length, cliCount: withCli.length };
+  return {
+    sortedClouds: [
+      ...withCreds,
+      ...featured,
+      ...withCli,
+      ...rest,
+    ],
+    hintOverrides,
+    credCount: withCreds.length,
+    cliCount: withCli.length,
+  };
 }
 
 /** Build hint overrides for the agent picker showing cloud count and credential readiness */
@@ -401,7 +490,7 @@ export function buildAgentPickerHints(manifest: Manifest): Record<string, string
       hints[agent] = "no clouds available yet";
       continue;
     }
-    const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+    const readyCount = implClouds.filter((c) => hasCloudCredentials(manifest.clouds[c].auth)).length;
     const cloudLabel = `${implClouds.length} cloud${implClouds.length !== 1 ? "s" : ""}`;
     if (readyCount > 0) {
       hints[agent] = `${cloudLabel}, ${readyCount} ready`;
@@ -421,15 +510,21 @@ async function selectAgent(manifest: Manifest): Promise<string> {
     options: mapToSelectOptions(agents, manifest.agents, agentHints),
     placeholder: "Start typing to search...",
   });
-  if (p.isCancel(agentChoice)) { handleCancel(); }
+  if (p.isCancel(agentChoice)) {
+    handleCancel();
+  }
   return agentChoice;
 }
 
 // Validate that agent has available clouds and return sorted cloud list with priority hints
 function getAndValidateCloudChoices(
   manifest: Manifest,
-  agent: string
-): { clouds: string[]; hintOverrides: Record<string, string>; credCount: number } {
+  agent: string,
+): {
+  clouds: string[];
+  hintOverrides: Record<string, string>;
+  credCount: number;
+} {
   const clouds = getImplementedClouds(manifest, agent);
 
   if (clouds.length === 0) {
@@ -440,7 +535,11 @@ function getAndValidateCloudChoices(
   }
 
   const featuredCloud = manifest.agents[agent]?.featured_cloud;
-  const { sortedClouds, hintOverrides, credCount, cliCount } = prioritizeCloudsByCredentials(clouds, manifest, featuredCloud);
+  const { sortedClouds, hintOverrides, credCount, cliCount } = prioritizeCloudsByCredentials(
+    clouds,
+    manifest,
+    featuredCloud,
+  );
   if (credCount > 0) {
     p.log.info(`${credCount} cloud${credCount > 1 ? "s" : ""} with credentials detected (shown first)`);
   }
@@ -448,17 +547,27 @@ function getAndValidateCloudChoices(
     p.log.info(`${cliCount} cloud${cliCount > 1 ? "s" : ""} with CLI installed`);
   }
 
-  return { clouds: sortedClouds, hintOverrides, credCount };
+  return {
+    clouds: sortedClouds,
+    hintOverrides,
+    credCount,
+  };
 }
 
 // Prompt user to select a cloud from the sorted list with type-ahead filtering
-async function selectCloud(manifest: Manifest, cloudList: string[], hintOverrides: Record<string, string>): Promise<string> {
+async function selectCloud(
+  manifest: Manifest,
+  cloudList: string[],
+  hintOverrides: Record<string, string>,
+): Promise<string> {
   const cloudChoice = await p.autocomplete({
     message: "Select a cloud provider (type to filter)",
     options: mapToSelectOptions(cloudList, manifest.clouds, hintOverrides),
     placeholder: "Start typing to search...",
   });
-  if (p.isCancel(cloudChoice)) { handleCancel(); }
+  if (p.isCancel(cloudChoice)) {
+    handleCancel();
+  }
   return cloudChoice;
 }
 
@@ -478,14 +587,18 @@ async function promptSpawnName(): Promise<string | undefined> {
     placeholder: defaultName,
     defaultValue: defaultName,
     validate: (value) => {
-      if (!value) { return undefined; }
+      if (!value) {
+        return undefined;
+      }
       if (value.length > 128) {
         return "Name must be 128 characters or less";
       }
       return undefined;
     },
   });
-  if (p.isCancel(spawnName)) { handleCancel(); }
+  if (p.isCancel(spawnName)) {
+    handleCancel();
+  }
   return spawnName || undefined;
 }
 
@@ -508,7 +621,15 @@ export async function cmdInteractive(): Promise<void> {
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${agentChoice} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(cloudChoice, agentChoice, undefined, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url, undefined, spawnName);
+  await execScript(
+    cloudChoice,
+    agentChoice,
+    undefined,
+    getAuthHint(manifest, cloudChoice),
+    manifest.clouds[cloudChoice].url,
+    undefined,
+    spawnName,
+  );
 }
 
 /** Interactive cloud selection when agent is already known (e.g. `spawn claude`) */
@@ -541,7 +662,15 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   p.log.info(`Next time, run directly: ${pc.cyan(`spawn ${resolvedAgent} ${cloudChoice}`)}`);
   p.outro("Handing off to spawn script...");
 
-  await execScript(cloudChoice, resolvedAgent, prompt, getAuthHint(manifest, cloudChoice), manifest.clouds[cloudChoice].url, dryRun, spawnName);
+  await execScript(
+    cloudChoice,
+    resolvedAgent,
+    prompt,
+    getAuthHint(manifest, cloudChoice),
+    manifest.clouds[cloudChoice].url,
+    dryRun,
+    spawnName,
+  );
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────
@@ -550,8 +679,11 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
 function resolveAndLog(
   manifest: Manifest,
   agent: string,
-  cloud: string
-): { agent: string; cloud: string } {
+  cloud: string,
+): {
+  agent: string;
+  cloud: string;
+} {
   const resolvedAgent = resolveAgentKey(manifest, agent);
   const resolvedCloud = resolveCloudKey(manifest, cloud);
   if (resolvedAgent && resolvedAgent !== agent) {
@@ -562,41 +694,68 @@ function resolveAndLog(
     p.log.info(`Resolved "${cloud}" to ${pc.cyan(resolvedCloud)}`);
     cloud = resolvedCloud;
   }
-  return { agent, cloud };
+  return {
+    agent,
+    cloud,
+  };
 }
 
 /** Detect and fix swapped arguments: "spawn <cloud> <agent>" -> "spawn <agent> <cloud>" */
 function detectAndFixSwappedArgs(
   manifest: Manifest,
   agent: string,
-  cloud: string
-): { agent: string; cloud: string } {
+  cloud: string,
+): {
+  agent: string;
+  cloud: string;
+} {
   if (!manifest.agents[agent] && manifest.clouds[agent] && manifest.agents[cloud]) {
     p.log.info("It looks like you swapped the agent and cloud arguments.");
     p.log.info(`Running: ${pc.cyan(`spawn ${cloud} ${agent}`)}`);
-    return { agent: cloud, cloud: agent };
+    return {
+      agent: cloud,
+      cloud: agent,
+    };
   }
-  return { agent, cloud };
+  return {
+    agent,
+    cloud,
+  };
 }
 
 /** Print a labeled section: bold header, body lines, then a blank line */
 function printDryRunSection(title: string, lines: string[]): void {
   p.log.step(pc.bold(title));
-  for (const line of lines) { console.log(line); }
+  for (const line of lines) {
+    console.log(line);
+  }
   console.log();
 }
 
-function buildAgentLines(agentInfo: { name: string; description: string; install?: string; launch?: string }): string[] {
+function buildAgentLines(agentInfo: {
+  name: string;
+  description: string;
+  install?: string;
+  launch?: string;
+}): string[] {
   const lines = [
     `  Name:        ${agentInfo.name}`,
     `  Description: ${agentInfo.description}`,
   ];
-  if (agentInfo.install) { lines.push(`  Install:     ${agentInfo.install}`); }
-  if (agentInfo.launch) { lines.push(`  Launch:      ${agentInfo.launch}`); }
+  if (agentInfo.install) {
+    lines.push(`  Install:     ${agentInfo.install}`);
+  }
+  if (agentInfo.launch) {
+    lines.push(`  Launch:      ${agentInfo.launch}`);
+  }
   return lines;
 }
 
-function buildCloudLines(cloudInfo: { name: string; description: string; defaults?: Record<string, string> }): string[] {
+function buildCloudLines(cloudInfo: {
+  name: string;
+  description: string;
+  defaults?: Record<string, string>;
+}): string[] {
   const lines = [
     `  Name:        ${cloudInfo.name}`,
     `  Description: ${cloudInfo.description}`,
@@ -625,7 +784,9 @@ function buildCredentialStatusLines(manifest: Manifest, cloud: string): string[]
   const authVars = parseAuthEnvVars(cloudAuth);
   const cloudUrl = manifest.clouds[cloud].url;
 
-  const lines = [formatCredStatusLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys")];
+  const lines = [
+    formatCredStatusLine("OPENROUTER_API_KEY", "https://openrouter.ai/settings/keys"),
+  ];
 
   for (let i = 0; i < authVars.length; i++) {
     lines.push(formatCredStatusLine(authVars[i], i === 0 ? cloudUrl : undefined));
@@ -636,7 +797,9 @@ function buildCredentialStatusLines(manifest: Manifest, cloud: string): string[]
 
 function buildEnvironmentLines(manifest: Manifest, agent: string): string[] | null {
   const env = manifest.agents[agent].env;
-  if (!env) { return null; }
+  if (!env) {
+    return null;
+  }
   return Object.entries(env).map(([k, v]) => {
     const display = v.includes("OPENROUTER_API_KEY") ? "(from OpenRouter)" : v;
     return `  ${k}=${display}`;
@@ -645,7 +808,9 @@ function buildEnvironmentLines(manifest: Manifest, agent: string): string[] | nu
 
 function buildPromptLines(prompt: string): string[] {
   const preview = prompt.length > 100 ? prompt.slice(0, 100) + "..." : prompt;
-  const lines = [`  ${preview}`];
+  const lines = [
+    `  ${preview}`,
+  ];
   if (prompt.length > 100) {
     lines.push(pc.dim(`  (${prompt.length} characters total)`));
   }
@@ -657,7 +822,9 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
 
   printDryRunSection("Agent", buildAgentLines(manifest.agents[agent]));
   printDryRunSection("Cloud", buildCloudLines(manifest.clouds[cloud]));
-  printDryRunSection("Script", [`  URL: ${RAW_BASE}/${cloud}/${agent}.sh`]);
+  printDryRunSection("Script", [
+    `  URL: ${RAW_BASE}/${cloud}/${agent}.sh`,
+  ]);
 
   const envLines = buildEnvironmentLines(manifest, agent);
   if (envLines) {
@@ -667,7 +834,7 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   // Show credential readiness
   const credLines = buildCredentialStatusLines(manifest, cloud);
   printDryRunSection("Credentials", credLines);
-  const allSet = credLines.every(l => l.includes("-- set"));
+  const allSet = credLines.every((l) => l.includes("-- set"));
   if (!allSet) {
     p.log.warn("Some credentials are missing. Set them before launching.");
     p.log.info(`Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions.`);
@@ -720,11 +887,13 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
 function hasCloudConfigCredentials(cloud: string): boolean {
   try {
     const configPath = path.join(process.env.HOME || "", ".config/spawn", `${cloud}.json`);
-    if (!fs.existsSync(configPath)) { return false; }
+    if (!fs.existsSync(configPath)) {
+      return false;
+    }
     const content = fs.readFileSync(configPath, "utf-8");
     const config = JSON.parse(content);
     // Check if config has any non-empty credentials
-    return Object.values(config).some(v => typeof v === "string" && v.trim().length > 0);
+    return Object.values(config).some((v) => typeof v === "string" && v.trim().length > 0);
   } catch {
     // If config can't be read, assume no saved credentials
     return false;
@@ -744,7 +913,7 @@ function collectMissingCredentials(authVars: string[], cloud?: string): string[]
 
   // If there are missing credentials but the cloud has saved config, don't report them as missing
   if (missing.length > 0 && cloud && hasCloudConfigCredentials(cloud)) {
-    return missing.filter(v => v === "OPENROUTER_API_KEY");
+    return missing.filter((v) => v === "OPENROUTER_API_KEY");
   }
 
   return missing;
@@ -770,14 +939,18 @@ async function confirmContinueWithMissingCreds(onlyOpenRouter: boolean): Promise
 
 export async function preflightCredentialCheck(manifest: Manifest, cloud: string): Promise<void> {
   const cloudAuth = manifest.clouds[cloud].auth;
-  if (cloudAuth.toLowerCase() === "none") { return; }
+  if (cloudAuth.toLowerCase() === "none") {
+    return;
+  }
 
   const authVars = parseAuthEnvVars(cloudAuth);
   const missing = collectMissingCredentials(authVars, cloud);
-  if (missing.length === 0) { return; }
+  if (missing.length === 0) {
+    return;
+  }
 
   const cloudName = manifest.clouds[cloud].name;
-  p.log.warn(`Missing credentials for ${cloudName}: ${missing.map(v => pc.cyan(v)).join(", ")}`);
+  p.log.warn(`Missing credentials for ${cloudName}: ${missing.map((v) => pc.cyan(v)).join(", ")}`);
 
   const onlyOpenRouter = missing.length === 1 && missing[0] === "OPENROUTER_API_KEY";
   p.log.info(getCredentialGuidance(cloud, onlyOpenRouter));
@@ -790,7 +963,13 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   }
 }
 
-export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean, debug?: boolean): Promise<void> {
+export async function cmdRun(
+  agent: string,
+  cloud: string,
+  prompt?: string,
+  dryRun?: boolean,
+  debug?: boolean,
+): Promise<void> {
   const manifest = await loadManifestWithSpinner();
   ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
 
@@ -849,17 +1028,39 @@ function headlessOutput(result: SpawnResult, outputFormat?: string): void {
     // Plain text output for headless without --output json
     if (result.status === "success") {
       console.error(`Success: ${result.agent} on ${result.cloud}`);
-      if (result.ip_address) { console.error(`  IP: ${result.ip_address}`); }
-      if (result.ssh_user) { console.error(`  User: ${result.ssh_user}`); }
-      if (result.server_id) { console.error(`  Server ID: ${result.server_id}`); }
+      if (result.ip_address) {
+        console.error(`  IP: ${result.ip_address}`);
+      }
+      if (result.ssh_user) {
+        console.error(`  User: ${result.ssh_user}`);
+      }
+      if (result.server_id) {
+        console.error(`  Server ID: ${result.server_id}`);
+      }
     } else {
       console.error(`Error: ${result.error_message}`);
     }
   }
 }
 
-function headlessError(agent: string, cloud: string, errorCode: string, errorMessage: string, outputFormat?: string, exitCode = 1): never {
-  headlessOutput({ status: "error", cloud, agent, error_code: errorCode, error_message: errorMessage }, outputFormat);
+function headlessError(
+  agent: string,
+  cloud: string,
+  errorCode: string,
+  errorMessage: string,
+  outputFormat?: string,
+  exitCode = 1,
+): never {
+  headlessOutput(
+    {
+      status: "error",
+      cloud,
+      agent,
+      error_code: errorCode,
+      error_message: errorMessage,
+    },
+    outputFormat,
+  );
   process.exit(exitCode);
 }
 
@@ -867,7 +1068,9 @@ function headlessError(agent: string, cloud: string, errorCode: string, errorMes
 function runBashHeadless(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<number> {
   validateScriptContent(script);
 
-  const env = { ...process.env };
+  const env = {
+    ...process.env,
+  };
   env.SPAWN_HEADLESS = "1";
   env.SPAWN_MODE = "non-interactive";
   if (prompt) {
@@ -881,10 +1084,21 @@ function runBashHeadless(script: string, prompt?: string, debug?: boolean, spawn
   }
 
   return new Promise<number>((resolve, reject) => {
-    const child = spawn("bash", ["-c", script], {
-      stdio: ["ignore", "pipe", "inherit"],
-      env,
-    });
+    const child = spawn(
+      "bash",
+      [
+        "-c",
+        script,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "inherit",
+        ],
+        env,
+      },
+    );
     // Forward stdout to stderr so JSON output stays clean on stdout
     if (child.stdout) {
       child.stdout.pipe(process.stderr);
@@ -903,7 +1117,9 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
   try {
     validateIdentifier(agent, "Agent name");
     validateIdentifier(cloud, "Cloud name");
-    if (prompt) { validatePrompt(prompt); }
+    if (prompt) {
+      validatePrompt(prompt);
+    }
   } catch (err) {
     headlessError(agent, cloud, "VALIDATION_ERROR", getErrorMessage(err), outputFormat, 3);
   }
@@ -930,7 +1146,14 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
 
   const matrixKey = `${resolvedCloud}/${resolvedAgent}`;
   if (manifest.matrix[matrixKey] !== "implemented") {
-    headlessError(resolvedAgent, resolvedCloud, "NOT_IMPLEMENTED", `${resolvedAgent} on ${resolvedCloud} is not implemented`, outputFormat, 3);
+    headlessError(
+      resolvedAgent,
+      resolvedCloud,
+      "NOT_IMPLEMENTED",
+      `${resolvedAgent} on ${resolvedCloud} is not implemented`,
+      outputFormat,
+      3,
+    );
   }
 
   // Check credentials upfront
@@ -939,8 +1162,14 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     const authVars = parseAuthEnvVars(cloudAuth);
     const missing = collectMissingCredentials(authVars, resolvedCloud);
     if (missing.length > 0) {
-      headlessError(resolvedAgent, resolvedCloud, "MISSING_CREDENTIALS",
-        `Missing required credentials: ${missing.join(", ")}`, outputFormat, 3);
+      headlessError(
+        resolvedAgent,
+        resolvedCloud,
+        "MISSING_CREDENTIALS",
+        `Missing required credentials: ${missing.join(", ")}`,
+        outputFormat,
+        3,
+      );
     }
   }
 
@@ -950,20 +1179,36 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
 
   let scriptContent: string;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    });
     if (res.ok) {
       scriptContent = await res.text();
     } else {
-      const ghRes = await fetch(ghUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+      const ghRes = await fetch(ghUrl, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT),
+      });
       if (!ghRes.ok) {
-        headlessError(resolvedAgent, resolvedCloud, "DOWNLOAD_ERROR",
-          `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`, outputFormat, 2);
+        headlessError(
+          resolvedAgent,
+          resolvedCloud,
+          "DOWNLOAD_ERROR",
+          `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
+          outputFormat,
+          2,
+        );
       }
       scriptContent = await ghRes.text();
     }
   } catch (err) {
-    headlessError(resolvedAgent, resolvedCloud, "DOWNLOAD_ERROR",
-      `Failed to download script: ${getErrorMessage(err)}`, outputFormat, 2);
+    headlessError(
+      resolvedAgent,
+      resolvedCloud,
+      "DOWNLOAD_ERROR",
+      `Failed to download script: ${getErrorMessage(err)}`,
+      outputFormat,
+      2,
+    );
   }
 
   // Phase 3: Execute script (exit code 1)
@@ -974,13 +1219,24 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
   const exitCode = await runBashHeadless(scriptContent, prompt, debug, spawnName);
 
   if (exitCode !== 0) {
-    headlessError(resolvedAgent, resolvedCloud, "EXECUTION_ERROR",
-      `Script exited with code ${exitCode}`, outputFormat, 1);
+    headlessError(
+      resolvedAgent,
+      resolvedCloud,
+      "EXECUTION_ERROR",
+      `Script exited with code ${exitCode}`,
+      outputFormat,
+      1,
+    );
   }
 
   // Read connection info from last-connection.json
   const { getConnectionPath } = await import("./history.js");
-  const connectionInfo: { ip?: string; user?: string; server_id?: string; server_name?: string } = {};
+  const connectionInfo: {
+    ip?: string;
+    user?: string;
+    server_id?: string;
+    server_name?: string;
+  } = {};
   try {
     const connPath = getConnectionPath();
     const { readFileSync, existsSync } = await import("node:fs");
@@ -1008,8 +1264,14 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
         }
       } catch (validationErr) {
         // Validation failure is a security issue - report via headless error
-        headlessError(resolvedAgent, resolvedCloud, "VALIDATION_ERROR",
-          `Connection info validation failed: ${getErrorMessage(validationErr)}`, outputFormat, 1);
+        headlessError(
+          resolvedAgent,
+          resolvedCloud,
+          "VALIDATION_ERROR",
+          `Connection info validation failed: ${getErrorMessage(validationErr)}`,
+          outputFormat,
+          1,
+        );
       }
     }
   } catch {
@@ -1020,10 +1282,26 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     status: "success",
     cloud: resolvedCloud,
     agent: resolvedAgent,
-    ...(connectionInfo.ip ? { ip_address: connectionInfo.ip } : {}),
-    ...(connectionInfo.user ? { ssh_user: connectionInfo.user } : {}),
-    ...(connectionInfo.server_id ? { server_id: connectionInfo.server_id } : {}),
-    ...(connectionInfo.server_name ? { server_name: connectionInfo.server_name } : {}),
+    ...(connectionInfo.ip
+      ? {
+          ip_address: connectionInfo.ip,
+        }
+      : {}),
+    ...(connectionInfo.user
+      ? {
+          ssh_user: connectionInfo.user,
+        }
+      : {}),
+    ...(connectionInfo.server_id
+      ? {
+          server_id: connectionInfo.server_id,
+        }
+      : {}),
+    ...(connectionInfo.server_name
+      ? {
+          server_name: connectionInfo.server_name,
+        }
+      : {}),
   };
 
   headlessOutput(result, outputFormat);
@@ -1082,7 +1360,9 @@ function report404Failure(): void {
 function reportHTTPFailure(primaryStatus: number, fallbackStatus: number): void {
   const hasServerError = primaryStatus >= 500 || fallbackStatus >= 500;
   p.log.error("Script download failed");
-  console.error(`\nCouldn't download the spawn script (HTTP ${primaryStatus} from primary, ${fallbackStatus} from fallback).`);
+  console.error(
+    `\nCouldn't download the spawn script (HTTP ${primaryStatus} from primary, ${fallbackStatus} from fallback).`,
+  );
   if (hasServerError) {
     console.error("\nThe servers are experiencing issues or temporarily unavailable.");
   }
@@ -1095,7 +1375,12 @@ function reportHTTPFailure(primaryStatus: number, fallbackStatus: number): void 
   }
 }
 
-function reportDownloadFailure(_primaryUrl: string, _fallbackUrl: string, primaryStatus: number, fallbackStatus: number): void {
+function reportDownloadFailure(
+  _primaryUrl: string,
+  _fallbackUrl: string,
+  primaryStatus: number,
+  fallbackStatus: number,
+): void {
   if (primaryStatus === 404 && fallbackStatus === 404) {
     report404Failure();
   } else {
@@ -1105,8 +1390,12 @@ function reportDownloadFailure(_primaryUrl: string, _fallbackUrl: string, primar
 
 // Detect error type from error message
 function classifyNetworkError(errMsg: string): "timeout" | "connection" | "unknown" {
-  if (errMsg.toLowerCase().includes("timeout")) { return "timeout"; }
-  if (errMsg.toLowerCase().includes("connect") || errMsg.toLowerCase().includes("enotfound")) { return "connection"; }
+  if (errMsg.toLowerCase().includes("timeout")) {
+    return "timeout";
+  }
+  if (errMsg.toLowerCase().includes("connect") || errMsg.toLowerCase().includes("enotfound")) {
+    return "connection";
+  }
   return "unknown";
 }
 
@@ -1183,15 +1472,21 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
   }
 
   // Parse individual env var names from the auth hint (e.g. "HCLOUD_TOKEN" or "UPCLOUD_USERNAME + UPCLOUD_PASSWORD")
-  const authVars = authHint.split(/\s*\+\s*/).map(s => s.trim()).filter(Boolean);
-  const allVars = [...authVars, "OPENROUTER_API_KEY"];
+  const authVars = authHint
+    .split(/\s*\+\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const allVars = [
+    ...authVars,
+    "OPENROUTER_API_KEY",
+  ];
 
-  const missing = allVars.filter(v => !process.env[v]);
+  const missing = allVars.filter((v) => !process.env[v]);
 
   if (missing.length === 0) {
     // All credentials are set -- the issue is likely something else
     return [
-      `  - Credentials appear to be set (${allVars.map(v => pc.cyan(v)).join(", ")})`,
+      `  - Credentials appear to be set (${allVars.map((v) => pc.cyan(v)).join(", ")})`,
       "    The error may be due to invalid or expired credentials",
       `    Run ${pc.cyan(`spawn ${cloud}`)} for setup instructions`,
     ];
@@ -1208,12 +1503,16 @@ export function credentialHints(cloud: string, authHint?: string, verb = "Missin
   return lines;
 }
 
-
 export function getSignalGuidance(signal: string, dashboardUrl?: string): string[] {
   const entry = SIGNAL_GUIDANCE[signal];
   if (entry) {
-    const lines = [entry.header, ...entry.causes];
-    if (entry.includeDashboard) { lines.push(buildDashboardHint(dashboardUrl)); }
+    const lines = [
+      entry.header,
+      ...entry.causes,
+    ];
+    if (entry.includeDashboard) {
+      lines.push(buildDashboardHint(dashboardUrl));
+    }
     return lines;
   }
   return [
@@ -1224,10 +1523,19 @@ export function getSignalGuidance(signal: string, dashboardUrl?: string): string
 }
 
 function optionalDashboardLine(dashboardUrl?: string): string[] {
-  return dashboardUrl ? [`  - Check your dashboard: ${pc.cyan(dashboardUrl)}`] : [];
+  return dashboardUrl
+    ? [
+        `  - Check your dashboard: ${pc.cyan(dashboardUrl)}`,
+      ]
+    : [];
 }
 
-export function getScriptFailureGuidance(exitCode: number | null, cloud: string, authHint?: string, dashboardUrl?: string): string[] {
+export function getScriptFailureGuidance(
+  exitCode: number | null,
+  cloud: string,
+  authHint?: string,
+  dashboardUrl?: string,
+): string[] {
   const entry = exitCode !== null ? EXIT_CODE_GUIDANCE[exitCode] : null;
 
   if (!entry) {
@@ -1241,7 +1549,10 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
     ];
   }
 
-  const lines = [pc.bold(entry.header), ...entry.lines];
+  const lines = [
+    pc.bold(entry.header),
+    ...entry.lines,
+  ];
 
   // Apply special handling if defined for this exit code
   if (entry.specialHandling) {
@@ -1250,7 +1561,7 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
       lines.push(
         ...credentialHints(cloud, authHint),
         "  - Cloud provider API error (quota, rate limit, or region issue)",
-        "  - Server provisioning failed (try again or pick a different region)"
+        "  - Server provisioning failed (try again or pick a different region)",
       );
     } else {
       lines.push(...entry.specialHandling(cloud, authHint, dashboardUrl));
@@ -1267,7 +1578,9 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
 export function buildRetryCommand(agent: string, cloud: string, prompt?: string, spawnName?: string): string {
   const safeName = spawnName ? spawnName.replace(/"/g, '\\"') : "";
   const nameFlag = spawnName ? ` --name "${safeName}"` : "";
-  if (!prompt) { return `spawn ${agent} ${cloud}${nameFlag}`; }
+  if (!prompt) {
+    return `spawn ${agent} ${cloud}${nameFlag}`;
+  }
   if (prompt.length <= 80) {
     const safe = prompt.replace(/"/g, '\\"');
     return `spawn ${agent} ${cloud}${nameFlag} --prompt "${safe}"`;
@@ -1276,7 +1589,15 @@ export function buildRetryCommand(agent: string, cloud: string, prompt?: string,
   return `spawn ${agent} ${cloud}${nameFlag} --prompt-file <your-prompt-file>`;
 }
 
-function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, prompt?: string, dashboardUrl?: string, spawnName?: string): never {
+function reportScriptFailure(
+  errMsg: string,
+  cloud: string,
+  agent: string,
+  authHint?: string,
+  prompt?: string,
+  dashboardUrl?: string,
+  spawnName?: string,
+): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
 
@@ -1291,25 +1612,34 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
     ? getSignalGuidance(signal, dashboardUrl)
     : getScriptFailureGuidance(exitCode, cloud, authHint, dashboardUrl);
   console.error("");
-  for (const line of lines) { console.error(line); }
+  for (const line of lines) {
+    console.error(line);
+  }
   console.error("");
   console.error(`Retry: ${pc.cyan(buildRetryCommand(agent, cloud, prompt, spawnName))}`);
   process.exit(1);
 }
 
 const MAX_RETRIES = 2;
-const RETRY_DELAYS = [5, 10]; // seconds
+const RETRY_DELAYS = [
+  5,
+  10,
+]; // seconds
 
 export function isRetryableExitCode(errMsg: string): boolean {
   const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
-  if (!exitCodeMatch) { return false; }
+  if (!exitCodeMatch) {
+    return false;
+  }
   const code = Number.parseInt(exitCodeMatch[1], 10);
   // Exit 255 = SSH connection failure (the standard SSH error exit code)
   return code === 255;
 }
 
 function handleUserInterrupt(errMsg: string, dashboardUrl?: string): void {
-  if (!errMsg.includes("interrupted by user") && !errMsg.includes("killed by SIGINT")) { return; }
+  if (!errMsg.includes("interrupted by user") && !errMsg.includes("killed by SIGINT")) {
+    return;
+  }
   console.error();
   p.log.warn("Script interrupted (Ctrl+C).");
   p.log.warn("If a server was already created, it may still be running.");
@@ -1321,7 +1651,13 @@ function handleUserInterrupt(errMsg: string, dashboardUrl?: string): void {
   process.exit(130);
 }
 
-async function runWithRetries(script: string, prompt?: string, dashboardUrl?: string, debug?: boolean, spawnName?: string): Promise<string | undefined> {
+async function runWithRetries(
+  script: string,
+  prompt?: string,
+  dashboardUrl?: string,
+  debug?: boolean,
+  spawnName?: string,
+): Promise<string | undefined> {
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     try {
       await runBash(script, prompt, debug, spawnName);
@@ -1333,7 +1669,7 @@ async function runWithRetries(script: string, prompt?: string, dashboardUrl?: st
       if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
         const delay = RETRY_DELAYS[attempt - 1];
         p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
-        await new Promise(r => setTimeout(r, delay * 1000));
+        await new Promise((r) => setTimeout(r, delay * 1000));
         continue;
       }
 
@@ -1343,7 +1679,15 @@ async function runWithRetries(script: string, prompt?: string, dashboardUrl?: st
   return "Script failed after all retries";
 }
 
-async function execScript(cloud: string, agent: string, prompt?: string, authHint?: string, dashboardUrl?: string, debug?: boolean, spawnName?: string): Promise<void> {
+async function execScript(
+  cloud: string,
+  agent: string,
+  prompt?: string,
+  authHint?: string,
+  dashboardUrl?: string,
+  debug?: boolean,
+  spawnName?: string,
+): Promise<void> {
   const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
   const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
 
@@ -1361,8 +1705,16 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
       agent,
       cloud,
       timestamp: new Date().toISOString(),
-      ...(spawnName ? { name: spawnName } : {}),
-      ...(prompt ? { prompt } : {}),
+      ...(spawnName
+        ? {
+            name: spawnName,
+          }
+        : {}),
+      ...(prompt
+        ? {
+            prompt,
+          }
+        : {}),
     });
   } catch (err) {
     // Non-fatal: don't block the spawn if history write fails
@@ -1380,16 +1732,22 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
 
 function spawnBash(script: string, env: Record<string, string | undefined>): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn("bash", ["-c", script], {
-      stdio: "inherit",
-      env,
-    });
+    const child = spawn(
+      "bash",
+      [
+        "-c",
+        script,
+      ],
+      {
+        stdio: "inherit",
+        env,
+      },
+    );
     child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
-      if (code === 0) { resolve(); }
-      else if (code !== null) {
-        const msg = code === 130
-          ? "Script interrupted by user (Ctrl+C)"
-          : `Script exited with code ${code}`;
+      if (code === 0) {
+        resolve();
+      } else if (code !== null) {
+        const msg = code === 130 ? "Script interrupted by user (Ctrl+C)" : `Script exited with code ${code}`;
         reject(new Error(msg));
       } else {
         // code is null when killed by a signal (SIGKILL, SIGTERM, etc.)
@@ -1406,7 +1764,9 @@ function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: s
   validateScriptContent(script);
 
   // Set environment variables for non-interactive mode
-  const env = { ...process.env };
+  const env = {
+    ...process.env,
+  };
   if (prompt) {
     env.SPAWN_PROMPT = prompt;
     env.SPAWN_MODE = "non-interactive";
@@ -1445,7 +1805,12 @@ export function calculateColumnWidth(items: string[], minWidth: number): number 
   return maxWidth;
 }
 
-function renderMatrixHeader(clouds: string[], manifest: Manifest, agentColWidth: number, cloudColWidth: number): string {
+function renderMatrixHeader(
+  clouds: string[],
+  manifest: Manifest,
+  agentColWidth: number,
+  cloudColWidth: number,
+): string {
   let header = "".padEnd(agentColWidth);
   for (const c of clouds) {
     header += pc.bold(manifest.clouds[c].name.padEnd(cloudColWidth));
@@ -1461,7 +1826,13 @@ function renderMatrixSeparator(clouds: string[], agentColWidth: number, cloudCol
   return sep;
 }
 
-function renderMatrixRow(agent: string, clouds: string[], manifest: Manifest, agentColWidth: number, cloudColWidth: number): string {
+function renderMatrixRow(
+  agent: string,
+  clouds: string[],
+  manifest: Manifest,
+  agentColWidth: number,
+  cloudColWidth: number,
+): string {
   let row = pc.bold(manifest.agents[agent].name.padEnd(agentColWidth));
   for (const c of clouds) {
     const status = matrixStatus(manifest, c, agent);
@@ -1496,7 +1867,7 @@ function buildCompactListRow(manifest: Manifest, agent: string, clouds: string[]
   const missing = getMissingClouds(manifest, agent, clouds);
   const countStr = `${implClouds.length}/${clouds.length}`;
   const colorFn = implClouds.length === clouds.length ? pc.green : pc.yellow;
-  const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
+  const readyCount = implClouds.filter((c) => hasCloudCredentials(manifest.clouds[c].auth)).length;
   const readyStr = readyCount > 0 ? pc.green(`${readyCount}`) : pc.dim("0");
 
   let line = pc.bold(manifest.agents[agent].name.padEnd(COMPACT_NAME_WIDTH));
@@ -1533,7 +1904,11 @@ function renderMatrixFooter(manifest: Manifest, agents: string[], clouds: string
     console.log(`${pc.green("+")} implemented  ${pc.dim("-")} not yet available`);
   }
   console.log(pc.green(`${impl}/${total} combinations implemented`));
-  console.log(pc.dim(`Launch: ${pc.cyan("spawn <agent> <cloud>")}  |  Details: ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")}`));
+  console.log(
+    pc.dim(
+      `Launch: ${pc.cyan("spawn <agent> <cloud>")}  |  Details: ${pc.cyan("spawn <agent>")} or ${pc.cyan("spawn <cloud>")}`,
+    ),
+  );
   console.log();
 }
 
@@ -1546,11 +1921,11 @@ export async function cmdMatrix(): Promise<void> {
   // Calculate column widths for grid view
   const agentColWidth = calculateColumnWidth(
     agents.map((a) => manifest.agents[a].name),
-    MIN_AGENT_COL_WIDTH
+    MIN_AGENT_COL_WIDTH,
   );
   const cloudColWidth = calculateColumnWidth(
     clouds.map((c) => manifest.clouds[c].name),
-    MIN_CLOUD_COL_WIDTH
+    MIN_CLOUD_COL_WIDTH,
   );
 
   const gridWidth = agentColWidth + clouds.length * cloudColWidth;
@@ -1583,20 +1958,37 @@ export async function cmdMatrix(): Promise<void> {
 export function formatRelativeTime(iso: string): string {
   try {
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) { return iso; }
+    if (Number.isNaN(d.getTime())) {
+      return iso;
+    }
     const diffMs = Date.now() - d.getTime();
-    if (diffMs < 0) { return "just now"; }
+    if (diffMs < 0) {
+      return "just now";
+    }
     const diffSec = Math.floor(diffMs / 1000);
-    if (diffSec < 60) { return "just now"; }
+    if (diffSec < 60) {
+      return "just now";
+    }
     const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) { return `${diffMin} min ago`; }
+    if (diffMin < 60) {
+      return `${diffMin} min ago`;
+    }
     const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) { return `${diffHr}h ago`; }
+    if (diffHr < 24) {
+      return `${diffHr}h ago`;
+    }
     const diffDays = Math.floor(diffHr / 24);
-    if (diffDays === 1) { return "yesterday"; }
-    if (diffDays < 30) { return `${diffDays}d ago`; }
+    if (diffDays === 1) {
+      return "yesterday";
+    }
+    if (diffDays < 30) {
+      return `${diffDays}d ago`;
+    }
     // Fall back to absolute date for old entries
-    const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const date = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
     return date;
   } catch (_err) {
     // Invalid date format - return as-is
@@ -1607,9 +1999,19 @@ export function formatRelativeTime(iso: string): string {
 export function formatTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) { return iso; }
-    const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    if (Number.isNaN(d.getTime())) {
+      return iso;
+    }
+    const date = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const time = d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
     return `${date} ${time}`;
   } catch (_err) {
     // Invalid date format - return as-is
@@ -1644,17 +2046,35 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
   }
 
   const parts: string[] = [];
-  if (agentFilter) { parts.push(`agent=${pc.bold(agentFilter)}`); }
-  if (cloudFilter) { parts.push(`cloud=${pc.bold(cloudFilter)}`); }
+  if (agentFilter) {
+    parts.push(`agent=${pc.bold(agentFilter)}`);
+  }
+  if (cloudFilter) {
+    parts.push(`cloud=${pc.bold(cloudFilter)}`);
+  }
   p.log.info(`No spawns found matching ${parts.join(", ")}.`);
 
   try {
     const manifest = await loadManifest();
     if (agentFilter) {
-      await suggestFilterCorrection(agentFilter, "-a", agentKeys(manifest), resolveAgentKey, (k) => manifest.agents[k].name, manifest);
+      await suggestFilterCorrection(
+        agentFilter,
+        "-a",
+        agentKeys(manifest),
+        resolveAgentKey,
+        (k) => manifest.agents[k].name,
+        manifest,
+      );
     }
     if (cloudFilter) {
-      await suggestFilterCorrection(cloudFilter, "-c", cloudKeys(manifest), resolveCloudKey, (k) => manifest.clouds[k].name, manifest);
+      await suggestFilterCorrection(
+        cloudFilter,
+        "-c",
+        cloudKeys(manifest),
+        resolveCloudKey,
+        (k) => manifest.clouds[k].name,
+        manifest,
+      );
     }
   } catch (_err) {
     // Manifest unavailable -- skip suggestions
@@ -1662,7 +2082,9 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
 
   const totalRecords = filterHistory();
   if (totalRecords.length > 0) {
-    p.log.info(`Run ${pc.cyan("spawn list")} to see all ${totalRecords.length} recorded spawn${totalRecords.length !== 1 ? "s" : ""}.`);
+    p.log.info(
+      `Run ${pc.cyan("spawn list")} to see all ${totalRecords.length} recorded spawn${totalRecords.length !== 1 ? "s" : ""}.`,
+    );
   }
 }
 
@@ -1673,11 +2095,17 @@ function buildListFooterLines(records: SpawnRecord[], agentFilter?: string, clou
 
   if (agentFilter || cloudFilter) {
     const totalRecords = filterHistory();
-    lines.push(pc.dim(`Showing ${records.length} of ${totalRecords.length} spawn${totalRecords.length !== 1 ? "s" : ""}`));
+    lines.push(
+      pc.dim(`Showing ${records.length} of ${totalRecords.length} spawn${totalRecords.length !== 1 ? "s" : ""}`),
+    );
     lines.push(pc.dim(`Clear filter: ${pc.cyan("spawn list")}`));
   } else {
     lines.push(pc.dim(`${records.length} spawn${records.length !== 1 ? "s" : ""} recorded`));
-    lines.push(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`));
+    lines.push(
+      pc.dim(
+        `Filter: ${pc.cyan("spawn list -a <agent>")}  or  ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`,
+      ),
+    );
   }
   return lines;
 }
@@ -1691,7 +2119,9 @@ function showListFooter(records: SpawnRecord[], agentFilter?: string, cloudFilte
 
 /** Resolve an agent/cloud key to its display name, or return the key as-is */
 export function resolveDisplayName(manifest: Manifest | null, key: string, kind: "agent" | "cloud"): string {
-  if (!manifest) { return key; }
+  if (!manifest) {
+    return key;
+  }
   const entry = kind === "agent" ? manifest.agents[key] : manifest.clouds[key];
   return entry ? entry.name : key;
 }
@@ -1705,10 +2135,7 @@ function renderListTable(records: SpawnRecord[], manifest: Manifest | null): voi
     const relative = formatRelativeTime(r.timestamp);
     const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
     const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
-    let line =
-      pc.green(agentDisplay.padEnd(20)) +
-      cloudDisplay.padEnd(20) +
-      pc.dim(relative);
+    let line = pc.green(agentDisplay.padEnd(20)) + cloudDisplay.padEnd(20) + pc.dim(relative);
     if (r.name) {
       line += pc.cyan(`  "${r.name}"`);
     }
@@ -1737,14 +2164,18 @@ export function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): str
   const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
   const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
   let label = `${agentDisplay} on ${cloudDisplay}`;
-  if (r.name) { label += ` -- ${r.name}`; }
+  if (r.name) {
+    label += ` -- ${r.name}`;
+  }
   return label;
 }
 
 /** Build a hint string (relative timestamp + connection status + optional prompt preview) for the interactive picker */
 export function buildRecordHint(r: SpawnRecord): string {
   const relative = formatRelativeTime(r.timestamp);
-  const parts: string[] = [relative];
+  const parts: string[] = [
+    relative,
+  ];
 
   if (r.connection?.deleted) {
     parts.push(pc.dim("[deleted]"));
@@ -1772,8 +2203,12 @@ export function buildRecordHint(r: SpawnRecord): string {
  *  When a bare positional filter doesn't match an agent, try it as a cloud. */
 async function resolveListFilters(
   agentFilter?: string,
-  cloudFilter?: string
-): Promise<{ manifest: Manifest | null; agentFilter?: string; cloudFilter?: string }> {
+  cloudFilter?: string,
+): Promise<{
+  manifest: Manifest | null;
+  agentFilter?: string;
+  cloudFilter?: string;
+}> {
   let manifest: Manifest | null = null;
   try {
     manifest = await loadManifest();
@@ -1796,20 +2231,26 @@ async function resolveListFilters(
   }
   if (manifest && cloudFilter) {
     const resolved = resolveCloudKey(manifest, cloudFilter);
-    if (resolved) { cloudFilter = resolved; }
+    if (resolved) {
+      cloudFilter = resolved;
+    }
   }
 
-  return { manifest, agentFilter, cloudFilter };
+  return {
+    manifest,
+    agentFilter,
+    cloudFilter,
+  };
 }
 
 // ── Delete ──────────────────────────────────────────────────────────────────────
 
 /** Execute server deletion for a given record using TypeScript cloud modules */
-async function execDeleteServer(
-  record: SpawnRecord
-): Promise<boolean> {
+async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
   const conn = record.connection;
-  if (!conn?.cloud || conn.cloud === "local") { return false; }
+  if (!conn?.cloud || conn.cloud === "local") {
+    return false;
+  }
 
   const id = conn.server_id || conn.server_name || "";
 
@@ -1820,9 +2261,9 @@ async function execDeleteServer(
   } catch (err) {
     throw new Error(
       `Invalid server identifier in history: ${getErrorMessage(err)}\n\n` +
-      "Your spawn history file may be corrupted or tampered with.\n" +
-      `Location: ${getHistoryPath()}\n` +
-      `To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'`
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `Location: ${getHistoryPath()}\n` +
+        `To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'`,
     );
   }
 
@@ -1910,10 +2351,7 @@ async function execDeleteServer(
 }
 
 /** Prompt for delete confirmation and execute */
-async function confirmAndDelete(
-  record: SpawnRecord,
-  manifest: Manifest | null
-): Promise<void> {
+async function confirmAndDelete(record: SpawnRecord, manifest: Manifest | null): Promise<void> {
   const conn = record.connection!;
   const label = conn.server_name || conn.server_id || conn.ip;
   const cloudLabel = manifest?.clouds[conn.cloud!]?.name || conn.cloud;
@@ -1941,26 +2379,25 @@ async function confirmAndDelete(
 }
 
 /** Handle reconnect or rerun action for a selected spawn record */
-async function handleRecordAction(
-  selected: SpawnRecord,
-  manifest: Manifest | null
-): Promise<void> {
+async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | null): Promise<void> {
   if (!selected.connection) {
     // No connection info -- just rerun, reusing the existing spawn name
-    if (selected.name) { process.env.SPAWN_NAME = selected.name; }
+    if (selected.name) {
+      process.env.SPAWN_NAME = selected.name;
+    }
     p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
     await cmdRun(selected.agent, selected.cloud, selected.prompt);
     return;
   }
 
   const conn = selected.connection;
-  const canDelete =
-    conn.cloud &&
-    conn.cloud !== "local" &&
-    !conn.deleted &&
-    (conn.server_id || conn.server_name);
+  const canDelete = conn.cloud && conn.cloud !== "local" && !conn.deleted && (conn.server_id || conn.server_name);
 
-  const options: { value: string; label: string; hint?: string }[] = [];
+  const options: {
+    value: string;
+    label: string;
+    hint?: string;
+  }[] = [];
 
   // Prefer stored launch command (captured at spawn time), fall back to manifest
   const agentDef = manifest?.agents?.[selected.agent];
@@ -1979,13 +2416,14 @@ async function handleRecordAction(
     options.push({
       value: "reconnect",
       label: "SSH into VM",
-      hint: conn.ip === "sprite-console"
-        ? `sprite console -s ${conn.server_name}`
-        : conn.ip === "fly-ssh"
-        ? `fly ssh console -a ${conn.server_name}`
-        : conn.ip === "daytona-sandbox"
-        ? `daytona ssh ${conn.server_id}`
-        : `ssh ${conn.user}@${conn.ip}`,
+      hint:
+        conn.ip === "sprite-console"
+          ? `sprite console -s ${conn.server_name}`
+          : conn.ip === "fly-ssh"
+            ? `fly ssh console -a ${conn.server_name}`
+            : conn.ip === "daytona-sandbox"
+              ? `daytona ssh ${conn.server_id}`
+              : `ssh ${conn.user}@${conn.ip}`,
     });
   }
 
@@ -2017,7 +2455,9 @@ async function handleRecordAction(
       await cmdEnterAgent(selected.connection, selected.agent, manifest);
     } catch (err) {
       p.log.error(`Connection failed: ${getErrorMessage(err)}`);
-      p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
+      p.log.info(
+        `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`,
+      );
     }
     return;
   }
@@ -2027,7 +2467,9 @@ async function handleRecordAction(
       await cmdConnect(selected.connection);
     } catch (err) {
       p.log.error(`Connection failed: ${getErrorMessage(err)}`);
-      p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
+      p.log.info(
+        `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`,
+      );
     }
     return;
   }
@@ -2038,14 +2480,20 @@ async function handleRecordAction(
   }
 
   // Rerun (create new spawn), reusing the existing spawn name
-  if (selected.name) { process.env.SPAWN_NAME = selected.name; }
+  if (selected.name) {
+    process.env.SPAWN_NAME = selected.name;
+  }
   p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
 
 /** Show interactive picker to select and reconnect/rerun a previous spawn */
 async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
-  p.log.info(pc.dim(`Filter: ${pc.cyan("spawn list -a <agent>")} or ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`));
+  p.log.info(
+    pc.dim(
+      `Filter: ${pc.cyan("spawn list -a <agent>")} or ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`,
+    ),
+  );
 
   const options = records.map((r, i) => ({
     value: i,
@@ -2124,7 +2572,11 @@ export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Pro
   if (filtered.length === 0) {
     p.log.info("No active servers to delete.");
     if (servers.length > 0) {
-      p.log.info(pc.dim(`${servers.length} active server${servers.length !== 1 ? "s" : ""} found, but none matched your filters.`));
+      p.log.info(
+        pc.dim(
+          `${servers.length} active server${servers.length !== 1 ? "s" : ""} found, but none matched your filters.`,
+        ),
+      );
     }
     p.log.info(`Run ${pc.cyan("spawn <agent> <cloud>")} to create a spawn first.`);
     return;
@@ -2181,21 +2633,20 @@ export async function cmdLast(): Promise<void> {
   const label = buildRecordLabel(latest, manifest);
   const hint = buildRecordHint(latest);
   p.log.step(`Rerunning last spawn: ${pc.bold(label)} ${pc.dim(hint)}`);
-  if (latest.name) { process.env.SPAWN_NAME = latest.name; }
+  if (latest.name) {
+    process.env.SPAWN_NAME = latest.name;
+  }
   await cmdRun(latest.agent, latest.cloud, latest.prompt);
 }
 
 // ── Connect ────────────────────────────────────────────────────────────────────
 
 /** Execute a shell command and resolve/reject on process close/error */
-function runInteractiveCommand(
-  cmd: string,
-  args: string[],
-  failureMsg: string,
-  manualCmd: string
-): Promise<void> {
+function runInteractiveCommand(cmd: string, args: string[], failureMsg: string, manualCmd: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: "inherit" });
+    const child = spawn(cmd, args, {
+      stdio: "inherit",
+    });
 
     child.on("close", (code: number | null) => {
       if (code === 0 || code === null) {
@@ -2236,9 +2687,13 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
     p.log.step(`Connecting to sprite ${pc.bold(connection.server_name)}...`);
     return runInteractiveCommand(
       "sprite",
-      ["console", "-s", connection.server_name],
+      [
+        "console",
+        "-s",
+        connection.server_name,
+      ],
       "Sprite console connection failed",
-      `sprite console -s ${connection.server_name}`
+      `sprite console -s ${connection.server_name}`,
     );
   }
 
@@ -2247,9 +2702,15 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
     p.log.step(`Connecting to Fly.io app ${pc.bold(connection.server_name)}...`);
     return runInteractiveCommand(
       "fly",
-      ["ssh", "console", "-a", connection.server_name, "--pty"],
+      [
+        "ssh",
+        "console",
+        "-a",
+        connection.server_name,
+        "--pty",
+      ],
       "Fly.io SSH connection failed",
-      `fly ssh console -a ${connection.server_name}`
+      `fly ssh console -a ${connection.server_name}`,
     );
   }
 
@@ -2259,18 +2720,18 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
 
   return runInteractiveCommand(
     "ssh",
-    ["-o", "StrictHostKeyChecking=accept-new", `${connection.user}@${connection.ip}`],
+    [
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      `${connection.user}@${connection.ip}`,
+    ],
     "SSH connection failed",
-    sshCmd
+    sshCmd,
   );
 }
 
 /** SSH into a VM and launch the agent directly */
-async function cmdEnterAgent(
-  connection: VMConnection,
-  agentKey: string,
-  manifest: Manifest | null
-): Promise<void> {
+async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifest: Manifest | null): Promise<void> {
   // SECURITY: Validate all connection parameters before use
   try {
     validateConnectionIP(connection.ip);
@@ -2298,8 +2759,12 @@ async function cmdEnterAgent(
   } else {
     const launchCmd = agentDef?.launch ?? agentKey;
     const preLaunch = agentDef?.pre_launch;
-    const parts = ["source ~/.spawnrc 2>/dev/null"];
-    if (preLaunch) { parts.push(preLaunch); }
+    const parts = [
+      "source ~/.spawnrc 2>/dev/null",
+    ];
+    if (preLaunch) {
+      parts.push(preLaunch);
+    }
     parts.push(launchCmd);
     remoteCmd = parts.join("; ");
   }
@@ -2311,9 +2776,17 @@ async function cmdEnterAgent(
     p.log.step(`Entering ${pc.bold(agentName)} on sprite ${pc.bold(connection.server_name)}...`);
     return runInteractiveCommand(
       "sprite",
-      ["console", "-s", connection.server_name, "--", "bash", "-lc", remoteCmd],
+      [
+        "console",
+        "-s",
+        connection.server_name,
+        "--",
+        "bash",
+        "-lc",
+        remoteCmd,
+      ],
       `Failed to enter ${agentName}`,
-      `sprite console -s ${connection.server_name} -- bash -lc '${remoteCmd}'`
+      `sprite console -s ${connection.server_name} -- bash -lc '${remoteCmd}'`,
     );
   }
 
@@ -2322,9 +2795,17 @@ async function cmdEnterAgent(
     p.log.step(`Entering ${pc.bold(agentName)} on Fly.io app ${pc.bold(connection.server_name)}...`);
     return runInteractiveCommand(
       "fly",
-      ["ssh", "console", "-a", connection.server_name, "--pty", "-C", remoteCmd],
+      [
+        "ssh",
+        "console",
+        "-a",
+        connection.server_name,
+        "--pty",
+        "-C",
+        remoteCmd,
+      ],
       `Failed to enter ${agentName}`,
-      `fly ssh console -a ${connection.server_name} --pty -C '${remoteCmd}'`
+      `fly ssh console -a ${connection.server_name} --pty -C '${remoteCmd}'`,
     );
   }
 
@@ -2333,9 +2814,16 @@ async function cmdEnterAgent(
     p.log.step(`Entering ${pc.bold(agentName)} on Daytona sandbox ${pc.bold(connection.server_id)}...`);
     return runInteractiveCommand(
       "daytona",
-      ["ssh", connection.server_id, "--", "bash", "-lc", remoteCmd],
+      [
+        "ssh",
+        connection.server_id,
+        "--",
+        "bash",
+        "-lc",
+        remoteCmd,
+      ],
       `Failed to enter ${agentName}`,
-      `daytona ssh ${connection.server_id} -- bash -lc '${remoteCmd}'`
+      `daytona ssh ${connection.server_id} -- bash -lc '${remoteCmd}'`,
     );
   }
 
@@ -2343,18 +2831,23 @@ async function cmdEnterAgent(
   p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
   return runInteractiveCommand(
     "ssh",
-    ["-t", "-o", "StrictHostKeyChecking=accept-new", `${connection.user}@${connection.ip}`, "--", `bash -lc '${remoteCmd}'`],
+    [
+      "-t",
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      `${connection.user}@${connection.ip}`,
+      "--",
+      `bash -lc '${remoteCmd}'`,
+    ],
     `Failed to enter ${agentName}`,
-    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${remoteCmd}'`
+    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${remoteCmd}'`,
   );
 }
 
 // ── Agents ─────────────────────────────────────────────────────────────────────
 
 export function getImplementedAgents(manifest: Manifest, cloud: string): string[] {
-  return agentKeys(manifest).filter(
-    (a: string): boolean => matrixStatus(manifest, cloud, a) === "implemented"
-  );
+  return agentKeys(manifest).filter((a: string): boolean => matrixStatus(manifest, cloud, a) === "implemented");
 }
 
 /** Extract environment variable names from a cloud's auth field (e.g. "HCLOUD_TOKEN" or "UPCLOUD_USERNAME + UPCLOUD_PASSWORD") */
@@ -2377,7 +2870,9 @@ function formatAuthVarLine(varName: string, urlHint?: string): string {
 /** Check if a cloud's required auth env vars are all set in the environment */
 export function hasCloudCredentials(auth: string): boolean {
   const vars = parseAuthEnvVars(auth);
-  if (vars.length === 0) { return false; }
+  if (vars.length === 0) {
+    return false;
+  }
   return vars.every((v) => !!process.env[v]);
 }
 
@@ -2392,17 +2887,23 @@ export async function cmdAgents(): Promise<void> {
   for (const key of allAgents) {
     const a = manifest.agents[key];
     const implClouds = getImplementedClouds(manifest, key);
-    const readyCount = implClouds.filter(c => hasCloudCredentials(manifest.clouds[c].auth)).length;
-    if (readyCount > 0) { totalReady++; }
+    const readyCount = implClouds.filter((c) => hasCloudCredentials(manifest.clouds[c].auth)).length;
+    if (readyCount > 0) {
+      totalReady++;
+    }
     const cloudStr = `${implClouds.length} cloud${implClouds.length !== 1 ? "s" : ""}`;
     const readyStr = readyCount > 0 ? `  ${pc.green(`${readyCount} ready`)}` : "";
-    console.log(`  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${cloudStr}  ${a.description}`)}${readyStr}`);
+    console.log(
+      `  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${cloudStr}  ${a.description}`)}${readyStr}`,
+    );
   }
   console.log();
   if (totalReady > 0) {
     console.log(pc.dim(`  ${pc.green("ready")} = credentials detected for at least one cloud`));
   }
-  console.log(pc.dim(`  Run ${pc.cyan("spawn <agent>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
+  console.log(
+    pc.dim(`  Run ${pc.cyan("spawn <agent>")} for details, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`),
+  );
   console.log();
 }
 
@@ -2410,10 +2911,10 @@ export async function cmdAgents(): Promise<void> {
 
 /** Format credential status indicator for a cloud in the list view */
 function formatCredentialIndicator(auth: string): string {
-  if (auth.toLowerCase() === "none") { return ""; }
-  return hasCloudCredentials(auth)
-    ? `  ${pc.green("ready")}`
-    : `  ${pc.yellow("needs")} ${pc.dim(auth)}`;
+  if (auth.toLowerCase() === "none") {
+    return "";
+  }
+  return hasCloudCredentials(auth) ? `  ${pc.green("ready")}` : `  ${pc.yellow("needs")} ${pc.dim(auth)}`;
 }
 
 export async function cmdClouds(): Promise<void> {
@@ -2435,18 +2936,28 @@ export async function cmdClouds(): Promise<void> {
       const c = manifest.clouds[key];
       const implCount = getImplementedAgents(manifest, key).length;
       const countStr = `${implCount}/${allAgents.length}`;
-      if (hasCloudCredentials(c.auth)) { credCount++; }
+      if (hasCloudCredentials(c.auth)) {
+        credCount++;
+      }
       const credIndicator = formatCredentialIndicator(c.auth);
-      console.log(`    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator}`);
+      console.log(
+        `    ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${c.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(`${countStr.padEnd(6)} ${c.description}`)}${credIndicator}`,
+      );
     }
   }
   console.log();
   if (credCount > 0) {
     console.log(pc.dim(`  ${pc.green("ready")} = credentials detected  ${pc.yellow("needs")} = credentials not set`));
   } else {
-    console.log(pc.dim(`  ${pc.yellow("needs")} = credentials not set (run ${pc.cyan("spawn <cloud>")} for setup instructions)`));
+    console.log(
+      pc.dim(`  ${pc.yellow("needs")} = credentials not set (run ${pc.cyan("spawn <cloud>")} for setup instructions)`),
+    );
   }
-  console.log(pc.dim(`  Run ${pc.cyan("spawn <cloud>")} for setup instructions, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`));
+  console.log(
+    pc.dim(
+      `  Run ${pc.cyan("spawn <cloud>")} for setup instructions, or ${pc.cyan("spawn <agent> <cloud>")} to launch.`,
+    ),
+  );
   console.log();
 }
 
@@ -2456,8 +2967,12 @@ export async function cmdClouds(): Promise<void> {
 function printInfoHeader(entry: { name: string; description: string; url?: string; notes?: string }): void {
   console.log();
   console.log(`${pc.bold(entry.name)} ${pc.dim("--")} ${entry.description}`);
-  if (entry.url) { console.log(pc.dim(`  ${entry.url}`)); }
-  if (entry.notes) { console.log(pc.dim(`  ${entry.notes}`)); }
+  if (entry.url) {
+    console.log(pc.dim(`  ${entry.url}`));
+  }
+  if (entry.notes) {
+    console.log(pc.dim(`  ${entry.notes}`));
+  }
 }
 
 /** Group keys by a classifier function (e.g., cloud type) */
@@ -2465,7 +2980,9 @@ function groupByType(keys: string[], getType: (key: string) => string): Record<s
   const byType: Record<string, string[]> = {};
   for (const key of keys) {
     const type = getType(key);
-    if (!byType[type]) { byType[type] = []; }
+    if (!byType[type]) {
+      byType[type] = [];
+    }
     byType[type].push(key);
   }
   return byType;
@@ -2476,12 +2993,14 @@ function printGroupedList(
   byType: Record<string, string[]>,
   getName: (key: string) => string,
   getHint: (key: string) => string,
-  indent = "  "
+  indent = "  ",
 ): void {
   for (const [type, keys] of Object.entries(byType)) {
     console.log(`${indent}${pc.dim(type)}`);
     for (const key of keys) {
-      console.log(`${indent}  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${getName(key).padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(getHint(key))}`);
+      console.log(
+        `${indent}  ${pc.green(key.padEnd(NAME_COLUMN_WIDTH))} ${getName(key).padEnd(NAME_COLUMN_WIDTH)} ${pc.dim(getHint(key))}`,
+      );
     }
   }
 }
@@ -2498,7 +3017,7 @@ function printAgentCloudsList(
   manifest: Manifest,
   agentKey: string,
   allClouds: string[],
-  credCount: number
+  credCount: number,
 ): void {
   console.log();
   console.log(pc.bold("Available clouds:") + pc.dim(` ${sortedClouds.length} of ${allClouds.length}`));
@@ -2517,14 +3036,17 @@ function printAgentCloudsList(
   printGroupedList(
     byType,
     (c) => manifest.clouds[c].name,
-    (c) => buildCloudCommandHint(agentKey, c, manifest)
+    (c) => buildCloudCommandHint(agentKey, c, manifest),
   );
   console.log();
 }
 
 export async function cmdAgentInfo(agent: string, preloadedManifest?: Manifest): Promise<void> {
   const [manifest, agentKey] = preloadedManifest
-    ? [preloadedManifest, agent]
+    ? [
+        preloadedManifest,
+        agent,
+      ]
     : await validateAndGetEntity(agent, "agent");
 
   const agentDef = manifest.agents[agentKey];
@@ -2567,12 +3089,7 @@ function printAuthVariableStatus(authVars: string[], cloudUrl?: string): void {
 }
 
 /** Print quick-start instructions showing credential status and example spawn command */
-function printQuickStart(opts: {
-  auth: string;
-  authVars: string[];
-  cloudUrl?: string;
-  spawnCmd?: string;
-}): void {
+function printQuickStart(opts: { auth: string; authVars: string[]; cloudUrl?: string; spawnCmd?: string }): void {
   console.log();
 
   if (checkAllCredentialsReady(opts.auth) && opts.spawnCmd) {
@@ -2591,18 +3108,15 @@ function printQuickStart(opts: {
 // ── Cloud Info ─────────────────────────────────────────────────────────────────
 
 /** Print the list of implemented agents and any missing ones */
-function printAgentList(
-  manifest: Manifest,
-  implAgents: string[],
-  missingAgents: string[],
-  cloudKey: string
-): void {
+function printAgentList(manifest: Manifest, implAgents: string[], missingAgents: string[], cloudKey: string): void {
   if (implAgents.length === 0) {
     console.log(pc.dim("  No implemented agents yet."));
   } else {
     for (const agent of implAgents) {
       const a = manifest.agents[agent];
-      console.log(`  ${pc.green(agent.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agent + " " + cloudKey)}`);
+      console.log(
+        `  ${pc.green(agent.padEnd(NAME_COLUMN_WIDTH))} ${a.name.padEnd(NAME_COLUMN_WIDTH)} ${pc.dim("spawn " + agent + " " + cloudKey)}`,
+      );
     }
   }
 
@@ -2614,7 +3128,10 @@ function printAgentList(
 
 export async function cmdCloudInfo(cloud: string, preloadedManifest?: Manifest): Promise<void> {
   const [manifest, cloudKey] = preloadedManifest
-    ? [preloadedManifest, cloud]
+    ? [
+        preloadedManifest,
+        cloud,
+      ]
     : await validateAndGetEntity(cloud, "cloud");
 
   const c = manifest.clouds[cloudKey];
@@ -2651,8 +3168,12 @@ async function fetchRemoteVersion(): Promise<string> {
   const res = await fetch(`${RAW_BASE}/cli/package.json`, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT),
   });
-  if (!res.ok) { throw new Error(`HTTP ${res.status} ${res.statusText}`); }
-  const remotePkg = (await res.json()) as { version: string };
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  }
+  const remotePkg = (await res.json()) as {
+    version: string;
+  };
   return remotePkg.version;
 }
 
@@ -2661,7 +3182,10 @@ const INSTALL_CMD = `curl -fsSL ${RAW_BASE}/cli/install.sh | bash`;
 async function performUpdate(_remoteVersion: string): Promise<void> {
   const { execSync } = await import("node:child_process");
   try {
-    execSync(INSTALL_CMD, { stdio: "inherit", shell: "/bin/bash" });
+    execSync(INSTALL_CMD, {
+      stdio: "inherit",
+      shell: "/bin/bash",
+    });
     console.log();
     p.log.success("Updated successfully!");
     p.log.info("Run spawn again to use the new version.");
@@ -2852,16 +3376,20 @@ export async function cmdPick(pickArgs: string[]): Promise<void> {
   if (options.length === 0) {
     process.stderr.write(
       pc.red("spawn pick: no options provided.\n") +
-      pc.dim(
-        "  Supply options via stdin as tab-separated lines:\n" +
-        '  printf "value1\\tLabel1\\nvalue2\\tLabel2" | spawn pick --prompt "..."\n'
-      )
+        pc.dim(
+          "  Supply options via stdin as tab-separated lines:\n" +
+            '  printf "value1\\tLabel1\\nvalue2\\tLabel2" | spawn pick --prompt "..."\n',
+        ),
     );
     process.exit(1);
   }
 
   // ── run picker ────────────────────────────────────────────────────────────
-  const config = { message, options, defaultValue };
+  const config = {
+    message,
+    options,
+    defaultValue,
+  };
 
   // pickToTTY already falls back to pickFallback internally when /dev/tty is
   // unavailable or stty fails.  It returns null only when the user cancels.

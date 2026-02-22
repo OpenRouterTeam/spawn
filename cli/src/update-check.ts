@@ -1,5 +1,10 @@
 import "./unicode-detect.js"; // Ensure TERM is set before using symbols
-import { execSync as nodeExecSync, execFileSync as nodeExecFileSync, type ExecSyncOptions, type ExecFileSyncOptions } from "node:child_process";
+import {
+  execSync as nodeExecSync,
+  execFileSync as nodeExecFileSync,
+  type ExecSyncOptions,
+  type ExecFileSyncOptions,
+} from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
@@ -20,7 +25,8 @@ const FETCH_TIMEOUT = 10000; // 10 seconds
 const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
 
 // Validate RAW_BASE matches expected GitHub raw content URL pattern (defense-in-depth, CWE-78)
-const GITHUB_RAW_URL_PATTERN = /^https:\/\/raw\.githubusercontent\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const GITHUB_RAW_URL_PATTERN =
+  /^https:\/\/raw\.githubusercontent\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 if (!GITHUB_RAW_URL_PATTERN.test(RAW_BASE)) {
   throw new Error(`RAW_BASE URL does not match expected GitHub raw URL pattern: ${RAW_BASE}`);
 }
@@ -37,9 +43,13 @@ async function fetchLatestVersion(): Promise<string | null> {
     const res = await fetch(`${RAW_BASE}/cli/package.json`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
-    if (!res.ok) { return null; }
+    if (!res.ok) {
+      return null;
+    }
 
-    const pkg = (await res.json()) as { version: string };
+    const pkg = (await res.json()) as {
+      version: string;
+    };
     return pkg.version;
   } catch {
     return null;
@@ -48,15 +58,18 @@ async function fetchLatestVersion(): Promise<string | null> {
 
 function compareVersions(current: string, latest: string): boolean {
   // Simple semantic version comparison (assumes format: major.minor.patch)
-  const parseSemver = (v: string): number[] =>
-    v.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const parseSemver = (v: string): number[] => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
 
   const currentParts = parseSemver(current);
   const latestParts = parseSemver(latest);
 
   for (let i = 0; i < 3; i++) {
-    if ((latestParts[i] || 0) > (currentParts[i] || 0)) { return true; }
-    if ((latestParts[i] || 0) < (currentParts[i] || 0)) { return false; }
+    if ((latestParts[i] || 0) > (currentParts[i] || 0)) {
+      return true;
+    }
+    if ((latestParts[i] || 0) < (currentParts[i] || 0)) {
+      return false;
+    }
   }
 
   return false; // Versions are equal
@@ -73,7 +86,9 @@ export function isUpdateBackedOff(): boolean {
     const failedPath = getUpdateFailedPath();
     const content = fs.readFileSync(failedPath, "utf8").trim();
     const failedAt = Number.parseInt(content, 10);
-    if (Number.isNaN(failedAt)) { return false; }
+    if (Number.isNaN(failedAt)) {
+      return false;
+    }
     return Date.now() - failedAt < UPDATE_BACKOFF_MS;
   } catch {
     return false;
@@ -83,7 +98,9 @@ export function isUpdateBackedOff(): boolean {
 function markUpdateFailed(): void {
   try {
     const failedPath = getUpdateFailedPath();
-    fs.mkdirSync(path.dirname(failedPath), { recursive: true });
+    fs.mkdirSync(path.dirname(failedPath), {
+      recursive: true,
+    });
     fs.writeFileSync(failedPath, String(Date.now()));
   } catch {
     // Best-effort — don't break the CLI if we can't write the file
@@ -109,17 +126,12 @@ function printUpdateBanner(latestVersion: string): void {
   console.error(pc.yellow(border));
   console.error(
     pc.yellow("| ") +
-    pc.bold(`Update available: v${VERSION} -> `) +
-    pc.green(pc.bold(`v${latestVersion}`)) +
-    " ".repeat(width - 2 - line1.length) +
-    pc.yellow(" |")
+      pc.bold(`Update available: v${VERSION} -> `) +
+      pc.green(pc.bold(`v${latestVersion}`)) +
+      " ".repeat(width - 2 - line1.length) +
+      pc.yellow(" |"),
   );
-  console.error(
-    pc.yellow("| ") +
-    pc.bold(line2) +
-    " ".repeat(width - 2 - line2.length) +
-    pc.yellow(" |")
-  );
+  console.error(pc.yellow("| ") + pc.bold(line2) + " ".repeat(width - 2 - line2.length) + pc.yellow(" |"));
   console.error(pc.yellow(border));
   console.error();
 }
@@ -138,7 +150,9 @@ function findUpdatedBinary(): string {
       shell: "/bin/bash",
     });
     const found = result ? result.toString().trim() : "";
-    if (found) { return found; }
+    if (found) {
+      return found;
+    }
   } catch {
     // fall through to argv fallback
   }
@@ -160,13 +174,21 @@ function reExecWithArgs(): void {
   try {
     executor.execFileSync(binPath, args, {
       stdio: "inherit",
-      env: { ...process.env, SPAWN_NO_UPDATE_CHECK: "1" },
+      env: {
+        ...process.env,
+        SPAWN_NO_UPDATE_CHECK: "1",
+      },
     });
     process.exit(0);
   } catch (reexecErr) {
-    const code = reexecErr && typeof reexecErr === "object" && "status" in reexecErr
-      ? (reexecErr as { status: number }).status
-      : 1;
+    const code =
+      reexecErr && typeof reexecErr === "object" && "status" in reexecErr
+        ? (
+            reexecErr as {
+              status: number;
+            }
+          ).status
+        : 1;
     process.exit(code);
   }
 }
@@ -221,7 +243,9 @@ export async function checkForUpdates(): Promise<void> {
   // Always fetch the latest version on every run
   try {
     const latestVersion = await fetchLatestVersion();
-    if (!latestVersion) { return; }
+    if (!latestVersion) {
+      return;
+    }
 
     // Auto-update if newer version is available
     if (compareVersions(VERSION, latestVersion)) {

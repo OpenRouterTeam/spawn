@@ -20,12 +20,17 @@ export interface FlyAgentConfig extends AgentConfig {
 export type { AgentConfig };
 export { generateEnvConfig };
 
-const runner: CloudRunner = { runServer, uploadFile };
+const runner: CloudRunner = {
+  runServer,
+  uploadFile,
+};
 
 // Start from default agents, then override Fly-specific differences
 export const agents: Record<string, FlyAgentConfig> = (() => {
   const base = createAgents(runner);
-  const fly: Record<string, FlyAgentConfig> = { ...base };
+  const fly: Record<string, FlyAgentConfig> = {
+    ...base,
+  };
 
   // Fly openclaw uses a pre-built Docker image
   fly.openclaw = {

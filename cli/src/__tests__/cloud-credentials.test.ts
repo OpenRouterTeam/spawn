@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "bun:test";
-import { hasCloudCredentials, } from "../commands";
+import { hasCloudCredentials } from "../commands";
 
 describe("hasCloudCredentials", () => {
   const savedEnv: Record<string, string | undefined> = {};
@@ -71,7 +71,9 @@ describe("hasCloudCredentials", () => {
     setEnv("CONTABO_CLIENT_SECRET", "secret");
     setEnv("CONTABO_API_USER", "user");
     setEnv("CONTABO_API_PASSWORD", "pass");
-    expect(hasCloudCredentials("CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET + CONTABO_API_USER + CONTABO_API_PASSWORD")).toBe(true);
+    expect(
+      hasCloudCredentials("CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET + CONTABO_API_USER + CONTABO_API_PASSWORD"),
+    ).toBe(true);
   });
 
   it("should return false for complex auth with one var missing", () => {
@@ -79,7 +81,9 @@ describe("hasCloudCredentials", () => {
     setEnv("CONTABO_CLIENT_SECRET", "secret");
     setEnv("CONTABO_API_USER", "user");
     delete process.env["CONTABO_API_PASSWORD"];
-    expect(hasCloudCredentials("CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET + CONTABO_API_USER + CONTABO_API_PASSWORD")).toBe(false);
+    expect(
+      hasCloudCredentials("CONTABO_CLIENT_ID + CONTABO_CLIENT_SECRET + CONTABO_API_USER + CONTABO_API_PASSWORD"),
+    ).toBe(false);
   });
 
   it("should handle auth with mixed text and env vars", () => {

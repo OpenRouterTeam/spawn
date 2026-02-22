@@ -25,7 +25,12 @@ const HOSTNAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a
 const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]*\$?$/;
 
 // Special connection sentinel values (not actual IPs)
-const CONNECTION_SENTINELS = ["sprite-console", "fly-ssh", "daytona-sandbox", "localhost"];
+const CONNECTION_SENTINELS = [
+  "sprite-console",
+  "fly-ssh",
+  "daytona-sandbox",
+  "localhost",
+];
 
 /**
  * Validates an identifier (agent or cloud name) against security constraints.
@@ -39,8 +44,7 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
   if (!identifier || identifier.trim() === "") {
     const listCmd = fieldName.toLowerCase().includes("agent") ? "spawn agents" : "spawn clouds";
     throw new Error(
-      `${fieldName} is required but was not provided.\n\n` +
-      `Run '${listCmd}' to see all available options.`
+      `${fieldName} is required but was not provided.\n\n` + `Run '${listCmd}' to see all available options.`,
     );
   }
 
@@ -50,9 +54,9 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
     const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `${fieldName} is too long (${identifier.length} characters, maximum is 64).\n\n` +
-      `This looks unusual. ${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names are typically short identifiers.\n\n` +
-      `Did you accidentally paste something else? Check that you're using the correct ${entityType} name.\n\n` +
-      `To see all available ${entityType}s, run: ${listCmd}`
+        `This looks unusual. ${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names are typically short identifiers.\n\n` +
+        `Did you accidentally paste something else? Check that you're using the correct ${entityType} name.\n\n` +
+        `To see all available ${entityType}s, run: ${listCmd}`,
     );
   }
 
@@ -62,15 +66,15 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
     const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
-      `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names can only contain:\n` +
-      "  • Lowercase letters (a-z)\n" +
-      "  • Numbers (0-9)\n" +
-      "  • Hyphens (-) and underscores (_)\n\n" +
-      "Examples of valid names:\n" +
-      "  • claude\n" +
-      "  • github-codespaces\n" +
-      "  • e2b\n\n" +
-      `To see all available ${entityType}s, run: ${listCmd}`
+        `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names can only contain:\n` +
+        "  • Lowercase letters (a-z)\n" +
+        "  • Numbers (0-9)\n" +
+        "  • Hyphens (-) and underscores (_)\n\n" +
+        "Examples of valid names:\n" +
+        "  • claude\n" +
+        "  • github-codespaces\n" +
+        "  • e2b\n\n" +
+        `To see all available ${entityType}s, run: ${listCmd}`,
     );
   }
 
@@ -80,12 +84,12 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
     const entityType = fieldName.toLowerCase().includes("agent") ? "agent" : "cloud provider";
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
-      `The name contains path-like characters that aren't allowed:\n` +
-      "  • Forward slashes (/)\n" +
-      "  • Backslashes (\\)\n" +
-      "  • Parent directory references (..)\n\n" +
-      `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names must be simple identifiers without paths.\n\n` +
-      `To see all available ${entityType}s, run: ${listCmd}`
+        `The name contains path-like characters that aren't allowed:\n` +
+        "  • Forward slashes (/)\n" +
+        "  • Backslashes (\\)\n" +
+        "  • Parent directory references (..)\n\n" +
+        `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names must be simple identifiers without paths.\n\n` +
+        `To see all available ${entityType}s, run: ${listCmd}`,
     );
   }
 }
@@ -102,29 +106,44 @@ export function validateScriptContent(script: string): void {
   if (!script || script.trim() === "") {
     throw new Error(
       "The downloaded script is empty.\n\n" +
-      "This usually means the server returned an error instead of the script.\n\n" +
-      "How to fix:\n" +
-      "  1. Check your internet connection\n" +
-      "  2. Verify the combination exists: spawn matrix\n" +
-      "  3. Wait a moment and try again (the server may be temporarily unavailable)"
+        "This usually means the server returned an error instead of the script.\n\n" +
+        "How to fix:\n" +
+        "  1. Check your internet connection\n" +
+        "  2. Verify the combination exists: spawn matrix\n" +
+        "  3. Wait a moment and try again (the server may be temporarily unavailable)",
     );
   }
 
   // Check for obviously malicious patterns
-  const dangerousPatterns: Array<{ pattern: RegExp; description: string }> = [
-    { pattern: /rm\s+-rf\s+\/(?!\w)/, description: "destructive filesystem operation (rm -rf /)" },
-    { pattern: /mkfs\./, description: "filesystem formatting command" },
-    { pattern: /dd\s+if=/, description: "raw disk operation" },
-    { pattern: /:(){:|:&};:/, description: "fork bomb pattern" },
+  const dangerousPatterns: Array<{
+    pattern: RegExp;
+    description: string;
+  }> = [
+    {
+      pattern: /rm\s+-rf\s+\/(?!\w)/,
+      description: "destructive filesystem operation (rm -rf /)",
+    },
+    {
+      pattern: /mkfs\./,
+      description: "filesystem formatting command",
+    },
+    {
+      pattern: /dd\s+if=/,
+      description: "raw disk operation",
+    },
+    {
+      pattern: /:(){:|:&};:/,
+      description: "fork bomb pattern",
+    },
   ];
 
   for (const { pattern, description } of dangerousPatterns) {
     if (pattern.test(script)) {
       throw new Error(
         "Security check failed: the downloaded script contains a dangerous pattern.\n\n" +
-        `Pattern detected: ${description}\n\n` +
-        "This is unexpected and may indicate the file was tampered with or corrupted.\n" +
-        "Please report this at: https://github.com/OpenRouterTeam/spawn/issues"
+          `Pattern detected: ${description}\n\n` +
+          "This is unexpected and may indicate the file was tampered with or corrupted.\n" +
+          "Please report this at: https://github.com/OpenRouterTeam/spawn/issues",
       );
     }
   }
@@ -133,15 +152,15 @@ export function validateScriptContent(script: string): void {
   if (!script.trim().startsWith("#!")) {
     throw new Error(
       "The downloaded file doesn't appear to be a valid bash script.\n\n" +
-      "Common causes:\n" +
-      "  • The server returned an error page (404, 500, etc.) instead of the script\n" +
-      "  • Network connection was interrupted during download\n" +
-      "  • The script file hasn't been published yet (even though it appears in the matrix)\n\n" +
-      "How to fix:\n" +
-      "  1. Check your internet connection and try again\n" +
-      "  2. Run 'spawn matrix' to verify the combination is marked as implemented\n" +
-      "  3. Wait a few moments (the script may be deploying) and retry\n" +
-      "  4. If the issue persists, report it: https://github.com/OpenRouterTeam/spawn/issues"
+        "Common causes:\n" +
+        "  • The server returned an error page (404, 500, etc.) instead of the script\n" +
+        "  • Network connection was interrupted during download\n" +
+        "  • The script file hasn't been published yet (even though it appears in the matrix)\n\n" +
+        "How to fix:\n" +
+        "  1. Check your internet connection and try again\n" +
+        "  2. Run 'spawn matrix' to verify the combination is marked as implemented\n" +
+        "  3. Wait a few moments (the script may be deploying) and retry\n" +
+        "  4. If the issue persists, report it: https://github.com/OpenRouterTeam/spawn/issues",
     );
   }
 }
@@ -183,9 +202,9 @@ export function validateConnectionIP(ip: string): void {
     if (!validOctets) {
       throw new Error(
         `Invalid connection IP address: "${ip}"\n\n` +
-        "IPv4 addresses must have octets in the range 0-255.\n\n" +
-        "Your spawn history file may be corrupted or tampered with.\n" +
-        `To fix: run 'spawn list --clear' to reset history`
+          "IPv4 addresses must have octets in the range 0-255.\n\n" +
+          "Your spawn history file may be corrupted or tampered with.\n" +
+          `To fix: run 'spawn list --clear' to reset history`,
       );
     }
     return;
@@ -203,9 +222,9 @@ export function validateConnectionIP(ip: string): void {
   // Neither IPv4, IPv6, nor valid hostname
   throw new Error(
     `Invalid connection IP address: "${ip}"\n\n` +
-    `Expected a valid IPv4 or IPv6 address, hostname, or one of: ${CONNECTION_SENTINELS.join(", ")}\n\n` +
-    "Your spawn history file may be corrupted or tampered with.\n" +
-    `To fix: run 'spawn list --clear' to reset history`
+      `Expected a valid IPv4 or IPv6 address, hostname, or one of: ${CONNECTION_SENTINELS.join(", ")}\n\n` +
+      "Your spawn history file may be corrupted or tampered with.\n" +
+      `To fix: run 'spawn list --clear' to reset history`,
   );
 }
 
@@ -227,21 +246,21 @@ export function validateUsername(username: string): void {
   if (username.length > 32) {
     throw new Error(
       `Username is too long: "${username}" (${username.length} characters, maximum is 32)\n\n` +
-      "Your spawn history file may be corrupted or tampered with.\n" +
-      `To fix: run 'spawn list --clear' to reset history`
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
     );
   }
 
   if (!USERNAME_PATTERN.test(username)) {
     throw new Error(
       `Invalid username: "${username}"\n\n` +
-      "Unix usernames must:\n" +
-      "  • Start with a lowercase letter or underscore\n" +
-      "  • Contain only lowercase letters, digits, underscores, hyphens\n" +
-      "  • Optionally end with $ (for system accounts)\n\n" +
-      "Examples of valid usernames: root, ubuntu, user-123, _system\n\n" +
-      "Your spawn history file may be corrupted or tampered with.\n" +
-      `To fix: run 'spawn list --clear' to reset history`
+        "Unix usernames must:\n" +
+        "  • Start with a lowercase letter or underscore\n" +
+        "  • Contain only lowercase letters, digits, underscores, hyphens\n" +
+        "  • Optionally end with $ (for system accounts)\n\n" +
+        "Examples of valid usernames: root, ubuntu, user-123, _system\n\n" +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
     );
   }
 }
@@ -264,8 +283,8 @@ export function validateServerIdentifier(id: string): void {
   if (id.length > 128) {
     throw new Error(
       `Server identifier is too long: "${id}" (${id.length} characters, maximum is 128)\n\n` +
-      "Your spawn history file may be corrupted or tampered with.\n" +
-      `To fix: run 'spawn list --clear' to reset history`
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
     );
   }
 
@@ -273,9 +292,9 @@ export function validateServerIdentifier(id: string): void {
   if (id.includes("..") || id.startsWith("/") || id.startsWith("\\")) {
     throw new Error(
       `Invalid server identifier: "${id}"\n\n` +
-      "Server identifiers cannot contain path-like patterns (/, \\, ..)\n\n" +
-      "Your spawn history file may be corrupted or tampered with.\n" +
-      `To fix: run 'spawn list --clear' to reset history`
+        "Server identifiers cannot contain path-like patterns (/, \\, ..)\n\n" +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
     );
   }
 
@@ -285,11 +304,11 @@ export function validateServerIdentifier(id: string): void {
   if (!serverIdPattern.test(id)) {
     throw new Error(
       `Invalid server identifier: "${id}"\n\n` +
-      "Server identifiers can only contain:\n" +
-      "  • Letters and digits (a-z, A-Z, 0-9)\n" +
-      "  • Hyphens (-), underscores (_), dots (.)\n\n" +
-      "Your spawn history file may be corrupted or tampered with.\n" +
-      `To fix: run 'spawn list --clear' to reset history`
+        "Server identifiers can only contain:\n" +
+        "  • Letters and digits (a-z, A-Z, 0-9)\n" +
+        "  • Hyphens (-), underscores (_), dots (.)\n\n" +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
     );
   }
 }
@@ -313,8 +332,8 @@ export function validateMetadataValue(value: string, fieldName: string): void {
   if (value.length > 128) {
     throw new Error(
       `${fieldName} is too long: "${value}" (${value.length} characters, maximum is 128)\n\n` +
-      "Your spawn history file may be corrupted or tampered with.\n" +
-      `To fix: run 'spawn list --clear' to reset history`
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
     );
   }
 
@@ -322,29 +341,71 @@ export function validateMetadataValue(value: string, fieldName: string): void {
   if (!SAFE_METADATA_PATTERN.test(value)) {
     throw new Error(
       `Invalid ${fieldName}: "${value}"\n\n` +
-      `${fieldName} can only contain letters, digits, hyphens, underscores, and dots.\n\n` +
-      "Your spawn history file may be corrupted or tampered with.\n" +
-      `To fix: run 'spawn list --clear' to reset history`
+        `${fieldName} can only contain letters, digits, hyphens, underscores, and dots.\n\n` +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
     );
   }
 }
 
 // Sensitive path patterns that should never be read as prompt files
 // These protect credentials and system files from accidental exfiltration
-const SENSITIVE_PATH_PATTERNS: ReadonlyArray<{ pattern: RegExp; description: string }> = [
-  { pattern: /(?:^|\/)\.ssh\//, description: "SSH directory (may contain private keys)" },
-  { pattern: /(?:^|\/)\.aws\//, description: "AWS credentials directory" },
-  { pattern: /(?:^|\/)\.config\/gcloud\//, description: "Google Cloud credentials" },
-  { pattern: /(?:^|\/)\.azure\//, description: "Azure credentials directory" },
-  { pattern: /(?:^|\/)\.kube\//, description: "Kubernetes config (may contain tokens)" },
-  { pattern: /(?:^|\/)\.docker\/config\.json$/, description: "Docker registry credentials" },
-  { pattern: /(?:^|\/)\.npmrc$/, description: "npm credentials" },
-  { pattern: /(?:^|\/)\.netrc$/, description: "netrc credentials" },
-  { pattern: /(?:^|\/)\.env(?:\.\w+)?$/, description: "environment file (may contain secrets)" },
-  { pattern: /(?:^|\/)\.git-credentials$/, description: "Git credentials" },
-  { pattern: /^\/etc\/shadow$/, description: "system password hashes" },
-  { pattern: /^\/etc\/master\.passwd$/, description: "system password hashes (macOS)" },
-  { pattern: /id_(?:rsa|ed25519|ecdsa|dsa)(?:\.pub)?$/, description: "SSH key file" },
+const SENSITIVE_PATH_PATTERNS: ReadonlyArray<{
+  pattern: RegExp;
+  description: string;
+}> = [
+  {
+    pattern: /(?:^|\/)\.ssh\//,
+    description: "SSH directory (may contain private keys)",
+  },
+  {
+    pattern: /(?:^|\/)\.aws\//,
+    description: "AWS credentials directory",
+  },
+  {
+    pattern: /(?:^|\/)\.config\/gcloud\//,
+    description: "Google Cloud credentials",
+  },
+  {
+    pattern: /(?:^|\/)\.azure\//,
+    description: "Azure credentials directory",
+  },
+  {
+    pattern: /(?:^|\/)\.kube\//,
+    description: "Kubernetes config (may contain tokens)",
+  },
+  {
+    pattern: /(?:^|\/)\.docker\/config\.json$/,
+    description: "Docker registry credentials",
+  },
+  {
+    pattern: /(?:^|\/)\.npmrc$/,
+    description: "npm credentials",
+  },
+  {
+    pattern: /(?:^|\/)\.netrc$/,
+    description: "netrc credentials",
+  },
+  {
+    pattern: /(?:^|\/)\.env(?:\.\w+)?$/,
+    description: "environment file (may contain secrets)",
+  },
+  {
+    pattern: /(?:^|\/)\.git-credentials$/,
+    description: "Git credentials",
+  },
+  {
+    pattern: /^\/etc\/shadow$/,
+    description: "system password hashes",
+  },
+  {
+    pattern: /^\/etc\/master\.passwd$/,
+    description: "system password hashes (macOS)",
+  },
+  {
+    pattern: /id_(?:rsa|ed25519|ecdsa|dsa)(?:\.pub)?$/,
+    description: "SSH key file",
+  },
 ];
 
 // Maximum prompt file size (1MB) to prevent accidental reads of large files
@@ -361,8 +422,8 @@ export function validatePromptFilePath(filePath: string): void {
   if (!filePath || filePath.trim() === "") {
     throw new Error(
       "Prompt file path is required when using --prompt-file.\n\n" +
-      "Example:\n" +
-      "  spawn <agent> <cloud> --prompt-file instructions.txt"
+        "Example:\n" +
+        "  spawn <agent> <cloud> --prompt-file instructions.txt",
     );
   }
 
@@ -374,11 +435,11 @@ export function validatePromptFilePath(filePath: string): void {
     if (pattern.test(resolved)) {
       throw new Error(
         `Security check failed: cannot use '${filePath}' as a prompt file.\n\n` +
-        `This path points to ${description}.\n` +
-        "Prompt contents are sent to the agent and may be logged or stored remotely.\n\n" +
-        "For security, use a plain text file instead:\n" +
-        `  1. Create a new file: echo "Your instructions here" > prompt.txt\n` +
-        "  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt"
+          `This path points to ${description}.\n` +
+          "Prompt contents are sent to the agent and may be logged or stored remotely.\n\n" +
+          "For security, use a plain text file instead:\n" +
+          `  1. Create a new file: echo "Your instructions here" > prompt.txt\n` +
+          "  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt",
       );
     }
   }
@@ -391,12 +452,18 @@ export function validatePromptFilePath(filePath: string): void {
  * @param statFn - Stat function (injectable for testing)
  * @throws Error if file is not suitable for reading as a prompt
  */
-export function validatePromptFileStats(filePath: string, stats: { isFile: () => boolean; size: number }): void {
+export function validatePromptFileStats(
+  filePath: string,
+  stats: {
+    isFile: () => boolean;
+    size: number;
+  },
+): void {
   if (!stats.isFile()) {
     throw new Error(
       `Cannot read prompt: '${filePath}' is not a regular file.\n\n` +
-      "The path points to a directory, device, or other non-file object.\n" +
-      "Provide a path to a text file containing your prompt."
+        "The path points to a directory, device, or other non-file object.\n" +
+        "Provide a path to a text file containing your prompt.",
     );
   }
 
@@ -404,18 +471,18 @@ export function validatePromptFileStats(filePath: string, stats: { isFile: () =>
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
     throw new Error(
       `Prompt file is too large: ${sizeMB}MB (maximum is 1MB).\n\n` +
-      "How to fix:\n" +
-      "  • Use a shorter, more focused prompt\n" +
-      "  • Break the work into multiple smaller tasks\n" +
-      "  • Remove unnecessary context or examples"
+        "How to fix:\n" +
+        "  • Use a shorter, more focused prompt\n" +
+        "  • Break the work into multiple smaller tasks\n" +
+        "  • Remove unnecessary context or examples",
     );
   }
 
   if (stats.size === 0) {
     throw new Error(
       `Prompt file is empty: ${filePath}\n\n` +
-      "The file exists but contains no text.\n" +
-      "Add your instructions to the file and try again."
+        "The file exists but contains no text.\n" +
+        "Add your instructions to the file and try again.",
     );
   }
 }
@@ -431,10 +498,10 @@ export function validatePrompt(prompt: string): void {
   if (!prompt || prompt.trim() === "") {
     throw new Error(
       "Prompt is required but was not provided.\n\n" +
-      "Provide a prompt with --prompt:\n" +
-      "  spawn <agent> <cloud> --prompt \"Your task here\"\n\n" +
-      "Or use a file:\n" +
-      "  spawn <agent> <cloud> --prompt-file prompt.txt"
+        "Provide a prompt with --prompt:\n" +
+        '  spawn <agent> <cloud> --prompt "Your task here"\n\n' +
+        "Or use a file:\n" +
+        "  spawn <agent> <cloud> --prompt-file prompt.txt",
     );
   }
 
@@ -444,57 +511,135 @@ export function validatePrompt(prompt: string): void {
     const lengthKB = (prompt.length / 1024).toFixed(1);
     throw new Error(
       `Your prompt is too long (${lengthKB}KB, maximum is 10KB).\n\n` +
-      "For longer instructions, save them to a file instead:\n\n" +
-      `  1. Save your prompt: echo "Your long instructions..." > instructions.txt\n` +
-      "  2. Use the file: spawn <agent> <cloud> --prompt-file instructions.txt\n\n" +
-      "This also makes it easier to edit and reuse your prompts."
+        "For longer instructions, save them to a file instead:\n\n" +
+        `  1. Save your prompt: echo "Your long instructions..." > instructions.txt\n` +
+        "  2. Use the file: spawn <agent> <cloud> --prompt-file instructions.txt\n\n" +
+        "This also makes it easier to edit and reuse your prompts.",
     );
   }
 
   // Check for obvious command injection patterns
   // These patterns would break out of the shell quoting used in bash scripts
-  const dangerousPatterns: Array<{ pattern: RegExp; description: string; suggestion: string }> = [
-    { pattern: /\$\(.*\)/, description: "command substitution $()", suggestion: 'Instead of "Fix $(ls)", try "Fix the output from ls"' },
-    { pattern: /`[^`]*`/, description: "backtick command substitution", suggestion: "Describe the command output instead of using backticks" },
-    { pattern: /;\s*rm\s+-rf/, description: "dangerous command sequence", suggestion: "Describe what you want the agent to do without using shell syntax" },
-    { pattern: /\|\s*bash/, description: "shell piping to bash", suggestion: "Describe the desired outcome instead" },
-    { pattern: /\|\s*sh/, description: "shell piping to sh", suggestion: "Describe the desired outcome instead" },
-    { pattern: /\$\{[^}]*\}/, description: "bash variable expansion", suggestion: "Describe the value you need instead of using shell variables" },
+  const dangerousPatterns: Array<{
+    pattern: RegExp;
+    description: string;
+    suggestion: string;
+  }> = [
+    {
+      pattern: /\$\(.*\)/,
+      description: "command substitution $()",
+      suggestion: 'Instead of "Fix $(ls)", try "Fix the output from ls"',
+    },
+    {
+      pattern: /`[^`]*`/,
+      description: "backtick command substitution",
+      suggestion: "Describe the command output instead of using backticks",
+    },
+    {
+      pattern: /;\s*rm\s+-rf/,
+      description: "dangerous command sequence",
+      suggestion: "Describe what you want the agent to do without using shell syntax",
+    },
+    {
+      pattern: /\|\s*bash/,
+      description: "shell piping to bash",
+      suggestion: "Describe the desired outcome instead",
+    },
+    {
+      pattern: /\|\s*sh/,
+      description: "shell piping to sh",
+      suggestion: "Describe the desired outcome instead",
+    },
+    {
+      pattern: /\$\{[^}]*\}/,
+      description: "bash variable expansion",
+      suggestion: "Describe the value you need instead of using shell variables",
+    },
     // Match && and || only when they appear to be shell command chaining
     // Pattern: look for common shell commands after && or ||
     // This avoids false positives on programming expressions like "a > b && c < d" or "value || default"
-    { pattern: /&&\s+(ls|rm|cp|mv|mkdir|cat|grep|find|echo|curl|wget|git|npm|yarn|bun|cd|chmod|chown|sudo|kill|pkill|systemctl|service|apt|yum|brew|docker|kubectl|terraform|ansible|python|node|go|java|ruby|php|perl|bash|sh|zsh|fish|powershell|cmd|exit|return)\b/i, description: "command chaining with &&", suggestion: "Describe your tasks separately instead of chaining commands" },
-    { pattern: /\|\|\s+(ls|rm|cp|mv|mkdir|cat|grep|find|echo|curl|wget|git|npm|yarn|bun|cd|chmod|chown|sudo|kill|pkill|systemctl|service|apt|yum|brew|docker|kubectl|terraform|ansible|python|node|go|java|ruby|php|perl|bash|sh|zsh|fish|powershell|cmd|exit|return)\b/i, description: "command chaining with ||", suggestion: "Describe error handling in plain language" },
+    {
+      pattern:
+        /&&\s+(ls|rm|cp|mv|mkdir|cat|grep|find|echo|curl|wget|git|npm|yarn|bun|cd|chmod|chown|sudo|kill|pkill|systemctl|service|apt|yum|brew|docker|kubectl|terraform|ansible|python|node|go|java|ruby|php|perl|bash|sh|zsh|fish|powershell|cmd|exit|return)\b/i,
+      description: "command chaining with &&",
+      suggestion: "Describe your tasks separately instead of chaining commands",
+    },
+    {
+      pattern:
+        /\|\|\s+(ls|rm|cp|mv|mkdir|cat|grep|find|echo|curl|wget|git|npm|yarn|bun|cd|chmod|chown|sudo|kill|pkill|systemctl|service|apt|yum|brew|docker|kubectl|terraform|ansible|python|node|go|java|ruby|php|perl|bash|sh|zsh|fish|powershell|cmd|exit|return)\b/i,
+      description: "command chaining with ||",
+      suggestion: "Describe error handling in plain language",
+    },
     // Match redirection only when followed by filesystem paths (/, ~, or word chars at line boundaries)
     // This avoids false positives on mathematical comparisons like "x > 5"
-    { pattern: />\s*[/~]/, description: "file redirection", suggestion: "Ask the agent to save output instead of using redirection syntax" },
-    { pattern: />\s*\w+\.\w+/, description: "file redirection", suggestion: "Ask the agent to save output instead of using redirection syntax" },
-    { pattern: /<\s*[/~]/, description: "file input redirection", suggestion: "Describe the input source in plain language" },
-    { pattern: /<\s*\w+\.\w+/, description: "file input redirection", suggestion: "Describe the input source in plain language" },
-    { pattern: /&\s*$/, description: "background execution", suggestion: "Describe the desired behavior instead" },
+    {
+      pattern: />\s*[/~]/,
+      description: "file redirection",
+      suggestion: "Ask the agent to save output instead of using redirection syntax",
+    },
+    {
+      pattern: />\s*\w+\.\w+/,
+      description: "file redirection",
+      suggestion: "Ask the agent to save output instead of using redirection syntax",
+    },
+    {
+      pattern: /<\s*[/~]/,
+      description: "file input redirection",
+      suggestion: "Describe the input source in plain language",
+    },
+    {
+      pattern: /<\s*\w+\.\w+/,
+      description: "file input redirection",
+      suggestion: "Describe the input source in plain language",
+    },
+    {
+      pattern: /&\s*$/,
+      description: "background execution",
+      suggestion: "Describe the desired behavior instead",
+    },
     // Stderr/fd redirections: 2>, 2>&1, 1>&2
-    { pattern: /\d+>\s*&?\d*/, description: "stderr/fd redirection", suggestion: "Describe the output handling in plain language instead" },
+    {
+      pattern: /\d+>\s*&?\d*/,
+      description: "stderr/fd redirection",
+      suggestion: "Describe the output handling in plain language instead",
+    },
     // Heredoc syntax: << EOF or <<- EOF
-    { pattern: /<<-?\s*'?\w+'?/, description: "heredoc", suggestion: "Describe the multi-line input in plain language instead" },
+    {
+      pattern: /<<-?\s*'?\w+'?/,
+      description: "heredoc",
+      suggestion: "Describe the multi-line input in plain language instead",
+    },
     // Process substitution: <(cmd) or >(cmd)
-    { pattern: /<\s*\(|>\s*\(/, description: "process substitution", suggestion: "Describe the command output in plain language instead" },
+    {
+      pattern: /<\s*\(|>\s*\(/,
+      description: "process substitution",
+      suggestion: "Describe the command output in plain language instead",
+    },
     // Redirection to paths with slashes: > foo/bar, > dir/output
-    { pattern: />\s*\w+\/[\w/]*/, description: "file redirection to path", suggestion: "Ask the agent to save output instead of using redirection syntax" },
+    {
+      pattern: />\s*\w+\/[\w/]*/,
+      description: "file redirection to path",
+      suggestion: "Ask the agent to save output instead of using redirection syntax",
+    },
     // Redirection to simple filenames without extensions (3+ chars to avoid math like "> 5")
-    { pattern: />>?\s*[a-zA-Z_]\w{2,}/, description: "file redirection to path", suggestion: "Ask the agent to save output instead of using redirection syntax" },
+    {
+      pattern: />>?\s*[a-zA-Z_]\w{2,}/,
+      description: "file redirection to path",
+      suggestion: "Ask the agent to save output instead of using redirection syntax",
+    },
   ];
 
   for (const { pattern, description, suggestion } of dangerousPatterns) {
     if (pattern.test(prompt)) {
       throw new Error(
         `Your prompt contains shell syntax that can't be safely passed to the agent.\n\n` +
-        `Issue: ${description}\n\n` +
-        `${suggestion}\n\n` +
-        `Important: You don't need to write shell commands in your prompt!\n` +
-        "Just describe what you want in plain English, and the agent will write the code for you.\n\n" +
-        "Example:\n" +
-        `  Instead of: "Fix $(ls -la)"\n` +
-        `  Write: "Fix the directory listing issues"`
+          `Issue: ${description}\n\n` +
+          `${suggestion}\n\n` +
+          `Important: You don't need to write shell commands in your prompt!\n` +
+          "Just describe what you want in plain English, and the agent will write the code for you.\n\n" +
+          "Example:\n" +
+          `  Instead of: "Fix $(ls -la)"\n` +
+          `  Write: "Fix the directory listing issues"`,
       );
     }
   }
@@ -508,10 +653,10 @@ export function validatePrompt(prompt: string): void {
   if (hasDoubledOperators && !looksLikeComparison) {
     throw new Error(
       "Your prompt contains shell operators that could be unsafe.\n\n" +
-      "Please describe what you want in plain English without shell syntax.\n\n" +
-      "Example:\n" +
-      `  Instead of: "Build a web server && deploy it"\n` +
-      `  Write: "Build a web server and deploy it"`
+        "Please describe what you want in plain English without shell syntax.\n\n" +
+        "Example:\n" +
+        `  Instead of: "Build a web server && deploy it"\n` +
+        `  Write: "Build a web server and deploy it"`,
     );
   }
 }

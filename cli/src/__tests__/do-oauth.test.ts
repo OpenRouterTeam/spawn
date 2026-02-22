@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,12 +18,13 @@ let testDir: string;
 let origHome: string | undefined;
 
 beforeEach(() => {
-  testDir = join(
-    tmpdir(),
-    `spawn-do-oauth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
-  mkdirSync(testDir, { recursive: true });
-  mkdirSync(join(testDir, ".config", "spawn"), { recursive: true });
+  testDir = join(tmpdir(), `spawn-do-oauth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(testDir, {
+    recursive: true,
+  });
+  mkdirSync(join(testDir, ".config", "spawn"), {
+    recursive: true,
+  });
   origHome = process.env.HOME;
   process.env.HOME = testDir;
 });
@@ -31,7 +32,10 @@ beforeEach(() => {
 afterEach(() => {
   process.env.HOME = origHome;
   if (existsSync(testDir)) {
-    rmSync(testDir, { recursive: true, force: true });
+    rmSync(testDir, {
+      recursive: true,
+      force: true,
+    });
   }
 });
 
@@ -223,10 +227,15 @@ describe("Token expiry detection", () => {
 describe("OAuth URL construction", () => {
   const DO_OAUTH_AUTHORIZE = "https://cloud.digitalocean.com/v1/oauth/authorize";
   const DO_SCOPES = [
-    "droplet:create", "droplet:delete", "droplet:read",
-    "ssh_key:create", "ssh_key:read",
-    "regions:read", "sizes:read",
-    "image:read", "actions:read",
+    "droplet:create",
+    "droplet:delete",
+    "droplet:read",
+    "ssh_key:create",
+    "ssh_key:read",
+    "regions:read",
+    "sizes:read",
+    "image:read",
+    "actions:read",
   ].join(" ");
 
   it("should construct valid authorize URL", () => {

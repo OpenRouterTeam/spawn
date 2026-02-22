@@ -27,11 +27,19 @@ async function promptVmOptions(): Promise<ServerOptions> {
   if (process.env.FLY_VM_MEMORY) {
     const memoryMb = Number.parseInt(process.env.FLY_VM_MEMORY, 10);
     const tier = FLY_VM_TIERS.find((t) => t.memoryMb === memoryMb) || DEFAULT_VM_TIER;
-    return { cpuKind: tier.cpuKind, cpus: tier.cpus, memoryMb: tier.memoryMb };
+    return {
+      cpuKind: tier.cpuKind,
+      cpus: tier.cpus,
+      memoryMb: tier.memoryMb,
+    };
   }
 
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    return { cpuKind: DEFAULT_VM_TIER.cpuKind, cpus: DEFAULT_VM_TIER.cpus, memoryMb: DEFAULT_VM_TIER.memoryMb };
+    return {
+      cpuKind: DEFAULT_VM_TIER.cpuKind,
+      cpus: DEFAULT_VM_TIER.cpus,
+      memoryMb: DEFAULT_VM_TIER.memoryMb,
+    };
   }
 
   process.stderr.write("\n");
@@ -39,7 +47,11 @@ async function promptVmOptions(): Promise<ServerOptions> {
   const tierId = await selectFromList(tierItems, "VM size", DEFAULT_VM_TIER.id);
   const selectedTier = FLY_VM_TIERS.find((t) => t.id === tierId) || DEFAULT_VM_TIER;
 
-  return { cpuKind: selectedTier.cpuKind, cpus: selectedTier.cpus, memoryMb: selectedTier.memoryMb };
+  return {
+    cpuKind: selectedTier.cpuKind,
+    cpus: selectedTier.cpus,
+    memoryMb: selectedTier.memoryMb,
+  };
 }
 
 async function main() {
@@ -57,7 +69,10 @@ async function main() {
   const cloud: CloudOrchestrator = {
     cloudName: "fly",
     cloudLabel: "Fly.io",
-    runner: { runServer, uploadFile },
+    runner: {
+      runServer,
+      uploadFile,
+    },
     async authenticate() {
       await promptSpawnName();
       await ensureFlyCli();
@@ -87,10 +102,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  const msg =
-    err && typeof err === "object" && "message" in err
-      ? String(err.message)
-      : String(err);
+  const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
   process.stderr.write(`\x1b[0;31mFatal: ${msg}\x1b[0m\n`);
   process.exit(1);
 });

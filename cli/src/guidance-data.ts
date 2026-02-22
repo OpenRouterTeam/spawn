@@ -28,7 +28,9 @@ export function buildDashboardHint(dashboardUrl?: string): string {
 export const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
   130: {
     header: "Script was interrupted (Ctrl+C).",
-    lines: ["Note: If a server was already created, it may still be running."],
+    lines: [
+      "Note: If a server was already created, it may still be running.",
+    ],
     includeDashboard: true,
   },
   137: {
@@ -50,9 +52,13 @@ export const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
   },
   127: {
     header: "A required command was not found. Check that these are installed:",
-    lines: ["  - bash, curl, ssh, jq"],
+    lines: [
+      "  - bash, curl, ssh, jq",
+    ],
     includeDashboard: false,
-    specialHandling: (cloud) => [`  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`],
+    specialHandling: (cloud) => [
+      `  - Cloud-specific CLI tools (run ${pc.cyan(`spawn ${cloud}`)} for details)`,
+    ],
   },
   126: {
     header: "A command was found but could not be executed (permission denied).",
@@ -65,7 +71,9 @@ export const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
   },
   2: {
     header: "Shell syntax or argument error. This is likely a bug in the script.",
-    lines: [`  Report it at: ${pc.cyan("https://github.com/OpenRouterTeam/spawn/issues")}`],
+    lines: [
+      `  Report it at: ${pc.cyan("https://github.com/OpenRouterTeam/spawn/issues")}`,
+    ],
     includeDashboard: false,
   },
   1: {

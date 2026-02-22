@@ -28,7 +28,9 @@ describe("validatePromptFilePath", () => {
   });
 
   it("should reject Google Cloud credential files", () => {
-    expect(() => validatePromptFilePath("/home/user/.config/gcloud/application_default_credentials.json")).toThrow("Google Cloud");
+    expect(() => validatePromptFilePath("/home/user/.config/gcloud/application_default_credentials.json")).toThrow(
+      "Google Cloud",
+    );
   });
 
   it("should reject Azure credential files", () => {
@@ -98,32 +100,50 @@ describe("validatePromptFilePath", () => {
 
 describe("validatePromptFileStats", () => {
   it("should accept regular files within size limit", () => {
-    const stats = { isFile: () => true, size: 100 };
+    const stats = {
+      isFile: () => true,
+      size: 100,
+    };
     expect(() => validatePromptFileStats("prompt.txt", stats)).not.toThrow();
   });
 
   it("should accept files at the 1MB limit", () => {
-    const stats = { isFile: () => true, size: 1024 * 1024 };
+    const stats = {
+      isFile: () => true,
+      size: 1024 * 1024,
+    };
     expect(() => validatePromptFileStats("prompt.txt", stats)).not.toThrow();
   });
 
   it("should reject non-regular files", () => {
-    const stats = { isFile: () => false, size: 100 };
+    const stats = {
+      isFile: () => false,
+      size: 100,
+    };
     expect(() => validatePromptFileStats("/dev/urandom", stats)).toThrow("not a regular file");
   });
 
   it("should reject files over 1MB", () => {
-    const stats = { isFile: () => true, size: 1024 * 1024 + 1 };
+    const stats = {
+      isFile: () => true,
+      size: 1024 * 1024 + 1,
+    };
     expect(() => validatePromptFileStats("huge.txt", stats)).toThrow("too large");
   });
 
   it("should reject empty files", () => {
-    const stats = { isFile: () => true, size: 0 };
+    const stats = {
+      isFile: () => true,
+      size: 0,
+    };
     expect(() => validatePromptFileStats("empty.txt", stats)).toThrow("empty");
   });
 
   it("should show file size in MB for large files", () => {
-    const stats = { isFile: () => true, size: 5 * 1024 * 1024 };
+    const stats = {
+      isFile: () => true,
+      size: 5 * 1024 * 1024,
+    };
     try {
       validatePromptFileStats("large.bin", stats);
       throw new Error("Expected to throw");

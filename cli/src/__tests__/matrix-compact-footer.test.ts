@@ -1,11 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import type { Manifest } from "../manifest";
-import {
-  getImplementedClouds,
-  getMissingClouds,
-  calculateColumnWidth,
-  getTerminalWidth,
-} from "../commands";
+import { getImplementedClouds, getMissingClouds, calculateColumnWidth, getTerminalWidth } from "../commands";
 import { countImplemented, cloudKeys, agentKeys } from "../manifest";
 
 /**
@@ -44,7 +39,9 @@ function createTestManifest(): Manifest {
         url: "https://claude.ai",
         install: "npm install -g claude",
         launch: "claude",
-        env: { ANTHROPIC_API_KEY: "test" },
+        env: {
+          ANTHROPIC_API_KEY: "test",
+        },
       },
       codex: {
         name: "Codex",
@@ -52,7 +49,9 @@ function createTestManifest(): Manifest {
         url: "https://codex.dev",
         install: "npm install -g codex",
         launch: "codex",
-        env: { OPENAI_API_KEY: "test" },
+        env: {
+          OPENAI_API_KEY: "test",
+        },
       },
       cline: {
         name: "Cline",
@@ -159,11 +158,7 @@ const MIN_CLOUD_COL_WIDTH = 10;
 const COL_PADDING = 2;
 
 // commands.ts:721-745
-function renderCompactList(
-  manifest: Manifest,
-  agents: string[],
-  clouds: string[]
-): string[] {
+function renderCompactList(manifest: Manifest, agents: string[], clouds: string[]): string[] {
   const totalClouds = clouds.length;
   const lines: string[] = [];
 
@@ -192,12 +187,7 @@ function renderCompactList(
 }
 
 // commands.ts:747-759
-function renderMatrixFooter(
-  manifest: Manifest,
-  agents: string[],
-  clouds: string[],
-  isCompact: boolean
-): string[] {
+function renderMatrixFooter(manifest: Manifest, agents: string[], clouds: string[], isCompact: boolean): string[] {
   const impl = countImplemented(manifest);
   const total = agents.length * clouds.length;
   const lines: string[] = [];
@@ -244,9 +234,7 @@ describe("renderCompactList", () => {
     const lines = renderCompactList(manifest, agents, clouds);
 
     // Lines: empty, header, separator, then one per agent
-    const dataLines = lines.filter(
-      (l) => l.trim() !== "" && !l.includes("Agent") && !l.match(/^-+$/)
-    );
+    const dataLines = lines.filter((l) => l.trim() !== "" && !l.includes("Agent") && !l.match(/^-+$/));
     expect(dataLines).toHaveLength(agents.length);
   });
 
@@ -355,9 +343,19 @@ describe("renderCompactList", () => {
           interactive_method: "ssh",
         },
       },
-      matrix: { "only/solo": "implemented" },
+      matrix: {
+        "only/solo": "implemented",
+      },
     };
-    const lines = renderCompactList(manifest, ["solo"], ["only"]);
+    const lines = renderCompactList(
+      manifest,
+      [
+        "solo",
+      ],
+      [
+        "only",
+      ],
+    );
     const soloLine = lines.find((l) => l.includes("Solo Agent"));
     expect(soloLine).toBeDefined();
     expect(soloLine).toContain("1/1");
@@ -369,9 +367,7 @@ describe("renderCompactList", () => {
     const lines = renderCompactList(manifest, [], cloudKeys(manifest));
 
     // Should only have empty line, header, separator
-    const dataLines = lines.filter(
-      (l) => l.trim() !== "" && !l.includes("Agent") && !l.match(/^-+$/)
-    );
+    const dataLines = lines.filter((l) => l.trim() !== "" && !l.includes("Agent") && !l.match(/^-+$/));
     expect(dataLines).toHaveLength(0);
   });
 
@@ -496,18 +492,38 @@ describe("renderMatrixFooter", () => {
       const manifest: Manifest = {
         agents: {
           a: {
-            name: "A", description: "A", url: "", install: "", launch: "", env: {},
+            name: "A",
+            description: "A",
+            url: "",
+            install: "",
+            launch: "",
+            env: {},
           },
         },
         clouds: {
           b: {
-            name: "B", description: "B", url: "", type: "vm", auth: "none",
-            provision_method: "api", exec_method: "ssh", interactive_method: "ssh",
+            name: "B",
+            description: "B",
+            url: "",
+            type: "vm",
+            auth: "none",
+            provision_method: "api",
+            exec_method: "ssh",
+            interactive_method: "ssh",
           },
         },
         matrix: {},
       };
-      const lines = renderMatrixFooter(manifest, ["a"], ["b"], false);
+      const lines = renderMatrixFooter(
+        manifest,
+        [
+          "a",
+        ],
+        [
+          "b",
+        ],
+        false,
+      );
       expect(lines.some((l) => l.includes("0/1"))).toBe(true);
     });
   });
@@ -559,17 +575,32 @@ describe("getTerminalWidth", () => {
 
 describe("calculateColumnWidth", () => {
   it("should return minimum width when items are shorter", () => {
-    const width = calculateColumnWidth(["ab", "cd"], 16);
+    const width = calculateColumnWidth(
+      [
+        "ab",
+        "cd",
+      ],
+      16,
+    );
     expect(width).toBe(16);
   });
 
   it("should expand beyond minimum for long items", () => {
-    const width = calculateColumnWidth(["a-very-long-cloud-name"], 10);
+    const width = calculateColumnWidth(
+      [
+        "a-very-long-cloud-name",
+      ],
+      10,
+    );
     expect(width).toBe("a-very-long-cloud-name".length + COL_PADDING);
   });
 
   it("should use the longest item to determine width", () => {
-    const items = ["short", "medium-length", "the-longest-item-here"];
+    const items = [
+      "short",
+      "medium-length",
+      "the-longest-item-here",
+    ];
     const width = calculateColumnWidth(items, 10);
     expect(width).toBe("the-longest-item-here".length + COL_PADDING);
   });
@@ -580,28 +611,48 @@ describe("calculateColumnWidth", () => {
   });
 
   it("should handle single item", () => {
-    const width = calculateColumnWidth(["x"], 16);
+    const width = calculateColumnWidth(
+      [
+        "x",
+      ],
+      16,
+    );
     expect(width).toBe(16); // "x" + 2 padding = 3, less than min 16
   });
 
   it("should add COL_PADDING (2) to item length", () => {
     // Item with length 15 + 2 padding = 17 > min 16
     const item = "a".repeat(15);
-    const width = calculateColumnWidth([item], 16);
+    const width = calculateColumnWidth(
+      [
+        item,
+      ],
+      16,
+    );
     expect(width).toBe(17);
   });
 
   it("should handle item at exactly minimum width - padding", () => {
     // Item with length 14 + 2 padding = 16 = min
     const item = "a".repeat(14);
-    const width = calculateColumnWidth([item], 16);
+    const width = calculateColumnWidth(
+      [
+        item,
+      ],
+      16,
+    );
     expect(width).toBe(16);
   });
 
   it("should handle item at minimum width - padding + 1", () => {
     // Item with length 15 + 2 padding = 17 > min 16
     const item = "a".repeat(15);
-    const width = calculateColumnWidth([item], 16);
+    const width = calculateColumnWidth(
+      [
+        item,
+      ],
+      16,
+    );
     expect(width).toBe(17);
   });
 });
@@ -648,9 +699,17 @@ describe("getMissingClouds", () => {
 
   it("should preserve cloud order from input", () => {
     const manifest = createTestManifest();
-    const clouds = ["vultr", "sprite", "hetzner"];
+    const clouds = [
+      "vultr",
+      "sprite",
+      "hetzner",
+    ];
     const missing = getMissingClouds(manifest, "cline", clouds);
-    expect(missing).toEqual(["vultr", "sprite", "hetzner"]);
+    expect(missing).toEqual([
+      "vultr",
+      "sprite",
+      "hetzner",
+    ]);
   });
 });
 
@@ -658,7 +717,9 @@ describe("getImplementedClouds", () => {
   it("should return clouds where agent is implemented", () => {
     const manifest = createTestManifest();
     const impl = getImplementedClouds(manifest, "codex");
-    expect(impl).toEqual(["sprite"]);
+    expect(impl).toEqual([
+      "sprite",
+    ]);
   });
 
   it("should return all clouds for fully implemented agent", () => {
@@ -702,11 +763,11 @@ describe("compact vs grid view decision", () => {
 
     const agentColWidth = calculateColumnWidth(
       agents.map((a) => manifest.agents[a].name),
-      MIN_AGENT_COL_WIDTH
+      MIN_AGENT_COL_WIDTH,
     );
     const cloudColWidth = calculateColumnWidth(
       clouds.map((c) => manifest.clouds[c].name),
-      MIN_CLOUD_COL_WIDTH
+      MIN_CLOUD_COL_WIDTH,
     );
 
     const gridWidth = agentColWidth + clouds.length * cloudColWidth;
@@ -722,11 +783,11 @@ describe("compact vs grid view decision", () => {
 
     const agentColWidth = calculateColumnWidth(
       agents.map((a) => manifest.agents[a].name),
-      MIN_AGENT_COL_WIDTH
+      MIN_AGENT_COL_WIDTH,
     );
     const cloudColWidth = calculateColumnWidth(
       clouds.map((c) => manifest.clouds[c].name),
-      MIN_CLOUD_COL_WIDTH
+      MIN_CLOUD_COL_WIDTH,
     );
 
     const gridWidth = agentColWidth + clouds.length * cloudColWidth;
@@ -841,7 +902,11 @@ describe("renderMatrixFooter count matches countImplemented", () => {
   });
 
   it("should handle 0/0 when both agents and clouds are empty", () => {
-    const manifest: Manifest = { agents: {}, clouds: {}, matrix: {} };
+    const manifest: Manifest = {
+      agents: {},
+      clouds: {},
+      matrix: {},
+    };
     const lines = renderMatrixFooter(manifest, [], [], false);
     expect(lines.some((l) => l.includes("0/0"))).toBe(true);
   });

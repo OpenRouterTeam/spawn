@@ -21,11 +21,7 @@ export interface CloudOrchestrator {
   saveLaunchCmd(launchCmd: string): void;
 }
 
-export async function runOrchestration(
-  cloud: CloudOrchestrator,
-  agent: AgentConfig,
-  agentName: string,
-): Promise<void> {
+export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentConfig, agentName: string): Promise<void> {
   logInfo(`${agent.name} on ${cloud.cloudLabel}`);
   process.stderr.write("\n");
 
@@ -47,10 +43,7 @@ export async function runOrchestration(
   // 4. Model selection (if agent needs it)
   let modelId: string | undefined;
   if (agent.modelPrompt) {
-    modelId = await getModelIdInteractive(
-      agent.modelDefault || "openrouter/auto",
-      agent.name,
-    );
+    modelId = await getModelIdInteractive(agent.modelDefault || "openrouter/auto", agent.name);
   }
 
   // 5. Size/bundle selection
@@ -73,8 +66,8 @@ export async function runOrchestration(
   try {
     await cloud.runner.runServer(
       `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
-      `grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc; ` +
-      `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc`,
+        `grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc; ` +
+        `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc`,
     );
   } catch {
     logWarn("Environment setup had errors");

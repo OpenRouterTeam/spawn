@@ -11,7 +11,10 @@
     "includes": ["src/**/*.ts"]
   },
   "formatter": {
-    "enabled": false
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
   },
   "linter": {
     "enabled": true,
@@ -83,6 +86,17 @@
       }
     }
   ],
+  "javascript": {
+    "formatter": {
+      "expand": "always",
+      "arrowParentheses": "always",
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": false
+    }
+  },
   "assist": {
     "enabled": false
   }

@@ -33,7 +33,9 @@ function createTestManifest(): Manifest {
         url: "https://claude.ai",
         install: "npm install -g claude",
         launch: "claude",
-        env: { ANTHROPIC_API_KEY: "test" },
+        env: {
+          ANTHROPIC_API_KEY: "test",
+        },
       },
       codex: {
         name: "Codex",
@@ -41,7 +43,9 @@ function createTestManifest(): Manifest {
         url: "https://codex.dev",
         install: "npm install -g codex",
         launch: "codex",
-        env: { OPENAI_API_KEY: "test" },
+        env: {
+          OPENAI_API_KEY: "test",
+        },
       },
       cline: {
         name: "Cline",
@@ -304,7 +308,9 @@ describe("checkEntity", () => {
     it("should return false when agents collection is empty", () => {
       const emptyAgents: Manifest = {
         agents: {},
-        clouds: { sprite: manifest.clouds.sprite },
+        clouds: {
+          sprite: manifest.clouds.sprite,
+        },
         matrix: {},
       };
       expect(checkEntity(emptyAgents, "claude", "agent")).toBe(false);
@@ -312,7 +318,9 @@ describe("checkEntity", () => {
 
     it("should return false when clouds collection is empty", () => {
       const emptyClouds: Manifest = {
-        agents: { claude: manifest.agents.claude },
+        agents: {
+          claude: manifest.agents.claude,
+        },
         clouds: {},
         matrix: {},
       };
@@ -320,19 +328,31 @@ describe("checkEntity", () => {
     });
 
     it("should not crash on completely empty manifest (agent check)", () => {
-      const empty: Manifest = { agents: {}, clouds: {}, matrix: {} };
+      const empty: Manifest = {
+        agents: {},
+        clouds: {},
+        matrix: {},
+      };
       expect(checkEntity(empty, "test", "agent")).toBe(false);
     });
 
     it("should not crash on completely empty manifest (cloud check)", () => {
-      const empty: Manifest = { agents: {}, clouds: {}, matrix: {} };
+      const empty: Manifest = {
+        agents: {},
+        clouds: {},
+        matrix: {},
+      };
       expect(checkEntity(empty, "test", "cloud")).toBe(false);
     });
 
     it("should detect wrong type with single-entry collections", () => {
       const single: Manifest = {
-        agents: { claude: manifest.agents.claude },
-        clouds: { sprite: manifest.clouds.sprite },
+        agents: {
+          claude: manifest.agents.claude,
+        },
+        clouds: {
+          sprite: manifest.clouds.sprite,
+        },
         matrix: {},
       };
       // "sprite" exists in clouds but not agents

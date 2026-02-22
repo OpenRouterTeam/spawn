@@ -33,10 +33,15 @@ const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649c
 // Fine-grained scopes for spawn (minimum required)
 const DO_SCOPES = [
   "account:read",
-  "droplet:create", "droplet:delete", "droplet:read",
-  "ssh_key:create", "ssh_key:read",
-  "regions:read", "sizes:read",
-  "image:read", "actions:read",
+  "droplet:create",
+  "droplet:delete",
+  "droplet:read",
+  "ssh_key:create",
+  "ssh_key:read",
+  "regions:read",
+  "sizes:read",
+  "image:read",
+  "actions:read",
 ].join(" ");
 
 const DO_OAUTH_CALLBACK_PORT = 5190;
@@ -47,7 +52,11 @@ let doDropletId = "";
 let doServerIp = "";
 
 export function getState() {
-  return { doToken, doDropletId, doServerIp };
+  return {
+    doToken,
+    doDropletId,
+    doServerIp,
+  };
 }
 
 // ─── API Client ──────────────────────────────────────────────────────────────
@@ -57,7 +66,10 @@ async function doApi(
   endpoint: string,
   body?: string,
   maxRetries = 3,
-): Promise<{ status: number; text: string }> {
+): Promise<{
+  status: number;
+  text: string;
+}> {
   const url = `${DO_API_BASE}${endpoint}`;
 
   let interval = 2;
@@ -67,7 +79,10 @@ async function doApi(
         "Content-Type": "application/json",
         Authorization: `Bearer ${doToken}`,
       };
-      const opts: RequestInit = { method, headers };
+      const opts: RequestInit = {
+        method,
+        headers,
+      };
       if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
         opts.body = body;
       }
@@ -75,16 +90,19 @@ async function doApi(
       const text = await resp.text();
 
       if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {
-        logWarn(
-          `API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`,
-        );
+        logWarn(`API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`);
         await sleep(interval * 1000);
         interval = Math.min(interval * 2, 30);
         continue;
       }
-      return { status: resp.status, text };
+      return {
+        status: resp.status,
+        text,
+      };
     } catch (err) {
-      if (attempt >= maxRetries) { throw err; }
+      if (attempt >= maxRetries) {
+        throw err;
+      }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
       await sleep(interval * 1000);
       interval = Math.min(interval * 2, 30);
@@ -129,12 +147,14 @@ function loadConfig(): DoConfig | null {
 
 async function saveConfig(config: DoConfig): Promise<void> {
   const dir = DO_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn(["mkdir", "-p", dir]).exited;
-  await Bun.write(
-    DO_CONFIG_PATH,
-    JSON.stringify(config, null, 2) + "\n",
-    { mode: 0o600 },
-  );
+  await Bun.spawn([
+    "mkdir",
+    "-p",
+    dir,
+  ]).exited;
+  await Bun.write(DO_CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", {
+    mode: 0o600,
+  });
 }
 
 async function saveTokenToConfig(token: string, refreshToken?: string, expiresIn?: number): Promise<void> {
@@ -154,23 +174,35 @@ async function saveTokenToConfig(token: string, refreshToken?: string, expiresIn
 
 function loadTokenFromConfig(): string | null {
   const data = loadConfig();
-  if (!data) { return null; }
+  if (!data) {
+    return null;
+  }
   const token = data.api_key || data.token || "";
-  if (!token) { return null; }
-  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) { return null; }
+  if (!token) {
+    return null;
+  }
+  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
+    return null;
+  }
   return token;
 }
 
 function loadRefreshToken(): string | null {
   const data = loadConfig();
-  if (!data?.refresh_token) { return null; }
-  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(data.refresh_token)) { return null; }
+  if (!data?.refresh_token) {
+    return null;
+  }
+  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(data.refresh_token)) {
+    return null;
+  }
   return data.refresh_token;
 }
 
 function isTokenExpired(): boolean {
   const data = loadConfig();
-  if (!data?.expires_at) { return false; }
+  if (!data?.expires_at) {
+    return false;
+  }
   // Consider expired 5 minutes before actual expiry
   return Math.floor(Date.now() / 1000) >= data.expires_at - 300;
 }
@@ -178,7 +210,9 @@ function isTokenExpired(): boolean {
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testDoToken(): Promise<boolean> {
-  if (!doToken) { return false; }
+  if (!doToken) {
+    return false;
+  }
   try {
     const { text } = await doApi("GET", "/account", undefined, 1);
     return text.includes('"uuid"');
@@ -189,7 +223,8 @@ async function testDoToken(): Promise<boolean> {
 
 // ─── DO OAuth Flow ──────────────────────────────────────────────────────────
 
-const OAUTH_CSS = "*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}";
+const OAUTH_CSS =
+  "*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}";
 
 const OAUTH_SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>DigitalOcean Authorization Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
 
@@ -206,10 +241,14 @@ function isOAuthConfigured(): boolean {
 }
 
 async function tryRefreshDoToken(): Promise<string | null> {
-  if (!isOAuthConfigured()) { return null; }
+  if (!isOAuthConfigured()) {
+    return null;
+  }
 
   const refreshToken = loadRefreshToken();
-  if (!refreshToken) { return null; }
+  if (!refreshToken) {
+    return null;
+  }
 
   logStep("Attempting to refresh DigitalOcean token...");
 
@@ -223,7 +262,9 @@ async function tryRefreshDoToken(): Promise<string | null> {
 
     const resp = await fetch(DO_OAUTH_TOKEN, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
       body: body.toString(),
       signal: AbortSignal.timeout(30_000),
     });
@@ -233,17 +274,13 @@ async function tryRefreshDoToken(): Promise<string | null> {
       return null;
     }
 
-    const data = await resp.json() as any;
+    const data = (await resp.json()) as any;
     if (!data.access_token) {
       logWarn("Token refresh returned no access token");
       return null;
     }
 
-    await saveTokenToConfig(
-      data.access_token,
-      data.refresh_token || refreshToken,
-      data.expires_in,
-    );
+    await saveTokenToConfig(data.access_token, data.refresh_token || refreshToken, data.expires_in);
     logInfo("DigitalOcean token refreshed successfully");
     return data.access_token;
   } catch {
@@ -291,7 +328,10 @@ async function tryDoOAuth(): Promise<string | null> {
               logError(`DigitalOcean authorization denied: ${desc}`);
               return new Response(OAUTH_ERROR_HTML, {
                 status: 403,
-                headers: { "Content-Type": "text/html", Connection: "close" },
+                headers: {
+                  "Content-Type": "text/html",
+                  Connection: "close",
+                },
               });
             }
 
@@ -299,7 +339,10 @@ async function tryDoOAuth(): Promise<string | null> {
             if (!code) {
               return new Response(OAUTH_ERROR_HTML, {
                 status: 400,
-                headers: { "Content-Type": "text/html", Connection: "close" },
+                headers: {
+                  "Content-Type": "text/html",
+                  Connection: "close",
+                },
               });
             }
 
@@ -307,36 +350,47 @@ async function tryDoOAuth(): Promise<string | null> {
             if (url.searchParams.get("state") !== csrfState) {
               return new Response(OAUTH_ERROR_HTML, {
                 status: 403,
-                headers: { "Content-Type": "text/html", Connection: "close" },
+                headers: {
+                  "Content-Type": "text/html",
+                  Connection: "close",
+                },
               });
             }
 
             // Validate code format (alphanumeric + common delimiters)
             if (!/^[a-zA-Z0-9_-]{8,256}$/.test(code)) {
-              return new Response(
-                "<html><body><h1>Invalid Authorization Code</h1></body></html>",
-                { status: 400, headers: { "Content-Type": "text/html" } },
-              );
+              return new Response("<html><body><h1>Invalid Authorization Code</h1></body></html>", {
+                status: 400,
+                headers: {
+                  "Content-Type": "text/html",
+                },
+              });
             }
 
             oauthCode = code;
             return new Response(OAUTH_SUCCESS_HTML, {
-              headers: { "Content-Type": "text/html", Connection: "close" },
+              headers: {
+                "Content-Type": "text/html",
+                Connection: "close",
+              },
             });
           }
           return new Response("Waiting for DigitalOcean OAuth callback...", {
-            headers: { "Content-Type": "text/html" },
+            headers: {
+              "Content-Type": "text/html",
+            },
           });
         },
       });
       actualPort = p;
       break;
-    } catch {
-    }
+    } catch {}
   }
 
   if (!server) {
-    logWarn(`Failed to start OAuth server — ports ${DO_OAUTH_CALLBACK_PORT}-${DO_OAUTH_CALLBACK_PORT + 9} may be in use`);
+    logWarn(
+      `Failed to start OAuth server — ports ${DO_OAUTH_CALLBACK_PORT}-${DO_OAUTH_CALLBACK_PORT + 9} may be in use`,
+    );
     return null;
   }
 
@@ -385,7 +439,9 @@ async function tryDoOAuth(): Promise<string | null> {
 
     const resp = await fetch(DO_OAUTH_TOKEN, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
       body: body.toString(),
       signal: AbortSignal.timeout(30_000),
     });
@@ -397,17 +453,13 @@ async function tryDoOAuth(): Promise<string | null> {
       return null;
     }
 
-    const data = await resp.json() as any;
+    const data = (await resp.json()) as any;
     if (!data.access_token) {
       logError("Token exchange returned no access token");
       return null;
     }
 
-    await saveTokenToConfig(
-      data.access_token,
-      data.refresh_token,
-      data.expires_in,
-    );
+    await saveTokenToConfig(data.access_token, data.refresh_token, data.expires_in);
     logInfo("Successfully obtained DigitalOcean access token via OAuth!");
     return data.access_token;
   } catch (_err) {
@@ -503,32 +555,73 @@ export async function ensureDoToken(): Promise<boolean> {
 
 // ─── SSH Key Management ──────────────────────────────────────────────────────
 
-function generateSshKeyIfMissing(): { pubPath: string; privPath: string } {
+function generateSshKeyIfMissing(): {
+  pubPath: string;
+  privPath: string;
+} {
   const sshDir = `${process.env.HOME}/.ssh`;
   const privPath = `${sshDir}/id_ed25519`;
   const pubPath = `${privPath}.pub`;
 
   if (existsSync(pubPath) && existsSync(privPath)) {
-    return { pubPath, privPath };
+    return {
+      pubPath,
+      privPath,
+    };
   }
 
-  mkdirSync(sshDir, { recursive: true, mode: 0o700 } as any);
+  mkdirSync(sshDir, {
+    recursive: true,
+    mode: 0o700,
+  } as any);
   logStep("Generating SSH key...");
   const result = Bun.spawnSync(
-    ["ssh-keygen", "-t", "ed25519", "-f", privPath, "-N", "", "-C", "spawn"],
-    { stdio: ["ignore", "pipe", "pipe"] },
+    [
+      "ssh-keygen",
+      "-t",
+      "ed25519",
+      "-f",
+      privPath,
+      "-N",
+      "",
+      "-C",
+      "spawn",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
   );
   if (result.exitCode !== 0) {
     throw new Error("SSH key generation failed");
   }
   logInfo("SSH key generated");
-  return { pubPath, privPath };
+  return {
+    pubPath,
+    privPath,
+  };
 }
 
 function getSshFingerprint(pubPath: string): string {
   const result = Bun.spawnSync(
-    ["ssh-keygen", "-l", "-E", "md5", "-f", pubPath],
-    { stdio: ["ignore", "pipe", "pipe"] },
+    [
+      "ssh-keygen",
+      "-l",
+      "-E",
+      "md5",
+      "-f",
+      pubPath,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
   );
   const output = new TextDecoder().decode(result.stdout).trim();
   const match = output.match(/MD5:([a-f0-9:]+)/);
@@ -592,12 +685,25 @@ function saveVmConnection(
   launchCmd?: string,
 ): void {
   const dir = `${process.env.HOME}/.spawn`;
-  mkdirSync(dir, { recursive: true });
-  const json: Record<string, string> = { ip, user };
-  if (serverId) { json.server_id = serverId; }
-  if (serverName) { json.server_name = serverName; }
-  if (cloud) { json.cloud = cloud; }
-  if (launchCmd) { json.launch_cmd = launchCmd; }
+  mkdirSync(dir, {
+    recursive: true,
+  });
+  const json: Record<string, string> = {
+    ip,
+    user,
+  };
+  if (serverId) {
+    json.server_id = serverId;
+  }
+  if (serverName) {
+    json.server_name = serverName;
+  }
+  if (cloud) {
+    json.cloud = cloud;
+  }
+  if (launchCmd) {
+    json.launch_cmd = launchCmd;
+  }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -629,8 +735,8 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   }
   if (needsBun(tier)) {
     lines.push(
-      'if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi',
-      'ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true',
+      "if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi",
+      "ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true",
     );
   }
   lines.push(
@@ -655,9 +761,7 @@ export async function createServer(name: string, tier?: CloudInitTier): Promise<
   // Get all SSH key IDs
   const { text: keysText } = await doApi("GET", "/account/keys");
   const keysData = parseJson(keysText);
-  const sshKeyIds: number[] = (keysData?.ssh_keys || [])
-    .map((k: any) => k.id)
-    .filter(Boolean);
+  const sshKeyIds: number[] = (keysData?.ssh_keys || []).map((k: any) => k.id).filter(Boolean);
 
   const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
@@ -694,10 +798,7 @@ export async function createServer(name: string, tier?: CloudInitTier): Promise<
   saveVmConnection(doServerIp, "root", doDropletId, name, "digitalocean");
 }
 
-async function waitForDropletActive(
-  dropletId: string,
-  maxAttempts = 60,
-): Promise<void> {
+async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promise<void> {
   logStep("Waiting for droplet to become active...");
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -728,24 +829,36 @@ async function waitForDropletActive(
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
 const SSH_OPTS = [
-  "-o", "StrictHostKeyChecking=no",
-  "-o", "UserKnownHostsFile=/dev/null",
-  "-o", "LogLevel=ERROR",
-  "-o", "ConnectTimeout=10",
+  "-o",
+  "StrictHostKeyChecking=no",
+  "-o",
+  "UserKnownHostsFile=/dev/null",
+  "-o",
+  "LogLevel=ERROR",
+  "-o",
+  "ConnectTimeout=10",
 ];
 
-export async function waitForCloudInit(
-  ip?: string,
-  maxAttempts = 60,
-): Promise<void> {
+export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<void> {
   const serverIp = ip || doServerIp;
   logStep("Waiting for SSH connectivity...");
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const proc = Bun.spawn(
-        ["ssh", ...SSH_OPTS, `root@${serverIp}`, "echo ok"],
-        { stdio: ["ignore", "pipe", "pipe"] },
+        [
+          "ssh",
+          ...SSH_OPTS,
+          `root@${serverIp}`,
+          "echo ok",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
       );
       const stdout = await new Response(proc.stdout).text();
       const exitCode = await proc.exited;
@@ -767,21 +880,32 @@ export async function waitForCloudInit(
   // Stream cloud-init output so the user sees progress in real time
   logStep("Streaming cloud-init output (timeout: 5min)...");
   const remoteScript =
-    'tail -f /var/log/cloud-init-output.log 2>/dev/null & TAIL_PID=$!\n' +
-    'for i in $(seq 1 150); do\n' +
-    '  if [ -f /root/.cloud-init-complete ]; then\n' +
-    '    kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n' +
+    "tail -f /var/log/cloud-init-output.log 2>/dev/null & TAIL_PID=$!\n" +
+    "for i in $(seq 1 150); do\n" +
+    "  if [ -f /root/.cloud-init-complete ]; then\n" +
+    "    kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n" +
     '    echo ""; echo "--- cloud-init complete ---"; exit 0\n' +
-    '  fi\n' +
-    '  sleep 2\n' +
-    'done\n' +
-    'kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n' +
+    "  fi\n" +
+    "  sleep 2\n" +
+    "done\n" +
+    "kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n" +
     'echo ""; echo "--- cloud-init timed out ---"; exit 1';
 
   try {
     const proc = Bun.spawn(
-      ["ssh", ...SSH_OPTS, `root@${serverIp}`, remoteScript],
-      { stdio: ["ignore", "inherit", "inherit"] },
+      [
+        "ssh",
+        ...SSH_OPTS,
+        `root@${serverIp}`,
+        remoteScript,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "inherit",
+        ],
+      },
     );
     const exitCode = await proc.exited;
     if (exitCode === 0) {
@@ -797,38 +921,66 @@ export async function waitForCloudInit(
   for (let attempt = 1; attempt <= 6; attempt++) {
     try {
       const proc = Bun.spawn(
-        ["ssh", ...SSH_OPTS, `root@${serverIp}`, "test -f /root/.cloud-init-complete && echo done"],
-        { stdio: ["ignore", "pipe", "pipe"] },
+        [
+          "ssh",
+          ...SSH_OPTS,
+          `root@${serverIp}`,
+          "test -f /root/.cloud-init-complete && echo done",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
       );
       const stdout = await new Response(proc.stdout).text();
       if ((await proc.exited) === 0 && stdout.includes("done")) {
         logInfo("Cloud-init complete");
         return;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     logStep(`Cloud-init in progress (${attempt}/6)`);
     await sleep(5000);
   }
   logWarn("Cloud-init marker not found, continuing anyway...");
 }
 
-export async function runServer(
-  cmd: string,
-  timeoutSecs?: number,
-  ip?: string,
-): Promise<void> {
+export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
   const serverIp = ip || doServerIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
 
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, `root@${serverIp}`, fullCmd],
-    { stdio: ["pipe", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      `root@${serverIp}`,
+      fullCmd,
+    ],
+    {
+      stdio: [
+        "pipe",
+        "inherit",
+        "inherit",
+      ],
+    },
   );
 
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {}
+  }, timeout);
   const exitCode = await proc.exited;
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   clearTimeout(timer);
 
   if (exitCode !== 0) {
@@ -836,35 +988,48 @@ export async function runServer(
   }
 }
 
-export async function runServerCapture(
-  cmd: string,
-  timeoutSecs?: number,
-  ip?: string,
-): Promise<string> {
+export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: string): Promise<string> {
   const serverIp = ip || doServerIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
 
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, `root@${serverIp}`, fullCmd],
-    { stdio: ["pipe", "pipe", "pipe"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      `root@${serverIp}`,
+      fullCmd,
+    ],
+    {
+      stdio: [
+        "pipe",
+        "pipe",
+        "pipe",
+      ],
+    },
   );
 
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {}
+  }, timeout);
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   clearTimeout(timer);
 
-  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
+  if (exitCode !== 0) {
+    throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  }
   return stdout.trim();
 }
 
-export async function uploadFile(
-  localPath: string,
-  remotePath: string,
-  ip?: string,
-): Promise<void> {
+export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || doServerIp;
   if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
     logError(`Invalid remote path: ${remotePath}`);
@@ -872,24 +1037,46 @@ export async function uploadFile(
   }
 
   const proc = Bun.spawn(
-    ["scp", ...SSH_OPTS, localPath, `root@${serverIp}:${remotePath}`],
-    { stdio: ["ignore", "ignore", "pipe"] },
+    [
+      "scp",
+      ...SSH_OPTS,
+      localPath,
+      `root@${serverIp}:${remotePath}`,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "ignore",
+        "pipe",
+      ],
+    },
   );
   const exitCode = await proc.exited;
-  if (exitCode !== 0) { throw new Error(`upload_file failed for ${remotePath}`); }
+  if (exitCode !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
+  }
 }
 
-export async function interactiveSession(
-  cmd: string,
-  ip?: string,
-): Promise<number> {
+export async function interactiveSession(cmd: string, ip?: string): Promise<number> {
   const serverIp = ip || doServerIp;
   const term = process.env.TERM || "xterm-256color";
   const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
 
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, "-t", `root@${serverIp}`, fullCmd],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      "-t",
+      `root@${serverIp}`,
+      fullCmd,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+    },
   );
   const exitCode = await proc.exited;
 
@@ -923,7 +1110,9 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
-      if (attempt < maxAttempts) { await sleep(sleepSec * 1000); }
+      if (attempt < maxAttempts) {
+        await sleep(sleepSec * 1000);
+      }
     }
   }
   logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);
@@ -943,13 +1132,14 @@ export async function getServerName(): Promise<string> {
     return name;
   }
 
-  const kebab = process.env.SPAWN_NAME_KEBAB
-    || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
+  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
   return kebab || defaultSpawnName();
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) { return; }
+  if (process.env.SPAWN_NAME_KEBAB) {
+    return;
+  }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {
@@ -1008,9 +1198,7 @@ export async function listServers(): Promise<void> {
   }
 
   const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-  console.log(
-    pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("SIZE", 15),
-  );
+  console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("SIZE", 15));
   console.log("-".repeat(80));
   for (const d of droplets) {
     const ip = (d.networks?.v4 || []).find((n: any) => n.type === "public")?.ip_address || "N/A";

@@ -22,7 +22,10 @@ let spriteName = "";
 let spriteOrg = "";
 
 export function getState() {
-  return { spriteName, spriteOrg };
+  return {
+    spriteName,
+    spriteOrg,
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -32,8 +35,18 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** Run a command locally and return { exitCode, stdout, stderr }. */
-function spawnSync(args: string[]): { exitCode: number; stdout: string; stderr: string } {
-  const proc = Bun.spawnSync(args, { stdio: ["ignore", "pipe", "pipe"] });
+function spawnSync(args: string[]): {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+} {
+  const proc = Bun.spawnSync(args, {
+    stdio: [
+      "ignore",
+      "pipe",
+      "pipe",
+    ],
+  });
   return {
     exitCode: proc.exitCode,
     stdout: new TextDecoder().decode(proc.stdout),
@@ -47,10 +60,7 @@ function spawnSync(args: string[]): { exitCode: number; stdout: string; stderr: 
  * Retry wrapper for transient Sprite CLI errors (TLS timeouts, connection resets, etc.)
  * Retries up to 3 times with 3s backoff for known transient errors.
  */
-async function spriteRetry<T>(
-  desc: string,
-  fn: () => Promise<T>,
-): Promise<T> {
+async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
   const maxRetries = 3;
   let lastError: unknown;
 
@@ -61,7 +71,9 @@ async function spriteRetry<T>(
       lastError = err;
       const msg = err instanceof Error ? err.message : String(err);
 
-      if (attempt >= maxRetries) { break; }
+      if (attempt >= maxRetries) {
+        break;
+      }
 
       // Only retry on transient network errors
       if (/TLS handshake timeout|connection closed|connection reset|connection refused/i.test(msg)) {
@@ -80,7 +92,21 @@ async function spriteRetry<T>(
 // ─── Sprite CLI Detection ────────────────────────────────────────────────────
 
 function getSpriteCmd(): string | null {
-  if (Bun.spawnSync(["which", "sprite"], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0) {
+  if (
+    Bun.spawnSync(
+      [
+        "which",
+        "sprite",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "ignore",
+        ],
+      },
+    ).exitCode === 0
+  ) {
     return "sprite";
   }
   const commonPaths = [
@@ -90,7 +116,9 @@ function getSpriteCmd(): string | null {
     "/usr/bin/sprite",
   ];
   for (const p of commonPaths) {
-    if (existsSync(p)) { return p; }
+    if (existsSync(p)) {
+      return p;
+    }
   }
   return null;
 }
@@ -101,7 +129,10 @@ export async function ensureSpriteCli(): Promise<void> {
   const cmd = getSpriteCmd();
   if (cmd) {
     // Log version if available
-    const { stdout } = spawnSync([cmd, "version"]);
+    const { stdout } = spawnSync([
+      cmd,
+      "version",
+    ]);
     const ver = stdout.match(/v?\d+\.\d+\.\d+(-rc\d+)?/)?.[0];
     if (ver) {
       logInfo(`sprite ${ver} already installed`);
@@ -112,9 +143,20 @@ export async function ensureSpriteCli(): Promise<void> {
   }
 
   logStep("Installing sprite CLI...");
-  const proc = Bun.spawn(["sh", "-c", "curl -fsSL https://sprites.dev/install.sh | bash"], {
-    stdio: ["ignore", "inherit", "pipe"],
-  });
+  const proc = Bun.spawn(
+    [
+      "sh",
+      "-c",
+      "curl -fsSL https://sprites.dev/install.sh | bash",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "inherit",
+        "pipe",
+      ],
+    },
+  );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     logError("Failed to install sprite CLI");
@@ -143,7 +185,11 @@ export async function ensureSpriteAuthenticated(): Promise<void> {
   const cmd = getSpriteCmd()!;
 
   // Check if already authenticated
-  const check = spawnSync([cmd, "org", "list"]);
+  const check = spawnSync([
+    cmd,
+    "org",
+    "list",
+  ]);
   if (check.exitCode === 0) {
     logInfo("Already authenticated with Sprite");
     detectOrg(check.stdout);
@@ -151,9 +197,19 @@ export async function ensureSpriteAuthenticated(): Promise<void> {
   }
 
   logStep("Logging in to Sprite...");
-  const proc = Bun.spawn([cmd, "login"], {
-    stdio: ["inherit", "inherit", "inherit"],
-  });
+  const proc = Bun.spawn(
+    [
+      cmd,
+      "login",
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+    },
+  );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     logError("Sprite login failed");
@@ -162,7 +218,11 @@ export async function ensureSpriteAuthenticated(): Promise<void> {
   }
 
   // Verify login succeeded
-  const verify = spawnSync([cmd, "org", "list"]);
+  const verify = spawnSync([
+    cmd,
+    "org",
+    "list",
+  ]);
   if (verify.exitCode !== 0) {
     logError("Sprite login completed but authentication check still fails");
     logError("Try running 'sprite login' manually");
@@ -185,14 +245,21 @@ function detectOrg(output: string): void {
 }
 
 function orgFlags(): string[] {
-  if (spriteOrg) { return ["-o", spriteOrg]; }
+  if (spriteOrg) {
+    return [
+      "-o",
+      spriteOrg,
+    ];
+  }
   return [];
 }
 
 // ─── Server Name ─────────────────────────────────────────────────────────────
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) { return; }
+  if (process.env.SPAWN_NAME_KEBAB) {
+    return;
+  }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {
@@ -222,8 +289,7 @@ export async function getServerName(): Promise<string> {
     return name;
   }
 
-  const kebab = process.env.SPAWN_NAME_KEBAB
-    || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
+  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
   return kebab || defaultSpawnName();
 }
 
@@ -233,7 +299,11 @@ export async function createSprite(name: string): Promise<void> {
   const cmd = getSpriteCmd()!;
 
   // Check if sprite already exists
-  const listResult = spawnSync([cmd, ...orgFlags(), "list"]);
+  const listResult = spawnSync([
+    cmd,
+    ...orgFlags(),
+    "list",
+  ]);
   if (listResult.exitCode === 0) {
     const lines = listResult.stdout.split("\n");
     for (const line of lines) {
@@ -248,9 +318,22 @@ export async function createSprite(name: string): Promise<void> {
 
   logStep(`Creating sprite '${name}'...`);
   await spriteRetry("sprite create", async () => {
-    const proc = Bun.spawn([cmd, ...orgFlags(), "create", "-skip-console", name], {
-      stdio: ["ignore", "inherit", "pipe"],
-    });
+    const proc = Bun.spawn(
+      [
+        cmd,
+        ...orgFlags(),
+        "create",
+        "-skip-console",
+        name,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "pipe",
+        ],
+      },
+    );
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
       const stderr = await new Response(proc.stderr).text();
@@ -263,7 +346,11 @@ export async function createSprite(name: string): Promise<void> {
   const maxWait = 30;
   let elapsed = 0;
   while (elapsed < maxWait) {
-    const check = spawnSync([cmd, ...orgFlags(), "list"]);
+    const check = spawnSync([
+      cmd,
+      ...orgFlags(),
+      "list",
+    ]);
     if (check.exitCode === 0) {
       const lines = check.stdout.split("\n");
       for (const line of lines) {
@@ -288,7 +375,16 @@ export async function verifySpriteConnectivity(maxAttempts = 6): Promise<void> {
 
   logStep("Verifying sprite connectivity...");
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const proc = spawnSync([cmd, ...orgFlags(), "exec", "-s", spriteName, "--", "echo", "ok"]);
+    const proc = spawnSync([
+      cmd,
+      ...orgFlags(),
+      "exec",
+      "-s",
+      spriteName,
+      "--",
+      "echo",
+      "ok",
+    ]);
     if (proc.exitCode === 0) {
       logInfo(`Sprite '${spriteName}' is ready`);
       return;
@@ -313,14 +409,18 @@ export async function setupShellEnvironment(): Promise<void> {
   // Upload and append PATH config to .bashrc and .zshrc
   const pathConfig = `\n# [spawn:path]\nexport PATH="\${HOME}/.bun/bin:/.sprite/languages/bun/bin:\${PATH}"\n`;
   const pathB64 = Buffer.from(pathConfig).toString("base64");
-  await runSprite(`printf '%s' '${pathB64}' | base64 -d >> ~/.bashrc && printf '%s' '${pathB64}' | base64 -d >> ~/.zshrc`);
+  await runSprite(
+    `printf '%s' '${pathB64}' | base64 -d >> ~/.bashrc && printf '%s' '${pathB64}' | base64 -d >> ~/.zshrc`,
+  );
 
   // Switch bash to zsh if available
   try {
     await runSpriteSilent("command -v zsh");
     const bashConfig = "# [spawn:bash]\nexec /usr/bin/zsh -l\n";
     const bashB64 = Buffer.from(bashConfig).toString("base64");
-    await runSprite(`printf '%s' '${bashB64}' | base64 -d > ~/.bash_profile && printf '%s' '${bashB64}' | base64 -d > ~/.bashrc`);
+    await runSprite(
+      `printf '%s' '${bashB64}' | base64 -d > ~/.bash_profile && printf '%s' '${bashB64}' | base64 -d > ~/.bashrc`,
+    );
   } catch {
     logWarn("zsh not available on sprite, keeping bash as default shell");
   }
@@ -330,7 +430,9 @@ export async function setupShellEnvironment(): Promise<void> {
 
 export function saveVmConnection(): void {
   const dir = `${process.env.HOME}/.spawn`;
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, {
+    recursive: true,
+  });
   const json: Record<string, string> = {
     ip: "sprite-console",
     user: process.env.USER || "root",
@@ -360,8 +462,24 @@ export async function runSprite(cmd: string): Promise<void> {
   const spriteCmd = getSpriteCmd()!;
   await spriteRetry("sprite exec", async () => {
     const proc = Bun.spawn(
-      [spriteCmd, ...orgFlags(), "exec", "-s", spriteName, "--", "bash", "-c", cmd],
-      { stdio: ["ignore", "inherit", "inherit"] },
+      [
+        spriteCmd,
+        ...orgFlags(),
+        "exec",
+        "-s",
+        spriteName,
+        "--",
+        "bash",
+        "-c",
+        cmd,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "inherit",
+        ],
+      },
     );
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
@@ -374,8 +492,24 @@ export async function runSprite(cmd: string): Promise<void> {
 async function runSpriteSilent(cmd: string): Promise<void> {
   const spriteCmd = getSpriteCmd()!;
   const proc = Bun.spawn(
-    [spriteCmd, ...orgFlags(), "exec", "-s", spriteName, "--", "bash", "-c", cmd],
-    { stdio: ["ignore", "ignore", "ignore"] },
+    [
+      spriteCmd,
+      ...orgFlags(),
+      "exec",
+      "-s",
+      spriteName,
+      "--",
+      "bash",
+      "-c",
+      cmd,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "ignore",
+        "ignore",
+      ],
+    },
   );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
@@ -387,11 +521,8 @@ async function runSpriteSilent(cmd: string): Promise<void> {
  * Upload a local file to the remote sprite using sprite exec -file flag.
  * The -file flag format is "localpath:remotepath".
  */
-export async function uploadFileSprite(
-  localPath: string,
-  remotePath: string,
-): Promise<void> {
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes('..')) {
+export async function uploadFileSprite(localPath: string, remotePath: string): Promise<void> {
+  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
@@ -405,12 +536,25 @@ export async function uploadFileSprite(
   await spriteRetry("sprite upload", async () => {
     const proc = Bun.spawn(
       [
-        spriteCmd, ...orgFlags(), "exec", "-s", spriteName,
-        "-file", `${localPath}:${tempRemote}`,
-        "--", "bash", "-c",
+        spriteCmd,
+        ...orgFlags(),
+        "exec",
+        "-s",
+        spriteName,
+        "-file",
+        `${localPath}:${tempRemote}`,
+        "--",
+        "bash",
+        "-c",
         `mkdir -p $(dirname '${remotePath}') && mv '${tempRemote}' '${remotePath}'`,
       ],
-      { stdio: ["ignore", "inherit", "pipe"] },
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "pipe",
+        ],
+      },
     );
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
@@ -428,11 +572,36 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const spriteCmd = getSpriteCmd()!;
 
   const args = process.env.SPAWN_PROMPT
-    ? [spriteCmd, ...orgFlags(), "exec", "-s", spriteName, "--", "bash", "-c", cmd]
-    : [spriteCmd, ...orgFlags(), "exec", "-s", spriteName, "-tty", "--", "bash", "-c", cmd];
+    ? [
+        spriteCmd,
+        ...orgFlags(),
+        "exec",
+        "-s",
+        spriteName,
+        "--",
+        "bash",
+        "-c",
+        cmd,
+      ]
+    : [
+        spriteCmd,
+        ...orgFlags(),
+        "exec",
+        "-s",
+        spriteName,
+        "-tty",
+        "--",
+        "bash",
+        "-c",
+        cmd,
+      ];
 
   const proc = Bun.spawn(args, {
-    stdio: ["inherit", "inherit", "inherit"],
+    stdio: [
+      "inherit",
+      "inherit",
+      "inherit",
+    ],
   });
   const exitCode = await proc.exited;
 
@@ -461,9 +630,21 @@ export async function destroyServer(name?: string): Promise<void> {
   const cmd = getSpriteCmd()!;
   logStep(`Destroying sprite '${target}'...`);
 
-  const proc = Bun.spawn([cmd, ...orgFlags(), "destroy", target], {
-    stdio: ["ignore", "inherit", "pipe"],
-  });
+  const proc = Bun.spawn(
+    [
+      cmd,
+      ...orgFlags(),
+      "destroy",
+      target,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "inherit",
+        "pipe",
+      ],
+    },
+  );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     logError(`Failed to destroy sprite '${target}'`);

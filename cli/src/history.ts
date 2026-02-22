@@ -29,12 +29,13 @@ export interface SpawnRecord {
  *  to prevent unintended file writes. */
 export function getSpawnDir(): string {
   const spawnHome = process.env.SPAWN_HOME;
-  if (!spawnHome) { return join(homedir(), ".spawn"); }
+  if (!spawnHome) {
+    return join(homedir(), ".spawn");
+  }
   // Require absolute path to prevent path traversal via relative paths
   if (!isAbsolute(spawnHome)) {
     throw new Error(
-      `SPAWN_HOME must be an absolute path (got "${spawnHome}").\n` +
-      "Example: export SPAWN_HOME=/home/user/.spawn"
+      `SPAWN_HOME must be an absolute path (got "${spawnHome}").\n` + "Example: export SPAWN_HOME=/home/user/.spawn",
     );
   }
   // Resolve to canonical form (collapses .. segments)
@@ -46,11 +47,7 @@ export function getSpawnDir(): string {
   // file writes to sensitive directories.
   const userHome = homedir();
   if (!resolved.startsWith(userHome + "/") && resolved !== userHome) {
-    throw new Error(
-      "SPAWN_HOME must be within your home directory.\n" +
-      `Got: ${resolved}\n` +
-      `Home: ${userHome}`
-    );
+    throw new Error("SPAWN_HOME must be within your home directory.\n" + `Got: ${resolved}\n` + `Home: ${userHome}`);
   }
 
   return resolved;
@@ -66,7 +63,9 @@ export function getConnectionPath(): string {
 
 export function loadHistory(): SpawnRecord[] {
   const path = getHistoryPath();
-  if (!existsSync(path)) { return []; }
+  if (!existsSync(path)) {
+    return [];
+  }
   try {
     const data = JSON.parse(readFileSync(path, "utf-8"));
     return Array.isArray(data) ? data : [];
@@ -80,7 +79,9 @@ const MAX_HISTORY_ENTRIES = 100;
 export function saveSpawnRecord(record: SpawnRecord): void {
   const dir = getSpawnDir();
   if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, {
+      recursive: true,
+    });
   }
   let history = loadHistory();
   history.push(record);
@@ -93,7 +94,9 @@ export function saveSpawnRecord(record: SpawnRecord): void {
 
 export function clearHistory(): number {
   const path = getHistoryPath();
-  if (!existsSync(path)) { return 0; }
+  if (!existsSync(path)) {
+    return 0;
+  }
   const records = loadHistory();
   const count = records.length;
   if (count > 0) {
@@ -107,7 +110,9 @@ export function clearHistory(): number {
  *  This function merges that data into the history and persists it. */
 export function mergeLastConnection(): void {
   const connPath = getConnectionPath();
-  if (!existsSync(connPath)) { return; }
+  if (!existsSync(connPath)) {
+    return;
+  }
 
   try {
     const connData = JSON.parse(readFileSync(connPath, "utf-8")) as VMConnection;
@@ -126,7 +131,9 @@ export function mergeLastConnection(): void {
     } catch (err) {
       // Log validation failure and skip merging
       // Use duck typing instead of instanceof to avoid prototype chain issues
-      console.error(`Warning: Invalid connection data from bash script, skipping merge: ${err && typeof err === "object" && "message" in err ? String(err.message) : String(err)}`);
+      console.error(
+        `Warning: Invalid connection data from bash script, skipping merge: ${err && typeof err === "object" && "message" in err ? String(err.message) : String(err)}`,
+      );
       unlinkSync(connPath);
       return;
     }
@@ -153,14 +160,15 @@ export function mergeLastConnection(): void {
 export function markRecordDeleted(record: SpawnRecord): boolean {
   const history = loadHistory();
   const index = history.findIndex(
-    (r) =>
-      r.timestamp === record.timestamp &&
-      r.agent === record.agent &&
-      r.cloud === record.cloud
+    (r) => r.timestamp === record.timestamp && r.agent === record.agent && r.cloud === record.cloud,
   );
-  if (index < 0) { return false; }
+  if (index < 0) {
+    return false;
+  }
   const found = history[index];
-  if (!found.connection) { return false; }
+  if (!found.connection) {
+    return false;
+  }
   found.connection.deleted = true;
   found.connection.deleted_at = new Date().toISOString();
   writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
@@ -170,18 +178,10 @@ export function markRecordDeleted(record: SpawnRecord): boolean {
 export function getActiveServers(): SpawnRecord[] {
   mergeLastConnection();
   const records = loadHistory();
-  return records.filter(
-    (r) =>
-      r.connection?.cloud &&
-      r.connection.cloud !== "local" &&
-      !r.connection.deleted
-  );
+  return records.filter((r) => r.connection?.cloud && r.connection.cloud !== "local" && !r.connection.deleted);
 }
 
-export function filterHistory(
-  agentFilter?: string,
-  cloudFilter?: string
-): SpawnRecord[] {
+export function filterHistory(agentFilter?: string, cloudFilter?: string): SpawnRecord[] {
   // Merge any pending connection data before filtering
   mergeLastConnection();
 

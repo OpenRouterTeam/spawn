@@ -86,10 +86,15 @@ describe("cmdUpdate", () => {
       if (typeof url === "string" && url.includes("package.json")) {
         return {
           ok: true,
-          json: async () => ({ version: VERSION }),
+          json: async () => ({
+            version: VERSION,
+          }),
         };
       }
-      return { ok: false, status: 404 };
+      return {
+        ok: false,
+        status: 404,
+      };
     }) as any;
 
     await cmdUpdate();
@@ -106,10 +111,15 @@ describe("cmdUpdate", () => {
       if (typeof url === "string" && url.includes("package.json")) {
         return {
           ok: true,
-          json: async () => ({ version: "99.99.99" }),
+          json: async () => ({
+            version: "99.99.99",
+          }),
         };
       }
-      return { ok: false, status: 404 };
+      return {
+        ok: false,
+        status: 404,
+      };
     }) as any;
 
     await cmdUpdate();
@@ -155,10 +165,15 @@ describe("cmdUpdate", () => {
       if (typeof url === "string" && url.includes("package.json")) {
         return {
           ok: true,
-          json: async () => ({ version: "99.99.99" }),
+          json: async () => ({
+            version: "99.99.99",
+          }),
         };
       }
-      return { ok: false, status: 404 };
+      return {
+        ok: false,
+        status: 404,
+      };
     }) as any;
 
     // cmdUpdate now runs execSync which will fail in test env
@@ -173,7 +188,9 @@ describe("cmdUpdate", () => {
   it("should start spinner with checking message", async () => {
     global.fetch = mock(async () => ({
       ok: true,
-      json: async () => ({ version: VERSION }),
+      json: async () => ({
+        version: VERSION,
+      }),
     })) as any;
 
     await cmdUpdate();
@@ -187,10 +204,14 @@ describe("cmdUpdate", () => {
       if (typeof url === "string" && url.includes("package.json")) {
         return {
           ok: true,
-          json: async () => ({ version: "2.0.0" }),
+          json: async () => ({
+            version: "2.0.0",
+          }),
         };
       }
-      return { ok: false };
+      return {
+        ok: false,
+      };
     }) as any;
 
     await cmdUpdate();
@@ -327,7 +348,11 @@ describe("Script download and execution", () => {
       }
       if (typeof url === "string" && url.includes("openrouter.ai")) {
         // Primary fails
-        return { ok: false, status: 503, text: async () => "Service Unavailable" };
+        return {
+          ok: false,
+          status: 503,
+          text: async () => "Service Unavailable",
+        };
       }
       if (typeof url === "string" && url.includes("raw.githubusercontent.com")) {
         // Fallback returns valid script
@@ -336,7 +361,11 @@ describe("Script download and execution", () => {
           text: async () => "#!/bin/bash\nset -eo pipefail\necho 'hello'",
         };
       }
-      return { ok: false, status: 404, text: async () => "Not found" };
+      return {
+        ok: false,
+        status: 404,
+        text: async () => "Not found",
+      };
     }) as any;
 
     await loadManifest(true);
@@ -351,10 +380,10 @@ describe("Script download and execution", () => {
     }
 
     // Verify both URLs were attempted
-    const scriptUrls = fetchedUrls.filter(u => u.includes(".sh"));
+    const scriptUrls = fetchedUrls.filter((u) => u.includes(".sh"));
     expect(scriptUrls.length).toBeGreaterThanOrEqual(2);
-    expect(scriptUrls.some(u => u.includes("openrouter.ai"))).toBe(true);
-    expect(scriptUrls.some(u => u.includes("raw.githubusercontent.com"))).toBe(true);
+    expect(scriptUrls.some((u) => u.includes("openrouter.ai"))).toBe(true);
+    expect(scriptUrls.some((u) => u.includes("raw.githubusercontent.com"))).toBe(true);
 
     // Should show fallback spinner message
     const messageCalls = mockSpinnerMessage.mock.calls.map((c: any[]) => c.join(" "));
@@ -370,7 +399,11 @@ describe("Script download and execution", () => {
           text: async () => JSON.stringify(mockManifest),
         };
       }
-      return { ok: false, status: 404, text: async () => "Not found" };
+      return {
+        ok: false,
+        status: 404,
+        text: async () => "Not found",
+      };
     }) as any;
 
     await loadManifest(true);
@@ -411,9 +444,7 @@ describe("Script download and execution", () => {
 
     // Should have gotten past download (spinner stop indicates success)
     const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
-    expect(stopCalls.some((msg: string) =>
-      msg.includes("downloaded") || msg.includes("Download")
-    )).toBe(true);
+    expect(stopCalls.some((msg: string) => msg.includes("downloaded") || msg.includes("Download"))).toBe(true);
   });
 
   it("should reject script with dangerous pattern (rm -rf /)", async () => {
@@ -442,12 +473,15 @@ describe("Script download and execution", () => {
     // The error from the download/execution pipeline should be caught
     const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-    const allErrors = [...errorCalls, errorOutput].join("\n");
+    const allErrors = [
+      ...errorCalls,
+      errorOutput,
+    ].join("\n");
     expect(
       allErrors.includes("dangerous") ||
-      allErrors.includes("blocked") ||
-      allErrors.includes("Failed") ||
-      allErrors.includes("Error")
+        allErrors.includes("blocked") ||
+        allErrors.includes("Failed") ||
+        allErrors.includes("Error"),
     ).toBe(true);
   });
 
@@ -460,7 +494,11 @@ describe("Script download and execution", () => {
           text: async () => JSON.stringify(mockManifest),
         };
       }
-      return { ok: false, status: 404, text: async () => "Not Found" };
+      return {
+        ok: false,
+        status: 404,
+        text: async () => "Not Found",
+      };
     }) as any;
 
     await loadManifest(true);
@@ -488,12 +526,24 @@ describe("Script download and execution", () => {
         };
       }
       if (typeof url === "string" && url.includes("openrouter.ai")) {
-        return { ok: false, status: 500, text: async () => "Error" };
+        return {
+          ok: false,
+          status: 500,
+          text: async () => "Error",
+        };
       }
       if (typeof url === "string" && url.includes("raw.githubusercontent.com")) {
-        return { ok: false, status: 502, text: async () => "Bad Gateway" };
+        return {
+          ok: false,
+          status: 502,
+          text: async () => "Bad Gateway",
+        };
       }
-      return { ok: false, status: 404, text: async () => "Not found" };
+      return {
+        ok: false,
+        status: 404,
+        text: async () => "Not found",
+      };
     }) as any;
 
     await loadManifest(true);

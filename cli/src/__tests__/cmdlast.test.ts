@@ -82,9 +82,13 @@ describe("cmdLast", () => {
 
   beforeEach(async () => {
     testDir = join(homedir(), `spawn-cmdlast-test-${Date.now()}-${Math.random()}`);
-    mkdirSync(testDir, { recursive: true });
+    mkdirSync(testDir, {
+      recursive: true,
+    });
 
-    originalEnv = { ...process.env };
+    originalEnv = {
+      ...process.env,
+    };
     process.env.SPAWN_HOME = testDir;
     process.env.XDG_CACHE_HOME = join(testDir, "cache");
 
@@ -100,8 +104,12 @@ describe("cmdLast", () => {
     cmdRunMock = mock(() => Promise.resolve());
 
     // Prime the manifest cache with mock data
-    global.fetch = mock(() =>
-      Promise.resolve({ ok: true, json: async () => mockManifest }) as any
+    global.fetch = mock(
+      () =>
+        Promise.resolve({
+          ok: true,
+          json: async () => mockManifest,
+        }) as any,
     );
     await loadManifest(true);
     global.fetch = originalFetch;
@@ -117,7 +125,9 @@ describe("cmdLast", () => {
     processExitSpy.mockRestore();
     restoreMocks(consoleMocks.log, consoleMocks.error);
     if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true });
+      rmSync(testDir, {
+        recursive: true,
+      });
     }
   });
 
@@ -158,7 +168,12 @@ describe("cmdLast", () => {
     });
 
     it("should handle history file with non-array JSON", async () => {
-      writeFileSync(join(testDir, "history.json"), JSON.stringify({ not: "array" }));
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify({
+          not: "array",
+        }),
+      );
 
       await cmdLast();
 
@@ -171,19 +186,32 @@ describe("cmdLast", () => {
 
   describe("history with records (rerunning latest)", () => {
     const sampleRecords: SpawnRecord[] = [
-      { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00Z" },
-      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T14:30:00Z" },
-      { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T09:15:00Z" },
+      {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T10:00:00Z",
+      },
+      {
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-01-02T14:30:00Z",
+      },
+      {
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-01-03T09:15:00Z",
+      },
     ];
 
     it("should show 'Rerunning last spawn' when history exists", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       // We need to mock cmdRun to prevent actual execution
@@ -201,11 +229,12 @@ describe("cmdLast", () => {
     it("should select the most recent record (newest first)", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -223,11 +252,12 @@ describe("cmdLast", () => {
     it("should display the record label with manifest display names", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -261,14 +291,19 @@ describe("cmdLast", () => {
 
     it("should show single record as most recent", async () => {
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T10:00:00Z",
+        },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -289,14 +324,19 @@ describe("cmdLast", () => {
     it("should include relative timestamp in hint", async () => {
       const now = new Date().toISOString();
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: now },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: now,
+        },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -320,11 +360,12 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -340,14 +381,19 @@ describe("cmdLast", () => {
 
     it("should not show prompt hint when record has no prompt", async () => {
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T10:00:00Z",
+        },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -372,11 +418,12 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -403,11 +450,12 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -427,7 +475,11 @@ describe("cmdLast", () => {
 
   describe("buildRecordLabel helper", () => {
     it("should format as 'AgentName on CloudName' with manifest", () => {
-      const record: SpawnRecord = { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" };
+      const record: SpawnRecord = {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00Z",
+      };
       const label = buildRecordLabel(record, mockManifest);
 
       expect(label).toContain("Claude Code");
@@ -436,7 +488,11 @@ describe("cmdLast", () => {
     });
 
     it("should use raw keys when manifest is null", () => {
-      const record: SpawnRecord = { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" };
+      const record: SpawnRecord = {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00Z",
+      };
       const label = buildRecordLabel(record, null);
 
       expect(label).toContain("claude");
@@ -444,7 +500,11 @@ describe("cmdLast", () => {
     });
 
     it("should handle unknown agent keys", () => {
-      const record: SpawnRecord = { agent: "unknown-agent", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" };
+      const record: SpawnRecord = {
+        agent: "unknown-agent",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00Z",
+      };
       const label = buildRecordLabel(record, mockManifest);
 
       // Should fall back to raw key when not in manifest
@@ -452,7 +512,11 @@ describe("cmdLast", () => {
     });
 
     it("should handle unknown cloud keys", () => {
-      const record: SpawnRecord = { agent: "claude", cloud: "unknown-cloud", timestamp: "2026-01-01T00:00:00Z" };
+      const record: SpawnRecord = {
+        agent: "claude",
+        cloud: "unknown-cloud",
+        timestamp: "2026-01-01T00:00:00Z",
+      };
       const label = buildRecordLabel(record, mockManifest);
 
       expect(label).toContain("unknown-cloud");
@@ -462,7 +526,11 @@ describe("cmdLast", () => {
   describe("buildRecordHint helper", () => {
     it("should include relative timestamp", () => {
       const now = new Date().toISOString();
-      const record: SpawnRecord = { agent: "claude", cloud: "sprite", timestamp: now };
+      const record: SpawnRecord = {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: now,
+      };
       const hint = buildRecordHint(record);
 
       expect(hint).toMatch(/now|seconds ago|minutes ago|hours ago|days ago/i);
@@ -482,7 +550,11 @@ describe("cmdLast", () => {
     });
 
     it("should not include prompt when not in record", () => {
-      const record: SpawnRecord = { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" };
+      const record: SpawnRecord = {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00Z",
+      };
       const hint = buildRecordHint(record);
 
       expect(hint).not.toContain("--prompt");
@@ -522,14 +594,19 @@ describe("cmdLast", () => {
   describe("edge cases", () => {
     it("should handle old timestamp formats", async () => {
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2020-01-01T00:00:00Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2020-01-01T00:00:00Z",
+        },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -553,11 +630,12 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {
@@ -573,16 +651,29 @@ describe("cmdLast", () => {
 
     it("should properly select most recent when records have same day", async () => {
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-03T10:00:00Z" },
-        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-03T15:00:00Z" },
-        { agent: "gptme", cloud: "sprite", timestamp: "2026-01-03T09:00:00Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-03T10:00:00Z",
+        },
+        {
+          agent: "codex",
+          cloud: "hetzner",
+          timestamp: "2026-01-03T15:00:00Z",
+        },
+        {
+          agent: "gptme",
+          cloud: "sprite",
+          timestamp: "2026-01-03T09:00:00Z",
+        },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       try {

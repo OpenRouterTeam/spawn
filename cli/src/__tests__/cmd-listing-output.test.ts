@@ -37,7 +37,9 @@ const smallManifest: Manifest = {
       url: "https://claude.ai",
       install: "npm install -g claude",
       launch: "claude",
-      env: { ANTHROPIC_API_KEY: "$OPENROUTER_API_KEY" },
+      env: {
+        ANTHROPIC_API_KEY: "$OPENROUTER_API_KEY",
+      },
     },
     codex: {
       name: "Codex",
@@ -45,7 +47,9 @@ const smallManifest: Manifest = {
       url: "https://codex.dev",
       install: "npm install -g codex",
       launch: "codex",
-      env: { OPENAI_API_KEY: "$OPENROUTER_API_KEY" },
+      env: {
+        OPENAI_API_KEY: "$OPENROUTER_API_KEY",
+      },
     },
   },
   clouds: {
@@ -100,8 +104,14 @@ const multiTypeManifest: Manifest = {
     claude: smallManifest.agents.claude,
   },
   clouds: {
-    sprite: { ...smallManifest.clouds.sprite, type: "vm" },
-    hetzner: { ...smallManifest.clouds.hetzner, type: "cloud" },
+    sprite: {
+      ...smallManifest.clouds.sprite,
+      type: "vm",
+    },
+    hetzner: {
+      ...smallManifest.clouds.hetzner,
+      type: "cloud",
+    },
     local: {
       name: "Local Machine",
       description: "Run agents on your own machine",
@@ -234,11 +244,17 @@ describe("cmdMatrix output", () => {
 
       // Force wide terminal for grid view
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 200, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 200,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("Sprite");
@@ -249,11 +265,17 @@ describe("cmdMatrix output", () => {
       await setManifest(smallManifest);
 
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 200, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 200,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("Claude Code");
@@ -264,11 +286,17 @@ describe("cmdMatrix output", () => {
       await setManifest(smallManifest);
 
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 200, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 200,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("+");
@@ -278,11 +306,17 @@ describe("cmdMatrix output", () => {
       await setManifest(smallManifest);
 
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 200, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 200,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("-");
@@ -292,11 +326,17 @@ describe("cmdMatrix output", () => {
       await setManifest(smallManifest);
 
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 200, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 200,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("implemented");
@@ -310,11 +350,17 @@ describe("cmdMatrix output", () => {
 
       const origColumns = process.stdout.columns;
       // Force very narrow terminal to trigger compact view
-      Object.defineProperty(process.stdout, "columns", { value: 40, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 40,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       // Compact view shows "Agent" header and "Clouds" count column
@@ -326,11 +372,17 @@ describe("cmdMatrix output", () => {
       await setManifest(smallManifest);
 
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 40, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 40,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       // claude: 2/2, codex: 1/2
@@ -342,11 +394,17 @@ describe("cmdMatrix output", () => {
       await setManifest(smallManifest);
 
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 40, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 40,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       // claude is implemented on both clouds
@@ -357,11 +415,17 @@ describe("cmdMatrix output", () => {
       await setManifest(smallManifest);
 
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 40, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 40,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       // codex is missing on hetzner
@@ -372,11 +436,17 @@ describe("cmdMatrix output", () => {
       await setManifest(smallManifest);
 
       const origColumns = process.stdout.columns;
-      Object.defineProperty(process.stdout, "columns", { value: 40, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: 40,
+        configurable: true,
+      });
 
       await cmdMatrix();
 
-      Object.defineProperty(process.stdout, "columns", { value: origColumns, configurable: true });
+      Object.defineProperty(process.stdout, "columns", {
+        value: origColumns,
+        configurable: true,
+      });
 
       const output = captureOutput(consoleMocks.log);
       expect(output).toContain("green");
@@ -387,9 +457,15 @@ describe("cmdMatrix output", () => {
   describe("edge cases", () => {
     it("should handle single agent and single cloud", async () => {
       const singleManifest: Manifest = {
-        agents: { claude: smallManifest.agents.claude },
-        clouds: { sprite: smallManifest.clouds.sprite },
-        matrix: { "sprite/claude": "implemented" },
+        agents: {
+          claude: smallManifest.agents.claude,
+        },
+        clouds: {
+          sprite: smallManifest.clouds.sprite,
+        },
+        matrix: {
+          "sprite/claude": "implemented",
+        },
       };
 
       await setManifest(singleManifest);
@@ -403,9 +479,15 @@ describe("cmdMatrix output", () => {
 
     it("should handle manifest where nothing is implemented", async () => {
       const noneImplemented: Manifest = {
-        agents: { claude: smallManifest.agents.claude },
-        clouds: { sprite: smallManifest.clouds.sprite },
-        matrix: { "sprite/claude": "missing" },
+        agents: {
+          claude: smallManifest.agents.claude,
+        },
+        clouds: {
+          sprite: smallManifest.clouds.sprite,
+        },
+        matrix: {
+          "sprite/claude": "missing",
+        },
       };
 
       await setManifest(noneImplemented);
@@ -505,9 +587,15 @@ describe("cmdAgents output", () => {
   describe("edge cases", () => {
     it("should handle single agent", async () => {
       const singleAgent: Manifest = {
-        agents: { claude: smallManifest.agents.claude },
-        clouds: { sprite: smallManifest.clouds.sprite },
-        matrix: { "sprite/claude": "implemented" },
+        agents: {
+          claude: smallManifest.agents.claude,
+        },
+        clouds: {
+          sprite: smallManifest.clouds.sprite,
+        },
+        matrix: {
+          "sprite/claude": "implemented",
+        },
       };
 
       await setManifest(singleAgent);
@@ -520,9 +608,15 @@ describe("cmdAgents output", () => {
 
     it("should show 0 clouds for agent with no implementations", async () => {
       const noImpl: Manifest = {
-        agents: { claude: smallManifest.agents.claude },
-        clouds: { sprite: smallManifest.clouds.sprite },
-        matrix: { "sprite/claude": "missing" },
+        agents: {
+          claude: smallManifest.agents.claude,
+        },
+        clouds: {
+          sprite: smallManifest.clouds.sprite,
+        },
+        matrix: {
+          "sprite/claude": "missing",
+        },
       };
 
       await setManifest(noImpl);
@@ -651,7 +745,7 @@ describe("cmdClouds output", () => {
       // The local cloud has auth: "none" - should not show "auth: none" as a hint
       // Find lines containing "Local Machine" and check they don't have auth: none
       const lines = output.split("\n");
-      const localLine = lines.find(l => l.includes("Local Machine"));
+      const localLine = lines.find((l) => l.includes("Local Machine"));
       if (localLine) {
         expect(localLine).not.toContain("auth:");
       }
@@ -661,9 +755,15 @@ describe("cmdClouds output", () => {
   describe("edge cases", () => {
     it("should handle single cloud", async () => {
       const singleCloud: Manifest = {
-        agents: { claude: smallManifest.agents.claude },
-        clouds: { sprite: smallManifest.clouds.sprite },
-        matrix: { "sprite/claude": "implemented" },
+        agents: {
+          claude: smallManifest.agents.claude,
+        },
+        clouds: {
+          sprite: smallManifest.clouds.sprite,
+        },
+        matrix: {
+          "sprite/claude": "implemented",
+        },
       };
 
       await setManifest(singleCloud);
@@ -675,8 +775,13 @@ describe("cmdClouds output", () => {
 
     it("should show 0/N for cloud with no implementations", async () => {
       const noImpl: Manifest = {
-        agents: { claude: smallManifest.agents.claude, codex: smallManifest.agents.codex },
-        clouds: { sprite: smallManifest.clouds.sprite },
+        agents: {
+          claude: smallManifest.agents.claude,
+          codex: smallManifest.agents.codex,
+        },
+        clouds: {
+          sprite: smallManifest.clouds.sprite,
+        },
         matrix: {
           "sprite/claude": "missing",
           "sprite/codex": "missing",

@@ -33,8 +33,13 @@ let sharedRl: ReturnType<typeof createInterface> | null = null;
 
 function getReadlineInterface(): ReturnType<typeof createInterface> {
   if (!sharedRl) {
-    sharedRl = createInterface({ input: process.stdin, output: process.stderr });
-    sharedRl.on("close", () => { sharedRl = null; });
+    sharedRl = createInterface({
+      input: process.stdin,
+      output: process.stderr,
+    });
+    sharedRl.on("close", () => {
+      sharedRl = null;
+    });
   }
   return sharedRl;
 }
@@ -58,16 +63,17 @@ export async function prompt(question: string): Promise<string> {
  * Uses @clack/prompts when available (local checkout), falls back to numbered list.
  * Returns the selected id.
  */
-export async function selectFromList(
-  items: string[],
-  promptText: string,
-  defaultValue: string,
-): Promise<string> {
-  if (items.length === 0) { return defaultValue; }
+export async function selectFromList(items: string[], promptText: string, defaultValue: string): Promise<string> {
+  if (items.length === 0) {
+    return defaultValue;
+  }
 
   const parsed = items.map((line) => {
     const parts = line.split("|");
-    return { id: parts[0], label: parts.slice(1).join(" — ") };
+    return {
+      id: parts[0],
+      label: parts.slice(1).join(" — "),
+    };
   });
 
   if (parsed.length === 1) {
@@ -84,23 +90,57 @@ export async function selectFromList(
     })),
     initialValue: defaultValue,
   });
-  if (p.isCancel(result)) { return defaultValue; }
+  if (p.isCancel(result)) {
+    return defaultValue;
+  }
   return result as string;
 }
 
 /** Open a URL in the user's browser. */
 export function openBrowser(url: string): void {
-  const cmds: [string, string[]][] =
+  const cmds: [
+    string,
+    string[],
+  ][] =
     process.platform === "darwin"
-      ? [["open", [url]]]
+      ? [
+          [
+            "open",
+            [
+              url,
+            ],
+          ],
+        ]
       : [
-          ["xdg-open", [url]],
-          ["termux-open-url", [url]],
+          [
+            "xdg-open",
+            [
+              url,
+            ],
+          ],
+          [
+            "termux-open-url",
+            [
+              url,
+            ],
+          ],
         ];
 
   for (const [cmd, args] of cmds) {
     try {
-      Bun.spawnSync([cmd, ...args], { stdio: ["ignore", "ignore", "ignore"] });
+      Bun.spawnSync(
+        [
+          cmd,
+          ...args,
+        ],
+        {
+          stdio: [
+            "ignore",
+            "ignore",
+            "ignore",
+          ],
+        },
+      );
       return;
     } catch {
       // try next
@@ -116,9 +156,15 @@ export function jsonEscape(s: string): string {
 
 /** Validate server name: 3-63 chars, alphanumeric + dash, no leading/trailing dash. */
 export function validateServerName(name: string): boolean {
-  if (name.length < 3 || name.length > 63) { return false; }
-  if (!/^[a-zA-Z0-9-]+$/.test(name)) { return false; }
-  if (name.startsWith("-") || name.endsWith("-")) { return false; }
+  if (name.length < 3 || name.length > 63) {
+    return false;
+  }
+  if (!/^[a-zA-Z0-9-]+$/.test(name)) {
+    return false;
+  }
+  if (name.startsWith("-") || name.endsWith("-")) {
+    return false;
+  }
   return true;
 }
 
@@ -129,7 +175,9 @@ export function validateRegionName(region: string): boolean {
 
 /** Validate model ID format. */
 export function validateModelId(id: string): boolean {
-  if (!id) { return true; }
+  if (!id) {
+    return true;
+  }
   return /^[a-zA-Z0-9/_:.-]+$/.test(id);
 }
 

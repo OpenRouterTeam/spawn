@@ -57,7 +57,9 @@ function createManifest(): Manifest {
         url: "https://claude.ai",
         install: "npm install -g claude",
         launch: "claude",
-        env: { ANTHROPIC_API_KEY: "test" },
+        env: {
+          ANTHROPIC_API_KEY: "test",
+        },
       },
       codex: {
         name: "Codex",
@@ -65,7 +67,9 @@ function createManifest(): Manifest {
         url: "https://codex.dev",
         install: "npm install -g codex",
         launch: "codex",
-        env: { OPENAI_API_KEY: "test" },
+        env: {
+          OPENAI_API_KEY: "test",
+        },
       },
     },
     clouds: {
@@ -125,40 +129,40 @@ describe("checkEntity message output", () => {
       checkEntity(manifest, "sprite", "agent");
 
       const errors = errorCalls();
-      expect(errors.some(m => m.includes("Unknown agent"))).toBe(true);
+      expect(errors.some((m) => m.includes("Unknown agent"))).toBe(true);
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("is a cloud provider"))).toBe(true);
-      expect(info.some(m => m.includes("not an agent"))).toBe(true);
+      expect(info.some((m) => m.includes("is a cloud provider"))).toBe(true);
+      expect(info.some((m) => m.includes("not an agent"))).toBe(true);
     });
 
     it("should say agent name 'is an agent, not a cloud provider'", () => {
       checkEntity(manifest, "claude", "cloud");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("is an agent"))).toBe(true);
-      expect(info.some(m => m.includes("not a cloud provider"))).toBe(true);
+      expect(info.some((m) => m.includes("is an agent"))).toBe(true);
+      expect(info.some((m) => m.includes("not a cloud provider"))).toBe(true);
     });
 
     it("should show usage hint for wrong-type detection", () => {
       checkEntity(manifest, "sprite", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn <agent> <cloud>"))).toBe(true);
+      expect(info.some((m) => m.includes("spawn <agent> <cloud>"))).toBe(true);
     });
 
     it("should show list command hint for wrong-type agent check", () => {
       checkEntity(manifest, "sprite", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn agents"))).toBe(true);
+      expect(info.some((m) => m.includes("spawn agents"))).toBe(true);
     });
 
     it("should show list command hint for wrong-type cloud check", () => {
       checkEntity(manifest, "claude", "cloud");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn clouds"))).toBe(true);
+      expect(info.some((m) => m.includes("spawn clouds"))).toBe(true);
     });
   });
 
@@ -169,42 +173,42 @@ describe("checkEntity message output", () => {
       checkEntity(manifest, "claud", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("Did you mean") && m.includes("claude"))).toBe(true);
+      expect(info.some((m) => m.includes("Did you mean") && m.includes("claude"))).toBe(true);
     });
 
     it("should show spawn command suggestion for same-kind match", () => {
       checkEntity(manifest, "claud", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn claude") || m.includes("spawn claud"))).toBe(true);
+      expect(info.some((m) => m.includes("spawn claude") || m.includes("spawn claud"))).toBe(true);
     });
 
     it("should show list command hint after same-kind match", () => {
       checkEntity(manifest, "claud", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn agents"))).toBe(true);
+      expect(info.some((m) => m.includes("spawn agents"))).toBe(true);
     });
 
     it("should suggest 'Did you mean sprite?' for 'sprit' as cloud", () => {
       checkEntity(manifest, "sprit", "cloud");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("Did you mean") && m.includes("sprite"))).toBe(true);
+      expect(info.some((m) => m.includes("Did you mean") && m.includes("sprite"))).toBe(true);
     });
 
     it("should show list command hint for cloud fuzzy match", () => {
       checkEntity(manifest, "sprit", "cloud");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn clouds"))).toBe(true);
+      expect(info.some((m) => m.includes("spawn clouds"))).toBe(true);
     });
 
     it("should include display name in suggestion", () => {
       checkEntity(manifest, "claud", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("Claude Code"))).toBe(true);
+      expect(info.some((m) => m.includes("Claude Code"))).toBe(true);
     });
   });
 
@@ -216,28 +220,28 @@ describe("checkEntity message output", () => {
       checkEntity(manifest, "htzner", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("looks like") && m.includes("hetzner"))).toBe(true);
+      expect(info.some((m) => m.includes("looks like") && m.includes("hetzner"))).toBe(true);
     });
 
     it("should mention display name in cross-kind suggestion", () => {
       checkEntity(manifest, "htzner", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("Hetzner Cloud"))).toBe(true);
+      expect(info.some((m) => m.includes("Hetzner Cloud"))).toBe(true);
     });
 
     it("should ask 'Did you swap the agent and cloud arguments?'", () => {
       checkEntity(manifest, "htzner", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("swap the agent and cloud"))).toBe(true);
+      expect(info.some((m) => m.includes("swap the agent and cloud"))).toBe(true);
     });
 
     it("should show usage hint for cross-kind match", () => {
       checkEntity(manifest, "htzner", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn <agent> <cloud>"))).toBe(true);
+      expect(info.some((m) => m.includes("spawn <agent> <cloud>"))).toBe(true);
     });
 
     it("should say 'looks like agent X' for cloud typo matching agent", () => {
@@ -245,14 +249,14 @@ describe("checkEntity message output", () => {
       checkEntity(manifest, "claud", "cloud");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("looks like") && m.includes("claude"))).toBe(true);
+      expect(info.some((m) => m.includes("looks like") && m.includes("claude"))).toBe(true);
     });
 
     it("should include agent display name for cloud cross-kind match", () => {
       checkEntity(manifest, "claud", "cloud");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("Claude Code"))).toBe(true);
+      expect(info.some((m) => m.includes("Claude Code"))).toBe(true);
     });
 
     it("should prefer same-kind match over cross-kind match for 'sprit' as cloud", () => {
@@ -261,8 +265,8 @@ describe("checkEntity message output", () => {
       checkEntity(manifest, "sprit", "cloud");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("Did you mean") && m.includes("sprite"))).toBe(true);
-      expect(info.some(m => m.includes("looks like"))).toBe(false);
+      expect(info.some((m) => m.includes("Did you mean") && m.includes("sprite"))).toBe(true);
+      expect(info.some((m) => m.includes("looks like"))).toBe(false);
     });
 
     it("should prefer same-kind match over cross-kind match for 'claud' as agent", () => {
@@ -270,8 +274,8 @@ describe("checkEntity message output", () => {
       checkEntity(manifest, "claud", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("Did you mean") && m.includes("claude"))).toBe(true);
-      expect(info.some(m => m.includes("looks like"))).toBe(false);
+      expect(info.some((m) => m.includes("Did you mean") && m.includes("claude"))).toBe(true);
+      expect(info.some((m) => m.includes("looks like"))).toBe(false);
     });
   });
 
@@ -282,32 +286,32 @@ describe("checkEntity message output", () => {
       checkEntity(manifest, "kubernetes", "agent");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn agents"))).toBe(true);
-      expect(info.some(m => m.includes("Did you mean"))).toBe(false);
-      expect(info.some(m => m.includes("looks like"))).toBe(false);
+      expect(info.some((m) => m.includes("spawn agents"))).toBe(true);
+      expect(info.some((m) => m.includes("Did you mean"))).toBe(false);
+      expect(info.some((m) => m.includes("looks like"))).toBe(false);
     });
 
     it("should show only list command hint when no match found for cloud", () => {
       checkEntity(manifest, "amazonaws", "cloud");
 
       const info = infoCalls();
-      expect(info.some(m => m.includes("spawn clouds"))).toBe(true);
-      expect(info.some(m => m.includes("Did you mean"))).toBe(false);
-      expect(info.some(m => m.includes("looks like"))).toBe(false);
+      expect(info.some((m) => m.includes("spawn clouds"))).toBe(true);
+      expect(info.some((m) => m.includes("Did you mean"))).toBe(false);
+      expect(info.some((m) => m.includes("looks like"))).toBe(false);
     });
 
     it("should show 'Unknown agent' error for non-matching agent", () => {
       checkEntity(manifest, "kubernetes", "agent");
 
       const errors = errorCalls();
-      expect(errors.some(m => m.includes("Unknown agent"))).toBe(true);
+      expect(errors.some((m) => m.includes("Unknown agent"))).toBe(true);
     });
 
     it("should show 'Unknown cloud' error for non-matching cloud", () => {
       checkEntity(manifest, "amazonaws", "cloud");
 
       const errors = errorCalls();
-      expect(errors.some(m => m.includes("Unknown cloud"))).toBe(true);
+      expect(errors.some((m) => m.includes("Unknown cloud"))).toBe(true);
     });
   });
 

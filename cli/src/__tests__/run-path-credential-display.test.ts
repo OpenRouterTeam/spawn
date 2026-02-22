@@ -169,7 +169,12 @@ describe("prioritizeCloudsByCredentials", () => {
 
   beforeEach(() => {
     // Save and clear credential env vars
-    for (const v of ["HCLOUD_TOKEN", "DO_API_TOKEN", "UPCLOUD_USERNAME", "UPCLOUD_PASSWORD"]) {
+    for (const v of [
+      "HCLOUD_TOKEN",
+      "DO_API_TOKEN",
+      "UPCLOUD_USERNAME",
+      "UPCLOUD_PASSWORD",
+    ]) {
       savedEnv[v] = process.env[v];
       delete process.env[v];
     }
@@ -178,14 +183,21 @@ describe("prioritizeCloudsByCredentials", () => {
   afterEach(() => {
     // Restore env vars
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) { delete process.env[k]; }
-      else { process.env[k] = v; }
+      if (v === undefined) {
+        delete process.env[k];
+      } else {
+        process.env[k] = v;
+      }
     }
   });
 
   it("should return all clouds when none have credentials", () => {
     const manifest = makeManifest();
-    const clouds = ["hetzner", "digitalocean", "upcloud"];
+    const clouds = [
+      "hetzner",
+      "digitalocean",
+      "upcloud",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(result.sortedClouds).toEqual(clouds);
@@ -196,7 +208,11 @@ describe("prioritizeCloudsByCredentials", () => {
   it("should move clouds with credentials to front", () => {
     process.env.HCLOUD_TOKEN = "test-token";
     const manifest = makeManifest();
-    const clouds = ["digitalocean", "hetzner", "upcloud"];
+    const clouds = [
+      "digitalocean",
+      "hetzner",
+      "upcloud",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(result.sortedClouds[0]).toBe("hetzner");
@@ -209,7 +225,11 @@ describe("prioritizeCloudsByCredentials", () => {
     process.env.HCLOUD_TOKEN = "test-token";
     process.env.DO_API_TOKEN = "test-do-token";
     const manifest = makeManifest();
-    const clouds = ["upcloud", "digitalocean", "hetzner"];
+    const clouds = [
+      "upcloud",
+      "digitalocean",
+      "hetzner",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     // Both hetzner and digitalocean should be first, upcloud last
@@ -221,7 +241,10 @@ describe("prioritizeCloudsByCredentials", () => {
   it("should build hint overrides for clouds with credentials", () => {
     process.env.HCLOUD_TOKEN = "test-token";
     const manifest = makeManifest();
-    const clouds = ["hetzner", "digitalocean"];
+    const clouds = [
+      "hetzner",
+      "digitalocean",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(result.hintOverrides["hetzner"]).toContain("credentials detected");
@@ -233,7 +256,10 @@ describe("prioritizeCloudsByCredentials", () => {
     process.env.UPCLOUD_USERNAME = "user";
     // Missing UPCLOUD_PASSWORD
     const manifest = makeManifest();
-    const clouds = ["upcloud", "hetzner"];
+    const clouds = [
+      "upcloud",
+      "hetzner",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     // upcloud should NOT be prioritized (missing one of two vars)
@@ -244,7 +270,10 @@ describe("prioritizeCloudsByCredentials", () => {
     process.env.UPCLOUD_USERNAME = "user";
     process.env.UPCLOUD_PASSWORD = "pass";
     const manifest = makeManifest();
-    const clouds = ["hetzner", "upcloud"];
+    const clouds = [
+      "hetzner",
+      "upcloud",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(result.credCount).toBe(1);
@@ -263,17 +292,31 @@ describe("prioritizeCloudsByCredentials", () => {
   it("should handle single cloud with credentials", () => {
     process.env.HCLOUD_TOKEN = "token";
     const manifest = makeManifest();
-    const result = prioritizeCloudsByCredentials(["hetzner"], manifest);
+    const result = prioritizeCloudsByCredentials(
+      [
+        "hetzner",
+      ],
+      manifest,
+    );
 
-    expect(result.sortedClouds).toEqual(["hetzner"]);
+    expect(result.sortedClouds).toEqual([
+      "hetzner",
+    ]);
     expect(result.credCount).toBe(1);
   });
 
   it("should handle single cloud without credentials", () => {
     const manifest = makeManifest();
-    const result = prioritizeCloudsByCredentials(["hetzner"], manifest);
+    const result = prioritizeCloudsByCredentials(
+      [
+        "hetzner",
+      ],
+      manifest,
+    );
 
-    expect(result.sortedClouds).toEqual(["hetzner"]);
+    expect(result.sortedClouds).toEqual([
+      "hetzner",
+    ]);
     expect(result.credCount).toBe(0);
   });
 
@@ -282,7 +325,11 @@ describe("prioritizeCloudsByCredentials", () => {
     process.env.DO_API_TOKEN = "token";
     const manifest = makeManifest();
     // Input order: digitalocean before hetzner (both have creds)
-    const clouds = ["digitalocean", "hetzner", "upcloud"];
+    const clouds = [
+      "digitalocean",
+      "hetzner",
+      "upcloud",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     // Both credential clouds should come first in their original relative order
@@ -293,7 +340,10 @@ describe("prioritizeCloudsByCredentials", () => {
 
   it("should handle CLI-based auth (sprite login) as no credentials", () => {
     const manifest = makeManifest();
-    const clouds = ["sprite", "hetzner"];
+    const clouds = [
+      "sprite",
+      "hetzner",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     // "sprite login" is not an env var, so sprite should not be prioritized
@@ -302,7 +352,10 @@ describe("prioritizeCloudsByCredentials", () => {
 
   it("should handle 'none' auth (local cloud) as no credentials", () => {
     const manifest = makeManifest();
-    const clouds = ["localcloud", "hetzner"];
+    const clouds = [
+      "localcloud",
+      "hetzner",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(result.credCount).toBe(0);
@@ -314,7 +367,13 @@ describe("prioritizeCloudsByCredentials", () => {
     process.env.UPCLOUD_USERNAME = "u";
     process.env.UPCLOUD_PASSWORD = "p";
     const manifest = makeManifest();
-    const clouds = ["hetzner", "digitalocean", "upcloud", "sprite", "localcloud"];
+    const clouds = [
+      "hetzner",
+      "digitalocean",
+      "upcloud",
+      "sprite",
+      "localcloud",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(result.credCount).toBe(3); // hetzner, digitalocean, upcloud
@@ -331,7 +390,11 @@ describe("credential status display logic", () => {
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
-    for (const v of ["OPENROUTER_API_KEY", "HCLOUD_TOKEN", "DO_API_TOKEN"]) {
+    for (const v of [
+      "OPENROUTER_API_KEY",
+      "HCLOUD_TOKEN",
+      "DO_API_TOKEN",
+    ]) {
       savedEnv[v] = process.env[v];
       delete process.env[v];
     }
@@ -339,14 +402,19 @@ describe("credential status display logic", () => {
 
   afterEach(() => {
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) { delete process.env[k]; }
-      else { process.env[k] = v; }
+      if (v === undefined) {
+        delete process.env[k];
+      } else {
+        process.env[k] = v;
+      }
     }
   });
 
   describe("parseAuthEnvVars for credential status", () => {
     it("should extract single env var", () => {
-      expect(parseAuthEnvVars("HCLOUD_TOKEN")).toEqual(["HCLOUD_TOKEN"]);
+      expect(parseAuthEnvVars("HCLOUD_TOKEN")).toEqual([
+        "HCLOUD_TOKEN",
+      ]);
     });
 
     it("should extract multiple env vars", () => {
@@ -607,8 +675,11 @@ describe("getScriptFailureGuidance for run path", () => {
 
   afterEach(() => {
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) { delete process.env[k]; }
-      else { process.env[k] = v; }
+      if (v === undefined) {
+        delete process.env[k];
+      } else {
+        process.env[k] = v;
+      }
     }
   });
 
@@ -624,12 +695,16 @@ describe("getScriptFailureGuidance for run path", () => {
 
   it("should mention OOM for exit code 137", () => {
     const lines = getScriptFailureGuidance(137, "hetzner");
-    expect(lines.some((l: string) => l.toLowerCase().includes("killed") || l.toLowerCase().includes("memory"))).toBe(true);
+    expect(lines.some((l: string) => l.toLowerCase().includes("killed") || l.toLowerCase().includes("memory"))).toBe(
+      true,
+    );
   });
 
   it("should mention command not found for exit code 127", () => {
     const lines = getScriptFailureGuidance(127, "hetzner");
-    expect(lines.some((l: string) => l.toLowerCase().includes("command") || l.toLowerCase().includes("not found"))).toBe(true);
+    expect(
+      lines.some((l: string) => l.toLowerCase().includes("command") || l.toLowerCase().includes("not found")),
+    ).toBe(true);
   });
 
   it("should mention permission denied for exit code 126", () => {
@@ -639,7 +714,9 @@ describe("getScriptFailureGuidance for run path", () => {
 
   it("should mention credentials for exit code 1 with authHint", () => {
     const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-    expect(lines.some((l: string) => l.includes("HCLOUD_TOKEN") || l.includes("credential") || l.includes("Missing"))).toBe(true);
+    expect(
+      lines.some((l: string) => l.includes("HCLOUD_TOKEN") || l.includes("credential") || l.includes("Missing")),
+    ).toBe(true);
   });
 
   it("should provide default guidance for unknown exit codes", () => {
@@ -682,11 +759,19 @@ describe("getErrorMessage for run path", () => {
   });
 
   it("should handle object with message property", () => {
-    expect(getErrorMessage({ message: "custom error" })).toBe("custom error");
+    expect(
+      getErrorMessage({
+        message: "custom error",
+      }),
+    ).toBe("custom error");
   });
 
   it("should handle object without message property", () => {
-    expect(getErrorMessage({ code: "ERR" })).toBe("[object Object]");
+    expect(
+      getErrorMessage({
+        code: "ERR",
+      }),
+    ).toBe("[object Object]");
   });
 });
 
@@ -746,7 +831,12 @@ describe("prioritizeCloudsByCredentials with real-world patterns", () => {
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
-    for (const v of ["HCLOUD_TOKEN", "DO_API_TOKEN", "UPCLOUD_USERNAME", "UPCLOUD_PASSWORD"]) {
+    for (const v of [
+      "HCLOUD_TOKEN",
+      "DO_API_TOKEN",
+      "UPCLOUD_USERNAME",
+      "UPCLOUD_PASSWORD",
+    ]) {
       savedEnv[v] = process.env[v];
       delete process.env[v];
     }
@@ -754,22 +844,37 @@ describe("prioritizeCloudsByCredentials with real-world patterns", () => {
 
   afterEach(() => {
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) { delete process.env[k]; }
-      else { process.env[k] = v; }
+      if (v === undefined) {
+        delete process.env[k];
+      } else {
+        process.env[k] = v;
+      }
     }
   });
 
   it("should not crash on clouds with 'none' auth", () => {
     const manifest = makeManifest();
-    const result = prioritizeCloudsByCredentials(["localcloud"], manifest);
+    const result = prioritizeCloudsByCredentials(
+      [
+        "localcloud",
+      ],
+      manifest,
+    );
     expect(result.credCount).toBe(0);
-    expect(result.sortedClouds).toEqual(["localcloud"]);
+    expect(result.sortedClouds).toEqual([
+      "localcloud",
+    ]);
   });
 
   it("should handle mix of API, CLI, and local clouds", () => {
     process.env.HCLOUD_TOKEN = "token";
     const manifest = makeManifest();
-    const clouds = ["localcloud", "sprite", "hetzner", "digitalocean"];
+    const clouds = [
+      "localcloud",
+      "sprite",
+      "hetzner",
+      "digitalocean",
+    ];
     const result = prioritizeCloudsByCredentials(clouds, manifest);
 
     expect(result.credCount).toBe(1);
@@ -780,16 +885,25 @@ describe("prioritizeCloudsByCredentials with real-world patterns", () => {
   it("should generate correct hint format with description", () => {
     process.env.DO_API_TOKEN = "token";
     const manifest = makeManifest();
-    const result = prioritizeCloudsByCredentials(["digitalocean"], manifest);
-
-    expect(result.hintOverrides["digitalocean"]).toBe(
-      "credentials detected -- Simple cloud hosting"
+    const result = prioritizeCloudsByCredentials(
+      [
+        "digitalocean",
+      ],
+      manifest,
     );
+
+    expect(result.hintOverrides["digitalocean"]).toBe("credentials detected -- Simple cloud hosting");
   });
 
   it("should not generate hints for clouds without credentials", () => {
     const manifest = makeManifest();
-    const result = prioritizeCloudsByCredentials(["hetzner", "digitalocean"], manifest);
+    const result = prioritizeCloudsByCredentials(
+      [
+        "hetzner",
+        "digitalocean",
+      ],
+      manifest,
+    );
 
     expect(result.hintOverrides["hetzner"]).toBeUndefined();
     expect(result.hintOverrides["digitalocean"]).toBeUndefined();
@@ -807,8 +921,11 @@ describe("credential function edge cases", () => {
   });
 
   afterEach(() => {
-    if (savedEnv.OPENROUTER_API_KEY === undefined) { delete process.env.OPENROUTER_API_KEY; }
-    else { process.env.OPENROUTER_API_KEY = savedEnv.OPENROUTER_API_KEY; }
+    if (savedEnv.OPENROUTER_API_KEY === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = savedEnv.OPENROUTER_API_KEY;
+    }
   });
 
   it("credentialHints should always mention OPENROUTER_API_KEY when missing", () => {
@@ -825,10 +942,15 @@ describe("credential function edge cases", () => {
   });
 
   it("parseAuthEnvVars should handle extra whitespace", () => {
-    expect(parseAuthEnvVars("  HCLOUD_TOKEN  ")).toEqual(["HCLOUD_TOKEN"]);
+    expect(parseAuthEnvVars("  HCLOUD_TOKEN  ")).toEqual([
+      "HCLOUD_TOKEN",
+    ]);
   });
 
   it("parseAuthEnvVars should handle empty + separator", () => {
-    expect(parseAuthEnvVars("VAR_A + + VAR_B")).toEqual(["VAR_A", "VAR_B"]);
+    expect(parseAuthEnvVars("VAR_A + + VAR_B")).toEqual([
+      "VAR_A",
+      "VAR_B",
+    ]);
   });
 });

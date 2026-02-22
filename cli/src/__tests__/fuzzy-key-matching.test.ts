@@ -6,7 +6,7 @@ import {
   resolveAgentKey,
   resolveCloudKey,
 } from "../commands";
-import { createMockManifest, } from "./test-helpers";
+import { createMockManifest } from "./test-helpers";
 
 /**
  * Tests for findClosestKeyByNameOrKey — the fuzzy matching function that
@@ -34,53 +34,74 @@ const mockManifest = createMockManifest();
 describe("findClosestKeyByNameOrKey", () => {
   describe("key-based matching", () => {
     it("should match a key with distance 1 (missing letter)", () => {
-      const keys = ["claude", "codex"];
+      const keys = [
+        "claude",
+        "codex",
+      ];
       const result = findClosestKeyByNameOrKey("claud", keys, () => "irrelevant-name");
       expect(result).toBe("claude");
     });
 
     it("should match a key with distance 1 (extra letter)", () => {
-      const keys = ["claude", "codex"];
+      const keys = [
+        "claude",
+        "codex",
+      ];
       const result = findClosestKeyByNameOrKey("claudee", keys, () => "irrelevant-name");
       expect(result).toBe("claude");
     });
 
     it("should match a key with distance 1 (substitution)", () => {
-      const keys = ["claude", "codex"];
+      const keys = [
+        "claude",
+        "codex",
+      ];
       const result = findClosestKeyByNameOrKey("claudi", keys, () => "irrelevant-name");
       expect(result).toBe("claude");
     });
 
     it("should match a key with distance 2", () => {
-      const keys = ["claude", "codex"];
+      const keys = [
+        "claude",
+        "codex",
+      ];
       const result = findClosestKeyByNameOrKey("clad", keys, () => "irrelevant-name");
       expect(result).toBe("claude");
     });
 
     it("should match a key with distance 3 (max threshold)", () => {
-      const keys = ["hetzner", "sprite"];
+      const keys = [
+        "hetzner",
+        "sprite",
+      ];
       const result = findClosestKeyByNameOrKey("hetz", keys, () => "irrelevant-name");
       expect(result).toBe("hetzner");
     });
 
     it("should return null when distance > 3 for all keys and names", () => {
-      const keys = ["claude", "codex"];
-      const result = findClosestKeyByNameOrKey(
-        "kubernetes",
-        keys,
-        () => "irrelevant-name-that-is-also-far"
-      );
+      const keys = [
+        "claude",
+        "codex",
+      ];
+      const result = findClosestKeyByNameOrKey("kubernetes", keys, () => "irrelevant-name-that-is-also-far");
       expect(result).toBeNull();
     });
 
     it("should be case-insensitive for key matching", () => {
-      const keys = ["claude", "codex"];
+      const keys = [
+        "claude",
+        "codex",
+      ];
       const result = findClosestKeyByNameOrKey("CLAUDE", keys, () => "irrelevant");
       expect(result).toBe("claude");
     });
 
     it("should pick the closest key among multiple close candidates", () => {
-      const keys = ["codx", "codex", "codec"];
+      const keys = [
+        "codx",
+        "codex",
+        "codec",
+      ];
       const result = findClosestKeyByNameOrKey("codex", keys, () => "irrelevant");
       // Exact match (distance 0) should always win
       expect(result).toBe("codex");
@@ -92,7 +113,9 @@ describe("findClosestKeyByNameOrKey", () => {
   describe("display name matching", () => {
     it("should match via display name when key is too far", () => {
       // Key "cc" is far from "claude-code", but name "Claude Code" is close
-      const keys = ["cc"];
+      const keys = [
+        "cc",
+      ];
       const getName = (k: string) => (k === "cc" ? "Claude Code" : "Unknown");
       const result = findClosestKeyByNameOrKey("claude-code", keys, getName);
       // "claude-code" vs "Claude Code" -> lowercase: "claude-code" vs "claude code" -> distance 1
@@ -100,7 +123,9 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should match via display name with minor typo", () => {
-      const keys = ["ap"];
+      const keys = [
+        "ap",
+      ];
       const getName = (k: string) => (k === "ap" ? "Codex Pro" : "Unknown");
       // "codex-pro" vs "codex pro" -> distance 1
       const result = findClosestKeyByNameOrKey("codex-pro", keys, getName);
@@ -108,7 +133,9 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should match via display name case-insensitively", () => {
-      const keys = ["sp"];
+      const keys = [
+        "sp",
+      ];
       const getName = (k: string) => (k === "sp" ? "Sprite" : "Unknown");
       const result = findClosestKeyByNameOrKey("SPRITE", keys, getName);
       // "sprite" vs "sprite" -> distance 0
@@ -116,7 +143,9 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should return null when display name is also too far", () => {
-      const keys = ["xy"];
+      const keys = [
+        "xy",
+      ];
       const getName = (k: string) => (k === "xy" ? "Extremely Long Different Name" : "Unknown");
       const result = findClosestKeyByNameOrKey("kubernetes", keys, getName);
       expect(result).toBeNull();
@@ -127,7 +156,9 @@ describe("findClosestKeyByNameOrKey", () => {
 
   describe("priority between key and display name matches", () => {
     it("should prefer key when key distance < name distance", () => {
-      const keys = ["sprite"];
+      const keys = [
+        "sprite",
+      ];
       const getName = () => "Very Long Different Display Name";
       // "sprit" vs key "sprite" -> distance 1 (close)
       // "sprit" vs name "Very Long Different Display Name" -> distance >> 3
@@ -136,7 +167,9 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should prefer name when name distance < key distance", () => {
-      const keys = ["hz"];
+      const keys = [
+        "hz",
+      ];
       const getName = (k: string) => (k === "hz" ? "Hetzner" : "Unknown");
       // "hetzne" vs key "hz" -> distance 4 (too far for key alone)
       // "hetzne" vs name "Hetzner" -> distance 1
@@ -145,10 +178,17 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should return key of best match even when match comes from display name", () => {
-      const keys = ["a1", "b2"];
+      const keys = [
+        "a1",
+        "b2",
+      ];
       const getName = (k: string) => {
-        if (k === "a1") { return "Alpha Service"; }
-        if (k === "b2") { return "Beta Cloud"; }
+        if (k === "a1") {
+          return "Alpha Service";
+        }
+        if (k === "b2") {
+          return "Beta Cloud";
+        }
         return "Unknown";
       };
       // "beta-cloud" vs key "a1" -> distance 8, name "Alpha Service" -> distance >> 3
@@ -158,10 +198,17 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should pick better match across keys when both key and name are close", () => {
-      const keys = ["codx", "codex"];
+      const keys = [
+        "codx",
+        "codex",
+      ];
       const getName = (k: string) => {
-        if (k === "codx") { return "Codx Tool"; }
-        if (k === "codex") { return "Codex"; }
+        if (k === "codx") {
+          return "Codx Tool";
+        }
+        if (k === "codex") {
+          return "Codex";
+        }
         return "Unknown";
       };
       // "codex" vs key "codx" -> distance 1, name "Codx Tool" -> distance 5
@@ -175,7 +222,11 @@ describe("findClosestKeyByNameOrKey", () => {
 
   describe("multiple keys competition", () => {
     it("should pick closest among multiple keys", () => {
-      const keys = ["claude", "clade", "claud"];
+      const keys = [
+        "claude",
+        "clade",
+        "claud",
+      ];
       const getName = () => "Irrelevant";
       // "claud" vs "claude" -> 1, vs "clade" -> 2, vs "claud" -> 0
       const result = findClosestKeyByNameOrKey("claud", keys, getName);
@@ -183,12 +234,21 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should pick closest via name when all keys are distant", () => {
-      const keys = ["x1", "y2", "z3"];
+      const keys = [
+        "x1",
+        "y2",
+        "z3",
+      ];
       const getName = (k: string) => {
-        if (k === "x1") { return "Alpha"; }
-        if (k === "y2") { return "Betta"; // intentional typo for "Beta"
-}
-        if (k === "z3") { return "Gamma"; }
+        if (k === "x1") {
+          return "Alpha";
+        }
+        if (k === "y2") {
+          return "Betta"; // intentional typo for "Beta"
+        }
+        if (k === "z3") {
+          return "Gamma";
+        }
         return "Unknown";
       };
       // "beta" vs all keys -> distance >> 3
@@ -200,7 +260,10 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should pick first key when two have equal distance", () => {
-      const keys = ["ab", "ba"];
+      const keys = [
+        "ab",
+        "ba",
+      ];
       const getName = () => "VeryDifferentName";
       // "aa" vs "ab" -> distance 1
       // "aa" vs "ba" -> distance 1
@@ -220,21 +283,29 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should handle exact key match (distance 0)", () => {
-      const keys = ["claude"];
+      const keys = [
+        "claude",
+      ];
       const getName = () => "Claude Code";
       const result = findClosestKeyByNameOrKey("claude", keys, getName);
       expect(result).toBe("claude");
     });
 
     it("should handle exact display name match (distance 0)", () => {
-      const keys = ["cc"];
+      const keys = [
+        "cc",
+      ];
       const getName = (k: string) => (k === "cc" ? "Test" : "Other");
       const result = findClosestKeyByNameOrKey("test", keys, getName);
       expect(result).toBe("cc");
     });
 
     it("should handle single character keys", () => {
-      const keys = ["a", "b", "c"];
+      const keys = [
+        "a",
+        "b",
+        "c",
+      ];
       const getName = () => "LongName";
       // "a" vs "a" -> 0, vs "b" -> 1, vs "c" -> 1
       const result = findClosestKeyByNameOrKey("a", keys, getName);
@@ -242,7 +313,10 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should handle empty input string", () => {
-      const keys = ["ab", "cd"];
+      const keys = [
+        "ab",
+        "cd",
+      ];
       const getName = () => "Test";
       // "" vs "ab" -> 2, "" vs "cd" -> 2, "" vs "Test" -> 4
       const result = findClosestKeyByNameOrKey("", keys, getName);
@@ -251,7 +325,9 @@ describe("findClosestKeyByNameOrKey", () => {
     });
 
     it("should handle getName returning empty string", () => {
-      const keys = ["test"];
+      const keys = [
+        "test",
+      ];
       const getName = () => "";
       // "tes" vs "test" -> distance 1
       // "tes" vs "" -> distance 3
@@ -349,7 +425,12 @@ describe("levenshtein - additional boundary tests", () => {
 // ── findClosestMatch: ensure threshold boundary ─────────────────────────────
 
 describe("findClosestMatch - threshold boundary tests", () => {
-  const candidates = ["claude", "codex", "sprite", "hetzner"];
+  const candidates = [
+    "claude",
+    "codex",
+    "sprite",
+    "hetzner",
+  ];
 
   it("should match at exactly distance 3", () => {
     // "clau" -> "claude" distance 2, within threshold
@@ -403,7 +484,11 @@ describe("findClosestMatch - threshold boundary tests", () => {
 
   it("should match with single character candidates", () => {
     // "a" distance from "a" is 0
-    const result = findClosestMatch("a", ["a", "b", "c"]);
+    const result = findClosestMatch("a", [
+      "a",
+      "b",
+      "c",
+    ]);
     expect(result).toBe("a");
   });
 });

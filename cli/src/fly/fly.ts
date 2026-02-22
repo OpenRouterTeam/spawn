@@ -33,12 +33,48 @@ export interface VmTier {
 }
 
 export const FLY_VM_TIERS: VmTier[] = [
-  { id: "shared-cpu-1x", cpuKind: "shared", cpus: 1, memoryMb: 1024, label: "1 shared vCPU, 1 GB (~$3/mo)" },
-  { id: "shared-cpu-2x", cpuKind: "shared", cpus: 2, memoryMb: 4096, label: "2 shared vCPUs, 4 GB (~$12/mo)" },
-  { id: "shared-cpu-4x", cpuKind: "shared", cpus: 4, memoryMb: 8192, label: "4 shared vCPUs, 8 GB (~$51/mo)" },
-  { id: "performance-1x", cpuKind: "performance", cpus: 1, memoryMb: 2048, label: "1 dedicated vCPU, 2 GB (~$32/mo)" },
-  { id: "performance-2x", cpuKind: "performance", cpus: 2, memoryMb: 4096, label: "2 dedicated vCPUs, 4 GB (~$63/mo)" },
-  { id: "performance-4x", cpuKind: "performance", cpus: 4, memoryMb: 8192, label: "4 dedicated vCPUs, 8 GB (~$126/mo)" },
+  {
+    id: "shared-cpu-1x",
+    cpuKind: "shared",
+    cpus: 1,
+    memoryMb: 1024,
+    label: "1 shared vCPU, 1 GB (~$3/mo)",
+  },
+  {
+    id: "shared-cpu-2x",
+    cpuKind: "shared",
+    cpus: 2,
+    memoryMb: 4096,
+    label: "2 shared vCPUs, 4 GB (~$12/mo)",
+  },
+  {
+    id: "shared-cpu-4x",
+    cpuKind: "shared",
+    cpus: 4,
+    memoryMb: 8192,
+    label: "4 shared vCPUs, 8 GB (~$51/mo)",
+  },
+  {
+    id: "performance-1x",
+    cpuKind: "performance",
+    cpus: 1,
+    memoryMb: 2048,
+    label: "1 dedicated vCPU, 2 GB (~$32/mo)",
+  },
+  {
+    id: "performance-2x",
+    cpuKind: "performance",
+    cpus: 2,
+    memoryMb: 4096,
+    label: "2 dedicated vCPUs, 4 GB (~$63/mo)",
+  },
+  {
+    id: "performance-4x",
+    cpuKind: "performance",
+    cpus: 4,
+    memoryMb: 8192,
+    label: "4 dedicated vCPUs, 8 GB (~$126/mo)",
+  },
 ];
 
 export const DEFAULT_VM_TIER = FLY_VM_TIERS[4]; // performance-2x
@@ -60,7 +96,12 @@ let flyMachineId = "";
 let flyAppName = "";
 
 export function getState() {
-  return { flyApiToken, flyOrg, flyMachineId, flyAppName };
+  return {
+    flyApiToken,
+    flyOrg,
+    flyMachineId,
+    flyAppName,
+  };
 }
 
 export function setOrg(org: string) {
@@ -69,17 +110,9 @@ export function setOrg(org: string) {
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 
-async function flyApi(
-  method: string,
-  endpoint: string,
-  body?: string,
-  maxRetries = 3,
-): Promise<string> {
+async function flyApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
   const url = `${FLY_API_BASE}${endpoint}`;
-  const authHeader =
-    flyApiToken.startsWith("FlyV1 ")
-      ? flyApiToken
-      : `Bearer ${flyApiToken}`;
+  const authHeader = flyApiToken.startsWith("FlyV1 ") ? flyApiToken : `Bearer ${flyApiToken}`;
 
   let interval = 2;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -88,7 +121,10 @@ async function flyApi(
         "Content-Type": "application/json",
         Authorization: authHeader,
       };
-      const opts: RequestInit = { method, headers };
+      const opts: RequestInit = {
+        method,
+        headers,
+      };
       if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
         opts.body = body;
       }
@@ -97,16 +133,16 @@ async function flyApi(
 
       // Retry on 429 / 5xx
       if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {
-        logWarn(
-          `API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`,
-        );
+        logWarn(`API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`);
         await sleep(interval * 1000);
         interval = Math.min(interval * 2, 30);
         continue;
       }
       return text;
     } catch (err) {
-      if (attempt >= maxRetries) { throw err; }
+      if (attempt >= maxRetries) {
+        throw err;
+      }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
       await sleep(interval * 1000);
       interval = Math.min(interval * 2, 30);
@@ -135,17 +171,39 @@ function hasError(text: string): boolean {
 
 function getCmd(): string | null {
   // Check PATH first
-  for (const name of ["fly", "flyctl"]) {
-    if (Bun.spawnSync(["which", name], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0) {
+  for (const name of [
+    "fly",
+    "flyctl",
+  ]) {
+    if (
+      Bun.spawnSync(
+        [
+          "which",
+          name,
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "ignore",
+          ],
+        },
+      ).exitCode === 0
+    ) {
       return name;
     }
   }
   // Bun.spawnSync inherits the original PATH, not process.env mutations.
   // Check the default install location directly.
   const flyBin = `${process.env.HOME}/.fly/bin`;
-  for (const name of ["fly", "flyctl"]) {
+  for (const name of [
+    "fly",
+    "flyctl",
+  ]) {
     const fullPath = `${flyBin}/${name}`;
-    if (existsSync(fullPath)) { return fullPath; }
+    if (existsSync(fullPath)) {
+      return fullPath;
+    }
   }
   return null;
 }
@@ -161,7 +219,9 @@ export function sanitizeFlyToken(raw: string): string {
     // Macaroon token — may have comma-separated discharge tokens (fm2_xxx,fm2_yyy,fo1_zzz).
     // Extract from the first fm2_ to end-of-string, preserving all segments.
     const m = t.match(/(fm2_\S+)/);
-    if (m) { t = "FlyV1 " + m[1]; }
+    if (m) {
+      t = "FlyV1 " + m[1];
+    }
   } else if (t.startsWith("m2.")) {
     t = "FlyV1 " + t;
   }
@@ -171,26 +231,32 @@ export function sanitizeFlyToken(raw: string): string {
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testFlyToken(): Promise<boolean> {
-  if (!flyApiToken) { return false; }
+  if (!flyApiToken) {
+    return false;
+  }
   try {
     const org = flyOrg || "personal";
     const resp = await flyApi("GET", `/apps?org_slug=${org}`, undefined, 1);
-    if (!hasError(resp)) { return true; }
+    if (!hasError(resp)) {
+      return true;
+    }
   } catch {
     // fall through
   }
   // Fallback: user API (OAuth/personal tokens)
   try {
-    const authHeader = flyApiToken.startsWith("FlyV1 ")
-      ? flyApiToken
-      : `Bearer ${flyApiToken}`;
+    const authHeader = flyApiToken.startsWith("FlyV1 ") ? flyApiToken : `Bearer ${flyApiToken}`;
     const resp = await fetch("https://api.fly.io/v1/user", {
-      headers: { Authorization: authHeader },
+      headers: {
+        Authorization: authHeader,
+      },
       signal: AbortSignal.timeout(10_000),
     });
     if (resp.ok) {
       const text = await resp.text();
-      if (text && !hasError(text)) { return true; }
+      if (text && !hasError(text)) {
+        return true;
+      }
     }
   } catch {
     // fall through
@@ -204,13 +270,15 @@ const FLY_CONFIG_PATH = `${process.env.HOME}/.config/spawn/fly.json`;
 
 async function saveTokenToConfig(token: string): Promise<void> {
   const dir = FLY_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn(["mkdir", "-p", dir]).exited;
+  await Bun.spawn([
+    "mkdir",
+    "-p",
+    dir,
+  ]).exited;
   const escaped = jsonEscape(token);
-  await Bun.write(
-    FLY_CONFIG_PATH,
-    `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`,
-    { mode: 0o600 },
-  );
+  await Bun.write(FLY_CONFIG_PATH, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
+    mode: 0o600,
+  });
 }
 
 /** Sync the resolved token to process.env so fly CLI subprocesses (ssh console) can authenticate. */
@@ -222,13 +290,15 @@ function syncTokenToEnv(): void {
 
 function loadTokenFromConfig(): string | null {
   try {
-    const data = JSON.parse(
-      readFileSync(FLY_CONFIG_PATH, "utf-8"),
-    );
+    const data = JSON.parse(readFileSync(FLY_CONFIG_PATH, "utf-8"));
     const token = data.api_key || data.token || "";
-    if (!token) { return null; }
+    if (!token) {
+      return null;
+    }
     // Security: validate token chars
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) { return null; }
+    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
+      return null;
+    }
     return token;
   } catch {
     return null;
@@ -246,12 +316,25 @@ export function saveVmConnection(
   launchCmd?: string,
 ): void {
   const dir = `${process.env.HOME}/.spawn`;
-  mkdirSync(dir, { recursive: true });
-  const json: Record<string, string> = { ip, user };
-  if (serverId) { json.server_id = serverId; }
-  if (serverName) { json.server_name = serverName; }
-  if (cloud) { json.cloud = cloud; }
-  if (launchCmd) { json.launch_cmd = launchCmd; }
+  mkdirSync(dir, {
+    recursive: true,
+  });
+  const json: Record<string, string> = {
+    ip,
+    user,
+  };
+  if (serverId) {
+    json.server_id = serverId;
+  }
+  if (serverName) {
+    json.server_name = serverName;
+  }
+  if (cloud) {
+    json.cloud = cloud;
+  }
+  if (launchCmd) {
+    json.launch_cmd = launchCmd;
+  }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -275,9 +358,20 @@ export async function ensureFlyCli(): Promise<void> {
     return;
   }
   logStep("Installing flyctl CLI...");
-  const proc = Bun.spawn(["sh", "-c", "curl -L https://fly.io/install.sh | sh"], {
-    stdio: ["ignore", "ignore", "pipe"],
-  });
+  const proc = Bun.spawn(
+    [
+      "sh",
+      "-c",
+      "curl -L https://fly.io/install.sh | sh",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "ignore",
+        "pipe",
+      ],
+    },
+  );
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     logError("Failed to install flyctl CLI");
@@ -304,25 +398,50 @@ export async function ensureFlyCli(): Promise<void> {
  */
 function extractTokenFromCli(flyCmd: string, args: string[]): string {
   try {
-    const proc = Bun.spawnSync([flyCmd, ...args], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const proc = Bun.spawnSync(
+      [
+        flyCmd,
+        ...args,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "pipe",
+        ],
+      },
+    );
     const stdout = new TextDecoder().decode(proc.stdout);
     const stderr = new TextDecoder().decode(proc.stderr);
     // Try stdout first, then stderr
-    for (const output of [stdout, stderr]) {
+    for (const output of [
+      stdout,
+      stderr,
+    ]) {
       for (const line of output.split("\n")) {
         const cleaned = line.replace(/\x1b\[[0-9;]*m/g, "").trim();
-        if (!cleaned) { continue; }
+        if (!cleaned) {
+          continue;
+        }
         // Match "FlyV1 fm2_..." (the standard output format)
-        if (/^FlyV1\s+\S+/.test(cleaned)) { return cleaned; }
+        if (/^FlyV1\s+\S+/.test(cleaned)) {
+          return cleaned;
+        }
         // Match bare macaroon tokens: fm2_..., m2....
-        if (/^(fm2_|m2\.)\S+/.test(cleaned)) { return cleaned; }
+        if (/^(fm2_|m2\.)\S+/.test(cleaned)) {
+          return cleaned;
+        }
         // Skip deprecation notices, help text, error messages
-        if (/deprecated|command|usage|error|failed|help|available|flags/i.test(cleaned)) { continue; }
-        if (cleaned.startsWith("-") || cleaned.startsWith("The ") || cleaned.startsWith("Use ")) { continue; }
+        if (/deprecated|command|usage|error|failed|help|available|flags/i.test(cleaned)) {
+          continue;
+        }
+        if (cleaned.startsWith("-") || cleaned.startsWith("The ") || cleaned.startsWith("Use ")) {
+          continue;
+        }
         // A long alphanumeric string is likely a token
-        if (/^[a-zA-Z0-9_.,+/=: -]{40,}$/.test(cleaned)) { return cleaned; }
+        if (/^[a-zA-Z0-9_.,+/=: -]{40,}$/.test(cleaned)) {
+          return cleaned;
+        }
       }
     }
   } catch {
@@ -365,8 +484,17 @@ export async function ensureFlyToken(): Promise<void> {
   //    Org tokens are needed (not deploy tokens) since spawn creates new apps.
   if (flyCmd) {
     const tokenCmds: string[][] = [
-      ["tokens", "create", "org", "--expiry", "24h"],
-      ["auth", "token"],
+      [
+        "tokens",
+        "create",
+        "org",
+        "--expiry",
+        "24h",
+      ],
+      [
+        "auth",
+        "token",
+      ],
     ];
     for (const args of tokenCmds) {
       const token = extractTokenFromCli(flyCmd, args);
@@ -387,15 +515,35 @@ export async function ensureFlyToken(): Promise<void> {
   // 4. OAuth login via fly auth login
   if (flyCmd) {
     logStep("Launching Fly.io OAuth login...");
-    const proc = Bun.spawn([flyCmd, "auth", "login"], {
-      stdio: ["inherit", "inherit", "inherit"],
-    });
+    const proc = Bun.spawn(
+      [
+        flyCmd,
+        "auth",
+        "login",
+      ],
+      {
+        stdio: [
+          "inherit",
+          "inherit",
+          "inherit",
+        ],
+      },
+    );
     await proc.exited;
 
     // After login, try to get an org token (needed for creating apps)
     const tokenCmds: string[][] = [
-      ["tokens", "create", "org", "--expiry", "24h"],
-      ["auth", "token"],
+      [
+        "tokens",
+        "create",
+        "org",
+        "--expiry",
+        "24h",
+      ],
+      [
+        "auth",
+        "token",
+      ],
     ];
     for (const args of tokenCmds) {
       const token = extractTokenFromCli(flyCmd, args);
@@ -415,7 +563,9 @@ export async function ensureFlyToken(): Promise<void> {
   logWarn("Get a token from: https://fly.io/dashboard -> Tokens");
   logWarn("Or run: fly tokens create org");
   const token = await prompt("Enter your Fly.io API token: ");
-  if (!token) { throw new Error("No token provided"); }
+  if (!token) {
+    throw new Error("No token provided");
+  }
   flyApiToken = sanitizeFlyToken(token);
   if (!(await testFlyToken())) {
     logError("Token is invalid");
@@ -436,7 +586,9 @@ interface OrgEntry {
 
 function parseOrgsJson(json: string): OrgEntry[] {
   const data = parseJson(json);
-  if (!data) { return []; }
+  if (!data) {
+    return [];
+  }
 
   // Handle different org response formats
   let orgs: any[] = [];
@@ -452,7 +604,10 @@ function parseOrgsJson(json: string): OrgEntry[] {
     // {slug: name} format
     return Object.entries(data)
       .filter(([slug]) => slug)
-      .map(([slug, name]) => ({ slug, label: String(name) }));
+      .map(([slug, name]) => ({
+        slug,
+        label: String(name),
+      }));
   }
 
   return orgs
@@ -461,7 +616,10 @@ function parseOrgsJson(json: string): OrgEntry[] {
       const slug = o.slug || o.name || "";
       const name = o.name || slug;
       const suffix = o.type ? ` (${o.type})` : "";
-      return { slug, label: `${name}${suffix}` };
+      return {
+        slug,
+        label: `${name}${suffix}`,
+      };
     });
 }
 
@@ -471,13 +629,27 @@ async function listOrgs(): Promise<OrgEntry[]> {
   // 1. Try fly CLI
   if (flyCmd) {
     try {
-      const proc = Bun.spawnSync([flyCmd, "orgs", "list", "--json"], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      const proc = Bun.spawnSync(
+        [
+          flyCmd,
+          "orgs",
+          "list",
+          "--json",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
       const json = new TextDecoder().decode(proc.stdout).trim();
       if (json) {
         const orgs = parseOrgsJson(json);
-        if (orgs.length > 0) { return orgs; }
+        if (orgs.length > 0) {
+          return orgs;
+        }
       }
     } catch {
       // fall through
@@ -485,10 +657,10 @@ async function listOrgs(): Promise<OrgEntry[]> {
   }
 
   // 2. Fall back to GraphQL
-  if (!flyApiToken) { return []; }
-  const authHeader = flyApiToken.startsWith("FlyV1 ")
-    ? flyApiToken
-    : `Bearer ${flyApiToken}`;
+  if (!flyApiToken) {
+    return [];
+  }
+  const authHeader = flyApiToken.startsWith("FlyV1 ") ? flyApiToken : `Bearer ${flyApiToken}`;
 
   try {
     const resp = await fetch("https://api.fly.io/graphql", {
@@ -502,7 +674,9 @@ async function listOrgs(): Promise<OrgEntry[]> {
     });
     const json = await resp.text();
     const orgs = parseOrgsJson(json);
-    if (orgs.length > 0) { return orgs; }
+    if (orgs.length > 0) {
+      return orgs;
+    }
   } catch {
     // fall through
   }
@@ -554,9 +728,7 @@ async function createApp(name: string): Promise<void> {
     }
     logError(`Failed to create Fly.io app: ${errMsg}`);
     if (/taken|Name.*valid/i.test(errMsg)) {
-      logWarn(
-        "Fly.io app names are globally unique. Set a different name with: FLY_APP_NAME=my-unique-name",
-      );
+      logWarn("Fly.io app names are globally unique. Set a different name with: FLY_APP_NAME=my-unique-name");
     }
     throw new Error(`App creation failed: ${errMsg}`);
   }
@@ -576,21 +748,37 @@ async function createMachine(
   logStep(`Creating Fly.io machine (region: ${region}, ${cpus} ${kindLabel} vCPU, ${vmMemory}MB)...`);
   const config: Record<string, unknown> = {
     image: image || "ubuntu:24.04",
-    guest: { cpu_kind: cpuKind, cpus, memory_mb: vmMemory },
-    init: { exec: ["/bin/sleep", "inf"] },
+    guest: {
+      cpu_kind: cpuKind,
+      cpus,
+      memory_mb: vmMemory,
+    },
+    init: {
+      exec: [
+        "/bin/sleep",
+        "inf",
+      ],
+    },
     auto_destroy: false,
   };
   if (volumeId) {
-    config.mounts = [{ volume: volumeId, path: "/data" }];
+    config.mounts = [
+      {
+        volume: volumeId,
+        path: "/data",
+      },
+    ];
   }
-  const body = JSON.stringify({ name, region, config });
+  const body = JSON.stringify({
+    name,
+    region,
+    config,
+  });
 
   const resp = await flyApi("POST", `/apps/${name}/machines`, body);
   if (resp.includes('"error"')) {
     const data = parseJson(resp);
-    logError(
-      `Failed to create Fly.io machine: ${data?.error || "Unknown error"}`,
-    );
+    logError(`Failed to create Fly.io machine: ${data?.error || "Unknown error"}`);
     logWarn("Check your dashboard: https://fly.io/dashboard");
     throw new Error("Machine creation failed");
   }
@@ -605,20 +793,10 @@ async function createMachine(
   return machineId;
 }
 
-async function waitForMachineStart(
-  name: string,
-  machineId: string,
-  timeout = 60,
-  retries = 3,
-): Promise<void> {
+async function waitForMachineStart(name: string, machineId: string, timeout = 60, retries = 3): Promise<void> {
   for (let attempt = 1; attempt <= retries; attempt++) {
-    logStep(
-      `Waiting for machine to start (timeout: ${timeout}s, attempt ${attempt}/${retries})...`,
-    );
-    const resp = await flyApi(
-      "GET",
-      `/apps/${name}/machines/${machineId}/wait?state=started&timeout=${timeout}`,
-    );
+    logStep(`Waiting for machine to start (timeout: ${timeout}s, attempt ${attempt}/${retries})...`);
+    const resp = await flyApi("GET", `/apps/${name}/machines/${machineId}/wait?state=started&timeout=${timeout}`);
     if (!hasError(resp)) {
       logInfo("Machine is running");
       return;
@@ -628,9 +806,7 @@ async function waitForMachineStart(
       continue;
     }
     const data = parseJson(resp);
-    logError(
-      `Machine did not reach 'started' state: ${data?.error || "timeout"}`,
-    );
+    logError(`Machine did not reach 'started' state: ${data?.error || "timeout"}`);
     logError("Try a new region: FLY_REGION=ord spawn fly <agent>");
     throw new Error("Machine start timeout");
   }
@@ -645,11 +821,7 @@ async function cleanupOnFailure(appName: string): Promise<void> {
   }
 }
 
-async function createVolume(
-  name: string,
-  region: string,
-  sizeGb: number,
-): Promise<string> {
+async function createVolume(name: string, region: string, sizeGb: number): Promise<string> {
   logStep(`Creating ${sizeGb}GB volume...`);
   const body = JSON.stringify({
     name: "data",
@@ -666,10 +838,18 @@ async function createVolume(
   return data.id;
 }
 
-export async function listVolumes(appName: string): Promise<Array<{ id: string; name: string; size_gb: number }>> {
+export async function listVolumes(appName: string): Promise<
+  Array<{
+    id: string;
+    name: string;
+    size_gb: number;
+  }>
+> {
   const resp = await flyApi("GET", `/apps/${appName}/volumes`);
   const data = parseJson(resp);
-  if (!Array.isArray(data)) { return []; }
+  if (!Array.isArray(data)) {
+    return [];
+  }
   return data
     .filter((v: any) => v.id)
     .map((v: any) => ({
@@ -718,10 +898,7 @@ export async function createServer(name: string, opts: ServerOptions, image?: st
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
-export async function runServer(
-  cmd: string,
-  timeoutSecs?: number,
-): Promise<void> {
+export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const flyCmd = getCmd()!;
 
@@ -733,18 +910,41 @@ export async function runServer(
   const escapedCmd = wrappedCmd.replace(/'/g, "'\\''");
   // Use fly ssh console (WireGuard) instead of fly machine exec (HTTP) to avoid
   // 408 deadline_exceeded on long-running commands.
-  const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
+  const args = [
+    flyCmd,
+    "ssh",
+    "console",
+    "-a",
+    flyAppName,
+    "-C",
+    `bash -c '${escapedCmd}'`,
+  ];
 
   // Don't inherit stdin — commands like `claude install` try to read input and
   // hang. Use "pipe" but keep it open until the process exits — closing stdin
   // early causes flyctl to tear down the WireGuard transport ("session forcibly
   // closed") before long-running commands like `bun install` finish.
-  const proc = Bun.spawn(args, { stdio: ["pipe", "inherit", "inherit"], env: process.env });
+  const proc = Bun.spawn(args, {
+    stdio: [
+      "pipe",
+      "inherit",
+      "inherit",
+    ],
+    env: process.env,
+  });
   // Local safety timer — WireGuard has no HTTP deadline but we still want a ceiling.
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {}
+  }, timeout);
   const exitCode = await proc.exited;
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   clearTimeout(timer);
   if (exitCode !== 0) {
     throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
@@ -752,33 +952,52 @@ export async function runServer(
 }
 
 /** Run a command and capture stdout. */
-export async function runServerCapture(
-  cmd: string,
-  timeoutSecs?: number,
-): Promise<string> {
+export async function runServerCapture(cmd: string, timeoutSecs?: number): Promise<string> {
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const flyCmd = getCmd()!;
 
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
-  const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
+  const args = [
+    flyCmd,
+    "ssh",
+    "console",
+    "-a",
+    flyAppName,
+    "-C",
+    `bash -c '${escapedCmd}'`,
+  ];
 
-  const proc = Bun.spawn(args, { stdio: ["pipe", "pipe", "pipe"], env: process.env });
+  const proc = Bun.spawn(args, {
+    stdio: [
+      "pipe",
+      "pipe",
+      "pipe",
+    ],
+    env: process.env,
+  });
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {}
+  }, timeout);
 
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   clearTimeout(timer);
 
-  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
+  if (exitCode !== 0) {
+    throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  }
   return stdout.trim();
 }
 
-export async function uploadFile(
-  localPath: string,
-  remotePath: string,
-): Promise<void> {
+export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
   if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
@@ -787,12 +1006,33 @@ export async function uploadFile(
   const content: Buffer = readFileSync(localPath);
   const b64 = content.toString("base64");
   const proc = Bun.spawn(
-    [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c 'printf "%s" ${b64} | base64 -d > ${remotePath}'`],
-    { stdio: ["pipe", "ignore", "ignore"], env: process.env },
+    [
+      flyCmd,
+      "ssh",
+      "console",
+      "-a",
+      flyAppName,
+      "-C",
+      `bash -c 'printf "%s" ${b64} | base64 -d > ${remotePath}'`,
+    ],
+    {
+      stdio: [
+        "pipe",
+        "ignore",
+        "ignore",
+      ],
+      env: process.env,
+    },
   );
   const exitCode = await proc.exited;
-  try { proc.stdin!.end(); } catch { /* already closed */ }
-  if (exitCode !== 0) { throw new Error(`upload_file failed for ${remotePath}`); }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
+  if (exitCode !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
+  }
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
@@ -803,8 +1043,24 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const flyCmd = getCmd()!;
 
   const proc = Bun.spawn(
-    [flyCmd, "ssh", "console", "-a", flyAppName, "--pty", "-C", `bash -c '${escapedCmd}'`],
-    { stdio: ["inherit", "inherit", "inherit"], env: process.env },
+    [
+      flyCmd,
+      "ssh",
+      "console",
+      "-a",
+      flyAppName,
+      "--pty",
+      "-C",
+      `bash -c '${escapedCmd}'`,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+      env: process.env,
+    },
   );
   const exitCode = await proc.exited;
 
@@ -838,7 +1094,9 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
-      if (attempt < maxAttempts) { await sleep(sleepSec * 1000); }
+      if (attempt < maxAttempts) {
+        await sleep(sleepSec * 1000);
+      }
     }
   }
   logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);
@@ -876,16 +1134,20 @@ export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<vo
     `echo "==> Installing base packages..."`,
     "export DEBIAN_FRONTEND=noninteractive",
     `apt-get update -y && apt-get install -y --no-install-recommends ${packages.join(" ")} || true`,
-    ...(needsNode(tier) ? [
-      `echo "==> Installing Node.js 22..."`,
-      `${NODE_INSTALL_CMD} || true`,
-    ] : []),
-    ...(needsBun(tier) ? [
-      `echo "==> Checking bun..."`,
-      `if ! command -v bun >/dev/null 2>&1 && [ ! -f "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash || true; fi`,
-    ] : []),
+    ...(needsNode(tier)
+      ? [
+          `echo "==> Installing Node.js 22..."`,
+          `${NODE_INSTALL_CMD} || true`,
+        ]
+      : []),
+    ...(needsBun(tier)
+      ? [
+          `echo "==> Checking bun..."`,
+          `if ! command -v bun >/dev/null 2>&1 && [ ! -f "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash || true; fi`,
+        ]
+      : []),
     `for rc in ~/.bashrc ~/.zshrc; do grep -q '.bun/bin' "$rc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' >> "$rc"; done`,
-  ].join('\n');
+  ].join("\n");
 
   try {
     await runWithRetry(3, 10, 300, setupScript);
@@ -909,13 +1171,14 @@ export async function getServerName(): Promise<string> {
     return name;
   }
 
-  const kebab = process.env.SPAWN_NAME_KEBAB
-    || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
+  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
   return kebab || defaultSpawnName();
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) { return; }
+  if (process.env.SPAWN_NAME_KEBAB) {
+    return;
+  }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {
@@ -953,12 +1216,16 @@ export async function destroyServer(appName?: string): Promise<void> {
     logStep(`Stopping machine ${mid}...`);
     try {
       await flyApi("POST", `/apps/${name}/machines/${mid}/stop`, "{}");
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     await sleep(2000);
     logStep(`Destroying machine ${mid}...`);
     try {
       await flyApi("DELETE", `/apps/${name}/machines/${mid}?force=true`);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   const delResp = await flyApi("DELETE", `/apps/${name}`);
@@ -974,15 +1241,13 @@ export async function listServers(): Promise<void> {
   const org = flyOrg || process.env.FLY_ORG || "personal";
   const resp = await flyApi("GET", `/apps?org_slug=${org}`);
   const data = parseJson(resp);
-  const apps: any[] = Array.isArray(data) ? data : data?.apps ?? [];
+  const apps: any[] = Array.isArray(data) ? data : (data?.apps ?? []);
   if (apps.length === 0) {
     console.log("No apps found");
     return;
   }
   const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-  console.log(
-    pad("NAME", 25) + pad("ID", 20) + pad("STATUS", 12) + pad("NETWORK", 20),
-  );
+  console.log(pad("NAME", 25) + pad("ID", 20) + pad("STATUS", 12) + pad("NETWORK", 20));
   console.log("-".repeat(77));
   for (const a of apps) {
     console.log(

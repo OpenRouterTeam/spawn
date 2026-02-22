@@ -1,18 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import {
-  loadManifest,
-  agentKeys,
-  cloudKeys,
-  matrixStatus,
-  countImplemented,
-  type Manifest,
-} from "../manifest";
-import { mkdirSync, writeFileSync, } from "node:fs";
-import {
-  setupTestEnvironment,
-  teardownTestEnvironment,
-  type TestEnvironment,
-} from "./test-helpers";
+import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented, type Manifest } from "../manifest";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { setupTestEnvironment, teardownTestEnvironment, type TestEnvironment } from "./test-helpers";
 
 /**
  * Tests for manifest.ts internal helper behaviors that are not covered
@@ -40,10 +29,17 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject array as manifest data", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => [1, 2, 3],
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => [
+              1,
+              2,
+              3,
+            ],
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -53,10 +49,13 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject string as manifest data", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => "not a manifest",
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => "not a manifest",
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -66,10 +65,13 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject number as manifest data", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => 42,
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => 42,
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -79,10 +81,13 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject boolean false as manifest data", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => false,
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => false,
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -92,10 +97,13 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject undefined as manifest data", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => undefined,
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => undefined,
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -117,7 +125,9 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should handle corrupted JSON in cache file gracefully", async () => {
-      mkdirSync(env.cacheDir, { recursive: true });
+      mkdirSync(env.cacheDir, {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, "not valid json {{{");
 
       global.fetch = mock(() => Promise.reject(new Error("Network error")));
@@ -130,7 +140,9 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should handle empty cache file gracefully", async () => {
-      mkdirSync(env.cacheDir, { recursive: true });
+      mkdirSync(env.cacheDir, {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, "");
 
       global.fetch = mock(() => Promise.reject(new Error("Network error")));
@@ -184,7 +196,9 @@ describe("Manifest Helper Edge Cases", () => {
       const manifest: Manifest = {
         agents: {},
         clouds: {},
-        matrix: { "a/b": "Implemented" },
+        matrix: {
+          "a/b": "Implemented",
+        },
       };
       expect(countImplemented(manifest)).toBe(0);
     });
@@ -193,7 +207,9 @@ describe("Manifest Helper Edge Cases", () => {
       const manifest: Manifest = {
         agents: {},
         clouds: {},
-        matrix: { "a/b": "IMPLEMENTED" },
+        matrix: {
+          "a/b": "IMPLEMENTED",
+        },
       };
       expect(countImplemented(manifest)).toBe(0);
     });
@@ -202,7 +218,9 @@ describe("Manifest Helper Edge Cases", () => {
       const manifest: Manifest = {
         agents: {},
         clouds: {},
-        matrix: { "a/b": "implemented " },
+        matrix: {
+          "a/b": "implemented ",
+        },
       };
       expect(countImplemented(manifest)).toBe(0);
     });
@@ -211,7 +229,9 @@ describe("Manifest Helper Edge Cases", () => {
       const manifest: Manifest = {
         agents: {},
         clouds: {},
-        matrix: { "a/b": "" },
+        matrix: {
+          "a/b": "",
+        },
       };
       expect(countImplemented(manifest)).toBe(0);
     });
@@ -221,7 +241,11 @@ describe("Manifest Helper Edge Cases", () => {
       for (let i = 0; i < 50; i++) {
         matrix[`cloud${i}/agent${i}`] = "implemented";
       }
-      const manifest: Manifest = { agents: {}, clouds: {}, matrix };
+      const manifest: Manifest = {
+        agents: {},
+        clouds: {},
+        matrix,
+      };
       expect(countImplemented(manifest)).toBe(50);
     });
   });
@@ -239,7 +263,11 @@ describe("Manifest Helper Edge Cases", () => {
           env: {},
         };
       }
-      const manifest: Manifest = { agents, clouds: {}, matrix: {} };
+      const manifest: Manifest = {
+        agents,
+        clouds: {},
+        matrix: {},
+      };
       expect(agentKeys(manifest)).toHaveLength(20);
     });
 
@@ -257,7 +285,11 @@ describe("Manifest Helper Edge Cases", () => {
           interactive_method: "",
         };
       }
-      const manifest: Manifest = { agents: {}, clouds, matrix: {} };
+      const manifest: Manifest = {
+        agents: {},
+        clouds,
+        matrix: {},
+      };
       expect(cloudKeys(manifest)).toHaveLength(20);
     });
   });

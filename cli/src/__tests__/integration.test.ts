@@ -55,7 +55,11 @@ describe("CLI Integration Tests", () => {
     // In a real environment, we'd spawn the CLI process
     // For now, we just verify the version is exported from package.json
 
-    const pkg = await import("../../package.json", { with: { type: "json" } });
+    const pkg = await import("../../package.json", {
+      with: {
+        type: "json",
+      },
+    });
     const VERSION = pkg.default.version;
     expect(VERSION).toBeDefined();
     expect(typeof VERSION).toBe("string");
@@ -63,7 +67,9 @@ describe("CLI Integration Tests", () => {
   });
 
   it("should cache manifest after first load", async () => {
-    mkdirSync(env.cacheDir, { recursive: true });
+    mkdirSync(env.cacheDir, {
+      recursive: true,
+    });
 
     // Mock fetch for manifest load
     global.fetch = mockSuccessfulFetch(mockManifest);
@@ -91,7 +97,9 @@ describe("CLI Integration Tests", () => {
   });
 
   it("should handle offline scenario with stale cache", async () => {
-    mkdirSync(env.cacheDir, { recursive: true });
+    mkdirSync(env.cacheDir, {
+      recursive: true,
+    });
 
     // Write stale cache (2 hours old)
     writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
@@ -118,8 +126,12 @@ describe("CLI Integration Tests", () => {
     const agents = agentKeys(manifest);
     const clouds = cloudKeys(manifest);
 
-    expect(agents).toEqual(["testAgent"]);
-    expect(clouds).toEqual(["testCloud"]);
+    expect(agents).toEqual([
+      "testAgent",
+    ]);
+    expect(clouds).toEqual([
+      "testCloud",
+    ]);
   });
 
   it("should validate matrix entries correctly", async () => {
@@ -138,11 +150,17 @@ describe("CLI Integration Tests", () => {
     const multiManifest: Manifest = {
       agents: {
         agent1: mockManifest.agents.testAgent,
-        agent2: { ...mockManifest.agents.testAgent, name: "Agent 2" },
+        agent2: {
+          ...mockManifest.agents.testAgent,
+          name: "Agent 2",
+        },
       },
       clouds: {
         cloud1: mockManifest.clouds.testCloud,
-        cloud2: { ...mockManifest.clouds.testCloud, name: "Cloud 2" },
+        cloud2: {
+          ...mockManifest.clouds.testCloud,
+          name: "Cloud 2",
+        },
       },
       matrix: {
         "cloud1/agent1": "implemented",

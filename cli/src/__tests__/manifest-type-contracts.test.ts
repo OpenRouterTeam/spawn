@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Manifest, } from "../manifest";
+import type { Manifest } from "../manifest";
 
 /**
  * Manifest type contract validation tests.
@@ -28,9 +28,7 @@ import type { Manifest, } from "../manifest";
  */
 
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
-const manifest: Manifest = JSON.parse(
-  readFileSync(resolve(REPO_ROOT, "manifest.json"), "utf-8")
-);
+const manifest: Manifest = JSON.parse(readFileSync(resolve(REPO_ROOT, "manifest.json"), "utf-8"));
 
 const allAgents = Object.entries(manifest.agents);
 const allClouds = Object.entries(manifest.clouds);
@@ -97,7 +95,7 @@ describe("Agent OPENROUTER_API_KEY requirement", () => {
       const envKeys = Object.keys(agent.env);
       const envValues = Object.values(agent.env);
       const hasKeyDirect = envKeys.includes("OPENROUTER_API_KEY");
-      const hasKeyRef = envValues.some(v => v.includes("OPENROUTER_API_KEY"));
+      const hasKeyRef = envValues.some((v) => v.includes("OPENROUTER_API_KEY"));
       expect(hasKeyDirect || hasKeyRef).toBe(true);
     });
   }
@@ -404,9 +402,7 @@ describe("Dotenv configuration", () => {
 // ── Interactive prompts structure ─────────────────────────────────────────
 
 describe("Interactive prompts structure", () => {
-  const agentsWithPrompts = allAgents.filter(
-    ([, a]) => a.interactive_prompts !== undefined
-  );
+  const agentsWithPrompts = allAgents.filter(([, a]) => a.interactive_prompts !== undefined);
 
   if (agentsWithPrompts.length > 0) {
     it("at least one agent uses interactive prompts", () => {
@@ -501,7 +497,11 @@ describe("Agent metadata field types (when present)", () => {
     if (a.category !== undefined) {
       it(`agent "${key}" category should be cli, tui, or ide-extension`, () => {
         expect(typeof a.category).toBe("string");
-        expect(["cli", "tui", "ide-extension"]).toContain(a.category);
+        expect([
+          "cli",
+          "tui",
+          "ide-extension",
+        ]).toContain(a.category);
       });
     }
 
@@ -527,9 +527,7 @@ describe("Agent metadata field types (when present)", () => {
 // ── Config files structure ────────────────────────────────────────────────
 
 describe("Config files structure", () => {
-  const agentsWithConfig = allAgents.filter(
-    ([, a]) => a.config_files !== undefined
-  );
+  const agentsWithConfig = allAgents.filter(([, a]) => a.config_files !== undefined);
 
   if (agentsWithConfig.length > 0) {
     it("at least one agent uses config files", () => {

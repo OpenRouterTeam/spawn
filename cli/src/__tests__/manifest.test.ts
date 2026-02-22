@@ -1,12 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import {
-  loadManifest,
-  agentKeys,
-  cloudKeys,
-  matrixStatus,
-  countImplemented,
-  type Manifest,
-} from "../manifest";
+import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented, type Manifest } from "../manifest";
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -25,7 +18,10 @@ describe("manifest", () => {
   describe("agentKeys", () => {
     it("should return all agent keys", () => {
       const keys = agentKeys(mockManifest);
-      expect(keys).toEqual(["claude", "codex"]);
+      expect(keys).toEqual([
+        "claude",
+        "codex",
+      ]);
     });
 
     it("should return empty array for empty agents", () => {
@@ -38,7 +34,10 @@ describe("manifest", () => {
   describe("cloudKeys", () => {
     it("should return all cloud keys", () => {
       const keys = cloudKeys(mockManifest);
-      expect(keys).toEqual(["sprite", "hetzner"]);
+      expect(keys).toEqual([
+        "sprite",
+        "hetzner",
+      ]);
     });
 
     it("should return empty array for empty clouds", () => {
@@ -122,7 +121,7 @@ describe("manifest", () => {
         expect.stringContaining("manifest.json"),
         expect.objectContaining({
           signal: expect.any(AbortSignal),
-        })
+        }),
       );
 
       // Cache location depends on whether the test runs in the project directory
@@ -133,14 +132,19 @@ describe("manifest", () => {
 
     it("should use disk cache when fresh", async () => {
       // Write fresh cache
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
 
       // Mock fetch (should not be called for fresh cache)
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => mockManifest,
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
+      );
 
       const manifest = await loadManifest();
 
@@ -151,15 +155,23 @@ describe("manifest", () => {
 
     it("should refresh cache when forceRefresh is true", async () => {
       // Write stale cache
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
 
       // Mock successful fetch with different data
-      const updatedManifest = { ...mockManifest, agents: {} };
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => updatedManifest,
-      }) as any);
+      const updatedManifest = {
+        ...mockManifest,
+        agents: {},
+      };
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => updatedManifest,
+          }) as any,
+      );
 
       const manifest = await loadManifest(true);
 
@@ -170,7 +182,9 @@ describe("manifest", () => {
 
     it("should use stale cache as fallback on network error", async () => {
       // Write old cache (more than 1 hour old)
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
       const { utimesSync } = await import("node:fs");
@@ -196,7 +210,10 @@ describe("manifest", () => {
       // Remove cache directory to ensure it's truly missing
       const cacheDir = join(env.testDir, "spawn");
       if (existsSync(cacheDir)) {
-        rmSync(cacheDir, { recursive: true, force: true });
+        rmSync(cacheDir, {
+          recursive: true,
+          force: true,
+        });
       }
 
       // Mock network failure
@@ -217,13 +234,20 @@ describe("manifest", () => {
 
     it("should validate manifest structure", async () => {
       // Mock fetch with invalid data (missing required fields)
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => ({ agents: {} }), // missing clouds and matrix
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => ({
+              agents: {},
+            }), // missing clouds and matrix
+          }) as any,
+      );
 
       // Write valid cache as fallback
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       const { utimesSync } = await import("node:fs");
@@ -240,13 +264,13 @@ describe("manifest", () => {
     it("should handle fetch timeout", async () => {
       // Mock timeout
       global.fetch = mock(async () => {
-        await new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout")), 100)
-        );
+        await new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 100));
       }) as any;
 
       // Write cache as fallback
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       const { utimesSync } = await import("node:fs");

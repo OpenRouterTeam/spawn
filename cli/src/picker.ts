@@ -46,7 +46,15 @@ export function parsePickerInput(text: string): PickOption[] {
       const value = (parts[0] ?? "").trim();
       const label = (parts[1] ?? value).trim();
       const hint = parts[2]?.trim();
-      return { value, label, ...(hint ? { hint } : {}) };
+      return {
+        value,
+        label,
+        ...(hint
+          ? {
+              hint,
+            }
+          : {}),
+      };
     })
     .filter((o) => o.value.length > 0);
 }
@@ -54,16 +62,16 @@ export function parsePickerInput(text: string): PickOption[] {
 // ── ANSI helpers ─────────────────────────────────────────────────────────────
 
 const A = {
-  reset:     "\x1b[0m",
-  bold:      "\x1b[1m",
-  dim:       "\x1b[2m",
-  green:     "\x1b[32m",
-  cyan:      "\x1b[36m",
-  hideC:     "\x1b[?25l",
-  showC:     "\x1b[?25h",
-  clearBelow:"\x1b[J",
+  reset: "\x1b[0m",
+  bold: "\x1b[1m",
+  dim: "\x1b[2m",
+  green: "\x1b[32m",
+  cyan: "\x1b[36m",
+  hideC: "\x1b[?25l",
+  showC: "\x1b[?25h",
+  clearBelow: "\x1b[J",
   up: (n: number) => `\x1b[${n}A`,
-  col1:      "\x1b[1G",
+  col1: "\x1b[1G",
 };
 
 // ── TTY picker ────────────────────────────────────────────────────────────────
@@ -76,7 +84,9 @@ const A = {
  * fd) but returns void so callers can `await` it uniformly.
  */
 export function pickToTTY(config: PickConfig): string | null {
-  if (config.options.length === 0) { return config.defaultValue ?? null; }
+  if (config.options.length === 0) {
+    return config.defaultValue ?? null;
+  }
 
   // ── open /dev/tty ──────────────────────────────────────────────────────────
   let ttyFd: number;
@@ -87,9 +97,19 @@ export function pickToTTY(config: PickConfig): string | null {
   }
 
   // ── save terminal settings ────────────────────────────────────────────────
-  const savedRes = spawnSync("stty", ["-g"], {
-    stdio: [ttyFd, "pipe", "pipe"],
-  });
+  const savedRes = spawnSync(
+    "stty",
+    [
+      "-g",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
   if (savedRes.status !== 0 || !savedRes.stdout) {
     fs.closeSync(ttyFd);
     return pickFallback(config);
@@ -97,28 +117,61 @@ export function pickToTTY(config: PickConfig): string | null {
   const savedSettings = savedRes.stdout.toString().trim();
 
   // ── enable raw / no-echo mode ─────────────────────────────────────────────
-  const rawRes = spawnSync("stty", ["raw", "-echo"], {
-    stdio: [ttyFd, "pipe", "pipe"],
-  });
+  const rawRes = spawnSync(
+    "stty",
+    [
+      "raw",
+      "-echo",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
   if (rawRes.status !== 0) {
     fs.closeSync(ttyFd);
     return pickFallback(config);
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
-  const w = (s: string) => { try { fs.writeSync(ttyFd, s); } catch {} };
+  const w = (s: string) => {
+    try {
+      fs.writeSync(ttyFd, s);
+    } catch {}
+  };
 
   const restore = () => {
-    try { spawnSync("stty", [savedSettings], { stdio: [ttyFd, "pipe", "pipe"] }); } catch {}
+    try {
+      spawnSync(
+        "stty",
+        [
+          savedSettings,
+        ],
+        {
+          stdio: [
+            ttyFd,
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
+    } catch {}
     w(A.showC);
-    try { fs.closeSync(ttyFd); } catch {}
+    try {
+      fs.closeSync(ttyFd);
+    } catch {}
   };
 
   // ── initial state ─────────────────────────────────────────────────────────
   let selected = 0;
   if (config.defaultValue) {
     const idx = config.options.findIndex((o) => o.value === config.defaultValue);
-    if (idx >= 0) { selected = idx; }
+    if (idx >= 0) {
+      selected = idx;
+    }
   }
 
   // header line + one line per option + footer line
@@ -133,7 +186,9 @@ export function pickToTTY(config: PickConfig): string | null {
       const opt = config.options[i];
       if (i === selected) {
         w(`${A.green}${A.bold}> ${opt.label}${A.reset}`);
-        if (opt.hint) { w(`  ${A.dim}${opt.hint}${A.reset}`); }
+        if (opt.hint) {
+          w(`  ${A.dim}${opt.hint}${A.reset}`);
+        }
       } else {
         w(`  ${A.dim}${opt.label}${A.reset}`);
       }
@@ -160,7 +215,9 @@ export function pickToTTY(config: PickConfig): string | null {
       } catch {
         break;
       }
-      if (n === 0) { continue; }
+      if (n === 0) {
+        continue;
+      }
 
       const key = buf.slice(0, n).toString("binary");
 
@@ -177,24 +234,21 @@ export function pickToTTY(config: PickConfig): string | null {
           // Replace picker with a one-line confirmation
           w(A.up(pickerHeight) + A.col1 + A.clearBelow);
           const opt = config.options[selected];
-          w(
-            `${A.green}${A.bold}> ${config.message}:${A.reset} ` +
-            `${A.cyan}${opt.label}${A.reset}\r\n`
-          );
+          w(`${A.green}${A.bold}> ${config.message}:${A.reset} ` + `${A.cyan}${opt.label}${A.reset}\r\n`);
           break outer;
         }
 
         // ── navigation ─────────────────────────────────────────────────────
         case "\x1b[A": // Up (CSI)
         case "\x1bOA": // Up (SS3, some terminals)
-        case "k":      // vim-style
+        case "k": // vim-style
           selected = (selected - 1 + config.options.length) % config.options.length;
           render(false);
           break;
 
         case "\x1b[B": // Down (CSI)
         case "\x1bOB": // Down (SS3)
-        case "j":      // vim-style
+        case "j": // vim-style
           selected = (selected + 1) % config.options.length;
           render(false);
           break;
@@ -218,18 +272,19 @@ export function pickToTTY(config: PickConfig): string | null {
  */
 export function pickFallback(config: PickConfig): string | null {
   const { message, options, defaultValue } = config;
-  if (options.length === 0) { return defaultValue ?? null; }
+  if (options.length === 0) {
+    return defaultValue ?? null;
+  }
 
-  const defaultIdx = Math.max(
-    options.findIndex((o) => o.value === defaultValue) + 1,
-    1
-  );
+  const defaultIdx = Math.max(options.findIndex((o) => o.value === defaultValue) + 1, 1);
 
   process.stderr.write(`\n${message}\n`);
   options.forEach((opt, i) => {
     const marker = opt.value === defaultValue ? "*" : " ";
     let line = `  ${marker} ${i + 1}) ${opt.label}`;
-    if (opt.hint) { line += `  — ${opt.hint}`; }
+    if (opt.hint) {
+      line += `  — ${opt.hint}`;
+    }
     process.stderr.write(line + "\n");
   });
   process.stderr.write(`\nSelect [${defaultIdx}]: `);
@@ -249,11 +304,19 @@ export function pickFallback(config: PickConfig): string | null {
   try {
     const lb = Buffer.alloc(256);
     const n = fs.readSync(inputFd, lb, 0, 255);
-    line = lb.slice(0, n).toString().replace(/[\r\n]/g, "").trim();
+    line = lb
+      .slice(0, n)
+      .toString()
+      .replace(/[\r\n]/g, "")
+      .trim();
   } catch {
     // ignore
   } finally {
-    if (openedTTY) { try { fs.closeSync(inputFd); } catch {} }
+    if (openedTTY) {
+      try {
+        fs.closeSync(inputFd);
+      } catch {}
+    }
   }
 
   const choice = Number.parseInt(line, 10);

@@ -1,12 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import {
-  loadManifest,
-  agentKeys,
-  cloudKeys,
-  matrixStatus,
-  countImplemented,
-  type Manifest,
-} from "../manifest";
+import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented, type Manifest } from "../manifest";
 import {
   createMockManifest,
   setupTestEnvironment,
@@ -36,10 +29,16 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject manifest missing agents field", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => ({ clouds: {}, matrix: {} }),
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => ({
+              clouds: {},
+              matrix: {},
+            }),
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -50,10 +49,16 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject manifest missing clouds field", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => ({ agents: {}, matrix: {} }),
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => ({
+              agents: {},
+              matrix: {},
+            }),
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -63,10 +68,16 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject manifest missing matrix field", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => ({ agents: {}, clouds: {} }),
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => ({
+              agents: {},
+              clouds: {},
+            }),
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -76,10 +87,13 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject null manifest data", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => null,
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => null,
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -89,10 +103,13 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject empty object manifest data", async () => {
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => ({}),
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => ({}),
+          }) as any,
+      );
 
       try {
         await loadManifest(true);
@@ -102,11 +119,18 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should accept valid manifest with empty collections", async () => {
-      const validEmpty = { agents: {}, clouds: {}, matrix: {} };
-      global.fetch = mock(() => Promise.resolve({
-        ok: true,
-        json: async () => validEmpty,
-      }) as any);
+      const validEmpty = {
+        agents: {},
+        clouds: {},
+        matrix: {},
+      };
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => validEmpty,
+          }) as any,
+      );
 
       const manifest = await loadManifest(true);
       expect(manifest).toHaveProperty("agents");
@@ -117,11 +141,14 @@ describe("Manifest Validation Edge Cases", () => {
     it("should handle non-ok HTTP response from GitHub", async () => {
       // When GitHub returns a non-ok response, fetchManifestFromGitHub returns null
       // and loadManifest falls back to cache or throws
-      global.fetch = mock(() => Promise.resolve({
-        ok: false,
-        status: 500,
-        statusText: "Internal Server Error",
-      }) as any);
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: false,
+            status: 500,
+            statusText: "Internal Server Error",
+          }) as any,
+      );
 
       try {
         const manifest = await loadManifest(true);
@@ -178,7 +205,11 @@ describe("Manifest Validation Edge Cases", () => {
       for (let i = 0; i < 100; i++) {
         matrix[`cloud${i}/agent${i}`] = i % 3 === 0 ? "implemented" : "missing";
       }
-      const manifest: Manifest = { agents: {}, clouds: {}, matrix };
+      const manifest: Manifest = {
+        agents: {},
+        clouds: {},
+        matrix,
+      };
       // i=0,3,6,...,99 => 0,3,6,...,99 => count of multiples of 3 from 0-99
       // 0,3,6,...,99 = 34 values
       expect(countImplemented(manifest)).toBe(34);
@@ -189,26 +220,72 @@ describe("Manifest Validation Edge Cases", () => {
     it("should preserve insertion order of agents", () => {
       const manifest: Manifest = {
         agents: {
-          zeta: { name: "Zeta", description: "", url: "", install: "", launch: "", env: {} },
-          alpha: { name: "Alpha", description: "", url: "", install: "", launch: "", env: {} },
-          mid: { name: "Mid", description: "", url: "", install: "", launch: "", env: {} },
+          zeta: {
+            name: "Zeta",
+            description: "",
+            url: "",
+            install: "",
+            launch: "",
+            env: {},
+          },
+          alpha: {
+            name: "Alpha",
+            description: "",
+            url: "",
+            install: "",
+            launch: "",
+            env: {},
+          },
+          mid: {
+            name: "Mid",
+            description: "",
+            url: "",
+            install: "",
+            launch: "",
+            env: {},
+          },
         },
         clouds: {},
         matrix: {},
       };
-      expect(agentKeys(manifest)).toEqual(["zeta", "alpha", "mid"]);
+      expect(agentKeys(manifest)).toEqual([
+        "zeta",
+        "alpha",
+        "mid",
+      ]);
     });
 
     it("should preserve insertion order of clouds", () => {
       const manifest: Manifest = {
         agents: {},
         clouds: {
-          zebra: { name: "Zebra", description: "", url: "", type: "", auth: "", provision_method: "", exec_method: "", interactive_method: "" },
-          apple: { name: "Apple", description: "", url: "", type: "", auth: "", provision_method: "", exec_method: "", interactive_method: "" },
+          zebra: {
+            name: "Zebra",
+            description: "",
+            url: "",
+            type: "",
+            auth: "",
+            provision_method: "",
+            exec_method: "",
+            interactive_method: "",
+          },
+          apple: {
+            name: "Apple",
+            description: "",
+            url: "",
+            type: "",
+            auth: "",
+            provision_method: "",
+            exec_method: "",
+            interactive_method: "",
+          },
         },
         matrix: {},
       };
-      expect(cloudKeys(manifest)).toEqual(["zebra", "apple"]);
+      expect(cloudKeys(manifest)).toEqual([
+        "zebra",
+        "apple",
+      ]);
     });
   });
 });
