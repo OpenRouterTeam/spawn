@@ -790,9 +790,9 @@ _generate_oauth_server_script() {
     port_file="${port_file//\'/\\\'}"
 
     printf '%s' "
-const http = require('http');
-const fs = require('fs');
-const url = require('url');
+import http from 'http';
+import fs from 'fs';
+import url from 'url';
 const expectedState = '${expected_state}';
 const html = '${success_html}';
 const errorHtml = '${error_html}';
