@@ -13,7 +13,7 @@ import {
   toKebabCase,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
-import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
+import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 
@@ -435,10 +435,10 @@ function getStartupScript(username: string, tier: CloudInitTier = "full"): strin
     "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
   ];
-  if (needsNodeUpgrade(tier)) {
+  if (needsNode(tier)) {
     lines.push(
-      "# Upgrade Node.js to v22 LTS",
-      "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx",
+      "# Install Node.js 22 via n",
+      `su - "${username}" -c '${NODE_INSTALL_CMD}'`,
       `# Install Claude Code as the login user`,
       `su - "${username}" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true`,
       "# Configure npm global prefix",

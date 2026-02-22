@@ -12,7 +12,7 @@ import {
   toKebabCase,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
-import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
+import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -484,13 +484,8 @@ export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<vo
     `apt-get update -y`,
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
   ];
-  if (needsNodeUpgrade(tier)) {
-    parts.push(
-      `npm install -g n && n 22`,
-      `ln -sf /usr/local/bin/node /usr/bin/node`,
-      `ln -sf /usr/local/bin/npm /usr/bin/npm`,
-      `ln -sf /usr/local/bin/npx /usr/bin/npx`,
-    );
+  if (needsNode(tier)) {
+    parts.push(NODE_INSTALL_CMD);
   }
   if (needsBun(tier)) {
     parts.push(`curl -fsSL https://bun.sh/install | bash`);

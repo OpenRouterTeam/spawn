@@ -13,7 +13,7 @@ import {
   toKebabCase,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
-import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
+import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
@@ -295,8 +295,8 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
     "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
   ];
-  if (needsNodeUpgrade(tier)) {
-    lines.push("npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true");
+  if (needsNode(tier)) {
+    lines.push(`${NODE_INSTALL_CMD} || true`);
   }
   if (needsBun(tier)) {
     lines.push('curl -fsSL https://bun.sh/install | bash || true');
