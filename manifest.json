@@ -29,9 +29,9 @@
       },
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/claude.png",
       "featured_cloud": [
-        "sprite",
         "gcp",
-        "aws"
+        "aws",
+        "digitalocean"
       ],
       "creator": "Anthropic",
       "repo": "anthropics/claude-code",
@@ -70,9 +70,9 @@
       },
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/openclaw.png",
       "featured_cloud": [
-        "fly",
         "gcp",
-        "aws"
+        "aws",
+        "digitalocean"
       ],
       "creator": "OpenClaw",
       "repo": "openclaw/openclaw",
@@ -140,9 +140,9 @@
       "notes": "Works with OpenRouter via OPENAI_BASE_URL override pointing to openrouter.ai/api/v1",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/codex.png",
       "featured_cloud": [
-        "fly",
         "gcp",
-        "aws"
+        "aws",
+        "digitalocean"
       ],
       "creator": "OpenAI",
       "repo": "openai/codex",
@@ -208,9 +208,9 @@
       "notes": "Natively supports OpenRouter as a provider via KILO_PROVIDER_TYPE=openrouter. CLI installable via npm as @kilocode/cli, invocable as 'kilocode' or 'kilo'.",
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/kilocode.png",
       "featured_cloud": [
-        "fly",
         "gcp",
-        "aws"
+        "aws",
+        "digitalocean"
       ],
       "creator": "Kilo-Org",
       "repo": "Kilo-Org/kilocode",
