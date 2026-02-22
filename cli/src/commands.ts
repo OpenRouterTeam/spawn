@@ -21,6 +21,12 @@ import { validateIdentifier, validateScriptContent, validatePrompt, validateConn
 import { saveSpawnRecord, filterHistory, clearHistory, markRecordDeleted, getActiveServers, getHistoryPath, type SpawnRecord, type VMConnection } from "./history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE, type ExitCodeEntry, type SignalEntry } from "./guidance-data.js";
 import { destroyServer as flyDestroyServer, ensureFlyCli, ensureFlyToken } from "./fly/fly.js";
+import { destroyServer as hetznerDestroyServer, ensureHcloudToken } from "./hetzner/hetzner.js";
+import { destroyServer as doDestroyServer, ensureDoToken } from "./digitalocean/digitalocean.js";
+import { destroyInstance as gcpDestroyInstance, ensureGcloudCli as gcpEnsureGcloudCli, authenticate as gcpAuthenticate, resolveProject as gcpResolveProject } from "./gcp/gcp.js";
+import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAuthenticate } from "./aws/aws.js";
+import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "./daytona/daytona.js";
+import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "./sprite/sprite.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -1415,13 +1421,6 @@ function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: s
   return spawnBash(script, env);
 }
 
-/** Run a locally-generated bash snippet without validateScriptContent.
- *  Only safe for scripts built by buildDeleteScript, which validates all
- *  dynamic values (server IDs, metadata) before interpolation. */
-function runBashTrusted(script: string): Promise<void> {
-  return spawnBash(script, { ...process.env });
-}
-
 // ── List ───────────────────────────────────────────────────────────────────────
 
 const MIN_AGENT_COL_WIDTH = 16;
@@ -1805,13 +1804,14 @@ async function resolveListFilters(
 
 // ── Delete ──────────────────────────────────────────────────────────────────────
 
-/** Build a bash script to delete a server on the given cloud */
-function buildDeleteScript(cloud: string, connection: VMConnection): string {
-  const libUrl = `${RAW_BASE}/${cloud}/lib/common.sh`;
-  const sourceLib = `eval "$(curl -fsSL '${libUrl}')"`;
+/** Execute server deletion for a given record using TypeScript cloud modules */
+async function execDeleteServer(
+  record: SpawnRecord
+): Promise<boolean> {
+  const conn = record.connection;
+  if (!conn?.cloud || conn.cloud === "local") return false;
 
-  // Determine the identifier to pass to destroy_server
-  const id = connection.server_id || connection.server_name || "";
+  const id = conn.server_id || conn.server_name || "";
 
   // SECURITY: Validate server ID to prevent command injection
   // This protects against corrupted or tampered history files
@@ -1826,91 +1826,86 @@ function buildDeleteScript(cloud: string, connection: VMConnection): string {
     );
   }
 
-  // Cloud-specific auth + destroy mapping
-  switch (cloud) {
-    case "hetzner":
-      return `${sourceLib}\nensure_hcloud_token\ndestroy_server "${id}"`;
-    case "digitalocean":
-      return `${sourceLib}\nensure_do_token\ndestroy_server "${id}"`;
-    case "gcp": {
-      const zone = connection.metadata?.zone || "us-central1-a";
-      const project = connection.metadata?.project || "";
-      // SECURITY: Validate metadata values to prevent command injection via tampered history
-      validateMetadataValue(zone, "GCP zone");
-      validateMetadataValue(project, "GCP project");
-      return `${sourceLib}\nensure_gcloud\nexport GCP_ZONE="${zone}"\nexport GCP_PROJECT="${project}"\ndestroy_server "${id}"`;
-    }
-    case "aws":
-      return `${sourceLib}\nensure_aws_cli\ndestroy_server "${id}"`;
+  const isAlreadyGone = (msg: string) =>
+    msg.includes("404") || msg.includes("not found") || msg.includes("Not Found") || msg.includes("Could not find");
 
-    case "daytona":
-      return `${sourceLib}\nensure_daytona_token\ndestroy_server "${id}"`;
-    case "sprite":
-      return `${sourceLib}\nensure_sprite_installed\nensure_sprite_authenticated\ndestroy_server "${id}"`;
-    default:
-      return "";
-  }
-}
-
-/** Execute server deletion for a given record */
-async function execDeleteServer(
-  record: SpawnRecord
-): Promise<boolean> {
-  const conn = record.connection;
-  if (!conn?.cloud || conn.cloud === "local") return false;
-
-  // Fly.io uses a TypeScript module — no bash script exists after the TS rewrite
-  if (conn.cloud === "fly") {
-    const id = conn.server_name || conn.server_id || "";
+  const tryDelete = async (deleteFn: () => Promise<void>): Promise<boolean> => {
     try {
-      validateServerIdentifier(id);
-    } catch (err) {
-      throw new Error(
-        `Invalid server identifier in history: ${getErrorMessage(err)}\n\n` +
-        `Your spawn history file may be corrupted or tampered with.\n` +
-        `Location: ${getHistoryPath()}\n` +
-        `To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'`
-      );
-    }
-    try {
-      await ensureFlyCli();
-      await ensureFlyToken();
-      await flyDestroyServer(id);
+      await deleteFn();
       markRecordDeleted(record);
       return true;
     } catch (err) {
       const errMsg = getErrorMessage(err);
-      if (errMsg.includes("404") || errMsg.includes("not found") || errMsg.includes("Not Found") || errMsg.includes("Could not find")) {
+      if (isAlreadyGone(errMsg)) {
         p.log.warn("Server already deleted or not found. Marking as deleted.");
         markRecordDeleted(record);
         return true;
       }
-      p.log.error(`Failed to delete Fly.io app: ${errMsg}`);
+      p.log.error(`Delete failed: ${errMsg}`);
+      p.log.info("The server may still be running. Check your cloud provider dashboard.");
       return false;
     }
-  }
+  };
 
-  const script = buildDeleteScript(conn.cloud, conn);
-  if (!script) {
-    p.log.error(`No delete handler for cloud: ${conn.cloud}`);
-    return false;
-  }
+  switch (conn.cloud) {
+    case "fly":
+      return tryDelete(async () => {
+        await ensureFlyCli();
+        await ensureFlyToken();
+        await flyDestroyServer(id);
+      });
 
-  try {
-    await runBashTrusted(script);
-    markRecordDeleted(record);
-    return true;
-  } catch (err) {
-    const errMsg = getErrorMessage(err);
-    // If the server is already gone, treat as success
-    if (errMsg.includes("404") || errMsg.includes("not found") || errMsg.includes("Not Found")) {
-      p.log.warn("Server already deleted or not found. Marking as deleted.");
-      markRecordDeleted(record);
-      return true;
+    case "hetzner":
+      return tryDelete(async () => {
+        await ensureHcloudToken();
+        await hetznerDestroyServer(id);
+      });
+
+    case "digitalocean":
+      return tryDelete(async () => {
+        await ensureDoToken();
+        await doDestroyServer(id);
+      });
+
+    case "gcp": {
+      const zone = conn.metadata?.zone || "us-central1-a";
+      const project = conn.metadata?.project || "";
+      // SECURITY: Validate metadata values to prevent injection via tampered history
+      validateMetadataValue(zone, "GCP zone");
+      validateMetadataValue(project, "GCP project");
+      return tryDelete(async () => {
+        process.env.GCP_ZONE = zone;
+        process.env.GCP_PROJECT = project;
+        await gcpEnsureGcloudCli();
+        await gcpAuthenticate();
+        await gcpResolveProject();
+        await gcpDestroyInstance(id);
+      });
     }
-    p.log.error(`Delete failed: ${errMsg}`);
-    p.log.info("The server may still be running. Check your cloud provider dashboard.");
-    return false;
+
+    case "aws":
+      return tryDelete(async () => {
+        await ensureAwsCli();
+        await awsAuthenticate();
+        await awsDestroyServer(id);
+      });
+
+    case "daytona":
+      return tryDelete(async () => {
+        await ensureDaytonaToken();
+        await daytonaDestroyServer(id);
+      });
+
+    case "sprite":
+      return tryDelete(async () => {
+        await ensureSpriteCli();
+        await ensureSpriteAuthenticated();
+        await spriteDestroyServer(id);
+      });
+
+    default:
+      p.log.error(`No delete handler for cloud: ${conn.cloud}`);
+      return false;
   }
 }
 
