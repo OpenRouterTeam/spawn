@@ -4,7 +4,7 @@
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { logInfo, logWarn, logError, logStep, prompt, jsonEscape } from "./ui";
+import { logInfo, logWarn, logError, logStep, prompt, jsonEscape, withRetry } from "./ui";
 import type { AgentConfig } from "./agents";
 
 // Re-export so cloud modules can re-export from here
@@ -28,7 +28,12 @@ export async function installAgent(
 ): Promise<void> {
   logStep(`Installing ${agentName}...`);
   try {
-    await runner.runServer(installCmd, timeoutSecs);
+    await withRetry(
+      `${agentName} install`,
+      () => runner.runServer(installCmd, timeoutSecs),
+      2,
+      10,
+    );
   } catch {
     logError(`${agentName} installation failed`);
     throw new Error(`${agentName} install failed`);
@@ -45,11 +50,18 @@ export async function uploadConfigFile(runner: CloudRunner, content: string, rem
     mode: 0o600,
   });
 
-  const tempRemote = `/tmp/spawn_config_${Date.now()}`;
   try {
-    await runner.uploadFile(tmpFile, tempRemote);
-    await runner.runServer(
-      `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
+    await withRetry(
+      "config upload",
+      async () => {
+        const tempRemote = `/tmp/spawn_config_${Date.now()}`;
+        await runner.uploadFile(tmpFile, tempRemote);
+        await runner.runServer(
+          `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
+        );
+      },
+      2,
+      5,
     );
   } finally {
     try {
