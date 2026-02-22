@@ -1820,6 +1820,10 @@ spawn_agent() {
     log_info "${agent_name} is ready"
     local launch_cmd
     launch_cmd=$(agent_launch_cmd)
+
+    # Save the launch command to connection file for `spawn list` → "Enter agent"
+    _save_launch_cmd "${launch_cmd}"
+
     launch_session "$(cloud_label)" cloud_interactive "${launch_cmd}"
 }
 
@@ -3753,6 +3757,25 @@ save_vm_connection() {
     json="${json}}"
 
     printf '%s\n' "${json}" > "${conn_file}"
+}
+
+# Append launch_cmd to an existing last-connection.json file.
+# Called by spawn_agent after computing the agent's launch command.
+# Usage: _save_launch_cmd LAUNCH_CMD
+_save_launch_cmd() {
+    local cmd="${1:-}"
+    if [[ -z "${cmd}" ]]; then return 0; fi
+
+    local conn_file="${HOME}/.spawn/last-connection.json"
+    if [[ ! -f "${conn_file}" ]]; then return 0; fi
+
+    # Read existing JSON content and inject launch_cmd before the closing brace
+    local existing
+    existing=$(cat "${conn_file}")
+    # Strip trailing } and add launch_cmd field
+    existing="${existing%\}}"
+    existing="${existing},\"launch_cmd\":$(json_escape "${cmd}")}"
+    printf '%s\n' "${existing}" > "${conn_file}"
 }
 
 # ============================================================
