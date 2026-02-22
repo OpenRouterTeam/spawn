@@ -10,6 +10,7 @@ import {
   jsonEscape,
   validateServerName,
   toKebabCase,
+  defaultSpawnName,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
@@ -518,7 +519,7 @@ export async function getServerName(): Promise<string> {
 
   const kebab = process.env.SPAWN_NAME_KEBAB
     || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
-  return kebab || "spawn";
+  return kebab || defaultSpawnName();
 }
 
 export async function promptSpawnName(): Promise<void> {
@@ -526,15 +527,14 @@ export async function promptSpawnName(): Promise<void> {
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {
-    kebab = toKebabCase(process.env.SPAWN_NAME) || "spawn";
+    kebab = toKebabCase(process.env.SPAWN_NAME) || defaultSpawnName();
   } else if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    kebab = "spawn";
+    kebab = defaultSpawnName();
   } else {
-    const suffix = Math.random().toString(36).slice(2, 6);
-    const defaultName = `spawn-${suffix}`;
+    const fallback = defaultSpawnName();
     process.stderr.write("\n");
-    const answer = await prompt(`Daytona workspace name [${defaultName}]: `);
-    kebab = toKebabCase(answer || defaultName) || "spawn";
+    const answer = await prompt(`Daytona workspace name [${fallback}]: `);
+    kebab = toKebabCase(answer || fallback) || defaultSpawnName();
   }
 
   process.env.SPAWN_NAME_DISPLAY = kebab;
