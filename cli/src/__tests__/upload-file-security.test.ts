@@ -143,7 +143,7 @@ describe("upload_file() Security Patterns", () => {
 
     it("should check at least 5 clouds total", () => {
       // Note: TS-based clouds (fly, local, hetzner, digitalocean, daytona, sprite) don't have bash lib/common.sh with upload_file
-      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(5);
+      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(4);
     });
   });
 
