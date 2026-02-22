@@ -632,6 +632,48 @@ describe("buildRetryCommand", () => {
   it("should return simple command when prompt is empty string", () => {
     expect(buildRetryCommand("codex", "vultr", "")).toBe("spawn codex vultr");
   });
+
+  // ── spawnName parameter (issue #1709) ────────────────────────────────────
+
+  it("should include --name flag when spawnName is provided without prompt", () => {
+    expect(buildRetryCommand("claude", "hetzner", undefined, "my-box")).toBe(
+      "spawn claude hetzner --name my-box"
+    );
+  });
+
+  it("should include --name flag when spawnName is provided with short prompt", () => {
+    expect(buildRetryCommand("claude", "hetzner", "Fix all bugs", "my-box")).toBe(
+      'spawn claude hetzner --name my-box --prompt "Fix all bugs"'
+    );
+  });
+
+  it("should include --name flag when spawnName is provided with long prompt", () => {
+    const longPrompt = "A".repeat(100);
+    const result = buildRetryCommand("claude", "hetzner", longPrompt, "my-box");
+    expect(result).toBe("spawn claude hetzner --name my-box --prompt-file <your-prompt-file>");
+  });
+
+  it("should not include --name flag when spawnName is undefined", () => {
+    expect(buildRetryCommand("claude", "hetzner", undefined, undefined)).toBe(
+      "spawn claude hetzner"
+    );
+    expect(buildRetryCommand("claude", "hetzner")).toBe("spawn claude hetzner");
+  });
+
+  it("should not include --name flag when spawnName is empty string", () => {
+    expect(buildRetryCommand("claude", "hetzner", undefined, "")).toBe(
+      "spawn claude hetzner"
+    );
+  });
+
+  it("should place --name before --prompt in the command", () => {
+    const result = buildRetryCommand("codex", "sprite", "short prompt", "dev-server");
+    expect(result).toBe('spawn codex sprite --name dev-server --prompt "short prompt"');
+    // Verify ordering: --name comes before --prompt
+    const nameIdx = result.indexOf("--name");
+    const promptIdx = result.indexOf("--prompt");
+    expect(nameIdx).toBeLessThan(promptIdx);
+  });
 });
 
 describe("dashboard URL in guidance", () => {
