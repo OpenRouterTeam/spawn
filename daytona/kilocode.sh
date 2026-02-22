@@ -1,30 +1,29 @@
 #!/bin/bash
 set -eo pipefail
 
-# Source common functions - try local file first, fall back to remote
+# Thin shim: ensures bun is available, runs bundled daytona TypeScript (local or from GitHub release)
+
+_ensure_bun() {
+    if command -v bun &>/dev/null; then return 0; fi
+    printf '\033[0;36mInstalling bun...\033[0m\n' >&2
+    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1 || { printf '\033[0;31mFailed to install bun\033[0m\n' >&2; exit 1; }
+    export PATH="$HOME/.bun/bin:$PATH"
+    command -v bun &>/dev/null || { printf '\033[0;31mbun not found after install\033[0m\n' >&2; exit 1; }
+}
+
+_ensure_bun
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
-    source "${SCRIPT_DIR}/lib/common.sh"
-else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/daytona/lib/common.sh)"
+
+# Local checkout — run from source
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/daytona/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../cli/src/daytona/main.ts" kilocode "$@"
 fi
 
-log_info "Kilo Code on Daytona"
-echo ""
+# Remote — download bundled daytona.js from GitHub release
+DAYTONA_JS=$(mktemp)
+trap 'rm -f "$DAYTONA_JS"' EXIT
+curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/daytona-latest/daytona.js" -o "$DAYTONA_JS" \
+    || { printf '\033[0;31mFailed to download daytona.js\033[0m\n' >&2; exit 1; }
 
-agent_install() {
-    install_agent "Kilo Code" "npm install -g @kilocode/cli" cloud_run
-}
-
-agent_env_vars() {
-    generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "KILO_PROVIDER_TYPE=openrouter" \
-        "KILO_OPEN_ROUTER_API_KEY=${OPENROUTER_API_KEY}"
-}
-
-agent_launch_cmd() {
-    echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode'
-}
-
-spawn_agent "Kilo Code" "kilocode" "daytona"
+exec bun run "$DAYTONA_JS" kilocode "$@"

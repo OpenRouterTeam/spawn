@@ -136,14 +136,14 @@ describe("upload_file() Security Patterns", () => {
       }
     });
 
-    it("should have at least 1 exec-based upload_file implementations to test", () => {
-      // Note: fly moved to TS, reducing exec-based count by 1
-      expect(execBasedClouds.length).toBeGreaterThanOrEqual(1);
+    it("should have at least 0 exec-based upload_file implementations to test", () => {
+      // Note: clouds with exec-based upload_file have been converted to TS
+      expect(execBasedClouds.length).toBeGreaterThanOrEqual(0);
     });
 
-    it("should check at least 7 clouds total", () => {
-      // Note: TS-based clouds (e.g. fly) don't have bash lib/common.sh with upload_file
-      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(7);
+    it("should check at least 5 clouds total", () => {
+      // Note: TS-based clouds (fly, local, hetzner, digitalocean, daytona) don't have bash lib/common.sh with upload_file
+      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(5);
     });
   });
 
@@ -213,7 +213,8 @@ describe("upload_file() Security Patterns", () => {
       .filter(([, info]) => info.type === "ssh");
 
     it("should have multiple SSH-based clouds", () => {
-      expect(sshClouds.length).toBeGreaterThanOrEqual(4);
+      // After TS conversions (daytona, digitalocean), fewer clouds use bash ssh_upload_file
+      expect(sshClouds.length).toBeGreaterThanOrEqual(3);
     });
 
     for (const [cloud, info] of sshClouds) {
