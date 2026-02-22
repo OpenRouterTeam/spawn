@@ -97,15 +97,18 @@ ensure_in_path() {
         if ! grep -qF "${install_dir}" "$rc_file" 2>/dev/null; then
             printf '\n# Added by spawn installer\n%s\n' "$export_line" >> "$rc_file"
         fi
-        if [[ "${SHELL:-/bin/bash}" == */bash ]]; then
+        # Also patch .profile/.bash_profile for login shells
+        case "${SHELL:-/bin/bash}" in */bash)
             for profile in "${HOME}/.profile" "${HOME}/.bash_profile"; do
                 if [ -f "$profile" ] && ! grep -qF "${install_dir}" "$profile" 2>/dev/null; then
                     printf '\n# Added by spawn installer\n%s\n' "$export_line" >> "$profile"
                 fi
             done
-        fi
-    elif [[ "${SHELL:-}" == */fish ]]; then
-        fish -c "fish_add_path ${install_dir}" 2>/dev/null || true
+        ;; esac
+    else
+        case "${SHELL:-}" in */fish)
+            fish -c "fish_add_path ${install_dir}" 2>/dev/null || true
+        ;; esac
     fi
 
     # 3. Show version and success message
