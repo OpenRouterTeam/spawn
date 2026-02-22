@@ -517,14 +517,15 @@ async function createMachine(
   name: string,
   region: string,
   vmMemory: number,
+  vmCpus: number,
 ): Promise<string> {
-  logStep(`Creating Fly.io machine (region: ${region}, memory: ${vmMemory}MB)...`);
+  logStep(`Creating Fly.io machine (region: ${region}, cpus: ${vmCpus}, memory: ${vmMemory}MB)...`);
   const body = JSON.stringify({
     name,
     region,
     config: {
       image: "ubuntu:24.04",
-      guest: { cpu_kind: "shared", cpus: 1, memory_mb: vmMemory },
+      guest: { cpu_kind: "shared", cpus: vmCpus, memory_mb: vmMemory },
       init: { exec: ["/bin/sleep", "inf"] },
       auto_destroy: false,
     },
@@ -593,6 +594,7 @@ async function cleanupOnFailure(appName: string): Promise<void> {
 export async function createServer(name: string): Promise<void> {
   const region = process.env.FLY_REGION || "iad";
   const vmMemory = parseInt(process.env.FLY_VM_MEMORY || "1024", 10);
+  const vmCpus = parseInt(process.env.FLY_VM_CPUS || "1", 10);
 
   if (!validateRegionName(region)) {
     logError("Invalid FLY_REGION");
@@ -602,12 +604,16 @@ export async function createServer(name: string): Promise<void> {
     logError("Invalid FLY_VM_MEMORY: must be numeric");
     throw new Error("Invalid VM memory");
   }
+  if (isNaN(vmCpus) || vmCpus < 1) {
+    logError("Invalid FLY_VM_CPUS: must be a positive integer");
+    throw new Error("Invalid VM CPUs");
+  }
 
   await createApp(name);
 
   let machineId: string;
   try {
-    machineId = await createMachine(name, region, vmMemory);
+    machineId = await createMachine(name, region, vmMemory, vmCpus);
   } catch (err) {
     await cleanupOnFailure(name);
     throw err;
