@@ -392,76 +392,7 @@ describe("_api_should_retry_on_error", () => {
   });
 });
 
-// ── calculate_retry_backoff ─────────────────────────────────────────────
-
-describe("calculate_retry_backoff", () => {
-  it("should return a value within +-20% of the interval", () => {
-    const result = runBash(`
-      for i in $(seq 1 20); do
-        calculate_retry_backoff 10 60
-      done
-    `);
-    expect(result.exitCode).toBe(0);
-    const values = result.stdout.split("\n").map(Number);
-    expect(values.length).toBe(20);
-    for (const v of values) {
-      // 10 * 0.8 = 8, 10 * 1.2 = 12
-      expect(v).toBeGreaterThanOrEqual(8);
-      expect(v).toBeLessThanOrEqual(12);
-    }
-  });
-
-  it("should return integer values", () => {
-    const result = runBash(`
-      for i in $(seq 1 10); do
-        calculate_retry_backoff 5 60
-      done
-    `);
-    expect(result.exitCode).toBe(0);
-    const values = result.stdout.split("\n");
-    for (const v of values) {
-      expect(v).toMatch(/^\d+$/);
-    }
-  });
-
-  it("should handle small interval (1 second)", () => {
-    const result = runBash(`
-      for i in $(seq 1 10); do
-        calculate_retry_backoff 1 60
-      done
-    `);
-    expect(result.exitCode).toBe(0);
-    const values = result.stdout.split("\n").map(Number);
-    for (const v of values) {
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThanOrEqual(2);
-    }
-  });
-
-  it("should handle large interval", () => {
-    const result = runBash(`
-      calculate_retry_backoff 100 200
-    `);
-    expect(result.exitCode).toBe(0);
-    const value = parseInt(result.stdout, 10);
-    // 100 * 0.8 = 80, 100 * 1.2 = 120
-    expect(value).toBeGreaterThanOrEqual(80);
-    expect(value).toBeLessThanOrEqual(120);
-  });
-
-  it("should produce some variance across calls (jitter works)", () => {
-    const result = runBash(`
-      for i in $(seq 1 30); do
-        calculate_retry_backoff 10 60
-      done
-    `);
-    expect(result.exitCode).toBe(0);
-    const values = result.stdout.split("\n").map(Number);
-    const unique = new Set(values);
-    // With 30 samples and jitter, we should see at least 2 distinct values
-    expect(unique.size).toBeGreaterThanOrEqual(2);
-  });
-});
+// calculate_retry_backoff tests are in shared-common-logging-utils.test.ts
 
 // ── _cloud_api_retry_loop ───────────────────────────────────────────────
 
