@@ -33,9 +33,6 @@ const manifest: Manifest = JSON.parse(manifestRaw);
 const matrixEntries = Object.entries(manifest.matrix);
 const implementedEntries = matrixEntries.filter(([, status]) => status === "implemented");
 
-// Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
-const TS_CLOUDS = new Set(["fly", "local", "hetzner", "digitalocean", "daytona", "sprite", "gcp"]);
-
 /** Run `bash -n` on a script file. Returns null on success, error message on failure. */
 function bashSyntaxCheck(filePath: string): string | null {
   try {
@@ -66,34 +63,6 @@ describe("Shell Script Syntax Validation (bash -n)", () => {
         throw new Error(`shared/common.sh has syntax errors:\n${error}`);
       }
     });
-  });
-
-  // ── Cloud lib/common.sh files ──────────────────────────────────────
-
-  describe("cloud lib/common.sh files", () => {
-    // Get unique clouds that have at least one implementation
-    const cloudsWithImpls = new Set<string>();
-    for (const [key, status] of matrixEntries) {
-      if (status === "implemented") {
-        cloudsWithImpls.add(key.split("/")[0]);
-      }
-    }
-
-    for (const cloud of cloudsWithImpls) {
-      // TS-based clouds don't have bash lib/common.sh
-      if (TS_CLOUDS.has(cloud)) continue;
-      const libPath = join(REPO_ROOT, cloud, "lib", "common.sh");
-
-      it(`${cloud}/lib/common.sh should pass bash -n`, () => {
-        if (!existsSync(libPath)) {
-          throw new Error(`${cloud}/lib/common.sh does not exist`);
-        }
-        const error = bashSyntaxCheck(libPath);
-        if (error) {
-          throw new Error(`${cloud}/lib/common.sh has syntax errors:\n${error}`);
-        }
-      });
-    }
   });
 
   // ── Implemented agent scripts ──────────────────────────────────────

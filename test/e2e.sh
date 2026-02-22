@@ -262,120 +262,14 @@ _run_with_timeout() {
 # --- Stale server cleanup ---
 
 _cleanup_stale_servers() {
-    local cloud="$1"
-    _e2e_log "Cleaning up stale ${E2E_SERVER_PREFIX}-* servers on ${cloud}..."
-
-    case "$cloud" in
-        fly)
-            source "${REPO_ROOT}/fly/lib/common.sh"
-            local org
-            org=$(get_fly_org 2>/dev/null) || return 0
-            local apps_json
-            apps_json=$(fly_api GET "/apps?org_slug=$org" 2>/dev/null) || return 0
-            local stale_apps
-            stale_apps=$(printf '%s' "$apps_json" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-apps = data if isinstance(data, list) else data.get('apps', [])
-for a in apps:
-    name = a.get('name', '')
-    if name.startswith('${E2E_SERVER_PREFIX}-'):
-        print(name)
-" 2>/dev/null || true)
-            for app in $stale_apps; do
-                _e2e_log "  Destroying stale app: $app"
-                destroy_server "$app" 2>/dev/null || true
-            done
-            ;;
-        hetzner)
-            source "${REPO_ROOT}/hetzner/lib/common.sh"
-            local servers_json
-            servers_json=$(hetzner_api GET "/servers" 2>/dev/null) || return 0
-            local stale_servers
-            stale_servers=$(printf '%s' "$servers_json" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for s in data.get('servers', []):
-    name = s.get('name', '')
-    sid = s.get('id', '')
-    if name.startswith('${E2E_SERVER_PREFIX}-'):
-        print(sid)
-" 2>/dev/null || true)
-            for sid in $stale_servers; do
-                _e2e_log "  Destroying stale server: $sid"
-                destroy_server "$sid" 2>/dev/null || true
-            done
-            ;;
-        digitalocean)
-            source "${REPO_ROOT}/digitalocean/lib/common.sh"
-            local droplets_json
-            droplets_json=$(do_api GET "/droplets" 2>/dev/null) || return 0
-            local stale_droplets
-            stale_droplets=$(printf '%s' "$droplets_json" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for d in data.get('droplets', []):
-    name = d.get('name', '')
-    did = d.get('id', '')
-    if name.startswith('${E2E_SERVER_PREFIX}-'):
-        print(did)
-" 2>/dev/null || true)
-            for did in $stale_droplets; do
-                _e2e_log "  Destroying stale droplet: $did"
-                destroy_server "$did" 2>/dev/null || true
-            done
-            ;;
-    esac
+    _e2e_log "Skipping bash-based cleanup (clouds use TypeScript)"
+    return 0
 }
 
 # Destroy a specific e2e test server by name.
 # Clouds that take a name directly are easy; others need a name→ID lookup.
 _destroy_e2e_server() {
-    local cloud="$1" server_name="$2"
-
-    case "$cloud" in
-        fly)
-            source "${REPO_ROOT}/fly/lib/common.sh" 2>/dev/null || return 0
-            destroy_server "$server_name" 2>/dev/null || true
-            ;;
-        aws)
-            return 0
-            ;;
-        gcp)
-            source "${REPO_ROOT}/gcp/lib/common.sh" 2>/dev/null || return 0
-            destroy_server "$server_name" 2>/dev/null || true
-            ;;
-        hetzner)
-            source "${REPO_ROOT}/hetzner/lib/common.sh" 2>/dev/null || return 0
-            local servers_json sid
-            servers_json=$(hetzner_api GET "/servers?name=${server_name}" 2>/dev/null) || return 0
-            sid=$(printf '%s' "$servers_json" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for s in data.get('servers', []):
-    if s.get('name') == '${server_name}':
-        print(s['id']); break
-" 2>/dev/null) || return 0
-            [[ -n "$sid" ]] && destroy_server "$sid" 2>/dev/null || true
-            ;;
-        digitalocean)
-            source "${REPO_ROOT}/digitalocean/lib/common.sh" 2>/dev/null || return 0
-            local droplets_json did
-            droplets_json=$(do_api GET "/droplets?tag_name=${server_name}" 2>/dev/null) || return 0
-            did=$(printf '%s' "$droplets_json" | python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-for d in data.get('droplets', []):
-    if d.get('name') == '${server_name}':
-        print(d['id']); break
-" 2>/dev/null) || return 0
-            [[ -n "$did" ]] && destroy_server "$did" 2>/dev/null || true
-            ;;
-        daytona)
-            source "${REPO_ROOT}/daytona/lib/common.sh" 2>/dev/null || return 0
-            destroy_server "$server_name" 2>/dev/null || true
-            ;;
-    esac
+    return 0
 }
 
 # --- Non-interactive env setup ---
@@ -425,10 +319,8 @@ _preflight_cloud() {
 
     (
         _setup_noninteractive_env "$cloud"
-        source "${REPO_ROOT}/${cloud}/lib/common.sh"
-        cloud_authenticate
 
-        # Write validated token to env file for parent to pick up
+        # Write token from env to env file for parent to pick up
         if [[ -n "$token_var" ]] && [[ -n "${!token_var:-}" ]]; then
             printf '%s' "${!token_var}" > "$env_file"
         fi

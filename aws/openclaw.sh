@@ -20,27 +20,8 @@ if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/aws/main.ts" ]]; then
     exec bun run "$SCRIPT_DIR/../cli/src/aws/main.ts" openclaw "$@"
 fi
 
-# Remote — fall back to bash implementation
-eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/aws/lib/common.sh)"
-
-log_info "OpenClaw on AWS Lightsail"
-echo ""
-
-AGENT_MODEL_PROMPT=1
-AGENT_MODEL_DEFAULT="openrouter/auto"
-
-agent_install() { install_agent "openclaw" "source ~/.bashrc && bun install -g openclaw" cloud_run; }
-agent_env_vars() {
-    generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-}
-agent_configure() { setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run; }
-agent_pre_launch() {
-    start_openclaw_gateway cloud_run
-    wait_for_openclaw_gateway cloud_run
-}
-agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; openclaw tui'; }
-
-spawn_agent "OpenClaw" "openclaw" "aws"
+# Remote — download and run compiled TypeScript bundle
+AWS_JS=$(mktemp)
+trap 'rm -f "$AWS_JS"' EXIT
+curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/aws-latest/aws.js" -o "$AWS_JS"
+exec bun run "$AWS_JS" openclaw "$@"

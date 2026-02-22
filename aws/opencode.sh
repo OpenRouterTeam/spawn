@@ -20,14 +20,8 @@ if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/aws/main.ts" ]]; then
     exec bun run "$SCRIPT_DIR/../cli/src/aws/main.ts" opencode "$@"
 fi
 
-# Remote — fall back to bash implementation
-eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/aws/lib/common.sh)"
-
-log_info "OpenCode on AWS Lightsail"
-echo ""
-
-agent_install() { install_agent "OpenCode" "$(opencode_install_cmd)" cloud_run; }
-agent_env_vars() { generate_env_config "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"; }
-agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode'; }
-
-spawn_agent "OpenCode" "opencode" "aws"
+# Remote — download and run compiled TypeScript bundle
+AWS_JS=$(mktemp)
+trap 'rm -f "$AWS_JS"' EXIT
+curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/aws-latest/aws.js" -o "$AWS_JS"
+exec bun run "$AWS_JS" opencode "$@"
