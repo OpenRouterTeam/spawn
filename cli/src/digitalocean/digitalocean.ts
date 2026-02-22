@@ -21,9 +21,11 @@ const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
 const DO_OAUTH_AUTHORIZE = "https://cloud.digitalocean.com/v1/oauth/authorize";
 const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 
-// OAuth application credentials (embedded, same pattern as gh CLI / doctl)
-const DO_CLIENT_ID = process.env.DO_OAUTH_CLIENT_ID || "";
-const DO_CLIENT_SECRET = process.env.DO_OAUTH_CLIENT_SECRET || "";
+// OAuth application credentials (embedded, same pattern as gh CLI / doctl).
+// Public clients cannot keep secrets confidential — security comes from the
+// authorization code flow itself (user consent, localhost redirect, CSRF state).
+const DO_CLIENT_ID = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
+const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
 
 // Fine-grained scopes for spawn (minimum required)
 const DO_SCOPES = [
@@ -196,7 +198,7 @@ function generateCsrfState(): string {
 }
 
 function isOAuthConfigured(): boolean {
-  return !!(DO_CLIENT_ID && DO_CLIENT_SECRET);
+  return true;
 }
 
 async function tryRefreshDoToken(): Promise<string | null> {

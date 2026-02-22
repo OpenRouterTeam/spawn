@@ -331,31 +331,16 @@ describe("OAuth HTML responses", () => {
   });
 });
 
-// ── OAuth Feature Toggle ────────────────────────────────────────────────────
+// ── OAuth Always Enabled ─────────────────────────────────────────────────────
 
-describe("OAuth feature toggle", () => {
-  it("should be disabled when client ID and secret are not set", () => {
-    const clientId = "";
-    const clientSecret = "";
-    expect(!!(clientId && clientSecret)).toBe(false);
-  });
-
-  it("should be enabled when both client ID and secret are set", () => {
-    const clientId = "test-client-id";
-    const clientSecret = "test-client-secret";
+describe("OAuth is always enabled (hardcoded credentials)", () => {
+  it("should always be configured with hardcoded client credentials", () => {
+    // Credentials are hardcoded constants, not env vars — OAuth is always available
+    const clientId = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
+    const clientSecret = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
+    expect(clientId).toHaveLength(64);
+    expect(clientSecret).toHaveLength(64);
     expect(!!(clientId && clientSecret)).toBe(true);
-  });
-
-  it("should be disabled when only client ID is set", () => {
-    const clientId = "test-client-id";
-    const clientSecret = "";
-    expect(!!(clientId && clientSecret)).toBe(false);
-  });
-
-  it("should be disabled when only client secret is set", () => {
-    const clientId = "";
-    const clientSecret = "test-client-secret";
-    expect(!!(clientId && clientSecret)).toBe(false);
   });
 });
 
