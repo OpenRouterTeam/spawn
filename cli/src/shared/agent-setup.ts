@@ -292,7 +292,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
 
     openclaw: {
       name: "OpenClaw",
-      cloudInitTier: "bun",
+      cloudInitTier: "full",
       modelPrompt: true,
       modelDefault: "openrouter/auto",
       install: () =>
