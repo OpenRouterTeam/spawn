@@ -258,7 +258,8 @@ export async function createSprite(name: string): Promise<void> {
   if (listResult.exitCode === 0) {
     const lines = listResult.stdout.split("\n");
     for (const line of lines) {
-      if (new RegExp(`^${name}( |$)`).test(line)) {
+      const firstToken = line.split(/\s/)[0];
+      if (firstToken === name) {
         logInfo(`Sprite '${name}' already exists`);
         spriteName = name;
         return;
@@ -287,7 +288,8 @@ export async function createSprite(name: string): Promise<void> {
     if (check.exitCode === 0) {
       const lines = check.stdout.split("\n");
       for (const line of lines) {
-        if (new RegExp(`^${name}( |$)`).test(line)) {
+        const firstToken = line.split(/\s/)[0];
+        if (firstToken === name) {
           logInfo(`Sprite '${name}' provisioned`);
           spriteName = name;
           return;
@@ -410,7 +412,7 @@ export async function uploadFileSprite(
   localPath: string,
   remotePath: string,
 ): Promise<void> {
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
+  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes('..')) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }

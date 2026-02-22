@@ -74,6 +74,9 @@ async function main() {
   logStep("Setting up environment variables...");
   const envContent = generateEnvConfig(agent.envVars(apiKey));
   const envB64 = Buffer.from(envContent).toString("base64");
+  if (/[^A-Za-z0-9+/=]/.test(envB64)) {
+    throw new Error("base64 output contains unexpected characters");
+  }
   try {
     await runSprite(
       `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
