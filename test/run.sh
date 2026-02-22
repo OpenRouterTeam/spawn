@@ -628,22 +628,27 @@ test_shared_common() {
 }
 
 # --- Test source detection in each script ---
+# All cloud provider scripts are now thin bun shims that delegate to TypeScript.
+# Verify each shim: (1) delegates to bun, (2) valid syntax.
 test_source_detection() {
     echo ""
-    printf '%b\n' "${YELLOW}━━━ Testing source detection ━━━${NC}"
+    printf '%b\n' "${YELLOW}━━━ Testing source detection (bun shims) ━━━${NC}"
 
-    for script in claude openclaw codex opencode kilocode zeroclaw; do
-        local script_path="${REPO_ROOT}/sprite/${script}.sh"
-        [[ -f "${script_path}" ]] || continue
+    local cloud script script_path
+    for cloud in sprite fly hetzner digitalocean aws gcp daytona local; do
+        for script in claude openclaw codex opencode kilocode zeroclaw; do
+            script_path="${REPO_ROOT}/${cloud}/${script}.sh"
+            [[ -f "${script_path}" ]] || continue
 
-        # Verify the source block checks for local file existence
-        assert_contains "${script_path}" 'if \[\[ -f "\$\{SCRIPT_DIR\}/lib/common.sh" \]\]' \
-            "${script}.sh uses file-existence check for sourcing"
+            # Verify shim delegates to TypeScript via bun
+            assert_contains "${script_path}" 'exec bun run' \
+                "${cloud}/${script}.sh delegates to bun"
 
-        # Verify syntax
-        local rc=0
-        bash -n "${script_path}" 2>/dev/null || rc=$?
-        assert_exit_code "${rc}" 0 "${script}.sh syntax valid"
+            # Verify syntax
+            local rc=0
+            bash -n "${script_path}" 2>/dev/null || rc=$?
+            assert_exit_code "${rc}" 0 "${cloud}/${script}.sh syntax valid"
+        done
     done
 }
 
