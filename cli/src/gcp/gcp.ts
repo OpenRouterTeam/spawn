@@ -772,7 +772,7 @@ export async function createInstance(
 
 // ─── SSH Operations ─────────────────────────────────────────────────────────
 
-const SSH_OPTS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR";
+const SSH_OPTS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3";
 
 export async function waitForSsh(maxAttempts = 30): Promise<void> {
   logStep("Waiting for SSH connectivity...");

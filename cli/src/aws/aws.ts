@@ -122,6 +122,10 @@ const SSH_OPTS = [
   "LogLevel=ERROR",
   "-o",
   "ConnectTimeout=10",
+  "-o",
+  "ServerAliveInterval=15",
+  "-o",
+  "ServerAliveCountMax=3",
   "-i",
   SSH_KEY_PATH,
 ];
