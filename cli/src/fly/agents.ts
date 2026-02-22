@@ -347,7 +347,7 @@ export const agents: Record<string, AgentConfig> = {
     install: () =>
       installAgent(
         "openclaw",
-        "curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard",
+        'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH" && bun install -g openclaw && command -v openclaw',
       ),
     envVars: (apiKey) => [
       `OPENROUTER_API_KEY=${apiKey}`,
