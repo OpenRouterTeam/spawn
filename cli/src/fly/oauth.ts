@@ -49,7 +49,7 @@ const SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-wi
 
 const ERROR_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}h1{color:#dc2626}@media(prefers-color-scheme:dark){h1{color:#ef4444}}</style></head><body><div class="card"><div class="icon">&#10007;</div><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>`;
 
-async function tryOauthFlow(callbackPort = 5180): Promise<string | null> {
+async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?: string): Promise<string | null> {
   logStep("Attempting OAuth authentication...");
 
   // Check network connectivity
@@ -117,7 +117,9 @@ async function tryOauthFlow(callbackPort = 5180): Promise<string | null> {
   logInfo(`OAuth server listening on port ${actualPort}`);
 
   const callbackUrl = `http://localhost:${actualPort}/callback`;
-  const authUrl = `https://openrouter.ai/auth?callback_url=${callbackUrl}&state=${csrfState}`;
+  let authUrl = `https://openrouter.ai/auth?callback_url=${callbackUrl}&state=${csrfState}`;
+  if (agentSlug) authUrl += `&spawn_agent=${encodeURIComponent(agentSlug)}`;
+  if (cloudSlug) authUrl += `&spawn_cloud=${encodeURIComponent(cloudSlug)}`;
   logStep("Opening browser to authenticate with OpenRouter...");
   openBrowser(authUrl);
 
@@ -183,7 +185,7 @@ async function promptAndValidateApiKey(): Promise<string | null> {
   return null;
 }
 
-export async function getOrPromptApiKey(): Promise<string> {
+export async function getOrPromptApiKey(agentSlug?: string, cloudSlug?: string): Promise<string> {
   process.stderr.write("\n");
 
   // 1. Check env var
@@ -198,7 +200,7 @@ export async function getOrPromptApiKey(): Promise<string> {
   // 2. Try OAuth + manual fallback (3 attempts)
   for (let attempt = 1; attempt <= 3; attempt++) {
     // Try OAuth first
-    const key = await tryOauthFlow(5180);
+    const key = await tryOauthFlow(5180, agentSlug, cloudSlug);
     if (key && (await verifyOpenrouterKey(key))) {
       process.env.OPENROUTER_API_KEY = key;
       return key;

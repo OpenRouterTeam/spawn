@@ -39,4 +39,4 @@ agent_launch_cmd() {
     echo 'source ~/.zshrc 2>/dev/null; openclaw tui'
 }
 
-spawn_agent "OpenClaw"
+spawn_agent "OpenClaw" "openclaw" "local"

@@ -35,4 +35,4 @@ agent_launch_cmd() {
     echo 'source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent'
 }
 
-spawn_agent "ZeroClaw"
+spawn_agent "ZeroClaw" "zeroclaw" "hetzner"
