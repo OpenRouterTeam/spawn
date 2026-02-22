@@ -2,13 +2,16 @@
 # shellcheck disable=SC2154
 # Test harness for spawn scripts
 #
-# Mocks the `sprite` CLI and runs each script end-to-end to verify:
-#   1. common.sh sources correctly (local + remote)
-#   2. All functions resolve
-#   3. Env var flow works (SPRITE_NAME, OPENROUTER_API_KEY)
-#   4. sprite commands are called in the correct order with correct args
-#   5. Temp files are created and cleaned up
-#   6. Each script reaches its final launch command
+# Tests the shared library and cloud provider scripts:
+#   1. shared/common.sh sources correctly (local + remote)
+#   2. All shared functions resolve
+#   3. Env var flow works (OPENROUTER_API_KEY)
+#   4. Temp files are created and cleaned up
+#   5. Each script reaches its final launch command
+#
+# Note: sprite/ cloud provider was converted to TypeScript (PR #1692).
+# The sprite/*.sh files are now thin shims that exec bun - shell-level
+# integration tests for sprite are covered by bun test instead.
 #
 # Usage:
 #   bash test/run.sh              # test all scripts
@@ -307,58 +310,48 @@ run_script_test() {
     _assert_no_temp_leaks
 }
 
-# --- Test common.sh sourcing ---
-_test_sprite_functions_and_syntax() {
-    # Source locally and check all functions exist
+# --- Test shared/common.sh sourcing ---
+# (sprite/lib/common.sh was removed when sprite/ was converted to TypeScript)
+_test_shared_functions_and_syntax() {
+    # Source locally and check all shared functions exist
     local output
     output=$(bash -c '
-        source "'"${REPO_ROOT}"'/sprite/lib/common.sh"
+        source "'"${REPO_ROOT}"'/shared/common.sh"
         for fn in log_info log_warn log_error safe_read \
-                  ensure_sprite_installed ensure_sprite_authenticated \
-                  get_sprite_name ensure_sprite_exists verify_sprite_connectivity \
-                  run_sprite setup_shell_environment \
                   get_openrouter_api_key_manual try_oauth_flow \
-                  get_openrouter_api_key_oauth open_browser; do
+                  get_openrouter_api_key_oauth open_browser \
+                  json_escape validate_model_id generate_ssh_key_if_missing \
+                  generic_ssh_wait; do
             type "${fn}" &>/dev/null && echo "OK:${fn}" || echo "MISSING:${fn}"
         done
     ' 2>/dev/null)
 
     local missing
     missing=$(echo "${output}" | grep "^MISSING:" || true)
-    assert_equals "${missing}" "" "All functions defined"
+    assert_equals "${missing}" "" "All shared functions defined"
 
     # Syntax check
     local rc=0
-    bash -n "${REPO_ROOT}/sprite/lib/common.sh" 2>/dev/null || rc=$?
-    assert_exit_code "${rc}" 0 "Syntax valid"
+    bash -n "${REPO_ROOT}/shared/common.sh" 2>/dev/null || rc=$?
+    assert_exit_code "${rc}" 0 "shared/common.sh syntax valid"
 }
 
-_test_sprite_log_and_name() {
+_test_shared_log_functions() {
     # log functions write to stderr, not stdout
     local stdout stderr
-    stdout=$(timeout 5 bash -c 'source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && log_info "test"' </dev/null 2>/dev/null)
-    stderr=$(timeout 5 bash -c 'source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && log_info "test"' </dev/null 2>&1 >/dev/null)
+    stdout=$(timeout 5 bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && log_info "test"' </dev/null 2>/dev/null)
+    stderr=$(timeout 5 bash -c 'source "'"${REPO_ROOT}"'/shared/common.sh" && log_info "test"' </dev/null 2>&1 >/dev/null)
     assert_equals "${stdout}" "" "Log functions write to stderr (no stdout)"
     assert_match "${stderr}" "?*" "Log functions produce stderr output"
-
-    # get_sprite_name uses SPRITE_NAME env var
-    local name
-    name=$(timeout 5 bash -c 'SPRITE_NAME=from-env; source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && get_sprite_name' 2>/dev/null)
-    assert_equals "${name}" "from-env" "get_sprite_name reads SPRITE_NAME env var"
-
-    # get_sprite_name fails gracefully without TTY or env var
-    local rc=0
-    timeout 5 bash -c 'SPRITE_NAME=""; source "'"${REPO_ROOT}"'/sprite/lib/common.sh" && get_sprite_name' </dev/null >/dev/null 2>&1 || rc=$?
-    assert_match "${rc}" "[1-9]*" "get_sprite_name fails without TTY or env var"
 }
 
-_test_sprite_remote_source() {
+_test_shared_remote_source() {
     if [[ "${REMOTE}" != true ]]; then
         return 0
     fi
     local remote_fns
     remote_fns=$(bash -c '
-        eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sprite/lib/common.sh)"
+        eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
         type log_info &>/dev/null && echo "OK" || echo "FAIL"
     ' 2>/dev/null)
     assert_equals "${remote_fns}" "OK" "Remote source from GitHub works"
@@ -366,11 +359,11 @@ _test_sprite_remote_source() {
 
 test_common_source() {
     echo ""
-    printf '%b\n' "${YELLOW}━━━ Testing common.sh ━━━${NC}"
+    printf '%b\n' "${YELLOW}━━━ Testing shared/common.sh ━━━${NC}"
 
-    _test_sprite_functions_and_syntax
-    _test_sprite_log_and_name
-    _test_sprite_remote_source
+    _test_shared_functions_and_syntax
+    _test_shared_log_functions
+    _test_shared_remote_source
 }
 
 # --- Test shared/common.sh functions ---
@@ -743,13 +736,9 @@ test_common_source
 test_shared_common
 test_source_detection
 
-# Run per-script tests
-for script in claude openclaw codex opencode kilocode zeroclaw; do
-    if [[ -n "${FILTER}" && "${FILTER}" != "${script}" && "${FILTER}" != "--remote" ]]; then
-        continue
-    fi
-    [[ -f "${REPO_ROOT}/sprite/${script}.sh" ]] && run_script_test "${script}"
-done
+# Note: sprite/ cloud provider scripts depend on sprite/lib/common.sh which was
+# removed when sprite was converted to TypeScript (PR #1692). Integration tests
+# for sprite agent scripts are covered by bun test (cli/src/__tests__/) instead.
 
 # --- Summary ---
 echo ""
