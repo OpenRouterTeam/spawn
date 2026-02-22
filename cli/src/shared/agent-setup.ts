@@ -82,7 +82,7 @@ export async function installClaudeCode(runner: CloudRunner): Promise<void> {
     `curl -fsSL https://claude.ai/install.sh | bash || true`,
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
-    `if ! command -v node >/dev/null 2>&1; then apt-get update -y && apt-get install -y --no-install-recommends nodejs npm && npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true; fi`,
+    `if ! command -v node >/dev/null 2>&1; then curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; fi`,
     `echo "==> Installing Claude Code (method 2/2: npm)..."`,
     `npm install -g @anthropic-ai/claude-code || true`,
     `export PATH="${claudePath}:$PATH"`,

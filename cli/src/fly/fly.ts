@@ -14,7 +14,7 @@ import {
   toKebabCase,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
-import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
+import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
 const FLY_DASHBOARD_URL = "https://fly.io/dashboard";
@@ -874,9 +874,9 @@ export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<vo
     `echo "==> Installing base packages..."`,
     `export DEBIAN_FRONTEND=noninteractive`,
     `apt-get update -y && apt-get install -y --no-install-recommends ${packages.join(" ")} || true`,
-    ...(needsNodeUpgrade(tier) ? [
-      `echo "==> Upgrading Node.js to v22 LTS..."`,
-      `npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true`,
+    ...(needsNode(tier) ? [
+      `echo "==> Installing Node.js 22..."`,
+      `${NODE_INSTALL_CMD} || true`,
     ] : []),
     ...(needsBun(tier) ? [
       `echo "==> Checking bun..."`,
