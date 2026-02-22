@@ -357,12 +357,12 @@ describe("_multi_creds_validate", () => {
 });
 
 // ============================================================================
-// check_python_available
+// check_json_processor_available
 // ============================================================================
 
-describe("check_python_available", () => {
+describe("check_json_processor_available", () => {
   it("should return 0 when python3 is available", () => {
-    const result = runBash("check_python_available");
+    const result = runBash("check_json_processor_available");
     // python3 should be available in CI/test environment
     expect(result.exitCode).toBe(0);
   });
@@ -371,20 +371,20 @@ describe("check_python_available", () => {
     const result = runBash(`
       PATH=/nonexistent
       hash -r
-      check_python_available 2>/dev/null
+      check_json_processor_available 2>/dev/null
     `);
     expect(result.exitCode).toBe(1);
   });
 
-  it("should show installation instructions when python3 is missing", () => {
+  it("should show installation instructions when jq and bun are missing", () => {
     const result = runBash(`
       PATH=/nonexistent
       hash -r
-      check_python_available 2>&1
+      check_json_processor_available 2>&1
     `);
-    expect(result.stdout).toContain("Python 3 is required");
+    expect(result.stdout).toContain("jq or bun is required");
     expect(result.stdout).toContain("sudo apt-get");
-    expect(result.stdout).toContain("brew install python3");
+    expect(result.stdout).toContain("brew install jq");
   });
 });
 

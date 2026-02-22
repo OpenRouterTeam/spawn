@@ -11,7 +11,7 @@ import { tmpdir } from "os";
  * pervasively across all cloud provider scripts:
  * - log_step: progress messages (cyan), added in PR #757
  * - _log_diagnostic: structured error output (header + causes + fixes)
- * - check_python_available: Python 3 dependency check
+ * - check_json_processor_available: JSON processor (jq/bun) dependency check
  * - find_node_runtime: bun/node detection
  * - track_temp_file + cleanup_temp_files: secure credential temp file cleanup
  * - get_cloud_init_userdata: cloud-init YAML generation for all providers
@@ -179,34 +179,34 @@ describe("_log_diagnostic", () => {
   });
 });
 
-// ── check_python_available ──────────────────────────────────────────────────
+// ── check_json_processor_available ──────────────────────────────────────────────────
 
-describe("check_python_available", () => {
+describe("check_json_processor_available", () => {
   it("should return 0 when python3 is available", () => {
-    const result = runBash("check_python_available");
+    const result = runBash("check_json_processor_available");
     expect(result.exitCode).toBe(0);
   });
 
   it("should return 1 when python3 is not in PATH", () => {
-    const result = runBash("check_python_available", { PATH: "/nonexistent" });
+    const result = runBash("check_json_processor_available", { PATH: "/nonexistent" });
     expect(result.exitCode).toBe(1);
   });
 
-  it("should show install instructions when python3 is missing", () => {
-    // Override command to simulate python3 not found (can't restrict PATH since sourcing needs it)
+  it("should show install instructions when jq and bun are missing", () => {
+    // Override command to simulate jq and bun not found (can't restrict PATH since sourcing needs it)
     const result = runBash(`
-      command() { if [[ "$2" == "python3" ]]; then return 1; fi; builtin command "$@"; }
-      check_python_available
+      command() { if [[ "$2" == "jq" || "$2" == "bun" ]]; then return 1; fi; builtin command "$@"; }
+      check_json_processor_available
     `);
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Python 3 is required");
-    expect(result.stderr).toContain("Install Python 3:");
+    expect(result.stderr).toContain("jq or bun is required");
+    expect(result.stderr).toContain("Install jq:");
   });
 
   it("should mention Ubuntu, Fedora, macOS, and Arch install options", () => {
     const result = runBash(`
-      command() { if [[ "$2" == "python3" ]]; then return 1; fi; builtin command "$@"; }
-      check_python_available
+      command() { if [[ "$2" == "jq" || "$2" == "bun" ]]; then return 1; fi; builtin command "$@"; }
+      check_json_processor_available
     `);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("Ubuntu/Debian");

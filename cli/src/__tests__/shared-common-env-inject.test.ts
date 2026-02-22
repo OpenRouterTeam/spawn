@@ -289,14 +289,14 @@ _extract_json_field '{"items":["first","second"]}' "d['items'][0]"
 _extract_json_field '{"active":true}' "d['active']"
 `);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe("True");
+    expect(result.stdout).toBe("true");
   });
 
   it("should handle null values with default", () => {
     const result = runBash(`
-_extract_json_field '{"ip":null}' "d['ip'] if d['ip'] else ''" "none"
+_extract_json_field '{"ip":null}' "d['ip']" "none"
 `);
-    expect(result.stdout).toBe("");
+    expect(result.stdout).toBe("none");
   });
 
   it("should extract from deeply nested response structures", () => {

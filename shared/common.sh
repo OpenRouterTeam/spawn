@@ -113,29 +113,29 @@ POLL_INTERVAL="${SPAWN_POLL_INTERVAL:-1}"
 # Dependency checks
 # ============================================================
 
-# Check if Python 3 is available (required for JSON parsing throughout Spawn)
-check_python_available() {
-    if ! command -v python3 &> /dev/null; then
-        log_error "Python 3 is required but not installed"
-        log_error ""
-        log_error "Spawn uses Python 3 for JSON parsing and API interactions."
-        log_error ""
-        printf '%b\n' "${YELLOW}Install Python 3:${NC}" >&2
-        log_error "  ${CYAN}# Ubuntu/Debian${NC}"
-        log_error "  sudo apt-get update && sudo apt-get install -y python3"
-        log_error ""
-        log_error "  ${CYAN}# Fedora/RHEL${NC}"
-        log_error "  sudo dnf install -y python3"
-        log_error ""
-        log_error "  ${CYAN}# macOS${NC}"
-        log_error "  brew install python3"
-        log_error ""
-        log_error "  ${CYAN}# Arch Linux${NC}"
-        log_error "  sudo pacman -S python"
-        log_error ""
-        return 1
+# Check if a JSON processor is available (jq or bun, required for JSON parsing throughout Spawn)
+check_json_processor_available() {
+    if command -v jq &>/dev/null || command -v bun &>/dev/null; then
+        return 0
     fi
-    return 0
+    log_error "jq or bun is required but neither is installed"
+    log_error ""
+    log_error "Spawn uses jq (or bun) for JSON parsing and API interactions."
+    log_error ""
+    printf '%b\n' "${YELLOW}Install jq:${NC}" >&2
+    log_error "  ${CYAN}# Ubuntu/Debian${NC}"
+    log_error "  sudo apt-get update && sudo apt-get install -y jq"
+    log_error ""
+    log_error "  ${CYAN}# Fedora/RHEL${NC}"
+    log_error "  sudo dnf install -y jq"
+    log_error ""
+    log_error "  ${CYAN}# macOS${NC}"
+    log_error "  brew install jq"
+    log_error ""
+    log_error "  ${CYAN}# Arch Linux${NC}"
+    log_error "  sudo pacman -S jq"
+    log_error ""
+    return 1
 }
 
 # Install jq if not already present (required by some cloud providers)
@@ -344,7 +344,6 @@ verify_openrouter_model() {
     if [[ "${model_id}" == "openrouter/auto" || "${model_id}" == "openrouter/free" ]]; then return 0; fi
     if [[ -n "${SPAWN_SKIP_API_VALIDATION:-}" || "${BUN_ENV:-}" == "test" || "${NODE_ENV:-}" == "test" ]]; then return 0; fi
     if ! command -v curl &>/dev/null; then return 0; fi
-    if ! command -v python3 &>/dev/null; then return 0; fi
 
     local models_json
     models_json=$(curl -s --connect-timeout 5 --max-time 15 \
@@ -352,14 +351,23 @@ verify_openrouter_model() {
 
     # Extract model IDs and check for exact match
     local found
-    found=$(printf '%s' "${models_json}" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    ids = [m['id'] for m in data.get('data', [])]
-    print('yes' if sys.argv[1] in ids else 'no')
-except: print('skip')
-" "${model_id}" 2>/dev/null)
+    if command -v jq &>/dev/null; then
+        if printf '%s' "${models_json}" | jq -e '.data[].id' 2>/dev/null | grep -qFx "\"${model_id}\""; then
+            found="yes"
+        else
+            found="no"
+        fi
+    elif command -v bun &>/dev/null; then
+        found=$(_INPUT="${models_json}" _MODEL="${model_id}" bun -e "
+try {
+  const d = JSON.parse(process.env._INPUT);
+  const ids = (d.data || []).map(m => m.id);
+  process.stdout.write(ids.includes(process.env._MODEL) ? 'yes' : 'no');
+} catch { process.stdout.write('skip'); }
+" 2>/dev/null)
+    else
+        found="skip"
+    fi
 
     if [[ "${found}" == "no" ]]; then
         log_warn "Model '${model_id}' not found on OpenRouter"
@@ -877,12 +885,12 @@ wait_for_oauth_code() {
     log_step "Waiting for authentication in browser (this usually takes 10-30 seconds, timeout: ${timeout}s)..."
     while [[ ! -f "${code_file}" ]] && [[ ${elapsed} -lt ${timeout} ]]; do
         sleep "${POLL_INTERVAL}"
-        # Use python3 for float addition since bash arithmetic only handles integers
+        # Use bun for float addition since bash arithmetic only handles integers
         # If POLL_INTERVAL is 0.5, bash $(( )) would fail. Fallback keeps timeout working.
-        if command -v python3 &>/dev/null; then
-            elapsed=$(python3 -c "print(int(${elapsed} + ${POLL_INTERVAL}))" 2>/dev/null || echo "$((elapsed + 1))")
+        if command -v bun &>/dev/null; then
+            elapsed=$(_E="${elapsed}" _P="${POLL_INTERVAL}" bun -e "process.stdout.write(String(Math.floor(Number(process.env._E) + Number(process.env._P))))" 2>/dev/null || echo "$((elapsed + 1))")
         else
-            # No python3 available - fall back to integer seconds (may timeout early with fractional POLL_INTERVAL)
+            # No bun available - fall back to integer seconds (may timeout early with fractional POLL_INTERVAL)
             elapsed=$((elapsed + 1))
         fi
     done
@@ -1926,7 +1934,7 @@ get_ssh_fingerprint() {
 # Usage: json_escape STRING
 json_escape() {
     local string="${1}"
-    python3 -c "import json, sys; print(json.dumps(sys.stdin.read().rstrip('\n')))" <<< "${string}" 2>/dev/null || {
+    _INPUT="${string}" bun -e "process.stdout.write(JSON.stringify(process.env._INPUT) + '\n')" 2>/dev/null || {
         # Fallback: manually escape backslashes, quotes, and JSON control characters
         local escaped="${string//\\/\\\\}"
         escaped="${escaped//\"/\\\"}"
@@ -1943,18 +1951,23 @@ json_escape() {
 extract_ssh_key_ids() {
     local api_response="${1}"
     local key_field="${2:-ssh_keys}"
-    # SECURITY: Pass key_field via sys.argv to prevent Python code injection.
-    # Previously interpolated directly into Python source as '${key_field}'.
-    python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-ids = [k['id'] for k in data.get(sys.argv[1], [])]
-print(json.dumps(ids))
-" "${key_field}" <<< "${api_response}" 2>/dev/null || {
-        log_error "Failed to parse SSH key IDs from API response"
-        log_error "The API response may be malformed or python3 is unavailable"
-        return 1
-    }
+    # Use jq with --arg to safely pass key_field (prevents code injection).
+    if command -v jq &>/dev/null; then
+        printf '%s' "${api_response}" | jq --arg field "${key_field}" '[.[$field][]?.id]' 2>/dev/null || {
+            log_error "Failed to parse SSH key IDs from API response"
+            return 1
+        }
+    else
+        _DATA="${api_response}" _FIELD="${key_field}" bun -e "
+const d = JSON.parse(process.env._DATA);
+const ids = (d[process.env._FIELD] || []).map(k => k.id);
+process.stdout.write(JSON.stringify(ids) + '\n');
+" 2>/dev/null || {
+            log_error "Failed to parse SSH key IDs from API response"
+            log_error "The API response may be malformed or bun is unavailable"
+            return 1
+        }
+    fi
 }
 
 # ============================================================
@@ -2018,8 +2031,8 @@ calculate_retry_backoff() {
     fi
 
     # Add jitter: ±20% randomization to prevent thundering herd
-    # Fallback to no-jitter interval if python3 is unavailable
-    python3 -c "import random; print(int(${interval} * (0.8 + random.random() * 0.4)))" 2>/dev/null || printf '%s' "${interval}"
+    # Fallback to no-jitter interval if bun is unavailable
+    _INTERVAL="${interval}" bun -e "process.stdout.write(String(Math.floor(Number(process.env._INTERVAL) * (0.8 + Math.random() * 0.4))) + '\n')" 2>/dev/null || printf '%s\n' "${interval}"
 }
 
 # Handle API retry decision with backoff - extracted to reduce duplication across API wrappers
@@ -2598,16 +2611,42 @@ ssh_verify_connectivity() {
     generic_ssh_wait "${SSH_USER:-root}" "${ip}" "$SSH_OPTS -o ConnectTimeout=5" "echo ok" "SSH connectivity" "${max_attempts}" "${initial_interval}"
 }
 
-# Extract a value from a JSON response using a Python expression
-# Usage: _extract_json_field JSON_STRING PYTHON_EXPR [DEFAULT]
-# The Python expression receives 'd' as the parsed JSON dict.
+# Extract a value from a JSON response using bracket-notation path
+# Usage: _extract_json_field JSON_STRING JS_EXPR [DEFAULT]
+# The JS expression uses bracket access syntax: d['key1']['key2'][0]
 # Returns DEFAULT (or empty string) on parse failure.
 _extract_json_field() {
     local json="${1}"
-    local py_expr="${2}"
+    local js_expr="${2}"
     local default="${3:-}"
 
-    printf '%s' "${json}" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(${py_expr})" 2>/dev/null || echo "${default}"
+    _DATA="${json}" _EXPR="${js_expr}" bun -e "
+try {
+  const d = JSON.parse(process.env._DATA);
+  const expr = process.env._EXPR || '';
+  // Parse bracket-notation path: d['key1']['key2'][0]
+  // Extract segments from ['...'] or [N] patterns
+  const segments = [];
+  const re = /\[(\d+|'[^']*'|\"[^\"]*\")\]/g;
+  let m;
+  while ((m = re.exec(expr)) !== null) {
+    let key = m[1];
+    if ((key.startsWith(\"'\") && key.endsWith(\"'\")) || (key.startsWith('\"') && key.endsWith('\"'))) {
+      key = key.slice(1, -1);
+    } else {
+      key = Number(key);
+    }
+    segments.push(key);
+  }
+  let result = d;
+  for (const seg of segments) {
+    if (result === null || result === undefined) { process.exit(1); }
+    result = result[seg];
+  }
+  if (result !== undefined && result !== null) process.stdout.write(String(result) + '\n');
+  else process.exit(1);
+} catch { process.exit(1); }
+" 2>/dev/null || echo "${default}"
 }
 
 # Extract an error message from a JSON API response.
@@ -2619,24 +2658,19 @@ extract_api_error_message() {
     local json="${1}"
     local fallback="${2:-Unknown error}"
 
-    printf '%s' "${json}" | python3 -c "
-import json, sys
-try:
-    d = json.loads(sys.stdin.read())
-    e = d.get('error', '')
-    msg = (
-        (isinstance(e, dict) and (e.get('message') or e.get('error_message')))
-        or d.get('message')
-        or d.get('reason')
-        or (isinstance(e, str) and e)
-        or ''
-    )
-    if msg:
-        print(msg)
-    else:
-        sys.exit(1)
-except:
-    sys.exit(1)
+    _DATA="${json}" bun -e "
+try {
+  const d = JSON.parse(process.env._DATA);
+  const e = d.error || '';
+  const msg =
+    (typeof e === 'object' && e !== null && (e.message || e.error_message)) ||
+    d.message ||
+    d.reason ||
+    (typeof e === 'string' && e) ||
+    '';
+  if (msg) process.stdout.write(String(msg) + '\n');
+  else process.exit(1);
+} catch { process.exit(1); }
 " 2>/dev/null || echo "${fallback}"
 }
 
@@ -2778,7 +2812,15 @@ _load_token_from_config() {
     fi
 
     local saved_token
-    saved_token=$(python3 -c "import json, sys; data=json.load(open(sys.argv[1])); print(data.get('api_key','') or data.get('token',''))" "${config_file}" 2>/dev/null)
+    if command -v jq &>/dev/null; then
+        saved_token=$(jq -r '(if (.api_key // "" | length) > 0 then .api_key else (.token // "") end)' "${config_file}" 2>/dev/null)
+    else
+        saved_token=$(_FILE="${config_file}" bun -e "
+import fs from 'fs';
+const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
+process.stdout.write(d.api_key || d.token || '');
+" 2>/dev/null)
+    fi
     if [[ -z "${saved_token}" ]]; then
         return 1
     fi
@@ -2882,7 +2924,7 @@ ensure_api_token_with_provider() {
     local help_url="${4}"
     local test_func="${5:-}"
 
-    check_python_available || return 1
+    check_json_processor_available || return 1
 
     # Try environment variable (validate if test function provided)
     if _load_token_from_env "${env_var_name}" "${provider_name}"; then
@@ -2925,7 +2967,7 @@ ensure_api_token_with_provider() {
 # Multi-credential configuration helpers
 # ============================================================
 
-# Load multiple fields from a JSON config file in a single python3 call.
+# Load multiple fields from a JSON config file in a single call.
 # Outputs each field value on a separate line. Returns 1 if file missing or parse fails.
 # Usage: local creds; creds=$(_load_json_config_fields CONFIG_FILE field1 field2 ...)
 # Then:  { read -r var1; read -r var2; ... } <<< "${creds}"
@@ -2933,14 +2975,22 @@ _load_json_config_fields() {
     local config_file="${1}"; shift
     [[ -f "${config_file}" ]] || return 1
 
-    # SECURITY: Pass field names via sys.argv to prevent Python code injection.
-    # Previously built Python source by interpolating field names as '${field}'.
-    python3 -c "
-import json, sys
-d = json.load(open(sys.argv[1]))
-for field in sys.argv[2:]:
-    print(d.get(field, ''))
-" "${config_file}" "$@" 2>/dev/null || return 1
+    if command -v jq &>/dev/null; then
+        # Use jq to extract each field; output one value per line
+        local field
+        for field in "$@"; do
+            jq -r --arg f "${field}" '.[$f] // ""' "${config_file}" 2>/dev/null || return 1
+        done
+    else
+        # SECURITY: Pass field names via env var to prevent code injection.
+        _FILE="${config_file}" _FIELDS="$(printf '%s\n' "$@")" bun -e "
+import fs from 'fs';
+const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
+for (const field of process.env._FIELDS.split('\n')) {
+  if (field) process.stdout.write((d[field] || '') + '\n');
+}
+" 2>/dev/null || return 1
+    fi
 }
 
 # Save key-value pairs to a JSON config file using json_escape for safe encoding.
@@ -3100,7 +3150,7 @@ ensure_multi_credentials() {
     local test_func="${4:-}"
     shift 4
 
-    check_python_available || return 1
+    check_json_processor_available || return 1
 
     # Parse credential specs into parallel arrays
     local env_vars=() config_keys=() labels=()

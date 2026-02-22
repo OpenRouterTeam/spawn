@@ -579,7 +579,7 @@ mock_api() {
 }
 INSTANCE_STATUS_POLL_DELAY=0
 generic_wait_for_instance mock_api "/x/1" "ready" \\
-  "d['x']['status']" "d['x'].get('ip','')" \\
+  "d['x']['status']" "d['x']['ip']" \\
   X_IP "Droplet" 2
 `);
     expect(stderr).toContain("Check your cloud dashboard");
@@ -604,7 +604,7 @@ mock_api() {
 }
 INSTANCE_STATUS_POLL_DELAY=0
 generic_wait_for_instance mock_api "/s/1" "running" \\
-  "d['s']" "d.get('ip','')" \\
+  "d['s']" "d['ip']" \\
   S_IP "Server" 5
 `);
     expect(exitCode).toBe(0);

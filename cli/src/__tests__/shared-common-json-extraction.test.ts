@@ -93,15 +93,15 @@ describe("_extract_json_field", () => {
         _extract_json_field '{"ready": true}' "d['ready']"
       `);
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toBe("True");
+      expect(result.stdout).toBe("true");
     });
 
-    it("should extract a null field", () => {
+    it("should extract a null field and return default", () => {
       const result = runBash(`
-        _extract_json_field '{"value": null}' "d['value']"
+        _extract_json_field '{"value": null}' "d['value']" "fallback"
       `);
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toBe("None");
+      expect(result.stdout).toBe("fallback");
     });
   });
 
@@ -147,18 +147,18 @@ describe("_extract_json_field", () => {
     });
   });
 
-  describe("complex Python expressions", () => {
-    it("should support .get() with default", () => {
+  describe("complex JS expressions", () => {
+    it("should support bracket access for existing key", () => {
       const result = runBash(`
-        _extract_json_field '{"status": "active"}' "d.get('status', 'unknown')"
+        _extract_json_field '{"status": "active"}' "d['status']"
       `);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toBe("active");
     });
 
-    it("should support .get() default when key missing", () => {
+    it("should return default when key missing", () => {
       const result = runBash(`
-        _extract_json_field '{"other": 1}' "d.get('status', 'unknown')"
+        _extract_json_field '{"other": 1}' "d['status']" "unknown"
       `);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toBe("unknown");
@@ -258,7 +258,7 @@ describe("_extract_json_field", () => {
 
     it("should handle empty JSON object", () => {
       const result = runBash(`
-        _extract_json_field '{}' "d.get('key', 'empty')"
+        _extract_json_field '{}' "d['key']" "empty"
       `);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toBe("empty");
