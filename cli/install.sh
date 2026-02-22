@@ -90,23 +90,29 @@ has_passwordless_sudo() {
 # Installs to ~/.local/bin. If that's not already in PATH, also symlinks
 # to /usr/local/bin for immediate availability (without prompting for a
 # password — only if writable or passwordless sudo is available).
-# Also patches shell rc files so ~/.local/bin is in PATH for future sessions.
+# Also patches shell rc files so both ~/.local/bin and ~/.bun/bin are in
+# PATH for future sessions (bun is required by spawn's shebang).
 ensure_in_path() {
     local install_dir="$1"
+    local bun_bin_dir="${BUN_INSTALL}/bin"
 
-    # 1. Check if install_dir is already in the user's real PATH
-    local already_in_path=false
+    # 1. Check if install_dir and bun are already in the user's real PATH
+    local spawn_in_path=false
+    local bun_in_path=false
     if echo "${_SPAWN_ORIG_PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
-        already_in_path=true
+        spawn_in_path=true
+    fi
+    if echo "${_SPAWN_ORIG_PATH}" | tr ':' '\n' | grep -qx "${bun_bin_dir}"; then
+        bun_in_path=true
     fi
 
-    # 2. If not in PATH, symlink into /usr/local/bin for immediate availability
+    # 2. If spawn not in PATH, symlink into /usr/local/bin for immediate availability
     #    Try in order: direct write → passwordless sudo → prompt for password
     #    Also symlink bun so that spawn's #!/usr/bin/env bun shebang resolves
     local linked=false
     local bun_path
     bun_path="$(command -v bun 2>/dev/null || true)"
-    if [ "$already_in_path" = false ]; then
+    if [ "$spawn_in_path" = false ]; then
         if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
             ln -sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true
             if [ -n "$bun_path" ] && [ ! -x /usr/local/bin/bun ]; then
@@ -127,8 +133,8 @@ ensure_in_path() {
         fi
     fi
 
-    # 3. Patch shell rc files so ~/.local/bin is in PATH for future sessions
-    local export_line="export PATH=\"${install_dir}:\$PATH\""
+    # 3. Patch shell rc files so both ~/.local/bin and ~/.bun/bin are in PATH
+    #    for future sessions. ~/.bun/bin is required by spawn's #!/usr/bin/env bun shebang.
     local rc_file=""
     case "${SHELL:-/bin/bash}" in
         */zsh)  rc_file="${HOME}/.zshrc" ;;
@@ -136,28 +142,47 @@ ensure_in_path() {
         *)      rc_file="${HOME}/.bashrc" ;;
     esac
 
-    if [ -n "$rc_file" ]; then
-        if ! grep -qF "${install_dir}" "$rc_file" 2>/dev/null; then
-            printf '\n# Added by spawn installer\n%s\n' "$export_line" >> "$rc_file"
+    # Helper: add a dir to rc files if not already present
+    _patch_rc() {
+        local dir="$1"
+        local line="export PATH=\"${dir}:\$PATH\""
+        if [ -n "$rc_file" ]; then
+            if ! grep -qF "${dir}" "$rc_file" 2>/dev/null; then
+                printf '\n# Added by spawn installer\n%s\n' "$line" >> "$rc_file"
+            fi
+            case "${SHELL:-/bin/bash}" in */bash)
+                for profile in "${HOME}/.profile" "${HOME}/.bash_profile"; do
+                    if [ -f "$profile" ] && ! grep -qF "${dir}" "$profile" 2>/dev/null; then
+                        printf '\n# Added by spawn installer\n%s\n' "$line" >> "$profile"
+                    fi
+                done
+            ;; esac
+        else
+            case "${SHELL:-}" in */fish)
+                fish -c "fish_add_path \"${dir}\"" 2>/dev/null || true
+            ;; esac
         fi
-        case "${SHELL:-/bin/bash}" in */bash)
-            for profile in "${HOME}/.profile" "${HOME}/.bash_profile"; do
-                if [ -f "$profile" ] && ! grep -qF "${install_dir}" "$profile" 2>/dev/null; then
-                    printf '\n# Added by spawn installer\n%s\n' "$export_line" >> "$profile"
-                fi
-            done
-        ;; esac
-    else
-        case "${SHELL:-}" in */fish)
-            fish -c "fish_add_path ${install_dir}" 2>/dev/null || true
-        ;; esac
+    }
+
+    if [ "$spawn_in_path" = false ]; then
+        _patch_rc "${install_dir}"
+    fi
+    if [ "$bun_in_path" = false ]; then
+        _patch_rc "${bun_bin_dir}"
     fi
 
     # 4. Show version and success message
     echo ""
     SPAWN_NO_UPDATE_CHECK=1 PATH="${install_dir}:${PATH}" "${install_dir}/spawn" version
     echo ""
-    if [ "$already_in_path" = true ] || [ "$linked" = true ]; then
+    local all_ready=true
+    if [ "$spawn_in_path" = false ] && [ "$linked" = false ]; then
+        all_ready=false
+    fi
+    if [ "$bun_in_path" = false ] && [ ! -x /usr/local/bin/bun ]; then
+        all_ready=false
+    fi
+    if [ "$all_ready" = true ]; then
         printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
     else
         printf "${GREEN}[spawn]${NC} To start using spawn, run:\n"
