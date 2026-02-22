@@ -1258,17 +1258,18 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
   return lines;
 }
 
-export function buildRetryCommand(agent: string, cloud: string, prompt?: string): string {
-  if (!prompt) return `spawn ${agent} ${cloud}`;
+export function buildRetryCommand(agent: string, cloud: string, prompt?: string, spawnName?: string): string {
+  const nameFlag = spawnName ? ` --name ${spawnName}` : "";
+  if (!prompt) return `spawn ${agent} ${cloud}${nameFlag}`;
   if (prompt.length <= 80) {
     const safe = prompt.replace(/"/g, '\\"');
-    return `spawn ${agent} ${cloud} --prompt "${safe}"`;
+    return `spawn ${agent} ${cloud}${nameFlag} --prompt "${safe}"`;
   }
   // Long prompts: suggest --prompt-file instead of truncating into a broken command
-  return `spawn ${agent} ${cloud} --prompt-file <your-prompt-file>`;
+  return `spawn ${agent} ${cloud}${nameFlag} --prompt-file <your-prompt-file>`;
 }
 
-function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, prompt?: string, dashboardUrl?: string): never {
+function reportScriptFailure(errMsg: string, cloud: string, agent: string, authHint?: string, prompt?: string, dashboardUrl?: string, spawnName?: string): never {
   p.log.error("Spawn script failed");
   console.error("\nError:", errMsg);
 
@@ -1285,7 +1286,7 @@ function reportScriptFailure(errMsg: string, cloud: string, agent: string, authH
   console.error("");
   for (const line of lines) console.error(line);
   console.error("");
-  console.error(`Retry: ${pc.cyan(buildRetryCommand(agent, cloud, prompt))}`);
+  console.error(`Retry: ${pc.cyan(buildRetryCommand(agent, cloud, prompt, spawnName))}`);
   process.exit(1);
 }
 
@@ -1366,7 +1367,7 @@ async function execScript(cloud: string, agent: string, prompt?: string, authHin
 
   const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {
-    reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl);
+    reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl, spawnName);
   }
 }
 
@@ -1668,7 +1669,7 @@ async function showEmptyListMessage(agentFilter?: string, cloudFilter?: string):
 function buildListFooterLines(records: SpawnRecord[], agentFilter?: string, cloudFilter?: string): string[] {
   const lines: string[] = [];
   const latest = records[0];
-  lines.push(`Rerun last: ${pc.cyan(buildRetryCommand(latest.agent, latest.cloud, latest.prompt))}`);
+  lines.push(`Rerun last: ${pc.cyan(buildRetryCommand(latest.agent, latest.cloud, latest.prompt, latest.name))}`);
 
   if (agentFilter || cloudFilter) {
     const totalRecords = filterHistory();
@@ -1949,7 +1950,8 @@ async function handleRecordAction(
   manifest: Manifest | null
 ): Promise<void> {
   if (!selected.connection) {
-    // No connection info -- just rerun
+    // No connection info -- just rerun, reusing the existing spawn name
+    if (selected.name) process.env.SPAWN_NAME = selected.name;
     p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
     await cmdRun(selected.agent, selected.cloud, selected.prompt);
     return;
@@ -2039,7 +2041,8 @@ async function handleRecordAction(
     return;
   }
 
-  // Rerun (create new spawn)
+  // Rerun (create new spawn), reusing the existing spawn name
+  if (selected.name) process.env.SPAWN_NAME = selected.name;
   p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
@@ -2182,6 +2185,7 @@ export async function cmdLast(): Promise<void> {
   const label = buildRecordLabel(latest, manifest);
   const hint = buildRecordHint(latest);
   p.log.step(`Rerunning last spawn: ${pc.bold(label)} ${pc.dim(hint)}`);
+  if (latest.name) process.env.SPAWN_NAME = latest.name;
   await cmdRun(latest.agent, latest.cloud, latest.prompt);
 }
 
