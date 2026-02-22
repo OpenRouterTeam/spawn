@@ -330,7 +330,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: (apiKey, modelId) => setupOpenclawConfig(runner, apiKey, modelId || "openrouter/auto"),
       preLaunch: () => startGateway(runner),
-      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; openclaw tui",
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
     },
 
     opencode: {

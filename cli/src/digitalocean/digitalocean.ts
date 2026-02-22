@@ -837,6 +837,10 @@ const SSH_OPTS = [
   "LogLevel=ERROR",
   "-o",
   "ConnectTimeout=10",
+  "-o",
+  "ServerAliveInterval=15",
+  "-o",
+  "ServerAliveCountMax=3",
 ];
 
 export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<void> {
@@ -917,8 +921,8 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
     logWarn("Could not stream cloud-init log, falling back to polling...");
   }
 
-  // Brief fallback poll if streaming failed (e.g. log file not yet created)
-  for (let attempt = 1; attempt <= 6; attempt++) {
+  // Fallback poll if streaming failed (e.g. log file not yet created)
+  for (let attempt = 1; attempt <= 20; attempt++) {
     try {
       const proc = Bun.spawn(
         [
@@ -943,7 +947,7 @@ export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<v
     } catch {
       /* ignore */
     }
-    logStep(`Cloud-init in progress (${attempt}/6)`);
+    logStep(`Cloud-init in progress (${attempt}/20)`);
     await sleep(5000);
   }
   logWarn("Cloud-init marker not found, continuing anyway...");
