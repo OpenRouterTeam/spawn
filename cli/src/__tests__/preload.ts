@@ -23,9 +23,35 @@
  * - Subprocesses (execSync, spawnSync) inherit the sandboxed environment
  */
 
-import { mkdirSync, rmSync, mkdtempSync } from "fs";
+import { mkdirSync, readdirSync, rmSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+
+// ── Stray test file cleanup ──────────────────────────────────────────────────
+//
+// Automated refactor/discovery agents occasionally run tests from outside the
+// cli/ directory, where bunfig.toml is not loaded and this preload never runs.
+// In those cases HOME remains the real home directory (/root on CI), so any
+// test that writes "$HOME/subprocess-test-*.txt" leaves files there.
+//
+// We clean up before and after every test run to keep the working tree tidy.
+
+const REAL_HOME = process.env.HOME ?? "";
+
+function cleanupStrayTestFiles(): void {
+  if (!REAL_HOME) return;
+  try {
+    for (const f of readdirSync(REAL_HOME)) {
+      if (f.startsWith("subprocess-test-") && f.endsWith(".txt")) {
+        rmSync(join(REAL_HOME, f), { force: true });
+      }
+    }
+  } catch {
+    // Best-effort
+  }
+}
+
+cleanupStrayTestFiles();
 
 // ── Create isolated HOME ────────────────────────────────────────────────────
 
@@ -52,4 +78,5 @@ process.on("exit", () => {
   } catch {
     // Best-effort cleanup
   }
+  cleanupStrayTestFiles();
 });
