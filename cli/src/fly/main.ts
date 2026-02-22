@@ -12,7 +12,6 @@ import {
   runServer,
   interactiveSession,
   saveLaunchCmd,
-  listVolumes,
   FLY_VM_TIERS,
   DEFAULT_VM_TIER,
 } from "./fly";
@@ -23,7 +22,7 @@ import {
   generateEnvConfig,
   offerGithubAuth,
 } from "./agents";
-import { logInfo, logStep, logWarn, selectFromList, prompt } from "./ui";
+import { logInfo, logStep, logWarn, selectFromList } from "./ui";
 
 async function promptVmOptions(): Promise<ServerOptions> {
   // If FLY_VM_MEMORY is set, skip the interactive prompt (CI/headless mode)
@@ -43,54 +42,7 @@ async function promptVmOptions(): Promise<ServerOptions> {
   const tierId = await selectFromList(tierItems, "VM size", DEFAULT_VM_TIER.id);
   const selectedTier = FLY_VM_TIERS.find((t) => t.id === tierId) || DEFAULT_VM_TIER;
 
-  // Volume prompt
-  process.stderr.write("\n");
-  const wantVolume = await prompt("Mount a persistent volume? (y/N): ");
-  if (!/^[Yy]$/.test(wantVolume)) {
-    return { cpus: selectedTier.cpus, memoryMb: selectedTier.memoryMb };
-  }
-
-  const volumeChoice = await selectFromList(
-    ["new|Create a new volume", "existing|Attach an existing volume"],
-    "volume option",
-    "new",
-  );
-
-  if (volumeChoice === "new") {
-    const sizeStr = await prompt("Volume size in GB [10]: ");
-    const sizeGb = parseInt(sizeStr, 10) || 10;
-    return {
-      cpus: selectedTier.cpus,
-      memoryMb: selectedTier.memoryMb,
-      newVolumeSizeGb: sizeGb,
-    };
-  }
-
-  // Existing volumes require an existing app — prompt for the app name
-  const appForVolumes = await prompt("App name to list volumes from: ");
-  if (!appForVolumes) {
-    logWarn("No app name provided, skipping volume attachment");
-    return { cpus: selectedTier.cpus, memoryMb: selectedTier.memoryMb };
-  }
-
-  logStep("Fetching existing volumes...");
-  const volumes = await listVolumes(appForVolumes);
-  if (volumes.length === 0) {
-    logWarn("No volumes found, creating a new 10GB volume instead");
-    return {
-      cpus: selectedTier.cpus,
-      memoryMb: selectedTier.memoryMb,
-      newVolumeSizeGb: 10,
-    };
-  }
-
-  const volItems = volumes.map((v) => `${v.id}|${v.name} (${v.size_gb} GB)`);
-  const volId = await selectFromList(volItems, "volume", volumes[0].id);
-  return {
-    cpus: selectedTier.cpus,
-    memoryMb: selectedTier.memoryMb,
-    volumeId: volId,
-  };
+  return { cpus: selectedTier.cpus, memoryMb: selectedTier.memoryMb };
 }
 
 async function main() {
