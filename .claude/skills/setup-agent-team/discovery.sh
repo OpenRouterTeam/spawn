@@ -55,8 +55,8 @@ if ! command -v claude &>/dev/null; then
     exit 1
 fi
 
-if ! command -v python3 &>/dev/null; then
-    log_error "python3 is required for manifest parsing"
+if ! command -v jq &>/dev/null; then
+    log_error "jq is required for manifest parsing"
     exit 1
 fi
 
@@ -73,22 +73,25 @@ if [[ -f "${HOME}/.spawnrc" ]]; then
 fi
 
 get_matrix_summary() {
-    python3 - "${MANIFEST}" <<'PYEOF'
-import json, sys
-m = json.load(open(sys.argv[1]))
-agents = list(m['agents'].keys())
-clouds = list(m['clouds'].keys())
-gaps = [k for k, v in m.get('matrix', {}).items() if v == 'missing']
-impl = sum(1 for v in m['matrix'].values() if v == 'implemented')
-total = len(agents) * len(clouds)
-print(f'Matrix: {len(agents)} agents x {len(clouds)} clouds = {impl}/{total} implemented')
-if gaps:
-    print(f'Gaps ({len(gaps)}): {", ".join(gaps[:10])}')
-else:
-    print('Matrix is full')
-print(f'Agents: {", ".join(agents)}')
-print(f'Clouds: {", ".join(clouds)}')
-PYEOF
+    local agents clouds impl total gaps gap_count gap_list
+    agents=$(jq -r '.agents | keys | join(", ")' "${MANIFEST}")
+    clouds=$(jq -r '.clouds | keys | join(", ")' "${MANIFEST}")
+    local agent_count cloud_count
+    agent_count=$(jq '.agents | keys | length' "${MANIFEST}")
+    cloud_count=$(jq '.clouds | keys | length' "${MANIFEST}")
+    impl=$(jq '[.matrix | to_entries[] | select(.value == "implemented")] | length' "${MANIFEST}")
+    total=$((agent_count * cloud_count))
+    gap_list=$(jq -r '[.matrix | to_entries[] | select(.value == "missing") | .key] | join(", ")' "${MANIFEST}")
+    gap_count=$(jq '[.matrix | to_entries[] | select(.value == "missing")] | length' "${MANIFEST}")
+
+    printf 'Matrix: %s agents x %s clouds = %s/%s implemented\n' "$agent_count" "$cloud_count" "$impl" "$total"
+    if [[ "$gap_count" -gt 0 ]]; then
+        printf 'Gaps (%s): %s\n' "$gap_count" "$gap_list"
+    else
+        printf 'Matrix is full\n'
+    fi
+    printf 'Agents: %s\n' "$agents"
+    printf 'Clouds: %s\n' "$clouds"
 }
 
 # Cleanup stale worktrees, branches, and related state
@@ -122,12 +125,11 @@ _prepare_prompt_file() {
 
     local summary
     summary=$(get_matrix_summary)
-    python3 - "${output_file}" "${summary}" <<'PYEOF'
-import sys
-path, replacement = sys.argv[1], sys.argv[2]
-content = open(path).read()
-open(path, 'w').write(content.replace('MATRIX_SUMMARY_PLACEHOLDER', replacement))
-PYEOF
+    # Replace placeholder with matrix summary (may contain newlines/special chars)
+    _SUMMARY="${summary}" _FILE="${output_file}" jq -Rrn '
+      [inputs] | join("\n") |
+      gsub("MATRIX_SUMMARY_PLACEHOLDER"; env._SUMMARY)
+    ' "${output_file}" > "${output_file}.tmp" && mv "${output_file}.tmp" "${output_file}"
 
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${output_file}"
 }
