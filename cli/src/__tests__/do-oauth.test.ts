@@ -223,7 +223,7 @@ describe("Token expiry detection", () => {
 describe("OAuth URL construction", () => {
   const DO_OAUTH_AUTHORIZE = "https://cloud.digitalocean.com/v1/oauth/authorize";
   const DO_SCOPES = [
-    "droplet:create", "droplet:read",
+    "droplet:create", "droplet:delete", "droplet:read",
     "ssh_key:create", "ssh_key:read",
     "regions:read", "sizes:read",
     "image:read", "actions:read",
@@ -256,6 +256,7 @@ describe("OAuth URL construction", () => {
   it("should include all required scopes", () => {
     const scopes = DO_SCOPES.split(" ");
     expect(scopes).toContain("droplet:create");
+    expect(scopes).toContain("droplet:delete");
     expect(scopes).toContain("droplet:read");
     expect(scopes).toContain("ssh_key:create");
     expect(scopes).toContain("ssh_key:read");
@@ -263,7 +264,7 @@ describe("OAuth URL construction", () => {
     expect(scopes).toContain("sizes:read");
     expect(scopes).toContain("image:read");
     expect(scopes).toContain("actions:read");
-    expect(scopes).toHaveLength(8);
+    expect(scopes).toHaveLength(9);
   });
 });
 

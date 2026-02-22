@@ -29,7 +29,7 @@ const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649c
 
 // Fine-grained scopes for spawn (minimum required)
 const DO_SCOPES = [
-  "droplet:create", "droplet:read",
+  "droplet:create", "droplet:delete", "droplet:read",
   "ssh_key:create", "ssh_key:read",
   "regions:read", "sizes:read",
   "image:read", "actions:read",
