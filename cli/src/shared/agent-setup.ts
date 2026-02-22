@@ -281,11 +281,11 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
 
     codex: {
       name: "Codex CLI",
-      install: () => installAgent(runner, "Codex CLI", "npm install -g @openai/codex"),
+      install: () => installAgent(runner, "Codex CLI", "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @openai/codex"),
       envVars: (apiKey) => [`OPENROUTER_API_KEY=${apiKey}`],
       configure: (apiKey) => setupCodexConfig(runner, apiKey),
       launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
+        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$(npm prefix -g 2>/dev/null)/bin:$PATH; codex",
     },
 
     openclaw: {
@@ -316,14 +316,14 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
 
     kilocode: {
       name: "Kilo Code",
-      install: () => installAgent(runner, "Kilo Code", "npm install -g @kilocode/cli"),
+      install: () => installAgent(runner, "Kilo Code", "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @kilocode/cli"),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "KILO_PROVIDER_TYPE=openrouter",
         `KILO_OPEN_ROUTER_API_KEY=${apiKey}`,
       ],
       launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
+        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$(npm prefix -g 2>/dev/null)/bin:$PATH; kilocode",
     },
 
     zeroclaw: {
