@@ -213,9 +213,23 @@ export async function offerGithubAuth(): Promise<void> {
   if (!githubAuthRequested) return;
 
   let ghCmd = "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash";
+  let localTmpFile = "";
   if (githubToken) {
     const escaped = githubToken.replace(/'/g, "'\\''");
-    ghCmd = `export GITHUB_TOKEN='${escaped}'; ${ghCmd}`;
+    // Write token to a local temp file with restricted permissions, then upload
+    // to the remote machine. This prevents the token from appearing in process
+    // argument lists (ps aux, /proc/*/cmdline) on either machine.
+    localTmpFile = join(tmpdir(), `gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    writeFileSync(localTmpFile, `export GITHUB_TOKEN='${escaped}'`, { mode: 0o600 });
+    const remoteTmpFile = `/tmp/gh_token_${Date.now()}`;
+    try {
+      await uploadFile(localTmpFile, remoteTmpFile);
+      ghCmd = `. ${remoteTmpFile} && rm -f ${remoteTmpFile} && ${ghCmd}`;
+    } catch {
+      // Fallback: if upload fails, clean up and skip token injection
+      try { unlinkSync(localTmpFile); } catch { /* ignore */ }
+      localTmpFile = "";
+    }
   }
 
   logStep("Installing and authenticating GitHub CLI...");
@@ -223,6 +237,10 @@ export async function offerGithubAuth(): Promise<void> {
     await runServer(ghCmd);
   } catch {
     logWarn("GitHub CLI setup failed (non-fatal, continuing)");
+  } finally {
+    if (localTmpFile) {
+      try { unlinkSync(localTmpFile); } catch { /* ignore */ }
+    }
   }
 }
 
