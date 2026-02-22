@@ -762,19 +762,17 @@ export async function waitForCloudInit(
 
   // Stream cloud-init output so the user sees progress in real time
   logStep("Streaming cloud-init output (timeout: 5min)...");
-  const remoteScript = [
-    'tail -f /var/log/cloud-init-output.log 2>/dev/null &',
-    'TAIL_PID=$!',
-    'for i in $(seq 1 150); do',
-    '  if [ -f /root/.cloud-init-complete ]; then',
-    '    kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null',
-    '    echo ""; echo "--- cloud-init complete ---"; exit 0',
-    '  fi',
-    '  sleep 2',
-    'done',
-    'kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null',
-    'echo ""; echo "--- cloud-init timed out ---"; exit 1',
-  ].join("; ");
+  const remoteScript =
+    'tail -f /var/log/cloud-init-output.log 2>/dev/null & TAIL_PID=$!\n' +
+    'for i in $(seq 1 150); do\n' +
+    '  if [ -f /root/.cloud-init-complete ]; then\n' +
+    '    kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n' +
+    '    echo ""; echo "--- cloud-init complete ---"; exit 0\n' +
+    '  fi\n' +
+    '  sleep 2\n' +
+    'done\n' +
+    'kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n' +
+    'echo ""; echo "--- cloud-init timed out ---"; exit 1';
 
   try {
     const proc = Bun.spawn(
