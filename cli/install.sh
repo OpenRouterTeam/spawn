@@ -69,62 +69,88 @@ ensure_min_bun_version() {
     fi
 }
 
-# --- Helper: find the best install directory ---
-# Picks the first directory that exists AND is in PATH
-find_install_dir() {
-    if [ -n "${SPAWN_INSTALL_DIR:-}" ]; then
-        echo "${SPAWN_INSTALL_DIR}"
-        return
+# --- Helper: check if sudo can authenticate without a password prompt ---
+# Returns 0 if sudo is passwordless (root, NOPASSWD, or macOS Touch ID).
+has_passwordless_sudo() {
+    # Already root — no sudo needed
+    [ "$(id -u)" = "0" ] && return 0
+    # Check if sudo works non-interactively (NOPASSWD or cached credentials)
+    sudo -n true 2>/dev/null && return 0
+    # macOS: check if Touch ID is configured for sudo (pam_tid.so)
+    if [ -f /etc/pam.d/sudo_local ] && grep -q "pam_tid" /etc/pam.d/sudo_local 2>/dev/null; then
+        return 0
     fi
-    # Check common bin dirs in order of preference
-    local dirs=(
-        "${HOME}/.local/bin"
-        "$(bun pm bin -g 2>/dev/null)"
-        "${HOME}/.bun/bin"
-        "${HOME}/bin"
-    )
-    for dir in "${dirs[@]}"; do
-        [ -z "$dir" ] && continue
-        if echo "${PATH}" | tr ':' '\n' | grep -qx "$dir"; then
-            echo "$dir"
-            return
-        fi
-    done
-    # Nothing in PATH — default to ~/.local/bin and warn later
-    echo "${HOME}/.local/bin"
+    if [ -f /etc/pam.d/sudo ] && grep -q "pam_tid" /etc/pam.d/sudo 2>/dev/null; then
+        return 0
+    fi
+    return 1
 }
 
-# --- Helper: show PATH instructions if spawn isn't findable ---
+# --- Helper: ensure spawn works immediately and in future sessions ---
+# Installs to ~/.local/bin. If that's not already in PATH, also symlinks
+# to /usr/local/bin for immediate availability (without prompting for a
+# password — only if writable or passwordless sudo is available).
+# Also patches shell rc files so ~/.local/bin is in PATH for future sessions.
 ensure_in_path() {
     local install_dir="$1"
-    if echo "${PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
-        echo ""
-        SPAWN_NO_UPDATE_CHECK=1 "${install_dir}/spawn" version
-        echo ""
+
+    # 1. Check if install_dir is already in the user's real PATH
+    local already_in_path=false
+    if echo "${_SPAWN_ORIG_PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
+        already_in_path=true
+    fi
+
+    # 2. If not in PATH, symlink into /usr/local/bin for immediate availability
+    #    Try in order: direct write → passwordless sudo → prompt for password
+    local linked=false
+    if [ "$already_in_path" = false ]; then
+        if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
+            ln -sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true
+        elif has_passwordless_sudo; then
+            sudo ln -sf "${install_dir}/spawn" /usr/local/bin/spawn 2>/dev/null && linked=true
+        elif command -v sudo &>/dev/null; then
+            # Last resort: ask for password
+            log_step "Adding spawn to /usr/local/bin (may require your password)..."
+            sudo ln -sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true || true
+        fi
+    fi
+
+    # 3. Patch shell rc files so ~/.local/bin is in PATH for future sessions
+    local export_line="export PATH=\"${install_dir}:\$PATH\""
+    local rc_file=""
+    case "${SHELL:-/bin/bash}" in
+        */zsh)  rc_file="${HOME}/.zshrc" ;;
+        */fish) rc_file="" ;;
+        *)      rc_file="${HOME}/.bashrc" ;;
+    esac
+
+    if [ -n "$rc_file" ]; then
+        if ! grep -qF "${install_dir}" "$rc_file" 2>/dev/null; then
+            printf '\n# Added by spawn installer\n%s\n' "$export_line" >> "$rc_file"
+        fi
+        case "${SHELL:-/bin/bash}" in */bash)
+            for profile in "${HOME}/.profile" "${HOME}/.bash_profile"; do
+                if [ -f "$profile" ] && ! grep -qF "${install_dir}" "$profile" 2>/dev/null; then
+                    printf '\n# Added by spawn installer\n%s\n' "$export_line" >> "$profile"
+                fi
+            done
+        ;; esac
+    else
+        case "${SHELL:-}" in */fish)
+            fish -c "fish_add_path ${install_dir}" 2>/dev/null || true
+        ;; esac
+    fi
+
+    # 4. Show version and success message
+    echo ""
+    SPAWN_NO_UPDATE_CHECK=1 PATH="${install_dir}:${PATH}" "${install_dir}/spawn" version
+    echo ""
+    if [ "$already_in_path" = true ] || [ "$linked" = true ]; then
         printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
     else
+        printf "${GREEN}[spawn]${NC} To start using spawn, run:\n"
         echo ""
-        log_warn "${BOLD}${install_dir}${NC}${YELLOW} is not in your PATH${NC}"
-        echo ""
-        case "${SHELL:-/bin/bash}" in
-            */zsh)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.zshrc"
-                ;;
-            */fish)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    fish_add_path ${install_dir}"
-                ;;
-            *)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.bashrc"
-                ;;
-        esac
-        echo ""
-        echo "  Or run directly: ${install_dir}/spawn"
+        echo "    exec \$SHELL"
         echo ""
     fi
 }
@@ -199,7 +225,7 @@ build_and_install() {
         fi
     fi
 
-    INSTALL_DIR="$(find_install_dir)"
+    INSTALL_DIR="${SPAWN_INSTALL_DIR:-${HOME}/.local/bin}"
     mkdir -p "${INSTALL_DIR}"
     cp cli.js "${INSTALL_DIR}/spawn"
     chmod +x "${INSTALL_DIR}/spawn"
@@ -209,6 +235,9 @@ build_and_install() {
 }
 
 # --- Locate or install bun ---
+# Save original PATH before modifications so ensure_in_path() can check
+# whether the install dir is already in the user's real PATH.
+_SPAWN_ORIG_PATH="${PATH}"
 # When running via `curl | bash`, subshells may not inherit PATH updates,
 # so we always prepend the standard bun install locations explicitly.
 export BUN_INSTALL="${BUN_INSTALL:-${HOME}/.bun}"

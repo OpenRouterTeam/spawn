@@ -97,10 +97,6 @@ describe("install.sh validation", () => {
       expect(content).toContain("ensure_min_bun_version()");
     });
 
-    it("should define find_install_dir function", () => {
-      expect(content).toContain("find_install_dir()");
-    });
-
     it("should define ensure_in_path function", () => {
       expect(content).toContain("ensure_in_path()");
     });
@@ -138,9 +134,9 @@ describe("install.sh validation", () => {
     });
 
     it("should check for SPAWN_INSTALL_DIR before defaulting", () => {
-      // The find_install_dir function should check SPAWN_INSTALL_DIR first
-      const fnStart = content.indexOf("find_install_dir()");
-      const fnBody = content.slice(fnStart, content.indexOf("}", fnStart) + 1);
+      // build_and_install should check SPAWN_INSTALL_DIR first
+      const fnStart = content.indexOf("build_and_install()");
+      const fnBody = content.slice(fnStart);
       expect(fnBody).toContain("SPAWN_INSTALL_DIR");
     });
   });
@@ -228,8 +224,10 @@ describe("install.sh validation", () => {
       expect(content).toContain("bun run build");
     });
 
-    it("should use find_install_dir to determine install location", () => {
-      expect(content).toContain("find_install_dir");
+    it("should default install dir to ~/.local/bin", () => {
+      const fnStart = content.indexOf("build_and_install()");
+      const fnBody = content.slice(fnStart);
+      expect(fnBody).toContain("${HOME}/.local/bin");
     });
 
     it("should create the install directory if it does not exist", () => {
@@ -330,67 +328,51 @@ describe("install.sh validation", () => {
     });
   });
 
-  // ── find_install_dir function ──────────────────────────────────────
+  // ── symlink into /usr/local/bin ────────────────────────────────────
 
-  describe("find_install_dir", () => {
-    it("should respect SPAWN_INSTALL_DIR when set", () => {
-      const fnStart = content.indexOf("find_install_dir()");
-      const fnBody = content.slice(fnStart, content.indexOf("}", fnStart) + 50);
-      expect(fnBody).toContain("SPAWN_INSTALL_DIR");
-    });
-
-    it("should check ~/.local/bin as a candidate", () => {
-      expect(content).toContain("${HOME}/.local/bin");
-    });
-
-    it("should check bun global bin directory", () => {
-      expect(content).toContain("bun pm bin -g");
-    });
-
-    it("should check ~/.bun/bin as a candidate", () => {
-      expect(content).toContain("${HOME}/.bun/bin");
-    });
-
-    it("should check ~/bin as a candidate", () => {
-      expect(content).toContain("${HOME}/bin");
-    });
-
-    it("should verify candidate directory is in PATH", () => {
-      expect(content).toContain("${PATH}");
-    });
-
-    it("should default to ~/.local/bin if nothing is in PATH", () => {
-      // Last resort fallback
-      const fnStart = content.indexOf("find_install_dir()");
+  describe("symlink to /usr/local/bin", () => {
+    it("should symlink spawn into /usr/local/bin for immediate availability", () => {
+      const fnStart = content.indexOf("ensure_in_path()");
       const fnBody = content.slice(fnStart);
-      const lastLocalBin = fnBody.lastIndexOf("${HOME}/.local/bin");
-      expect(lastLocalBin).toBeGreaterThan(0);
+      expect(fnBody).toContain("/usr/local/bin/spawn");
+      expect(fnBody).toContain("ln -sf");
+    });
+
+    it("should try sudo if /usr/local/bin is not writable", () => {
+      const fnStart = content.indexOf("ensure_in_path()");
+      const fnBody = content.slice(fnStart);
+      expect(fnBody).toContain("sudo ln -sf");
+    });
+
+    it("should gracefully handle symlink failure", () => {
+      // Should not hard-fail if symlink fails — falls back to exec $SHELL
+      const fnStart = content.indexOf("ensure_in_path()");
+      const fnBody = content.slice(fnStart);
+      expect(fnBody).toContain("|| true");
+      expect(fnBody).toContain("exec");
+    });
+
+    it("should default install to ~/.local/bin", () => {
+      expect(content).toContain("${HOME}/.local/bin");
     });
   });
 
   // ── ensure_in_path function ────────────────────────────────────────
 
   describe("ensure_in_path", () => {
-    it("should check if install dir is in PATH", () => {
-      const fnStart = content.indexOf("ensure_in_path()");
-      const fnBody = content.slice(fnStart);
-      expect(fnBody).toContain("${PATH}");
-    });
-
-    it("should run spawn version if in PATH", () => {
-      // Uses "${install_dir}/spawn" version
+    it("should run spawn version after install", () => {
       expect(content).toContain("/spawn\" version");
     });
 
-    it("should show zsh instructions for zsh users", () => {
+    it("should patch zsh rc file for zsh users", () => {
       expect(content).toContain(".zshrc");
     });
 
-    it("should show fish instructions for fish users", () => {
+    it("should patch fish PATH for fish users", () => {
       expect(content).toContain("fish_add_path");
     });
 
-    it("should show bash instructions as default", () => {
+    it("should patch bashrc as default", () => {
       expect(content).toContain(".bashrc");
     });
 
@@ -398,8 +380,10 @@ describe("install.sh validation", () => {
       expect(content).toContain("${SHELL:-");
     });
 
-    it("should provide direct run command as alternative", () => {
-      expect(content).toContain("Or run directly");
+    it("should show exec $SHELL fallback when symlink fails", () => {
+      const fnStart = content.indexOf("ensure_in_path()");
+      const fnBody = content.slice(fnStart);
+      expect(fnBody).toContain("exec");
     });
   });
 
@@ -511,7 +495,7 @@ describe("install.sh validation", () => {
 
     it("should show upgrade instructions if bun version is too low", () => {
       const fnStart = content.indexOf("ensure_min_bun_version()");
-      const fnEnd = content.indexOf("\n# --- Helper: find", fnStart);
+      const fnEnd = content.indexOf("\n# --- Helper: ensure", fnStart);
       const fnBody = content.slice(fnStart, fnEnd > fnStart ? fnEnd : undefined);
       expect(fnBody).toContain("bun upgrade");
       expect(fnBody).toContain("exit 1");

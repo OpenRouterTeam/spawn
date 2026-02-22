@@ -619,6 +619,7 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   const lines = [
     "#!/bin/bash",
     "set -e",
+    "export HOME=/root",
     "export DEBIAN_FRONTEND=noninteractive",
     "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
@@ -760,29 +761,52 @@ export async function waitForCloudInit(
     await sleep(5000);
   }
 
-  logStep("Waiting for cloud-init to complete...");
-  for (let attempt = 1; attempt <= 60; attempt++) {
+  // Stream cloud-init output so the user sees progress in real time
+  logStep("Streaming cloud-init output (timeout: 5min)...");
+  const remoteScript =
+    'tail -f /var/log/cloud-init-output.log 2>/dev/null & TAIL_PID=$!\n' +
+    'for i in $(seq 1 150); do\n' +
+    '  if [ -f /root/.cloud-init-complete ]; then\n' +
+    '    kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n' +
+    '    echo ""; echo "--- cloud-init complete ---"; exit 0\n' +
+    '  fi\n' +
+    '  sleep 2\n' +
+    'done\n' +
+    'kill $TAIL_PID 2>/dev/null; wait $TAIL_PID 2>/dev/null\n' +
+    'echo ""; echo "--- cloud-init timed out ---"; exit 1';
+
+  try {
+    const proc = Bun.spawn(
+      ["ssh", ...SSH_OPTS, `root@${serverIp}`, remoteScript],
+      { stdio: ["ignore", "inherit", "inherit"] },
+    );
+    const exitCode = await proc.exited;
+    if (exitCode === 0) {
+      logInfo("Cloud-init complete");
+      return;
+    }
+    logWarn("Cloud-init did not complete within 5 minutes");
+  } catch {
+    logWarn("Could not stream cloud-init log, falling back to polling...");
+  }
+
+  // Brief fallback poll if streaming failed (e.g. log file not yet created)
+  for (let attempt = 1; attempt <= 6; attempt++) {
     try {
       const proc = Bun.spawn(
         ["ssh", ...SSH_OPTS, `root@${serverIp}`, "test -f /root/.cloud-init-complete && echo done"],
         { stdio: ["ignore", "pipe", "pipe"] },
       );
       const stdout = await new Response(proc.stdout).text();
-      const exitCode = await proc.exited;
-      if (exitCode === 0 && stdout.includes("done")) {
+      if ((await proc.exited) === 0 && stdout.includes("done")) {
         logInfo("Cloud-init complete");
         return;
       }
-    } catch {
-      // ignore
-    }
-    if (attempt >= 60) {
-      logWarn("Cloud-init marker not found, continuing anyway...");
-      return;
-    }
-    logStep(`Cloud-init in progress (${attempt}/60)`);
+    } catch { /* ignore */ }
+    logStep(`Cloud-init in progress (${attempt}/6)`);
     await sleep(5000);
   }
+  logWarn("Cloud-init marker not found, continuing anyway...");
 }
 
 export async function runServer(
