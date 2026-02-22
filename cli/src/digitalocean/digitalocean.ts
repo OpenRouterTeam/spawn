@@ -1,0 +1,682 @@
+// digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import {
+  logInfo,
+  logWarn,
+  logError,
+  logStep,
+  prompt,
+  jsonEscape,
+  validateServerName,
+  validateRegionName,
+  toKebabCase,
+} from "../fly/ui";
+
+const DO_API_BASE = "https://api.digitalocean.com/v2";
+const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let doToken = "";
+let doDropletId = "";
+let doServerIp = "";
+
+export function getState() {
+  return { doToken, doDropletId, doServerIp };
+}
+
+// ─── API Client ──────────────────────────────────────────────────────────────
+
+async function doApi(
+  method: string,
+  endpoint: string,
+  body?: string,
+  maxRetries = 3,
+): Promise<{ status: number; text: string }> {
+  const url = `${DO_API_BASE}${endpoint}`;
+
+  let interval = 2;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${doToken}`,
+      };
+      const opts: RequestInit = { method, headers };
+      if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
+        opts.body = body;
+      }
+      const resp = await fetch(url, opts);
+      const text = await resp.text();
+
+      if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {
+        logWarn(
+          `API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`,
+        );
+        await sleep(interval * 1000);
+        interval = Math.min(interval * 2, 30);
+        continue;
+      }
+      return { status: resp.status, text };
+    } catch (err) {
+      if (attempt >= maxRetries) throw err;
+      logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
+      await sleep(interval * 1000);
+      interval = Math.min(interval * 2, 30);
+    }
+  }
+  throw new Error("doApi: unreachable");
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function parseJson(text: string): any {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+// ─── Token Persistence ───────────────────────────────────────────────────────
+
+const DO_CONFIG_PATH = `${process.env.HOME}/.config/spawn/digitalocean.json`;
+
+async function saveTokenToConfig(token: string): Promise<void> {
+  const dir = DO_CONFIG_PATH.replace(/\/[^/]+$/, "");
+  await Bun.spawn(["mkdir", "-p", dir]).exited;
+  const escaped = jsonEscape(token);
+  await Bun.write(
+    DO_CONFIG_PATH,
+    `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`,
+    { mode: 0o600 },
+  );
+}
+
+function loadTokenFromConfig(): string | null {
+  try {
+    const data = JSON.parse(readFileSync(DO_CONFIG_PATH, "utf-8"));
+    const token = data.api_key || data.token || "";
+    if (!token) return null;
+    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) return null;
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Token Validation ────────────────────────────────────────────────────────
+
+async function testDoToken(): Promise<boolean> {
+  if (!doToken) return false;
+  try {
+    const { text } = await doApi("GET", "/account", undefined, 1);
+    return text.includes('"uuid"');
+  } catch {
+    return false;
+  }
+}
+
+// ─── Authentication ──────────────────────────────────────────────────────────
+
+export async function ensureDoToken(): Promise<void> {
+  // 1. Env var
+  if (process.env.DO_API_TOKEN) {
+    doToken = process.env.DO_API_TOKEN.trim();
+    if (await testDoToken()) {
+      logInfo("Using DigitalOcean API token from environment");
+      await saveTokenToConfig(doToken);
+      return;
+    }
+    logWarn("DO_API_TOKEN from environment is invalid");
+    doToken = "";
+  }
+
+  // 2. Saved config
+  const saved = loadTokenFromConfig();
+  if (saved) {
+    doToken = saved;
+    if (await testDoToken()) {
+      logInfo("Using saved DigitalOcean API token");
+      return;
+    }
+    logWarn("Saved DigitalOcean token is invalid or expired");
+    doToken = "";
+  }
+
+  // 3. Manual entry
+  logStep("DigitalOcean API Token Required");
+  logWarn("Get a token from: https://cloud.digitalocean.com/account/api/tokens");
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const token = await prompt("Enter your DigitalOcean API token: ");
+    if (!token) {
+      logError("Token cannot be empty");
+      continue;
+    }
+    doToken = token.trim();
+    if (await testDoToken()) {
+      await saveTokenToConfig(doToken);
+      logInfo("DigitalOcean API token validated and saved");
+      return;
+    }
+    logError("Token is invalid");
+    doToken = "";
+  }
+
+  logError("No valid token after 3 attempts");
+  throw new Error("DigitalOcean authentication failed");
+}
+
+// ─── SSH Key Management ──────────────────────────────────────────────────────
+
+function generateSshKeyIfMissing(): { pubPath: string; privPath: string } {
+  const sshDir = `${process.env.HOME}/.ssh`;
+  const privPath = `${sshDir}/id_ed25519`;
+  const pubPath = `${privPath}.pub`;
+
+  if (existsSync(pubPath) && existsSync(privPath)) {
+    return { pubPath, privPath };
+  }
+
+  mkdirSync(sshDir, { recursive: true, mode: 0o700 } as any);
+  logStep("Generating SSH key...");
+  const result = Bun.spawnSync(
+    ["ssh-keygen", "-t", "ed25519", "-f", privPath, "-N", "", "-C", "spawn"],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  if (result.exitCode !== 0) {
+    throw new Error("SSH key generation failed");
+  }
+  logInfo("SSH key generated");
+  return { pubPath, privPath };
+}
+
+function getSshFingerprint(pubPath: string): string {
+  const result = Bun.spawnSync(
+    ["ssh-keygen", "-l", "-E", "md5", "-f", pubPath],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const output = new TextDecoder().decode(result.stdout).trim();
+  const match = output.match(/MD5:([a-f0-9:]+)/);
+  return match ? match[1] : "";
+}
+
+export async function ensureSshKey(): Promise<void> {
+  const { pubPath } = generateSshKeyIfMissing();
+  const fingerprint = getSshFingerprint(pubPath);
+  if (!fingerprint) {
+    logWarn("Could not determine SSH key fingerprint");
+    return;
+  }
+
+  // Check if key is registered with DigitalOcean
+  const { text } = await doApi("GET", "/account/keys");
+  const data = parseJson(text);
+  const keys: any[] = data?.ssh_keys || [];
+
+  const found = keys.some((k: any) => {
+    const fp = k.fingerprint || "";
+    return fp === fingerprint;
+  });
+
+  if (found) {
+    logInfo("SSH key already registered with DigitalOcean");
+    return;
+  }
+
+  // Register key
+  logStep("Registering SSH key with DigitalOcean...");
+  const pubKey = readFileSync(pubPath, "utf-8").trim();
+  const body = JSON.stringify({
+    name: "spawn",
+    public_key: pubKey,
+  });
+  const { text: regText } = await doApi("POST", "/account/keys", body);
+
+  if (regText.includes('"id"')) {
+    logInfo("SSH key registered with DigitalOcean");
+    return;
+  }
+
+  // Key may already exist under a different name — non-fatal
+  if (regText.includes("already been taken") || regText.includes("already in use")) {
+    logInfo("SSH key already registered (under a different name)");
+    return;
+  }
+
+  logWarn("SSH key registration may have failed, continuing...");
+}
+
+// ─── Connection Tracking ─────────────────────────────────────────────────────
+
+function saveVmConnection(
+  ip: string,
+  user: string,
+  serverId: string,
+  serverName: string,
+  cloud: string,
+  launchCmd?: string,
+): void {
+  const dir = `${process.env.HOME}/.spawn`;
+  mkdirSync(dir, { recursive: true });
+  const json: Record<string, string> = { ip, user };
+  if (serverId) json.server_id = serverId;
+  if (serverName) json.server_name = serverName;
+  if (cloud) json.cloud = cloud;
+  if (launchCmd) json.launch_cmd = launchCmd;
+  writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
+}
+
+export function saveLaunchCmd(launchCmd: string): void {
+  const connFile = `${process.env.HOME}/.spawn/last-connection.json`;
+  try {
+    const data = JSON.parse(readFileSync(connFile, "utf-8"));
+    data.launch_cmd = launchCmd;
+    writeFileSync(connFile, JSON.stringify(data) + "\n");
+  } catch {
+    // Connection file may not exist — non-fatal
+  }
+}
+
+// ─── Provisioning ────────────────────────────────────────────────────────────
+
+function getCloudInitUserdata(): string {
+  return [
+    "#!/bin/bash",
+    "set -e",
+    "export DEBIAN_FRONTEND=noninteractive",
+    "apt-get update -y",
+    "apt-get install -y --no-install-recommends curl unzip git ca-certificates zsh nodejs npm build-essential",
+    "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true",
+    'if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi',
+    'for rc in ~/.bashrc ~/.zshrc; do grep -q ".bun/bin" "$rc" 2>/dev/null || echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> "$rc"; done',
+    "touch /root/.cloud-init-complete",
+  ].join("\n");
+}
+
+export async function createServer(name: string): Promise<void> {
+  const size = process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
+  const region = process.env.DO_REGION || "nyc3";
+  const image = "ubuntu-24-04-x64";
+
+  if (!validateRegionName(region)) {
+    logError("Invalid DO_REGION");
+    throw new Error("Invalid region");
+  }
+
+  logStep(`Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${region})...`);
+
+  // Get all SSH key IDs
+  const { text: keysText } = await doApi("GET", "/account/keys");
+  const keysData = parseJson(keysText);
+  const sshKeyIds: number[] = (keysData?.ssh_keys || [])
+    .map((k: any) => k.id)
+    .filter(Boolean);
+
+  const userdata = getCloudInitUserdata();
+  const body = JSON.stringify({
+    name,
+    region,
+    size,
+    image,
+    ssh_keys: sshKeyIds,
+    user_data: userdata,
+    backups: false,
+    monitoring: false,
+  });
+
+  const { text: createText } = await doApi("POST", "/droplets", body);
+  const createData = parseJson(createText);
+
+  if (!createData?.droplet?.id) {
+    const errMsg = createData?.message || "Unknown error";
+    logError(`Failed to create DigitalOcean droplet: ${errMsg}`);
+    logWarn("Common issues:");
+    logWarn("  - Insufficient account balance or payment method required");
+    logWarn("  - Region/size unavailable (try different DO_REGION or DO_DROPLET_SIZE)");
+    logWarn("  - Droplet limit reached (check account limits)");
+    logWarn(`Check your dashboard: ${DO_DASHBOARD_URL}`);
+    throw new Error("Droplet creation failed");
+  }
+
+  doDropletId = String(createData.droplet.id);
+  logInfo(`Droplet created: ID=${doDropletId}`);
+
+  // Wait for droplet to become active and get IP
+  await waitForDropletActive(doDropletId);
+
+  saveVmConnection(doServerIp, "root", doDropletId, name, "digitalocean");
+}
+
+async function waitForDropletActive(
+  dropletId: string,
+  maxAttempts = 60,
+): Promise<void> {
+  logStep("Waiting for droplet to become active...");
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const { text } = await doApi("GET", `/droplets/${dropletId}`);
+    const data = parseJson(text);
+    const status = data?.droplet?.status;
+
+    if (status === "active") {
+      const networks = data?.droplet?.networks?.v4 || [];
+      const publicNet = networks.find((n: any) => n.type === "public");
+      if (publicNet?.ip_address) {
+        doServerIp = publicNet.ip_address;
+        logInfo(`Droplet active, IP: ${doServerIp}`);
+        return;
+      }
+    }
+
+    if (attempt >= maxAttempts) {
+      logError("Droplet did not become active in time");
+      throw new Error("Droplet activation timeout");
+    }
+
+    logStep(`Droplet status: ${status || "unknown"} (${attempt}/${maxAttempts})`);
+    await sleep(5000);
+  }
+}
+
+// ─── SSH Execution ───────────────────────────────────────────────────────────
+
+const SSH_OPTS = [
+  "-o", "StrictHostKeyChecking=no",
+  "-o", "UserKnownHostsFile=/dev/null",
+  "-o", "LogLevel=ERROR",
+  "-o", "ConnectTimeout=10",
+];
+
+export async function waitForCloudInit(
+  ip?: string,
+  maxAttempts = 60,
+): Promise<void> {
+  const serverIp = ip || doServerIp;
+  logStep("Waiting for SSH connectivity...");
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const proc = Bun.spawn(
+        ["ssh", ...SSH_OPTS, `root@${serverIp}`, "echo ok"],
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+      const stdout = await new Response(proc.stdout).text();
+      const exitCode = await proc.exited;
+      if (exitCode === 0 && stdout.includes("ok")) {
+        logInfo("SSH is ready");
+        break;
+      }
+    } catch {
+      // ignore
+    }
+    if (attempt >= maxAttempts) {
+      logError("SSH connectivity failed");
+      throw new Error("SSH wait timeout");
+    }
+    logStep(`SSH not ready yet (${attempt}/${maxAttempts})`);
+    await sleep(5000);
+  }
+
+  logStep("Waiting for cloud-init to complete...");
+  for (let attempt = 1; attempt <= 60; attempt++) {
+    try {
+      const proc = Bun.spawn(
+        ["ssh", ...SSH_OPTS, `root@${serverIp}`, "test -f /root/.cloud-init-complete && echo done"],
+        { stdio: ["ignore", "pipe", "pipe"] },
+      );
+      const stdout = await new Response(proc.stdout).text();
+      const exitCode = await proc.exited;
+      if (exitCode === 0 && stdout.includes("done")) {
+        logInfo("Cloud-init complete");
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    if (attempt >= 60) {
+      logWarn("Cloud-init marker not found, continuing anyway...");
+      return;
+    }
+    logStep(`Cloud-init in progress (${attempt}/60)`);
+    await sleep(5000);
+  }
+}
+
+export async function runServer(
+  cmd: string,
+  timeoutSecs?: number,
+  ip?: string,
+): Promise<void> {
+  const serverIp = ip || doServerIp;
+  const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+
+  const proc = Bun.spawn(
+    ["ssh", ...SSH_OPTS, `root@${serverIp}`, fullCmd],
+    { stdio: ["pipe", "inherit", "inherit"] },
+  );
+
+  const timeout = (timeoutSecs || 300) * 1000;
+  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
+  const exitCode = await proc.exited;
+  try { proc.stdin!.end(); } catch { /* already closed */ }
+  clearTimeout(timer);
+
+  if (exitCode !== 0) {
+    throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
+  }
+}
+
+export async function runServerCapture(
+  cmd: string,
+  timeoutSecs?: number,
+  ip?: string,
+): Promise<string> {
+  const serverIp = ip || doServerIp;
+  const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+
+  const proc = Bun.spawn(
+    ["ssh", ...SSH_OPTS, `root@${serverIp}`, fullCmd],
+    { stdio: ["pipe", "pipe", "pipe"] },
+  );
+
+  const timeout = (timeoutSecs || 300) * 1000;
+  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
+  const stdout = await new Response(proc.stdout).text();
+  const exitCode = await proc.exited;
+  try { proc.stdin!.end(); } catch { /* already closed */ }
+  clearTimeout(timer);
+
+  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  return stdout.trim();
+}
+
+export async function uploadFile(
+  localPath: string,
+  remotePath: string,
+  ip?: string,
+): Promise<void> {
+  const serverIp = ip || doServerIp;
+  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
+    logError(`Invalid remote path: ${remotePath}`);
+    throw new Error("Invalid remote path");
+  }
+
+  const proc = Bun.spawn(
+    ["scp", ...SSH_OPTS, localPath, `root@${serverIp}:${remotePath}`],
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
+}
+
+export async function interactiveSession(
+  cmd: string,
+  ip?: string,
+): Promise<number> {
+  const serverIp = ip || doServerIp;
+  const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+
+  const proc = Bun.spawn(
+    ["ssh", ...SSH_OPTS, "-t", `root@${serverIp}`, fullCmd],
+    { stdio: ["inherit", "inherit", "inherit"] },
+  );
+  const exitCode = await proc.exited;
+
+  // Post-session summary
+  process.stderr.write("\n");
+  logWarn(`Session ended. Your DigitalOcean droplet (ID: ${doDropletId}) is still running.`);
+  logWarn("Remember to delete it when you're done to avoid ongoing charges.");
+  logWarn("");
+  logWarn("Manage or delete it in your dashboard:");
+  logWarn(`  ${DO_DASHBOARD_URL}`);
+  logWarn("");
+  logInfo("To delete from CLI:");
+  logInfo("  spawn delete");
+  logInfo("To reconnect:");
+  logInfo(`  ssh root@${serverIp}`);
+
+  return exitCode;
+}
+
+// ─── Retry Helper ────────────────────────────────────────────────────────────
+
+export async function runWithRetry(
+  maxAttempts: number,
+  sleepSec: number,
+  timeoutSecs: number,
+  cmd: string,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await runServer(cmd, timeoutSecs);
+      return;
+    } catch {
+      logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
+      if (attempt < maxAttempts) await sleep(sleepSec * 1000);
+    }
+  }
+  logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);
+  throw new Error(`runWithRetry exhausted: ${cmd}`);
+}
+
+// ─── Server Name ─────────────────────────────────────────────────────────────
+
+export async function getServerName(): Promise<string> {
+  if (process.env.DO_DROPLET_NAME) {
+    const name = process.env.DO_DROPLET_NAME;
+    if (!validateServerName(name)) {
+      logError(`Invalid DO_DROPLET_NAME: '${name}'`);
+      throw new Error("Invalid server name");
+    }
+    logInfo(`Using droplet name from environment: ${name}`);
+    return name;
+  }
+
+  const kebab = process.env.SPAWN_NAME_KEBAB
+    || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
+  const defaultName = kebab || "spawn";
+
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return defaultName;
+  }
+
+  const answer = await prompt(`Enter droplet name [${defaultName}]: `);
+  const name = answer || defaultName;
+
+  if (!validateServerName(name)) {
+    logError(`Invalid droplet name: '${name}'`);
+    throw new Error("Invalid server name");
+  }
+  return name;
+}
+
+export async function promptSpawnName(): Promise<void> {
+  if (process.env.SPAWN_NAME_KEBAB) return;
+
+  let displayName: string;
+  if (process.env.SPAWN_NAME) {
+    displayName = process.env.SPAWN_NAME;
+    logInfo(`Spawn name: ${displayName}`);
+  } else if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    displayName = "spawn";
+  } else {
+    process.stderr.write("\n");
+    displayName = await prompt('Spawn name (e.g. "My Dev Box"): ');
+    if (!displayName) displayName = "spawn";
+  }
+
+  let kebab = toKebabCase(displayName) || "spawn";
+
+  if (process.env.SPAWN_NON_INTERACTIVE !== "1") {
+    const confirmed = await prompt(`Resource name [${kebab}]: `);
+    if (confirmed) {
+      kebab = toKebabCase(confirmed) || "spawn";
+    }
+  }
+
+  process.env.SPAWN_NAME_DISPLAY = displayName;
+  process.env.SPAWN_NAME_KEBAB = kebab;
+  logInfo(`Using resource name: ${kebab}`);
+}
+
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+export async function destroyServer(dropletId?: string): Promise<void> {
+  const id = dropletId || doDropletId;
+  if (!id) {
+    logError("destroy_server: no droplet ID provided");
+    throw new Error("No droplet ID");
+  }
+
+  logStep(`Destroying DigitalOcean droplet ${id}...`);
+  const { status, text } = await doApi("DELETE", `/droplets/${id}`);
+
+  // DELETE returns 204 No Content on success (empty body)
+  if (status === 204) {
+    logInfo(`Droplet ${id} destroyed`);
+    return;
+  }
+
+  const data = parseJson(text);
+  if (data?.message) {
+    logError(`Failed to destroy droplet ${id}: ${data.message}`);
+    logWarn("The droplet may still be running and incurring charges.");
+    logWarn(`Delete it manually at: ${DO_DASHBOARD_URL}`);
+    throw new Error("Droplet deletion failed");
+  }
+
+  logInfo(`Droplet ${id} destroyed`);
+}
+
+export async function listServers(): Promise<void> {
+  const { text } = await doApi("GET", "/droplets");
+  const data = parseJson(text);
+  const droplets: any[] = data?.droplets || [];
+
+  if (droplets.length === 0) {
+    console.log("No droplets found");
+    return;
+  }
+
+  const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
+  console.log(
+    pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("SIZE", 15),
+  );
+  console.log("-".repeat(80));
+  for (const d of droplets) {
+    const ip = (d.networks?.v4 || []).find((n: any) => n.type === "public")?.ip_address || "N/A";
+    console.log(
+      pad((d.name ?? "N/A").slice(0, 24), 25) +
+        pad(String(d.id ?? "N/A").slice(0, 11), 12) +
+        pad((d.status ?? "N/A").slice(0, 11), 12) +
+        pad(ip.slice(0, 15), 16) +
+        pad((d.size_slug ?? "N/A").slice(0, 14), 15),
+    );
+  }
+}
