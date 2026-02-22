@@ -221,19 +221,20 @@ print(json.dumps(providers))
         ' -- "${key_server_url}" "${key_server_secret}" "${providers_json}" &
     else
         # macOS fallback - no timeout command, rely on curl --max-time only
-        (
-            http_code=$(curl -s -o /dev/stderr -w '%{http_code}' --max-time 10 \
-                -X POST "${key_server_url}/request-batch" \
-                -H "Authorization: Bearer ${key_server_secret}" \
+        # Use positional parameters to safely pass variables to subshell (prevents command injection)
+        bash -c '
+            http_code=$(curl -s -o /dev/stderr -w "%{http_code}" --max-time 10 \
+                -X POST "$1/request-batch" \
+                -H "Authorization: Bearer $2" \
                 -H "Content-Type: application/json" \
-                -d "{\"providers\": ${providers_json}}" 2>/dev/null) || http_code="000"
+                -d "{\"providers\": $3}" 2>/dev/null) || http_code="000"
             case "${http_code}" in
                 2*) ;; # success
-                000) printf "[%s] [keys] Key preflight: WARNING — key-server unreachable at %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "${key_server_url}" ;;
+                000) printf "[%s] [keys] Key preflight: WARNING — key-server unreachable at %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "$1" ;;
                 401) printf "[%s] [keys] Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)\n" "$(date +"%Y-%m-%d %H:%M:%S")" ;;
                 *)   printf "[%s] [keys] Key preflight: WARNING — key-server returned HTTP %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "${http_code}" ;;
             esac
-        ) &
+        ' -- "${key_server_url}" "${key_server_secret}" "${providers_json}" &
     fi
 }
 
