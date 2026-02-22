@@ -5,7 +5,7 @@ import {
   ensureSpriteCli,
   ensureSpriteAuthenticated,
   promptSpawnName,
-  getSpriteName,
+  getServerName,
   createSprite,
   verifySpriteConnectivity,
   setupShellEnvironment,
@@ -45,7 +45,7 @@ async function main() {
       await setupShellEnvironment();
       saveVmConnection();
     },
-    getServerName: getSpriteName,
+    getServerName,
     async waitForReady() {},
     interactiveSession,
     saveLaunchCmd,

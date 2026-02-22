@@ -9,6 +9,7 @@ import {
   prompt,
   validateServerName,
   toKebabCase,
+  defaultSpawnName,
 } from "../shared/ui";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
@@ -193,33 +194,24 @@ function orgFlags(): string[] {
 export async function promptSpawnName(): Promise<void> {
   if (process.env.SPAWN_NAME_KEBAB) return;
 
-  let displayName: string;
+  let kebab: string;
   if (process.env.SPAWN_NAME) {
-    displayName = process.env.SPAWN_NAME;
-    logInfo(`Spawn name: ${displayName}`);
+    kebab = toKebabCase(process.env.SPAWN_NAME) || defaultSpawnName();
   } else if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    displayName = "spawn";
+    kebab = defaultSpawnName();
   } else {
+    const fallback = defaultSpawnName();
     process.stderr.write("\n");
-    displayName = await prompt('Spawn name (e.g. "My Dev Box"): ');
-    if (!displayName) displayName = "spawn";
+    const answer = await prompt(`Sprite name [${fallback}]: `);
+    kebab = toKebabCase(answer || fallback) || defaultSpawnName();
   }
 
-  let kebab = toKebabCase(displayName) || "spawn";
-
-  if (process.env.SPAWN_NON_INTERACTIVE !== "1") {
-    const confirmed = await prompt(`Resource name [${kebab}]: `);
-    if (confirmed) {
-      kebab = toKebabCase(confirmed) || "spawn";
-    }
-  }
-
-  process.env.SPAWN_NAME_DISPLAY = displayName;
+  process.env.SPAWN_NAME_DISPLAY = kebab;
   process.env.SPAWN_NAME_KEBAB = kebab;
   logInfo(`Using resource name: ${kebab}`);
 }
 
-export async function getSpriteName(): Promise<string> {
+export async function getServerName(): Promise<string> {
   if (process.env.SPRITE_NAME) {
     const name = process.env.SPRITE_NAME;
     if (!validateServerName(name)) {
@@ -232,20 +224,7 @@ export async function getSpriteName(): Promise<string> {
 
   const kebab = process.env.SPAWN_NAME_KEBAB
     || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
-  const defaultName = kebab || "spawn";
-
-  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    return defaultName;
-  }
-
-  const answer = await prompt(`Enter sprite name [${defaultName}]: `);
-  const name = answer || defaultName;
-
-  if (!validateServerName(name)) {
-    logError(`Invalid sprite name: '${name}'`);
-    throw new Error("Invalid server name");
-  }
-  return name;
+  return kebab || defaultSpawnName();
 }
 
 // ─── Provisioning ────────────────────────────────────────────────────────────

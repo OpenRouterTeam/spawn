@@ -141,3 +141,9 @@ export function toKebabCase(name: string): string {
     .replace(/-{2,}/g, "-")
     .replace(/^-|-$/g, "");
 }
+
+/** Generate a default spawn name with random suffix (e.g. "spawn-a1b2"). */
+export function defaultSpawnName(): string {
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `spawn-${suffix}`;
+}

@@ -12,6 +12,7 @@ import {
   validateServerName,
   validateRegionName,
   toKebabCase,
+  defaultSpawnName,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
@@ -908,51 +909,27 @@ export async function getServerName(): Promise<string> {
     return name;
   }
 
-  // Derive from spawn name
   const kebab = process.env.SPAWN_NAME_KEBAB
     || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
-  const defaultName = kebab || "spawn";
-
-  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    return defaultName;
-  }
-
-  const answer = await prompt(`Enter app name [${defaultName}]: `);
-  const name = answer || defaultName;
-
-  if (!validateServerName(name)) {
-    logError(`Invalid app name: '${name}'`);
-    throw new Error("Invalid server name");
-  }
-  return name;
+  return kebab || defaultSpawnName();
 }
 
-/** Prompt for a spawn display name, derive kebab-case resource name. */
 export async function promptSpawnName(): Promise<void> {
   if (process.env.SPAWN_NAME_KEBAB) return;
 
-  let displayName: string;
+  let kebab: string;
   if (process.env.SPAWN_NAME) {
-    displayName = process.env.SPAWN_NAME;
-    logInfo(`Spawn name: ${displayName}`);
+    kebab = toKebabCase(process.env.SPAWN_NAME) || defaultSpawnName();
   } else if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    displayName = "spawn";
+    kebab = defaultSpawnName();
   } else {
+    const fallback = defaultSpawnName();
     process.stderr.write("\n");
-    displayName = await prompt('Spawn name (e.g. "My Dev Box"): ');
-    if (!displayName) displayName = "spawn";
+    const answer = await prompt(`Fly machine name [${fallback}]: `);
+    kebab = toKebabCase(answer || fallback) || defaultSpawnName();
   }
 
-  let kebab = toKebabCase(displayName) || "spawn";
-
-  if (process.env.SPAWN_NON_INTERACTIVE !== "1") {
-    const confirmed = await prompt(`Resource name [${kebab}]: `);
-    if (confirmed) {
-      kebab = toKebabCase(confirmed) || "spawn";
-    }
-  }
-
-  process.env.SPAWN_NAME_DISPLAY = displayName;
+  process.env.SPAWN_NAME_DISPLAY = kebab;
   process.env.SPAWN_NAME_KEBAB = kebab;
   logInfo(`Using resource name: ${kebab}`);
 }
