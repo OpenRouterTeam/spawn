@@ -11,14 +11,86 @@ import {
   waitForCloudInit,
   runServer,
   interactiveSession,
+  listVolumes,
+  FLY_VM_TIERS,
+  DEFAULT_VM_TIER,
 } from "./fly";
+import type { ServerOptions } from "./fly";
 import { getOrPromptApiKey, getModelIdInteractive } from "./oauth";
 import {
   resolveAgent,
   generateEnvConfig,
   offerGithubAuth,
 } from "./agents";
-import { logInfo, logStep, logWarn } from "./ui";
+import { logInfo, logStep, logWarn, selectFromList, prompt } from "./ui";
+
+async function promptVmOptions(): Promise<ServerOptions> {
+  // If FLY_VM_MEMORY is set, skip the interactive prompt (CI/headless mode)
+  if (process.env.FLY_VM_MEMORY) {
+    const memoryMb = parseInt(process.env.FLY_VM_MEMORY, 10);
+    const tier = FLY_VM_TIERS.find((t) => t.memoryMb === memoryMb) || DEFAULT_VM_TIER;
+    return { cpus: tier.cpus, memoryMb: tier.memoryMb };
+  }
+
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return { cpus: DEFAULT_VM_TIER.cpus, memoryMb: DEFAULT_VM_TIER.memoryMb };
+  }
+
+  // VM size prompt
+  process.stderr.write("\n");
+  const tierItems = FLY_VM_TIERS.map((t) => `${t.id}|${t.label}`);
+  const tierId = await selectFromList(tierItems, "VM size", DEFAULT_VM_TIER.id);
+  const selectedTier = FLY_VM_TIERS.find((t) => t.id === tierId) || DEFAULT_VM_TIER;
+
+  // Volume prompt
+  process.stderr.write("\n");
+  const wantVolume = await prompt("Mount a persistent volume? (y/N): ");
+  if (!/^[Yy]$/.test(wantVolume)) {
+    return { cpus: selectedTier.cpus, memoryMb: selectedTier.memoryMb };
+  }
+
+  const volumeChoice = await selectFromList(
+    ["new|Create a new volume", "existing|Attach an existing volume"],
+    "volume option",
+    "new",
+  );
+
+  if (volumeChoice === "new") {
+    const sizeStr = await prompt("Volume size in GB [10]: ");
+    const sizeGb = parseInt(sizeStr, 10) || 10;
+    return {
+      cpus: selectedTier.cpus,
+      memoryMb: selectedTier.memoryMb,
+      newVolumeSizeGb: sizeGb,
+    };
+  }
+
+  // Existing volumes require an existing app — prompt for the app name
+  const appForVolumes = await prompt("App name to list volumes from: ");
+  if (!appForVolumes) {
+    logWarn("No app name provided, skipping volume attachment");
+    return { cpus: selectedTier.cpus, memoryMb: selectedTier.memoryMb };
+  }
+
+  logStep("Fetching existing volumes...");
+  const volumes = await listVolumes(appForVolumes);
+  if (volumes.length === 0) {
+    logWarn("No volumes found, creating a new 10GB volume instead");
+    return {
+      cpus: selectedTier.cpus,
+      memoryMb: selectedTier.memoryMb,
+      newVolumeSizeGb: 10,
+    };
+  }
+
+  const volItems = volumes.map((v) => `${v.id}|${v.name} (${v.size_gb} GB)`);
+  const volId = await selectFromList(volItems, "volume", volumes[0].id);
+  return {
+    cpus: selectedTier.cpus,
+    memoryMb: selectedTier.memoryMb,
+    volumeId: volId,
+  };
+}
 
 async function main() {
   const agentName = process.argv[2];
@@ -31,11 +103,6 @@ async function main() {
   const agent = resolveAgent(agentName);
   logInfo(`${agent.name} on Fly.io`);
   process.stderr.write("\n");
-
-  // Apply VM memory override from agent config
-  if (agent.vmMemory && !process.env.FLY_VM_MEMORY) {
-    process.env.FLY_VM_MEMORY = String(agent.vmMemory);
-  }
 
   // 1. Authenticate with cloud provider
   await promptSpawnName();
@@ -64,17 +131,20 @@ async function main() {
     );
   }
 
-  // 5. Provision server
-  const serverName = await getServerName();
-  await createServer(serverName);
+  // 5. VM size selection
+  const serverOpts = await promptVmOptions();
 
-  // 6. Wait for readiness
+  // 6. Provision server
+  const serverName = await getServerName();
+  await createServer(serverName, serverOpts);
+
+  // 7. Wait for readiness
   await waitForCloudInit();
 
-  // 7. Install agent
+  // 8. Install agent
   await agent.install();
 
-  // 8. Inject environment variables via .spawnrc
+  // 9. Inject environment variables via .spawnrc
   // Inline base64 write + shell hook in a single remote call instead of
   // separate uploadFile + mv + 2× shell hook calls.
   logStep("Setting up environment variables...");
@@ -93,7 +163,7 @@ async function main() {
   // GitHub CLI setup
   await offerGithubAuth();
 
-  // 9. Agent-specific configuration
+  // 10. Agent-specific configuration
   if (agent.configure) {
     try {
       await agent.configure(apiKey, modelId);
@@ -102,12 +172,12 @@ async function main() {
     }
   }
 
-  // 10. Pre-launch hooks (e.g. OpenClaw gateway — must succeed before TUI)
+  // 11. Pre-launch hooks (e.g. OpenClaw gateway — must succeed before TUI)
   if (agent.preLaunch) {
     await agent.preLaunch();
   }
 
-  // 11. Launch interactive session
+  // 12. Launch interactive session
   logInfo(`${agent.name} is ready`);
   process.stderr.write("\n");
   logInfo("Fly.io machine setup completed successfully!");

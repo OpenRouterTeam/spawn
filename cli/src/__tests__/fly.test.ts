@@ -13,7 +13,8 @@ import {
   toKebabCase,
 } from "../fly/ui";
 
-import { sanitizeFlyToken } from "../fly/fly";
+import { sanitizeFlyToken, FLY_VM_TIERS, DEFAULT_VM_TIER } from "../fly/fly";
+import type { ServerOptions } from "../fly/fly";
 
 import { generateEnvConfig, resolveAgent, agents } from "../fly/agents";
 
@@ -139,6 +140,34 @@ describe("fly/lib/fly", () => {
       expect(sanitizeFlyToken("token\n\r")).toBe("token");
     });
   });
+
+  describe("FLY_VM_TIERS", () => {
+    it("has 3 tiers", () => {
+      expect(FLY_VM_TIERS.length).toBe(3);
+    });
+
+    it("default tier is shared-cpu-2x", () => {
+      expect(DEFAULT_VM_TIER.id).toBe("shared-cpu-2x");
+      expect(DEFAULT_VM_TIER.cpus).toBe(2);
+      expect(DEFAULT_VM_TIER.memoryMb).toBe(4096);
+    });
+
+    it("tiers have increasing resources", () => {
+      for (let i = 1; i < FLY_VM_TIERS.length; i++) {
+        expect(FLY_VM_TIERS[i].cpus).toBeGreaterThan(FLY_VM_TIERS[i - 1].cpus);
+        expect(FLY_VM_TIERS[i].memoryMb).toBeGreaterThan(FLY_VM_TIERS[i - 1].memoryMb);
+      }
+    });
+
+    it("all tiers have required fields", () => {
+      for (const tier of FLY_VM_TIERS) {
+        expect(tier.id).toBeTruthy();
+        expect(tier.cpus).toBeGreaterThan(0);
+        expect(tier.memoryMb).toBeGreaterThan(0);
+        expect(tier.label).toBeTruthy();
+      }
+    });
+  });
 });
 
 // ─── agents.ts tests ─────────────────────────────────────────────────────────
@@ -210,8 +239,10 @@ describe("fly/lib/agents", () => {
       expect(agents.openclaw.modelDefault).toBe("openrouter/auto");
     });
 
-    it("openclaw has 2048MB memory", () => {
-      expect(agents.openclaw.vmMemory).toBe(2048);
+    it("agents have no vmMemory field (VM sizing is user-chosen)", () => {
+      for (const [key, agent] of Object.entries(agents)) {
+        expect((agent as any).vmMemory).toBeUndefined();
+      }
     });
 
     it("kilocode envVars include provider type", () => {
