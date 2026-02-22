@@ -460,6 +460,11 @@ async function selectCloud(manifest: Manifest, cloudList: string[], hintOverride
 // Any string is allowed (spaces, uppercase, etc.) — the shell scripts
 // derive a kebab-case slug for the actual cloud resource name.
 async function promptSpawnName(): Promise<string | undefined> {
+  // If SPAWN_NAME is set (e.g. via --name flag), use it without prompting
+  if (process.env.SPAWN_NAME) {
+    return process.env.SPAWN_NAME;
+  }
+
   const suffix = Math.random().toString(36).slice(2, 6);
   const defaultName = `spawn-${suffix}`;
   const spawnName = await p.text({
@@ -794,12 +799,14 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
 
   await preflightCredentialCheck(manifest, cloud);
 
+  const spawnName = await promptSpawnName();
+
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
   const suffix = prompt ? " with prompt..." : "...";
   p.log.step(`Launching ${pc.bold(agentName)} on ${pc.bold(cloudName)}${suffix}`);
 
-  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), manifest.clouds[cloud].url, debug);
+  await execScript(cloud, agent, prompt, getAuthHint(manifest, cloud), manifest.clouds[cloud].url, debug, spawnName);
 }
 
 // ── Headless Mode ──────────────────────────────────────────────────────────────
@@ -814,6 +821,7 @@ export interface HeadlessOptions {
   prompt?: string;
   debug?: boolean;
   outputFormat?: string;
+  spawnName?: string;
 }
 
 interface SpawnResult {
@@ -883,7 +891,7 @@ function runBashHeadless(script: string, prompt?: string, debug?: boolean, spawn
 }
 
 export async function cmdRunHeadless(agent: string, cloud: string, opts: HeadlessOptions = {}): Promise<void> {
-  const { prompt, debug, outputFormat } = opts;
+  const { prompt, debug, outputFormat, spawnName } = opts;
 
   // Phase 1: Validate inputs (exit code 3)
   try {
@@ -957,7 +965,7 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     console.error(`[headless] Executing ${resolvedAgent} on ${resolvedCloud}...`);
   }
 
-  const exitCode = await runBashHeadless(scriptContent, prompt, debug);
+  const exitCode = await runBashHeadless(scriptContent, prompt, debug, spawnName);
 
   if (exitCode !== 0) {
     headlessError(resolvedAgent, resolvedCloud, "EXECUTION_ERROR",
