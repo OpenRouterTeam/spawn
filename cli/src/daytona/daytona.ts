@@ -387,7 +387,7 @@ export async function uploadFile(
   localPath: string,
   remotePath: string,
 ): Promise<void> {
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
+  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
@@ -406,7 +406,7 @@ export async function uploadFile(
     "-o", "BatchMode=yes",
     `${sshToken}@${sshHost}`,
     "--",
-    `printf '%s' '${b64}' | base64 -d > ${remotePath}`,
+    `printf '%s' '${b64}' | base64 -d > '${remotePath}'`,
   ];
 
   const proc = Bun.spawn(args, {

@@ -83,6 +83,11 @@ async function uploadConfigFile(
   content: string,
   remotePath: string,
 ): Promise<void> {
+  // Security: validate remotePath to prevent command injection and path traversal
+  if (!/^[a-zA-Z0-9/_.~$-]+$/.test(remotePath) || remotePath.includes("..")) {
+    logError(`SECURITY: Invalid remote path rejected: ${remotePath}`);
+    throw new Error("Invalid remote path");
+  }
   const tmpFile = join(tmpdir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
   writeFileSync(tmpFile, content, { mode: 0o600 });
 
@@ -90,7 +95,7 @@ async function uploadConfigFile(
   try {
     await uploadFile(tmpFile, tempRemote);
     await runServer(
-      `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
+      `mkdir -p $(dirname '${remotePath}') && chmod 600 '${tempRemote}' && mv '${tempRemote}' '${remotePath}'`,
     );
   } finally {
     try { unlinkSync(tmpFile); } catch { /* ignore */ }
