@@ -1,47 +1,12 @@
 import { describe, it, expect } from "bun:test";
+import { KNOWN_FLAGS, findUnknownFlag, expandEqualsFlags } from "../flags";
 
 /**
- * Tests for unknown flag detection in CLI argument parsing.
+ * Tests for unknown flag detection and flag expansion in CLI argument parsing.
  *
- * Since index.ts runs main() on import, we replicate the checkUnknownFlags
- * logic as a pure function to test it without side effects.
+ * Imports KNOWN_FLAGS and findUnknownFlag directly from flags.ts to avoid
+ * copy-paste drift (see issue #1744).
  */
-
-const KNOWN_FLAGS = new Set([
-  "--help",
-  "-h",
-  "--version",
-  "-v",
-  "-V",
-  "--prompt",
-  "-p",
-  "--prompt-file",
-  "-f",
-  "--dry-run",
-  "-n",
-  "--debug",
-  "--headless",
-  "--output",
-  "--default",
-  "-a",
-  "-c",
-  "--agent",
-  "--cloud",
-  "--clear",
-]);
-
-/** Replicated from index.ts for testability - returns the first unknown flag or null */
-function findUnknownFlag(args: string[]): string | null {
-  for (const arg of args) {
-    if (
-      (arg.startsWith("--") || (arg.startsWith("-") && arg.length > 1 && !/^-\d/.test(arg))) &&
-      !KNOWN_FLAGS.has(arg)
-    ) {
-      return arg;
-    }
-  }
-  return null;
-}
 
 describe("Unknown Flag Detection", () => {
   describe("detects unknown flags", () => {
@@ -246,6 +211,10 @@ describe("Unknown Flag Detection", () => {
         ]),
       ).toBeNull();
     });
+
+    it("should allow --name", () => {
+      expect(findUnknownFlag(["claude", "sprite", "--name", "my-box"])).toBeNull();
+    });
   });
 
   describe("ignores positional arguments", () => {
@@ -331,5 +300,66 @@ describe("Unknown Flag Detection", () => {
         ]),
       ).toBeNull();
     });
+  });
+});
+
+describe("KNOWN_FLAGS completeness", () => {
+  it("should contain --name flag", () => {
+    expect(KNOWN_FLAGS.has("--name")).toBe(true);
+  });
+
+  it("should contain all expected flags", () => {
+    const expected = [
+      "--help", "-h",
+      "--version", "-v", "-V",
+      "--prompt", "-p", "--prompt-file", "-f",
+      "--dry-run", "-n",
+      "--debug",
+      "--headless",
+      "--output",
+      "--name",
+      "--default",
+      "-a", "-c", "--agent", "--cloud",
+      "--clear",
+    ];
+    for (const flag of expected) {
+      expect(KNOWN_FLAGS.has(flag)).toBe(true);
+    }
+  });
+});
+
+describe("expandEqualsFlags", () => {
+  it("should expand --flag=value into two args", () => {
+    expect(expandEqualsFlags(["--prompt=hello"])).toEqual(["--prompt", "hello"]);
+  });
+
+  it("should expand multiple --flag=value pairs", () => {
+    expect(expandEqualsFlags(["--prompt=hello", "--name=box"])).toEqual([
+      "--prompt", "hello", "--name", "box",
+    ]);
+  });
+
+  it("should pass through args without equals", () => {
+    expect(expandEqualsFlags(["--help", "claude", "sprite"])).toEqual([
+      "--help", "claude", "sprite",
+    ]);
+  });
+
+  it("should not expand short flags", () => {
+    expect(expandEqualsFlags(["-p=value"])).toEqual(["-p=value"]);
+  });
+
+  it("should handle empty args", () => {
+    expect(expandEqualsFlags([])).toEqual([]);
+  });
+
+  it("should handle value containing equals sign", () => {
+    expect(expandEqualsFlags(["--prompt=a=b"])).toEqual(["--prompt", "a=b"]);
+  });
+
+  it("should handle mixed args", () => {
+    expect(expandEqualsFlags(["claude", "--prompt=hello", "sprite", "--dry-run"])).toEqual([
+      "claude", "--prompt", "hello", "sprite", "--dry-run",
+    ]);
   });
 });

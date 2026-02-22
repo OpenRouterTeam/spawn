@@ -26,6 +26,7 @@ import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { checkForUpdates } from "./update-check.js";
 import { loadManifest, agentKeys, cloudKeys, getCacheAge } from "./manifest.js";
+import { KNOWN_FLAGS, findUnknownFlag, expandEqualsFlags } from "./flags.js";
 
 const VERSION = pkg.version;
 
@@ -78,75 +79,33 @@ const HELP_FLAGS = [
   "help",
 ];
 
-const KNOWN_FLAGS = new Set([
-  "--help",
-  "-h",
-  "--version",
-  "-v",
-  "-V",
-  "--prompt",
-  "-p",
-  "--prompt-file",
-  "-f",
-  "--dry-run",
-  "-n",
-  "--debug",
-  "--headless",
-  "--output",
-  "--name",
-  "--default",
-  "-a",
-  "-c",
-  "--agent",
-  "--cloud",
-  "--clear",
-]);
-
-/** Expand --flag=value into --flag value so all flag parsing works uniformly */
-export function expandEqualsFlags(args: string[]): string[] {
-  const result: string[] = [];
-  for (const arg of args) {
-    if (arg.startsWith("--") && arg.includes("=")) {
-      const eqIdx = arg.indexOf("=");
-      result.push(arg.slice(0, eqIdx), arg.slice(eqIdx + 1));
-    } else {
-      result.push(arg);
-    }
-  }
-  return result;
-}
-
 /** Check for unknown flags and show an actionable error */
 function checkUnknownFlags(args: string[]): void {
-  for (const arg of args) {
-    if (
-      (arg.startsWith("--") || (arg.startsWith("-") && arg.length > 1 && !/^-\d/.test(arg))) &&
-      !KNOWN_FLAGS.has(arg)
-    ) {
-      console.error(pc.red(`Unknown flag: ${pc.bold(arg)}`));
-      console.error();
-      console.error("  Supported flags:");
-      console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
-      console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
-      console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
-      console.error(`    ${pc.cyan("--debug")}             Show all commands being executed`);
-      console.error(`    ${pc.cyan("--headless")}          Non-interactive mode (no prompts, no SSH session)`);
-      console.error(`    ${pc.cyan("--output json")}       Output structured JSON to stdout`);
-      console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
-      console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
-      console.error(`    ${pc.cyan("--version, -v")}       Show version`);
-      console.error();
-      console.error(`  For ${pc.cyan("spawn pick")}:`);
-      console.error(`    ${pc.cyan("--default")}           Pre-selected value in the picker`);
-      console.error();
-      console.error(`  For ${pc.cyan("spawn list")}:`);
-      console.error(`    ${pc.cyan("-a, --agent")}         Filter history by agent`);
-      console.error(`    ${pc.cyan("-c, --cloud")}         Filter history by cloud`);
-      console.error(`    ${pc.cyan("--clear")}             Clear all spawn history`);
-      console.error();
-      console.error(`  Run ${pc.cyan("spawn help")} for full usage information.`);
-      process.exit(1);
-    }
+  const unknown = findUnknownFlag(args);
+  if (unknown) {
+    console.error(pc.red(`Unknown flag: ${pc.bold(unknown)}`));
+    console.error();
+    console.error(`  Supported flags:`);
+    console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
+    console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
+    console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
+    console.error(`    ${pc.cyan("--debug")}             Show all commands being executed`);
+    console.error(`    ${pc.cyan("--headless")}          Non-interactive mode (no prompts, no SSH session)`);
+    console.error(`    ${pc.cyan("--output json")}       Output structured JSON to stdout`);
+    console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
+    console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
+    console.error(`    ${pc.cyan("--version, -v")}       Show version`);
+    console.error();
+    console.error(`  For ${pc.cyan("spawn pick")}:`);
+    console.error(`    ${pc.cyan("--default")}           Pre-selected value in the picker`);
+    console.error();
+    console.error(`  For ${pc.cyan("spawn list")}:`);
+    console.error(`    ${pc.cyan("-a, --agent")}         Filter history by agent`);
+    console.error(`    ${pc.cyan("-c, --cloud")}         Filter history by cloud`);
+    console.error(`    ${pc.cyan("--clear")}             Clear all spawn history`);
+    console.error();
+    console.error(`  Run ${pc.cyan("spawn help")} for full usage information.`);
+    process.exit(1);
   }
 }
 
