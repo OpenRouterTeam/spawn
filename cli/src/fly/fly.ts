@@ -698,10 +698,10 @@ export async function runServer(
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const flyCmd = getCmd()!;
 
-  // Wrap command with a background keepalive that prints a dot to stderr every
+  // Wrap command with a background keepalive that sends a space to stderr every
   // 10s. Without this, flyctl tears down silent SSH sessions ("session forcibly
-  // closed") when no data flows for too long (e.g. during bun install).
-  const wrappedCmd = `(while true; do sleep 10; printf '.' >&2; done) & _ka=$!; (${fullCmd}); _rc=$?; kill $_ka 2>/dev/null; wait $_ka 2>/dev/null; exit $_rc`;
+  // closed") when no data flows for too long (e.g. during npm install).
+  const wrappedCmd = `(while true; do sleep 10; printf ' ' >&2; done) & _ka=$!; (${fullCmd}); _rc=$?; kill $_ka 2>/dev/null; wait $_ka 2>/dev/null; exit $_rc`;
 
   const escapedCmd = wrappedCmd.replace(/'/g, "'\\''");
   // Use fly ssh console (WireGuard) instead of fly machine exec (HTTP) to avoid
@@ -846,6 +846,8 @@ export async function waitForCloudInit(): Promise<void> {
   // Install bun first (single binary, no deps), then Node.js as a direct binary
   // download from nodejs.org — no apt nodejs/npm/python3, no NodeSource, no n.
   const setupScript = [
+    `echo "==> Setting up workspace volume..."`,
+    `if [ -d /data ]; then mkdir -p /data/work && ln -sf /data/work /root/work && echo 'cd /root/work 2>/dev/null' >> ~/.bashrc; fi`,
     `echo "==> Installing base packages..."`,
     `export DEBIAN_FRONTEND=noninteractive`,
     `apt-get update -y && apt-get install -y --no-install-recommends curl unzip git ca-certificates xz-utils || true`,
