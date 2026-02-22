@@ -72,10 +72,13 @@ Complete within 45 minutes. At 35 min tell teammates to wrap up, at 40 min shutd
 
 ## No Self-Merge Rule
 
-Teammates NEVER merge their own PRs. After creating a PR:
-1. Self-review: `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]\n\n-- discovery/AGENT-NAME"`
-2. Label: `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
-3. Leave open — merging is handled externally.
+Teammates NEVER merge their own PRs. Use the draft-first workflow:
+1. After first commit, open a draft PR: `gh pr create --draft --title "title" --body "body\n\n-- discovery/AGENT-NAME"`
+2. Keep pushing commits as work progresses
+3. When complete: `gh pr ready NUMBER`
+4. Self-review: `gh pr review NUMBER --repo OpenRouterTeam/spawn --comment --body "Self-review by AGENT-NAME: [summary]\n\n-- discovery/AGENT-NAME"`
+5. Label: `gh pr edit NUMBER --repo OpenRouterTeam/spawn --add-label "needs-team-review"`
+6. Leave open — merging is handled externally.
 
 ## Phase 1: Check Upvote Thresholds (ALWAYS DO FIRST)
 
@@ -189,8 +192,10 @@ Values: cloud-scout, agent-scout, issue-responder, implementer, team-lead.
 git fetch origin main
 git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH -b BRANCH origin/main
 cd WORKTREE_BASE_PLACEHOLDER/BRANCH
-# ... work, commit, push ...
-gh pr create --title "title" --body "body\n\n-- discovery/AGENT-NAME"
+# ... first commit, push ...
+gh pr create --draft --title "title" --body "body\n\n-- discovery/AGENT-NAME"
+# ... keep pushing commits ...
+gh pr ready NUMBER  # when work is complete
 gh pr review NUMBER --comment --body "Self-review: [summary]\n\n-- discovery/AGENT-NAME"
 gh pr edit NUMBER --add-label "needs-team-review"
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
