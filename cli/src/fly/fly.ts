@@ -872,7 +872,7 @@ export async function waitForCloudInit(): Promise<void> {
     `if [ -d /data ]; then mkdir -p /data/work && ln -sf /data/work /root/work && echo 'cd /root/work 2>/dev/null' >> ~/.bashrc; fi`,
     `echo "==> Installing base packages..."`,
     `export DEBIAN_FRONTEND=noninteractive`,
-    `apt-get update -y && apt-get install -y --no-install-recommends curl unzip git ca-certificates zsh nodejs npm || true`,
+    `apt-get update -y && apt-get install -y --no-install-recommends curl unzip git ca-certificates zsh nodejs npm build-essential || true`,
     `echo "==> Upgrading Node.js to v22 LTS..."`,
     `npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true`,
     `echo "==> Checking bun..."`,
