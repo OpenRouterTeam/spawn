@@ -26,19 +26,29 @@ export function logStep(msg: string): void {
   process.stderr.write(`${CYAN}${msg}${NC}\n`);
 }
 
+// Shared readline interface — reused across prompt() calls to avoid Bun's
+// issue where repeatedly creating/closing interfaces on the same stdin causes
+// the "close" event to fire immediately on subsequent interfaces (#1707).
+let sharedRl: ReturnType<typeof createInterface> | null = null;
+
+function getReadlineInterface(): ReturnType<typeof createInterface> {
+  if (!sharedRl) {
+    sharedRl = createInterface({ input: process.stdin, output: process.stderr });
+    sharedRl.on("close", () => { sharedRl = null; });
+  }
+  return sharedRl;
+}
+
 /** Prompt for a line of user input. Throws if non-interactive. */
 export async function prompt(question: string): Promise<string> {
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     throw new Error("Cannot prompt: SPAWN_NON_INTERACTIVE is set");
   }
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
-  return new Promise<string>((resolve, reject) => {
+  const rl = getReadlineInterface();
+  return new Promise<string>((resolve) => {
     rl.question(question, (answer) => {
-      rl.close();
       resolve(answer.trim());
     });
-    rl.on("error", reject);
-    rl.on("close", () => resolve(""));
   });
 }
 
