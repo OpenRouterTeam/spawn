@@ -34,7 +34,7 @@ const matrixEntries = Object.entries(manifest.matrix);
 const implementedEntries = matrixEntries.filter(([, status]) => status === "implemented");
 
 // Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
-const TS_CLOUDS = new Set(["fly"]);
+const TS_CLOUDS = new Set(["fly", "digitalocean"]);
 
 /** Run `bash -n` on a script file. Returns null on success, error message on failure. */
 function bashSyntaxCheck(filePath: string): string | null {
