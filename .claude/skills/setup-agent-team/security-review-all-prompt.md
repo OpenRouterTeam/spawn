@@ -73,7 +73,7 @@ Each pr-reviewer MUST:
 6. **Security review** of every changed file:
    - Command injection, credential leaks, path traversal, XSS/injection, unsafe eval/source, curl|bash safety, macOS bash 3.x compat
 
-7. **Test** (in worktree): `bash -n` on .sh files, `bun test` for .ts files, verify source fallback pattern
+7. **Test** (in worktree): `bash -n` on .sh files, `bun test` for .ts files
 
 8. **Decision** — Before posting any review, verify it applies to the **current HEAD commit**:
    - CRITICAL/HIGH found → `gh pr review NUMBER --request-changes` + label `security-review-required`

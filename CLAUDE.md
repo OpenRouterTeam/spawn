@@ -45,7 +45,7 @@ We are currently shipping with **9 curated clouds** (sorted by price):
 - **Prestige or unbeatable pricing** — must be a well-known brand OR beat our cheapest options
 - **Must be manually testable** — you need an account and can verify scripts work
 - **REST API or CLI with SSH/exec** — no proprietary-only access methods
-- **Test coverage is mandatory** (see "Mock Test Infrastructure" section below)
+- **Test coverage is mandatory** — add unit tests in `cli/src/__tests__/`
 
 Steps to add one:
 1. Add cloud-specific TypeScript module in `cli/src/{cloud}/`
@@ -53,9 +53,7 @@ Steps to add one:
 3. Add `"missing"` entries to the matrix for every existing agent
 4. Implement at least 2-3 agent scripts to prove the lib works
 5. Update the cloud's `README.md`
-6. **Add test coverage** (mandatory):
-   - `test/record.sh` — add to `ALL_RECORDABLE_CLOUDS`, add cases in `get_endpoints()`, `get_auth_env_var()`, `call_api()`, `has_api_error()`, and add a `_live_{cloud}()` function
-   - `test/mock.sh` — add cases in `_strip_api_base()`, `_validate_body()`, `assert_cloud_api_calls()`, and `setup_env_for_cloud()`
+6. **Add test coverage** (mandatory) — add unit tests in `cli/src/__tests__/`
 
 **DO NOT add GPU clouds** (CoreWeave, RunPod, etc.). Spawn agents call remote LLM APIs for inference — they need cheap CPU instances with SSH, not expensive GPU VMs.
 
@@ -85,10 +83,9 @@ Check `gh issue list --repo OpenRouterTeam/spawn --state open` for user requests
 
 ### 4. Extend tests
 
-`test/run.sh` contains the test harness. When adding a new cloud or agent:
-- Add mock functions for the cloud's CLI/API calls
-- Add per-script assertions matching the agent's setup steps
-- Run `bash test/run.sh` to verify
+Tests use Bun's built-in test runner (`bun:test`). When adding a new cloud or agent:
+- Add unit tests in `cli/src/__tests__/` with mocked fetch/prompts
+- Run `bun test` to verify
 
 ## File Structure Convention
 
@@ -117,7 +114,7 @@ spawn/
     refactor.yml                 # Scheduled + issue-triggered refactor workflow
   manifest.json                  # The matrix (source of truth)
   discovery.sh                   # Run this to trigger one discovery cycle
-  test/run.sh                    # Test harness
+  test/fixtures/                 # API response fixtures for testing
   README.md                      # User-facing docs
   CLAUDE.md                      # This file - contributor guide
 ```
@@ -194,30 +191,8 @@ All TypeScript code in `cli/src/` MUST use ESM (`import`/`export`):
 - Test files go in `cli/src/__tests__/`
 - Run tests with `bun test`
 - Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
-- **NEVER run `bash test/mock.sh` locally** — it opens the browser (OAuth flow) and is disruptive. `test/mock.sh` is for CI only. Locally, only run `bun test` and `bash test/run.sh`.
-
-### Mock Test Infrastructure (MANDATORY for new clouds)
-
-When adding a new cloud provider, you **MUST** update all of these in `test/mock.sh`:
-
-| Function | What to add |
-|---|---|
-| `_strip_api_base()` | URL pattern to strip the cloud's API base (e.g., `https://api.newcloud.com/v1*`) |
-| `_validate_body()` | Server creation endpoint + required POST fields |
-| `assert_cloud_api_calls()` | Expected API calls (SSH key fetch + server create endpoints) |
-| `setup_env_for_cloud()` | Test env vars (API token, server name, plan, region) |
-
-And in `test/record.sh`:
-
-| Function | What to add |
-|---|---|
-| `ALL_RECORDABLE_CLOUDS` | Cloud name to the list |
-| `get_endpoints()` | GET-only API endpoints for fixture recording |
-| `get_auth_env_var()` | Auth env var name mapping |
-| `call_api()` | API function dispatcher |
-| `has_api_error()` | Error response detection for the cloud's API |
-
-Without these, the cloud has **no test coverage**, body validation is missing, mock tests log `UNHANDLED_URL` warnings, and the QA cycle skips the cloud entirely.
+- All tests must be pure unit tests with mocked fetch/prompts — **no subprocess spawning** (`execSync`, `spawnSync`, `Bun.spawn`)
+- Test fixtures (API response snapshots) go in `test/fixtures/{cloud}/`
 
 ## CLI Version Management
 
@@ -309,3 +284,19 @@ refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
 2. Update `manifest.json` matrix status to `"implemented"`
 3. Update the cloud's `README.md` with usage instructions
 4. Commit with a descriptive message
+
+## Filing Issues for Discovered Problems
+
+When you encounter bugs, stale references, broken functionality, or architectural issues that are **outside the scope of your current task**, file a GitHub issue immediately rather than ignoring them or trying to fix everything at once:
+
+```bash
+gh issue create --repo OpenRouterTeam/spawn --title "bug: <brief description>" --body "<details>"
+```
+
+Examples of when to file:
+- Dead code or stale references to files/functions that no longer exist
+- Broken features (e.g., `spawn delete` references non-existent shell scripts)
+- Security concerns that need separate review
+- Architectural debt that would be too large to fix in the current PR
+
+**Do NOT silently ignore problems.** If you find something weird and won't fix it now, file an issue so it's tracked.
