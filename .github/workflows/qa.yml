@@ -1,8 +1,10 @@
 name: Daily QA
-on:
-  schedule:
-    - cron: '0 6 * * *'
-  workflow_dispatch:
+# Disabled until QA VM is fixed
+# on:
+#   schedule:
+#     - cron: '0 6 * * *'
+#   workflow_dispatch:
+on: workflow_dispatch
 jobs:
   trigger:
     runs-on: ubuntu-latest
