@@ -11,23 +11,13 @@
 #   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash
 
 # ============================================================
-# Source shared/common.sh for logging (local-or-remote fallback)
+# Logging helpers
 # ============================================================
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -n "${SCRIPT_DIR:-}" && -f "${SCRIPT_DIR}/common.sh" ]]; then
-    source "${SCRIPT_DIR}/common.sh"
-else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/common.sh)"
-fi
-
-# Fallback log functions if common.sh failed to load
-if ! type log_info &>/dev/null 2>&1; then
-    log_info()  { printf '[github-auth] %s\n' "$*" >&2; }
-    log_step()  { printf '[github-auth] %s\n' "$*" >&2; }
-    log_warn()  { printf '[github-auth] WARNING: %s\n' "$*" >&2; }
-    log_error() { printf '[github-auth] ERROR: %s\n' "$*" >&2; }
-fi
+log_info()  { printf '[github-auth] %s\n' "$*" >&2; }
+log_step()  { printf '[github-auth] %s\n' "$*" >&2; }
+log_warn()  { printf '[github-auth] WARNING: %s\n' "$*" >&2; }
+log_error() { printf '[github-auth] ERROR: %s\n' "$*" >&2; }
 
 # ============================================================
 # ensure_gh_cli — Install gh CLI if not already present
