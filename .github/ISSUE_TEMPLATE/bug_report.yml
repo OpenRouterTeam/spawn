@@ -7,7 +7,6 @@ body:
     id: what-happened
     attributes:
       label: What happened?
-      placeholder: "Paste the error or describe what went wrong"
-      render: shell
+      placeholder: "Paste the error or describe what went wrong. You can drag & drop screenshots here."
     validations:
       required: true
