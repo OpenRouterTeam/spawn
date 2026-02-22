@@ -157,6 +157,20 @@ export function mergeLastConnection(): void {
   }
 }
 
+/** Remove a record from history entirely (soft delete — no cloud API call). */
+export function removeRecord(record: SpawnRecord): boolean {
+  const history = loadHistory();
+  const index = history.findIndex(
+    (r) => r.timestamp === record.timestamp && r.agent === record.agent && r.cloud === record.cloud,
+  );
+  if (index < 0) {
+    return false;
+  }
+  history.splice(index, 1);
+  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
+  return true;
+}
+
 export function markRecordDeleted(record: SpawnRecord): boolean {
   const history = loadHistory();
   const index = history.findIndex(
