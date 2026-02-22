@@ -630,7 +630,12 @@ export async function runServer(
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const flyCmd = getCmd()!;
 
-  const escapedCmd = fullCmd.replace(/'/g, "'\\''");
+  // Wrap command with a background keepalive that prints a dot to stderr every
+  // 10s. Without this, flyctl tears down silent SSH sessions ("session forcibly
+  // closed") when no data flows for too long (e.g. during bun install).
+  const wrappedCmd = `(while true; do sleep 10; printf '.' >&2; done) & _ka=$!; (${fullCmd}); _rc=$?; kill $_ka 2>/dev/null; wait $_ka 2>/dev/null; exit $_rc`;
+
+  const escapedCmd = wrappedCmd.replace(/'/g, "'\\''");
   // Use fly ssh console (WireGuard) instead of fly machine exec (HTTP) to avoid
   // 408 deadline_exceeded on long-running commands.
   const args = [flyCmd, "ssh", "console", "-a", flyAppName, "-C", `bash -c '${escapedCmd}'`];
