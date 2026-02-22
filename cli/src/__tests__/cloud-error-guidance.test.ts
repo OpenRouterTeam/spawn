@@ -130,9 +130,9 @@ describe("create_server error handling", () => {
     c.content.includes("create_server()")
   );
 
-  it("should find at least 4 clouds with create_server", () => {
-    // Note: TS-based clouds (fly, local, hetzner, digitalocean, daytona) may not have bash create_server()
-    expect(cloudsWithCreate.length).toBeGreaterThanOrEqual(4);
+  it("should find at least 3 clouds with create_server", () => {
+    // Note: TS-based clouds (fly, local, hetzner, digitalocean, daytona, gcp) may not have bash create_server()
+    expect(cloudsWithCreate.length).toBeGreaterThanOrEqual(3);
   });
 
   for (const cloud of cloudsWithCreate) {

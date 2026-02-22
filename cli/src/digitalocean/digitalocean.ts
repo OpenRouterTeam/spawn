@@ -11,7 +11,7 @@ import {
   validateServerName,
   validateRegionName,
   toKebabCase,
-} from "../fly/ui";
+} from "../shared/ui";
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
 const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";

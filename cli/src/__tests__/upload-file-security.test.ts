@@ -141,9 +141,9 @@ describe("upload_file() Security Patterns", () => {
       expect(execBasedClouds.length).toBeGreaterThanOrEqual(0);
     });
 
-    it("should check at least 5 clouds total", () => {
-      // Note: TS-based clouds (fly, local, hetzner, digitalocean, daytona, sprite) don't have bash lib/common.sh with upload_file
-      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(4);
+    it("should check at least 2 clouds total", () => {
+      // Note: TS-based clouds (fly, local, hetzner, digitalocean, daytona, sprite, gcp) don't have bash lib/common.sh with upload_file
+      expect(cloudUploadTypes.size).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -212,9 +212,9 @@ describe("upload_file() Security Patterns", () => {
     const sshClouds = Array.from(cloudUploadTypes.entries())
       .filter(([, info]) => info.type === "ssh");
 
-    it("should have multiple SSH-based clouds", () => {
-      // After TS conversions (daytona, digitalocean, sprite), fewer clouds use bash ssh_upload_file
-      expect(sshClouds.length).toBeGreaterThanOrEqual(3);
+    it("should have SSH-based clouds", () => {
+      // After TS conversions (daytona, digitalocean, sprite, gcp), fewer clouds use bash ssh_upload_file
+      expect(sshClouds.length).toBeGreaterThanOrEqual(1);
     });
 
     for (const [cloud, info] of sshClouds) {

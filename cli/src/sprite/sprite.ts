@@ -9,7 +9,7 @@ import {
   prompt,
   validateServerName,
   toKebabCase,
-} from "../fly/ui";
+} from "../shared/ui";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
 

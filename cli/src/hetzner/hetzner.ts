@@ -11,7 +11,7 @@ import {
   validateServerName,
   validateRegionName,
   toKebabCase,
-} from "../fly/ui";
+} from "../shared/ui";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";

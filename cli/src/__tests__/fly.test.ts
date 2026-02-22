@@ -11,7 +11,7 @@ import {
   validateRegionName,
   validateModelId,
   toKebabCase,
-} from "../fly/ui";
+} from "../shared/ui";
 
 import { sanitizeFlyToken, FLY_VM_TIERS, DEFAULT_VM_TIER } from "../fly/fly";
 import type { ServerOptions } from "../fly/fly";

@@ -10,7 +10,7 @@ import {
   jsonEscape,
   validateServerName,
   toKebabCase,
-} from "../fly/ui";
+} from "../shared/ui";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
