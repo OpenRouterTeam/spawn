@@ -423,7 +423,8 @@ export async function uploadFile(
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
-  const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const term = process.env.TERM || "xterm-256color";
+  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
 
   // Interactive mode — drop BatchMode so the PTY works
   const args = [

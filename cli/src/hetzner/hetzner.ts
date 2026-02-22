@@ -515,7 +515,8 @@ export async function interactiveSession(
   ip?: string,
 ): Promise<number> {
   const serverIp = ip || hetznerServerIp;
-  const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const term = process.env.TERM || "xterm-256color";
+  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
 
   const proc = Bun.spawn(
     ["ssh", ...SSH_OPTS, "-t", `root@${serverIp}`, fullCmd],
