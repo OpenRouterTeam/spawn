@@ -567,11 +567,12 @@ async function createMachine(
   cpus: number,
   vmMemory: number,
   volumeId?: string,
+  image?: string,
 ): Promise<string> {
   const kindLabel = cpuKind === "performance" ? "dedicated" : "shared";
   logStep(`Creating Fly.io machine (region: ${region}, ${cpus} ${kindLabel} vCPU, ${vmMemory}MB)...`);
   const config: Record<string, unknown> = {
-    image: "ubuntu:24.04",
+    image: image || "ubuntu:24.04",
     guest: { cpu_kind: cpuKind, cpus, memory_mb: vmMemory },
     init: { exec: ["/bin/sleep", "inf"] },
     auto_destroy: false,
@@ -675,7 +676,7 @@ export async function listVolumes(appName: string): Promise<Array<{ id: string; 
     }));
 }
 
-export async function createServer(name: string, opts: ServerOptions): Promise<void> {
+export async function createServer(name: string, opts: ServerOptions, image?: string): Promise<void> {
   const region = process.env.FLY_REGION || "iad";
 
   if (!validateRegionName(region)) {
@@ -698,7 +699,7 @@ export async function createServer(name: string, opts: ServerOptions): Promise<v
 
   let machineId: string;
   try {
-    machineId = await createMachine(name, region, opts.cpuKind, opts.cpus, opts.memoryMb, volumeId);
+    machineId = await createMachine(name, region, opts.cpuKind, opts.cpus, opts.memoryMb, volumeId, image);
   } catch (err) {
     await cleanupOnFailure(name);
     throw err;

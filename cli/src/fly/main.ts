@@ -9,6 +9,7 @@ import {
   createServer,
   getServerName,
   waitForCloudInit,
+  waitForSsh,
   runServer,
   interactiveSession,
   saveLaunchCmd,
@@ -89,10 +90,15 @@ async function main() {
 
   // 6. Provision server
   const serverName = await getServerName();
-  await createServer(serverName, serverOpts);
+  await createServer(serverName, serverOpts, agent.image);
 
   // 7. Wait for readiness
-  await waitForCloudInit();
+  if (agent.image) {
+    // Custom image already has packages baked in — just wait for SSH
+    await waitForSsh();
+  } else {
+    await waitForCloudInit();
+  }
 
   // 8. Install agent
   await agent.install();
