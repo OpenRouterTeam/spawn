@@ -192,20 +192,20 @@ describe("check_python_available", () => {
     expect(result.exitCode).toBe(1);
   });
 
-  it("should show install instructions when python3 is missing", () => {
-    // Override command to simulate python3 not found (can't restrict PATH since sourcing needs it)
+  it("should show install instructions when jq and bun are missing", () => {
+    // Override command to simulate jq and bun not found (can't restrict PATH since sourcing needs it)
     const result = runBash(`
-      command() { if [[ "$2" == "python3" ]]; then return 1; fi; builtin command "$@"; }
+      command() { if [[ "$2" == "jq" || "$2" == "bun" ]]; then return 1; fi; builtin command "$@"; }
       check_python_available
     `);
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Python 3 is required");
-    expect(result.stderr).toContain("Install Python 3:");
+    expect(result.stderr).toContain("jq or bun is required");
+    expect(result.stderr).toContain("Install jq:");
   });
 
   it("should mention Ubuntu, Fedora, macOS, and Arch install options", () => {
     const result = runBash(`
-      command() { if [[ "$2" == "python3" ]]; then return 1; fi; builtin command "$@"; }
+      command() { if [[ "$2" == "jq" || "$2" == "bun" ]]; then return 1; fi; builtin command "$@"; }
       check_python_available
     `);
     expect(result.exitCode).toBe(1);

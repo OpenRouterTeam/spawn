@@ -376,15 +376,15 @@ describe("check_python_available", () => {
     expect(result.exitCode).toBe(1);
   });
 
-  it("should show installation instructions when python3 is missing", () => {
+  it("should show installation instructions when jq and bun are missing", () => {
     const result = runBash(`
       PATH=/nonexistent
       hash -r
       check_python_available 2>&1
     `);
-    expect(result.stdout).toContain("Python 3 is required");
+    expect(result.stdout).toContain("jq or bun is required");
     expect(result.stdout).toContain("sudo apt-get");
-    expect(result.stdout).toContain("brew install python3");
+    expect(result.stdout).toContain("brew install jq");
   });
 });
 

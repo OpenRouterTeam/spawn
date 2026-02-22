@@ -2,7 +2,7 @@
 # Shell helpers for API key provisioning
 # Sourced by qa-cycle.sh for Phase 0 key loading and Phase 1 stale key handling
 #
-# Requires: python3, curl, REPO_ROOT set, log() function defined by caller
+# Requires: jq or bun, curl, REPO_ROOT set, log() function defined by caller
 #
 # Functions:
 #   load_cloud_keys_from_config  — Load keys from ~/.config/spawn/{cloud}.json into env
@@ -23,17 +23,30 @@ fi
 # Outputs one env var name per line, empty if CLI-based auth
 get_cloud_env_vars() {
     local cloud="${1}"
-    python3 -c "
-import json, re, sys
-m = json.load(open(sys.argv[1]))
-auth = m.get('clouds', {}).get(sys.argv[2], {}).get('auth', '')
-if re.search(r'\b(login|configure|setup)\b', auth, re.I):
-    sys.exit(0)
-for var in re.split(r'\s*[+,]\s*', auth):
-    v = var.strip()
-    if v:
-        print(v)
-" "${REPO_ROOT}/manifest.json" "${cloud}" 2>/dev/null
+    if command -v jq &>/dev/null; then
+        local auth
+        auth=$(jq -r --arg c "${cloud}" '.clouds[$c].auth // ""' "${REPO_ROOT}/manifest.json" 2>/dev/null) || return 0
+        # Skip CLI-based auth (login, configure, setup)
+        if printf '%s' "${auth}" | grep -qiE '\b(login|configure|setup)\b'; then
+            return 0
+        fi
+        # Empty auth means no env vars needed
+        if [[ -z "${auth}" ]]; then
+            return 0
+        fi
+        # Split on + or , and output each var name
+        printf '%s' "${auth}" | tr '+,' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' || true
+    else
+        _MANIFEST="${REPO_ROOT}/manifest.json" _CLOUD="${cloud}" bun -e "
+import fs from 'fs';
+const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
+const auth = (m.clouds?.[process.env._CLOUD]?.auth) || '';
+if (/\b(login|configure|setup)\b/i.test(auth)) process.exit(0);
+for (const v of auth.split(/\s*[+,]\s*/)) {
+  if (v.trim()) process.stdout.write(v.trim() + '\n');
+}
+" 2>/dev/null
+    fi
 }
 
 # Parse manifest.json to extract cloud_key|auth_string lines for API-token clouds.
@@ -41,17 +54,20 @@ for var in re.split(r'\s*[+,]\s*', auth):
 # Outputs one "cloud_key|auth_string" per line to stdout.
 _parse_cloud_auths() {
     local manifest_path="${1}"
-    python3 -c "
-import json, re, sys
-manifest = json.load(open(sys.argv[1]))
-for key, cloud in manifest.get('clouds', {}).items():
-    auth = cloud.get('auth', '')
-    if re.search(r'\b(login|configure|setup)\b', auth, re.I):
-        continue
-    if not auth.strip():
-        continue
-    print(key + '|' + auth)
-" "${manifest_path}" 2>/dev/null
+    if command -v jq &>/dev/null; then
+        jq -r '.clouds | to_entries[] | select(.value.auth != null and .value.auth != "") | select(.value.auth | test("\\b(login|configure|setup)\\b"; "i") | not) | "\(.key)|\(.value.auth)"' "${manifest_path}" 2>/dev/null
+    else
+        _MANIFEST="${manifest_path}" bun -e "
+import fs from 'fs';
+const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
+for (const [key, cloud] of Object.entries(m.clouds || {})) {
+  const auth = cloud.auth || '';
+  if (/\b(login|configure|setup)\b/i.test(auth)) continue;
+  if (!auth.trim()) continue;
+  process.stdout.write(key + '|' + auth + '\n');
+}
+" 2>/dev/null
+    fi
 }
 
 # Try to load a single env var from config file if not already set in environment.
@@ -76,12 +92,15 @@ _try_load_env_var() {
     # Try loading from config file
     if [[ -f "${config_file}" ]]; then
         local val
-        val=$(python3 -c "
-import json, sys
-data = json.load(open(sys.argv[1]))
-v = data.get(sys.argv[2], '') or data.get('api_key', '') or data.get('token', '')
-print(v)
-" "${config_file}" "${var_name}" 2>/dev/null)
+        if command -v jq &>/dev/null; then
+            val=$(jq -r --arg v "${var_name}" '(.[$v] // .api_key // .token) // "" | select(. != null)' "${config_file}" 2>/dev/null)
+        else
+            val=$(_FILE="${config_file}" _VAR="${var_name}" bun -e "
+import fs from 'fs';
+const d = JSON.parse(fs.readFileSync(process.env._FILE, 'utf8'));
+process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
+" 2>/dev/null)
+        fi
         if [[ -n "${val}" ]]; then
             # SECURITY: Defense-in-depth — prevent malicious values from being misused
             # downstream in unquoted expansions, eval contexts, or logging
@@ -138,8 +157,8 @@ load_cloud_keys_from_config() {
         return 1
     fi
 
-    if ! command -v python3 &>/dev/null; then
-        log "Key preflight: python3 not found, skipping"
+    if ! command -v jq &>/dev/null && ! command -v bun &>/dev/null; then
+        log "Key preflight: neither jq nor bun found, skipping"
         return 1
     fi
 
@@ -188,17 +207,18 @@ request_missing_cloud_keys() {
         return 0  # Nothing to request
     fi
 
-    if ! command -v python3 &>/dev/null; then
-        return 0
-    fi
-
     # Build JSON array of provider names
     local providers_json
-    providers_json=$(printf '%s\n' ${MISSING_KEY_PROVIDERS} | python3 -c "
-import json, sys
-providers = [line.strip() for line in sys.stdin if line.strip()]
-print(json.dumps(providers))
+    if command -v jq &>/dev/null; then
+        providers_json=$(printf '%s\n' ${MISSING_KEY_PROVIDERS} | jq -Rn '[inputs | select(. != "")]' 2>/dev/null) || return 0
+    elif command -v bun &>/dev/null; then
+        providers_json=$(_PROVIDERS="${MISSING_KEY_PROVIDERS}" bun -e "
+const providers = process.env._PROVIDERS.trim().split(/\s+/).filter(Boolean);
+process.stdout.write(JSON.stringify(providers));
 " 2>/dev/null) || return 0
+    else
+        return 0
+    fi
 
     log "Key preflight: Requesting keys for: ${MISSING_KEY_PROVIDERS}"
 

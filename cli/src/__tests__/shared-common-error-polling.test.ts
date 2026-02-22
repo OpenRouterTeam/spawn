@@ -325,7 +325,7 @@ describe("_extract_json_field edge cases", () => {
       `_extract_json_field '{"enabled":false}' "d['enabled']" "default"`
     );
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe("False");
+    expect(result.stdout).toBe("false");
   });
 });
 

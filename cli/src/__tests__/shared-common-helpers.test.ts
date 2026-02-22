@@ -160,7 +160,7 @@ describe("_load_json_config_fields", () => {
     expect(result.exitCode).toBe(0);
     const lines = result.stdout.split("\n");
     expect(lines[0]).toBe("8080");
-    expect(lines[1]).toBe("True");
+    expect(lines[1]).toBe("true");
 
     rmSync(dir, { recursive: true, force: true });
   });
