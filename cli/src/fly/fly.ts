@@ -13,6 +13,8 @@ import {
   validateRegionName,
   toKebabCase,
 } from "../shared/ui";
+import type { CloudInitTier } from "../shared/agents";
+import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
 const FLY_DASHBOARD_URL = "https://fly.io/dashboard";
@@ -861,25 +863,26 @@ export async function waitForSsh(maxAttempts = 20): Promise<void> {
   throw new Error("SSH wait timeout");
 }
 
-export async function waitForCloudInit(): Promise<void> {
+export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<void> {
   await waitForSsh();
 
-  logStep("Installing packages (bun, Node.js)...");
-  // Batch all package installs into a single remote script to avoid multiple
-  // round-trips (each of which was previously a separate fly machine exec call).
-  // Aligned with other clouds: apt for base Node.js, then `n` to upgrade to v22 LTS.
+  const packages = getPackagesForTier(tier);
+  logStep("Installing packages...");
   const setupScript = [
     `echo "==> Setting up workspace volume..."`,
     `if [ -d /data ]; then mkdir -p /data/work && ln -sf /data/work /root/work && echo 'cd /root/work 2>/dev/null' >> ~/.bashrc; fi`,
     `echo "==> Installing base packages..."`,
     `export DEBIAN_FRONTEND=noninteractive`,
-    `apt-get update -y && apt-get install -y --no-install-recommends curl unzip git ca-certificates zsh nodejs npm build-essential || true`,
-    `echo "==> Upgrading Node.js to v22 LTS..."`,
-    `npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true`,
-    `echo "==> Checking bun..."`,
-    `if ! command -v bun >/dev/null 2>&1 && [ ! -f "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash || true; fi`,
+    `apt-get update -y && apt-get install -y --no-install-recommends ${packages.join(" ")} || true`,
+    ...(needsNodeUpgrade(tier) ? [
+      `echo "==> Upgrading Node.js to v22 LTS..."`,
+      `npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true`,
+    ] : []),
+    ...(needsBun(tier) ? [
+      `echo "==> Checking bun..."`,
+      `if ! command -v bun >/dev/null 2>&1 && [ ! -f "$HOME/.bun/bin/bun" ]; then curl -fsSL https://bun.sh/install | bash || true; fi`,
+    ] : []),
     `for rc in ~/.bashrc ~/.zshrc; do grep -q '.bun/bin' "$rc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"' >> "$rc"; done`,
-    `echo "node: $(node --version 2>/dev/null || echo not installed)"`,
   ].join('\n');
 
   try {

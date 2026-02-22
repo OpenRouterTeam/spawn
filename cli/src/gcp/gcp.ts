@@ -12,6 +12,8 @@ import {
   validateServerName,
   toKebabCase,
 } from "../shared/ui";
+import type { CloudInitTier } from "../shared/agents";
+import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 
@@ -425,23 +427,37 @@ export async function promptSpawnName(): Promise<void> {
 
 // ─── Cloud Init Startup Script ──────────────────────────────────────────────
 
-function getStartupScript(username: string): string {
-  return `#!/bin/bash
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y --no-install-recommends curl unzip git zsh nodejs npm ca-certificates
-# Upgrade Node.js to v22 LTS
-npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
-# Install Bun and Claude Code as the login user
-su - "${username}" -c 'curl -fsSL https://bun.sh/install | bash' || true
-su - "${username}" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true
-# Configure npm global prefix
-su - "${username}" -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'
-# Configure PATH for all users
-echo 'export PATH="\${HOME}/.npm-global/bin:\${HOME}/.claude/local/bin:\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}"' >> /etc/profile.d/spawn.sh
-chmod +x /etc/profile.d/spawn.sh
-touch /tmp/.cloud-init-complete
-`;
+function getStartupScript(username: string, tier: CloudInitTier = "full"): string {
+  const packages = getPackagesForTier(tier);
+  const lines = [
+    "#!/bin/bash",
+    "export DEBIAN_FRONTEND=noninteractive",
+    "apt-get update -y",
+    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+  ];
+  if (needsNodeUpgrade(tier)) {
+    lines.push(
+      "# Upgrade Node.js to v22 LTS",
+      "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx",
+      `# Install Claude Code as the login user`,
+      `su - "${username}" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true`,
+      "# Configure npm global prefix",
+      `su - "${username}" -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'`,
+    );
+  }
+  if (needsBun(tier)) {
+    lines.push(
+      `# Install Bun as the login user`,
+      `su - "${username}" -c 'curl -fsSL https://bun.sh/install | bash' || true`,
+    );
+  }
+  lines.push(
+    "# Configure PATH for all users",
+    'echo \'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"\' >> /etc/profile.d/spawn.sh',
+    "chmod +x /etc/profile.d/spawn.sh",
+    "touch /tmp/.cloud-init-complete",
+  );
+  return lines.join("\n") + "\n";
 }
 
 // ─── Provisioning ───────────────────────────────────────────────────────────
@@ -450,6 +466,7 @@ export async function createInstance(
   name: string,
   zone: string,
   machineType: string,
+  tier?: CloudInitTier,
 ): Promise<void> {
   const username = resolveUsername();
   const pubKey = ensureSshKey();
@@ -458,7 +475,7 @@ export async function createInstance(
 
   // Write startup script to a temp file
   const tmpFile = `/tmp/spawn_startup_${Date.now()}.sh`;
-  writeFileSync(tmpFile, getStartupScript(username));
+  writeFileSync(tmpFile, getStartupScript(username, tier));
 
   const args = [
     "compute", "instances", "create", name,

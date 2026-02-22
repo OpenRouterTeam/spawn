@@ -6,6 +6,9 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/** Cloud-init dependency tier: what packages to pre-install on the VM. */
+export type CloudInitTier = "minimal" | "node" | "bun" | "full";
+
 export interface AgentConfig {
   name: string;
   /** If true, prompt for model selection before provisioning. */
@@ -24,6 +27,8 @@ export interface AgentConfig {
   preLaunch?: () => Promise<void>;
   /** Shell command to launch the agent interactively. */
   launchCmd: () => string;
+  /** Cloud-init dependency tier. Defaults to "full" if unset. */
+  cloudInitTier?: CloudInitTier;
 }
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────

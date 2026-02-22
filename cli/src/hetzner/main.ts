@@ -38,7 +38,7 @@ async function main() {
     },
     async promptSize() {},
     async createServer(name: string) {
-      await createHetznerServer(name);
+      await createHetznerServer(name, undefined, undefined, agent.cloudInitTier);
     },
     getServerName,
     async waitForReady() {

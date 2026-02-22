@@ -47,7 +47,7 @@ async function main() {
       // Bundle selection handled during authenticate()
     },
     async createServer(name: string) {
-      await createInstance(name);
+      await createInstance(name, agent.cloudInitTier);
     },
     getServerName,
     async waitForReady() {

@@ -76,7 +76,7 @@ async function main() {
         // Custom image already has packages baked in — just wait for SSH
         await waitForSsh();
       } else {
-        await waitForCloudInit();
+        await waitForCloudInit(agent.cloudInitTier);
       }
     },
     interactiveSession,

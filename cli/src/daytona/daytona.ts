@@ -11,6 +11,8 @@ import {
   validateServerName,
   toKebabCase,
 } from "../shared/ui";
+import type { CloudInitTier } from "../shared/agents";
+import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -472,25 +474,34 @@ export async function waitForSsh(maxAttempts = 20): Promise<void> {
   throw new Error("SSH wait timeout");
 }
 
-export async function waitForCloudInit(): Promise<void> {
+export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<void> {
   await waitForSsh();
 
+  const packages = getPackagesForTier(tier);
   logStep("Installing base tools in sandbox...");
-  const setupScript = [
+  const parts = [
     `export DEBIAN_FRONTEND=noninteractive`,
     `apt-get update -y`,
-    `apt-get install -y --no-install-recommends curl unzip git zsh nodejs npm ca-certificates`,
-    `npm install -g n && n 22`,
-    `ln -sf /usr/local/bin/node /usr/bin/node`,
-    `ln -sf /usr/local/bin/npm /usr/bin/npm`,
-    `ln -sf /usr/local/bin/npx /usr/bin/npx`,
-    `curl -fsSL https://bun.sh/install | bash`,
+    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+  ];
+  if (needsNodeUpgrade(tier)) {
+    parts.push(
+      `npm install -g n && n 22`,
+      `ln -sf /usr/local/bin/node /usr/bin/node`,
+      `ln -sf /usr/local/bin/npm /usr/bin/npm`,
+      `ln -sf /usr/local/bin/npx /usr/bin/npx`,
+    );
+  }
+  if (needsBun(tier)) {
+    parts.push(`curl -fsSL https://bun.sh/install | bash`);
+  }
+  parts.push(
     `echo 'export PATH="\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}"' >> ~/.bashrc`,
     `echo 'export PATH="\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}"' >> ~/.zshrc`,
-  ].join(' && ');
+  );
 
   try {
-    await runServer(setupScript);
+    await runServer(parts.join(' && '));
   } catch {
     logWarn("Base tools install had errors, continuing...");
   }
