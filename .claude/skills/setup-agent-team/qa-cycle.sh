@@ -875,10 +875,12 @@ if [[ -f "${RESULTS_PHASE4}" ]]; then
     RETRY_FAIL=$(grep -c ':fail$' "${RESULTS_PHASE4}" || true)
     log "Phase 4: ${RETRY_PASS} passed, ${RETRY_FAIL} failed"
 
-    python3 test/update-readme.py "${RESULTS_PHASE4}" 2>&1 | tee -a "${LOG_FILE}"
+    # TODO: Rewrite update-readme.py as TypeScript utility
+    # For now, skip README auto-update (removed test/update-readme.py - security theater cleanup)
+    log "Phase 4: Skipping README auto-update (needs TypeScript rewrite)"
 
     # Commit + push if README changed (using PR workflow to avoid race conditions)
-    if [[ -n "$(git diff --name-only README.md 2>/dev/null)" ]]; then
+    if false && [[ -n "$(git diff --name-only README.md 2>/dev/null)" ]]; then
         # Create feature branch for README update (timestamped to avoid collisions)
         README_BRANCH="qa/readme-update-$(date +%s)"
         git checkout -b "${README_BRANCH}" 2>&1 | tee -a "${LOG_FILE}"
