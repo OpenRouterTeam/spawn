@@ -3,7 +3,7 @@
 
 import type { AgentConfig } from "./agents";
 import { generateEnvConfig } from "./agents";
-import { logInfo, logStep, logWarn } from "./ui";
+import { logInfo, logStep, logWarn, withRetry } from "./ui";
 import { getOrPromptApiKey, getModelIdInteractive } from "./oauth";
 import type { CloudRunner } from "./agent-setup";
 import { offerGithubAuth } from "./agent-setup";
@@ -64,10 +64,16 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
   const envContent = generateEnvConfig(agent.envVars(apiKey));
   const envB64 = Buffer.from(envContent).toString("base64");
   try {
-    await cloud.runner.runServer(
-      `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
-        `grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc; ` +
-        `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc`,
+    await withRetry(
+      "env setup",
+      () =>
+        cloud.runner.runServer(
+          `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
+            `grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc; ` +
+            `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc`,
+        ),
+      2,
+      5,
     );
   } catch {
     logWarn("Environment setup had errors");
@@ -79,7 +85,7 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
   // 10. Agent-specific configuration
   if (agent.configure) {
     try {
-      await agent.configure(apiKey, modelId);
+      await withRetry("agent config", () => agent.configure!(apiKey, modelId), 2, 5);
     } catch {
       logWarn("Agent configuration failed (continuing with defaults)");
     }

@@ -149,6 +149,25 @@ export function openBrowser(url: string): void {
   logStep(`Please open: ${url}`);
 }
 
+/** Generic async retry helper. Retries `fn` up to `maxAttempts` times with a delay between attempts. */
+export async function withRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  delaySec = 5,
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt >= maxAttempts) throw err;
+      logWarn(`${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delaySec}s...`);
+      await new Promise((r) => setTimeout(r, delaySec * 1000));
+    }
+  }
+  throw new Error("unreachable");
+}
+
 /** JSON-escape a string (returns the quoted JSON string). */
 export function jsonEscape(s: string): string {
   return JSON.stringify(s);
