@@ -2748,6 +2748,12 @@ _load_token_from_env() {
 
     local env_value="${!env_var_name}"
     if [[ -n "${env_value}" ]]; then
+        # SECURITY: Validate token characters to prevent curl config injection via -K -
+        # Must match the same character class used in _load_token_from_config()
+        if [[ ! "${env_value}" =~ ^[a-zA-Z0-9._/@:+=,\ -]+$ ]]; then
+            log_warn "${provider_name} token from environment contains invalid characters — ignoring"
+            return 1
+        fi
         log_info "Using ${provider_name} API token from environment"
         return 0
     fi
