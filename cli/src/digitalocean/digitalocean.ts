@@ -416,14 +416,15 @@ async function tryDoOAuth(): Promise<string | null> {
 
 // ─── Authentication ──────────────────────────────────────────────────────────
 
-export async function ensureDoToken(): Promise<void> {
+/** Returns true if browser OAuth was triggered (so caller can delay before next OAuth). */
+export async function ensureDoToken(): Promise<boolean> {
   // 1. Env var
   if (process.env.DO_API_TOKEN) {
     doToken = process.env.DO_API_TOKEN.trim();
     if (await testDoToken()) {
       logInfo("Using DigitalOcean API token from environment");
       await saveTokenToConfig(doToken);
-      return;
+      return false;
     }
     logWarn("DO_API_TOKEN from environment is invalid");
     doToken = "";
@@ -439,14 +440,14 @@ export async function ensureDoToken(): Promise<void> {
         doToken = refreshed;
         if (await testDoToken()) {
           logInfo("Using refreshed DigitalOcean token");
-          return;
+          return false;
         }
       }
     } else {
       doToken = saved;
       if (await testDoToken()) {
         logInfo("Using saved DigitalOcean API token");
-        return;
+        return false;
       }
       logWarn("Saved DigitalOcean token is invalid or expired");
       // Try refresh as fallback
@@ -455,7 +456,7 @@ export async function ensureDoToken(): Promise<void> {
         doToken = refreshed;
         if (await testDoToken()) {
           logInfo("Using refreshed DigitalOcean token");
-          return;
+          return false;
         }
       }
     }
@@ -468,7 +469,7 @@ export async function ensureDoToken(): Promise<void> {
     doToken = oauthToken;
     if (await testDoToken()) {
       logInfo("Using DigitalOcean token from OAuth");
-      return;
+      return true;
     }
     logWarn("OAuth token failed validation");
     doToken = "";
@@ -488,7 +489,7 @@ export async function ensureDoToken(): Promise<void> {
     if (await testDoToken()) {
       await saveTokenToConfig(doToken);
       logInfo("DigitalOcean API token validated and saved");
-      return;
+      return false;
     }
     logError("Token is invalid");
     doToken = "";

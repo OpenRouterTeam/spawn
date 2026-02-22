@@ -16,6 +16,7 @@ import {
 import { resolveAgent } from "./agents";
 import { runOrchestration } from "../shared/orchestrate";
 import type { CloudOrchestrator } from "../shared/orchestrate";
+import { logStep } from "../shared/ui";
 
 async function main() {
   const agentName = process.argv[2];
@@ -33,8 +34,12 @@ async function main() {
     runner: { runServer, uploadFile },
     async authenticate() {
       await promptSpawnName();
-      await ensureDoToken();
+      const usedBrowserAuth = await ensureDoToken();
       await ensureSshKey();
+      if (usedBrowserAuth) {
+        logStep("Next step: OpenRouter authentication (opening browser in 5s)...");
+        await new Promise((r) => setTimeout(r, 5000));
+      }
     },
     async promptSize() {},
     async createServer(name: string) {
