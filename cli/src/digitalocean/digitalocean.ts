@@ -12,6 +12,8 @@ import {
   validateRegionName,
   toKebabCase,
 } from "../shared/ui";
+import type { CloudInitTier } from "../shared/agents";
+import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
 const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
@@ -612,21 +614,29 @@ export function saveLaunchCmd(launchCmd: string): void {
 
 // ─── Provisioning ────────────────────────────────────────────────────────────
 
-function getCloudInitUserdata(): string {
-  return [
+function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
+  const packages = getPackagesForTier(tier);
+  const lines = [
     "#!/bin/bash",
     "set -e",
     "export DEBIAN_FRONTEND=noninteractive",
     "apt-get update -y",
-    "apt-get install -y --no-install-recommends curl unzip git ca-certificates zsh nodejs npm build-essential",
-    "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true",
-    'if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi',
+    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+  ];
+  if (needsNodeUpgrade(tier)) {
+    lines.push("npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true");
+  }
+  if (needsBun(tier)) {
+    lines.push('if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi');
+  }
+  lines.push(
     'for rc in ~/.bashrc ~/.zshrc; do grep -q ".bun/bin" "$rc" 2>/dev/null || echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> "$rc"; done',
     "touch /root/.cloud-init-complete",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
-export async function createServer(name: string): Promise<void> {
+export async function createServer(name: string, tier?: CloudInitTier): Promise<void> {
   const size = process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
   const region = process.env.DO_REGION || "nyc3";
   const image = "ubuntu-24-04-x64";
@@ -645,7 +655,7 @@ export async function createServer(name: string): Promise<void> {
     .map((k: any) => k.id)
     .filter(Boolean);
 
-  const userdata = getCloudInitUserdata();
+  const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
     name,
     region,

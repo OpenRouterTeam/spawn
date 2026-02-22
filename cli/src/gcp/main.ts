@@ -48,7 +48,7 @@ async function main() {
       zone = await promptZone();
     },
     async createServer(name: string) {
-      await createInstance(name, zone, machineType);
+      await createInstance(name, zone, machineType, agent.cloudInitTier);
     },
     getServerName,
     async waitForReady() {

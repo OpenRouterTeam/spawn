@@ -43,7 +43,7 @@ async function main() {
     },
     async promptSize() {},
     async createServer(name: string) {
-      await createDroplet(name);
+      await createDroplet(name, agent.cloudInitTier);
     },
     getServerName,
     async waitForReady() {

@@ -14,6 +14,8 @@ import {
   validateRegionName,
   toKebabCase,
 } from "../shared/ui";
+import type { CloudInitTier } from "../shared/agents";
+import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 
@@ -451,31 +453,44 @@ export async function ensureSshKey(): Promise<void> {
 
 // ─── Cloud-init User Data ───────────────────────────────────────────────────
 
-function getCloudInitUserdata(): string {
-  return `#!/bin/bash
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y --no-install-recommends curl unzip git zsh nodejs npm ca-certificates
-# Upgrade Node.js to v22 LTS
-npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx
-# Install Bun
-su - ubuntu -c 'curl -fsSL https://bun.sh/install | bash'
-# Install Claude Code
-su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'
-# Configure npm global prefix
-su - ubuntu -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'
-# Configure PATH
-echo 'export PATH="\${HOME}/.npm-global/bin:\${HOME}/.claude/local/bin:\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}"' >> /home/ubuntu/.bashrc
-echo 'export PATH="\${HOME}/.npm-global/bin:\${HOME}/.claude/local/bin:\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}"' >> /home/ubuntu/.zshrc
-chown ubuntu:ubuntu /home/ubuntu/.bashrc /home/ubuntu/.zshrc
-touch /home/ubuntu/.cloud-init-complete
-chown ubuntu:ubuntu /home/ubuntu/.cloud-init-complete
-`;
+function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
+  const packages = getPackagesForTier(tier);
+  const lines = [
+    "#!/bin/bash",
+    "export DEBIAN_FRONTEND=noninteractive",
+    "apt-get update -y",
+    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+  ];
+  if (needsNodeUpgrade(tier)) {
+    lines.push(
+      "# Upgrade Node.js to v22 LTS",
+      "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx",
+      "# Install Claude Code",
+      "su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'",
+      "# Configure npm global prefix",
+      "su - ubuntu -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'",
+    );
+  }
+  if (needsBun(tier)) {
+    lines.push(
+      "# Install Bun",
+      "su - ubuntu -c 'curl -fsSL https://bun.sh/install | bash'",
+    );
+  }
+  lines.push(
+    "# Configure PATH",
+    'echo \'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"\' >> /home/ubuntu/.bashrc',
+    'echo \'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"\' >> /home/ubuntu/.zshrc',
+    "chown ubuntu:ubuntu /home/ubuntu/.bashrc /home/ubuntu/.zshrc",
+    "touch /home/ubuntu/.cloud-init-complete",
+    "chown ubuntu:ubuntu /home/ubuntu/.cloud-init-complete",
+  );
+  return lines.join("\n") + "\n";
 }
 
 // ─── Provisioning ───────────────────────────────────────────────────────────
 
-export async function createInstance(name: string): Promise<void> {
+export async function createInstance(name: string, tier?: CloudInitTier): Promise<void> {
   const bundle = selectedBundle;
   const region = awsRegion;
   const az = `${region}a`;
@@ -487,7 +502,7 @@ export async function createInstance(name: string): Promise<void> {
 
   logStep(`Creating Lightsail instance '${name}' (bundle: ${bundle}, AZ: ${az})...`);
 
-  const userdata = getCloudInitUserdata();
+  const userdata = getCloudInitUserdata(tier);
 
   if (lightsailMode === "cli") {
     try {

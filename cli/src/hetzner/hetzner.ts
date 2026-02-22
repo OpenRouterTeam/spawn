@@ -12,6 +12,8 @@ import {
   validateRegionName,
   toKebabCase,
 } from "../shared/ui";
+import type { CloudInitTier } from "../shared/agents";
+import { getPackagesForTier, needsNodeUpgrade, needsBun } from "../shared/cloud-init";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
@@ -283,19 +285,27 @@ export function saveLaunchCmd(launchCmd: string): void {
 
 // ─── Cloud Init Userdata ────────────────────────────────────────────────────
 
-function getCloudInitUserdata(): string {
-  return [
+function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
+  const packages = getPackagesForTier(tier);
+  const lines = [
     "#!/bin/bash",
     "set -e",
     "export DEBIAN_FRONTEND=noninteractive",
     "apt-get update -y",
-    "apt-get install -y --no-install-recommends curl unzip git ca-certificates zsh build-essential jq nodejs npm",
-    "npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true",
-    'curl -fsSL https://bun.sh/install | bash || true',
+    `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
+  ];
+  if (needsNodeUpgrade(tier)) {
+    lines.push("npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true");
+  }
+  if (needsBun(tier)) {
+    lines.push('curl -fsSL https://bun.sh/install | bash || true');
+  }
+  lines.push(
     'echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> /root/.bashrc',
     'echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> /root/.zshrc',
     "touch /home/ubuntu/.cloud-init-complete 2>/dev/null; touch /root/.cloud-init-complete",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 // ─── Provisioning ────────────────────────────────────────────────────────────
@@ -304,6 +314,7 @@ export async function createServer(
   name: string,
   serverType?: string,
   location?: string,
+  tier?: CloudInitTier,
 ): Promise<void> {
   const sType = serverType || process.env.HETZNER_SERVER_TYPE || "cx23";
   const loc = location || process.env.HETZNER_LOCATION || "nbg1";
@@ -321,7 +332,7 @@ export async function createServer(
   const keysData = parseJson(keysResp);
   const sshKeyIds: number[] = (keysData?.ssh_keys || []).map((k: any) => k.id).filter(Boolean);
 
-  const userdata = getCloudInitUserdata();
+  const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
     name,
     server_type: sType,

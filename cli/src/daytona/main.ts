@@ -40,7 +40,7 @@ async function main() {
     },
     getServerName,
     async waitForReady() {
-      await waitForCloudInit();
+      await waitForCloudInit(agent.cloudInitTier);
     },
     interactiveSession,
     saveLaunchCmd,
