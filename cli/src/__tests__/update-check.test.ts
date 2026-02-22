@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 
 // ── Test Helpers ───────────────────────────────────────────────────────────────
 
@@ -14,7 +14,9 @@ function clearUpdateBackoff() {
 }
 
 function mockEnv() {
-  const originalEnv = { ...process.env };
+  const originalEnv = {
+    ...process.env,
+  };
   process.env.NODE_ENV = undefined;
   process.env.BUN_ENV = undefined;
   process.env.SPAWN_NO_UPDATE_CHECK = undefined;
@@ -76,8 +78,11 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "99.0.0" }),
-        } as Response)
+          json: () =>
+            Promise.resolve({
+              version: "99.0.0",
+            }),
+        } as Response),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -99,8 +104,11 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "99.0.0" }),
-        } as Response)
+          json: () =>
+            Promise.resolve({
+              version: "99.0.0",
+            }),
+        } as Response),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -134,8 +142,11 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "0.2.3" }),
-        } as Response)
+          json: () =>
+            Promise.resolve({
+              version: "0.2.3",
+            }),
+        } as Response),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -174,8 +185,11 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "99.0.0" }),
-        } as Response)
+          json: () =>
+            Promise.resolve({
+              version: "99.0.0",
+            }),
+        } as Response),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -204,7 +218,7 @@ describe("update-check", () => {
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: false,
-        } as Response)
+        } as Response),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -219,13 +233,21 @@ describe("update-check", () => {
 
     it("should re-exec with original args after successful update", async () => {
       const originalArgv = process.argv;
-      process.argv = ["/usr/bin/bun", "/usr/local/bin/spawn", "claude", "sprite"];
+      process.argv = [
+        "/usr/bin/bun",
+        "/usr/local/bin/spawn",
+        "claude",
+        "sprite",
+      ];
 
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "99.0.0" }),
-        } as Response)
+          json: () =>
+            Promise.resolve({
+              version: "99.0.0",
+            }),
+        } as Response),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -247,7 +269,10 @@ describe("update-check", () => {
       // execFileSync called once for re-exec (no shell interpretation)
       expect(execFileSyncSpy).toHaveBeenCalledTimes(1);
       expect(execFileSyncSpy.mock.calls[0][0]).toContain("spawn");
-      expect(execFileSyncSpy.mock.calls[0][1]).toEqual(["claude", "sprite"]);
+      expect(execFileSyncSpy.mock.calls[0][1]).toEqual([
+        "claude",
+        "sprite",
+      ]);
 
       // Should show rerunning message
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
@@ -267,13 +292,21 @@ describe("update-check", () => {
 
     it("should forward exit code when re-exec fails", async () => {
       const originalArgv = process.argv;
-      process.argv = ["/usr/bin/bun", "/usr/local/bin/spawn", "claude", "sprite"];
+      process.argv = [
+        "/usr/bin/bun",
+        "/usr/local/bin/spawn",
+        "claude",
+        "sprite",
+      ];
 
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "99.0.0" }),
-        } as Response)
+          json: () =>
+            Promise.resolve({
+              version: "99.0.0",
+            }),
+        } as Response),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -281,7 +314,9 @@ describe("update-check", () => {
       const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {
         // Re-exec fails with exit code 42
-        const err = new Error("Command failed") as Error & { status: number };
+        const err = new Error("Command failed") as Error & {
+          status: number;
+        };
         err.status = 42;
         throw err;
       });
@@ -300,13 +335,19 @@ describe("update-check", () => {
 
     it("should re-exec even when run without arguments (bare spawn)", async () => {
       const originalArgv = process.argv;
-      process.argv = ["/usr/bin/bun", "/usr/local/bin/spawn"];
+      process.argv = [
+        "/usr/bin/bun",
+        "/usr/local/bin/spawn",
+      ];
 
       const mockFetch = mock(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ version: "99.0.0" }),
-        } as Response)
+          json: () =>
+            Promise.resolve({
+              version: "99.0.0",
+            }),
+        } as Response),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 

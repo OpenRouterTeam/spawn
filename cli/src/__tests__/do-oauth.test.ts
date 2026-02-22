@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * Tests for DigitalOcean OAuth flow in cli/src/digitalocean/digitalocean.ts.
@@ -18,12 +18,13 @@ let testDir: string;
 let origHome: string | undefined;
 
 beforeEach(() => {
-  testDir = join(
-    tmpdir(),
-    `spawn-do-oauth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
-  mkdirSync(testDir, { recursive: true });
-  mkdirSync(join(testDir, ".config", "spawn"), { recursive: true });
+  testDir = join(tmpdir(), `spawn-do-oauth-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(testDir, {
+    recursive: true,
+  });
+  mkdirSync(join(testDir, ".config", "spawn"), {
+    recursive: true,
+  });
   origHome = process.env.HOME;
   process.env.HOME = testDir;
 });
@@ -31,7 +32,10 @@ beforeEach(() => {
 afterEach(() => {
   process.env.HOME = origHome;
   if (existsSync(testDir)) {
-    rmSync(testDir, { recursive: true, force: true });
+    rmSync(testDir, {
+      recursive: true,
+      force: true,
+    });
   }
 });
 
@@ -223,10 +227,15 @@ describe("Token expiry detection", () => {
 describe("OAuth URL construction", () => {
   const DO_OAUTH_AUTHORIZE = "https://cloud.digitalocean.com/v1/oauth/authorize";
   const DO_SCOPES = [
-    "droplet:create", "droplet:delete", "droplet:read",
-    "ssh_key:create", "ssh_key:read",
-    "regions:read", "sizes:read",
-    "image:read", "actions:read",
+    "droplet:create",
+    "droplet:delete",
+    "droplet:read",
+    "ssh_key:create",
+    "ssh_key:read",
+    "regions:read",
+    "sizes:read",
+    "image:read",
+    "actions:read",
   ].join(" ");
 
   it("should construct valid authorize URL", () => {
@@ -307,7 +316,7 @@ describe("Token exchange request body", () => {
 // ── OAuth HTML Responses ────────────────────────────────────────────────────
 
 describe("OAuth HTML responses", () => {
-  const OAUTH_CSS = `*{margin:0;padding:0;box-sizing:border-box}`;
+  const OAUTH_CSS = "*{margin:0;padding:0;box-sizing:border-box}";
   const SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>DigitalOcean Authorization Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
   const ERROR_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10007;</div><h1>Authorization Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>`;
 

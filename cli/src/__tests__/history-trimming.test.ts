@@ -1,13 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
-import {
-  loadHistory,
-  saveSpawnRecord,
-  filterHistory,
-  type SpawnRecord,
-} from "../history.js";
+import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { loadHistory, saveSpawnRecord, filterHistory, type SpawnRecord } from "../history.js";
 
 /**
  * Tests for history trimming and boundary behavior.
@@ -28,15 +23,22 @@ describe("History Trimming and Boundaries", () => {
 
   beforeEach(() => {
     testDir = join(homedir(), `spawn-history-trim-${Date.now()}-${Math.random()}`);
-    mkdirSync(testDir, { recursive: true });
-    originalEnv = { ...process.env };
+    mkdirSync(testDir, {
+      recursive: true,
+    });
+    originalEnv = {
+      ...process.env,
+    };
     process.env.SPAWN_HOME = testDir;
   });
 
   afterEach(() => {
     process.env = originalEnv;
     if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
+      rmSync(testDir, {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -149,7 +151,11 @@ describe("History Trimming and Boundaries", () => {
           agent: `agent-${i}`,
           cloud: `cloud-${i}`,
           timestamp: `2026-01-01T00:${String(i).padStart(2, "0")}:00.000Z`,
-          ...(i >= 90 ? { prompt: `Prompt for agent-${i}` } : {}),
+          ...(i >= 90
+            ? {
+                prompt: `Prompt for agent-${i}`,
+              }
+            : {}),
         });
       }
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -175,15 +181,27 @@ describe("History Trimming and Boundaries", () => {
         records.push({
           agent: `agent-${i}`,
           cloud: `cloud-${i}`,
-          timestamp: `2026-01-01T00:00:00.000Z`,
+          timestamp: "2026-01-01T00:00:00.000Z",
         });
       }
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
       // Save 3 more (98 + 3 = 101, triggers trim at 101)
-      saveSpawnRecord({ agent: "new-98", cloud: "cloud", timestamp: "2026-02-01T00:00:00.000Z" });
-      saveSpawnRecord({ agent: "new-99", cloud: "cloud", timestamp: "2026-02-02T00:00:00.000Z" });
-      saveSpawnRecord({ agent: "new-100", cloud: "cloud", timestamp: "2026-02-03T00:00:00.000Z" });
+      saveSpawnRecord({
+        agent: "new-98",
+        cloud: "cloud",
+        timestamp: "2026-02-01T00:00:00.000Z",
+      });
+      saveSpawnRecord({
+        agent: "new-99",
+        cloud: "cloud",
+        timestamp: "2026-02-02T00:00:00.000Z",
+      });
+      saveSpawnRecord({
+        agent: "new-100",
+        cloud: "cloud",
+        timestamp: "2026-02-03T00:00:00.000Z",
+      });
 
       const loaded = loadHistory();
       expect(loaded).toHaveLength(100);
@@ -201,9 +219,21 @@ describe("History Trimming and Boundaries", () => {
   describe("filterHistory ordering guarantees", () => {
     it("should return records in reverse chronological order (newest first)", () => {
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
-        { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          agent: "codex",
+          cloud: "hetzner",
+          timestamp: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          agent: "claude",
+          cloud: "hetzner",
+          timestamp: "2026-01-03T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
@@ -217,10 +247,26 @@ describe("History Trimming and Boundaries", () => {
 
     it("should maintain reverse order after filtering by agent", () => {
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
-        { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
-        { agent: "codex", cloud: "sprite", timestamp: "2026-01-04T00:00:00.000Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          agent: "codex",
+          cloud: "hetzner",
+          timestamp: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          agent: "claude",
+          cloud: "hetzner",
+          timestamp: "2026-01-03T00:00:00.000Z",
+        },
+        {
+          agent: "codex",
+          cloud: "sprite",
+          timestamp: "2026-01-04T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
@@ -232,9 +278,21 @@ describe("History Trimming and Boundaries", () => {
 
     it("should maintain reverse order after filtering by cloud", () => {
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-03T00:00:00.000Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          agent: "codex",
+          cloud: "hetzner",
+          timestamp: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-03T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
@@ -246,10 +304,26 @@ describe("History Trimming and Boundaries", () => {
 
     it("should maintain reverse order after filtering by both agent and cloud", () => {
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "claude", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
-        { agent: "codex", cloud: "sprite", timestamp: "2026-01-03T00:00:00.000Z" },
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-04T00:00:00.000Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          agent: "claude",
+          cloud: "hetzner",
+          timestamp: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          agent: "codex",
+          cloud: "sprite",
+          timestamp: "2026-01-03T00:00:00.000Z",
+        },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-04T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
@@ -261,7 +335,11 @@ describe("History Trimming and Boundaries", () => {
 
     it("should return single-element array unchanged for one matching record", () => {
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
 
@@ -330,7 +408,9 @@ describe("History Trimming and Boundaries", () => {
           cloud: "sprite",
           timestamp: "2026-01-01T00:00:00.000Z",
           extra_field: "should not break",
-          nested: { foo: "bar" },
+          nested: {
+            foo: "bar",
+          },
         },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -357,7 +437,7 @@ describe("History Trimming and Boundaries", () => {
         records.push({
           agent: `agent-${i}`,
           cloud: `cloud-${i}`,
-          timestamp: `2026-01-01T00:00:00.000Z`,
+          timestamp: "2026-01-01T00:00:00.000Z",
         });
       }
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -382,7 +462,7 @@ describe("History Trimming and Boundaries", () => {
         records.push({
           agent: `agent-${i}`,
           cloud: `cloud-${i}`,
-          timestamp: `2026-01-01T00:00:00.000Z`,
+          timestamp: "2026-01-01T00:00:00.000Z",
         });
       }
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));

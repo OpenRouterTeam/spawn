@@ -1,20 +1,9 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect } from "bun:test";
 
 // Import modules under test — these are pure functions, no side effects
-import {
-  logInfo,
-  logWarn,
-  logError,
-  logStep,
-  jsonEscape,
-  validateServerName,
-  validateRegionName,
-  validateModelId,
-  toKebabCase,
-} from "../shared/ui";
+import { jsonEscape, validateServerName, validateRegionName, validateModelId, toKebabCase } from "../shared/ui";
 
 import { sanitizeFlyToken, FLY_VM_TIERS, DEFAULT_VM_TIER } from "../fly/fly";
-import type { ServerOptions } from "../fly/fly";
 
 import { generateEnvConfig, resolveAgent, agents } from "../fly/agents";
 
@@ -121,14 +110,10 @@ describe("fly/lib/fly", () => {
       expect(sanitizeFlyToken("fm2_abc123")).toBe("FlyV1 fm2_abc123");
     });
     it("preserves comma-separated macaroon discharge tokens", () => {
-      expect(sanitizeFlyToken("fm2_abc,fm2_def,fo1_ghi")).toBe(
-        "FlyV1 fm2_abc,fm2_def,fo1_ghi",
-      );
+      expect(sanitizeFlyToken("fm2_abc,fm2_def,fo1_ghi")).toBe("FlyV1 fm2_abc,fm2_def,fo1_ghi");
     });
     it("extracts full macaroon from noisy input", () => {
-      expect(sanitizeFlyToken("deploy token fm2_abc,fm2_def extra")).toBe(
-        "FlyV1 fm2_abc,fm2_def",
-      );
+      expect(sanitizeFlyToken("deploy token fm2_abc,fm2_def extra")).toBe("FlyV1 fm2_abc,fm2_def");
     });
     it("wraps m2. tokens with FlyV1", () => {
       expect(sanitizeFlyToken("m2.abc")).toBe("FlyV1 m2.abc");
@@ -172,24 +157,33 @@ describe("fly/lib/fly", () => {
 describe("fly/lib/agents", () => {
   describe("generateEnvConfig", () => {
     it("generates export lines", () => {
-      const result = generateEnvConfig(["OPENROUTER_API_KEY=sk-test", "FOO=bar"]);
+      const result = generateEnvConfig([
+        "OPENROUTER_API_KEY=sk-test",
+        "FOO=bar",
+      ]);
       expect(result).toContain("export IS_SANDBOX='1'");
       expect(result).toContain("export OPENROUTER_API_KEY='sk-test'");
       expect(result).toContain("export FOO='bar'");
     });
 
     it("escapes single quotes in values", () => {
-      const result = generateEnvConfig(["FOO=it's"]);
+      const result = generateEnvConfig([
+        "FOO=it's",
+      ]);
       expect(result).toContain("export FOO='it'\\''s'");
     });
 
     it("rejects invalid env var names", () => {
-      const result = generateEnvConfig(["invalid-name=val"]);
+      const result = generateEnvConfig([
+        "invalid-name=val",
+      ]);
       expect(result).not.toContain("invalid-name");
     });
 
     it("allows empty values", () => {
-      const result = generateEnvConfig(["ANTHROPIC_API_KEY="]);
+      const result = generateEnvConfig([
+        "ANTHROPIC_API_KEY=",
+      ]);
       expect(result).toContain("export ANTHROPIC_API_KEY=''");
     });
   });

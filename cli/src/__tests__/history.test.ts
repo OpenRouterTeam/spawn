@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   getSpawnDir,
   getHistoryPath,
@@ -17,17 +16,24 @@ describe("history", () => {
 
   beforeEach(() => {
     // Use a directory within home directory for testing (required by security validation)
-    const { homedir } = require("os");
+    const { homedir } = require("node:os");
     testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
-    mkdirSync(testDir, { recursive: true });
-    originalEnv = { ...process.env };
+    mkdirSync(testDir, {
+      recursive: true,
+    });
+    originalEnv = {
+      ...process.env,
+    };
     process.env.SPAWN_HOME = testDir;
   });
 
   afterEach(() => {
     process.env = originalEnv;
     if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
+      rmSync(testDir, {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -35,7 +41,7 @@ describe("history", () => {
 
   describe("getSpawnDir", () => {
     it("returns SPAWN_HOME when set to valid path within home", () => {
-      const { homedir } = require("os");
+      const { homedir } = require("node:os");
       const validPath = join(homedir(), "custom", "spawn", "dir");
       process.env.SPAWN_HOME = validPath;
       expect(getSpawnDir()).toBe(validPath);
@@ -43,7 +49,7 @@ describe("history", () => {
 
     it("falls back to ~/.spawn when SPAWN_HOME is not set", () => {
       delete process.env.SPAWN_HOME;
-      const { homedir } = require("os");
+      const { homedir } = require("node:os");
       expect(getSpawnDir()).toBe(join(homedir(), ".spawn"));
     });
 
@@ -58,14 +64,14 @@ describe("history", () => {
     });
 
     it("resolves .. segments in absolute SPAWN_HOME within home", () => {
-      const { homedir } = require("os");
+      const { homedir } = require("node:os");
       const pathWithDots = join(homedir(), "foo", "..", "bar");
       process.env.SPAWN_HOME = pathWithDots;
       expect(getSpawnDir()).toBe(join(homedir(), "bar"));
     });
 
     it("accepts normal absolute SPAWN_HOME within home", () => {
-      const { homedir } = require("os");
+      const { homedir } = require("node:os");
       const validPath = join(homedir(), ".spawn");
       process.env.SPAWN_HOME = validPath;
       expect(getSpawnDir()).toBe(validPath);
@@ -77,7 +83,7 @@ describe("history", () => {
     });
 
     it("throws for SPAWN_HOME pointing to /root when user home is different", () => {
-      const { homedir } = require("os");
+      const { homedir } = require("node:os");
       // Only run this test if we're not actually running as root
       if (homedir() !== "/root") {
         process.env.SPAWN_HOME = "/root/.spawn";
@@ -86,7 +92,7 @@ describe("history", () => {
     });
 
     it("throws for path traversal attempt to escape home directory", () => {
-      const { homedir } = require("os");
+      const { homedir } = require("node:os");
       // Attempt to traverse outside home using .. segments
       // e.g., /home/user/../../etc/.spawn
       const traversalPath = join(homedir(), "..", "..", "etc", ".spawn");
@@ -95,7 +101,7 @@ describe("history", () => {
     });
 
     it("accepts home directory itself as SPAWN_HOME", () => {
-      const { homedir } = require("os");
+      const { homedir } = require("node:os");
       process.env.SPAWN_HOME = homedir();
       expect(getSpawnDir()).toBe(homedir());
     });
@@ -118,7 +124,11 @@ describe("history", () => {
 
     it("loads valid history from file", () => {
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
       expect(loadHistory()).toEqual(records);
@@ -130,7 +140,12 @@ describe("history", () => {
     });
 
     it("returns empty array when file contains a non-array JSON value", () => {
-      writeFileSync(join(testDir, "history.json"), JSON.stringify({ not: "array" }));
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify({
+          not: "array",
+        }),
+      );
       expect(loadHistory()).toEqual([]);
     });
 
@@ -151,9 +166,21 @@ describe("history", () => {
 
     it("loads multiple records preserving order", () => {
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
-        { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          agent: "codex",
+          cloud: "hetzner",
+          timestamp: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          agent: "claude",
+          cloud: "hetzner",
+          timestamp: "2026-01-03T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
       expect(loadHistory()).toEqual(records);
@@ -161,7 +188,12 @@ describe("history", () => {
 
     it("loads records that include optional prompt field", () => {
       const records: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z", prompt: "Fix bugs" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          prompt: "Fix bugs",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
       const loaded = loadHistory();
@@ -179,11 +211,15 @@ describe("history", () => {
 
   describe("saveSpawnRecord", () => {
     it("creates directory and file when neither exist", () => {
-      const { homedir } = require("os");
+      const { homedir } = require("node:os");
       const nestedDir = join(homedir(), ".spawn-test", "nested", "spawn");
       process.env.SPAWN_HOME = nestedDir;
 
-      saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" });
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      });
 
       expect(existsSync(join(nestedDir, "history.json"))).toBe(true);
       const data = JSON.parse(readFileSync(join(nestedDir, "history.json"), "utf-8"));
@@ -191,16 +227,27 @@ describe("history", () => {
       expect(data[0].agent).toBe("claude");
 
       // Clean up
-      rmSync(join(homedir(), ".spawn-test"), { recursive: true, force: true });
+      rmSync(join(homedir(), ".spawn-test"), {
+        recursive: true,
+        force: true,
+      });
     });
 
     it("appends to existing history", () => {
       const existing: SpawnRecord[] = [
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(testDir, "history.json"), JSON.stringify(existing));
 
-      saveSpawnRecord({ agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" });
+      saveSpawnRecord({
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-01-02T00:00:00.000Z",
+      });
 
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
       expect(data).toHaveLength(2);
@@ -221,14 +268,22 @@ describe("history", () => {
     });
 
     it("saves record without prompt field", () => {
-      saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" });
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      });
 
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
       expect(data[0].prompt).toBeUndefined();
     });
 
     it("writes pretty-printed JSON with trailing newline", () => {
-      saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" });
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      });
 
       const raw = readFileSync(join(testDir, "history.json"), "utf-8");
       expect(raw).toContain("\n");
@@ -255,7 +310,11 @@ describe("history", () => {
     it("recovers from corrupted existing history file", () => {
       writeFileSync(join(testDir, "history.json"), "corrupted{{{");
 
-      saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" });
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      });
 
       // loadHistory returns [] for corrupted files, so saveSpawnRecord starts fresh
       const data = JSON.parse(readFileSync(join(testDir, "history.json"), "utf-8"));
@@ -268,11 +327,32 @@ describe("history", () => {
 
   describe("filterHistory", () => {
     const sampleRecords: SpawnRecord[] = [
-      { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00.000Z" },
-      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00.000Z" },
-      { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00.000Z" },
-      { agent: "codex", cloud: "sprite", timestamp: "2026-01-04T00:00:00.000Z" },
-      { agent: "claude", cloud: "sprite", timestamp: "2026-01-05T00:00:00.000Z", prompt: "Test" },
+      {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-01-02T00:00:00.000Z",
+      },
+      {
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-01-03T00:00:00.000Z",
+      },
+      {
+        agent: "codex",
+        cloud: "sprite",
+        timestamp: "2026-01-04T00:00:00.000Z",
+      },
+      {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-05T00:00:00.000Z",
+        prompt: "Test",
+      },
     ];
 
     beforeEach(() => {
@@ -358,14 +438,22 @@ describe("history", () => {
     // timestamp handling indirectly through loadHistory round-trip
     it("preserves ISO timestamp strings through save/load cycle", () => {
       const ts = "2026-02-11T14:30:00.000Z";
-      saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: ts });
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: ts,
+      });
       const loaded = loadHistory();
       expect(loaded[0].timestamp).toBe(ts);
     });
 
     it("preserves non-ISO timestamp strings through save/load cycle", () => {
       const ts = "not-a-date";
-      saveSpawnRecord({ agent: "claude", cloud: "sprite", timestamp: ts });
+      saveSpawnRecord({
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: ts,
+      });
       const loaded = loadHistory();
       expect(loaded[0].timestamp).toBe("not-a-date");
     });

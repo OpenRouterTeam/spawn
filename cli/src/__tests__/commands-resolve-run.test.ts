@@ -32,7 +32,9 @@ const manyCloudManifest = {
       url: "https://claude.ai",
       install: "npm install -g claude",
       launch: "claude",
-      env: { ANTHROPIC_API_KEY: "test" },
+      env: {
+        ANTHROPIC_API_KEY: "test",
+      },
     },
     codex: {
       name: "Codex",
@@ -40,7 +42,9 @@ const manyCloudManifest = {
       url: "https://codex.dev",
       install: "npm install -g codex",
       launch: "codex",
-      env: { OPENAI_API_KEY: "test" },
+      env: {
+        OPENAI_API_KEY: "test",
+      },
     },
   },
   clouds: {
@@ -391,8 +395,8 @@ describe("cmdRun - display name resolution", () => {
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
       // Count example spawn commands (not the "see all" hint)
-      const exampleCmds = infoCalls.filter((msg: string) =>
-        msg.includes("spawn claude") && !msg.includes("see all") && !msg.includes("to see")
+      const exampleCmds = infoCalls.filter(
+        (msg: string) => msg.includes("spawn claude") && !msg.includes("see all") && !msg.includes("to see"),
       );
       expect(exampleCmds.length).toBeLessThanOrEqual(3);
     });

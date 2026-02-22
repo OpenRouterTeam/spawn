@@ -1,7 +1,7 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { createHash, createHmac } from "crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, createHmac } from "node:crypto";
 import {
   logInfo,
   logWarn,
@@ -9,7 +9,6 @@ import {
   logStep,
   prompt,
   selectFromList,
-  jsonEscape,
   validateServerName,
   validateRegionName,
   toKebabCase,
@@ -28,12 +27,30 @@ export interface Bundle {
 }
 
 export const BUNDLES: Bundle[] = [
-  { id: "nano_3_0", label: "nano \u00b7 2 vCPU \u00b7 512 MB \u00b7 $3.50/mo" },
-  { id: "micro_3_0", label: "micro \u00b7 2 vCPU \u00b7 1 GB \u00b7 $5/mo" },
-  { id: "small_3_0", label: "small \u00b7 2 vCPU \u00b7 2 GB \u00b7 $10/mo" },
-  { id: "medium_3_0", label: "medium \u00b7 2 vCPU \u00b7 4 GB \u00b7 $20/mo" },
-  { id: "large_3_0", label: "large \u00b7 2 vCPU \u00b7 8 GB \u00b7 $40/mo" },
-  { id: "xlarge_3_0", label: "xlarge \u00b7 2 vCPU \u00b7 16 GB \u00b7 $80/mo" },
+  {
+    id: "nano_3_0",
+    label: "nano \u00b7 2 vCPU \u00b7 512 MB \u00b7 $3.50/mo",
+  },
+  {
+    id: "micro_3_0",
+    label: "micro \u00b7 2 vCPU \u00b7 1 GB \u00b7 $5/mo",
+  },
+  {
+    id: "small_3_0",
+    label: "small \u00b7 2 vCPU \u00b7 2 GB \u00b7 $10/mo",
+  },
+  {
+    id: "medium_3_0",
+    label: "medium \u00b7 2 vCPU \u00b7 4 GB \u00b7 $20/mo",
+  },
+  {
+    id: "large_3_0",
+    label: "large \u00b7 2 vCPU \u00b7 8 GB \u00b7 $40/mo",
+  },
+  {
+    id: "xlarge_3_0",
+    label: "xlarge \u00b7 2 vCPU \u00b7 16 GB \u00b7 $80/mo",
+  },
 ];
 
 export const DEFAULT_BUNDLE = BUNDLES[0]; // nano_3_0
@@ -46,12 +63,30 @@ export interface Region {
 }
 
 export const REGIONS: Region[] = [
-  { id: "us-east-1", label: "us-east-1 (N. Virginia)" },
-  { id: "us-west-2", label: "us-west-2 (Oregon)" },
-  { id: "eu-west-1", label: "eu-west-1 (Ireland)" },
-  { id: "eu-central-1", label: "eu-central-1 (Frankfurt)" },
-  { id: "ap-southeast-1", label: "ap-southeast-1 (Singapore)" },
-  { id: "ap-northeast-1", label: "ap-northeast-1 (Tokyo)" },
+  {
+    id: "us-east-1",
+    label: "us-east-1 (N. Virginia)",
+  },
+  {
+    id: "us-west-2",
+    label: "us-west-2 (Oregon)",
+  },
+  {
+    id: "eu-west-1",
+    label: "eu-west-1 (Ireland)",
+  },
+  {
+    id: "eu-central-1",
+    label: "eu-central-1 (Frankfurt)",
+  },
+  {
+    id: "ap-southeast-1",
+    label: "ap-southeast-1 (Singapore)",
+  },
+  {
+    id: "ap-northeast-1",
+    label: "ap-northeast-1 (Tokyo)",
+  },
 ];
 
 // ─── State ──────────────────────────────────────────────────────────────────
@@ -65,7 +100,12 @@ let instanceName = "";
 let instanceIp = "";
 
 export function getState() {
-  return { awsRegion, lightsailMode, instanceName, instanceIp };
+  return {
+    awsRegion,
+    lightsailMode,
+    instanceName,
+    instanceIp,
+  };
 }
 
 // ─── SSH Config ─────────────────────────────────────────────────────────────
@@ -74,11 +114,16 @@ const SSH_USER = "ubuntu";
 const SSH_KEY_PATH = `${process.env.HOME}/.ssh/id_ed25519`;
 
 const SSH_OPTS = [
-  "-o", "StrictHostKeyChecking=no",
-  "-o", "UserKnownHostsFile=/dev/null",
-  "-o", "LogLevel=ERROR",
-  "-o", "ConnectTimeout=10",
-  "-i", SSH_KEY_PATH,
+  "-o",
+  "StrictHostKeyChecking=no",
+  "-o",
+  "UserKnownHostsFile=/dev/null",
+  "-o",
+  "LogLevel=ERROR",
+  "-o",
+  "ConnectTimeout=10",
+  "-i",
+  SSH_KEY_PATH,
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -97,11 +142,25 @@ function parseJson(text: string): any {
 
 // ─── AWS CLI Wrapper ────────────────────────────────────────────────────────
 
-function awsCliSync(args: string[]): { exitCode: number; stdout: string; stderr: string } {
-  const proc = Bun.spawnSync(["aws", ...args], {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: process.env,
-  });
+function awsCliSync(args: string[]): {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+} {
+  const proc = Bun.spawnSync(
+    [
+      "aws",
+      ...args,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+      env: process.env,
+    },
+  );
   return {
     exitCode: proc.exitCode,
     stdout: new TextDecoder().decode(proc.stdout),
@@ -110,10 +169,20 @@ function awsCliSync(args: string[]): { exitCode: number; stdout: string; stderr:
 }
 
 async function awsCli(args: string[]): Promise<string> {
-  const proc = Bun.spawn(["aws", ...args], {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: process.env,
-  });
+  const proc = Bun.spawn(
+    [
+      "aws",
+      ...args,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+      env: process.env,
+    },
+  );
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
@@ -125,7 +194,7 @@ async function awsCli(args: string[]): Promise<string> {
 
 // ─── SigV4 REST API ─────────────────────────────────────────────────────────
 
-async function lightsailRest(target: string, body: string = "{}"): Promise<string> {
+async function lightsailRest(target: string, body = "{}"): Promise<string> {
   if (!awsAccessKeyId || !awsSecretAccessKey) {
     throw new Error("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set for REST API calls");
   }
@@ -145,18 +214,50 @@ async function lightsailRest(target: string, body: string = "{}"): Promise<strin
   const payloadHash = sha256(body);
   const ct = "application/x-amz-json-1.1";
 
-  const allHeaders: [string, string][] = [
-    ["content-type", ct],
-    ["host", host],
-    ["x-amz-date", amzDate],
-    ...(awsSessionToken ? [["x-amz-security-token", awsSessionToken] as [string, string]] : []),
-    ["x-amz-target", target],
+  const allHeaders: [
+    string,
+    string,
+  ][] = [
+    [
+      "content-type",
+      ct,
+    ],
+    [
+      "host",
+      host,
+    ],
+    [
+      "x-amz-date",
+      amzDate,
+    ],
+    ...(awsSessionToken
+      ? [
+          [
+            "x-amz-security-token",
+            awsSessionToken,
+          ] as [
+            string,
+            string,
+          ],
+        ]
+      : []),
+    [
+      "x-amz-target",
+      target,
+    ],
   ];
 
   const canonicalHeaders = allHeaders.map(([k, v]) => `${k}:${v}`).join("\n") + "\n";
   const signedHeaders = allHeaders.map(([k]) => k).join(";");
 
-  const canonicalRequest = ["POST", "/", "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
+  const canonicalRequest = [
+    "POST",
+    "/",
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
 
   const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
   const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credentialScope}\n${sha256(canonicalRequest)}`;
@@ -172,7 +273,11 @@ async function lightsailRest(target: string, body: string = "{}"): Promise<strin
   const reqHeaders: Record<string, string> = Object.fromEntries(allHeaders.filter(([k]) => k !== "host"));
   reqHeaders["Authorization"] = authHeader;
 
-  const resp = await fetch(`https://${host}/`, { method: "POST", headers: reqHeaders, body });
+  const resp = await fetch(`https://${host}/`, {
+    method: "POST",
+    headers: reqHeaders,
+    body,
+  });
   const text = await resp.text();
 
   if (!resp.ok) {
@@ -180,7 +285,9 @@ async function lightsailRest(target: string, body: string = "{}"): Promise<strin
     try {
       const e = JSON.parse(text);
       msg = e.message || e.Message || e.__type || "";
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     throw new Error(`Lightsail API error (HTTP ${resp.status}) ${target}: ${msg || text}`);
   }
 
@@ -190,19 +297,58 @@ async function lightsailRest(target: string, body: string = "{}"): Promise<strin
 // ─── AWS CLI Installation ───────────────────────────────────────────────────
 
 function hasAwsCli(): boolean {
-  return Bun.spawnSync(["which", "aws"], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0;
+  return (
+    Bun.spawnSync(
+      [
+        "which",
+        "aws",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "ignore",
+        ],
+      },
+    ).exitCode === 0
+  );
 }
 
 async function installAwsCli(): Promise<void> {
   logStep("Installing AWS CLI v2...");
 
   // Try brew first
-  if (Bun.spawnSync(["which", "brew"], { stdio: ["ignore", "pipe", "ignore"] }).exitCode === 0) {
+  if (
+    Bun.spawnSync(
+      [
+        "which",
+        "brew",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "ignore",
+        ],
+      },
+    ).exitCode === 0
+  ) {
     logInfo("Installing via Homebrew...");
-    const proc = Bun.spawn(["brew", "install", "awscli"], {
-      stdio: ["ignore", "inherit", "inherit"],
-    });
-    if (await proc.exited === 0) {
+    const proc = Bun.spawn(
+      [
+        "brew",
+        "install",
+        "awscli",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "inherit",
+        ],
+      },
+    );
+    if ((await proc.exited) === 0) {
       logInfo("AWS CLI v2 installed via Homebrew");
       return;
     }
@@ -211,20 +357,40 @@ async function installAwsCli(): Promise<void> {
 
   if (process.platform === "darwin") {
     const proc = Bun.spawn(
-      ["sh", "-c", 'tmp=$(mktemp -d) && curl -fsSL "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "$tmp/AWSCLIV2.pkg" && sudo installer -pkg "$tmp/AWSCLIV2.pkg" -target / && rm -rf "$tmp"'],
-      { stdio: ["ignore", "inherit", "inherit"] },
+      [
+        "sh",
+        "-c",
+        'tmp=$(mktemp -d) && curl -fsSL "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "$tmp/AWSCLIV2.pkg" && sudo installer -pkg "$tmp/AWSCLIV2.pkg" -target / && rm -rf "$tmp"',
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "inherit",
+        ],
+      },
     );
-    if (await proc.exited !== 0) {
+    if ((await proc.exited) !== 0) {
       logError("AWS CLI install failed.");
       logError("  Try manually: brew install awscli");
       throw new Error("AWS CLI install failed");
     }
   } else {
     const proc = Bun.spawn(
-      ["sh", "-c", 'tmp=$(mktemp -d) && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$tmp/awscliv2.zip" && unzip -q "$tmp/awscliv2.zip" -d "$tmp" && sudo "$tmp/aws/install" && rm -rf "$tmp"'],
-      { stdio: ["ignore", "inherit", "inherit"] },
+      [
+        "sh",
+        "-c",
+        'tmp=$(mktemp -d) && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$tmp/awscliv2.zip" && unzip -q "$tmp/awscliv2.zip" -d "$tmp" && sudo "$tmp/aws/install" && rm -rf "$tmp"',
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "inherit",
+        ],
+      },
     );
-    if (await proc.exited !== 0) {
+    if ((await proc.exited) !== 0) {
       logError("AWS CLI install failed.");
       logError("  See: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html");
       throw new Error("AWS CLI install failed");
@@ -262,7 +428,10 @@ export async function authenticate(): Promise<void> {
 
   // 1. Try existing CLI with valid credentials
   if (hasAwsCli()) {
-    const result = awsCliSync(["sts", "get-caller-identity"]);
+    const result = awsCliSync([
+      "sts",
+      "get-caller-identity",
+    ]);
     if (result.exitCode === 0) {
       lightsailMode = "cli";
       process.env.AWS_DEFAULT_REGION = region;
@@ -299,9 +468,13 @@ export async function authenticate(): Promise<void> {
 
   logStep("Enter your AWS credentials:");
   const accessKey = await prompt("AWS Access Key ID: ");
-  if (!accessKey) throw new Error("No access key provided");
+  if (!accessKey) {
+    throw new Error("No access key provided");
+  }
   const secretKey = await prompt("AWS Secret Access Key: ");
-  if (!secretKey) throw new Error("No secret key provided");
+  if (!secretKey) {
+    throw new Error("No secret key provided");
+  }
 
   process.env.AWS_ACCESS_KEY_ID = accessKey;
   process.env.AWS_SECRET_ACCESS_KEY = secretKey;
@@ -310,7 +483,10 @@ export async function authenticate(): Promise<void> {
   awsSecretAccessKey = secretKey;
 
   if (hasAwsCli()) {
-    const result = awsCliSync(["sts", "get-caller-identity"]);
+    const result = awsCliSync([
+      "sts",
+      "get-caller-identity",
+    ]);
     if (result.exitCode === 0) {
       lightsailMode = "cli";
       logInfo(`AWS CLI configured, using region: ${region}`);
@@ -365,16 +541,35 @@ export async function promptBundle(): Promise<void> {
 // ─── SSH Key Management ─────────────────────────────────────────────────────
 
 async function generateSshKeyIfMissing(): Promise<void> {
-  if (existsSync(SSH_KEY_PATH)) return;
+  if (existsSync(SSH_KEY_PATH)) {
+    return;
+  }
 
   logStep("Generating SSH key...");
   const dir = SSH_KEY_PATH.replace(/\/[^/]+$/, "");
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, {
+    recursive: true,
+  });
   const proc = Bun.spawn(
-    ["ssh-keygen", "-t", "ed25519", "-f", SSH_KEY_PATH, "-N", "", "-q"],
-    { stdio: ["ignore", "ignore", "ignore"] },
+    [
+      "ssh-keygen",
+      "-t",
+      "ed25519",
+      "-f",
+      SSH_KEY_PATH,
+      "-N",
+      "",
+      "-q",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "ignore",
+        "ignore",
+      ],
+    },
   );
-  if (await proc.exited !== 0) {
+  if ((await proc.exited) !== 0) {
     throw new Error("SSH key generation failed");
   }
   logInfo("SSH key generated");
@@ -393,7 +588,12 @@ export async function ensureSshKey(): Promise<void> {
 
   if (lightsailMode === "cli") {
     // Check if already registered
-    const check = awsCliSync(["lightsail", "get-key-pair", "--key-pair-name", keyName]);
+    const check = awsCliSync([
+      "lightsail",
+      "get-key-pair",
+      "--key-pair-name",
+      keyName,
+    ]);
     if (check.exitCode === 0) {
       logInfo("SSH key already registered with Lightsail");
       return;
@@ -402,13 +602,21 @@ export async function ensureSshKey(): Promise<void> {
     logStep("Importing SSH key to Lightsail...");
     try {
       await awsCli([
-        "lightsail", "import-key-pair",
-        "--key-pair-name", keyName,
-        "--public-key-base64", pubKey,
+        "lightsail",
+        "import-key-pair",
+        "--key-pair-name",
+        keyName,
+        "--public-key-base64",
+        pubKey,
       ]);
     } catch {
       // Race condition: another process may have imported it
-      const recheck = awsCliSync(["lightsail", "get-key-pair", "--key-pair-name", keyName]);
+      const recheck = awsCliSync([
+        "lightsail",
+        "get-key-pair",
+        "--key-pair-name",
+        keyName,
+      ]);
       if (recheck.exitCode === 0) {
         logInfo("SSH key already registered with Lightsail");
         return;
@@ -421,7 +629,9 @@ export async function ensureSshKey(): Promise<void> {
     try {
       await lightsailRest(
         "Lightsail_20161128.GetKeyPair",
-        JSON.stringify({ keyPairName: keyName }),
+        JSON.stringify({
+          keyPairName: keyName,
+        }),
       );
       logInfo("SSH key already registered with Lightsail");
       return;
@@ -433,14 +643,19 @@ export async function ensureSshKey(): Promise<void> {
     try {
       await lightsailRest(
         "Lightsail_20161128.ImportKeyPair",
-        JSON.stringify({ keyPairName: keyName, publicKeyBase64: pubKey }),
+        JSON.stringify({
+          keyPairName: keyName,
+          publicKeyBase64: pubKey,
+        }),
       );
     } catch {
       // Race condition check
       try {
         await lightsailRest(
           "Lightsail_20161128.GetKeyPair",
-          JSON.stringify({ keyPairName: keyName }),
+          JSON.stringify({
+            keyPairName: keyName,
+          }),
         );
         logInfo("SSH key already registered with Lightsail");
         return;
@@ -481,8 +696,8 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   }
   lines.push(
     "# Configure PATH",
-    'echo \'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"\' >> /home/ubuntu/.bashrc',
-    'echo \'export PATH="${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"\' >> /home/ubuntu/.zshrc',
+    "echo 'export PATH=\"${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"' >> /home/ubuntu/.bashrc",
+    "echo 'export PATH=\"${HOME}/.npm-global/bin:${HOME}/.claude/local/bin:${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}\"' >> /home/ubuntu/.zshrc",
     "chown ubuntu:ubuntu /home/ubuntu/.bashrc /home/ubuntu/.zshrc",
     "touch /home/ubuntu/.cloud-init-complete",
     "chown ubuntu:ubuntu /home/ubuntu/.cloud-init-complete",
@@ -509,13 +724,20 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
   if (lightsailMode === "cli") {
     try {
       await awsCli([
-        "lightsail", "create-instances",
-        "--instance-names", name,
-        "--availability-zone", az,
-        "--blueprint-id", blueprint,
-        "--bundle-id", bundle,
-        "--key-pair-name", "spawn-key",
-        "--user-data", userdata,
+        "lightsail",
+        "create-instances",
+        "--instance-names",
+        name,
+        "--availability-zone",
+        az,
+        "--blueprint-id",
+        blueprint,
+        "--bundle-id",
+        bundle,
+        "--key-pair-name",
+        "spawn-key",
+        "--user-data",
+        userdata,
       ]);
     } catch (err) {
       logError("Failed to create Lightsail instance");
@@ -531,7 +753,9 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
       await lightsailRest(
         "Lightsail_20161128.CreateInstances",
         JSON.stringify({
-          instanceNames: [name],
+          instanceNames: [
+            name,
+          ],
           availabilityZone: az,
           blueprintId: blueprint,
           bundleId: bundle,
@@ -567,16 +791,22 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
     try {
       if (lightsailMode === "cli") {
         const resp = await awsCli([
-          "lightsail", "get-instance",
-          "--instance-name", instanceName,
-          "--query", "instance.state.name",
-          "--output", "text",
+          "lightsail",
+          "get-instance",
+          "--instance-name",
+          instanceName,
+          "--query",
+          "instance.state.name",
+          "--output",
+          "text",
         ]);
         state = resp.trim();
       } else {
         const resp = await lightsailRest(
           "Lightsail_20161128.GetInstance",
-          JSON.stringify({ instanceName }),
+          JSON.stringify({
+            instanceName,
+          }),
         );
         const data = parseJson(resp);
         state = data?.instance?.state?.name || "";
@@ -589,15 +819,21 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
       try {
         if (lightsailMode === "cli") {
           ip = await awsCli([
-            "lightsail", "get-instance",
-            "--instance-name", instanceName,
-            "--query", "instance.publicIpAddress",
-            "--output", "text",
+            "lightsail",
+            "get-instance",
+            "--instance-name",
+            instanceName,
+            "--query",
+            "instance.publicIpAddress",
+            "--output",
+            "text",
           ]);
         } else {
           const resp = await lightsailRest(
             "Lightsail_20161128.GetInstance",
-            JSON.stringify({ instanceName }),
+            JSON.stringify({
+              instanceName,
+            }),
           );
           const data = parseJson(resp);
           ip = data?.instance?.publicIpAddress || "";
@@ -624,19 +860,24 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
 
 // ─── Connection Tracking ────────────────────────────────────────────────────
 
-function saveVmConnection(
-  ip: string,
-  user: string,
-  serverId: string,
-  serverName: string,
-  cloud: string,
-): void {
+function saveVmConnection(ip: string, user: string, serverId: string, serverName: string, cloud: string): void {
   const dir = `${process.env.HOME}/.spawn`;
-  mkdirSync(dir, { recursive: true });
-  const json: Record<string, string> = { ip, user };
-  if (serverId) json.server_id = serverId;
-  if (serverName) json.server_name = serverName;
-  if (cloud) json.cloud = cloud;
+  mkdirSync(dir, {
+    recursive: true,
+  });
+  const json: Record<string, string> = {
+    ip,
+    user,
+  };
+  if (serverId) {
+    json.server_id = serverId;
+  }
+  if (serverName) {
+    json.server_name = serverName;
+  }
+  if (cloud) {
+    json.cloud = cloud;
+  }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -659,8 +900,19 @@ export async function waitForSsh(maxAttempts = 30): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const proc = Bun.spawn(
-        ["ssh", ...SSH_OPTS, `${SSH_USER}@${instanceIp}`, "echo ok"],
-        { stdio: ["ignore", "pipe", "ignore"] },
+        [
+          "ssh",
+          ...SSH_OPTS,
+          `${SSH_USER}@${instanceIp}`,
+          "echo ok",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "ignore",
+          ],
+        },
       );
       const stdout = await new Response(proc.stdout).text();
       const exitCode = await proc.exited;
@@ -685,10 +937,21 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const proc = Bun.spawn(
-        ["ssh", ...SSH_OPTS, `${SSH_USER}@${instanceIp}`, "test -f /home/ubuntu/.cloud-init-complete"],
-        { stdio: ["ignore", "pipe", "ignore"] },
+        [
+          "ssh",
+          ...SSH_OPTS,
+          `${SSH_USER}@${instanceIp}`,
+          "test -f /home/ubuntu/.cloud-init-complete",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "ignore",
+          ],
+        },
       );
-      if (await proc.exited === 0) {
+      if ((await proc.exited) === 0) {
         logInfo("Cloud-init complete");
         return;
       }
@@ -705,11 +968,28 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, `${SSH_USER}@${instanceIp}`, `bash -c '${fullCmd.replace(/'/g, "'\\''")}'`],
-    { stdio: ["ignore", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      `${SSH_USER}@${instanceIp}`,
+      `bash -c '${fullCmd.replace(/'/g, "'\\''")}'`,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "inherit",
+        "inherit",
+      ],
+    },
   );
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => { try { proc.kill(); } catch { /* ignore */ } }, timeout);
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {
+      /* ignore */
+    }
+  }, timeout);
   const exitCode = await proc.exited;
   clearTimeout(timer);
   if (exitCode !== 0) {
@@ -720,15 +1000,34 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
 export async function runServerCapture(cmd: string, timeoutSecs?: number): Promise<string> {
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, `${SSH_USER}@${instanceIp}`, `bash -c '${fullCmd.replace(/'/g, "'\\''")}'`],
-    { stdio: ["ignore", "pipe", "pipe"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      `${SSH_USER}@${instanceIp}`,
+      `bash -c '${fullCmd.replace(/'/g, "'\\''")}'`,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
   );
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => { try { proc.kill(); } catch { /* ignore */ } }, timeout);
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {
+      /* ignore */
+    }
+  }, timeout);
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
   clearTimeout(timer);
-  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  if (exitCode !== 0) {
+    throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  }
   return stdout.trim();
 }
 
@@ -737,10 +1036,21 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     throw new Error(`Invalid remote path: ${remotePath}`);
   }
   const proc = Bun.spawn(
-    ["scp", ...SSH_OPTS, localPath, `${SSH_USER}@${instanceIp}:${remotePath}`],
-    { stdio: ["ignore", "ignore", "pipe"] },
+    [
+      "scp",
+      ...SSH_OPTS,
+      localPath,
+      `${SSH_USER}@${instanceIp}:${remotePath}`,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "ignore",
+        "pipe",
+      ],
+    },
   );
-  if (await proc.exited !== 0) {
+  if ((await proc.exited) !== 0) {
     throw new Error(`upload_file failed for ${remotePath}`);
   }
 }
@@ -750,8 +1060,20 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, "-t", `${SSH_USER}@${instanceIp}`, `bash -c '${escapedCmd}'`],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      "-t",
+      `${SSH_USER}@${instanceIp}`,
+      `bash -c '${escapedCmd}'`,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+    },
   );
   const exitCode = await proc.exited;
 
@@ -785,7 +1107,9 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd.slice(0, 80)}...`);
-      if (attempt < maxAttempts) await sleep(sleepSec * 1000);
+      if (attempt < maxAttempts) {
+        await sleep(sleepSec * 1000);
+      }
     }
   }
   throw new Error(`runWithRetry exhausted: ${cmd.slice(0, 80)}...`);
@@ -804,13 +1128,14 @@ export async function getServerName(): Promise<string> {
     return name;
   }
 
-  const kebab = process.env.SPAWN_NAME_KEBAB
-    || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
+  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
   return kebab || defaultSpawnName();
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) {
+    return;
+  }
 
   let kebab: string;
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
@@ -832,13 +1157,20 @@ export async function promptSpawnName(): Promise<void> {
 
 export async function destroyServer(name?: string): Promise<void> {
   const target = name || instanceName;
-  if (!target) throw new Error("destroy_server: no instance name provided");
+  if (!target) {
+    throw new Error("destroy_server: no instance name provided");
+  }
 
   logStep(`Destroying Lightsail instance '${target}'...`);
 
   if (lightsailMode === "cli") {
     try {
-      await awsCli(["lightsail", "delete-instance", "--instance-name", target]);
+      await awsCli([
+        "lightsail",
+        "delete-instance",
+        "--instance-name",
+        target,
+      ]);
     } catch {
       logError(`Failed to destroy Lightsail instance '${target}'`);
       logWarn(`Delete it manually: ${DASHBOARD_URL}`);
@@ -848,7 +1180,10 @@ export async function destroyServer(name?: string): Promise<void> {
     try {
       await lightsailRest(
         "Lightsail_20161128.DeleteInstance",
-        JSON.stringify({ instanceName: target, forceDeleteAddOns: false }),
+        JSON.stringify({
+          instanceName: target,
+          forceDeleteAddOns: false,
+        }),
       );
     } catch {
       logError(`Failed to destroy Lightsail instance '${target}'`);
@@ -862,8 +1197,23 @@ export async function destroyServer(name?: string): Promise<void> {
 export async function listServers(): Promise<void> {
   if (lightsailMode === "cli") {
     const proc = Bun.spawn(
-      ["aws", "lightsail", "get-instances", "--query", "instances[].{Name:name,State:state.name,IP:publicIpAddress,Bundle:bundleId}", "--output", "table"],
-      { stdio: ["ignore", "inherit", "inherit"], env: process.env },
+      [
+        "aws",
+        "lightsail",
+        "get-instances",
+        "--query",
+        "instances[].{Name:name,State:state.name,IP:publicIpAddress,Bundle:bundleId}",
+        "--output",
+        "table",
+      ],
+      {
+        stdio: [
+          "ignore",
+          "inherit",
+          "inherit",
+        ],
+        env: process.env,
+      },
     );
     await proc.exited;
   } else {
@@ -875,10 +1225,7 @@ export async function listServers(): Promise<void> {
     console.log("-".repeat(72));
     for (const i of instances) {
       console.log(
-        pad(i.name || "", 30) +
-        pad(i.state?.name || "", 12) +
-        pad(i.publicIpAddress || "N/A", 16) +
-        (i.bundleId || ""),
+        pad(i.name || "", 30) + pad(i.state?.name || "", 12) + pad(i.publicIpAddress || "N/A", 16) + (i.bundleId || ""),
       );
     }
   }

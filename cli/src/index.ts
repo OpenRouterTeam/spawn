@@ -41,11 +41,19 @@ function handleError(err: unknown): never {
 function extractFlagValue(
   args: string[],
   flags: string[],
-  flagLabel: string,
-  usageHint: string
-): [string | undefined, string[]] {
-  const idx = args.findIndex(arg => flags.includes(arg));
-  if (idx === -1) return [undefined, args];
+  _flagLabel: string,
+  usageHint: string,
+): [
+  string | undefined,
+  string[],
+] {
+  const idx = args.findIndex((arg) => flags.includes(arg));
+  if (idx === -1) {
+    return [
+      undefined,
+      args,
+    ];
+  }
 
   if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
     console.error(pc.red(`Error: ${pc.bold(args[idx])} requires a value`));
@@ -54,24 +62,43 @@ function extractFlagValue(
   }
 
   const value = args[idx + 1];
-  const remaining = [...args];
+  const remaining = [
+    ...args,
+  ];
   remaining.splice(idx, 2);
-  return [value, remaining];
+  return [
+    value,
+    remaining,
+  ];
 }
 
-const HELP_FLAGS = ["--help", "-h", "help"];
+const HELP_FLAGS = [
+  "--help",
+  "-h",
+  "help",
+];
 
 const KNOWN_FLAGS = new Set([
-  "--help", "-h",
-  "--version", "-v", "-V",
-  "--prompt", "-p", "--prompt-file", "-f",
-  "--dry-run", "-n",
+  "--help",
+  "-h",
+  "--version",
+  "-v",
+  "-V",
+  "--prompt",
+  "-p",
+  "--prompt-file",
+  "-f",
+  "--dry-run",
+  "-n",
   "--debug",
   "--headless",
   "--output",
   "--name",
   "--default",
-  "-a", "-c", "--agent", "--cloud",
+  "-a",
+  "-c",
+  "--agent",
+  "--cloud",
   "--clear",
 ]);
 
@@ -92,10 +119,13 @@ export function expandEqualsFlags(args: string[]): string[] {
 /** Check for unknown flags and show an actionable error */
 function checkUnknownFlags(args: string[]): void {
   for (const arg of args) {
-    if ((arg.startsWith("--") || (arg.startsWith("-") && arg.length > 1 && !/^-\d/.test(arg))) && !KNOWN_FLAGS.has(arg)) {
+    if (
+      (arg.startsWith("--") || (arg.startsWith("-") && arg.length > 1 && !/^-\d/.test(arg))) &&
+      !KNOWN_FLAGS.has(arg)
+    ) {
       console.error(pc.red(`Unknown flag: ${pc.bold(arg)}`));
       console.error();
-      console.error(`  Supported flags:`);
+      console.error("  Supported flags:");
       console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
       console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
       console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
@@ -121,7 +151,23 @@ function checkUnknownFlags(args: string[]): void {
 }
 
 /** Show info for a name that could be an agent or cloud, or show an error with suggestions */
-function showUnknownCommandError(name: string, manifest: { agents: Record<string, { name: string }>; clouds: Record<string, { name: string }> }): never {
+function showUnknownCommandError(
+  name: string,
+  manifest: {
+    agents: Record<
+      string,
+      {
+        name: string;
+      }
+    >;
+    clouds: Record<
+      string,
+      {
+        name: string;
+      }
+    >;
+  },
+): never {
   const agentMatch = findClosestKeyByNameOrKey(name, agentKeys(manifest), (k) => manifest.agents[k].name);
   const cloudMatch = findClosestKeyByNameOrKey(name, cloudKeys(manifest), (k) => manifest.clouds[k].name);
 
@@ -129,8 +175,12 @@ function showUnknownCommandError(name: string, manifest: { agents: Record<string
   console.error();
   if (agentMatch || cloudMatch) {
     const suggestions: string[] = [];
-    if (agentMatch) suggestions.push(`${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})`);
-    if (cloudMatch) suggestions.push(`${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})`);
+    if (agentMatch) {
+      suggestions.push(`${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})`);
+    }
+    if (cloudMatch) {
+      suggestions.push(`${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})`);
+    }
     console.error(`  Did you mean ${suggestions.join(" or ")}?`);
   }
   console.error();
@@ -144,19 +194,39 @@ async function showInfoOrError(name: string): Promise<void> {
   const manifest = await loadManifestWithSpinner();
 
   // Direct key match — pass pre-loaded manifest to avoid a redundant spinner
-  if (manifest.agents[name]) { await cmdAgentInfo(name, manifest); return; }
-  if (manifest.clouds[name]) { await cmdCloudInfo(name, manifest); return; }
+  if (manifest.agents[name]) {
+    await cmdAgentInfo(name, manifest);
+    return;
+  }
+  if (manifest.clouds[name]) {
+    await cmdCloudInfo(name, manifest);
+    return;
+  }
 
   // Try resolving display names and case-insensitive matches
   const resolvedAgent = resolveAgentKey(manifest, name);
-  if (resolvedAgent) { await cmdAgentInfo(resolvedAgent, manifest); return; }
+  if (resolvedAgent) {
+    await cmdAgentInfo(resolvedAgent, manifest);
+    return;
+  }
   const resolvedCloud = resolveCloudKey(manifest, name);
-  if (resolvedCloud) { await cmdCloudInfo(resolvedCloud, manifest); return; }
+  if (resolvedCloud) {
+    await cmdCloudInfo(resolvedCloud, manifest);
+    return;
+  }
 
   showUnknownCommandError(name, manifest);
 }
 
-async function handleDefaultCommand(agent: string, cloud: string | undefined, prompt?: string, dryRun?: boolean, debug?: boolean, headless?: boolean, outputFormat?: string): Promise<void> {
+async function handleDefaultCommand(
+  agent: string,
+  cloud: string | undefined,
+  prompt?: string,
+  dryRun?: boolean,
+  debug?: boolean,
+  headless?: boolean,
+  outputFormat?: string,
+): Promise<void> {
   if (cloud && HELP_FLAGS.includes(cloud)) {
     await showInfoOrError(agent);
     return;
@@ -164,14 +234,25 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   if (headless) {
     if (!cloud) {
       if (outputFormat === "json") {
-        console.log(JSON.stringify({ status: "error", error_code: "VALIDATION_ERROR", error_message: "--headless requires both <agent> and <cloud>" }));
+        console.log(
+          JSON.stringify({
+            status: "error",
+            error_code: "VALIDATION_ERROR",
+            error_message: "--headless requires both <agent> and <cloud>",
+          }),
+        );
       } else {
         console.error(pc.red("Error: --headless requires both <agent> and <cloud>"));
         console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
       }
       process.exit(3);
     }
-    await cmdRunHeadless(agent, cloud, { prompt, debug, outputFormat, spawnName: process.env.SPAWN_NAME });
+    await cmdRunHeadless(agent, cloud, {
+      prompt,
+      debug,
+      outputFormat,
+      spawnName: process.env.SPAWN_NAME,
+    });
     return;
   }
   if (cloud) {
@@ -180,7 +261,7 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   }
   if (dryRun) {
     console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
-    console.error(`\nUsage: ${pc.cyan(`spawn <agent> <cloud> --dry-run`)}`);
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --dry-run")}`);
     process.exit(1);
   }
   if (prompt) {
@@ -205,12 +286,16 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
   try {
     const manifest = await loadManifest();
     const resolvedAgent = resolveAgentKey(manifest, agent);
-    if (!resolvedAgent) return;
+    if (!resolvedAgent) {
+      return;
+    }
 
     const clouds = cloudKeys(manifest).filter(
-      (c: string) => manifest.matrix[`${c}/${resolvedAgent}`] === "implemented"
+      (c: string) => manifest.matrix[`${c}/${resolvedAgent}`] === "implemented",
     );
-    if (clouds.length === 0) return;
+    if (clouds.length === 0) {
+      return;
+    }
 
     const agentName = manifest.agents[resolvedAgent].name;
     console.error(`\nAvailable clouds for ${pc.bold(agentName)}:`);
@@ -220,7 +305,7 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
     if (clouds.length > 5) {
       console.error(`  Run ${pc.cyan(`spawn ${resolvedAgent}`)} to see all ${clouds.length} clouds.`);
     }
-  } catch (err) {
+  } catch (_err) {
     // Manifest unavailable — skip cloud suggestions
   }
 }
@@ -230,13 +315,13 @@ function handlePromptFileError(promptFile: string, err: unknown): never {
   const code = err && typeof err === "object" && "code" in err ? err.code : "";
   if (code === "ENOENT") {
     console.error(pc.red(`Prompt file not found: ${pc.bold(promptFile)}`));
-    console.error(`\nCheck the path and try again.`);
+    console.error("\nCheck the path and try again.");
   } else if (code === "EACCES") {
     console.error(pc.red(`Permission denied reading prompt file: ${pc.bold(promptFile)}`));
     console.error(`\nCheck file permissions: ${pc.cyan(`ls -la ${promptFile}`)}`);
   } else if (code === "EISDIR") {
     console.error(pc.red(`'${promptFile}' is a directory, not a file.`));
-    console.error(`\nProvide a path to a text file containing your prompt.`);
+    console.error("\nProvide a path to a text file containing your prompt.");
   } else {
     const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
     console.error(pc.red(`Error reading prompt file '${promptFile}': ${msg}`));
@@ -247,7 +332,7 @@ function handlePromptFileError(promptFile: string, err: unknown): never {
 /** Read and validate a prompt file, exiting on any error */
 async function readPromptFile(promptFile: string): Promise<string> {
   const { validatePromptFilePath, validatePromptFileStats } = await import("./security.js");
-  const { readFileSync, statSync } = await import("fs");
+  const { readFileSync, statSync } = await import("node:fs");
 
   try {
     validatePromptFilePath(promptFile);
@@ -278,25 +363,36 @@ async function readPromptFile(promptFile: string): Promise<string> {
 }
 
 /** Parse --prompt / -p and --prompt-file flags, returning the resolved prompt text and remaining args */
-async function resolvePrompt(args: string[]): Promise<[string | undefined, string[]]> {
+async function resolvePrompt(args: string[]): Promise<
+  [
+    string | undefined,
+    string[],
+  ]
+> {
   let [prompt, filteredArgs] = extractFlagValue(
     args,
-    ["--prompt", "-p"],
+    [
+      "--prompt",
+      "-p",
+    ],
     "prompt",
-    'spawn <agent> <cloud> --prompt "your prompt here"'
+    'spawn <agent> <cloud> --prompt "your prompt here"',
   );
 
   const [promptFile, finalArgs] = extractFlagValue(
     filteredArgs,
-    ["--prompt-file", "-f"],
+    [
+      "--prompt-file",
+      "-f",
+    ],
     "prompt file",
-    "spawn <agent> <cloud> --prompt-file instructions.txt"
+    "spawn <agent> <cloud> --prompt-file instructions.txt",
   );
   filteredArgs = finalArgs;
 
   if (prompt && promptFile) {
     console.error(pc.red("Error: --prompt and --prompt-file cannot be used together"));
-    console.error(`\nUse one or the other:`);
+    console.error("\nUse one or the other:");
     console.error(`  ${pc.cyan('spawn <agent> <cloud> --prompt "your prompt here"')}`);
     console.error(`  ${pc.cyan("spawn <agent> <cloud> --prompt-file instructions.txt")}`);
     process.exit(1);
@@ -306,7 +402,10 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
     prompt = await readPromptFile(promptFile);
   }
 
-  return [prompt, filteredArgs];
+  return [
+    prompt,
+    filteredArgs,
+  ];
 }
 
 /** Handle the case when no command is given (interactive mode or help) */
@@ -338,10 +437,18 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
 }
 
 function formatCacheAge(seconds: number): string {
-  if (!isFinite(seconds)) return "no cache";
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (!Number.isFinite(seconds)) {
+    return "no cache";
+  }
+  if (seconds < 60) {
+    return "just now";
+  }
+  if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)}m ago`;
+  }
+  if (seconds < 86400) {
+    return `${Math.floor(seconds / 3600)}h ago`;
+  }
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
@@ -351,38 +458,60 @@ function showVersion(): void {
   if (binPath) {
     console.log(pc.dim(`  ${binPath}`));
   }
-  console.log(pc.dim(`  ${process.versions.bun ? "bun" : "node"} ${process.versions.bun ?? process.versions.node}  ${process.platform} ${process.arch}`));
+  console.log(
+    pc.dim(
+      `  ${process.versions.bun ? "bun" : "node"} ${process.versions.bun ?? process.versions.node}  ${process.platform} ${process.arch}`,
+    ),
+  );
   const age = getCacheAge();
   console.log(pc.dim(`  manifest cache: ${formatCacheAge(age)}`));
-  console.log(pc.dim(`  https://github.com/OpenRouterTeam/spawn`));
+  console.log(pc.dim("  https://github.com/OpenRouterTeam/spawn"));
   console.log(pc.dim(`  Run ${pc.cyan("spawn update")} to check for updates.`));
 }
 
 const IMMEDIATE_COMMANDS: Record<string, () => void> = {
-  "help": cmdHelp, "--help": cmdHelp, "-h": cmdHelp,
-  "version": showVersion,
+  help: cmdHelp,
+  "--help": cmdHelp,
+  "-h": cmdHelp,
+  version: showVersion,
   "--version": showVersion,
   "-v": showVersion,
   "-V": showVersion,
 };
 
 const SUBCOMMANDS: Record<string, () => Promise<void>> = {
-  "matrix": cmdMatrix, "m": cmdMatrix,
-  "agents": cmdAgents,
-  "clouds": cmdClouds,
-  "update": cmdUpdate,
-  "last": cmdLast, "rerun": cmdLast,
+  matrix: cmdMatrix,
+  m: cmdMatrix,
+  agents: cmdAgents,
+  clouds: cmdClouds,
+  update: cmdUpdate,
+  last: cmdLast,
+  rerun: cmdLast,
 };
 
 // list/ls/history handled separately for -a/-c flag parsing
-const LIST_COMMANDS = new Set(["list", "ls", "history"]);
+const LIST_COMMANDS = new Set([
+  "list",
+  "ls",
+  "history",
+]);
 
 // delete/rm/destroy handled separately for -a/-c flag parsing
-const DELETE_COMMANDS = new Set(["delete", "rm", "destroy"]);
+const DELETE_COMMANDS = new Set([
+  "delete",
+  "rm",
+  "destroy",
+]);
 
 // Common verb prefixes that users naturally try (e.g. "spawn run claude sprite")
 // These are not real subcommands -- we strip them and forward to the default handler
-const VERB_ALIASES = new Set(["run", "launch", "start", "deploy", "exec"]);
+const VERB_ALIASES = new Set([
+  "run",
+  "launch",
+  "start",
+  "deploy",
+  "exec",
+]);
 
 /** Warn when extra positional arguments are silently ignored */
 function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
@@ -396,7 +525,10 @@ function warnExtraArgs(filteredArgs: string[], maxExpected: number): void {
 
 /** Parse -a/--agent <agent> and -c/--cloud <cloud> filter flags from args.
  *  Also accepts a bare positional arg as a filter (e.g. "spawn list claude"). */
-function parseListFilters(args: string[]): { agentFilter?: string; cloudFilter?: string } {
+function parseListFilters(args: string[]): {
+  agentFilter?: string;
+  cloudFilter?: string;
+} {
   let agentFilter: string | undefined;
   let cloudFilter: string | undefined;
   const positional: string[] = [];
@@ -427,17 +559,23 @@ function parseListFilters(args: string[]): { agentFilter?: string; cloudFilter?:
     agentFilter = positional[0];
   }
 
-  return { agentFilter, cloudFilter };
+  return {
+    agentFilter,
+    cloudFilter,
+  };
 }
 
 /** Check if trailing args contain a help flag */
 function hasTrailingHelpFlag(args: string[]): boolean {
-  return args.slice(1).some(a => HELP_FLAGS.includes(a));
+  return args.slice(1).some((a) => HELP_FLAGS.includes(a));
 }
 
 /** Handle list/ls/history commands with filters and --clear */
 async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
-  if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+  if (hasTrailingHelpFlag(filteredArgs)) {
+    cmdHelp();
+    return;
+  }
   if (filteredArgs.slice(1).includes("--clear")) {
     await cmdListClear();
     return;
@@ -448,14 +586,20 @@ async function dispatchListCommand(filteredArgs: string[]): Promise<void> {
 
 /** Handle delete/rm/destroy commands with filters */
 async function dispatchDeleteCommand(filteredArgs: string[]): Promise<void> {
-  if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+  if (hasTrailingHelpFlag(filteredArgs)) {
+    cmdHelp();
+    return;
+  }
   const { agentFilter, cloudFilter } = parseListFilters(filteredArgs.slice(1));
   await cmdDelete(agentFilter, cloudFilter);
 }
 
 /** Handle named subcommands (agents, clouds, matrix, etc.) */
 async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<void> {
-  if (hasTrailingHelpFlag(filteredArgs)) { cmdHelp(); return; }
+  if (hasTrailingHelpFlag(filteredArgs)) {
+    cmdHelp();
+    return;
+  }
 
   // "spawn agents <name>" or "spawn clouds <name>" -> show info for that name
   if ((cmd === "agents" || cmd === "clouds") && filteredArgs.length > 1 && !filteredArgs[1].startsWith("-")) {
@@ -472,7 +616,15 @@ async function dispatchSubcommand(cmd: string, filteredArgs: string[]): Promise<
 }
 
 /** Handle verb aliases like "spawn run claude sprite" -> "spawn claude sprite" */
-async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, debug: boolean, headless: boolean, outputFormat?: string): Promise<void> {
+async function dispatchVerbAlias(
+  cmd: string,
+  filteredArgs: string[],
+  prompt: string | undefined,
+  dryRun: boolean,
+  debug: boolean,
+  headless: boolean,
+  outputFormat?: string,
+): Promise<void> {
   if (filteredArgs.length > 1) {
     const remaining = filteredArgs.slice(1);
     warnExtraArgs(remaining, 2);
@@ -486,7 +638,14 @@ async function dispatchVerbAlias(cmd: string, filteredArgs: string[], prompt: st
 }
 
 /** Handle slash notation: "spawn claude/hetzner" -> "spawn claude hetzner" */
-async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dryRun: boolean, debug: boolean, headless: boolean, outputFormat?: string): Promise<boolean> {
+async function dispatchSlashNotation(
+  cmd: string,
+  prompt: string | undefined,
+  dryRun: boolean,
+  debug: boolean,
+  headless: boolean,
+  outputFormat?: string,
+): Promise<boolean> {
   const parts = cmd.split("/");
   if (parts.length === 2 && parts[0] && parts[1]) {
     if (!headless) {
@@ -500,20 +659,42 @@ async function dispatchSlashNotation(cmd: string, prompt: string | undefined, dr
 }
 
 /** Dispatch a named command or fall through to agent/cloud handling */
-async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: string | undefined, dryRun: boolean, debug: boolean, headless: boolean, outputFormat?: string): Promise<void> {
+async function dispatchCommand(
+  cmd: string,
+  filteredArgs: string[],
+  prompt: string | undefined,
+  dryRun: boolean,
+  debug: boolean,
+  headless: boolean,
+  outputFormat?: string,
+): Promise<void> {
   if (IMMEDIATE_COMMANDS[cmd]) {
     warnExtraArgs(filteredArgs, 1);
     IMMEDIATE_COMMANDS[cmd]();
     return;
   }
 
-  if (LIST_COMMANDS.has(cmd)) { await dispatchListCommand(filteredArgs); return; }
-  if (DELETE_COMMANDS.has(cmd)) { await dispatchDeleteCommand(filteredArgs); return; }
-  if (SUBCOMMANDS[cmd]) { await dispatchSubcommand(cmd, filteredArgs); return; }
-  if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun, debug, headless, outputFormat); return; }
+  if (LIST_COMMANDS.has(cmd)) {
+    await dispatchListCommand(filteredArgs);
+    return;
+  }
+  if (DELETE_COMMANDS.has(cmd)) {
+    await dispatchDeleteCommand(filteredArgs);
+    return;
+  }
+  if (SUBCOMMANDS[cmd]) {
+    await dispatchSubcommand(cmd, filteredArgs);
+    return;
+  }
+  if (VERB_ALIASES.has(cmd)) {
+    await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun, debug, headless, outputFormat);
+    return;
+  }
 
   if (filteredArgs.length === 1 && cmd.includes("/")) {
-    if (await dispatchSlashNotation(cmd, prompt, dryRun, debug, headless, outputFormat)) return;
+    if (await dispatchSlashNotation(cmd, prompt, dryRun, debug, headless, outputFormat)) {
+      return;
+    }
   }
 
   warnExtraArgs(filteredArgs, 2);
@@ -542,26 +723,34 @@ async function main(): Promise<void> {
   const [prompt, filteredArgs] = await resolvePrompt(args);
 
   // Extract --dry-run / -n boolean flag
-  const dryRunIdx = filteredArgs.findIndex(a => a === "--dry-run" || a === "-n");
+  const dryRunIdx = filteredArgs.findIndex((a) => a === "--dry-run" || a === "-n");
   const dryRun = dryRunIdx !== -1;
-  if (dryRun) filteredArgs.splice(dryRunIdx, 1);
+  if (dryRun) {
+    filteredArgs.splice(dryRunIdx, 1);
+  }
 
   // Extract --debug boolean flag
-  const debugIdx = filteredArgs.findIndex(a => a === "--debug");
+  const debugIdx = filteredArgs.indexOf("--debug");
   const debug = debugIdx !== -1;
-  if (debug) filteredArgs.splice(debugIdx, 1);
+  if (debug) {
+    filteredArgs.splice(debugIdx, 1);
+  }
 
   // Extract --headless boolean flag
-  const headlessIdx = filteredArgs.findIndex(a => a === "--headless");
+  const headlessIdx = filteredArgs.indexOf("--headless");
   const headless = headlessIdx !== -1;
-  if (headless) filteredArgs.splice(headlessIdx, 1);
+  if (headless) {
+    filteredArgs.splice(headlessIdx, 1);
+  }
 
   // Extract --output <format> flag
-  let [outputFormat, outputFilteredArgs] = extractFlagValue(
+  const [outputFormat, outputFilteredArgs] = extractFlagValue(
     filteredArgs,
-    ["--output"],
+    [
+      "--output",
+    ],
     "output format",
-    "spawn <agent> <cloud> --headless --output json"
+    "spawn <agent> <cloud> --headless --output json",
   );
   // Replace filteredArgs contents in-place (splice + push to maintain reference)
   filteredArgs.splice(0, filteredArgs.length, ...outputFilteredArgs);
@@ -576,9 +765,11 @@ async function main(): Promise<void> {
   // Extract --name <value> flag
   const [nameFlag, nameFilteredArgs] = extractFlagValue(
     filteredArgs,
-    ["--name"],
+    [
+      "--name",
+    ],
     "spawn name",
-    'spawn <agent> <cloud> --name "my-dev-box"'
+    'spawn <agent> <cloud> --name "my-dev-box"',
   );
   filteredArgs.splice(0, filteredArgs.length, ...nameFilteredArgs);
   if (nameFlag) {
@@ -591,7 +782,13 @@ async function main(): Promise<void> {
   // Validate headless-incompatible flags
   if (effectiveHeadless && dryRun) {
     if (outputFormat === "json") {
-      console.log(JSON.stringify({ status: "error", error_code: "VALIDATION_ERROR", error_message: "--headless and --dry-run cannot be used together" }));
+      console.log(
+        JSON.stringify({
+          status: "error",
+          error_code: "VALIDATION_ERROR",
+          error_message: "--headless and --dry-run cannot be used together",
+        }),
+      );
     } else {
       console.error(pc.red("Error: --headless and --dry-run cannot be used together"));
       console.error(`\nUse ${pc.cyan("--dry-run")} for previewing, or ${pc.cyan("--headless")} for execution.`);
@@ -607,7 +804,13 @@ async function main(): Promise<void> {
     if (!cmd) {
       if (effectiveHeadless) {
         if (outputFormat === "json") {
-          console.log(JSON.stringify({ status: "error", error_code: "VALIDATION_ERROR", error_message: "--headless requires both <agent> and <cloud>" }));
+          console.log(
+            JSON.stringify({
+              status: "error",
+              error_code: "VALIDATION_ERROR",
+              error_message: "--headless requires both <agent> and <cloud>",
+            }),
+          );
         } else {
           console.error(pc.red("Error: --headless requires both <agent> and <cloud>"));
           console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
@@ -621,7 +824,13 @@ async function main(): Promise<void> {
   } catch (err) {
     if (effectiveHeadless && outputFormat === "json") {
       const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
-      console.log(JSON.stringify({ status: "error", error_code: "UNEXPECTED_ERROR", error_message: msg }));
+      console.log(
+        JSON.stringify({
+          status: "error",
+          error_code: "UNEXPECTED_ERROR",
+          error_message: msg,
+        }),
+      );
       process.exit(1);
     }
     handleError(err);

@@ -32,7 +32,10 @@ async function main() {
   const cloud: CloudOrchestrator = {
     cloudName: "sprite",
     cloudLabel: "Sprite",
-    runner: { runServer: runSprite, uploadFile: uploadFileSprite },
+    runner: {
+      runServer: runSprite,
+      uploadFile: uploadFileSprite,
+    },
     async authenticate() {
       await promptSpawnName();
       await ensureSpriteCli();
@@ -55,10 +58,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  const msg =
-    err && typeof err === "object" && "message" in err
-      ? String(err.message)
-      : String(err);
+  const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
   process.stderr.write(`\x1b[0;31mFatal: ${msg}\x1b[0m\n`);
   process.exit(1);
 });

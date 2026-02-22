@@ -267,7 +267,7 @@ describe("cmdCloudInfo", () => {
       // "none" should not appear as an auth instruction in quick-start
       const quickStartLines = output.split("\n");
       const noneAsCommand = quickStartLines.some(
-        (line: string) => line.includes("Quick start") === false && line.trim() === "none"
+        (line: string) => line.includes("Quick start") === false && line.trim() === "none",
       );
       expect(noneAsCommand).toBe(false);
     });

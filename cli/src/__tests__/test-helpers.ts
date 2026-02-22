@@ -1,7 +1,7 @@
 import { spyOn, mock } from "bun:test";
-import { existsSync, mkdirSync, rmSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { Manifest } from "../manifest";
 
 // ── Mock Data ──────────────────────────────────────────────────────────────────
@@ -80,30 +80,45 @@ export function createProcessExitMock() {
   }) as any);
 }
 
-export function restoreMocks(...mocks: Array<{ mockRestore?: () => void } | undefined>) {
-  mocks.forEach(mock => mock?.mockRestore());
+export function restoreMocks(
+  ...mocks: Array<
+    | {
+        mockRestore?: () => void;
+      }
+    | undefined
+  >
+) {
+  mocks.forEach((mock) => {
+    mock?.mockRestore();
+  });
 }
 
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────
 
 export function mockSuccessfulFetch(data: any) {
-  return mock(() => Promise.resolve({
-    ok: true,
-    json: async () => data,
-  }) as any);
+  return mock(
+    () =>
+      Promise.resolve({
+        ok: true,
+        json: async () => data,
+      }) as any,
+  );
 }
 
-export function mockFailedFetch(error: string = "Network error") {
+export function mockFailedFetch(error = "Network error") {
   return mock(() => Promise.reject(new Error(error)));
 }
 
 export function mockFetchWithStatus(status: number, data?: any) {
-  return mock(() => Promise.resolve({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 404 ? "Not Found" : "Error",
-    json: async () => data || {},
-  }) as any);
+  return mock(
+    () =>
+      Promise.resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: status === 404 ? "Not Found" : "Error",
+        json: async () => data || {},
+      }) as any,
+  );
 }
 
 // ── Test Environment Setup ─────────────────────────────────────────────────────
@@ -118,12 +133,16 @@ export interface TestEnvironment {
 
 export function setupTestEnvironment(): TestEnvironment {
   const testDir = join(tmpdir(), `spawn-test-${Date.now()}-${Math.random()}`);
-  mkdirSync(testDir, { recursive: true });
+  mkdirSync(testDir, {
+    recursive: true,
+  });
 
   const cacheDir = join(testDir, "spawn");
   const cacheFile = join(cacheDir, "manifest.json");
 
-  const originalEnv = { ...process.env };
+  const originalEnv = {
+    ...process.env,
+  };
   const originalFetch = global.fetch;
 
   process.env.XDG_CACHE_HOME = testDir;
@@ -142,7 +161,10 @@ export function teardownTestEnvironment(env: TestEnvironment) {
   global.fetch = env.originalFetch;
 
   if (existsSync(env.testDir)) {
-    rmSync(env.testDir, { recursive: true, force: true });
+    rmSync(env.testDir, {
+      recursive: true,
+      force: true,
+    });
   }
 
   mock.restore();

@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -14,8 +14,17 @@ export interface AgentDef {
   pre_launch?: string;
   deps?: string[];
   config_files?: Record<string, unknown>;
-  interactive_prompts?: Record<string, { prompt: string; default: string }>;
-  dotenv?: { path: string; values: Record<string, string> };
+  interactive_prompts?: Record<
+    string,
+    {
+      prompt: string;
+      default: string;
+    }
+  >;
+  dotenv?: {
+    path: string;
+    values: Record<string, string>;
+  };
   notes?: string;
   icon?: string;
   featured_cloud?: string[];
@@ -75,9 +84,9 @@ function cacheAge(): number {
   try {
     const st: ReturnType<typeof statSync> = statSync(getCacheFile());
     return (Date.now() - st.mtimeMs) / 1000;
-  } catch (err) {
+  } catch (_err) {
     // Cache file doesn't exist or is inaccessible - treat as infinitely old
-    return Infinity;
+    return Number.POSITIVE_INFINITY;
   }
 }
 
@@ -109,7 +118,9 @@ function writeCache(data: Manifest): void {
   if (isTestEnv() && !process.env.XDG_CACHE_HOME) {
     return;
   }
-  mkdirSync(getCacheDir(), { recursive: true });
+  mkdirSync(getCacheDir(), {
+    recursive: true,
+  });
   writeFileSync(getCacheFile(), JSON.stringify(data, null, 2), "utf-8");
 }
 
@@ -118,19 +129,24 @@ function writeCache(data: Manifest): void {
 /** Recursively strip __proto__, constructor, and prototype keys from parsed JSON
  *  to prevent prototype pollution attacks (defense in depth). */
 function stripDangerousKeys(obj: any): any {
-  if (obj === null || typeof obj !== "object") return obj;
-  if (Array.isArray(obj)) return obj.map(stripDangerousKeys);
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(stripDangerousKeys);
+  }
   const clean: Record<string, any> = {};
   for (const key of Object.keys(obj)) {
-    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+      continue;
+    }
     clean[key] = stripDangerousKeys(obj[key]);
   }
   return clean;
 }
 
 function isValidManifest(data: any): data is Manifest {
-  return data && typeof data === "object" && !Array.isArray(data) &&
-    data.agents && data.clouds && data.matrix;
+  return data && typeof data === "object" && !Array.isArray(data) && data.agents && data.clouds && data.matrix;
 }
 
 async function fetchManifestFromGitHub(): Promise<Manifest | null> {
@@ -161,7 +177,9 @@ let _cached: Manifest | null = null;
 let _staleCache = false;
 
 function tryLoadFromDiskCache(): Manifest | null {
-  if (cacheAge() >= CACHE_TTL) return null;
+  if (cacheAge() >= CACHE_TTL) {
+    return null;
+  }
   return readCache();
 }
 
@@ -187,7 +205,7 @@ function tryLoadLocalManifest(): Manifest | null {
         return data as Manifest;
       }
     }
-  } catch (err) {
+  } catch (_err) {
     // Local manifest not found or invalid - not an error, just continue
   }
   return null;
@@ -195,7 +213,9 @@ function tryLoadLocalManifest(): Manifest | null {
 
 export async function loadManifest(forceRefresh = false): Promise<Manifest> {
   // Return in-memory cache if available and not forcing refresh
-  if (_cached && !forceRefresh) return _cached;
+  if (_cached && !forceRefresh) {
+    return _cached;
+  }
 
   // Try local manifest first (for development/testing, but not in test environment)
   const local = tryLoadLocalManifest();
@@ -228,13 +248,13 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
   }
 
   throw new Error(
-    `Cannot load manifest: failed to fetch from GitHub and no local cache available.\n` +
-    `\n` +
-    `How to fix:\n` +
-    `  1. Check your internet connection\n` +
-    `  2. Try again in a few moments (GitHub may be temporarily unreachable)\n` +
-    `  3. If the problem persists, clear the cache and retry:\n` +
-    `     rm -rf ${getCacheDir()}`
+    "Cannot load manifest: failed to fetch from GitHub and no local cache available.\n" +
+      "\n" +
+      "How to fix:\n" +
+      "  1. Check your internet connection\n" +
+      "  2. Try again in a few moments (GitHub may be temporarily unreachable)\n" +
+      "  3. If the problem persists, clear the cache and retry:\n" +
+      `     rm -rf ${getCacheDir()}`,
   );
 }
 

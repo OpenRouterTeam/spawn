@@ -1,13 +1,7 @@
 #!/usr/bin/env bun
 // local/main.ts — Orchestrator: deploys an agent on the local machine
 
-import {
-  runLocal,
-  uploadFile,
-  interactiveSession,
-  saveLocalConnection,
-  saveLaunchCmd,
-} from "./local";
+import { runLocal, uploadFile, interactiveSession, saveLocalConnection, saveLaunchCmd } from "./local";
 import { resolveAgent } from "./agents";
 import { runOrchestration } from "../shared/orchestrate";
 import type { CloudOrchestrator } from "../shared/orchestrate";
@@ -35,9 +29,18 @@ async function main() {
     async promptSize() {},
     async createServer() {},
     async getServerName() {
-      const result = Bun.spawnSync(["hostname"], {
-        stdio: ["ignore", "pipe", "ignore"],
-      });
+      const result = Bun.spawnSync(
+        [
+          "hostname",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "ignore",
+          ],
+        },
+      );
       return new TextDecoder().decode(result.stdout).trim() || "local";
     },
     async waitForReady() {},
@@ -49,10 +52,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  const msg =
-    err && typeof err === "object" && "message" in err
-      ? String(err.message)
-      : String(err);
+  const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
   process.stderr.write(`\x1b[0;31mFatal: ${msg}\x1b[0m\n`);
   process.exit(1);
 });

@@ -1,14 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { existsSync, writeFileSync, mkdirSync, rmSync, utimesSync } from "fs";
-import { join } from "path";
-import {
-  loadManifest,
-  agentKeys,
-  cloudKeys,
-  matrixStatus,
-  countImplemented,
-  type Manifest,
-} from "../manifest";
+import { existsSync, writeFileSync, mkdirSync, rmSync, utimesSync } from "node:fs";
+import { join } from "node:path";
+import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented, type Manifest } from "../manifest";
 import {
   createMockManifest,
   setupTestEnvironment,
@@ -41,7 +34,7 @@ const mockManifest = createMockManifest();
 // or first falsy value, NOT a boolean. Tests use toBeTruthy/toBeFalsy.
 
 function isValidManifest(data: any): data is Manifest {
-  return data && data.agents && data.clouds && data.matrix;
+  return data?.agents && data.clouds && data.matrix;
 }
 
 describe("Manifest Cache Lifecycle", () => {
@@ -63,20 +56,41 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should reject manifest missing agents", () => {
-      expect(isValidManifest({ clouds: {}, matrix: {} })).toBeFalsy();
+      expect(
+        isValidManifest({
+          clouds: {},
+          matrix: {},
+        }),
+      ).toBeFalsy();
     });
 
     it("should reject manifest missing clouds", () => {
-      expect(isValidManifest({ agents: {}, matrix: {} })).toBeFalsy();
+      expect(
+        isValidManifest({
+          agents: {},
+          matrix: {},
+        }),
+      ).toBeFalsy();
     });
 
     it("should reject manifest missing matrix", () => {
-      expect(isValidManifest({ agents: {}, clouds: {} })).toBeFalsy();
+      expect(
+        isValidManifest({
+          agents: {},
+          clouds: {},
+        }),
+      ).toBeFalsy();
     });
 
     it("should accept manifest with empty but present fields", () => {
       // Note: empty objects {} are truthy in JS, so this passes validation
-      expect(isValidManifest({ agents: {}, clouds: {}, matrix: {} })).toBeTruthy();
+      expect(
+        isValidManifest({
+          agents: {},
+          clouds: {},
+          matrix: {},
+        }),
+      ).toBeTruthy();
     });
 
     it("should reject a string", () => {
@@ -88,7 +102,13 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should reject an array", () => {
-      expect(isValidManifest([1, 2, 3])).toBeFalsy();
+      expect(
+        isValidManifest([
+          1,
+          2,
+          3,
+        ]),
+      ).toBeFalsy();
     });
 
     it("should reject boolean true", () => {
@@ -100,35 +120,79 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should accept manifest with extra fields", () => {
-      expect(isValidManifest({
-        agents: { a: 1 },
-        clouds: { b: 2 },
-        matrix: { c: 3 },
-        extra: "field",
-        version: 2,
-      })).toBeTruthy();
+      expect(
+        isValidManifest({
+          agents: {
+            a: 1,
+          },
+          clouds: {
+            b: 2,
+          },
+          matrix: {
+            c: 3,
+          },
+          extra: "field",
+          version: 2,
+        }),
+      ).toBeTruthy();
     });
 
     it("should reject when agents is null", () => {
-      expect(isValidManifest({ agents: null, clouds: {}, matrix: {} })).toBeFalsy();
+      expect(
+        isValidManifest({
+          agents: null,
+          clouds: {},
+          matrix: {},
+        }),
+      ).toBeFalsy();
     });
 
     it("should reject when clouds is 0 (falsy)", () => {
-      expect(isValidManifest({ agents: {}, clouds: 0, matrix: {} })).toBeFalsy();
+      expect(
+        isValidManifest({
+          agents: {},
+          clouds: 0,
+          matrix: {},
+        }),
+      ).toBeFalsy();
     });
 
     it("should reject when matrix is empty string (falsy)", () => {
-      expect(isValidManifest({ agents: {}, clouds: {}, matrix: "" })).toBeFalsy();
+      expect(
+        isValidManifest({
+          agents: {},
+          clouds: {},
+          matrix: "",
+        }),
+      ).toBeFalsy();
     });
 
     it("should reject when matrix is false", () => {
-      expect(isValidManifest({ agents: {}, clouds: {}, matrix: false })).toBeFalsy();
+      expect(
+        isValidManifest({
+          agents: {},
+          clouds: {},
+          matrix: false,
+        }),
+      ).toBeFalsy();
     });
 
     it("should accept when agents/clouds/matrix are arrays (truthy but wrong type)", () => {
       // The function only checks truthiness, not actual types
       // This is a known limitation - arrays are truthy
-      expect(isValidManifest({ agents: [1], clouds: [2], matrix: [3] })).toBeTruthy();
+      expect(
+        isValidManifest({
+          agents: [
+            1,
+          ],
+          clouds: [
+            2,
+          ],
+          matrix: [
+            3,
+          ],
+        }),
+      ).toBeTruthy();
     });
   });
 
@@ -144,14 +208,17 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should recover from corrupted JSON in cache file", async () => {
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, "{ invalid json content !!!");
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       const manifest = await loadManifest(true);
@@ -161,14 +228,17 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should recover from empty cache file", async () => {
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, "");
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       const manifest = await loadManifest(true);
@@ -176,14 +246,17 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should recover from cache containing a JSON array", async () => {
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, "[1, 2, 3]");
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       const manifest = await loadManifest(true);
@@ -191,14 +264,17 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should recover from cache containing a JSON string", async () => {
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, '"just a string"');
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       const manifest = await loadManifest(true);
@@ -206,15 +282,23 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should recover from cache containing partial manifest JSON", async () => {
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       // Valid JSON but missing required fields
-      writeFileSync(env.cacheFile, JSON.stringify({ agents: {} }));
+      writeFileSync(
+        env.cacheFile,
+        JSON.stringify({
+          agents: {},
+        }),
+      );
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       const manifest = await loadManifest(true);
@@ -235,15 +319,18 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache on HTTP 500", async () => {
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: false,
-          status: 500,
-          statusText: "Internal Server Error",
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: false,
+            status: 500,
+            statusText: "Internal Server Error",
+          }) as any,
       );
 
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
@@ -254,15 +341,18 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache on HTTP 403 (rate limited)", async () => {
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: false,
-          status: 403,
-          statusText: "Forbidden",
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: false,
+            status: 403,
+            statusText: "Forbidden",
+          }) as any,
       );
 
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
@@ -272,14 +362,19 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache when fetch response json() throws", async () => {
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => { throw new SyntaxError("Unexpected token"); },
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => {
+              throw new SyntaxError("Unexpected token");
+            },
+          }) as any,
       );
 
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
@@ -289,11 +384,11 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache on TypeError (network down)", async () => {
-      global.fetch = mock(() =>
-        Promise.reject(new TypeError("Failed to fetch"))
-      );
+      global.fetch = mock(() => Promise.reject(new TypeError("Failed to fetch")));
 
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
@@ -303,14 +398,21 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back when fetch returns invalid manifest structure", async () => {
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => ({ agents: { claude: {} } }), // missing clouds and matrix
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => ({
+              agents: {
+                claude: {},
+              },
+            }), // missing clouds and matrix
+          }) as any,
       );
 
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
@@ -323,12 +425,13 @@ describe("Manifest Cache Lifecycle", () => {
     it("should throw when fetch fails with no cache at all", async () => {
       const cacheDir = join(env.testDir, "spawn");
       if (existsSync(cacheDir)) {
-        rmSync(cacheDir, { recursive: true, force: true });
+        rmSync(cacheDir, {
+          recursive: true,
+          force: true,
+        });
       }
 
-      global.fetch = mock(() =>
-        Promise.reject(new Error("DNS resolution failed"))
-      );
+      global.fetch = mock(() => Promise.reject(new Error("DNS resolution failed")));
 
       try {
         await loadManifest(true);
@@ -351,11 +454,12 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should bypass in-memory cache with forceRefresh", async () => {
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await loadManifest(true);
@@ -366,11 +470,12 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should return same instance without forceRefresh", async () => {
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       const manifest1 = await loadManifest(true);
@@ -392,16 +497,22 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache when fetch returns non-manifest data", async () => {
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => ({ version: 1, data: "not a manifest" }),
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => ({
+              version: 1,
+              data: "not a manifest",
+            }),
+          }) as any,
       );
 
       const manifest = await loadManifest(true);
@@ -412,15 +523,22 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should use fresh disk cache without calling fetch", async () => {
-      mkdirSync(join(env.testDir, "spawn"), { recursive: true });
+      mkdirSync(join(env.testDir, "spawn"), {
+        recursive: true,
+      });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       // Cache is fresh (just written)
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => ({ agents: {}, clouds: {}, matrix: {} }),
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => ({
+              agents: {},
+              clouds: {},
+              matrix: {},
+            }),
+          }) as any,
       );
 
       // loadManifest(false) should check disk cache first
@@ -436,9 +554,15 @@ describe("Manifest Cache Lifecycle", () => {
   describe("matrixStatus edge cases", () => {
     it("should handle cloud/agent keys with hyphens", () => {
       const manifest: Manifest = {
-        agents: { "my-agent": mockManifest.agents.claude },
-        clouds: { "my-cloud": mockManifest.clouds.sprite },
-        matrix: { "my-cloud/my-agent": "implemented" },
+        agents: {
+          "my-agent": mockManifest.agents.claude,
+        },
+        clouds: {
+          "my-cloud": mockManifest.clouds.sprite,
+        },
+        matrix: {
+          "my-cloud/my-agent": "implemented",
+        },
       };
       expect(matrixStatus(manifest, "my-cloud", "my-agent")).toBe("implemented");
     });
@@ -447,7 +571,9 @@ describe("Manifest Cache Lifecycle", () => {
       const manifest: Manifest = {
         agents: {},
         clouds: {},
-        matrix: { "cloud/agent": "implemented" },
+        matrix: {
+          "cloud/agent": "implemented",
+        },
       };
       // "cloud" + "sub/agent" => "cloud/sub/agent" which doesn't match "cloud/agent"
       expect(matrixStatus(manifest, "cloud", "sub/agent")).toBe("missing");
@@ -464,9 +590,15 @@ describe("Manifest Cache Lifecycle", () => {
 
     it("should handle keys with underscores", () => {
       const manifest: Manifest = {
-        agents: { my_agent: mockManifest.agents.claude },
-        clouds: { my_cloud: mockManifest.clouds.sprite },
-        matrix: { "my_cloud/my_agent": "implemented" },
+        agents: {
+          my_agent: mockManifest.agents.claude,
+        },
+        clouds: {
+          my_cloud: mockManifest.clouds.sprite,
+        },
+        matrix: {
+          "my_cloud/my_agent": "implemented",
+        },
       };
       expect(matrixStatus(manifest, "my_cloud", "my_agent")).toBe("implemented");
     });
@@ -531,7 +663,11 @@ describe("Manifest Cache Lifecycle", () => {
       for (let i = 0; i < 1000; i++) {
         matrix[`cloud${i}/agent${i}`] = i % 3 === 0 ? "implemented" : "missing";
       }
-      const manifest: Manifest = { agents: {}, clouds: {}, matrix };
+      const manifest: Manifest = {
+        agents: {},
+        clouds: {},
+        matrix,
+      };
       // i=0,3,6,...,999: (999-0)/3 + 1 = 334
       expect(countImplemented(manifest)).toBe(334);
     });
@@ -540,13 +676,19 @@ describe("Manifest Cache Lifecycle", () => {
       const manifest: Manifest = {
         agents: {},
         clouds: {},
-        matrix: { "only/one": "implemented" },
+        matrix: {
+          "only/one": "implemented",
+        },
       };
       expect(countImplemented(manifest)).toBe(1);
     });
 
     it("should handle empty matrix", () => {
-      const manifest: Manifest = { agents: {}, clouds: {}, matrix: {} };
+      const manifest: Manifest = {
+        agents: {},
+        clouds: {},
+        matrix: {},
+      };
       expect(countImplemented(manifest)).toBe(0);
     });
   });
@@ -562,7 +704,11 @@ describe("Manifest Cache Lifecycle", () => {
         clouds: {},
         matrix: {},
       };
-      expect(agentKeys(manifest)).toEqual(["zulu", "alpha", "mike"]);
+      expect(agentKeys(manifest)).toEqual([
+        "zulu",
+        "alpha",
+        "mike",
+      ]);
     });
 
     it("should preserve insertion order of clouds", () => {
@@ -574,7 +720,10 @@ describe("Manifest Cache Lifecycle", () => {
         },
         matrix: {},
       };
-      expect(cloudKeys(manifest)).toEqual(["zebra", "apple"]);
+      expect(cloudKeys(manifest)).toEqual([
+        "zebra",
+        "apple",
+      ]);
     });
 
     it("should handle manifest with many agents", () => {
@@ -582,7 +731,11 @@ describe("Manifest Cache Lifecycle", () => {
       for (let i = 0; i < 50; i++) {
         agents[`agent-${i}`] = mockManifest.agents.claude;
       }
-      const manifest: Manifest = { agents, clouds: {}, matrix: {} };
+      const manifest: Manifest = {
+        agents,
+        clouds: {},
+        matrix: {},
+      };
       expect(agentKeys(manifest)).toHaveLength(50);
       expect(agentKeys(manifest)[0]).toBe("agent-0");
       expect(agentKeys(manifest)[49]).toBe("agent-49");
@@ -593,23 +746,35 @@ describe("Manifest Cache Lifecycle", () => {
       for (let i = 0; i < 30; i++) {
         clouds[`cloud-${i}`] = mockManifest.clouds.sprite;
       }
-      const manifest: Manifest = { agents: {}, clouds, matrix: {} };
+      const manifest: Manifest = {
+        agents: {},
+        clouds,
+        matrix: {},
+      };
       expect(cloudKeys(manifest)).toHaveLength(30);
     });
 
     it("should return empty arrays for empty manifest", () => {
-      const manifest: Manifest = { agents: {}, clouds: {}, matrix: {} };
+      const manifest: Manifest = {
+        agents: {},
+        clouds: {},
+        matrix: {},
+      };
       expect(agentKeys(manifest)).toEqual([]);
       expect(cloudKeys(manifest)).toEqual([]);
     });
 
     it("should return single-element array for single agent", () => {
       const manifest: Manifest = {
-        agents: { solo: mockManifest.agents.claude },
+        agents: {
+          solo: mockManifest.agents.claude,
+        },
         clouds: {},
         matrix: {},
       };
-      expect(agentKeys(manifest)).toEqual(["solo"]);
+      expect(agentKeys(manifest)).toEqual([
+        "solo",
+      ]);
     });
   });
 });

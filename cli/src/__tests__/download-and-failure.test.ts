@@ -63,8 +63,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import after mock setup
-const { cmdRun, getScriptFailureGuidance, getStatusDescription, getErrorMessage } =
-  await import("../commands.js");
+const { cmdRun, getScriptFailureGuidance, getStatusDescription, getErrorMessage } = await import("../commands.js");
 
 describe("Download and Failure Pipeline", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -73,7 +72,11 @@ describe("Download and Failure Pipeline", () => {
 
   /** Set up fetch to return manifest from manifest URLs and custom responses for script URLs */
   function setupFetch(
-    scriptHandler: (url: string) => Promise<{ ok: boolean; status?: number; text?: () => Promise<string> }>
+    scriptHandler: (url: string) => Promise<{
+      ok: boolean;
+      status?: number;
+      text?: () => Promise<string>;
+    }>,
   ) {
     global.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
       const urlStr = typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url;
@@ -153,7 +156,10 @@ describe("Download and Failure Pipeline", () => {
           };
         }
         fallbackCalled = true;
-        return { ok: true, text: async () => "#!/bin/bash\nexit 0" };
+        return {
+          ok: true,
+          text: async () => "#!/bin/bash\nexit 0",
+        };
       });
 
       try {
@@ -172,7 +178,10 @@ describe("Download and Failure Pipeline", () => {
     it("should fall back to GitHub raw URL when primary returns 404", async () => {
       await setupFetch(async (url) => {
         if (url.includes("openrouter.ai")) {
-          return { ok: false, status: 404 };
+          return {
+            ok: false,
+            status: 404,
+          };
         }
         // GitHub raw fallback succeeds
         if (url.includes("raw.githubusercontent.com")) {
@@ -181,7 +190,10 @@ describe("Download and Failure Pipeline", () => {
             text: async () => "#!/bin/bash\nexit 0",
           };
         }
-        return { ok: false, status: 500 };
+        return {
+          ok: false,
+          status: 500,
+        };
       });
 
       try {
@@ -202,7 +214,10 @@ describe("Download and Failure Pipeline", () => {
     it("should fall back to GitHub raw URL when primary returns 500", async () => {
       await setupFetch(async (url) => {
         if (url.includes("openrouter.ai")) {
-          return { ok: false, status: 500 };
+          return {
+            ok: false,
+            status: 500,
+          };
         }
         if (url.includes("raw.githubusercontent.com")) {
           return {
@@ -210,7 +225,10 @@ describe("Download and Failure Pipeline", () => {
             text: async () => "#!/bin/bash\nexit 0",
           };
         }
-        return { ok: false, status: 500 };
+        return {
+          ok: false,
+          status: 500,
+        };
       });
 
       try {
@@ -230,7 +248,10 @@ describe("Download and Failure Pipeline", () => {
   describe("download - both URLs fail", () => {
     it("should show 'script not found' when both return 404", async () => {
       await setupFetch(async (url) => {
-        return { ok: false, status: 404 };
+        return {
+          ok: false,
+          status: 404,
+        };
       });
 
       try {
@@ -247,7 +268,10 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should suggest verifying the combination when both return 404", async () => {
-      await setupFetch(async () => ({ ok: false, status: 404 }));
+      await setupFetch(async () => ({
+        ok: false,
+        status: 404,
+      }));
 
       try {
         await cmdRun("claude", "sprite");
@@ -260,7 +284,10 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should suggest reporting the issue when both return 404", async () => {
-      await setupFetch(async () => ({ ok: false, status: 404 }));
+      await setupFetch(async () => ({
+        ok: false,
+        status: 404,
+      }));
 
       try {
         await cmdRun("claude", "sprite");
@@ -273,7 +300,10 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should show server error message when both return 500", async () => {
-      await setupFetch(async () => ({ ok: false, status: 500 }));
+      await setupFetch(async () => ({
+        ok: false,
+        status: 500,
+      }));
 
       try {
         await cmdRun("claude", "sprite");
@@ -286,7 +316,10 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should mention temporary server issues on 500 errors", async () => {
-      await setupFetch(async () => ({ ok: false, status: 500 }));
+      await setupFetch(async () => ({
+        ok: false,
+        status: 500,
+      }));
 
       try {
         await cmdRun("claude", "sprite");
@@ -303,9 +336,15 @@ describe("Download and Failure Pipeline", () => {
       await setupFetch(async (url) => {
         callCount++;
         if (url.includes("openrouter.ai")) {
-          return { ok: false, status: 404 };
+          return {
+            ok: false,
+            status: 404,
+          };
         }
-        return { ok: false, status: 500 };
+        return {
+          ok: false,
+          status: 500,
+        };
       });
 
       try {
@@ -400,7 +439,10 @@ describe("Download and Failure Pipeline", () => {
             text: async () => "no shebang here",
           };
         }
-        return { ok: false, status: 404 };
+        return {
+          ok: false,
+          status: 404,
+        };
       });
 
       try {
@@ -420,7 +462,10 @@ describe("Download and Failure Pipeline", () => {
             text: async () => "<!DOCTYPE html>\n<html><body>Error page</body></html>",
           };
         }
-        return { ok: false, status: 404 };
+        return {
+          ok: false,
+          status: 404,
+        };
       });
 
       try {
@@ -561,7 +606,11 @@ describe("getErrorMessage - real export", () => {
   });
 
   it("should extract message from plain objects with message property", () => {
-    expect(getErrorMessage({ message: "obj error" })).toBe("obj error");
+    expect(
+      getErrorMessage({
+        message: "obj error",
+      }),
+    ).toBe("obj error");
   });
 
   it("should stringify non-Error values", () => {
@@ -572,7 +621,11 @@ describe("getErrorMessage - real export", () => {
   });
 
   it("should handle objects without message property", () => {
-    expect(getErrorMessage({ code: "ENOENT" })).toBe("[object Object]");
+    expect(
+      getErrorMessage({
+        code: "ENOENT",
+      }),
+    ).toBe("[object Object]");
   });
 
   it("should handle boolean values", () => {

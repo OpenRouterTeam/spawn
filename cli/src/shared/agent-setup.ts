@@ -1,17 +1,10 @@
 // shared/agent-setup.ts — Shared agent helpers + definitions for SSH-based clouds
 // Cloud-agnostic: receives runServer/uploadFile via CloudRunner interface.
 
-import { writeFileSync, unlinkSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
-import {
-  logInfo,
-  logWarn,
-  logError,
-  logStep,
-  prompt,
-  jsonEscape,
-} from "./ui";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { logInfo, logWarn, logError, logStep, prompt, jsonEscape } from "./ui";
 import type { AgentConfig } from "./agents";
 
 // Re-export so cloud modules can re-export from here
@@ -46,13 +39,11 @@ export async function installAgent(
 /**
  * Upload a config file to the remote machine via a temp file and mv.
  */
-export async function uploadConfigFile(
-  runner: CloudRunner,
-  content: string,
-  remotePath: string,
-): Promise<void> {
+export async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
   const tmpFile = join(tmpdir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-  writeFileSync(tmpFile, content, { mode: 0o600 });
+  writeFileSync(tmpFile, content, {
+    mode: 0o600,
+  });
 
   const tempRemote = `/tmp/spawn_config_${Date.now()}`;
   try {
@@ -61,7 +52,11 @@ export async function uploadConfigFile(
       `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
     );
   } finally {
-    try { unlinkSync(tmpFile); } catch { /* ignore */ }
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -70,7 +65,7 @@ export async function uploadConfigFile(
 export async function installClaudeCode(runner: CloudRunner): Promise<void> {
   logStep("Installing Claude Code...");
 
-  const claudePath = '$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin';
+  const claudePath = "$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin";
   const pathSetup = `for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' "$rc" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH="$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"\\n' >> "$rc"; done`;
   const finalize = `claude install --force 2>/dev/null || true; ${pathSetup}`;
 
@@ -79,16 +74,16 @@ export async function installClaudeCode(runner: CloudRunner): Promise<void> {
     `if [ -f ~/.bash_profile ] && grep -q 'spawn:env\\|Claude Code PATH\\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
     `echo "==> Installing Claude Code (method 1/2: curl installer)..."`,
-    `curl -fsSL https://claude.ai/install.sh | bash || true`,
+    "curl -fsSL https://claude.ai/install.sh | bash || true",
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
-    `if ! command -v node >/dev/null 2>&1; then curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; fi`,
+    "if ! command -v node >/dev/null 2>&1; then curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; fi",
     `echo "==> Installing Claude Code (method 2/2: npm)..."`,
-    `npm install -g @anthropic-ai/claude-code || true`,
+    "npm install -g @anthropic-ai/claude-code || true",
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
-    `exit 1`,
-  ].join('\n');
+    "exit 1",
+  ].join("\n");
 
   try {
     await runner.runServer(script, 300);
@@ -136,7 +131,9 @@ let githubAuthRequested = false;
 let githubToken = "";
 
 export async function promptGithubAuth(): Promise<void> {
-  if (process.env.SPAWN_SKIP_GITHUB_AUTH) return;
+  if (process.env.SPAWN_SKIP_GITHUB_AUTH) {
+    return;
+  }
   process.stderr.write("\n");
   const choice = await prompt("Set up GitHub CLI (gh) on this machine? (y/N): ");
   if (/^[Yy]$/.test(choice)) {
@@ -145,33 +142,56 @@ export async function promptGithubAuth(): Promise<void> {
       githubToken = process.env.GITHUB_TOKEN;
     } else {
       try {
-        const result = Bun.spawnSync(["gh", "auth", "token"], {
-          stdio: ["ignore", "pipe", "ignore"],
-        });
+        const result = Bun.spawnSync(
+          [
+            "gh",
+            "auth",
+            "token",
+          ],
+          {
+            stdio: [
+              "ignore",
+              "pipe",
+              "ignore",
+            ],
+          },
+        );
         if (result.exitCode === 0) {
           githubToken = new TextDecoder().decode(result.stdout).trim();
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
 
 export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
-  if (process.env.SPAWN_SKIP_GITHUB_AUTH) return;
-  if (!githubAuthRequested) return;
+  if (process.env.SPAWN_SKIP_GITHUB_AUTH) {
+    return;
+  }
+  if (!githubAuthRequested) {
+    return;
+  }
 
   let ghCmd = "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash";
   let localTmpFile = "";
   if (githubToken) {
     const escaped = githubToken.replace(/'/g, "'\\''");
     localTmpFile = join(tmpdir(), `gh_token_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-    writeFileSync(localTmpFile, `export GITHUB_TOKEN='${escaped}'`, { mode: 0o600 });
+    writeFileSync(localTmpFile, `export GITHUB_TOKEN='${escaped}'`, {
+      mode: 0o600,
+    });
     const remoteTmpFile = `/tmp/gh_token_${Date.now()}`;
     try {
       await runner.uploadFile(localTmpFile, remoteTmpFile);
       ghCmd = `. ${remoteTmpFile} && rm -f ${remoteTmpFile} && ${ghCmd}`;
     } catch {
-      try { unlinkSync(localTmpFile); } catch { /* ignore */ }
+      try {
+        unlinkSync(localTmpFile);
+      } catch {
+        /* ignore */
+      }
       localTmpFile = "";
     }
   }
@@ -183,14 +203,18 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
     logWarn("GitHub CLI setup failed (non-fatal, continuing)");
   } finally {
     if (localTmpFile) {
-      try { unlinkSync(localTmpFile); } catch { /* ignore */ }
+      try {
+        unlinkSync(localTmpFile);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
 
 // ─── Codex CLI Config ────────────────────────────────────────────────────────
 
-export async function setupCodexConfig(runner: CloudRunner, apiKey: string): Promise<void> {
+export async function setupCodexConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
   const config = `model = "openai/gpt-5-codex"
 model_provider = "openrouter"
@@ -206,11 +230,7 @@ wire_api = "chat"
 
 // ─── OpenClaw Config ─────────────────────────────────────────────────────────
 
-export async function setupOpenclawConfig(
-  runner: CloudRunner,
-  apiKey: string,
-  modelId: string,
-): Promise<void> {
+export async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId: string): Promise<void> {
   logStep("Configuring openclaw...");
   await runner.runServer("mkdir -p ~/.openclaw");
 
@@ -243,9 +263,9 @@ export async function setupOpenclawConfig(
 export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   await runner.runServer(
-    `source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; ` +
-    `if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & ` +
-    `else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi`,
+    "source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+      "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
+      "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi",
   );
   logInfo("OpenClaw gateway started");
 }
@@ -258,7 +278,8 @@ export function openCodeInstallCmd(): string {
 
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
-const ZEROCLAW_INSTALL_URL = "https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/install.sh";
+const ZEROCLAW_INSTALL_URL =
+  "https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/install.sh";
 
 export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   return {
@@ -283,11 +304,17 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     codex: {
       name: "Codex CLI",
       cloudInitTier: "node",
-      install: () => installAgent(runner, "Codex CLI", "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @openai/codex"),
-      envVars: (apiKey) => [`OPENROUTER_API_KEY=${apiKey}`],
+      install: () =>
+        installAgent(
+          runner,
+          "Codex CLI",
+          "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @openai/codex",
+        ),
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+      ],
       configure: (apiKey) => setupCodexConfig(runner, apiKey),
-      launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex",
     },
 
     openclaw: {
@@ -295,40 +322,42 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "full",
       modelPrompt: true,
       modelDefault: "openrouter/auto",
-      install: () =>
-        installAgent(runner, "openclaw", 'source ~/.bashrc && bun install -g openclaw'),
+      install: () => installAgent(runner, "openclaw", "source ~/.bashrc && bun install -g openclaw"),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,
         "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
       ],
-      configure: (apiKey, modelId) =>
-        setupOpenclawConfig(runner, apiKey, modelId || "openrouter/auto"),
+      configure: (apiKey, modelId) => setupOpenclawConfig(runner, apiKey, modelId || "openrouter/auto"),
       preLaunch: () => startGateway(runner),
-      launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; openclaw tui",
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; openclaw tui",
     },
 
     opencode: {
       name: "OpenCode",
       cloudInitTier: "minimal",
       install: () => installAgent(runner, "OpenCode", openCodeInstallCmd()),
-      envVars: (apiKey) => [`OPENROUTER_API_KEY=${apiKey}`],
-      launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode",
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+      ],
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode",
     },
 
     kilocode: {
       name: "Kilo Code",
       cloudInitTier: "node",
-      install: () => installAgent(runner, "Kilo Code", "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @kilocode/cli"),
+      install: () =>
+        installAgent(
+          runner,
+          "Kilo Code",
+          "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @kilocode/cli",
+        ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "KILO_PROVIDER_TYPE=openrouter",
         `KILO_OPEN_ROUTER_API_KEY=${apiKey}`,
       ],
-      launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode",
     },
 
     zeroclaw: {
@@ -344,13 +373,12 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
       ],
-      configure: async (apiKey) => {
+      configure: async (_apiKey) => {
         await runner.runServer(
           `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "\${OPENROUTER_API_KEY}" --provider openrouter`,
         );
       },
-      launchCmd: () =>
-        "source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
+      launchCmd: () => "source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
     },
   };
 }

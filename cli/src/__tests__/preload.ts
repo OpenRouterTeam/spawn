@@ -23,9 +23,9 @@
  * - Subprocesses (execSync, spawnSync) inherit the sandboxed environment
  */
 
-import { mkdirSync, readdirSync, rmSync, mkdtempSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { mkdirSync, readdirSync, rmSync, mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 // ── Stray test file cleanup ──────────────────────────────────────────────────
 //
@@ -39,11 +39,15 @@ import { tmpdir } from "os";
 const REAL_HOME = process.env.HOME ?? "";
 
 function cleanupStrayTestFiles(): void {
-  if (!REAL_HOME) return;
+  if (!REAL_HOME) {
+    return;
+  }
   try {
     for (const f of readdirSync(REAL_HOME)) {
       if (f.startsWith("subprocess-test-") && f.endsWith(".txt")) {
-        rmSync(join(REAL_HOME, f), { force: true });
+        rmSync(join(REAL_HOME, f), {
+          force: true,
+        });
       }
     }
   } catch {
@@ -64,17 +68,30 @@ process.env.XDG_CONFIG_HOME = join(TEST_HOME, ".config");
 process.env.XDG_DATA_HOME = join(TEST_HOME, ".local", "share");
 
 // Pre-create common directories tests might expect
-mkdirSync(join(TEST_HOME, ".cache"), { recursive: true });
-mkdirSync(join(TEST_HOME, ".config"), { recursive: true });
-mkdirSync(join(TEST_HOME, ".claude"), { recursive: true });
-mkdirSync(join(TEST_HOME, ".ssh"), { recursive: true });
-mkdirSync(join(TEST_HOME, ".local", "share"), { recursive: true });
+mkdirSync(join(TEST_HOME, ".cache"), {
+  recursive: true,
+});
+mkdirSync(join(TEST_HOME, ".config"), {
+  recursive: true,
+});
+mkdirSync(join(TEST_HOME, ".claude"), {
+  recursive: true,
+});
+mkdirSync(join(TEST_HOME, ".ssh"), {
+  recursive: true,
+});
+mkdirSync(join(TEST_HOME, ".local", "share"), {
+  recursive: true,
+});
 
 // ── Cleanup on exit ─────────────────────────────────────────────────────────
 
 process.on("exit", () => {
   try {
-    rmSync(TEST_HOME, { recursive: true, force: true });
+    rmSync(TEST_HOME, {
+      recursive: true,
+      force: true,
+    });
   } catch {
     // Best-effort cleanup
   }

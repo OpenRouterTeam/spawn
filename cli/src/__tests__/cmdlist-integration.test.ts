@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import type { SpawnRecord } from "../history";
 
@@ -93,12 +93,15 @@ describe("cmdList integration", () => {
     return consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
   }
 
-
   beforeEach(async () => {
     testDir = join(homedir(), `spawn-cmdlist-test-${Date.now()}-${Math.random()}`);
-    mkdirSync(testDir, { recursive: true });
+    mkdirSync(testDir, {
+      recursive: true,
+    });
 
-    originalEnv = { ...process.env };
+    originalEnv = {
+      ...process.env,
+    };
     process.env.SPAWN_HOME = testDir;
     // Isolate disk cache so tests don't read/write the real ~/.cache/spawn
     process.env.XDG_CACHE_HOME = join(testDir, "cache");
@@ -115,8 +118,12 @@ describe("cmdList integration", () => {
 
     // Prime the manifest in-memory cache with mock data so tests don't
     // depend on network availability or stale values from other test files.
-    global.fetch = mock(() =>
-      Promise.resolve({ ok: true, json: async () => mockManifest }) as any
+    global.fetch = mock(
+      () =>
+        Promise.resolve({
+          ok: true,
+          json: async () => mockManifest,
+        }) as any,
     );
     await loadManifest(true);
     global.fetch = originalFetch;
@@ -134,7 +141,10 @@ describe("cmdList integration", () => {
 
     // Clean up test directory
     if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
+      rmSync(testDir, {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -157,7 +167,11 @@ describe("cmdList integration", () => {
 
     it("should show 'No spawns found matching' when filter matches nothing", async () => {
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00Z",
+        },
       ]);
 
       await cmdList("nonexistent");
@@ -169,8 +183,16 @@ describe("cmdList integration", () => {
 
     it("should suggest clearing filter when filtered results are empty", async () => {
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" },
-        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00Z",
+        },
+        {
+          agent: "codex",
+          cloud: "hetzner",
+          timestamp: "2026-01-02T00:00:00Z",
+        },
       ]);
 
       await cmdList("nonexistent");
@@ -193,20 +215,33 @@ describe("cmdList integration", () => {
 
   describe("history with records (table rendering)", () => {
     const sampleRecords: SpawnRecord[] = [
-      { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00Z" },
-      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T14:30:00Z" },
-      { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T09:15:00Z" },
+      {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T10:00:00Z",
+      },
+      {
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-01-02T14:30:00Z",
+      },
+      {
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-01-03T09:15:00Z",
+      },
     ];
 
     it("should render table header with AGENT, CLOUD, WHEN columns", async () => {
       writeHistory(sampleRecords);
 
       // Mock fetch to return manifest (for display names)
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -220,11 +255,12 @@ describe("cmdList integration", () => {
     it("should show separator line under header", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -236,11 +272,12 @@ describe("cmdList integration", () => {
     it("should render records in reverse chronological order (newest first)", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -250,7 +287,7 @@ describe("cmdList integration", () => {
 
       // Find lines with agent names (after header/separator)
       const dataLines = lines.filter(
-        (l: string) => l.includes("Claude Code") || l.includes("Codex") || l.includes("Hetzner")
+        (l: string) => l.includes("Claude Code") || l.includes("Codex") || l.includes("Hetzner"),
       );
 
       // The most recent record (Jan 3) should appear before the oldest (Jan 1)
@@ -260,11 +297,12 @@ describe("cmdList integration", () => {
     it("should show display names when manifest is available", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -295,11 +333,12 @@ describe("cmdList integration", () => {
     it("should show rerun hint in footer", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -313,11 +352,12 @@ describe("cmdList integration", () => {
     it("should show record count in footer", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -328,14 +368,19 @@ describe("cmdList integration", () => {
 
     it("should use singular 'spawn' for single record", async () => {
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T10:00:00Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T10:00:00Z",
+        },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -359,11 +404,12 @@ describe("cmdList integration", () => {
         },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -378,15 +424,17 @@ describe("cmdList integration", () => {
           agent: "claude",
           cloud: "sprite",
           timestamp: "2026-01-01T10:00:00Z",
-          prompt: "This is a very long prompt that should be truncated because it exceeds the display limit in the table",
+          prompt:
+            "This is a very long prompt that should be truncated because it exceeds the display limit in the table",
         },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -405,11 +453,12 @@ describe("cmdList integration", () => {
         },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -424,20 +473,37 @@ describe("cmdList integration", () => {
 
   describe("filtering by agent and cloud", () => {
     const records: SpawnRecord[] = [
-      { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" },
-      { agent: "codex", cloud: "hetzner", timestamp: "2026-01-02T00:00:00Z" },
-      { agent: "claude", cloud: "hetzner", timestamp: "2026-01-03T00:00:00Z" },
-      { agent: "codex", cloud: "sprite", timestamp: "2026-01-04T00:00:00Z" },
+      {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00Z",
+      },
+      {
+        agent: "codex",
+        cloud: "hetzner",
+        timestamp: "2026-01-02T00:00:00Z",
+      },
+      {
+        agent: "claude",
+        cloud: "hetzner",
+        timestamp: "2026-01-03T00:00:00Z",
+      },
+      {
+        agent: "codex",
+        cloud: "sprite",
+        timestamp: "2026-01-04T00:00:00Z",
+      },
     ];
 
     it("should filter by agent name", async () => {
       writeHistory(records);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList("claude");
@@ -450,11 +516,12 @@ describe("cmdList integration", () => {
     it("should filter by cloud name", async () => {
       writeHistory(records);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList(undefined, "hetzner");
@@ -466,11 +533,12 @@ describe("cmdList integration", () => {
     it("should filter by both agent and cloud", async () => {
       writeHistory(records);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList("claude", "sprite");
@@ -482,11 +550,12 @@ describe("cmdList integration", () => {
     it("should show 'Clear filter' hint when filters are active", async () => {
       writeHistory(records);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList("claude");
@@ -499,11 +568,12 @@ describe("cmdList integration", () => {
     it("should show filter suggestion hint when no filters active", async () => {
       writeHistory(records);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -517,11 +587,12 @@ describe("cmdList integration", () => {
     it("should show case-insensitive filter results", async () => {
       writeHistory(records);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList("CLAUDE");
@@ -546,7 +617,12 @@ describe("cmdList integration", () => {
     });
 
     it("should handle history file with non-array JSON", async () => {
-      writeFileSync(join(testDir, "history.json"), JSON.stringify({ not: "array" }));
+      writeFileSync(
+        join(testDir, "history.json"),
+        JSON.stringify({
+          not: "array",
+        }),
+      );
 
       await cmdList();
 
@@ -565,11 +641,12 @@ describe("cmdList integration", () => {
       }
       writeHistory(manyRecords);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();
@@ -580,14 +657,19 @@ describe("cmdList integration", () => {
 
     it("should handle records with missing optional prompt field", async () => {
       writeHistory([
-        { agent: "claude", cloud: "sprite", timestamp: "2026-01-01T00:00:00Z" },
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T00:00:00Z",
+        },
       ]);
 
-      global.fetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any
+      global.fetch = mock(
+        () =>
+          Promise.resolve({
+            ok: true,
+            json: async () => mockManifest,
+          }) as any,
       );
 
       await cmdList();

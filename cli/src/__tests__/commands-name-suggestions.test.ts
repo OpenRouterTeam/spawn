@@ -33,7 +33,9 @@ const manifestWithDistinctNames = {
       url: "https://claude.ai",
       install: "npm install -g claude",
       launch: "claude",
-      env: { ANTHROPIC_API_KEY: "test" },
+      env: {
+        ANTHROPIC_API_KEY: "test",
+      },
     },
     ap: {
       name: "Codex Pro",
@@ -41,7 +43,9 @@ const manifestWithDistinctNames = {
       url: "https://codex.dev",
       install: "npm install -g codex",
       launch: "codex",
-      env: { OPENAI_API_KEY: "test" },
+      env: {
+        OPENAI_API_KEY: "test",
+      },
     },
     oi: {
       name: "GPTMe",
@@ -49,7 +53,9 @@ const manifestWithDistinctNames = {
       url: "https://gptme.dev",
       install: "pip install gptme",
       launch: "gptme",
-      env: { OPENAI_API_KEY: "test" },
+      env: {
+        OPENAI_API_KEY: "test",
+      },
     },
   },
   clouds: {
@@ -128,8 +134,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import commands after mock setup
-const { cmdRun, cmdAgentInfo, cmdCloudInfo, findClosestMatch } =
-  await import("../commands.js");
+const { cmdRun, cmdAgentInfo, cmdCloudInfo, findClosestMatch } = await import("../commands.js");
 
 describe("Display Name Suggestions in Validation Errors", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -335,7 +340,11 @@ describe("Display Name Suggestions in Validation Errors", () => {
   // ── findClosestMatch with display names ─────────────────────────────
 
   describe("findClosestMatch with display name arrays", () => {
-    const displayNames = ["Claude Code", "Codex Pro", "GPTMe"];
+    const displayNames = [
+      "Claude Code",
+      "Codex Pro",
+      "GPTMe",
+    ];
 
     it("should match close display name (distance 1)", () => {
       // "claude-code" vs "Claude Code" -> case-insensitive: "claude-code" vs "claude code" -> dist 1
@@ -358,7 +367,11 @@ describe("Display Name Suggestions in Validation Errors", () => {
     });
 
     it("should handle single-word display names", () => {
-      const names = ["Sprite", "Hetzner", "Vultr"];
+      const names = [
+        "Sprite",
+        "Hetzner",
+        "Vultr",
+      ];
       expect(findClosestMatch("sprit", names)).toBe("Sprite");
       expect(findClosestMatch("hetzne", names)).toBe("Hetzner");
     });
@@ -369,7 +382,11 @@ describe("Display Name Suggestions in Validation Errors", () => {
     });
 
     it("should pick closest among multiple close display names", () => {
-      const names = ["Codex", "Codex Pro", "Clin"];
+      const names = [
+        "Codex",
+        "Codex Pro",
+        "Clin",
+      ];
       // "codx" -> "codex" (dist 1), "codex pro" (dist 5), "clin" (dist 3)
       // Codex is closest at dist 1
       expect(findClosestMatch("codx", names)).toBe("Codex");

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
-import { readFileSync, existsSync } from "fs";
-import { join, resolve } from "path";
-import type { Manifest, AgentDef, CloudDef } from "../manifest";
+import { readFileSync, existsSync } from "node:fs";
+import { join, resolve } from "node:path";
+import type { Manifest } from "../manifest";
 
 /**
  * Manifest integrity tests.
@@ -133,7 +133,10 @@ describe("Manifest Integrity", () => {
 
   describe("matrix consistency", () => {
     it("should only contain valid status values", () => {
-      const validStatuses = ["implemented", "missing"];
+      const validStatuses = [
+        "implemented",
+        "missing",
+      ];
       for (const [key, status] of matrixEntries) {
         expect(validStatuses).toContain(status);
       }
@@ -196,7 +199,7 @@ describe("Manifest Integrity", () => {
       if (missing.length > 0) {
         throw new Error(
           `${missing.length} implemented entries are missing script files:\n` +
-          missing.map((f) => `  - ${f}`).join("\n")
+            missing.map((f) => `  - ${f}`).join("\n"),
         );
       }
     });
@@ -223,10 +226,7 @@ describe("Manifest Integrity", () => {
       }
 
       if (badScripts.length > 0) {
-        throw new Error(
-          `Scripts missing shebang:\n` +
-          badScripts.map((f) => `  - ${f}`).join("\n")
-        );
+        throw new Error("Scripts missing shebang:\n" + badScripts.map((f) => `  - ${f}`).join("\n"));
       }
     });
 
@@ -244,13 +244,9 @@ describe("Manifest Integrity", () => {
       }
 
       if (badScripts.length > 0) {
-        throw new Error(
-          `Scripts missing 'set -eo pipefail':\n` +
-          badScripts.map((f) => `  - ${f}`).join("\n")
-        );
+        throw new Error(`Scripts missing 'set -eo pipefail':\n` + badScripts.map((f) => `  - ${f}`).join("\n"));
       }
     });
-
   });
 
   // ── Cross-reference: orphaned scripts ──────────────────────────────
@@ -270,8 +266,8 @@ describe("Manifest Integrity", () => {
       if (orphaned.length > 0) {
         throw new Error(
           `${orphaned.length} scripts exist but are marked "missing" in manifest:\n` +
-          orphaned.map((f) => `  - ${f}`).join("\n") +
-          `\nUpdate manifest.json to mark these as "implemented".`
+            orphaned.map((f) => `  - ${f}`).join("\n") +
+            `\nUpdate manifest.json to mark these as "implemented".`,
         );
       }
     });

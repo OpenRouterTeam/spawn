@@ -1,5 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import { getScriptFailureGuidance as _getScriptFailureGuidance, getSignalGuidance as _getSignalGuidance, getStatusDescription, buildRetryCommand } from "../commands";
+import {
+  getScriptFailureGuidance as _getScriptFailureGuidance,
+  getSignalGuidance as _getSignalGuidance,
+  buildRetryCommand,
+} from "../commands";
 
 /** Strip ANSI escape codes from a string so assertions work regardless of color support. */
 function stripAnsi(s: string): string {
@@ -347,7 +351,9 @@ describe("getScriptFailureGuidance", () => {
         expect(joined).toContain("spawn hetzner");
         expect(joined).toContain("setup");
       } finally {
-        if (savedOR !== undefined) process.env.OPENROUTER_API_KEY = savedOR;
+        if (savedOR !== undefined) {
+          process.env.OPENROUTER_API_KEY = savedOR;
+        }
       }
     });
 
@@ -369,7 +375,9 @@ describe("getScriptFailureGuidance", () => {
         expect(joined).toContain("spawn digitalocean");
         expect(joined).toContain("setup");
       } finally {
-        if (savedOR !== undefined) process.env.OPENROUTER_API_KEY = savedOR;
+        if (savedOR !== undefined) {
+          process.env.OPENROUTER_API_KEY = savedOR;
+        }
       }
     });
 
@@ -447,7 +455,17 @@ describe("getScriptFailureGuidance", () => {
 
   describe("return type and structure", () => {
     it("should always return an array of strings", () => {
-      const codes: (number | null)[] = [0, 1, 2, 126, 127, 130, 137, 255, null];
+      const codes: (number | null)[] = [
+        0,
+        1,
+        2,
+        126,
+        127,
+        130,
+        137,
+        255,
+        null,
+      ];
       for (const code of codes) {
         const lines = getScriptFailureGuidance(code, "sprite");
         expect(Array.isArray(lines)).toBe(true);
@@ -458,7 +476,17 @@ describe("getScriptFailureGuidance", () => {
     });
 
     it("should never return an empty array", () => {
-      const codes: (number | null)[] = [0, 1, 2, 126, 127, 130, 255, null, -1];
+      const codes: (number | null)[] = [
+        0,
+        1,
+        2,
+        126,
+        127,
+        130,
+        255,
+        null,
+        -1,
+      ];
       for (const code of codes) {
         const lines = getScriptFailureGuidance(code, "sprite");
         expect(lines.length).toBeGreaterThan(0);
@@ -475,7 +503,16 @@ describe("getScriptFailureGuidance", () => {
       const result1 = getScriptFailureGuidance(1, "sprite");
       const resultDefault = getScriptFailureGuidance(42, "sprite");
 
-      const all = [result130, result137, result255, result127, result126, result2, result1, resultDefault];
+      const all = [
+        result130,
+        result137,
+        result255,
+        result127,
+        result126,
+        result2,
+        result1,
+        resultDefault,
+      ];
       // Every handled exit code should produce unique output
       for (let i = 0; i < all.length; i++) {
         for (let j = i + 1; j < all.length; j++) {
@@ -567,7 +604,13 @@ describe("getSignalGuidance", () => {
 
   describe("return type", () => {
     it("should always return string arrays", () => {
-      const signals = ["SIGKILL", "SIGTERM", "SIGINT", "SIGHUP", "SIGUSR1"];
+      const signals = [
+        "SIGKILL",
+        "SIGTERM",
+        "SIGINT",
+        "SIGHUP",
+        "SIGUSR1",
+      ];
       for (const sig of signals) {
         const lines = getSignalGuidance(sig);
         expect(Array.isArray(lines)).toBe(true);
@@ -595,9 +638,7 @@ describe("buildRetryCommand", () => {
   });
 
   it("should include --prompt when prompt is provided", () => {
-    expect(buildRetryCommand("claude", "sprite", "Fix all bugs")).toBe(
-      'spawn claude sprite --prompt "Fix all bugs"'
-    );
+    expect(buildRetryCommand("claude", "sprite", "Fix all bugs")).toBe('spawn claude sprite --prompt "Fix all bugs"');
   });
 
   it("should suggest --prompt-file for long prompts instead of truncating", () => {
@@ -636,14 +677,12 @@ describe("buildRetryCommand", () => {
   // ── spawnName parameter (issue #1709) ────────────────────────────────────
 
   it("should include --name flag when spawnName is provided without prompt", () => {
-    expect(buildRetryCommand("claude", "hetzner", undefined, "my-box")).toBe(
-      'spawn claude hetzner --name "my-box"'
-    );
+    expect(buildRetryCommand("claude", "hetzner", undefined, "my-box")).toBe('spawn claude hetzner --name "my-box"');
   });
 
   it("should include --name flag when spawnName is provided with short prompt", () => {
     expect(buildRetryCommand("claude", "hetzner", "Fix all bugs", "my-box")).toBe(
-      'spawn claude hetzner --name "my-box" --prompt "Fix all bugs"'
+      'spawn claude hetzner --name "my-box" --prompt "Fix all bugs"',
     );
   });
 
@@ -654,16 +693,12 @@ describe("buildRetryCommand", () => {
   });
 
   it("should not include --name flag when spawnName is undefined", () => {
-    expect(buildRetryCommand("claude", "hetzner", undefined, undefined)).toBe(
-      "spawn claude hetzner"
-    );
+    expect(buildRetryCommand("claude", "hetzner", undefined, undefined)).toBe("spawn claude hetzner");
     expect(buildRetryCommand("claude", "hetzner")).toBe("spawn claude hetzner");
   });
 
   it("should not include --name flag when spawnName is empty string", () => {
-    expect(buildRetryCommand("claude", "hetzner", undefined, "")).toBe(
-      "spawn claude hetzner"
-    );
+    expect(buildRetryCommand("claude", "hetzner", undefined, "")).toBe("spawn claude hetzner");
   });
 
   it("should place --name before --prompt in the command", () => {
@@ -677,13 +712,13 @@ describe("buildRetryCommand", () => {
 
   it("should quote --name value when it contains spaces", () => {
     expect(buildRetryCommand("claude", "hetzner", undefined, "my dev box")).toBe(
-      'spawn claude hetzner --name "my dev box"'
+      'spawn claude hetzner --name "my dev box"',
     );
   });
 
   it("should escape double quotes in --name value", () => {
     expect(buildRetryCommand("claude", "hetzner", undefined, 'my "box"')).toBe(
-      'spawn claude hetzner --name "my \\"box\\""'
+      'spawn claude hetzner --name "my \\"box\\""',
     );
   });
 
@@ -730,7 +765,12 @@ describe("dashboard URL in guidance", () => {
     });
 
     it("should not add dashboard URL for exit codes 127, 126, 255, 2", () => {
-      for (const code of [127, 126, 255, 2]) {
+      for (const code of [
+        127,
+        126,
+        255,
+        2,
+      ]) {
         const lines = getScriptFailureGuidance(code, "hetzner", undefined, "https://console.hetzner.cloud/");
         const joined = lines.join("\n");
         expect(joined).not.toContain("https://console.hetzner.cloud/");

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
 
@@ -68,10 +68,16 @@ const { cmdRun } = await import("../commands.js");
 const VALID_SCRIPT = "#!/bin/bash\nset -eo pipefail\nexit 0";
 
 /** Track child_process.spawn calls to verify env vars passed to bash */
-let spawnCalls: Array<{ command: string; args: string[]; options: any }> = [];
+let spawnCalls: Array<{
+  command: string;
+  args: string[];
+  options: any;
+}> = [];
 
 /** Track all fetch calls to verify download behavior */
-let fetchCalls: Array<{ url: string }> = [];
+let fetchCalls: Array<{
+  url: string;
+}> = [];
 
 function mockFetchForDownload(opts: {
   primaryOk?: boolean;
@@ -90,7 +96,9 @@ function mockFetchForDownload(opts: {
 
   return mock(async (url: string | URL | Request, init?: any) => {
     const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-    fetchCalls.push({ url: urlStr });
+    fetchCalls.push({
+      url: urlStr,
+    });
 
     // Manifest fetch
     if (urlStr.includes("manifest.json")) {
@@ -135,7 +143,11 @@ function mockFetchForDownload(opts: {
       };
     }
 
-    return { ok: false, status: 404, text: async () => "not found" };
+    return {
+      ok: false,
+      status: 404,
+      text: async () => "not found",
+    };
   }) as any;
 }
 
@@ -167,7 +179,9 @@ describe("cmdRun happy-path pipeline", () => {
 
     // Set up isolated history directory
     historyDir = join(homedir(), `spawn-test-history-${Date.now()}-${Math.random()}`);
-    mkdirSync(historyDir, { recursive: true });
+    mkdirSync(historyDir, {
+      recursive: true,
+    });
     originalSpawnHome = process.env.SPAWN_HOME;
     process.env.SPAWN_HOME = historyDir;
   });
@@ -180,7 +194,10 @@ describe("cmdRun happy-path pipeline", () => {
     // Clean up history directory
     process.env.SPAWN_HOME = originalSpawnHome;
     if (existsSync(historyDir)) {
-      rmSync(historyDir, { recursive: true, force: true });
+      rmSync(historyDir, {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -188,7 +205,9 @@ describe("cmdRun happy-path pipeline", () => {
 
   describe("primary URL download success", () => {
     it("should download from primary URL without trying fallback", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
@@ -200,7 +219,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should show spinner start and stop for successful download", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
@@ -213,7 +234,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should not call process.exit on successful execution", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
@@ -267,9 +290,7 @@ describe("cmdRun happy-path pipeline", () => {
       await cmdRun("claude", "sprite");
 
       const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c[0]);
-      expect(
-        stopCalls.some((msg: string) => typeof msg === "string" && msg.includes("fallback"))
-      ).toBe(true);
+      expect(stopCalls.some((msg: string) => typeof msg === "string" && msg.includes("fallback"))).toBe(true);
     });
   });
 
@@ -277,7 +298,9 @@ describe("cmdRun happy-path pipeline", () => {
 
   describe("history recording during execution", () => {
     it("should save history record on successful execution", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
@@ -293,7 +316,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should include prompt in history record when provided", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite", "Fix all bugs");
@@ -305,7 +330,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should not include prompt field when no prompt provided", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
@@ -317,7 +344,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should record timestamp in ISO 8601 format", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       const before = new Date().toISOString();
@@ -355,12 +384,16 @@ describe("cmdRun happy-path pipeline", () => {
     it("should still execute script when history save fails", async () => {
       // Make history dir read-only to force saveSpawnRecord failure
       const readOnlyDir = join(homedir(), `spawn-test-readonly-${Date.now()}`);
-      mkdirSync(readOnlyDir, { recursive: true });
+      mkdirSync(readOnlyDir, {
+        recursive: true,
+      });
       // Create a file where the directory should be, so mkdir fails
       writeFileSync(join(readOnlyDir, "history.json"), "not-a-directory");
       process.env.SPAWN_HOME = readOnlyDir;
 
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       // Should complete without error even though history write might fail
@@ -368,17 +401,26 @@ describe("cmdRun happy-path pipeline", () => {
       expect(processExitSpy).not.toHaveBeenCalled();
 
       // Cleanup
-      rmSync(readOnlyDir, { recursive: true, force: true });
+      rmSync(readOnlyDir, {
+        recursive: true,
+        force: true,
+      });
     });
 
     it("should append to existing history", async () => {
       // Pre-populate history
       const existing = [
-        { agent: "codex", cloud: "hetzner", timestamp: "2026-01-01T00:00:00.000Z" },
+        {
+          agent: "codex",
+          cloud: "hetzner",
+          timestamp: "2026-01-01T00:00:00.000Z",
+        },
       ];
       writeFileSync(join(historyDir, "history.json"), JSON.stringify(existing));
 
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
@@ -409,8 +451,7 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should set SPAWN_MODE to non-interactive when prompt is provided", async () => {
-      const checkScript =
-        '#!/bin/bash\nset -eo pipefail\ntest "$SPAWN_MODE" = "non-interactive"';
+      const checkScript = '#!/bin/bash\nset -eo pipefail\ntest "$SPAWN_MODE" = "non-interactive"';
       global.fetch = mockFetchForDownload({
         primaryOk: true,
         scriptContent: checkScript,
@@ -423,8 +464,7 @@ describe("cmdRun happy-path pipeline", () => {
 
     it("should NOT set SPAWN_PROMPT when no prompt is provided", async () => {
       // This script fails if SPAWN_PROMPT is set (non-empty)
-      const checkScript =
-        '#!/bin/bash\nset -eo pipefail\ntest -z "${SPAWN_PROMPT:-}"';
+      const checkScript = '#!/bin/bash\nset -eo pipefail\ntest -z "${SPAWN_PROMPT:-}"';
       global.fetch = mockFetchForDownload({
         primaryOk: true,
         scriptContent: checkScript,
@@ -436,8 +476,7 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should NOT set SPAWN_MODE when no prompt is provided", async () => {
-      const checkScript =
-        '#!/bin/bash\nset -eo pipefail\ntest -z "${SPAWN_MODE:-}"';
+      const checkScript = '#!/bin/bash\nset -eo pipefail\ntest -z "${SPAWN_MODE:-}"';
       global.fetch = mockFetchForDownload({
         primaryOk: true,
         scriptContent: checkScript,
@@ -450,7 +489,7 @@ describe("cmdRun happy-path pipeline", () => {
 
     it("should handle prompts with special characters", async () => {
       const prompt = 'Fix the "login" page & add tests';
-      const checkScript = `#!/bin/bash\nset -eo pipefail\ntest -n "\$SPAWN_PROMPT"`;
+      const checkScript = `#!/bin/bash\nset -eo pipefail\ntest -n "$SPAWN_PROMPT"`;
       global.fetch = mockFetchForDownload({
         primaryOk: true,
         scriptContent: checkScript,
@@ -466,20 +505,22 @@ describe("cmdRun happy-path pipeline", () => {
 
   describe("dry-run mode skips download", () => {
     it("should not download script in dry-run mode", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite", undefined, true);
 
       // In dry-run, only manifest fetch should occur (no script download)
-      const scriptFetches = fetchCalls.filter(
-        (c) => c.url.includes("openrouter.ai") && !c.url.includes("manifest")
-      );
+      const scriptFetches = fetchCalls.filter((c) => c.url.includes("openrouter.ai") && !c.url.includes("manifest"));
       expect(scriptFetches).toHaveLength(0);
     });
 
     it("should not save history in dry-run mode", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite", undefined, true);
@@ -489,7 +530,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should show dry-run preview with agent and cloud info", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite", undefined, true);
@@ -500,7 +543,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should show prompt in dry-run preview when provided", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite", "Fix bugs", true);
@@ -514,7 +559,9 @@ describe("cmdRun happy-path pipeline", () => {
 
   describe("launch step message", () => {
     it("should show 'Launching <agent> on <cloud>' for normal run", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
@@ -527,7 +574,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should append 'with prompt...' when prompt is provided", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite", "Fix bugs");
@@ -538,7 +587,9 @@ describe("cmdRun happy-path pipeline", () => {
     });
 
     it("should append '...' without prompt when no prompt provided", async () => {
-      global.fetch = mockFetchForDownload({ primaryOk: true });
+      global.fetch = mockFetchForDownload({
+        primaryOk: true,
+      });
       await loadManifest(true);
 
       await cmdRun("claude", "sprite");
@@ -566,7 +617,10 @@ describe("cmdRun happy-path pipeline", () => {
       }
 
       const clackErrors = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
-      const errOutput = [...clackErrors, ...consoleMocks.error.mock.calls.map((c: any[]) => c.join(" "))].join("\n");
+      const errOutput = [
+        ...clackErrors,
+        ...consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")),
+      ].join("\n");
       expect(errOutput).toContain("valid bash script");
     });
 
@@ -584,7 +638,10 @@ describe("cmdRun happy-path pipeline", () => {
       }
 
       const clackErrors = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
-      const errOutput = [...clackErrors, ...consoleMocks.error.mock.calls.map((c: any[]) => c.join(" "))].join("\n");
+      const errOutput = [
+        ...clackErrors,
+        ...consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")),
+      ].join("\n");
       expect(errOutput).toContain("dangerous");
     });
   });

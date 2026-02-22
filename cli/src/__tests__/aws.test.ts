@@ -1,10 +1,6 @@
 import { describe, it, expect } from "bun:test";
 
-import {
-  BUNDLES,
-  DEFAULT_BUNDLE,
-} from "../aws/aws";
-import type { Bundle } from "../aws/aws";
+import { BUNDLES, DEFAULT_BUNDLE } from "../aws/aws";
 
 import { resolveAgent, agents } from "../aws/agents";
 import { generateEnvConfig } from "../shared/agents";
@@ -127,24 +123,33 @@ describe("aws/agents", () => {
 
   describe("generateEnvConfig (shared)", () => {
     it("generates export lines", () => {
-      const result = generateEnvConfig(["OPENROUTER_API_KEY=sk-test", "FOO=bar"]);
+      const result = generateEnvConfig([
+        "OPENROUTER_API_KEY=sk-test",
+        "FOO=bar",
+      ]);
       expect(result).toContain("export IS_SANDBOX='1'");
       expect(result).toContain("export OPENROUTER_API_KEY='sk-test'");
       expect(result).toContain("export FOO='bar'");
     });
 
     it("escapes single quotes in values", () => {
-      const result = generateEnvConfig(["FOO=it's"]);
+      const result = generateEnvConfig([
+        "FOO=it's",
+      ]);
       expect(result).toContain("export FOO='it'\\''s'");
     });
 
     it("rejects invalid env var names", () => {
-      const result = generateEnvConfig(["invalid-name=val"]);
+      const result = generateEnvConfig([
+        "invalid-name=val",
+      ]);
       expect(result).not.toContain("invalid-name");
     });
 
     it("allows empty values", () => {
-      const result = generateEnvConfig(["ANTHROPIC_API_KEY="]);
+      const result = generateEnvConfig([
+        "ANTHROPIC_API_KEY=",
+      ]);
       expect(result).toContain("export ANTHROPIC_API_KEY=''");
     });
   });

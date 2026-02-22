@@ -1,6 +1,6 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import {
   logInfo,
   logWarn,
@@ -25,17 +25,16 @@ let hetznerServerId = "";
 let hetznerServerIp = "";
 
 export function getState() {
-  return { hcloudToken, hetznerServerId, hetznerServerIp };
+  return {
+    hcloudToken,
+    hetznerServerId,
+    hetznerServerIp,
+  };
 }
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 
-async function hetznerApi(
-  method: string,
-  endpoint: string,
-  body?: string,
-  maxRetries = 3,
-): Promise<string> {
+async function hetznerApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
   const url = `${HETZNER_API_BASE}${endpoint}`;
 
   let interval = 2;
@@ -45,7 +44,10 @@ async function hetznerApi(
         "Content-Type": "application/json",
         Authorization: `Bearer ${hcloudToken}`,
       };
-      const opts: RequestInit = { method, headers };
+      const opts: RequestInit = {
+        method,
+        headers,
+      };
       if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
         opts.body = body;
       }
@@ -53,16 +55,16 @@ async function hetznerApi(
       const text = await resp.text();
 
       if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {
-        logWarn(
-          `API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`,
-        );
+        logWarn(`API ${resp.status} (attempt ${attempt}/${maxRetries}), retrying in ${interval}s...`);
         await sleep(interval * 1000);
         interval = Math.min(interval * 2, 30);
         continue;
       }
       return text;
     } catch (err) {
-      if (attempt >= maxRetries) throw err;
+      if (attempt >= maxRetries) {
+        throw err;
+      }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
       await sleep(interval * 1000);
       interval = Math.min(interval * 2, 30);
@@ -91,22 +93,28 @@ const HETZNER_CONFIG_PATH = `${process.env.HOME}/.config/spawn/hetzner.json`;
 
 async function saveTokenToConfig(token: string): Promise<void> {
   const dir = HETZNER_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn(["mkdir", "-p", dir]).exited;
+  await Bun.spawn([
+    "mkdir",
+    "-p",
+    dir,
+  ]).exited;
   const escaped = jsonEscape(token);
-  await Bun.write(
-    HETZNER_CONFIG_PATH,
-    `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`,
-    { mode: 0o600 },
-  );
+  await Bun.write(HETZNER_CONFIG_PATH, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
+    mode: 0o600,
+  });
 }
 
 function loadTokenFromConfig(): string | null {
   try {
     const data = JSON.parse(readFileSync(HETZNER_CONFIG_PATH, "utf-8"));
     const token = data.api_key || data.token || "";
-    if (!token) return null;
+    if (!token) {
+      return null;
+    }
     // Security: validate token chars
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) return null;
+    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
+      return null;
+    }
     return token;
   } catch {
     return null;
@@ -116,14 +124,18 @@ function loadTokenFromConfig(): string | null {
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testHcloudToken(): Promise<boolean> {
-  if (!hcloudToken) return false;
+  if (!hcloudToken) {
+    return false;
+  }
   try {
     const resp = await hetznerApi("GET", "/servers?per_page=1", undefined, 1);
     const data = parseJson(resp);
     // Hetzner returns { "error": { ... } } on auth failure.
     // Success responses may contain "error": null inside action objects,
     // so check for a real error object with a message.
-    if (data?.error?.message) return false;
+    if (data?.error?.message) {
+      return false;
+    }
     return true;
   } catch {
     return false;
@@ -183,32 +195,73 @@ export async function ensureHcloudToken(): Promise<void> {
 
 // ─── SSH Key Management ──────────────────────────────────────────────────────
 
-function generateSshKeyIfMissing(): { pubPath: string; privPath: string } {
+function generateSshKeyIfMissing(): {
+  pubPath: string;
+  privPath: string;
+} {
   const sshDir = `${process.env.HOME}/.ssh`;
   const privPath = `${sshDir}/id_ed25519`;
   const pubPath = `${privPath}.pub`;
 
   if (existsSync(pubPath) && existsSync(privPath)) {
-    return { pubPath, privPath };
+    return {
+      pubPath,
+      privPath,
+    };
   }
 
-  mkdirSync(sshDir, { recursive: true, mode: 0o700 } as any);
+  mkdirSync(sshDir, {
+    recursive: true,
+    mode: 0o700,
+  } as any);
   logStep("Generating SSH key...");
   const result = Bun.spawnSync(
-    ["ssh-keygen", "-t", "ed25519", "-f", privPath, "-N", "", "-C", "spawn"],
-    { stdio: ["ignore", "pipe", "pipe"] },
+    [
+      "ssh-keygen",
+      "-t",
+      "ed25519",
+      "-f",
+      privPath,
+      "-N",
+      "",
+      "-C",
+      "spawn",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
   );
   if (result.exitCode !== 0) {
     throw new Error("SSH key generation failed");
   }
   logInfo("SSH key generated");
-  return { pubPath, privPath };
+  return {
+    pubPath,
+    privPath,
+  };
 }
 
 function getSshFingerprint(pubPath: string): string {
-  const result = Bun.spawnSync(["ssh-keygen", "-lf", pubPath, "-E", "md5"], {
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const result = Bun.spawnSync(
+    [
+      "ssh-keygen",
+      "-lf",
+      pubPath,
+      "-E",
+      "md5",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
   const output = new TextDecoder().decode(result.stdout).trim();
   // Format: "2048 MD5:xx:xx:xx... user@host (ED25519)"
   const match = output.match(/MD5:([a-f0-9:]+)/i);
@@ -264,12 +317,25 @@ export function saveVmConnection(
   launchCmd?: string,
 ): void {
   const dir = `${process.env.HOME}/.spawn`;
-  mkdirSync(dir, { recursive: true });
-  const json: Record<string, string> = { ip, user };
-  if (serverId) json.server_id = serverId;
-  if (serverName) json.server_name = serverName;
-  if (cloud) json.cloud = cloud;
-  if (launchCmd) json.launch_cmd = launchCmd;
+  mkdirSync(dir, {
+    recursive: true,
+  });
+  const json: Record<string, string> = {
+    ip,
+    user,
+  };
+  if (serverId) {
+    json.server_id = serverId;
+  }
+  if (serverName) {
+    json.server_name = serverName;
+  }
+  if (cloud) {
+    json.cloud = cloud;
+  }
+  if (launchCmd) {
+    json.launch_cmd = launchCmd;
+  }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -301,13 +367,13 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   }
   if (needsBun(tier)) {
     lines.push(
-      'curl -fsSL https://bun.sh/install | bash || true',
-      'ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true',
+      "curl -fsSL https://bun.sh/install | bash || true",
+      "ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true",
     );
   }
   lines.push(
-    'echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> /root/.bashrc',
-    'echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> /root/.zshrc',
+    "echo 'export PATH=\"$HOME/.local/bin:$HOME/.bun/bin:$PATH\"' >> /root/.bashrc",
+    "echo 'export PATH=\"$HOME/.local/bin:$HOME/.bun/bin:$PATH\"' >> /root/.zshrc",
     "touch /home/ubuntu/.cloud-init-complete 2>/dev/null; touch /root/.cloud-init-complete",
   );
   return lines.join("\n");
@@ -383,24 +449,36 @@ export async function createServer(
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
 const SSH_OPTS = [
-  "-o", "StrictHostKeyChecking=no",
-  "-o", "UserKnownHostsFile=/dev/null",
-  "-o", "LogLevel=ERROR",
-  "-o", "ConnectTimeout=10",
+  "-o",
+  "StrictHostKeyChecking=no",
+  "-o",
+  "UserKnownHostsFile=/dev/null",
+  "-o",
+  "LogLevel=ERROR",
+  "-o",
+  "ConnectTimeout=10",
 ];
 
-export async function waitForCloudInit(
-  ip?: string,
-  maxAttempts = 60,
-): Promise<void> {
+export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<void> {
   const serverIp = ip || hetznerServerIp;
   logStep("Waiting for SSH connectivity...");
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const proc = Bun.spawn(
-        ["ssh", ...SSH_OPTS, `root@${serverIp}`, "echo ok"],
-        { stdio: ["ignore", "pipe", "pipe"] },
+        [
+          "ssh",
+          ...SSH_OPTS,
+          `root@${serverIp}`,
+          "echo ok",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
       );
       const stdout = await new Response(proc.stdout).text();
       const exitCode = await proc.exited;
@@ -423,8 +501,19 @@ export async function waitForCloudInit(
   for (let attempt = 1; attempt <= 60; attempt++) {
     try {
       const proc = Bun.spawn(
-        ["ssh", ...SSH_OPTS, `root@${serverIp}`, "test -f /root/.cloud-init-complete && echo done"],
-        { stdio: ["ignore", "pipe", "pipe"] },
+        [
+          "ssh",
+          ...SSH_OPTS,
+          `root@${serverIp}`,
+          "test -f /root/.cloud-init-complete && echo done",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
       );
       const stdout = await new Response(proc.stdout).text();
       const exitCode = await proc.exited;
@@ -444,23 +533,38 @@ export async function waitForCloudInit(
   }
 }
 
-export async function runServer(
-  cmd: string,
-  timeoutSecs?: number,
-  ip?: string,
-): Promise<void> {
+export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
   const serverIp = ip || hetznerServerIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
 
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, `root@${serverIp}`, fullCmd],
-    { stdio: ["pipe", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      `root@${serverIp}`,
+      fullCmd,
+    ],
+    {
+      stdio: [
+        "pipe",
+        "inherit",
+        "inherit",
+      ],
+    },
   );
 
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {}
+  }, timeout);
   const exitCode = await proc.exited;
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   clearTimeout(timer);
 
   if (exitCode !== 0) {
@@ -468,35 +572,48 @@ export async function runServer(
   }
 }
 
-export async function runServerCapture(
-  cmd: string,
-  timeoutSecs?: number,
-  ip?: string,
-): Promise<string> {
+export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: string): Promise<string> {
   const serverIp = ip || hetznerServerIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
 
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, `root@${serverIp}`, fullCmd],
-    { stdio: ["pipe", "pipe", "pipe"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      `root@${serverIp}`,
+      fullCmd,
+    ],
+    {
+      stdio: [
+        "pipe",
+        "pipe",
+        "pipe",
+      ],
+    },
   );
 
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => { try { proc.kill(); } catch {} }, timeout);
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {}
+  }, timeout);
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
-  try { proc.stdin!.end(); } catch { /* already closed */ }
+  try {
+    proc.stdin!.end();
+  } catch {
+    /* already closed */
+  }
   clearTimeout(timer);
 
-  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  if (exitCode !== 0) {
+    throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  }
   return stdout.trim();
 }
 
-export async function uploadFile(
-  localPath: string,
-  remotePath: string,
-  ip?: string,
-): Promise<void> {
+export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || hetznerServerIp;
   if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
     logError(`Invalid remote path: ${remotePath}`);
@@ -504,24 +621,46 @@ export async function uploadFile(
   }
 
   const proc = Bun.spawn(
-    ["scp", ...SSH_OPTS, localPath, `root@${serverIp}:${remotePath}`],
-    { stdio: ["ignore", "ignore", "pipe"] },
+    [
+      "scp",
+      ...SSH_OPTS,
+      localPath,
+      `root@${serverIp}:${remotePath}`,
+    ],
+    {
+      stdio: [
+        "ignore",
+        "ignore",
+        "pipe",
+      ],
+    },
   );
   const exitCode = await proc.exited;
-  if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
+  if (exitCode !== 0) {
+    throw new Error(`upload_file failed for ${remotePath}`);
+  }
 }
 
-export async function interactiveSession(
-  cmd: string,
-  ip?: string,
-): Promise<number> {
+export async function interactiveSession(cmd: string, ip?: string): Promise<number> {
   const serverIp = ip || hetznerServerIp;
   const term = process.env.TERM || "xterm-256color";
   const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
 
   const proc = Bun.spawn(
-    ["ssh", ...SSH_OPTS, "-t", `root@${serverIp}`, fullCmd],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_OPTS,
+      "-t",
+      `root@${serverIp}`,
+      fullCmd,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+    },
   );
   const exitCode = await proc.exited;
 
@@ -555,7 +694,9 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
-      if (attempt < maxAttempts) await sleep(sleepSec * 1000);
+      if (attempt < maxAttempts) {
+        await sleep(sleepSec * 1000);
+      }
     }
   }
   logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);
@@ -575,13 +716,14 @@ export async function getServerName(): Promise<string> {
     return name;
   }
 
-  const kebab = process.env.SPAWN_NAME_KEBAB
-    || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
+  const kebab = process.env.SPAWN_NAME_KEBAB || (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "");
   return kebab || defaultSpawnName();
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) {
+    return;
+  }
 
   let kebab: string;
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
@@ -634,9 +776,7 @@ export async function listServers(): Promise<void> {
   }
 
   const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-  console.log(
-    pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10),
-  );
+  console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10));
   console.log("-".repeat(75));
   for (const s of servers) {
     console.log(

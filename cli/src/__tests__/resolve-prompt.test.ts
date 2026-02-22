@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { describe, it, expect, mock } from "bun:test";
 
 /**
  * Tests for the resolvePrompt pipeline and handleDefaultCommand routing
@@ -26,13 +26,28 @@ function extractFlagValue(
   flags: string[],
   _flagLabel: string,
   usageHint: string,
-  hooks?: { exit?: (code: number) => void; stderr?: (msg: string) => void }
-): [string | undefined, string[]] {
-  const idx = args.findIndex(arg => flags.includes(arg));
-  if (idx === -1) return [undefined, args];
+  hooks?: {
+    exit?: (code: number) => void;
+    stderr?: (msg: string) => void;
+  },
+): [
+  string | undefined,
+  string[],
+] {
+  const idx = args.findIndex((arg) => flags.includes(arg));
+  if (idx === -1) {
+    return [
+      undefined,
+      args,
+    ];
+  }
 
   if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
-    const exitFn = hooks?.exit ?? ((code: number) => { throw new Error(`process.exit(${code})`); });
+    const exitFn =
+      hooks?.exit ??
+      ((code: number) => {
+        throw new Error(`process.exit(${code})`);
+      });
     const stderrFn = hooks?.stderr ?? (() => {});
     stderrFn(`Error: ${args[idx]} requires a value`);
     stderrFn(`\nUsage: ${usageHint}`);
@@ -40,9 +55,14 @@ function extractFlagValue(
   }
 
   const value = args[idx + 1];
-  const remaining = [...args];
+  const remaining = [
+    ...args,
+  ];
   remaining.splice(idx, 2);
-  return [value, remaining];
+  return [
+    value,
+    remaining,
+  ];
 }
 
 // ── Faithful replica of resolvePrompt from index.ts (lines 76-113) ────────────
@@ -53,60 +73,88 @@ async function resolvePrompt(
     exit?: (code: number) => void;
     stderr?: (msg: string) => void;
     readFile?: (path: string) => string;
-  }
-): Promise<[string | undefined, string[]]> {
-  const exitFn = hooks?.exit ?? ((code: number) => { throw new Error(`process.exit(${code})`); });
+  },
+): Promise<
+  [
+    string | undefined,
+    string[],
+  ]
+> {
+  const exitFn =
+    hooks?.exit ??
+    ((code: number) => {
+      throw new Error(`process.exit(${code})`);
+    });
   const stderrFn = hooks?.stderr ?? (() => {});
 
   let [prompt, filteredArgs] = extractFlagValue(
     args,
-    ["--prompt", "-p"],
+    [
+      "--prompt",
+      "-p",
+    ],
     "prompt",
     'spawn <agent> <cloud> --prompt "your prompt here"',
-    hooks
+    hooks,
   );
 
   const [promptFile, finalArgs] = extractFlagValue(
     filteredArgs,
-    ["--prompt-file"],
+    [
+      "--prompt-file",
+    ],
     "prompt file",
     "spawn <agent> <cloud> --prompt-file instructions.txt",
-    hooks
+    hooks,
   );
   filteredArgs = finalArgs;
 
   if (prompt && promptFile) {
     stderrFn("Error: --prompt and --prompt-file cannot be used together");
-    stderrFn(`\nUse one or the other:`);
+    stderrFn("\nUse one or the other:");
     stderrFn(`  spawn <agent> <cloud> --prompt "your prompt here"`);
-    stderrFn(`  spawn <agent> <cloud> --prompt-file instructions.txt`);
+    stderrFn("  spawn <agent> <cloud> --prompt-file instructions.txt");
     exitFn(1);
   }
 
   if (promptFile) {
-    const readFileFn = hooks?.readFile ?? (() => { throw new Error("readFileSync not available"); });
+    const readFileFn =
+      hooks?.readFile ??
+      (() => {
+        throw new Error("readFileSync not available");
+      });
     try {
       prompt = readFileFn(promptFile);
     } catch (err) {
       const msg = err && typeof err === "object" && "message" in err ? err.message : String(err);
       stderrFn(`Error reading prompt file '${promptFile}': ${msg}`);
-      stderrFn(`\nMake sure the file exists and is readable.`);
+      stderrFn("\nMake sure the file exists and is readable.");
       exitFn(1);
     }
   }
 
-  return [prompt, filteredArgs];
+  return [
+    prompt,
+    filteredArgs,
+  ];
 }
 
 // ── Faithful replica of handleDefaultCommand routing from index.ts ────────────
 
-const HELP_FLAGS = ["--help", "-h", "help"];
+const HELP_FLAGS = [
+  "--help",
+  "-h",
+  "help",
+];
 
 function handleDefaultCommand(
   agent: string,
   cloud: string | undefined,
   prompt: string | undefined,
-  hooks?: { exit?: (code: number) => void; stderr?: (msg: string) => void }
+  hooks?: {
+    exit?: (code: number) => void;
+    stderr?: (msg: string) => void;
+  },
 ): "agentInfo" | "run" | "agentInfoFromHelp" | "promptError" {
   const exitFn = hooks?.exit ?? (() => {});
   const stderrFn = hooks?.stderr ?? (() => {});
@@ -117,15 +165,14 @@ function handleDefaultCommand(
   }
   if (cloud) {
     return "run";
-  } else {
-    if (prompt) {
-      stderrFn("Error: --prompt requires both <agent> and <cloud>");
-      stderrFn(`\nUsage: spawn ${agent} <cloud> --prompt "your prompt here"`);
-      exitFn(1);
-      return "promptError";
-    }
-    return "agentInfo";
   }
+  if (prompt) {
+    stderrFn("Error: --prompt requires both <agent> and <cloud>");
+    stderrFn(`\nUsage: spawn ${agent} <cloud> --prompt "your prompt here"`);
+    exitFn(1);
+    return "promptError";
+  }
+  return "agentInfo";
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -133,41 +180,71 @@ function handleDefaultCommand(
 describe("resolvePrompt pipeline", () => {
   describe("basic prompt extraction", () => {
     it("should extract --prompt and remove it from args", async () => {
-      const [prompt, args] = await resolvePrompt(
-        ["claude", "sprite", "--prompt", "Fix bugs"]
-      );
+      const [prompt, args] = await resolvePrompt([
+        "claude",
+        "sprite",
+        "--prompt",
+        "Fix bugs",
+      ]);
       expect(prompt).toBe("Fix bugs");
-      expect(args).toEqual(["claude", "sprite"]);
+      expect(args).toEqual([
+        "claude",
+        "sprite",
+      ]);
     });
 
     it("should extract -p short form", async () => {
-      const [prompt, args] = await resolvePrompt(
-        ["claude", "sprite", "-p", "Add tests"]
-      );
+      const [prompt, args] = await resolvePrompt([
+        "claude",
+        "sprite",
+        "-p",
+        "Add tests",
+      ]);
       expect(prompt).toBe("Add tests");
-      expect(args).toEqual(["claude", "sprite"]);
+      expect(args).toEqual([
+        "claude",
+        "sprite",
+      ]);
     });
 
     it("should return undefined prompt when no flag present", async () => {
-      const [prompt, args] = await resolvePrompt(["claude", "sprite"]);
+      const [prompt, args] = await resolvePrompt([
+        "claude",
+        "sprite",
+      ]);
       expect(prompt).toBeUndefined();
-      expect(args).toEqual(["claude", "sprite"]);
+      expect(args).toEqual([
+        "claude",
+        "sprite",
+      ]);
     });
 
     it("should handle --prompt at beginning of args", async () => {
-      const [prompt, args] = await resolvePrompt(
-        ["--prompt", "Fix bugs", "claude", "sprite"]
-      );
+      const [prompt, args] = await resolvePrompt([
+        "--prompt",
+        "Fix bugs",
+        "claude",
+        "sprite",
+      ]);
       expect(prompt).toBe("Fix bugs");
-      expect(args).toEqual(["claude", "sprite"]);
+      expect(args).toEqual([
+        "claude",
+        "sprite",
+      ]);
     });
 
     it("should handle prompt with spaces and special characters", async () => {
-      const [prompt, args] = await resolvePrompt(
-        ["claude", "sprite", "--prompt", "Fix all linter errors & add tests"]
-      );
+      const [prompt, args] = await resolvePrompt([
+        "claude",
+        "sprite",
+        "--prompt",
+        "Fix all linter errors & add tests",
+      ]);
       expect(prompt).toBe("Fix all linter errors & add tests");
-      expect(args).toEqual(["claude", "sprite"]);
+      expect(args).toEqual([
+        "claude",
+        "sprite",
+      ]);
     });
   });
 
@@ -175,19 +252,36 @@ describe("resolvePrompt pipeline", () => {
     it("should extract --prompt-file and read contents", async () => {
       const readFile = mock((path: string) => "File contents here");
       const [prompt, args] = await resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "instructions.txt"],
-        { readFile }
+        [
+          "claude",
+          "sprite",
+          "--prompt-file",
+          "instructions.txt",
+        ],
+        {
+          readFile,
+        },
       );
       expect(prompt).toBe("File contents here");
-      expect(args).toEqual(["claude", "sprite"]);
+      expect(args).toEqual([
+        "claude",
+        "sprite",
+      ]);
       expect(readFile).toHaveBeenCalledWith("instructions.txt");
     });
 
     it("should handle --prompt-file with absolute path", async () => {
       const readFile = mock((path: string) => "Absolute file contents");
       const [prompt, args] = await resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "/home/user/prompt.md"],
-        { readFile }
+        [
+          "claude",
+          "sprite",
+          "--prompt-file",
+          "/home/user/prompt.md",
+        ],
+        {
+          readFile,
+        },
       );
       expect(prompt).toBe("Absolute file contents");
       expect(readFile).toHaveBeenCalledWith("/home/user/prompt.md");
@@ -196,8 +290,15 @@ describe("resolvePrompt pipeline", () => {
     it("should handle --prompt-file with path containing spaces in the name", async () => {
       const readFile = mock(() => "content");
       const [prompt, args] = await resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "my prompt.txt"],
-        { readFile }
+        [
+          "claude",
+          "sprite",
+          "--prompt-file",
+          "my prompt.txt",
+        ],
+        {
+          readFile,
+        },
       );
       expect(prompt).toBe("content");
       expect(readFile).toHaveBeenCalledWith("my prompt.txt");
@@ -206,75 +307,121 @@ describe("resolvePrompt pipeline", () => {
     it("should handle --prompt-file at beginning of args", async () => {
       const readFile = mock(() => "file content");
       const [prompt, args] = await resolvePrompt(
-        ["--prompt-file", "todo.md", "claude", "sprite"],
-        { readFile }
+        [
+          "--prompt-file",
+          "todo.md",
+          "claude",
+          "sprite",
+        ],
+        {
+          readFile,
+        },
       );
       expect(prompt).toBe("file content");
-      expect(args).toEqual(["claude", "sprite"]);
+      expect(args).toEqual([
+        "claude",
+        "sprite",
+      ]);
     });
   });
 
   describe("--prompt-file read errors", () => {
     it("should exit with error when file does not exist", async () => {
       const stderrMessages: string[] = [];
-      const readFile = mock(() => { throw new Error("ENOENT: no such file or directory"); });
+      const readFile = mock(() => {
+        throw new Error("ENOENT: no such file or directory");
+      });
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "nonexistent.txt"],
-        {
-          readFile,
-          stderr: (msg: string) => stderrMessages.push(msg),
-        }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt-file",
+            "nonexistent.txt",
+          ],
+          {
+            readFile,
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("nonexistent.txt"))).toBe(true);
-      expect(stderrMessages.some(m => m.includes("ENOENT"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("nonexistent.txt"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("ENOENT"))).toBe(true);
     });
 
     it("should exit with error when file is not readable", async () => {
       const stderrMessages: string[] = [];
-      const readFile = mock(() => { throw new Error("EACCES: permission denied"); });
+      const readFile = mock(() => {
+        throw new Error("EACCES: permission denied");
+      });
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "restricted.txt"],
-        {
-          readFile,
-          stderr: (msg: string) => stderrMessages.push(msg),
-        }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt-file",
+            "restricted.txt",
+          ],
+          {
+            readFile,
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("restricted.txt"))).toBe(true);
-      expect(stderrMessages.some(m => m.includes("EACCES"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("restricted.txt"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("EACCES"))).toBe(true);
     });
 
     it("should include 'Make sure the file exists' hint in error output", async () => {
       const stderrMessages: string[] = [];
-      const readFile = mock(() => { throw new Error("File error"); });
+      const readFile = mock(() => {
+        throw new Error("File error");
+      });
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "bad.txt"],
-        {
-          readFile,
-          stderr: (msg: string) => stderrMessages.push(msg),
-        }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt-file",
+            "bad.txt",
+          ],
+          {
+            readFile,
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("Make sure the file exists"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("Make sure the file exists"))).toBe(true);
     });
 
     it("should handle non-Error throw from readFile", async () => {
       const stderrMessages: string[] = [];
-      const readFile = mock(() => { throw "string error"; });
+      const readFile = mock(() => {
+        throw "string error";
+      });
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "file.txt"],
-        {
-          readFile,
-          stderr: (msg: string) => stderrMessages.push(msg),
-        }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt-file",
+            "file.txt",
+          ],
+          {
+            readFile,
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("file.txt"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("file.txt"))).toBe(true);
     });
   });
 
@@ -282,50 +429,88 @@ describe("resolvePrompt pipeline", () => {
     it("should exit when both --prompt and --prompt-file are provided", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt", "Fix bugs", "--prompt-file", "todo.txt"],
-        {
-          stderr: (msg: string) => stderrMessages.push(msg),
-        }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt",
+            "Fix bugs",
+            "--prompt-file",
+            "todo.txt",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("cannot be used together"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("cannot be used together"))).toBe(true);
     });
 
     it("should exit when both -p and --prompt-file are provided", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "-p", "Fix bugs", "--prompt-file", "todo.txt"],
-        {
-          stderr: (msg: string) => stderrMessages.push(msg),
-        }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "-p",
+            "Fix bugs",
+            "--prompt-file",
+            "todo.txt",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("cannot be used together"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("cannot be used together"))).toBe(true);
     });
 
     it("should include usage examples in mutual exclusion error", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt", "text", "--prompt-file", "file.txt"],
-        {
-          stderr: (msg: string) => stderrMessages.push(msg),
-        }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt",
+            "text",
+            "--prompt-file",
+            "file.txt",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("Use one or the other"))).toBe(true);
-      expect(stderrMessages.some(m => m.includes("--prompt-file instructions.txt"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("Use one or the other"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("--prompt-file instructions.txt"))).toBe(true);
     });
 
     it("should not call readFile when mutual exclusion fires", async () => {
       const readFile = mock(() => "should not be called");
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt", "text", "--prompt-file", "file.txt"],
-        { readFile }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt",
+            "text",
+            "--prompt-file",
+            "file.txt",
+          ],
+          {
+            readFile,
+          },
+        ),
+      ).rejects.toThrow();
 
       expect(readFile).not.toHaveBeenCalled();
     });
@@ -335,80 +520,136 @@ describe("resolvePrompt pipeline", () => {
     it("should exit when --prompt is last argument", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt"],
-        { stderr: (msg: string) => stderrMessages.push(msg) }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("--prompt requires a value"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("--prompt requires a value"))).toBe(true);
     });
 
     it("should exit when -p is last argument", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "-p"],
-        { stderr: (msg: string) => stderrMessages.push(msg) }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "-p",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("-p requires a value"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("-p requires a value"))).toBe(true);
     });
 
     it("should exit when --prompt-file is last argument", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt-file"],
-        { stderr: (msg: string) => stderrMessages.push(msg) }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt-file",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("--prompt-file requires a value"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("--prompt-file requires a value"))).toBe(true);
     });
 
     it("should exit when --prompt is followed by another flag", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt", "--verbose"],
-        { stderr: (msg: string) => stderrMessages.push(msg) }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt",
+            "--verbose",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("--prompt requires a value"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("--prompt requires a value"))).toBe(true);
     });
 
     it("should exit when --prompt-file is followed by a flag", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "-v"],
-        { stderr: (msg: string) => stderrMessages.push(msg) }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "sprite",
+            "--prompt-file",
+            "-v",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("--prompt-file requires a value"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("--prompt-file requires a value"))).toBe(true);
     });
 
     it("should include usage hint in error for missing --prompt value", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "--prompt"],
-        { stderr: (msg: string) => stderrMessages.push(msg) }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "--prompt",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("Usage:"))).toBe(true);
-      expect(stderrMessages.some(m => m.includes("--prompt"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("Usage:"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("--prompt"))).toBe(true);
     });
 
     it("should include usage hint in error for missing --prompt-file value", async () => {
       const stderrMessages: string[] = [];
 
-      await expect(resolvePrompt(
-        ["claude", "--prompt-file"],
-        { stderr: (msg: string) => stderrMessages.push(msg) }
-      )).rejects.toThrow();
+      await expect(
+        resolvePrompt(
+          [
+            "claude",
+            "--prompt-file",
+          ],
+          {
+            stderr: (msg: string) => stderrMessages.push(msg),
+          },
+        ),
+      ).rejects.toThrow();
 
-      expect(stderrMessages.some(m => m.includes("Usage:"))).toBe(true);
-      expect(stderrMessages.some(m => m.includes("--prompt-file"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("Usage:"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("--prompt-file"))).toBe(true);
     });
   });
 
@@ -420,50 +661,79 @@ describe("resolvePrompt pipeline", () => {
     });
 
     it("should handle args with only flags and no positional args", async () => {
-      const [prompt, args] = await resolvePrompt(
-        ["--prompt", "text"]
-      );
+      const [prompt, args] = await resolvePrompt([
+        "--prompt",
+        "text",
+      ]);
       expect(prompt).toBe("text");
       expect(args).toEqual([]);
     });
 
     it("should accept prompt value that starts with a number", async () => {
-      const [prompt] = await resolvePrompt(
-        ["claude", "sprite", "--prompt", "42 things to fix"]
-      );
+      const [prompt] = await resolvePrompt([
+        "claude",
+        "sprite",
+        "--prompt",
+        "42 things to fix",
+      ]);
       expect(prompt).toBe("42 things to fix");
     });
 
     it("should accept prompt value containing quotes", async () => {
-      const [prompt] = await resolvePrompt(
-        ["claude", "sprite", "--prompt", 'Fix the "bug" in module']
-      );
+      const [prompt] = await resolvePrompt([
+        "claude",
+        "sprite",
+        "--prompt",
+        'Fix the "bug" in module',
+      ]);
       expect(prompt).toBe('Fix the "bug" in module');
     });
 
     it("should accept prompt-file value with dots in filename", async () => {
       const readFile = mock(() => "dot content");
       const [prompt] = await resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "my.prompt.v2.txt"],
-        { readFile }
+        [
+          "claude",
+          "sprite",
+          "--prompt-file",
+          "my.prompt.v2.txt",
+        ],
+        {
+          readFile,
+        },
       );
       expect(prompt).toBe("dot content");
       expect(readFile).toHaveBeenCalledWith("my.prompt.v2.txt");
     });
 
     it("should preserve all non-flag positional args", async () => {
-      const [prompt, args] = await resolvePrompt(
-        ["claude", "sprite", "--prompt", "Fix bugs", "extra-arg"]
-      );
+      const [prompt, args] = await resolvePrompt([
+        "claude",
+        "sprite",
+        "--prompt",
+        "Fix bugs",
+        "extra-arg",
+      ]);
       expect(prompt).toBe("Fix bugs");
-      expect(args).toEqual(["claude", "sprite", "extra-arg"]);
+      expect(args).toEqual([
+        "claude",
+        "sprite",
+        "extra-arg",
+      ]);
     });
 
     it("should handle prompt-file returning empty string", async () => {
       const readFile = mock(() => "");
       const [prompt] = await resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "empty.txt"],
-        { readFile }
+        [
+          "claude",
+          "sprite",
+          "--prompt-file",
+          "empty.txt",
+        ],
+        {
+          readFile,
+        },
       );
       expect(prompt).toBe("");
     });
@@ -472,8 +742,15 @@ describe("resolvePrompt pipeline", () => {
       const multiline = "Line 1\nLine 2\nLine 3\n";
       const readFile = mock(() => multiline);
       const [prompt] = await resolvePrompt(
-        ["claude", "sprite", "--prompt-file", "multi.txt"],
-        { readFile }
+        [
+          "claude",
+          "sprite",
+          "--prompt-file",
+          "multi.txt",
+        ],
+        {
+          readFile,
+        },
       );
       expect(prompt).toBe(multiline);
     });
@@ -546,7 +823,7 @@ describe("handleDefaultCommand routing", () => {
         exit: () => {},
       });
       expect(result).toBe("promptError");
-      expect(stderrMessages.some(m => m.includes("--prompt requires both <agent> and <cloud>"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("--prompt requires both <agent> and <cloud>"))).toBe(true);
     });
 
     it("should include usage example in prompt error", () => {
@@ -555,7 +832,7 @@ describe("handleDefaultCommand routing", () => {
         stderr: (msg: string) => stderrMessages.push(msg),
         exit: () => {},
       });
-      expect(stderrMessages.some(m => m.includes("spawn claude <cloud>"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("spawn claude <cloud>"))).toBe(true);
     });
 
     it("should include actual agent name in usage example", () => {
@@ -564,7 +841,7 @@ describe("handleDefaultCommand routing", () => {
         stderr: (msg: string) => stderrMessages.push(msg),
         exit: () => {},
       });
-      expect(stderrMessages.some(m => m.includes("spawn codex <cloud>"))).toBe(true);
+      expect(stderrMessages.some((m) => m.includes("spawn codex <cloud>"))).toBe(true);
     });
   });
 });
@@ -572,31 +849,83 @@ describe("handleDefaultCommand routing", () => {
 describe("subcommand --help flag detection", () => {
   // Replicate the hasHelpFlag logic from index.ts main()
   function hasHelpFlag(filteredArgs: string[]): boolean {
-    return filteredArgs.slice(1).some(a => HELP_FLAGS.includes(a));
+    return filteredArgs.slice(1).some((a) => HELP_FLAGS.includes(a));
   }
 
   it("should detect --help after subcommand", () => {
-    expect(hasHelpFlag(["list", "--help"])).toBe(true);
-    expect(hasHelpFlag(["agents", "--help"])).toBe(true);
-    expect(hasHelpFlag(["clouds", "--help"])).toBe(true);
-    expect(hasHelpFlag(["update", "--help"])).toBe(true);
-    expect(hasHelpFlag(["update", "--help"])).toBe(true);
+    expect(
+      hasHelpFlag([
+        "list",
+        "--help",
+      ]),
+    ).toBe(true);
+    expect(
+      hasHelpFlag([
+        "agents",
+        "--help",
+      ]),
+    ).toBe(true);
+    expect(
+      hasHelpFlag([
+        "clouds",
+        "--help",
+      ]),
+    ).toBe(true);
+    expect(
+      hasHelpFlag([
+        "update",
+        "--help",
+      ]),
+    ).toBe(true);
+    expect(
+      hasHelpFlag([
+        "update",
+        "--help",
+      ]),
+    ).toBe(true);
   });
 
   it("should detect -h after subcommand", () => {
-    expect(hasHelpFlag(["list", "-h"])).toBe(true);
-    expect(hasHelpFlag(["agents", "-h"])).toBe(true);
+    expect(
+      hasHelpFlag([
+        "list",
+        "-h",
+      ]),
+    ).toBe(true);
+    expect(
+      hasHelpFlag([
+        "agents",
+        "-h",
+      ]),
+    ).toBe(true);
   });
 
   it("should detect 'help' as second arg", () => {
-    expect(hasHelpFlag(["list", "help"])).toBe(true);
+    expect(
+      hasHelpFlag([
+        "list",
+        "help",
+      ]),
+    ).toBe(true);
   });
 
   it("should not detect help flag in first position (that is the command)", () => {
     // slice(1) means we skip the first arg
-    expect(hasHelpFlag(["--help"])).toBe(false);
-    expect(hasHelpFlag(["-h"])).toBe(false);
-    expect(hasHelpFlag(["help"])).toBe(false);
+    expect(
+      hasHelpFlag([
+        "--help",
+      ]),
+    ).toBe(false);
+    expect(
+      hasHelpFlag([
+        "-h",
+      ]),
+    ).toBe(false);
+    expect(
+      hasHelpFlag([
+        "help",
+      ]),
+    ).toBe(false);
   });
 
   it("should not detect help flag when no args", () => {
@@ -604,14 +933,46 @@ describe("subcommand --help flag detection", () => {
   });
 
   it("should detect help flag in any position after first", () => {
-    expect(hasHelpFlag(["list", "something", "--help"])).toBe(true);
-    expect(hasHelpFlag(["update", "--verbose", "-h"])).toBe(true);
+    expect(
+      hasHelpFlag([
+        "list",
+        "something",
+        "--help",
+      ]),
+    ).toBe(true);
+    expect(
+      hasHelpFlag([
+        "update",
+        "--verbose",
+        "-h",
+      ]),
+    ).toBe(true);
   });
 
   it("should not false-positive on similar but different flags", () => {
-    expect(hasHelpFlag(["list", "--helper"])).toBe(false);
-    expect(hasHelpFlag(["list", "-help"])).toBe(false);
-    expect(hasHelpFlag(["list", "helpful"])).toBe(false);
-    expect(hasHelpFlag(["list", "--Help"])).toBe(false);
+    expect(
+      hasHelpFlag([
+        "list",
+        "--helper",
+      ]),
+    ).toBe(false);
+    expect(
+      hasHelpFlag([
+        "list",
+        "-help",
+      ]),
+    ).toBe(false);
+    expect(
+      hasHelpFlag([
+        "list",
+        "helpful",
+      ]),
+    ).toBe(false);
+    expect(
+      hasHelpFlag([
+        "list",
+        "--Help",
+      ]),
+    ).toBe(false);
   });
 });

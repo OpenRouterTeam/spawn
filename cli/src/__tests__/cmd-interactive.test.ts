@@ -120,16 +120,26 @@ describe("cmdInteractive", () => {
 
   describe("cancel handling", () => {
     it("should exit with code 0 when user cancels agent selection", async () => {
-      selectReturnValues = [CANCEL_SYMBOL, "sprite"];
-      isCancelValues = new Set([CANCEL_SYMBOL]);
+      selectReturnValues = [
+        CANCEL_SYMBOL,
+        "sprite",
+      ];
+      isCancelValues = new Set([
+        CANCEL_SYMBOL,
+      ]);
 
       await expect(cmdInteractive()).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(0);
     });
 
     it("should show cancelled message when user cancels agent selection", async () => {
-      selectReturnValues = [CANCEL_SYMBOL, "sprite"];
-      isCancelValues = new Set([CANCEL_SYMBOL]);
+      selectReturnValues = [
+        CANCEL_SYMBOL,
+        "sprite",
+      ];
+      isCancelValues = new Set([
+        CANCEL_SYMBOL,
+      ]);
 
       try {
         await cmdInteractive();
@@ -142,16 +152,26 @@ describe("cmdInteractive", () => {
     });
 
     it("should exit with code 0 when user cancels cloud selection", async () => {
-      selectReturnValues = ["claude", CANCEL_SYMBOL];
-      isCancelValues = new Set([CANCEL_SYMBOL]);
+      selectReturnValues = [
+        "claude",
+        CANCEL_SYMBOL,
+      ];
+      isCancelValues = new Set([
+        CANCEL_SYMBOL,
+      ]);
 
       await expect(cmdInteractive()).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(0);
     });
 
     it("should show cancelled message when user cancels cloud selection", async () => {
-      selectReturnValues = ["claude", CANCEL_SYMBOL];
-      isCancelValues = new Set([CANCEL_SYMBOL]);
+      selectReturnValues = [
+        "claude",
+        CANCEL_SYMBOL,
+      ];
+      isCancelValues = new Set([
+        CANCEL_SYMBOL,
+      ]);
 
       try {
         await cmdInteractive();
@@ -164,8 +184,13 @@ describe("cmdInteractive", () => {
     });
 
     it("should not show launch message when user cancels", async () => {
-      selectReturnValues = [CANCEL_SYMBOL, "sprite"];
-      isCancelValues = new Set([CANCEL_SYMBOL]);
+      selectReturnValues = [
+        CANCEL_SYMBOL,
+        "sprite",
+      ];
+      isCancelValues = new Set([
+        CANCEL_SYMBOL,
+      ]);
 
       try {
         await cmdInteractive();
@@ -202,7 +227,10 @@ describe("cmdInteractive", () => {
       })) as any;
       await loadManifest(true);
 
-      selectReturnValues = ["codex", "sprite"];
+      selectReturnValues = [
+        "codex",
+        "sprite",
+      ];
 
       await expect(cmdInteractive()).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
@@ -226,7 +254,10 @@ describe("cmdInteractive", () => {
       })) as any;
       await loadManifest(true);
 
-      selectReturnValues = ["codex", "sprite"];
+      selectReturnValues = [
+        "codex",
+        "sprite",
+      ];
 
       try {
         await cmdInteractive();
@@ -256,7 +287,10 @@ describe("cmdInteractive", () => {
       })) as any;
       await loadManifest(true);
 
-      selectReturnValues = ["codex", "sprite"];
+      selectReturnValues = [
+        "codex",
+        "sprite",
+      ];
 
       try {
         await cmdInteractive();
@@ -274,7 +308,10 @@ describe("cmdInteractive", () => {
   describe("happy path", () => {
     it("should show intro banner with version", async () => {
       // Select claude + sprite, fetch returns valid script
-      selectReturnValues = ["claude", "sprite"];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
@@ -299,7 +336,10 @@ describe("cmdInteractive", () => {
     });
 
     it("should show launch step with agent and cloud names", async () => {
-      selectReturnValues = ["claude", "sprite"];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
@@ -326,7 +366,10 @@ describe("cmdInteractive", () => {
     });
 
     it("should show 'run directly' hint with agent and cloud keys", async () => {
-      selectReturnValues = ["claude", "sprite"];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
@@ -352,7 +395,10 @@ describe("cmdInteractive", () => {
     });
 
     it("should show outro message before handing off", async () => {
-      selectReturnValues = ["claude", "sprite"];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
@@ -377,7 +423,10 @@ describe("cmdInteractive", () => {
     });
 
     it("should work with codex agent on sprite cloud", async () => {
-      selectReturnValues = ["codex", "sprite"];
+      selectReturnValues = [
+        "codex",
+        "sprite",
+      ];
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
@@ -408,11 +457,16 @@ describe("cmdInteractive", () => {
 
   describe("script execution after selection", () => {
     it("should attempt to download script after user selects agent and cloud", async () => {
-      let fetchedUrls: string[] = [];
-      selectReturnValues = ["claude", "sprite"];
+      const fetchedUrls: string[] = [];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string") fetchedUrls.push(url);
+        if (typeof url === "string") {
+          fetchedUrls.push(url);
+        }
         if (typeof url === "string" && url.includes("manifest.json")) {
           return {
             ok: true,
@@ -430,13 +484,16 @@ describe("cmdInteractive", () => {
       await cmdInteractive();
 
       // Should have fetched script URLs for sprite/claude
-      const scriptUrls = fetchedUrls.filter(u => u.includes(".sh"));
+      const scriptUrls = fetchedUrls.filter((u) => u.includes(".sh"));
       expect(scriptUrls.length).toBeGreaterThanOrEqual(1);
-      expect(scriptUrls.some(u => u.includes("sprite") && u.includes("claude"))).toBe(true);
+      expect(scriptUrls.some((u) => u.includes("sprite") && u.includes("claude"))).toBe(true);
     });
 
     it("should propagate script download failure as process.exit(1)", async () => {
-      selectReturnValues = ["claude", "sprite"];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
@@ -447,7 +504,11 @@ describe("cmdInteractive", () => {
           };
         }
         // Both primary and fallback fail
-        return { ok: false, status: 404, text: async () => "Not Found" };
+        return {
+          ok: false,
+          status: 404,
+          text: async () => "Not Found",
+        };
       }) as any;
       await loadManifest(true);
 
@@ -472,7 +533,10 @@ describe("cmdInteractive", () => {
         },
       };
 
-      selectReturnValues = ["claude", "sprite"];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
       delete process.env.SPRITE_API_KEY;
 
       global.fetch = mock(async (url: string) => {
@@ -509,7 +573,10 @@ describe("cmdInteractive", () => {
         },
       };
 
-      selectReturnValues = ["claude", "sprite"];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
       const savedKey = process.env.SPRITE_API_KEY;
       const savedOR = process.env.OPENROUTER_API_KEY;
       process.env.SPRITE_API_KEY = "test-sprite-key";
@@ -537,10 +604,16 @@ describe("cmdInteractive", () => {
       expect(credWarn).toBeUndefined();
 
       // Restore env
-      if (savedKey === undefined) delete process.env.SPRITE_API_KEY;
-      else process.env.SPRITE_API_KEY = savedKey;
-      if (savedOR === undefined) delete process.env.OPENROUTER_API_KEY;
-      else process.env.OPENROUTER_API_KEY = savedOR;
+      if (savedKey === undefined) {
+        delete process.env.SPRITE_API_KEY;
+      } else {
+        process.env.SPRITE_API_KEY = savedKey;
+      }
+      if (savedOR === undefined) {
+        delete process.env.OPENROUTER_API_KEY;
+      } else {
+        process.env.OPENROUTER_API_KEY = savedOR;
+      }
     });
 
     it("should still launch script after credential warning", async () => {
@@ -555,12 +628,17 @@ describe("cmdInteractive", () => {
         },
       };
 
-      selectReturnValues = ["claude", "sprite"];
+      selectReturnValues = [
+        "claude",
+        "sprite",
+      ];
       delete process.env.SPRITE_API_KEY;
 
-      let fetchedUrls: string[] = [];
+      const fetchedUrls: string[] = [];
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string") fetchedUrls.push(url);
+        if (typeof url === "string") {
+          fetchedUrls.push(url);
+        }
         if (typeof url === "string" && url.includes("manifest.json")) {
           return {
             ok: true,
@@ -578,7 +656,7 @@ describe("cmdInteractive", () => {
       await cmdInteractive();
 
       // Script should still be downloaded despite credential warning
-      const scriptUrls = fetchedUrls.filter(u => u.includes(".sh"));
+      const scriptUrls = fetchedUrls.filter((u) => u.includes(".sh"));
       expect(scriptUrls.length).toBeGreaterThanOrEqual(1);
     });
   });

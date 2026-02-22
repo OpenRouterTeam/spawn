@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
-import { loadManifest, type Manifest } from "../manifest";
+import { loadManifest } from "../manifest";
 
 /**
  * Tests for detectAndFixSwappedArgs and resolveAndLog logic in commands.ts.
@@ -315,12 +315,8 @@ describe("resolveAndLog via cmdRun", () => {
       }
 
       const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      const resolvedAgent = infoCalls.some((msg: string) =>
-        msg.includes("Resolved") && msg.includes("claude")
-      );
-      const resolvedCloud = infoCalls.some((msg: string) =>
-        msg.includes("Resolved") && msg.includes("sprite")
-      );
+      const resolvedAgent = infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("claude"));
+      const resolvedCloud = infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("sprite"));
       expect(resolvedAgent).toBe(true);
       expect(resolvedCloud).toBe(true);
     });
@@ -387,7 +383,10 @@ describe("manifest validation (isValidManifest)", () => {
   it("should reject manifest missing 'agents' field", async () => {
     global.fetch = mock(async () => ({
       ok: true,
-      json: async () => ({ clouds: {}, matrix: {} }),
+      json: async () => ({
+        clouds: {},
+        matrix: {},
+      }),
     })) as any;
 
     // Force refresh to avoid cache, should reject invalid manifest
@@ -399,13 +398,18 @@ describe("manifest validation (isValidManifest)", () => {
 
     // The key assertion: console.error should mention validation failure
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" "));
-    expect(errorOutput.some((msg: string) => msg.includes("validation failed") || msg.includes("Cannot load"))).toBe(true);
+    expect(errorOutput.some((msg: string) => msg.includes("validation failed") || msg.includes("Cannot load"))).toBe(
+      true,
+    );
   });
 
   it("should reject manifest missing 'clouds' field", async () => {
     global.fetch = mock(async () => ({
       ok: true,
-      json: async () => ({ agents: {}, matrix: {} }),
+      json: async () => ({
+        agents: {},
+        matrix: {},
+      }),
     })) as any;
 
     try {
@@ -415,13 +419,18 @@ describe("manifest validation (isValidManifest)", () => {
     }
 
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" "));
-    expect(errorOutput.some((msg: string) => msg.includes("validation failed") || msg.includes("Cannot load"))).toBe(true);
+    expect(errorOutput.some((msg: string) => msg.includes("validation failed") || msg.includes("Cannot load"))).toBe(
+      true,
+    );
   });
 
   it("should reject manifest missing 'matrix' field", async () => {
     global.fetch = mock(async () => ({
       ok: true,
-      json: async () => ({ agents: {}, clouds: {} }),
+      json: async () => ({
+        agents: {},
+        clouds: {},
+      }),
     })) as any;
 
     try {
@@ -431,7 +440,9 @@ describe("manifest validation (isValidManifest)", () => {
     }
 
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" "));
-    expect(errorOutput.some((msg: string) => msg.includes("validation failed") || msg.includes("Cannot load"))).toBe(true);
+    expect(errorOutput.some((msg: string) => msg.includes("validation failed") || msg.includes("Cannot load"))).toBe(
+      true,
+    );
   });
 
   it("should reject null manifest data", async () => {
@@ -447,7 +458,9 @@ describe("manifest validation (isValidManifest)", () => {
     }
 
     const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" "));
-    expect(errorOutput.some((msg: string) => msg.includes("validation failed") || msg.includes("Cannot load"))).toBe(true);
+    expect(errorOutput.some((msg: string) => msg.includes("validation failed") || msg.includes("Cannot load"))).toBe(
+      true,
+    );
   });
 
   it("should accept valid manifest with all required fields", async () => {
@@ -464,7 +477,11 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should accept manifest with empty agents/clouds/matrix", async () => {
-    const emptyManifest = { agents: {}, clouds: {}, matrix: {} };
+    const emptyManifest = {
+      agents: {},
+      clouds: {},
+      matrix: {},
+    };
     global.fetch = mock(async () => ({
       ok: true,
       json: async () => emptyManifest,
@@ -571,6 +588,8 @@ describe("prompt handling with swapped args", () => {
     }
 
     const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
-    expect(errorCalls.some((msg: string) => msg.includes("shell syntax") || msg.includes("command substitution"))).toBe(true);
+    expect(errorCalls.some((msg: string) => msg.includes("shell syntax") || msg.includes("command substitution"))).toBe(
+      true,
+    );
   });
 });

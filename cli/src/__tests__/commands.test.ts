@@ -1,18 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import {
-  cmdRun,
-  cmdMatrix,
-  cmdAgents,
-  cmdClouds,
-  cmdAgentInfo,
-  cmdHelp,
-} from "../commands";
-import {
-  createConsoleMocks,
-  createProcessExitMock,
-  restoreMocks,
-  createMockManifest,
-} from "./test-helpers";
+import { cmdHelp } from "../commands";
+import { createConsoleMocks, createProcessExitMock, restoreMocks, createMockManifest } from "./test-helpers";
 
 const mockManifest = createMockManifest();
 
