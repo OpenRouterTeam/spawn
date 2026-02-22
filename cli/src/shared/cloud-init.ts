@@ -7,7 +7,7 @@ const MINIMAL = ["curl", "unzip", "git", "ca-certificates"];
 export function getPackagesForTier(tier: CloudInitTier = "full"): string[] {
   switch (tier) {
     case "minimal": return [...MINIMAL];
-    case "node":    return [...MINIMAL, "zsh", "nodejs", "npm"];
+    case "node":    return [...MINIMAL, "zsh", "nodejs", "npm", "build-essential"];
     case "bun":     return [...MINIMAL, "zsh"];
     case "full":    return [...MINIMAL, "zsh", "nodejs", "npm", "build-essential"];
   }
