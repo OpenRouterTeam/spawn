@@ -21,6 +21,8 @@ import {
 
 export interface AgentConfig {
   name: string;
+  /** Custom Docker image for the Fly machine (default: ubuntu:24.04). */
+  image?: string;
   /** If true, prompt for model selection before provisioning. */
   modelPrompt?: boolean;
   /** Default model ID when modelPrompt is true. */
@@ -342,13 +344,22 @@ export const agents: Record<string, AgentConfig> = {
 
   openclaw: {
     name: "OpenClaw",
+    image: "ghcr.io/openrouterteam/spawn-openclaw:latest",
     modelPrompt: true,
     modelDefault: "openrouter/auto",
-    install: () =>
-      installAgent(
-        "openclaw",
-        'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH" && bun install -g openclaw && command -v openclaw',
-      ),
+    install: async () => {
+      logStep("Verifying openclaw installation...");
+      try {
+        await runServer("command -v openclaw");
+        logInfo("openclaw is pre-installed");
+      } catch {
+        logInfo("openclaw not found in image, installing from scratch...");
+        await installAgent(
+          "openclaw",
+          'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH" && bun install -g openclaw && command -v openclaw',
+        );
+      }
+    },
     envVars: (apiKey) => [
       `OPENROUTER_API_KEY=${apiKey}`,
       `ANTHROPIC_API_KEY=${apiKey}`,
