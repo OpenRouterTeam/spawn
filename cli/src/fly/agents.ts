@@ -21,8 +21,6 @@ import {
 
 export interface AgentConfig {
   name: string;
-  /** Override default VM memory (1024 MB). */
-  vmMemory?: number;
   /** If true, prompt for model selection before provisioning. */
   modelPrompt?: boolean;
   /** Default model ID when modelPrompt is true. */
@@ -323,7 +321,6 @@ export const agents: Record<string, AgentConfig> = {
 
   openclaw: {
     name: "OpenClaw",
-    vmMemory: 2048,
     modelPrompt: true,
     modelDefault: "openrouter/auto",
     install: () =>

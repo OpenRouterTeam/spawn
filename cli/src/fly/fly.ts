@@ -17,6 +17,32 @@ import {
 const FLY_API_BASE = "https://api.machines.dev/v1";
 const FLY_DASHBOARD_URL = "https://fly.io/dashboard";
 
+// ─── VM Size Tiers ──────────────────────────────────────────────────────────
+
+export interface VmTier {
+  id: string;
+  cpus: number;
+  memoryMb: number;
+  label: string;
+}
+
+export const FLY_VM_TIERS: VmTier[] = [
+  { id: "shared-cpu-1x", cpus: 1, memoryMb: 1024, label: "1 shared vCPU, 1 GB (~$3/mo)" },
+  { id: "shared-cpu-2x", cpus: 2, memoryMb: 4096, label: "2 shared vCPUs, 4 GB (~$12/mo)" },
+  { id: "shared-cpu-4x", cpus: 4, memoryMb: 8192, label: "4 shared vCPUs, 8 GB (~$51/mo)" },
+];
+
+export const DEFAULT_VM_TIER = FLY_VM_TIERS[1]; // shared-cpu-2x
+
+// ─── Server Options ─────────────────────────────────────────────────────────
+
+export interface ServerOptions {
+  cpus: number;
+  memoryMb: number;
+  volumeId?: string;
+  newVolumeSizeGb?: number;
+}
+
 // ─── State ───────────────────────────────────────────────────────────────────
 let flyApiToken = "";
 let flyOrg = "";
@@ -516,19 +542,21 @@ async function createApp(name: string): Promise<void> {
 async function createMachine(
   name: string,
   region: string,
+  cpus: number,
   vmMemory: number,
+  volumeId?: string,
 ): Promise<string> {
-  logStep(`Creating Fly.io machine (region: ${region}, memory: ${vmMemory}MB)...`);
-  const body = JSON.stringify({
-    name,
-    region,
-    config: {
-      image: "ubuntu:24.04",
-      guest: { cpu_kind: "shared", cpus: 1, memory_mb: vmMemory },
-      init: { exec: ["/bin/sleep", "inf"] },
-      auto_destroy: false,
-    },
-  });
+  logStep(`Creating Fly.io machine (region: ${region}, ${cpus} vCPU, ${vmMemory}MB)...`);
+  const config: Record<string, unknown> = {
+    image: "ubuntu:24.04",
+    guest: { cpu_kind: "shared", cpus, memory_mb: vmMemory },
+    init: { exec: ["/bin/sleep", "inf"] },
+    auto_destroy: false,
+  };
+  if (volumeId) {
+    config.mounts = [{ volume: volumeId, path: "/data" }];
+  }
+  const body = JSON.stringify({ name, region, config });
 
   const resp = await flyApi("POST", `/apps/${name}/machines`, body);
   if (resp.includes('"error"')) {
@@ -590,24 +618,64 @@ async function cleanupOnFailure(appName: string): Promise<void> {
   }
 }
 
-export async function createServer(name: string): Promise<void> {
+async function createVolume(
+  name: string,
+  region: string,
+  sizeGb: number,
+): Promise<string> {
+  logStep(`Creating ${sizeGb}GB volume...`);
+  const body = JSON.stringify({
+    name: "data",
+    region,
+    size_gb: sizeGb,
+  });
+  const resp = await flyApi("POST", `/apps/${name}/volumes`, body);
+  const data = parseJson(resp);
+  if (!data?.id) {
+    logError("Failed to create volume");
+    throw new Error("Volume creation failed");
+  }
+  logInfo(`Volume created: ${data.id}`);
+  return data.id;
+}
+
+export async function listVolumes(appName: string): Promise<Array<{ id: string; name: string; size_gb: number }>> {
+  const resp = await flyApi("GET", `/apps/${appName}/volumes`);
+  const data = parseJson(resp);
+  if (!Array.isArray(data)) return [];
+  return data
+    .filter((v: any) => v.id)
+    .map((v: any) => ({
+      id: v.id as string,
+      name: (v.name || "unnamed") as string,
+      size_gb: (v.size_gb || 0) as number,
+    }));
+}
+
+export async function createServer(name: string, opts: ServerOptions): Promise<void> {
   const region = process.env.FLY_REGION || "iad";
-  const vmMemory = parseInt(process.env.FLY_VM_MEMORY || "1024", 10);
 
   if (!validateRegionName(region)) {
     logError("Invalid FLY_REGION");
     throw new Error("Invalid region");
   }
-  if (isNaN(vmMemory)) {
-    logError("Invalid FLY_VM_MEMORY: must be numeric");
-    throw new Error("Invalid VM memory");
-  }
 
   await createApp(name);
 
+  // Resolve volume: attach existing, create new, or skip
+  let volumeId: string | undefined = opts.volumeId;
+  if (!volumeId && opts.newVolumeSizeGb) {
+    try {
+      volumeId = await createVolume(name, region, opts.newVolumeSizeGb);
+    } catch (err) {
+      await cleanupOnFailure(name);
+      throw err;
+    }
+  }
+
   let machineId: string;
   try {
-    machineId = await createMachine(name, region, vmMemory);
+    machineId = await createMachine(name, region, opts.cpus, opts.memoryMb, volumeId);
   } catch (err) {
     await cleanupOnFailure(name);
     throw err;
