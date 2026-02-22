@@ -101,12 +101,17 @@ ensure_in_path() {
     fi
 
     # 2. If not in PATH, symlink into /usr/local/bin for immediate availability
+    #    Try in order: direct write → passwordless sudo → prompt for password
     local linked=false
     if [ "$already_in_path" = false ]; then
         if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
             ln -sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true
         elif has_passwordless_sudo; then
             sudo ln -sf "${install_dir}/spawn" /usr/local/bin/spawn 2>/dev/null && linked=true
+        elif command -v sudo &>/dev/null; then
+            # Last resort: ask for password
+            log_step "Adding spawn to /usr/local/bin (may require your password)..."
+            sudo ln -sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true || true
         fi
     fi
 
