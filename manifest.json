@@ -95,7 +95,7 @@
       "name": "ZeroClaw",
       "description": "Fast, small, fully autonomous AI assistant infrastructure \u2014 deploy anywhere, swap anything",
       "url": "https://github.com/zeroclaw-labs/zeroclaw",
-      "install": "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install.sh | bash -s -- --install-rust --install-system-deps",
+      "install": "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/install.sh | bash -s -- --install-rust --install-system-deps",
       "launch": "zeroclaw agent",
       "env": {
         "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
