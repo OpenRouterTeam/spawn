@@ -162,6 +162,16 @@ TS_EOF
 _install_aws_cli() {
     log_step "Installing AWS CLI v2..."
 
+    # Try brew first (works on macOS and Linux if Homebrew is installed)
+    if command -v brew &>/dev/null; then
+        log_info "Installing via Homebrew..."
+        if brew install awscli; then
+            log_info "AWS CLI v2 installed via Homebrew"
+            return 0
+        fi
+        log_warn "Homebrew install failed, falling back to official installer..."
+    fi
+
     if [[ "$(uname)" == "Darwin" ]]; then
         local _aws_tmp
         _aws_tmp=$(mktemp -d)
