@@ -1,33 +1,19 @@
 #!/bin/bash
 set -eo pipefail
 
-# Source common functions - try local file first, fall back to remote
+_ensure_bun() {
+    if command -v bun &>/dev/null; then return 0; fi
+    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1
+    export PATH="$HOME/.bun/bin:$PATH"
+}
+_ensure_bun
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-# shellcheck source=hetzner/lib/common.sh
-if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
-    source "${SCRIPT_DIR}/lib/common.sh"
-else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/hetzner/lib/common.sh)"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/hetzner/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../cli/src/hetzner/main.ts" openclaw "$@"
 fi
 
-log_info "OpenClaw on Hetzner Cloud"
-echo ""
-
-AGENT_MODEL_PROMPT=1
-AGENT_MODEL_DEFAULT="openrouter/auto"
-
-agent_install() { install_agent "openclaw" "source ~/.bashrc && bun install -g openclaw" cloud_run; }
-agent_env_vars() {
-    generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "ANTHROPIC_API_KEY=${OPENROUTER_API_KEY}" \
-        "ANTHROPIC_BASE_URL=https://openrouter.ai/api"
-}
-agent_configure() { setup_openclaw_config "${OPENROUTER_API_KEY}" "${MODEL_ID}" cloud_upload cloud_run; }
-agent_pre_launch() {
-    start_openclaw_gateway cloud_run
-    wait_for_openclaw_gateway cloud_run
-}
-agent_launch_cmd() { echo 'source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; openclaw tui'; }
-
-spawn_agent "OpenClaw" "openclaw" "hetzner"
+HETZNER_JS=$(mktemp)
+trap 'rm -f "$HETZNER_JS"' EXIT
+curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/hetzner-latest/hetzner.js" -o "$HETZNER_JS"
+exec bun run "$HETZNER_JS" openclaw "$@"
