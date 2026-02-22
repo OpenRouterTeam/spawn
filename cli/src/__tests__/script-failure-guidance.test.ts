@@ -674,6 +674,18 @@ describe("buildRetryCommand", () => {
     const promptIdx = result.indexOf("--prompt");
     expect(nameIdx).toBeLessThan(promptIdx);
   });
+
+  it("should quote --name value when it contains spaces", () => {
+    expect(buildRetryCommand("claude", "hetzner", undefined, "my dev box")).toBe(
+      'spawn claude hetzner --name "my dev box"'
+    );
+  });
+
+  it("should escape double quotes in --name value with spaces", () => {
+    expect(buildRetryCommand("claude", "hetzner", undefined, 'my "box"')).toBe(
+      'spawn claude hetzner --name "my \\"box\\""'
+    );
+  });
 });
 
 describe("dashboard URL in guidance", () => {

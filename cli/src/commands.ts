@@ -1259,7 +1259,8 @@ export function getScriptFailureGuidance(exitCode: number | null, cloud: string,
 }
 
 export function buildRetryCommand(agent: string, cloud: string, prompt?: string, spawnName?: string): string {
-  const nameFlag = spawnName ? ` --name ${spawnName}` : "";
+  const safeName = spawnName ? spawnName.replace(/"/g, '\\"') : "";
+  const nameFlag = spawnName ? (spawnName.includes(" ") ? ` --name "${safeName}"` : ` --name ${spawnName}`) : "";
   if (!prompt) return `spawn ${agent} ${cloud}${nameFlag}`;
   if (prompt.length <= 80) {
     const safe = prompt.replace(/"/g, '\\"');
