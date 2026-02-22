@@ -290,6 +290,7 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   const lines = [
     "#!/bin/bash",
     "set -e",
+    "export HOME=/root",
     "export DEBIAN_FRONTEND=noninteractive",
     "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
