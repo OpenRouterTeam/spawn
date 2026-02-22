@@ -17,23 +17,9 @@ When run via `./discovery.sh`, your job is to pick ONE of these tasks and execut
 
 Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 
-- Find the **cloud's** `lib/common.sh` — it has all the provider-specific primitives (create server, run command, upload file, interactive session)
 - Find the **agent's** existing script on another cloud — it shows the install steps, config files, env vars, and launch command
-- Combine them: use the cloud's primitives to execute the agent's setup steps
+- The agent scripts are thin bash wrappers that bootstrap bun and run the TypeScript CLI
 - The script goes at `{cloud}/{agent}.sh`
-
-**Pattern for every script:**
-```
-1. Source {cloud}/lib/common.sh (local or remote fallback)
-2. Authenticate with cloud provider
-3. Provision server/VM
-4. Wait for readiness
-5. Install the agent
-6. Get OpenRouter API key (env var or OAuth)
-7. Inject env vars into shell config
-8. Write agent-specific config files
-9. Launch interactive session
-```
 
 **OpenRouter injection is mandatory.** Every agent script MUST:
 - Set `OPENROUTER_API_KEY` in the shell environment
@@ -62,7 +48,7 @@ We are currently shipping with **9 curated clouds** (sorted by price):
 - **Test coverage is mandatory** (see "Mock Test Infrastructure" section below)
 
 Steps to add one:
-1. Create `{cloud}/lib/common.sh` with the provider's primitives
+1. Add cloud-specific TypeScript module in `cli/src/{cloud}/`
 2. Add an entry to `manifest.json` → `clouds`
 3. Add `"missing"` entries to the matrix for every existing agent
 4. Implement at least 2-3 agent scripts to prove the lib works
@@ -116,10 +102,10 @@ spawn/
     package.json                 # npm package (@openrouter/spawn)
     install.sh                   # One-liner installer (bun → npm → auto-install bun)
   shared/
-    common.sh                    # Provider-agnostic shared utilities
+    github-auth.sh               # Standalone GitHub CLI auth helper
+    key-request.sh               # API key provisioning helpers (used by QA)
   {cloud}/
-    lib/common.sh                # Cloud-specific functions (sources shared/common.sh)
-    {agent}.sh                   # Agent deployment scripts
+    {agent}.sh                   # Agent deployment scripts (thin bash → bun wrappers)
   .claude/skills/setup-agent-team/
     trigger-server.ts            # HTTP trigger server (concurrent runs, dedup)
     discovery.sh                 # Discovery cycle script (fill gaps, scout new clouds/agents)
@@ -154,61 +140,13 @@ The only documentation files allowed in the repository are:
 
 If you need to create documentation during development, write it to `.docs/` and add `.docs/` to `.gitignore`.
 
-### Architecture: Shared Library Pattern
+### Architecture
 
-**`shared/common.sh`** - Core utilities used by all clouds:
-- **Logging**: `log_info`, `log_warn`, `log_error` (colored output)
-- **Input handling**: `safe_read` (works in interactive and piped contexts)
-- **OAuth flow**: `try_oauth_flow`, `get_openrouter_api_key_oauth` (browser-based auth)
-- **Network utilities**: `nc_listen` (cross-platform netcat wrapper), `open_browser`
-- **SSH helpers**: `generate_ssh_key_if_missing`, `get_ssh_fingerprint`, `generic_ssh_wait`
-- **Security**: `validate_model_id`, `json_escape`
+All cloud provisioning and agent setup logic lives in TypeScript under `cli/src/`. Agent scripts (`{cloud}/{agent}.sh`) are thin bash wrappers that bootstrap bun and invoke the CLI.
 
-**`{cloud}/lib/common.sh`** - Cloud-specific extensions:
-- Sources `shared/common.sh` at the top
-- Adds provider-specific functions:
-  - **Sprite**: `ensure_sprite_installed`, `get_sprite_name`, `run_sprite`, etc.
-  - **Hetzner**: API wrappers for server creation, SSH key management, etc.
-  - **DigitalOcean**: Droplet provisioning, API calls, etc.
-  - **Vultr**: Instance management via REST API
-  - **Linode**: Linode-specific provisioning functions
+**`shared/github-auth.sh`** — Standalone GitHub CLI installer + OAuth login helper. Used by `cli/src/shared/agent-setup.ts` to set up `gh` on remote VMs.
 
-**Agent scripts** (`{cloud}/{agent}.sh`):
-1. Source their cloud's `lib/common.sh` (which auto-sources `shared/common.sh`)
-2. Use shared functions for logging, OAuth, SSH setup
-3. Use cloud functions for provisioning and connecting to servers
-4. Deploy the specific agent with its configuration
-
-### Why This Structure?
-
-- **DRY principle**: OAuth, logging, SSH logic written once in `shared/common.sh`
-- **Consistency**: All scripts use same authentication and error handling patterns
-- **Maintainability**: Bug fixes in shared code benefit all providers automatically
-- **Extensibility**: New clouds only need to implement provider-specific logic
-- **Testability**: Shared functions can be tested independently
-
-### Source Pattern
-
-Every cloud's `lib/common.sh` starts with:
-
-```bash
-#!/bin/bash
-# Cloud-specific functions for {provider}
-
-# Source shared provider-agnostic functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../shared/common.sh" || {
-    echo "ERROR: Failed to load shared/common.sh" >&2
-    exit 1
-}
-
-# ... cloud-specific functions below ...
-```
-
-This pattern ensures:
-- Shared utilities are always available
-- Path resolution works when sourced from any location
-- Script fails fast if shared library is missing
+**`shared/key-request.sh`** — API key provisioning helpers sourced by the QA harness (`qa.sh`) for loading cloud credentials from `~/.config/spawn/{cloud}.json`.
 
 ## Shell Script Rules
 
@@ -218,16 +156,6 @@ These rules are **non-negotiable** — violating them breaks remote execution fo
 Every script MUST work when executed via `bash <(curl -fsSL URL)`:
 - **NEVER** use relative paths for sourcing (`source ./lib/...`, `source ../shared/...`)
 - **NEVER** rely on `$0`, `dirname $0`, or `BASH_SOURCE` resolving to a real filesystem path
-- **ALWAYS** use the local-or-remote fallback pattern:
-  ```bash
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-  if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
-      source "$SCRIPT_DIR/lib/common.sh"
-  else
-      eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/{cloud}/lib/common.sh)"
-  fi
-  ```
-- Similarly, `{cloud}/lib/common.sh` MUST use the same fallback for `shared/common.sh`
 
 ### macOS bash 3.x Compatibility
 macOS ships bash 3.2. All scripts MUST work on it:
@@ -309,9 +237,8 @@ Without these, the cloud has **no test coverage**, body validation is missing, m
 When running autonomous discovery/refactoring loops (`./discovery.sh --loop`):
 
 - **Run `bash -n` on every changed .sh file** before committing — syntax errors break everything
-- **NEVER revert a prior fix** — if `shared/common.sh` was changed to fix macOS compat, don't undo it
-- **NEVER re-introduce deleted functions** — if `write_oauth_response_file` was removed, don't call it
-- **NEVER change the source/eval fallback pattern** in lib/common.sh files — it's load-bearing for curl|bash
+- **NEVER revert a prior fix** — don't undo previously applied compatibility fixes
+- **NEVER re-introduce deleted functions** — if a function was removed, don't call it
 - **Test after EACH iteration** — don't batch multiple changes without verification
 - **If a change breaks tests, STOP** — revert and ask for guidance rather than compounding the regression
 

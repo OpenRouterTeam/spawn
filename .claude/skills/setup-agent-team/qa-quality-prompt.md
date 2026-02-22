@@ -94,8 +94,8 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 2. `cd` into worktree
 3. Scan for these issues:
 
-   **a) Dead code**: Functions in `shared/*.sh` or `*/lib/common.sh` that are never called by any script
-   - Grep for the function name across all `.sh` files
+   **a) Dead code**: Functions in `shared/*.sh` or `cli/src/` that are never called
+   - Grep for the function name across all source files
    - If only the definition exists (no callers), remove the function
 
    **b) Stale references**: Scripts or code referencing deleted files:
@@ -106,8 +106,8 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    **c) Python usage**: Any `python3 -c` or `python -c` calls in shell scripts
    - Replace with `bun eval` or `jq` as appropriate per CLAUDE.md rules
 
-   **d) Duplicate utilities**: Same helper function defined in multiple cloud `lib/common.sh` files
-   - If identical, move to `shared/common.sh` and have cloud libs call the shared version
+   **d) Duplicate utilities**: Same helper function defined in multiple TypeScript cloud modules
+   - If identical, move to `cli/src/shared/` and have cloud modules import it
 
    **e) Stale comments**: Comments referencing removed infrastructure, old test files, or deleted functions
    - Remove or update these comments

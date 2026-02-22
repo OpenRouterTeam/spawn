@@ -108,7 +108,7 @@ process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
             #   - _ . / @  (standard API key chars)
             #   : + =      (base64 segments, URL-style formats)
             #   space       (Fly.io "FlyV1 <macaroon>" prefixed tokens)
-            # Must match shared/common.sh _load_token_from_config regex
+            # Must match CLI's loadTokenFromConfig regex in cli/src/digitalocean/digitalocean.ts
             if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
                 log "SECURITY: Invalid characters in config value for ${var_name}"
                 return 1

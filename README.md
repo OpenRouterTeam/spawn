@@ -191,18 +191,16 @@ git config core.hooksPath .githooks
 ### Structure
 
 ```
-{cloud}/lib/common.sh    # Cloud provider primitives (provision, SSH, cleanup)
-{cloud}/{agent}.sh        # Agent deployment script
-shared/common.sh          # Shared utilities (OAuth, logging, SSH helpers)
-cli/                      # TypeScript CLI (bun)
+{cloud}/{agent}.sh        # Agent deployment script (thin bash → bun wrapper)
+cli/                      # TypeScript CLI — all provisioning logic (bun)
 manifest.json             # Source of truth for the matrix
 ```
 
 ### Adding a new cloud
 
-1. Create `{cloud}/lib/common.sh` with provisioning primitives
+1. Add cloud-specific TypeScript module in `cli/src/{cloud}/`
 2. Add to `manifest.json`
-3. Implement agent scripts using the cloud's primitives
+3. Implement agent scripts
 4. See [CLAUDE.md](CLAUDE.md) for full contributor guide
 
 ### Adding a new agent
