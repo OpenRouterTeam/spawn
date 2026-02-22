@@ -2284,6 +2284,7 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
       }
       p.log.error(`Delete failed: ${errMsg}`);
       p.log.info("The server may still be running. Check your cloud provider dashboard.");
+      markRecordDeleted(record);
       return false;
     }
   };
@@ -2350,8 +2351,8 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
   }
 }
 
-/** Prompt for delete confirmation and execute */
-async function confirmAndDelete(record: SpawnRecord, manifest: Manifest | null): Promise<void> {
+/** Prompt for delete confirmation and execute. Returns true if deleted. */
+async function confirmAndDelete(record: SpawnRecord, manifest: Manifest | null): Promise<boolean> {
   const conn = record.connection!;
   const label = conn.server_name || conn.server_id || conn.ip;
   const cloudLabel = manifest?.clouds[conn.cloud!]?.name || conn.cloud;
@@ -2363,7 +2364,7 @@ async function confirmAndDelete(record: SpawnRecord, manifest: Manifest | null):
 
   if (p.isCancel(confirmed) || !confirmed) {
     p.log.info("Delete cancelled.");
-    return;
+    return false;
   }
 
   const s = p.spinner();
@@ -2376,6 +2377,7 @@ async function confirmAndDelete(record: SpawnRecord, manifest: Manifest | null):
   } else {
     s.stop("Delete failed.");
   }
+  return success;
 }
 
 /** Handle reconnect or rerun action for a selected spawn record */
@@ -2487,30 +2489,52 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
 
-/** Show interactive picker to select and reconnect/rerun a previous spawn */
-async function interactiveListPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
-  p.log.info(
-    pc.dim(
-      `Filter: ${pc.cyan("spawn list -a <agent>")} or ${pc.cyan("spawn list -c <cloud>")}  |  Clear: ${pc.cyan("spawn list --clear")}`,
-    ),
-  );
+/** Interactive picker with inline delete support.
+ *  Pressing 'd' triggers delete; Enter triggers handleRecordAction. */
+async function activeServerPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
+  const { pickToTTYWithActions } = await import("./picker.js");
 
-  const options = records.map((r, i) => ({
-    value: i,
-    label: buildRecordLabel(r, manifest),
-    hint: buildRecordHint(r),
-  }));
+  let remaining = [...records];
 
-  const choice = await p.select({
-    message: `Select a spawn (${records.length} recorded)`,
-    options,
-  });
-  if (p.isCancel(choice)) {
-    handleCancel();
+  while (remaining.length > 0) {
+    const options = remaining.map((r) => ({
+      value: r.timestamp,
+      label: buildRecordLabel(r, manifest),
+      hint: buildRecordHint(r),
+    }));
+
+    const result = pickToTTYWithActions({
+      message: `Select a spawn (${remaining.length} server${remaining.length !== 1 ? "s" : ""})`,
+      options,
+      deleteKey: true,
+    });
+
+    if (result.action === "cancel") {
+      return;
+    }
+
+    const picked = remaining[result.index];
+
+    if (result.action === "delete") {
+      const conn = picked.connection;
+      const canDelete = conn?.cloud && conn.cloud !== "local" && !conn.deleted && (conn.server_id || conn.server_name);
+      if (!canDelete) {
+        p.log.warn("This server cannot be deleted (no cloud connection info).");
+        continue;
+      }
+      const deleted = await confirmAndDelete(picked, manifest);
+      if (deleted) {
+        remaining.splice(result.index, 1);
+      }
+      continue;
+    }
+
+    // action === "select"
+    await handleRecordAction(picked, manifest);
+    return;
   }
 
-  const selected = records[choice];
-  await handleRecordAction(selected, manifest);
+  p.log.info("No servers remaining.");
 }
 
 export async function cmdListClear(): Promise<void> {
@@ -2540,15 +2564,32 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
   agentFilter = resolved.agentFilter;
   cloudFilter = resolved.cloudFilter;
 
-  const records = filterHistory(agentFilter, cloudFilter);
+  if (isInteractiveTTY()) {
+    // Interactive mode: show active servers with inline delete
+    const servers = getActiveServers();
+    let filtered = servers;
+    if (agentFilter) {
+      const lower = agentFilter.toLowerCase();
+      filtered = filtered.filter((r) => r.agent.toLowerCase() === lower);
+    }
+    if (cloudFilter) {
+      const lower = cloudFilter.toLowerCase();
+      filtered = filtered.filter((r) => r.cloud.toLowerCase() === lower);
+    }
 
-  if (records.length === 0) {
-    await showEmptyListMessage(agentFilter, cloudFilter);
+    if (filtered.length === 0) {
+      await showEmptyListMessage(agentFilter, cloudFilter);
+      return;
+    }
+
+    await activeServerPicker(filtered, manifest);
     return;
   }
 
-  if (isInteractiveTTY()) {
-    await interactiveListPicker(records, manifest);
+  // Non-interactive: show full history table
+  const records = filterHistory(agentFilter, cloudFilter);
+  if (records.length === 0) {
+    await showEmptyListMessage(agentFilter, cloudFilter);
     return;
   }
 
@@ -2595,22 +2636,7 @@ export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Pro
     process.exit(1);
   }
 
-  const options = filtered.map((r, i) => ({
-    value: i,
-    label: buildRecordLabel(r, manifest),
-    hint: buildRecordHint(r),
-  }));
-
-  const choice = await p.select({
-    message: `Select a server to delete (${filtered.length} active)`,
-    options,
-  });
-  if (p.isCancel(choice)) {
-    handleCancel();
-  }
-
-  const selected = filtered[choice];
-  await confirmAndDelete(selected, manifest);
+  await activeServerPicker(filtered, manifest);
 }
 
 export async function cmdLast(): Promise<void> {

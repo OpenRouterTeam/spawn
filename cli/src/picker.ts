@@ -30,6 +30,13 @@ export interface PickConfig {
   message: string;
   options: PickOption[];
   defaultValue?: string;
+  deleteKey?: boolean;
+}
+
+export interface PickResult {
+  action: "select" | "delete" | "cancel";
+  value: string | null;
+  index: number;
 }
 
 /**
@@ -237,6 +244,170 @@ export function pickToTTY(config: PickConfig): string | null {
           w(`${A.green}${A.bold}> ${config.message}:${A.reset} ` + `${A.cyan}${opt.label}${A.reset}\r\n`);
           break outer;
         }
+
+        // ── navigation ─────────────────────────────────────────────────────
+        case "\x1b[A": // Up (CSI)
+        case "\x1bOA": // Up (SS3, some terminals)
+        case "k": // vim-style
+          selected = (selected - 1 + config.options.length) % config.options.length;
+          render(false);
+          break;
+
+        case "\x1b[B": // Down (CSI)
+        case "\x1bOB": // Down (SS3)
+        case "j": // vim-style
+          selected = (selected + 1) % config.options.length;
+          render(false);
+          break;
+
+        default:
+          break;
+      }
+    }
+  } finally {
+    restore();
+  }
+
+  return result;
+}
+
+/**
+ * Like pickToTTY but returns a PickResult with action discrimination.
+ * When deleteKey is enabled, pressing 'd' returns { action: "delete" }.
+ */
+export function pickToTTYWithActions(config: PickConfig): PickResult {
+  const cancel: PickResult = { action: "cancel", value: null, index: -1 };
+
+  if (config.options.length === 0) {
+    return config.defaultValue ? { action: "select", value: config.defaultValue, index: 0 } : cancel;
+  }
+
+  // ── open /dev/tty ──────────────────────────────────────────────────────────
+  let ttyFd: number;
+  try {
+    ttyFd = fs.openSync("/dev/tty", "r+");
+  } catch {
+    // Fall back to basic pickFallback which returns a value
+    const val = pickFallback(config);
+    return val ? { action: "select", value: val, index: config.options.findIndex((o) => o.value === val) } : cancel;
+  }
+
+  // ── save terminal settings ────────────────────────────────────────────────
+  const savedRes = spawnSync("stty", ["-g"], { stdio: [ttyFd, "pipe", "pipe"] });
+  if (savedRes.status !== 0 || !savedRes.stdout) {
+    fs.closeSync(ttyFd);
+    const val = pickFallback(config);
+    return val ? { action: "select", value: val, index: config.options.findIndex((o) => o.value === val) } : cancel;
+  }
+  const savedSettings = savedRes.stdout.toString().trim();
+
+  // ── enable raw / no-echo mode ─────────────────────────────────────────────
+  const rawRes = spawnSync("stty", ["raw", "-echo"], { stdio: [ttyFd, "pipe", "pipe"] });
+  if (rawRes.status !== 0) {
+    fs.closeSync(ttyFd);
+    const val = pickFallback(config);
+    return val ? { action: "select", value: val, index: config.options.findIndex((o) => o.value === val) } : cancel;
+  }
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+  const w = (s: string) => {
+    try {
+      fs.writeSync(ttyFd, s);
+    } catch {}
+  };
+
+  const restore = () => {
+    try {
+      spawnSync("stty", [savedSettings], { stdio: [ttyFd, "pipe", "pipe"] });
+    } catch {}
+    w(A.showC);
+    try {
+      fs.closeSync(ttyFd);
+    } catch {}
+  };
+
+  // ── initial state ─────────────────────────────────────────────────────────
+  let selected = 0;
+  if (config.defaultValue) {
+    const idx = config.options.findIndex((o) => o.value === config.defaultValue);
+    if (idx >= 0) {
+      selected = idx;
+    }
+  }
+
+  const footerHint = config.deleteKey
+    ? "\u2191/\u2193 move  \u23ce select  d delete  Ctrl-C cancel"
+    : "\u2191/\u2193 move  \u23ce select  Ctrl-C cancel";
+
+  // header line + one line per option + footer line
+  const pickerHeight = config.options.length + 2;
+
+  const render = (first: boolean) => {
+    if (!first) {
+      w(A.up(pickerHeight) + A.col1 + A.clearBelow);
+    }
+    w(`${A.bold}${A.cyan}? ${config.message}${A.reset}\r\n`);
+    for (let i = 0; i < config.options.length; i++) {
+      const opt = config.options[i];
+      if (i === selected) {
+        w(`${A.green}${A.bold}> ${opt.label}${A.reset}`);
+        if (opt.hint) {
+          w(`  ${A.dim}${opt.hint}${A.reset}`);
+        }
+      } else {
+        w(`  ${A.dim}${opt.label}${A.reset}`);
+      }
+      w("\r\n");
+    }
+    w(`${A.dim}  ${footerHint}${A.reset}\r\n`);
+  };
+
+  // ── render & key loop ─────────────────────────────────────────────────────
+  w(A.hideC);
+  render(true);
+
+  const buf = Buffer.alloc(8);
+  let result: PickResult = cancel;
+
+  try {
+    outer: while (true) {
+      let n: number;
+      try {
+        n = fs.readSync(ttyFd, buf, 0, 8);
+      } catch {
+        break;
+      }
+      if (n === 0) {
+        continue;
+      }
+
+      const key = buf.slice(0, n).toString("binary");
+
+      switch (key) {
+        // ── cancel ─────────────────────────────────────────────────────────
+        case "\x03": // Ctrl-C
+        case "\x1b": // standalone Escape
+          break outer;
+
+        // ── confirm ────────────────────────────────────────────────────────
+        case "\r":
+        case "\n": {
+          result = { action: "select", value: config.options[selected].value, index: selected };
+          // Replace picker with a one-line confirmation
+          w(A.up(pickerHeight) + A.col1 + A.clearBelow);
+          const opt = config.options[selected];
+          w(`${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${opt.label}${A.reset}\r\n`);
+          break outer;
+        }
+
+        // ── delete ───────────────────────────────────────────────────────
+        case "d":
+          if (config.deleteKey) {
+            result = { action: "delete", value: config.options[selected].value, index: selected };
+            w(A.up(pickerHeight) + A.col1 + A.clearBelow);
+            break outer;
+          }
+          break;
 
         // ── navigation ─────────────────────────────────────────────────────
         case "\x1b[A": // Up (CSI)
