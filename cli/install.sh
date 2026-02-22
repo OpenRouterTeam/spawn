@@ -69,62 +69,55 @@ ensure_min_bun_version() {
     fi
 }
 
-# --- Helper: find the best install directory ---
-# Picks the first directory that exists AND is in PATH
-find_install_dir() {
-    if [ -n "${SPAWN_INSTALL_DIR:-}" ]; then
-        echo "${SPAWN_INSTALL_DIR}"
-        return
-    fi
-    # Check common bin dirs in order of preference
-    local dirs=(
-        "${HOME}/.local/bin"
-        "$(bun pm bin -g 2>/dev/null)"
-        "${HOME}/.bun/bin"
-        "${HOME}/bin"
-    )
-    for dir in "${dirs[@]}"; do
-        [ -z "$dir" ] && continue
-        if echo "${PATH}" | tr ':' '\n' | grep -qx "$dir"; then
-            echo "$dir"
-            return
-        fi
-    done
-    # Nothing in PATH — default to ~/.local/bin and warn later
-    echo "${HOME}/.local/bin"
-}
-
-# --- Helper: show PATH instructions if spawn isn't findable ---
+# --- Helper: ensure spawn works immediately and in future sessions ---
+# Always installs to ~/.local/bin AND symlinks to /usr/local/bin.
+# Also patches shell rc files so ~/.local/bin is in PATH for future sessions.
 ensure_in_path() {
     local install_dir="$1"
-    if echo "${PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
-        echo ""
-        SPAWN_NO_UPDATE_CHECK=1 "${install_dir}/spawn" version
-        echo ""
+
+    # 1. Symlink into /usr/local/bin so it works RIGHT NOW (always in PATH)
+    local linked=false
+    if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
+        ln -sf "${install_dir}/spawn" /usr/local/bin/spawn && linked=true
+    fi
+    if [ "$linked" = false ] && command -v sudo &>/dev/null; then
+        sudo ln -sf "${install_dir}/spawn" /usr/local/bin/spawn 2>/dev/null && linked=true
+    fi
+
+    # 2. Patch shell rc files so ~/.local/bin is in PATH for future sessions
+    local export_line="export PATH=\"${install_dir}:\$PATH\""
+    local rc_file=""
+    case "${SHELL:-/bin/bash}" in
+        */zsh)  rc_file="${HOME}/.zshrc" ;;
+        */fish) rc_file="" ;;
+        *)      rc_file="${HOME}/.bashrc" ;;
+    esac
+
+    if [ -n "$rc_file" ]; then
+        if ! grep -qF "${install_dir}" "$rc_file" 2>/dev/null; then
+            printf '\n# Added by spawn installer\n%s\n' "$export_line" >> "$rc_file"
+        fi
+        if [[ "${SHELL:-/bin/bash}" == */bash ]]; then
+            for profile in "${HOME}/.profile" "${HOME}/.bash_profile"; do
+                if [ -f "$profile" ] && ! grep -qF "${install_dir}" "$profile" 2>/dev/null; then
+                    printf '\n# Added by spawn installer\n%s\n' "$export_line" >> "$profile"
+                fi
+            done
+        fi
+    elif [[ "${SHELL:-}" == */fish ]]; then
+        fish -c "fish_add_path ${install_dir}" 2>/dev/null || true
+    fi
+
+    # 3. Show version and success message
+    echo ""
+    SPAWN_NO_UPDATE_CHECK=1 PATH="${install_dir}:${PATH}" "${install_dir}/spawn" version
+    echo ""
+    if [ "$linked" = true ]; then
         printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
     else
+        printf "${GREEN}[spawn]${NC} To start using spawn, run:\n"
         echo ""
-        log_warn "${BOLD}${install_dir}${NC}${YELLOW} is not in your PATH${NC}"
-        echo ""
-        case "${SHELL:-/bin/bash}" in
-            */zsh)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.zshrc"
-                ;;
-            */fish)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    fish_add_path ${install_dir}"
-                ;;
-            *)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.bashrc"
-                ;;
-        esac
-        echo ""
-        echo "  Or run directly: ${install_dir}/spawn"
+        echo "    exec \$SHELL"
         echo ""
     fi
 }
@@ -199,7 +192,7 @@ build_and_install() {
         fi
     fi
 
-    INSTALL_DIR="$(find_install_dir)"
+    INSTALL_DIR="${SPAWN_INSTALL_DIR:-${HOME}/.local/bin}"
     mkdir -p "${INSTALL_DIR}"
     cp cli.js "${INSTALL_DIR}/spawn"
     chmod +x "${INSTALL_DIR}/spawn"
