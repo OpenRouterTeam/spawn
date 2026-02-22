@@ -1956,10 +1956,23 @@ async function handleRecordAction(
 
   const options: { value: string; label: string; hint?: string }[] = [];
 
+  // Prefer stored launch command (captured at spawn time), fall back to manifest
+  const agentDef = manifest?.agents?.[selected.agent];
+  const launchCmd = conn.launch_cmd || agentDef?.launch;
+
+  if (!conn.deleted && launchCmd) {
+    const agentName = agentDef?.name || selected.agent;
+    options.push({
+      value: "enter",
+      label: `Enter ${agentName}`,
+      hint: agentDef?.launch || launchCmd,
+    });
+  }
+
   if (!conn.deleted) {
     options.push({
       value: "reconnect",
-      label: "Reconnect to existing VM",
+      label: "SSH into VM",
       hint: conn.ip === "sprite-console"
         ? `sprite console -s ${conn.server_name}`
         : conn.ip === "fly-ssh"
@@ -1991,6 +2004,16 @@ async function handleRecordAction(
 
   if (p.isCancel(action)) {
     handleCancel();
+  }
+
+  if (action === "enter") {
+    try {
+      await cmdEnterAgent(selected.connection, selected.agent, manifest);
+    } catch (err) {
+      p.log.error(`Connection failed: ${getErrorMessage(err)}`);
+      p.log.info(`VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`);
+    }
+    return;
   }
 
   if (action === "reconnect") {
@@ -2231,6 +2254,90 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
     ["-o", "StrictHostKeyChecking=accept-new", `${connection.user}@${connection.ip}`],
     "SSH connection failed",
     sshCmd
+  );
+}
+
+/** SSH into a VM and launch the agent directly */
+async function cmdEnterAgent(
+  connection: VMConnection,
+  agentKey: string,
+  manifest: Manifest | null
+): Promise<void> {
+  // SECURITY: Validate all connection parameters before use
+  try {
+    validateConnectionIP(connection.ip);
+    validateUsername(connection.user);
+    if (connection.server_name) {
+      validateServerIdentifier(connection.server_name);
+    }
+  } catch (err) {
+    p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
+    p.log.info(`Your spawn history file may be corrupted or tampered with.`);
+    p.log.info(`Location: ${getHistoryPath()}`);
+    p.log.info(`To fix: edit the file and remove the invalid entry, or run 'spawn list --clear'`);
+    process.exit(1);
+  }
+
+  const agentDef = manifest?.agents?.[agentKey];
+
+  // Prefer the launch command stored at spawn time (captures dynamic state),
+  // fall back to manifest definition, then to agent key as last resort
+  const storedCmd = connection.launch_cmd;
+  let remoteCmd: string;
+  if (storedCmd) {
+    // Stored command already includes source ~/.spawnrc, PATH setup, etc.
+    remoteCmd = storedCmd;
+  } else {
+    const launchCmd = agentDef?.launch ?? agentKey;
+    const preLaunch = agentDef?.pre_launch;
+    const parts = ["source ~/.spawnrc 2>/dev/null"];
+    if (preLaunch) parts.push(preLaunch);
+    parts.push(launchCmd);
+    remoteCmd = parts.join("; ");
+  }
+
+  const agentName = agentDef?.name || agentKey;
+
+  // Handle Sprite console connections
+  if (connection.ip === "sprite-console" && connection.server_name) {
+    p.log.step(`Entering ${pc.bold(agentName)} on sprite ${pc.bold(connection.server_name)}...`);
+    return runInteractiveCommand(
+      "sprite",
+      ["console", "-s", connection.server_name, "--", "bash", "-lc", remoteCmd],
+      `Failed to enter ${agentName}`,
+      `sprite console -s ${connection.server_name} -- bash -lc '${remoteCmd}'`
+    );
+  }
+
+  // Handle Fly.io SSH connections
+  if (connection.ip === "fly-ssh" && connection.server_name) {
+    p.log.step(`Entering ${pc.bold(agentName)} on Fly.io app ${pc.bold(connection.server_name)}...`);
+    return runInteractiveCommand(
+      "fly",
+      ["ssh", "console", "-a", connection.server_name, "--pty", "-C", remoteCmd],
+      `Failed to enter ${agentName}`,
+      `fly ssh console -a ${connection.server_name} --pty -C '${remoteCmd}'`
+    );
+  }
+
+  // Handle Daytona sandbox connections
+  if (connection.ip === "daytona-sandbox" && connection.server_id) {
+    p.log.step(`Entering ${pc.bold(agentName)} on Daytona sandbox ${pc.bold(connection.server_id)}...`);
+    return runInteractiveCommand(
+      "daytona",
+      ["ssh", connection.server_id, "--", "bash", "-lc", remoteCmd],
+      `Failed to enter ${agentName}`,
+      `daytona ssh ${connection.server_id} -- bash -lc '${remoteCmd}'`
+    );
+  }
+
+  // Standard SSH connection with agent launch
+  p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
+  return runInteractiveCommand(
+    "ssh",
+    ["-t", "-o", "StrictHostKeyChecking=accept-new", `${connection.user}@${connection.ip}`, "--", `bash -lc '${remoteCmd}'`],
+    `Failed to enter ${agentName}`,
+    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${remoteCmd}'`
   );
 }
 

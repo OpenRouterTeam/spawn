@@ -11,6 +11,7 @@ export interface VMConnection {
   cloud?: string;
   deleted?: boolean;
   deleted_at?: string;
+  launch_cmd?: string;
   metadata?: Record<string, string>;
 }
 

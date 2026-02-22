@@ -11,6 +11,7 @@ import {
   waitForCloudInit,
   runServer,
   interactiveSession,
+  saveLaunchCmd,
   listVolumes,
   FLY_VM_TIERS,
   DEFAULT_VM_TIER,
@@ -185,7 +186,9 @@ async function main() {
   logStep("Starting agent...");
   await new Promise((r) => setTimeout(r, 1000));
 
-  const exitCode = await interactiveSession(agent.launchCmd());
+  const launchCmd = agent.launchCmd();
+  saveLaunchCmd(launchCmd);
+  const exitCode = await interactiveSession(launchCmd);
   process.exit(exitCode);
 }
 

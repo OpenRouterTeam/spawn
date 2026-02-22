@@ -233,6 +233,7 @@ export function saveVmConnection(
   serverId: string,
   serverName: string,
   cloud: string,
+  launchCmd?: string,
 ): void {
   const dir = `${process.env.HOME}/.spawn`;
   mkdirSync(dir, { recursive: true });
@@ -240,7 +241,20 @@ export function saveVmConnection(
   if (serverId) json.server_id = serverId;
   if (serverName) json.server_name = serverName;
   if (cloud) json.cloud = cloud;
+  if (launchCmd) json.launch_cmd = launchCmd;
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
+}
+
+/** Append launch_cmd to the last-connection.json file */
+export function saveLaunchCmd(launchCmd: string): void {
+  const connFile = `${process.env.HOME}/.spawn/last-connection.json`;
+  try {
+    const data = JSON.parse(readFileSync(connFile, "utf-8"));
+    data.launch_cmd = launchCmd;
+    writeFileSync(connFile, JSON.stringify(data) + "\n");
+  } catch {
+    // Connection file may not exist — non-fatal
+  }
 }
 
 // ─── Authentication ──────────────────────────────────────────────────────────
