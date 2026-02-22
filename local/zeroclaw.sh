@@ -1,42 +1,29 @@
 #!/bin/bash
 set -eo pipefail
 
-# Source common functions - try local file first, fall back to remote
+# Thin shim: ensures bun is available, runs bundled local.js (local or from GitHub release)
+
+_ensure_bun() {
+    if command -v bun &>/dev/null; then return 0; fi
+    printf '\033[0;36mInstalling bun...\033[0m\n' >&2
+    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1 || { printf '\033[0;31mFailed to install bun\033[0m\n' >&2; exit 1; }
+    export PATH="$HOME/.bun/bin:$PATH"
+    command -v bun &>/dev/null || { printf '\033[0;31mbun not found after install\033[0m\n' >&2; exit 1; }
+}
+
+_ensure_bun
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
-    source "${SCRIPT_DIR}/lib/common.sh"
-else
-    eval "$(curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/local/lib/common.sh)"
+
+# Local checkout — run from source
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/local/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../cli/src/local/main.ts" zeroclaw "$@"
 fi
 
-log_info "ZeroClaw on local machine"
-echo ""
-log_warn "Note: ZeroClaw is built from Rust source and may take 5-10 minutes to compile."
-echo ""
+# Remote — download bundled local.js from GitHub release
+LOCAL_JS=$(mktemp)
+trap 'rm -f "$LOCAL_JS"' EXIT
+curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/local-latest/local.js" -o "$LOCAL_JS" \
+    || { printf '\033[0;31mFailed to download local.js\033[0m\n' >&2; exit 1; }
 
-agent_install() {
-    install_agent "ZeroClaw" \
-        "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/install.sh | bash -s -- --install-rust" \
-        cloud_run
-}
-
-agent_env_vars() {
-    generate_env_config \
-        "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
-        "ZEROCLAW_PROVIDER=openrouter"
-}
-
-agent_configure() {
-    cloud_run 'source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "${OPENROUTER_API_KEY}" --provider openrouter'
-}
-
-agent_launch_cmd() {
-    if [[ -n "${SPAWN_PROMPT:-}" ]]; then
-        local escaped; escaped=$(printf '%q' "${SPAWN_PROMPT}")
-        printf 'source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent -m %s' "${escaped}"
-    else
-        echo 'source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent'
-    fi
-}
-
-spawn_agent "ZeroClaw" "zeroclaw" "local"
+exec bun run "$LOCAL_JS" zeroclaw "$@"
