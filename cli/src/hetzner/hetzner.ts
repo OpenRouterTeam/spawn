@@ -299,7 +299,10 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
     lines.push("npm install -g n && n 22 && ln -sf /usr/local/bin/node /usr/bin/node && ln -sf /usr/local/bin/npm /usr/bin/npm && ln -sf /usr/local/bin/npx /usr/bin/npx || true");
   }
   if (needsBun(tier)) {
-    lines.push('curl -fsSL https://bun.sh/install | bash || true');
+    lines.push(
+      'curl -fsSL https://bun.sh/install | bash || true',
+      'ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true',
+    );
   }
   lines.push(
     'echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> /root/.bashrc',
