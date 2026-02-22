@@ -637,20 +637,20 @@ describe("buildRetryCommand", () => {
 
   it("should include --name flag when spawnName is provided without prompt", () => {
     expect(buildRetryCommand("claude", "hetzner", undefined, "my-box")).toBe(
-      "spawn claude hetzner --name my-box"
+      'spawn claude hetzner --name "my-box"'
     );
   });
 
   it("should include --name flag when spawnName is provided with short prompt", () => {
     expect(buildRetryCommand("claude", "hetzner", "Fix all bugs", "my-box")).toBe(
-      'spawn claude hetzner --name my-box --prompt "Fix all bugs"'
+      'spawn claude hetzner --name "my-box" --prompt "Fix all bugs"'
     );
   });
 
   it("should include --name flag when spawnName is provided with long prompt", () => {
     const longPrompt = "A".repeat(100);
     const result = buildRetryCommand("claude", "hetzner", longPrompt, "my-box");
-    expect(result).toBe("spawn claude hetzner --name my-box --prompt-file <your-prompt-file>");
+    expect(result).toBe('spawn claude hetzner --name "my-box" --prompt-file <your-prompt-file>');
   });
 
   it("should not include --name flag when spawnName is undefined", () => {
@@ -668,7 +668,7 @@ describe("buildRetryCommand", () => {
 
   it("should place --name before --prompt in the command", () => {
     const result = buildRetryCommand("codex", "sprite", "short prompt", "dev-server");
-    expect(result).toBe('spawn codex sprite --name dev-server --prompt "short prompt"');
+    expect(result).toBe('spawn codex sprite --name "dev-server" --prompt "short prompt"');
     // Verify ordering: --name comes before --prompt
     const nameIdx = result.indexOf("--name");
     const promptIdx = result.indexOf("--prompt");
@@ -681,10 +681,16 @@ describe("buildRetryCommand", () => {
     );
   });
 
-  it("should escape double quotes in --name value with spaces", () => {
+  it("should escape double quotes in --name value", () => {
     expect(buildRetryCommand("claude", "hetzner", undefined, 'my "box"')).toBe(
       'spawn claude hetzner --name "my \\"box\\""'
     );
+  });
+
+  it("should always quote --name value to prevent shell injection", () => {
+    // Names with shell metacharacters should be safely quoted
+    const result = buildRetryCommand("claude", "hetzner", undefined, "foo; rm -rf");
+    expect(result).toBe('spawn claude hetzner --name "foo; rm -rf"');
   });
 });
 
