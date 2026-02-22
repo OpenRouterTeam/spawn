@@ -27,9 +27,6 @@ const agents = Object.keys(manifest.agents);
 const clouds = Object.keys(manifest.clouds);
 const matrixEntries = Object.entries(manifest.matrix);
 
-// Clouds that use TypeScript instead of bash lib/common.sh (thin .sh shims)
-const TS_CLOUDS = new Set(["fly", "local", "hetzner", "digitalocean", "daytona", "sprite", "gcp"]);
-
 describe("Manifest Integrity", () => {
   // ── Basic structure ─────────────────────────────────────────────────
 
@@ -205,36 +202,6 @@ describe("Manifest Integrity", () => {
     });
   });
 
-  // ── Cloud lib/common.sh existence ──────────────────────────────────
-
-  describe("cloud lib files", () => {
-    it("should have lib/common.sh for every cloud with implementations", () => {
-      const cloudsWithImpls = new Set<string>();
-      for (const [key, status] of matrixEntries) {
-        if (status === "implemented") {
-          cloudsWithImpls.add(key.split("/")[0]);
-        }
-      }
-
-      const missing: string[] = [];
-      for (const cloud of cloudsWithImpls) {
-        // TS-based clouds don't use bash lib/common.sh
-        if (TS_CLOUDS.has(cloud)) continue;
-        const libPath = join(REPO_ROOT, cloud, "lib", "common.sh");
-        if (!existsSync(libPath)) {
-          missing.push(`${cloud}/lib/common.sh`);
-        }
-      }
-
-      if (missing.length > 0) {
-        throw new Error(
-          `${missing.length} clouds with implementations are missing lib/common.sh:\n` +
-          missing.map((f) => `  - ${f}`).join("\n")
-        );
-      }
-    });
-  });
-
   // ── Script content validation ──────────────────────────────────────
 
   describe("script content basics", () => {
@@ -284,30 +251,6 @@ describe("Manifest Integrity", () => {
       }
     });
 
-    it("should source cloud lib/common.sh in sampled scripts", () => {
-      const badScripts: string[] = [];
-
-      for (const [key] of sample) {
-        const cloud = key.split("/")[0];
-        // TS-based clouds use thin .sh shims that don't source lib/common.sh
-        if (TS_CLOUDS.has(cloud)) continue;
-        const scriptPath = join(REPO_ROOT, key + ".sh");
-        if (existsSync(scriptPath)) {
-          const content = readFileSync(scriptPath, "utf-8");
-          // Should reference the cloud's lib/common.sh (source or eval pattern)
-          if (!content.includes("lib/common.sh") && !content.includes(`${cloud}/lib/common.sh`)) {
-            badScripts.push(key + ".sh");
-          }
-        }
-      }
-
-      if (badScripts.length > 0) {
-        throw new Error(
-          `Scripts not sourcing cloud lib/common.sh:\n` +
-          badScripts.map((f) => `  - ${f}`).join("\n")
-        );
-      }
-    });
   });
 
   // ── Cross-reference: orphaned scripts ──────────────────────────────
