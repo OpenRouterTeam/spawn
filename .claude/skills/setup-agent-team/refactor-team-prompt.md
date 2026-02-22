@@ -104,10 +104,11 @@ Proactive teammates: AT MOST one PR each — zero is the ideal if nothing needs 
 
 ## Separation of Concerns
 
-Refactor team **creates PRs** — security team **reviews and merges** them.
+Refactor team **creates PRs** — security team **reviews, closes, and merges** them.
 - Teammates: research deeply, create PR with clear description, leave it open
 - MAY `gh pr merge` ONLY if PR is already approved (reviewDecision=APPROVED)
 - NEVER `gh pr review --approve` or `--request-changes` — that's the security team's job
+- NEVER `gh pr close` — that's the security team's job (only exception: superseding with a new PR)
 
 ## Team Structure
 
@@ -147,10 +148,7 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
    ```
    Read ALL comments — prior discussion contains decisions, rejected approaches, and scope changes.
 
-   **Comment-based triage** — Close if comments indicate superseded/duplicate/abandoned:
-   `gh pr close NUMBER --repo OpenRouterTeam/spawn --delete-branch --comment "Closing: [reason].\n\n-- refactor/pr-maintainer"`
-
-   For remaining PRs:
+   For EACH PR:
    - **Merge conflicts**: rebase in worktree, force-push. If unresolvable, comment.
    - **Review changes requested**: read comments, address fixes in worktree, push, comment summary.
    - **Failing checks**: investigate, fix if trivial, push. If non-trivial, comment.
@@ -166,6 +164,9 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
    - **Stale non-draft, not yet reviewed (3+ days)** → pick up and continue work
 
    Leave fresh unreviewed PRs alone. Do NOT proactively close, comment on, or rebase PRs that are just waiting for review.
+
+   **NEVER close a PR** — only the security team can close PRs. If a PR is stale, broken, or superseded, comment explaining the issue and move on.
+   **NEVER touch human-created PRs** — only interact with PRs that have `-- refactor/` in their description.
 
 6. **community-coordinator** (Sonnet)
    First: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
@@ -199,7 +200,7 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
 1. Community-coordinator: dedup check → label "under-review" → acknowledge → delegate → label "in-progress"
 2. Fixing teammate: `git worktree add WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER -b fix/issue-NUMBER origin/main` → fix → first commit (with Agent: marker) → push → `gh pr create --draft --body "Fixes #NUMBER\n\n-- refactor/AGENT-NAME"` → keep pushing → `gh pr ready NUMBER` when done → clean up worktree
 3. Community-coordinator: post PR link on issue. Do NOT close issue — auto-closes on merge.
-4. NEVER close a PR without a comment. NEVER close an issue manually.
+4. NEVER close a PR — the security team handles that. NEVER close an issue manually.
 
 ## Commit Markers
 
@@ -256,7 +257,9 @@ Follow this exact shutdown sequence:
 
 ## Safety
 
-- NEVER close a PR — rebase, fix, or comment instead
+- **NEVER close a PR.** No teammate, including team-lead and pr-maintainer, may close any PR — not even PRs created by refactor teammates. Closing PRs is the **security team's responsibility exclusively**. The only exception is if you are immediately opening a superseding PR (state the replacement PR number in the close comment). If a PR is stale, broken, or should not be merged, **leave it open** and comment explaining the issue — the security team will close it during review.
+- **NEVER close or modify PRs created by humans.** If a PR was not created by a `-- refactor/` agent, do not touch it at all (no close, no rebase, no force-push, no comment). Only interact with PRs that have `-- refactor/` in their description.
+- **DEDUP before every comment (ALL teammates).** Before posting ANY comment on a PR or issue, fetch existing comments and check for `-- refactor/` signatures. If ANY refactor teammate has already commented with the same intent (acknowledgment, status update, fix description, close reason), do NOT post a duplicate. Only comment if you have genuinely new information (a new PR link, a concrete resolution, or addressing different feedback). Run: `gh api repos/OpenRouterTeam/spawn/issues/NUMBER/comments --jq '.[] | select(.body | test("-- refactor/")) | "\(.body[-80:])"'`
 - Run tests after every change. If 3 consecutive failures, pause and investigate.
 - **SIGN-OFF**: Every comment MUST end with `-- refactor/AGENT-NAME`
 
