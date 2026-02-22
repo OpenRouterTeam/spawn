@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shell helpers for API key provisioning
-# Sourced by qa-cycle.sh for Phase 0 key loading and Phase 1 stale key handling
+# Sourced by qa.sh (fixtures mode) for key loading and stale key handling
 #
 # Requires: jq or bun, curl, REPO_ROOT set, log() function defined by caller
 #

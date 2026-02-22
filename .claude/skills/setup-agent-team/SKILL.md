@@ -358,7 +358,7 @@ export RUN_TIMEOUT_MS=43200000   # 12 hours (safe starting point)
 
 ## Step 8: Ensure the target script is single-cycle
 
-The target script (e.g., `refactor.sh`, `discovery.sh`, `security.sh`, `qa-cycle.sh`) MUST:
+The target script (e.g., `refactor.sh`, `discovery.sh`, `security.sh`, `qa.sh`) MUST:
 
 1. **Run a single cycle and exit** — no `while true` loops
 2. **Sync with origin before work** (MANDATORY) — Update to latest main before every cycle:
@@ -375,7 +375,7 @@ If converting from a looping script, remove the `while true` / `sleep` and keep 
 - `discovery.sh` — Discovery team service (uses `git pull --rebase`)
 - `refactor.sh` — Refactoring team service (uses `git reset --hard`)
 - `security.sh` — Security team service (uses `git pull --rebase`)
-- `qa-cycle.sh` — QA team service (uses `git reset --hard`)
+- `qa.sh` — QA team service (quality mode uses `git pull --rebase`)
 
 ## Agent Teams (ref: https://code.claude.com/docs/en/agent-teams)
 
@@ -405,7 +405,7 @@ if [[ -f "${HOME}/.spawnrc" ]]; then
 fi
 ```
 
-This is idempotent — it only appends once. All four service scripts (`discovery.sh`, `refactor.sh`, `security.sh`, `qa-cycle.sh`) include this check.
+This is idempotent — it only appends once. All four service scripts (`discovery.sh`, `refactor.sh`, `security.sh`, `qa.sh`) include this check.
 
 All service scripts use **agent teams**, not subagents. Key differences:
 
@@ -534,7 +534,11 @@ Every comment posted by an agent on issues or PRs MUST end with a sign-off line 
 -- refactor/pr-maintainer
 -- discovery/issue-responder
 -- discovery/cloud-scout
--- qa/cycle
+-- qa/test-runner
+-- qa/dedup-scanner
+-- qa/code-quality
+-- qa/fixture-collector
+-- qa/issue-fixer
 ```
 
 **Why:** Agents run on schedules (every 15-30 min). Without sign-offs, the same issue gets re-triaged and re-commented every cycle. The sign-off lets each agent grep for its own prior comments and skip duplicates:
@@ -546,12 +550,12 @@ gh issue view NUMBER --json comments --jq '.comments[].body' | grep -q '-- secur
 
 **Rules:**
 - Use `--` (double hyphen), never `—` (emdash) — emdash causes encoding issues in shell strings
-- The team name matches the script: `security.sh` → `security`, `refactor.sh` → `refactor`, `discovery.sh` → `discovery`, `qa-cycle.sh` → `qa`
+- The team name matches the script: `security.sh` → `security`, `refactor.sh` → `refactor`, `discovery.sh` → `discovery`, `qa.sh` → `qa`
 - The agent name matches the teammate name defined in the prompt (e.g., `pr-reviewer`, `community-coordinator`, `issue-responder`)
 - Sign-off goes on its own line at the very end of the comment body
 - For PR review bodies, wrap in italics: `*-- security/pr-reviewer*`
 
-These conventions are already embedded in the prompts of `discovery.sh`, `refactor.sh`, `security.sh`, and `qa-cycle.sh`. When adding new service scripts, copy the same patterns.
+These conventions are already embedded in the prompts of `discovery.sh`, `refactor.sh`, `security.sh`, and `qa.sh`. When adding new service scripts, copy the same patterns.
 
 ## Step 10: Commit and push
 
