@@ -12,7 +12,7 @@ import {
   validateServerName,
   validateRegionName,
   toKebabCase,
-} from "./ui";
+} from "../shared/ui";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
 const FLY_DASHBOARD_URL = "https://fly.io/dashboard";
