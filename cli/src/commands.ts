@@ -784,7 +784,7 @@ export async function preflightCredentialCheck(manifest: Manifest, cloud: string
   }
 }
 
-export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean, debug?: boolean): Promise<void> {
+export async function cmdRun(agent: string, cloud: string, prompt?: string, dryRun?: boolean, debug?: boolean, name?: string): Promise<void> {
   const manifest = await loadManifestWithSpinner();
   ({ agent, cloud } = resolveAndLog(manifest, agent, cloud));
 
@@ -799,7 +799,7 @@ export async function cmdRun(agent: string, cloud: string, prompt?: string, dryR
 
   await preflightCredentialCheck(manifest, cloud);
 
-  const spawnName = await promptSpawnName();
+  const spawnName = name !== undefined ? name : await promptSpawnName();
 
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
@@ -1951,7 +1951,7 @@ async function handleRecordAction(
   if (!selected.connection) {
     // No connection info -- just rerun
     p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
-    await cmdRun(selected.agent, selected.cloud, selected.prompt);
+    await cmdRun(selected.agent, selected.cloud, selected.prompt, undefined, undefined, selected.name);
     return;
   }
 
@@ -2041,7 +2041,7 @@ async function handleRecordAction(
 
   // Rerun (create new spawn)
   p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
-  await cmdRun(selected.agent, selected.cloud, selected.prompt);
+  await cmdRun(selected.agent, selected.cloud, selected.prompt, undefined, undefined, selected.name);
 }
 
 /** Show interactive picker to select and reconnect/rerun a previous spawn */
@@ -2182,7 +2182,7 @@ export async function cmdLast(): Promise<void> {
   const label = buildRecordLabel(latest, manifest);
   const hint = buildRecordHint(latest);
   p.log.step(`Rerunning last spawn: ${pc.bold(label)} ${pc.dim(hint)}`);
-  await cmdRun(latest.agent, latest.cloud, latest.prompt);
+  await cmdRun(latest.agent, latest.cloud, latest.prompt, undefined, undefined, latest.name);
 }
 
 // ── Connect ────────────────────────────────────────────────────────────────────
