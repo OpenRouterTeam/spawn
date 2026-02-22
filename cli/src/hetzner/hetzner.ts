@@ -584,12 +584,11 @@ export async function promptSpawnName(): Promise<void> {
   if (process.env.SPAWN_NAME_KEBAB) return;
 
   let kebab: string;
-  if (process.env.SPAWN_NAME) {
-    kebab = toKebabCase(process.env.SPAWN_NAME) || defaultSpawnName();
-  } else if (process.env.SPAWN_NON_INTERACTIVE === "1") {
-    kebab = defaultSpawnName();
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    kebab = (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "") || defaultSpawnName();
   } else {
-    const fallback = defaultSpawnName();
+    const derived = process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "";
+    const fallback = derived || defaultSpawnName();
     process.stderr.write("\n");
     const answer = await prompt(`Hetzner server name [${fallback}]: `);
     kebab = toKebabCase(answer || fallback) || defaultSpawnName();
