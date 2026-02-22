@@ -305,7 +305,7 @@ export const agents: Record<string, AgentConfig> = {
 
   codex: {
     name: "Codex CLI",
-    install: () => installAgent("Codex CLI", "npm install -g @openai/codex"),
+    install: () => installAgent("Codex CLI", "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @openai/codex"),
     envVars: (apiKey) => [`OPENROUTER_API_KEY=${apiKey}`],
     configure: (apiKey) => setupCodexConfig(apiKey),
     launchCmd: () =>
@@ -319,7 +319,7 @@ export const agents: Record<string, AgentConfig> = {
     install: () =>
       installAgent(
         "openclaw",
-        'source ~/.bashrc 2>/dev/null; bun install -g openclaw || npm install -g openclaw',
+        'source ~/.bashrc 2>/dev/null; bun install -g openclaw || (mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw)',
       ),
     envVars: (apiKey) => [
       `OPENROUTER_API_KEY=${apiKey}`,
@@ -343,7 +343,7 @@ export const agents: Record<string, AgentConfig> = {
 
   kilocode: {
     name: "Kilo Code",
-    install: () => installAgent("Kilo Code", "npm install -g @kilocode/cli"),
+    install: () => installAgent("Kilo Code", "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @kilocode/cli"),
     envVars: (apiKey) => [
       `OPENROUTER_API_KEY=${apiKey}`,
       "KILO_PROVIDER_TYPE=openrouter",
