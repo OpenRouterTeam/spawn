@@ -315,8 +315,9 @@ describe("ssh_interactive_session post-session integration", () => {
 describe("SPAWN_DASHBOARD_URL convention", () => {
   const sshClouds = discoverSSHClouds();
 
-  it("should find at least 4 SSH-based clouds", () => {
-    expect(sshClouds.length).toBeGreaterThanOrEqual(4);
+  it("should find at least 3 SSH-based clouds", () => {
+    // After TS conversions (daytona, digitalocean), fewer clouds use bash SSH helpers
+    expect(sshClouds.length).toBeGreaterThanOrEqual(3);
   });
 
   for (const cloud of sshClouds) {

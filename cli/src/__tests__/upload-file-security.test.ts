@@ -213,7 +213,8 @@ describe("upload_file() Security Patterns", () => {
       .filter(([, info]) => info.type === "ssh");
 
     it("should have multiple SSH-based clouds", () => {
-      expect(sshClouds.length).toBeGreaterThanOrEqual(4);
+      // After TS conversions (daytona, digitalocean), fewer clouds use bash ssh_upload_file
+      expect(sshClouds.length).toBeGreaterThanOrEqual(3);
     });
 
     for (const [cloud, info] of sshClouds) {
