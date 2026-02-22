@@ -601,7 +601,9 @@ describe("_load_token_from_env edge cases", () => {
       export MY_TOKEN="$(printf 'line1\\nline2')"
       _load_token_from_env MY_TOKEN "Cloud"
     `);
-    expect(result.exitCode).toBe(0);
+    // Newlines are rejected to prevent curl config injection via -K -
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("invalid characters");
   });
 
   it("should handle env var with equals sign in value", () => {
