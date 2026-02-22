@@ -320,7 +320,7 @@ describe("_generate_oauth_server_script", () => {
         "${testDir}/code" "${testDir}/port" 5180
     `);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("require('http')");
+    expect(result.stdout).toContain("import http from 'http'");
   });
 
   it("should embed the expected CSRF state", () => {
