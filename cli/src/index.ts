@@ -460,6 +460,7 @@ const DELETE_COMMANDS = new Set([
   "delete",
   "rm",
   "destroy",
+  "kill",
 ]);
 
 // Common verb prefixes that users naturally try (e.g. "spawn run claude sprite")

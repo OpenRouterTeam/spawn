@@ -31,6 +31,7 @@ import {
   filterHistory,
   clearHistory,
   markRecordDeleted,
+  removeRecord,
   getActiveServers,
   getHistoryPath,
   type SpawnRecord,
@@ -2494,7 +2495,7 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
 async function activeServerPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
   const { pickToTTYWithActions } = await import("./picker.js");
 
-  let remaining = [...records];
+  const remaining = [...records];
 
   while (remaining.length > 0) {
     const options = remaining.map((r) => ({
@@ -2517,14 +2518,48 @@ async function activeServerPicker(records: SpawnRecord[], manifest: Manifest | n
 
     if (result.action === "delete") {
       const conn = picked.connection;
-      const canDelete = conn?.cloud && conn.cloud !== "local" && !conn.deleted && (conn.server_id || conn.server_name);
-      if (!canDelete) {
-        p.log.warn("This server cannot be deleted (no cloud connection info).");
+      const canDestroy = conn?.cloud && conn.cloud !== "local" && !conn.deleted && (conn.server_id || conn.server_name);
+
+      const deleteOptions: { value: string; label: string; hint?: string }[] = [];
+      if (canDestroy) {
+        deleteOptions.push({
+          value: "destroy",
+          label: "Destroy server",
+          hint: "permanently delete the cloud VM",
+        });
+      }
+      deleteOptions.push({
+        value: "remove",
+        label: "Remove from history",
+        hint: "remove this entry without touching the server",
+      });
+      deleteOptions.push({
+        value: "cancel",
+        label: "Cancel",
+      });
+
+      const deleteAction = await p.select({
+        message: "How do you want to delete this?",
+        options: deleteOptions,
+      });
+
+      if (p.isCancel(deleteAction) || deleteAction === "cancel") {
         continue;
       }
-      const deleted = await confirmAndDelete(picked, manifest);
-      if (deleted) {
-        remaining.splice(result.index, 1);
+
+      if (deleteAction === "destroy") {
+        const deleted = await confirmAndDelete(picked, manifest);
+        if (deleted) {
+          remaining.splice(result.index, 1);
+        }
+      } else if (deleteAction === "remove") {
+        const removed = removeRecord(picked);
+        if (removed) {
+          p.log.success("Removed from history.");
+          remaining.splice(result.index, 1);
+        } else {
+          p.log.warn("Could not find record in history.");
+        }
       }
       continue;
     }
@@ -3268,7 +3303,7 @@ function getHelpUsageSection(): string {
   spawn list -a <agent>              Filter spawn history by agent (or --agent)
   spawn list -c <cloud>              Filter spawn history by cloud (or --cloud)
   spawn list --clear                 Clear all spawn history
-  spawn delete                       Delete a previously spawned server (aliases: rm, destroy)
+  spawn delete                       Delete a previously spawned server (aliases: rm, destroy, kill)
   spawn delete -a <agent>            Filter servers by agent
   spawn delete -c <cloud>            Filter servers by cloud
   spawn last                         Instantly rerun the most recent spawn (alias: rerun)
