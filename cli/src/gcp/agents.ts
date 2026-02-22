@@ -73,10 +73,20 @@ async function uploadConfigFile(
   writeFileSync(tmpFile, content, { mode: 0o600 });
 
   const tempRemote = `/tmp/spawn_config_${Date.now()}`;
+  // Prevent command injection: escape remotePath for single-quoted shell context.
+  // $HOME prefix is handled by splitting into a safe shell variable reference + single-quoted suffix.
+  let shellPath: string;
+  if (remotePath.startsWith("$HOME/")) {
+    const suffix = remotePath.slice(6).replace(/'/g, "'\\''");
+    shellPath = `"$HOME"/'${suffix}'`;
+  } else {
+    const escaped = remotePath.replace(/'/g, "'\\''");
+    shellPath = `'${escaped}'`;
+  }
   try {
     await uploadFile(tmpFile, tempRemote);
     await runServer(
-      `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
+      `_RPATH=${shellPath} && mkdir -p "$(dirname "$_RPATH")" && chmod 600 '${tempRemote}' && mv '${tempRemote}' "$_RPATH"`,
     );
   } finally {
     try { unlinkSync(tmpFile); } catch { /* ignore */ }
