@@ -577,10 +577,30 @@ for (const i of instances)
 }
 
 # ============================================================
+# Instance bundle picker
+# ============================================================
+
+_list_lightsail_bundles() {
+    printf '%s\n' \
+        "nano_3_0|0.5 GB RAM · 1 vCPU · 20 GB SSD (~\$5/mo)" \
+        "micro_3_0|1 GB RAM · 1 vCPU · 40 GB SSD (~\$10/mo)" \
+        "small_3_0|2 GB RAM · 1 vCPU · 60 GB SSD (~\$20/mo)" \
+        "medium_3_0|4 GB RAM · 2 vCPUs · 120 GB SSD (~\$40/mo)" \
+        "large_3_0|8 GB RAM · 4 vCPUs · 240 GB SSD (~\$80/mo)" \
+        "xlarge_3_0|16 GB RAM · 8 vCPUs · 480 GB SSD (~\$160/mo)" \
+        "2xlarge_3_0|32 GB RAM · 12 vCPUs · 960 GB SSD (~\$320/mo)"
+}
+
+prompt_lightsail_bundle() {
+    LIGHTSAIL_BUNDLE=$(interactive_pick "LIGHTSAIL_BUNDLE" "medium_3_0" "instance size" _list_lightsail_bundles "medium_3_0")
+    export LIGHTSAIL_BUNDLE
+}
+
+# ============================================================
 # Cloud adapter interface
 # ============================================================
 
-cloud_authenticate() { prompt_spawn_name; ensure_aws_cli; ensure_ssh_key; }
+cloud_authenticate() { prompt_spawn_name; ensure_aws_cli; ensure_ssh_key; prompt_lightsail_bundle; }
 cloud_provision() { create_server "$1"; }
 cloud_wait_ready() { verify_server_connectivity "${LIGHTSAIL_SERVER_IP}"; wait_for_cloud_init "${LIGHTSAIL_SERVER_IP}" 60; }
 cloud_run() { run_server "${LIGHTSAIL_SERVER_IP}" "$1"; }
