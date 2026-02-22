@@ -85,6 +85,9 @@ async function uploadConfigFile(
   remotePath: string,
 ): Promise<void> {
   const tmpFile = join(tmpdir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  if (!tmpFile.startsWith(tmpdir())) {
+    throw new Error("Invalid temp file path");
+  }
   writeFileSync(tmpFile, content, { mode: 0o600 });
 
   try {
