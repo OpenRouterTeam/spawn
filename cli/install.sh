@@ -94,39 +94,72 @@ find_install_dir() {
     echo "${HOME}/.local/bin"
 }
 
-# --- Helper: show PATH instructions if spawn isn't findable ---
+# --- Helper: show PATH instructions if spawn or bun aren't findable ---
 ensure_in_path() {
     local install_dir="$1"
-    if echo "${PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
+    local bun_bin_dir="${BUN_INSTALL}/bin"
+    local spawn_missing=false
+    local bun_missing=false
+
+    # Check against ORIGINAL_USER_PATH (before the installer prepended dirs for its own use)
+    if ! echo "${ORIGINAL_USER_PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
+        spawn_missing=true
+    fi
+    if ! echo "${ORIGINAL_USER_PATH}" | tr ':' '\n' | grep -qx "${bun_bin_dir}"; then
+        bun_missing=true
+    fi
+
+    if ! $spawn_missing && ! $bun_missing; then
         echo ""
         SPAWN_NO_UPDATE_CHECK=1 "${install_dir}/spawn" version
         echo ""
         printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
-    else
-        echo ""
-        log_warn "${BOLD}${install_dir}${NC}${YELLOW} is not in your PATH${NC}"
-        echo ""
-        case "${SHELL:-/bin/bash}" in
-            */zsh)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.zshrc"
-                ;;
-            */fish)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    fish_add_path ${install_dir}"
-                ;;
-            *)
-                echo "  Run this, then reopen your terminal:"
-                echo ""
-                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.bashrc"
-                ;;
-        esac
-        echo ""
-        echo "  Or run directly: ${install_dir}/spawn"
-        echo ""
+        return
     fi
+
+    echo ""
+    if $spawn_missing; then
+        log_warn "${BOLD}${install_dir}${NC}${YELLOW} is not in your PATH${NC}"
+    fi
+    if $bun_missing; then
+        log_warn "${BOLD}${bun_bin_dir}${NC}${YELLOW} is not in your PATH (required by spawn)${NC}"
+    fi
+    echo ""
+    case "${SHELL:-/bin/bash}" in
+        */zsh)
+            echo "  Add to your PATH — run this, then reopen your terminal:"
+            echo ""
+            if $spawn_missing; then
+                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.zshrc"
+            fi
+            if $bun_missing; then
+                echo "    echo 'export PATH=\"${bun_bin_dir}:\$PATH\"' >> ~/.zshrc"
+            fi
+            ;;
+        */fish)
+            echo "  Add to your PATH — run this, then reopen your terminal:"
+            echo ""
+            if $spawn_missing; then
+                echo "    fish_add_path ${install_dir}"
+            fi
+            if $bun_missing; then
+                echo "    fish_add_path ${bun_bin_dir}"
+            fi
+            ;;
+        *)
+            echo "  Add to your PATH — run this, then reopen your terminal:"
+            echo ""
+            if $spawn_missing; then
+                echo "    echo 'export PATH=\"${install_dir}:\$PATH\"' >> ~/.bashrc"
+            fi
+            if $bun_missing; then
+                echo "    echo 'export PATH=\"${bun_bin_dir}:\$PATH\"' >> ~/.bashrc"
+            fi
+            ;;
+    esac
+    echo ""
+    echo "  Or run directly: ${install_dir}/spawn"
+    echo ""
 }
 
 clone_cli() {
@@ -211,6 +244,10 @@ build_and_install() {
 # --- Locate or install bun ---
 # When running via `curl | bash`, subshells may not inherit PATH updates,
 # so we always prepend the standard bun install locations explicitly.
+
+# Save the user's original PATH before prepending dirs for our own use
+ORIGINAL_USER_PATH="${PATH}"
+
 export BUN_INSTALL="${BUN_INSTALL:-${HOME}/.bun}"
 export PATH="${BUN_INSTALL}/bin:${HOME}/.local/bin:${PATH}"
 
