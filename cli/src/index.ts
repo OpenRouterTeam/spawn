@@ -69,6 +69,7 @@ const KNOWN_FLAGS = new Set([
   "--debug",
   "--headless",
   "--output",
+  "--name",
   "--default",
   "-a", "-c", "--agent", "--cloud",
   "--clear",
@@ -101,6 +102,7 @@ function checkUnknownFlags(args: string[]): void {
       console.error(`    ${pc.cyan("--debug")}             Show all commands being executed`);
       console.error(`    ${pc.cyan("--headless")}          Non-interactive mode (no prompts, no SSH session)`);
       console.error(`    ${pc.cyan("--output json")}       Output structured JSON to stdout`);
+      console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
       console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
       console.error(`    ${pc.cyan("--version, -v")}       Show version`);
       console.error();
@@ -169,7 +171,7 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
       }
       process.exit(3);
     }
-    await cmdRunHeadless(agent, cloud, { prompt, debug, outputFormat });
+    await cmdRunHeadless(agent, cloud, { prompt, debug, outputFormat, spawnName: process.env.SPAWN_NAME });
     return;
   }
   if (cloud) {
@@ -569,6 +571,18 @@ async function main(): Promise<void> {
     console.error(pc.red(`Error: --output only supports "json" (got "${outputFormat}")`));
     console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --headless --output json")}`);
     process.exit(1);
+  }
+
+  // Extract --name <value> flag
+  const [nameFlag, nameFilteredArgs] = extractFlagValue(
+    filteredArgs,
+    ["--name"],
+    "spawn name",
+    'spawn <agent> <cloud> --name "my-dev-box"'
+  );
+  filteredArgs.splice(0, filteredArgs.length, ...nameFilteredArgs);
+  if (nameFlag) {
+    process.env.SPAWN_NAME = nameFlag;
   }
 
   // --output implies --headless
