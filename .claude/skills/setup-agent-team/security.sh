@@ -102,6 +102,13 @@ cleanup() {
     git worktree prune 2>/dev/null || true
     rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
 
+    # Clean up test directories from CLI integration tests
+    TEST_DIR_COUNT=$(find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' 2>/dev/null | wc -l)
+    if [[ "${TEST_DIR_COUNT}" -gt 0 ]]; then
+        log "Post-cycle cleanup: removing ${TEST_DIR_COUNT} test directories..."
+        find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' -exec rm -rf {} + 2>/dev/null || true
+    fi
+
     # Clean up prompt file and kill claude if still running
     rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
     if [[ -n "${CLAUDE_PID:-}" ]] && kill -0 "${CLAUDE_PID}" 2>/dev/null; then
@@ -123,7 +130,7 @@ if [[ "${RUN_MODE}" == "team_building" ]] || [[ "${RUN_MODE}" == "triage" ]]; th
     log "Issue: #${ISSUE_NUM}"
 fi
 
-# Pre-cycle cleanup (stale branches, worktrees from prior runs)
+# Pre-cycle cleanup (stale branches, worktrees, test directories from prior runs)
 log "Pre-cycle cleanup..."
 git fetch --prune origin 2>&1 | tee -a "${LOG_FILE}" || true
 git pull --rebase origin main 2>&1 | tee -a "${LOG_FILE}" || true
@@ -133,6 +140,14 @@ git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
 if [[ -d "${WORKTREE_BASE}" ]]; then
     rm -rf "${WORKTREE_BASE}" 2>&1 | tee -a "${LOG_FILE}" || true
     log "Removed stale ${WORKTREE_BASE} directory"
+fi
+
+# Clean up test directories from CLI integration tests
+TEST_DIR_COUNT=$(find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' 2>/dev/null | wc -l)
+if [[ "${TEST_DIR_COUNT}" -gt 0 ]]; then
+    log "Cleaning up ${TEST_DIR_COUNT} stale test directories..."
+    find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' -exec rm -rf {} + 2>&1 | tee -a "${LOG_FILE}" || true
+    log "Test directory cleanup complete"
 fi
 
 # Delete merged security-related remote branches (team-building/*, review-pr-*)
