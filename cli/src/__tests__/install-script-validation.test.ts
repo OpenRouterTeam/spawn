@@ -324,7 +324,7 @@ describe("install.sh validation", () => {
       const fnStart = content.indexOf("clone_cli()");
       const fnBody = content.slice(fnStart);
       // Should remove the temporary repo dir (uses safe canonical path validation)
-      expect(fnBody).toContain('rm -rf "${repo_dir}"');
+      expect(fnBody).toContain('rm -rf "${canonical_repo}"');
     });
   });
 
