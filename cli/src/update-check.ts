@@ -1,5 +1,7 @@
 import "./unicode-detect.js"; // Ensure TERM is set before using symbols
 import { execSync as nodeExecSync, execFileSync as nodeExecFileSync, type ExecSyncOptions, type ExecFileSyncOptions } from "child_process";
+import fs from "fs";
+import path from "path";
 import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE } from "./manifest.js";
@@ -14,7 +16,8 @@ export const executor = {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const FETCH_TIMEOUT = 5000; // 5 seconds
+const FETCH_TIMEOUT = 10000; // 10 seconds
+const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
 
 // Validate RAW_BASE matches expected GitHub raw content URL pattern (defense-in-depth, CWE-78)
 const GITHUB_RAW_URL_PATTERN = /^https:\/\/raw\.githubusercontent\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -57,6 +60,42 @@ function compareVersions(current: string, latest: string): boolean {
   }
 
   return false; // Versions are equal
+}
+
+// ── Failure Backoff ──────────────────────────────────────────────────────────
+
+function getUpdateFailedPath(): string {
+  return path.join(process.env.HOME || "/tmp", ".config", "spawn", ".update-failed");
+}
+
+export function isUpdateBackedOff(): boolean {
+  try {
+    const failedPath = getUpdateFailedPath();
+    const content = fs.readFileSync(failedPath, "utf8").trim();
+    const failedAt = parseInt(content, 10);
+    if (isNaN(failedAt)) return false;
+    return Date.now() - failedAt < UPDATE_BACKOFF_MS;
+  } catch {
+    return false;
+  }
+}
+
+function markUpdateFailed(): void {
+  try {
+    const failedPath = getUpdateFailedPath();
+    fs.mkdirSync(path.dirname(failedPath), { recursive: true });
+    fs.writeFileSync(failedPath, String(Date.now()));
+  } catch {
+    // Best-effort — don't break the CLI if we can't write the file
+  }
+}
+
+function clearUpdateFailed(): void {
+  try {
+    fs.unlinkSync(getUpdateFailedPath());
+  } catch {
+    // File may not exist — that's fine
+  }
 }
 
 /** Print boxed update banner to stderr */
@@ -143,8 +182,10 @@ function performAutoUpdate(latestVersion: string): void {
 
     console.error();
     console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));
+    clearUpdateFailed();
     reExecWithArgs();
   } catch {
+    markUpdateFailed();
     console.error();
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
     console.error(pc.dim("  Please update manually:"));
@@ -159,7 +200,7 @@ function performAutoUpdate(latestVersion: string): void {
 
 /**
  * Check for updates on every run and auto-update if available.
- * Uses a 5-second timeout to avoid blocking for too long.
+ * Uses a 10-second timeout to avoid blocking for too long.
  */
 export async function checkForUpdates(): Promise<void> {
   // Skip in test environment
@@ -169,6 +210,11 @@ export async function checkForUpdates(): Promise<void> {
 
   // Skip if SPAWN_NO_UPDATE_CHECK is set
   if (process.env.SPAWN_NO_UPDATE_CHECK === "1") {
+    return;
+  }
+
+  // Skip if a recent auto-update failed (backoff for 1 hour)
+  if (isUpdateBackedOff()) {
     return;
   }
 

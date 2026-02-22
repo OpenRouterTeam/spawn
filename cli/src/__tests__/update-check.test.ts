@@ -1,6 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import fs from "fs";
+import path from "path";
 
 // ── Test Helpers ───────────────────────────────────────────────────────────────
+
+/** Remove the .update-failed backoff file so it doesn't interfere with tests */
+function clearUpdateBackoff() {
+  try {
+    fs.unlinkSync(path.join(process.env.HOME || "/tmp", ".config", "spawn", ".update-failed"));
+  } catch {
+    // File may not exist
+  }
+}
 
 function mockEnv() {
   const originalEnv = { ...process.env };
@@ -23,6 +34,7 @@ describe("update-check", () => {
 
   beforeEach(() => {
     originalEnv = mockEnv();
+    clearUpdateBackoff();
     consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {});
     // Mock process.exit to prevent tests from exiting
     processExitSpy = spyOn(process, "exit").mockImplementation((() => {}) as any);
