@@ -209,7 +209,7 @@ Complete within 12 minutes. At 9 min wrap up, at 11 min shutdown, at 12 min forc
 
 ## Team Structure
 
-1. **implementer** (Opus) — Identify target script (`.claude/skills/setup-agent-team/{team}.sh`), implement changes in worktree, update workflows if needed, run `bash -n`, create PR: `gh pr create --title "feat: [desc]" --body "Implements #ISSUE_NUM_PLACEHOLDER\n\n-- security/implementer"`
+1. **implementer** (Opus) — Identify target script (`.claude/skills/setup-agent-team/{team}.sh`), implement changes in worktree, update workflows if needed, run `bash -n`. Open a draft PR immediately after first commit: `gh pr create --draft --title "feat: [desc]" --body "Implements #ISSUE_NUM_PLACEHOLDER\n\n-- security/implementer"`. Keep pushing commits. When complete: `gh pr ready NUMBER`
 2. **reviewer** (Opus) — Wait for PR, review for security/correctness/macOS compat/consistency. Approve or request-changes. If approved, merge: `gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch`
 
 ## Workflow
@@ -356,9 +356,11 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/pr-NUM
 
 ## Step 1 — Discover Open PRs
 
-\`gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable\`
+\`gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,isDraft\`
 
-If zero PRs, skip to Step 3.
+**Skip draft PRs** — draft PRs are work-in-progress and not ready for security review. Only review PRs where \`isDraft\` is \`false\`.
+
+If zero non-draft PRs, skip to Step 3.
 
 ## Step 2 — Create Team and Spawn Reviewers
 
@@ -431,6 +433,13 @@ Spawn **branch-cleaner** (model=sonnet):
 - List remote branches: \`git branch -r --format='%(refname:short) %(committerdate:unix)'\`
 - For each non-main branch: if no open PR + stale >48h → \`git push origin --delete BRANCH\`
 - Report summary.
+
+## Step 3.5 — Close Stale Draft PRs
+
+From the PR list in Step 1, for each draft PR (\`isDraft\`=true) with \`updatedAt\` older than 7 days:
+\`\`\`bash
+gh pr close NUMBER --repo OpenRouterTeam/spawn --delete-branch --comment "Closing stale draft PR (no updates for 7+ days). Re-open or create a new PR when ready to continue.\n\n-- security/pr-reviewer"
+\`\`\`
 
 ## Step 4 — Stale Issue Re-triage
 

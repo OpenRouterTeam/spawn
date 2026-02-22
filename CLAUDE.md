@@ -368,6 +368,14 @@ refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
 - If a PR can't be merged (conflicts, superseded, wrong approach), close it with `gh pr close {number} --comment "Reason"`
 - Never rebase main or use `--force` unless explicitly asked
 
+### Draft PR Workflow (for autonomous agents)
+
+- **Commit early and often** — make small, incremental commits as you work
+- **Push and open a draft PR immediately** — `gh pr create --draft` after your first commit
+- **Keep working on the draft PR** — push additional commits to the same branch
+- **Convert to non-draft when ready for review** — `gh pr ready NUMBER`
+- Draft PRs that go stale (no updates for 1 week) will be auto-closed
+
 ## After Each Change
 
 1. `bash -n {file}` syntax check on all modified scripts

@@ -180,9 +180,11 @@ Track lifecycle: "pending-review" → "under-review" → "in-progress". Check la
 3. Post acknowledgment (ONLY if no `-- ` sign-off exists in any comment): `gh issue comment SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --body "Thanks for flagging this! Looking into it now.\n\n-- refactor/issue-fixer"`
 4. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER -b fix/issue-SPAWN_ISSUE_PLACEHOLDER origin/main`
 5. Spawn issue-fixer + issue-tester
-6. When fix is ready: push, create PR with `Fixes #SPAWN_ISSUE_PLACEHOLDER` in body, post update comment linking PR
-7. Do NOT close the issue — `Fixes #SPAWN_ISSUE_PLACEHOLDER` auto-closes on merge
-8. Clean up: `git worktree remove WORKTREE_BASE_PLACEHOLDER`, shutdown teammates
+6. After first commit: push and open a draft PR immediately: `gh pr create --draft --title "fix: [desc]" --body "Fixes #SPAWN_ISSUE_PLACEHOLDER\n\n-- refactor/issue-fixer"`
+7. Keep pushing commits to the same branch as work progresses
+8. When fix is complete and tests pass: `gh pr ready NUMBER`, post update comment linking PR
+9. Do NOT close the issue — `Fixes #SPAWN_ISSUE_PLACEHOLDER` auto-closes on merge
+10. Clean up: `git worktree remove WORKTREE_BASE_PLACEHOLDER`, shutdown teammates
 
 ## Commit Markers
 
@@ -343,7 +345,7 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
 6. **pr-maintainer** (Sonnet)
    Role: Keep PRs healthy and mergeable. Do NOT review/approve/merge — security team handles that.
 
-   First: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision`
+   First: `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,reviewDecision,isDraft`
 
    For EACH PR, fetch full context:
    ```
@@ -361,14 +363,16 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
    - **Failing checks**: investigate, fix if trivial, push. If non-trivial, comment.
    - **Approved + mergeable**: rebase, merge: `gh pr merge NUMBER --repo OpenRouterTeam/spawn --squash --delete-branch`
    - **Not yet reviewed**: leave alone — security team handles review.
+   - **Stale non-draft PRs (3+ days, no review)**: If a non-draft PR (\`isDraft\`=false) has \`updatedAt\` older than 3 days AND \`reviewDecision\` is empty (not yet reviewed), check it out in a worktree, continue the work (fix issues, update code, push), and comment: \`"Picked up stale PR — [what was done].\n\n-- refactor/pr-maintainer"\`
 
    NEVER review or approve PRs. But if already approved, DO merge.
 
    Only act on PRs that are:
    - **Approved + mergeable** → rebase and merge
    - **Have explicit review feedback** (changes requested) → address the feedback
+   - **Stale non-draft, not yet reviewed (3+ days)** → pick up and continue work
 
-   Leave unreviewed PRs alone. Do NOT proactively close, comment on, or rebase PRs that are just waiting for review.
+   Leave fresh unreviewed PRs alone. Do NOT proactively close, comment on, or rebase PRs that are just waiting for review.
 
 6. **community-coordinator** (Sonnet)
    First: `gh issue list --repo OpenRouterTeam/spawn --state open --json number,title,body,labels,createdAt`
@@ -400,7 +404,7 @@ Assign teammates to labeled issues first (no plan mode). Remaining teammates do 
 ## Issue Fix Workflow
 
 1. Community-coordinator: dedup check → label "under-review" → acknowledge → delegate → label "in-progress"
-2. Fixing teammate: `git worktree add WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER -b fix/issue-NUMBER origin/main` → fix → commit (with Agent: marker) → push → `gh pr create --body "Fixes #NUMBER\n\n-- refactor/AGENT-NAME"` → clean up worktree
+2. Fixing teammate: `git worktree add WORKTREE_BASE_PLACEHOLDER/fix/issue-NUMBER -b fix/issue-NUMBER origin/main` → fix → first commit (with Agent: marker) → push → `gh pr create --draft --body "Fixes #NUMBER\n\n-- refactor/AGENT-NAME"` → keep pushing → `gh pr ready NUMBER` when done → clean up worktree
 3. Community-coordinator: post PR link on issue. Do NOT close issue — auto-closes on merge.
 4. NEVER close a PR without a comment. NEVER close an issue manually.
 
@@ -416,8 +420,10 @@ Every teammate uses worktrees — never `git checkout -b` in the main repo.
 ```bash
 git worktree add WORKTREE_BASE_PLACEHOLDER/BRANCH -b BRANCH origin/main
 cd WORKTREE_BASE_PLACEHOLDER/BRANCH
-# ... work, commit, push ...
-gh pr create --title "title" --body "body\n\n-- refactor/AGENT-NAME"
+# ... first commit, push ...
+gh pr create --draft --title "title" --body "body\n\n-- refactor/AGENT-NAME"
+# ... keep pushing commits ...
+gh pr ready NUMBER  # when work is complete
 git worktree remove WORKTREE_BASE_PLACEHOLDER/BRANCH
 ```
 
