@@ -13,7 +13,6 @@ import {
 } from "./ui";
 import {
   runServer,
-  runServerCapture,
   uploadFile,
   runWithRetry,
 } from "./fly";
@@ -277,33 +276,14 @@ async function setupOpenclawConfig(
   await uploadConfigFile(config, "$HOME/.openclaw/openclaw.json");
 }
 
-async function startOpenclawGateway(): Promise<void> {
+async function startGateway(): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   await runServer(
-    "source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi",
+    `source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; ` +
+    `if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & ` +
+    `else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi`,
   );
-}
-
-async function waitForOpenclawGateway(): Promise<void> {
-  logStep("Waiting for OpenClaw gateway to start...");
-  const maxWait = 60;
-  for (let elapsed = 0; elapsed < maxWait; elapsed++) {
-    try {
-      await runServerCapture(
-        `nc -z 127.0.0.1 18789 2>/dev/null || (command -v telnet >/dev/null && timeout 1 telnet 127.0.0.1 18789 2>&1 | grep -q Connected)`,
-        5,
-      );
-      logInfo(`Gateway ready after ${elapsed}s`);
-      return;
-    } catch { /* not ready */ }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  logError(`OpenClaw gateway failed to start after ${maxWait}s`);
-  logInfo("Check gateway logs: cat /tmp/openclaw-gateway.log");
-  try {
-    await runServer("tail -10 /tmp/openclaw-gateway.log 2>/dev/null || true");
-  } catch { /* ignore */ }
-  throw new Error("OpenClaw gateway timeout");
+  logInfo("OpenClaw gateway started");
 }
 
 // ─── OpenCode Install Command ────────────────────────────────────────────────
@@ -358,10 +338,7 @@ export const agents: Record<string, AgentConfig> = {
     ],
     configure: (apiKey, modelId) =>
       setupOpenclawConfig(apiKey, modelId || "openrouter/auto"),
-    preLaunch: async () => {
-      await startOpenclawGateway();
-      await waitForOpenclawGateway();
-    },
+    preLaunch: startGateway,
     launchCmd: () =>
       "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; openclaw tui",
   },
