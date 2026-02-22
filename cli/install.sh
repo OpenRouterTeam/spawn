@@ -99,7 +99,7 @@ ensure_in_path() {
     local install_dir="$1"
     if echo "${PATH}" | tr ':' '\n' | grep -qx "${install_dir}"; then
         echo ""
-        "${install_dir}/spawn" version
+        SPAWN_NO_UPDATE_CHECK=1 "${install_dir}/spawn" version
         echo ""
         printf "${GREEN}[spawn]${NC} Run ${BOLD}spawn${NC} to get started\n"
     else
