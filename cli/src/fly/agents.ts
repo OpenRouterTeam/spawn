@@ -70,8 +70,11 @@ export function generateEnvConfig(pairs: string[]): string {
 
 async function installAgent(agentName: string, installCmd: string): Promise<void> {
   logStep(`Installing ${agentName}...`);
+  // Wrap in a keepalive: run install in background, print a dot every 5s to
+  // prevent fly machine exec from killing the SSH session on idle timeout.
+  const keepalive = `{ ${installCmd}; } & PID=$!; while kill -0 $PID 2>/dev/null; do printf '.'; sleep 5; done; echo; wait $PID`;
   try {
-    await runServer(installCmd);
+    await runServer(keepalive);
   } catch {
     logError(`${agentName} installation failed`);
     logError("The agent could not be installed or verified on the server.");
