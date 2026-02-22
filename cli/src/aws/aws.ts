@@ -1,7 +1,7 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { createHash, createHmac } from "crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, createHmac } from "node:crypto";
 import {
   logInfo,
   logWarn,
@@ -9,7 +9,6 @@ import {
   logStep,
   prompt,
   selectFromList,
-  jsonEscape,
   validateServerName,
   validateRegionName,
   toKebabCase,
@@ -125,7 +124,7 @@ async function awsCli(args: string[]): Promise<string> {
 
 // ─── SigV4 REST API ─────────────────────────────────────────────────────────
 
-async function lightsailRest(target: string, body: string = "{}"): Promise<string> {
+async function lightsailRest(target: string, body = "{}"): Promise<string> {
   if (!awsAccessKeyId || !awsSecretAccessKey) {
     throw new Error("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set for REST API calls");
   }
@@ -299,9 +298,9 @@ export async function authenticate(): Promise<void> {
 
   logStep("Enter your AWS credentials:");
   const accessKey = await prompt("AWS Access Key ID: ");
-  if (!accessKey) throw new Error("No access key provided");
+  if (!accessKey) { throw new Error("No access key provided"); }
   const secretKey = await prompt("AWS Secret Access Key: ");
-  if (!secretKey) throw new Error("No secret key provided");
+  if (!secretKey) { throw new Error("No secret key provided"); }
 
   process.env.AWS_ACCESS_KEY_ID = accessKey;
   process.env.AWS_SECRET_ACCESS_KEY = secretKey;
@@ -365,7 +364,7 @@ export async function promptBundle(): Promise<void> {
 // ─── SSH Key Management ─────────────────────────────────────────────────────
 
 async function generateSshKeyIfMissing(): Promise<void> {
-  if (existsSync(SSH_KEY_PATH)) return;
+  if (existsSync(SSH_KEY_PATH)) { return; }
 
   logStep("Generating SSH key...");
   const dir = SSH_KEY_PATH.replace(/\/[^/]+$/, "");
@@ -634,9 +633,9 @@ function saveVmConnection(
   const dir = `${process.env.HOME}/.spawn`;
   mkdirSync(dir, { recursive: true });
   const json: Record<string, string> = { ip, user };
-  if (serverId) json.server_id = serverId;
-  if (serverName) json.server_name = serverName;
-  if (cloud) json.cloud = cloud;
+  if (serverId) { json.server_id = serverId; }
+  if (serverName) { json.server_name = serverName; }
+  if (cloud) { json.cloud = cloud; }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -728,7 +727,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
   clearTimeout(timer);
-  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
   return stdout.trim();
 }
 
@@ -785,7 +784,7 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd.slice(0, 80)}...`);
-      if (attempt < maxAttempts) await sleep(sleepSec * 1000);
+      if (attempt < maxAttempts) { await sleep(sleepSec * 1000); }
     }
   }
   throw new Error(`runWithRetry exhausted: ${cmd.slice(0, 80)}...`);
@@ -810,7 +809,7 @@ export async function getServerName(): Promise<string> {
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) { return; }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {
@@ -833,7 +832,7 @@ export async function promptSpawnName(): Promise<void> {
 
 export async function destroyServer(name?: string): Promise<void> {
   const target = name || instanceName;
-  if (!target) throw new Error("destroy_server: no instance name provided");
+  if (!target) { throw new Error("destroy_server: no instance name provided"); }
 
   logStep(`Destroying Lightsail instance '${target}'...`);
 

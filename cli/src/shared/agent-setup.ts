@@ -1,9 +1,9 @@
 // shared/agent-setup.ts — Shared agent helpers + definitions for SSH-based clouds
 // Cloud-agnostic: receives runServer/uploadFile via CloudRunner interface.
 
-import { writeFileSync, unlinkSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   logInfo,
   logWarn,
@@ -79,15 +79,15 @@ export async function installClaudeCode(runner: CloudRunner): Promise<void> {
     `if [ -f ~/.bash_profile ] && grep -q 'spawn:env\\|Claude Code PATH\\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
     `echo "==> Installing Claude Code (method 1/2: curl installer)..."`,
-    `curl -fsSL https://claude.ai/install.sh | bash || true`,
+    "curl -fsSL https://claude.ai/install.sh | bash || true",
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
-    `if ! command -v node >/dev/null 2>&1; then curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; fi`,
+    "if ! command -v node >/dev/null 2>&1; then curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; fi",
     `echo "==> Installing Claude Code (method 2/2: npm)..."`,
-    `npm install -g @anthropic-ai/claude-code || true`,
+    "npm install -g @anthropic-ai/claude-code || true",
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
-    `exit 1`,
+    "exit 1",
   ].join('\n');
 
   try {
@@ -136,7 +136,7 @@ let githubAuthRequested = false;
 let githubToken = "";
 
 export async function promptGithubAuth(): Promise<void> {
-  if (process.env.SPAWN_SKIP_GITHUB_AUTH) return;
+  if (process.env.SPAWN_SKIP_GITHUB_AUTH) { return; }
   process.stderr.write("\n");
   const choice = await prompt("Set up GitHub CLI (gh) on this machine? (y/N): ");
   if (/^[Yy]$/.test(choice)) {
@@ -157,8 +157,8 @@ export async function promptGithubAuth(): Promise<void> {
 }
 
 export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
-  if (process.env.SPAWN_SKIP_GITHUB_AUTH) return;
-  if (!githubAuthRequested) return;
+  if (process.env.SPAWN_SKIP_GITHUB_AUTH) { return; }
+  if (!githubAuthRequested) { return; }
 
   let ghCmd = "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash";
   let localTmpFile = "";
@@ -190,7 +190,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
 
 // ─── Codex CLI Config ────────────────────────────────────────────────────────
 
-export async function setupCodexConfig(runner: CloudRunner, apiKey: string): Promise<void> {
+export async function setupCodexConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
   const config = `model = "openai/gpt-5-codex"
 model_provider = "openrouter"
@@ -243,9 +243,9 @@ export async function setupOpenclawConfig(
 export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   await runner.runServer(
-    `source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; ` +
-    `if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & ` +
-    `else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi`,
+    "source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+    "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
+    "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi",
   );
   logInfo("OpenClaw gateway started");
 }
@@ -344,7 +344,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
       ],
-      configure: async (apiKey) => {
+      configure: async (_apiKey) => {
         await runner.runServer(
           `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "\${OPENROUTER_API_KEY}" --provider openrouter`,
         );

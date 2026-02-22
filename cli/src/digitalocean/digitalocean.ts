@@ -1,6 +1,6 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import {
   logInfo,
   logWarn,
@@ -84,7 +84,7 @@ async function doApi(
       }
       return { status: resp.status, text };
     } catch (err) {
-      if (attempt >= maxRetries) throw err;
+      if (attempt >= maxRetries) { throw err; }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
       await sleep(interval * 1000);
       interval = Math.min(interval * 2, 30);
@@ -154,23 +154,23 @@ async function saveTokenToConfig(token: string, refreshToken?: string, expiresIn
 
 function loadTokenFromConfig(): string | null {
   const data = loadConfig();
-  if (!data) return null;
+  if (!data) { return null; }
   const token = data.api_key || data.token || "";
-  if (!token) return null;
-  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) return null;
+  if (!token) { return null; }
+  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) { return null; }
   return token;
 }
 
 function loadRefreshToken(): string | null {
   const data = loadConfig();
-  if (!data?.refresh_token) return null;
-  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(data.refresh_token)) return null;
+  if (!data?.refresh_token) { return null; }
+  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(data.refresh_token)) { return null; }
   return data.refresh_token;
 }
 
 function isTokenExpired(): boolean {
   const data = loadConfig();
-  if (!data?.expires_at) return false;
+  if (!data?.expires_at) { return false; }
   // Consider expired 5 minutes before actual expiry
   return Math.floor(Date.now() / 1000) >= data.expires_at - 300;
 }
@@ -178,7 +178,7 @@ function isTokenExpired(): boolean {
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testDoToken(): Promise<boolean> {
-  if (!doToken) return false;
+  if (!doToken) { return false; }
   try {
     const { text } = await doApi("GET", "/account", undefined, 1);
     return text.includes('"uuid"');
@@ -189,7 +189,7 @@ async function testDoToken(): Promise<boolean> {
 
 // ─── DO OAuth Flow ──────────────────────────────────────────────────────────
 
-const OAUTH_CSS = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}`;
+const OAUTH_CSS = "*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}";
 
 const OAUTH_SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>DigitalOcean Authorization Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
 
@@ -206,10 +206,10 @@ function isOAuthConfigured(): boolean {
 }
 
 async function tryRefreshDoToken(): Promise<string | null> {
-  if (!isOAuthConfigured()) return null;
+  if (!isOAuthConfigured()) { return null; }
 
   const refreshToken = loadRefreshToken();
-  if (!refreshToken) return null;
+  if (!refreshToken) { return null; }
 
   logStep("Attempting to refresh DigitalOcean token...");
 
@@ -332,7 +332,6 @@ async function tryDoOAuth(): Promise<string | null> {
       actualPort = p;
       break;
     } catch {
-      continue;
     }
   }
 
@@ -411,7 +410,7 @@ async function tryDoOAuth(): Promise<string | null> {
     );
     logInfo("Successfully obtained DigitalOcean access token via OAuth!");
     return data.access_token;
-  } catch (err) {
+  } catch (_err) {
     logError("Failed to exchange authorization code");
     return null;
   }
@@ -595,10 +594,10 @@ function saveVmConnection(
   const dir = `${process.env.HOME}/.spawn`;
   mkdirSync(dir, { recursive: true });
   const json: Record<string, string> = { ip, user };
-  if (serverId) json.server_id = serverId;
-  if (serverName) json.server_name = serverName;
-  if (cloud) json.cloud = cloud;
-  if (launchCmd) json.launch_cmd = launchCmd;
+  if (serverId) { json.server_id = serverId; }
+  if (serverName) { json.server_name = serverName; }
+  if (cloud) { json.cloud = cloud; }
+  if (launchCmd) { json.launch_cmd = launchCmd; }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -857,7 +856,7 @@ export async function runServerCapture(
   try { proc.stdin!.end(); } catch { /* already closed */ }
   clearTimeout(timer);
 
-  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
   return stdout.trim();
 }
 
@@ -877,7 +876,7 @@ export async function uploadFile(
     { stdio: ["ignore", "ignore", "pipe"] },
   );
   const exitCode = await proc.exited;
-  if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
+  if (exitCode !== 0) { throw new Error(`upload_file failed for ${remotePath}`); }
 }
 
 export async function interactiveSession(
@@ -924,7 +923,7 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
-      if (attempt < maxAttempts) await sleep(sleepSec * 1000);
+      if (attempt < maxAttempts) { await sleep(sleepSec * 1000); }
     }
   }
   logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);
@@ -950,7 +949,7 @@ export async function getServerName(): Promise<string> {
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) { return; }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {

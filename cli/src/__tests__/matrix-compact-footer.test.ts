@@ -6,7 +6,7 @@ import {
   calculateColumnWidth,
   getTerminalWidth,
 } from "../commands";
-import { matrixStatus, countImplemented, cloudKeys, agentKeys } from "../manifest";
+import { countImplemented, cloudKeys, agentKeys } from "../manifest";
 
 /**
  * Tests for the compact matrix view rendering and matrix footer logic

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import {
   loadHistory,
   saveSpawnRecord,
@@ -175,7 +175,7 @@ describe("History Trimming and Boundaries", () => {
         records.push({
           agent: `agent-${i}`,
           cloud: `cloud-${i}`,
-          timestamp: `2026-01-01T00:00:00.000Z`,
+          timestamp: "2026-01-01T00:00:00.000Z",
         });
       }
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -357,7 +357,7 @@ describe("History Trimming and Boundaries", () => {
         records.push({
           agent: `agent-${i}`,
           cloud: `cloud-${i}`,
-          timestamp: `2026-01-01T00:00:00.000Z`,
+          timestamp: "2026-01-01T00:00:00.000Z",
         });
       }
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -382,7 +382,7 @@ describe("History Trimming and Boundaries", () => {
         records.push({
           agent: `agent-${i}`,
           cloud: `cloud-${i}`,
-          timestamp: `2026-01-01T00:00:00.000Z`,
+          timestamp: "2026-01-01T00:00:00.000Z",
         });
       }
       writeFileSync(join(testDir, "history.json"), JSON.stringify(records));

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { describe, it, expect, mock, } from "bun:test";
 
 /**
  * Tests for the resolvePrompt pipeline and handleDefaultCommand routing
@@ -29,7 +29,7 @@ function extractFlagValue(
   hooks?: { exit?: (code: number) => void; stderr?: (msg: string) => void }
 ): [string | undefined, string[]] {
   const idx = args.findIndex(arg => flags.includes(arg));
-  if (idx === -1) return [undefined, args];
+  if (idx === -1) { return [undefined, args]; }
 
   if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
     const exitFn = hooks?.exit ?? ((code: number) => { throw new Error(`process.exit(${code})`); });
@@ -77,9 +77,9 @@ async function resolvePrompt(
 
   if (prompt && promptFile) {
     stderrFn("Error: --prompt and --prompt-file cannot be used together");
-    stderrFn(`\nUse one or the other:`);
+    stderrFn("\nUse one or the other:");
     stderrFn(`  spawn <agent> <cloud> --prompt "your prompt here"`);
-    stderrFn(`  spawn <agent> <cloud> --prompt-file instructions.txt`);
+    stderrFn("  spawn <agent> <cloud> --prompt-file instructions.txt");
     exitFn(1);
   }
 
@@ -90,7 +90,7 @@ async function resolvePrompt(
     } catch (err) {
       const msg = err && typeof err === "object" && "message" in err ? err.message : String(err);
       stderrFn(`Error reading prompt file '${promptFile}': ${msg}`);
-      stderrFn(`\nMake sure the file exists and is readable.`);
+      stderrFn("\nMake sure the file exists and is readable.");
       exitFn(1);
     }
   }
@@ -117,7 +117,7 @@ function handleDefaultCommand(
   }
   if (cloud) {
     return "run";
-  } else {
+  }
     if (prompt) {
       stderrFn("Error: --prompt requires both <agent> and <cloud>");
       stderrFn(`\nUsage: spawn ${agent} <cloud> --prompt "your prompt here"`);
@@ -125,7 +125,6 @@ function handleDefaultCommand(
       return "promptError";
     }
     return "agentInfo";
-  }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

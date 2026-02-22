@@ -1,7 +1,7 @@
 // shared/ui.ts — Logging, prompts, and browser opening
 // @clack/prompts is bundled into fly.js at build time.
 
-import { createInterface } from "readline";
+import { createInterface } from "node:readline";
 import * as p from "@clack/prompts";
 
 const RED = "\x1b[0;31m";
@@ -63,7 +63,7 @@ export async function selectFromList(
   promptText: string,
   defaultValue: string,
 ): Promise<string> {
-  if (items.length === 0) return defaultValue;
+  if (items.length === 0) { return defaultValue; }
 
   const parsed = items.map((line) => {
     const parts = line.split("|");
@@ -84,7 +84,7 @@ export async function selectFromList(
     })),
     initialValue: defaultValue,
   });
-  if (p.isCancel(result)) return defaultValue;
+  if (p.isCancel(result)) { return defaultValue; }
   return result as string;
 }
 
@@ -116,9 +116,9 @@ export function jsonEscape(s: string): string {
 
 /** Validate server name: 3-63 chars, alphanumeric + dash, no leading/trailing dash. */
 export function validateServerName(name: string): boolean {
-  if (name.length < 3 || name.length > 63) return false;
-  if (!/^[a-zA-Z0-9-]+$/.test(name)) return false;
-  if (name.startsWith("-") || name.endsWith("-")) return false;
+  if (name.length < 3 || name.length > 63) { return false; }
+  if (!/^[a-zA-Z0-9-]+$/.test(name)) { return false; }
+  if (name.startsWith("-") || name.endsWith("-")) { return false; }
   return true;
 }
 
@@ -129,7 +129,7 @@ export function validateRegionName(region: string): boolean {
 
 /** Validate model ID format. */
 export function validateModelId(id: string): boolean {
-  if (!id) return true;
+  if (!id) { return true; }
   return /^[a-zA-Z0-9/_:.-]+$/.test(id);
 }
 

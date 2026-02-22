@@ -6,7 +6,7 @@ import {
   resolveAgentKey,
   resolveCloudKey,
 } from "../commands";
-import { createMockManifest, createEmptyManifest } from "./test-helpers";
+import { createMockManifest, } from "./test-helpers";
 
 /**
  * Tests for findClosestKeyByNameOrKey — the fuzzy matching function that
@@ -147,8 +147,8 @@ describe("findClosestKeyByNameOrKey", () => {
     it("should return key of best match even when match comes from display name", () => {
       const keys = ["a1", "b2"];
       const getName = (k: string) => {
-        if (k === "a1") return "Alpha Service";
-        if (k === "b2") return "Beta Cloud";
+        if (k === "a1") { return "Alpha Service"; }
+        if (k === "b2") { return "Beta Cloud"; }
         return "Unknown";
       };
       // "beta-cloud" vs key "a1" -> distance 8, name "Alpha Service" -> distance >> 3
@@ -160,8 +160,8 @@ describe("findClosestKeyByNameOrKey", () => {
     it("should pick better match across keys when both key and name are close", () => {
       const keys = ["codx", "codex"];
       const getName = (k: string) => {
-        if (k === "codx") return "Codx Tool";
-        if (k === "codex") return "Codex";
+        if (k === "codx") { return "Codx Tool"; }
+        if (k === "codex") { return "Codex"; }
         return "Unknown";
       };
       // "codex" vs key "codx" -> distance 1, name "Codx Tool" -> distance 5
@@ -185,9 +185,10 @@ describe("findClosestKeyByNameOrKey", () => {
     it("should pick closest via name when all keys are distant", () => {
       const keys = ["x1", "y2", "z3"];
       const getName = (k: string) => {
-        if (k === "x1") return "Alpha";
-        if (k === "y2") return "Betta"; // intentional typo for "Beta"
-        if (k === "z3") return "Gamma";
+        if (k === "x1") { return "Alpha"; }
+        if (k === "y2") { return "Betta"; // intentional typo for "Beta"
+}
+        if (k === "z3") { return "Gamma"; }
         return "Unknown";
       };
       // "beta" vs all keys -> distance >> 3

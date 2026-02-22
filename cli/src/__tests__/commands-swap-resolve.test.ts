@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
-import { loadManifest, type Manifest } from "../manifest";
+import { loadManifest, } from "../manifest";
 
 /**
  * Tests for detectAndFixSwappedArgs and resolveAndLog logic in commands.ts.

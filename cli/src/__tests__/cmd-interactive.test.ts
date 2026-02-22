@@ -408,11 +408,11 @@ describe("cmdInteractive", () => {
 
   describe("script execution after selection", () => {
     it("should attempt to download script after user selects agent and cloud", async () => {
-      let fetchedUrls: string[] = [];
+      const fetchedUrls: string[] = [];
       selectReturnValues = ["claude", "sprite"];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string") fetchedUrls.push(url);
+        if (typeof url === "string") { fetchedUrls.push(url); }
         if (typeof url === "string" && url.includes("manifest.json")) {
           return {
             ok: true,
@@ -537,10 +537,10 @@ describe("cmdInteractive", () => {
       expect(credWarn).toBeUndefined();
 
       // Restore env
-      if (savedKey === undefined) delete process.env.SPRITE_API_KEY;
-      else process.env.SPRITE_API_KEY = savedKey;
-      if (savedOR === undefined) delete process.env.OPENROUTER_API_KEY;
-      else process.env.OPENROUTER_API_KEY = savedOR;
+      if (savedKey === undefined) { delete process.env.SPRITE_API_KEY; }
+      else { process.env.SPRITE_API_KEY = savedKey; }
+      if (savedOR === undefined) { delete process.env.OPENROUTER_API_KEY; }
+      else { process.env.OPENROUTER_API_KEY = savedOR; }
     });
 
     it("should still launch script after credential warning", async () => {
@@ -558,9 +558,9 @@ describe("cmdInteractive", () => {
       selectReturnValues = ["claude", "sprite"];
       delete process.env.SPRITE_API_KEY;
 
-      let fetchedUrls: string[] = [];
+      const fetchedUrls: string[] = [];
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string") fetchedUrls.push(url);
+        if (typeof url === "string") { fetchedUrls.push(url); }
         if (typeof url === "string" && url.includes("manifest.json")) {
           return {
             ok: true,

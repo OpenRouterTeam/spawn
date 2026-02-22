@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { describe, it, expect, beforeEach, afterEach, } from "bun:test";
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * Tests for DigitalOcean OAuth flow in cli/src/digitalocean/digitalocean.ts.
@@ -307,7 +307,7 @@ describe("Token exchange request body", () => {
 // ── OAuth HTML Responses ────────────────────────────────────────────────────
 
 describe("OAuth HTML responses", () => {
-  const OAUTH_CSS = `*{margin:0;padding:0;box-sizing:border-box}`;
+  const OAUTH_CSS = "*{margin:0;padding:0;box-sizing:border-box}";
   const SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>DigitalOcean Authorization Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
   const ERROR_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10007;</div><h1>Authorization Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>`;
 

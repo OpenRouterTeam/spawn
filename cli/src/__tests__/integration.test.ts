@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import type { Manifest } from "../manifest";
 import {
   mockSuccessfulFetch,
@@ -96,7 +96,7 @@ describe("CLI Integration Tests", () => {
     // Write stale cache (2 hours old)
     writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
     const oldTime = Date.now() - 2 * 60 * 60 * 1000;
-    const { utimesSync } = await import("fs");
+    const { utimesSync } = await import("node:fs");
     utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
 
     // Mock network failure

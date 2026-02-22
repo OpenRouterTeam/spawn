@@ -7,9 +7,8 @@ import {
   countImplemented,
   type Manifest,
 } from "../manifest";
-import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import {
   createMockManifest,
   createEmptyManifest,
@@ -174,7 +173,7 @@ describe("manifest", () => {
       mkdirSync(join(env.testDir, "spawn"), { recursive: true });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
-      const { utimesSync } = await import("fs");
+      const { utimesSync } = await import("node:fs");
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
 
       // Mock network failure
@@ -227,7 +226,7 @@ describe("manifest", () => {
       mkdirSync(join(env.testDir, "spawn"), { recursive: true });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
-      const { utimesSync } = await import("fs");
+      const { utimesSync } = await import("node:fs");
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
 
       const manifest = await loadManifest(true);
@@ -250,7 +249,7 @@ describe("manifest", () => {
       mkdirSync(join(env.testDir, "spawn"), { recursive: true });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
-      const { utimesSync } = await import("fs");
+      const { utimesSync } = await import("node:fs");
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
 
       const manifest = await loadManifest(true);

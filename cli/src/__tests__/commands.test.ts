@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import {
-  cmdRun,
-  cmdMatrix,
-  cmdAgents,
-  cmdClouds,
-  cmdAgentInfo,
   cmdHelp,
 } from "../commands";
 import {

@@ -5,8 +5,6 @@ import {
   getImplementedClouds,
   getMissingClouds,
   getErrorMessage,
-  levenshtein,
-  findClosestMatch,
   getStatusDescription,
   calculateColumnWidth,
   getTerminalWidth,

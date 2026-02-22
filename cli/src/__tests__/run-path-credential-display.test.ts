@@ -178,8 +178,8 @@ describe("prioritizeCloudsByCredentials", () => {
   afterEach(() => {
     // Restore env vars
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
+      if (v === undefined) { delete process.env[k]; }
+      else { process.env[k] = v; }
     }
   });
 
@@ -339,8 +339,8 @@ describe("credential status display logic", () => {
 
   afterEach(() => {
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
+      if (v === undefined) { delete process.env[k]; }
+      else { process.env[k] = v; }
     }
   });
 
@@ -607,8 +607,8 @@ describe("getScriptFailureGuidance for run path", () => {
 
   afterEach(() => {
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
+      if (v === undefined) { delete process.env[k]; }
+      else { process.env[k] = v; }
     }
   });
 
@@ -754,8 +754,8 @@ describe("prioritizeCloudsByCredentials with real-world patterns", () => {
 
   afterEach(() => {
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
+      if (v === undefined) { delete process.env[k]; }
+      else { process.env[k] = v; }
     }
   });
 
@@ -807,8 +807,8 @@ describe("credential function edge cases", () => {
   });
 
   afterEach(() => {
-    if (savedEnv.OPENROUTER_API_KEY === undefined) delete process.env.OPENROUTER_API_KEY;
-    else process.env.OPENROUTER_API_KEY = savedEnv.OPENROUTER_API_KEY;
+    if (savedEnv.OPENROUTER_API_KEY === undefined) { delete process.env.OPENROUTER_API_KEY; }
+    else { process.env.OPENROUTER_API_KEY = savedEnv.OPENROUTER_API_KEY; }
   });
 
   it("credentialHints should always mention OPENROUTER_API_KEY when missing", () => {

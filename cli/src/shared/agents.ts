@@ -45,7 +45,7 @@ export function generateEnvConfig(pairs: string[]): string {
   ];
   for (const pair of pairs) {
     const eqIdx = pair.indexOf("=");
-    if (eqIdx === -1) continue;
+    if (eqIdx === -1) { continue; }
     const key = pair.slice(0, eqIdx);
     const value = pair.slice(eqIdx + 1);
     // Validate env var name

@@ -1,7 +1,7 @@
 // local/local.ts — Core local provider: runs commands on the user's machine
 
-import { copyFileSync, mkdirSync, readFileSync } from "fs";
-import { dirname } from "path";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 

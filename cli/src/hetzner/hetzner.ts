@@ -1,6 +1,6 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import {
   logInfo,
   logWarn,
@@ -62,7 +62,7 @@ async function hetznerApi(
       }
       return text;
     } catch (err) {
-      if (attempt >= maxRetries) throw err;
+      if (attempt >= maxRetries) { throw err; }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
       await sleep(interval * 1000);
       interval = Math.min(interval * 2, 30);
@@ -104,9 +104,9 @@ function loadTokenFromConfig(): string | null {
   try {
     const data = JSON.parse(readFileSync(HETZNER_CONFIG_PATH, "utf-8"));
     const token = data.api_key || data.token || "";
-    if (!token) return null;
+    if (!token) { return null; }
     // Security: validate token chars
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) return null;
+    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) { return null; }
     return token;
   } catch {
     return null;
@@ -116,14 +116,14 @@ function loadTokenFromConfig(): string | null {
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testHcloudToken(): Promise<boolean> {
-  if (!hcloudToken) return false;
+  if (!hcloudToken) { return false; }
   try {
     const resp = await hetznerApi("GET", "/servers?per_page=1", undefined, 1);
     const data = parseJson(resp);
     // Hetzner returns { "error": { ... } } on auth failure.
     // Success responses may contain "error": null inside action objects,
     // so check for a real error object with a message.
-    if (data?.error?.message) return false;
+    if (data?.error?.message) { return false; }
     return true;
   } catch {
     return false;
@@ -266,10 +266,10 @@ export function saveVmConnection(
   const dir = `${process.env.HOME}/.spawn`;
   mkdirSync(dir, { recursive: true });
   const json: Record<string, string> = { ip, user };
-  if (serverId) json.server_id = serverId;
-  if (serverName) json.server_name = serverName;
-  if (cloud) json.cloud = cloud;
-  if (launchCmd) json.launch_cmd = launchCmd;
+  if (serverId) { json.server_id = serverId; }
+  if (serverName) { json.server_name = serverName; }
+  if (cloud) { json.cloud = cloud; }
+  if (launchCmd) { json.launch_cmd = launchCmd; }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -488,7 +488,7 @@ export async function runServerCapture(
   try { proc.stdin!.end(); } catch { /* already closed */ }
   clearTimeout(timer);
 
-  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
   return stdout.trim();
 }
 
@@ -508,7 +508,7 @@ export async function uploadFile(
     { stdio: ["ignore", "ignore", "pipe"] },
   );
   const exitCode = await proc.exited;
-  if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
+  if (exitCode !== 0) { throw new Error(`upload_file failed for ${remotePath}`); }
 }
 
 export async function interactiveSession(
@@ -555,7 +555,7 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
-      if (attempt < maxAttempts) await sleep(sleepSec * 1000);
+      if (attempt < maxAttempts) { await sleep(sleepSec * 1000); }
     }
   }
   logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);
@@ -581,7 +581,7 @@ export async function getServerName(): Promise<string> {
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) { return; }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {

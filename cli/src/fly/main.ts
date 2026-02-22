@@ -25,7 +25,7 @@ import { selectFromList } from "../shared/ui";
 
 async function promptVmOptions(): Promise<ServerOptions> {
   if (process.env.FLY_VM_MEMORY) {
-    const memoryMb = parseInt(process.env.FLY_VM_MEMORY, 10);
+    const memoryMb = Number.parseInt(process.env.FLY_VM_MEMORY, 10);
     const tier = FLY_VM_TIERS.find((t) => t.memoryMb === memoryMb) || DEFAULT_VM_TIER;
     return { cpuKind: tier.cpuKind, cpus: tier.cpus, memoryMb: tier.memoryMb };
   }

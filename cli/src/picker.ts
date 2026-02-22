@@ -17,8 +17,8 @@
  *            | spawn pick --prompt "Select zone" --default "us-central1-a")
  */
 
-import * as fs from "fs";
-import { spawnSync } from "child_process";
+import * as fs from "node:fs";
+import { spawnSync } from "node:child_process";
 
 export interface PickOption {
   value: string;
@@ -76,7 +76,7 @@ const A = {
  * fd) but returns void so callers can `await` it uniformly.
  */
 export function pickToTTY(config: PickConfig): string | null {
-  if (config.options.length === 0) return config.defaultValue ?? null;
+  if (config.options.length === 0) { return config.defaultValue ?? null; }
 
   // ── open /dev/tty ──────────────────────────────────────────────────────────
   let ttyFd: number;
@@ -118,7 +118,7 @@ export function pickToTTY(config: PickConfig): string | null {
   let selected = 0;
   if (config.defaultValue) {
     const idx = config.options.findIndex((o) => o.value === config.defaultValue);
-    if (idx >= 0) selected = idx;
+    if (idx >= 0) { selected = idx; }
   }
 
   // header line + one line per option + footer line
@@ -133,7 +133,7 @@ export function pickToTTY(config: PickConfig): string | null {
       const opt = config.options[i];
       if (i === selected) {
         w(`${A.green}${A.bold}> ${opt.label}${A.reset}`);
-        if (opt.hint) w(`  ${A.dim}${opt.hint}${A.reset}`);
+        if (opt.hint) { w(`  ${A.dim}${opt.hint}${A.reset}`); }
       } else {
         w(`  ${A.dim}${opt.label}${A.reset}`);
       }
@@ -160,7 +160,7 @@ export function pickToTTY(config: PickConfig): string | null {
       } catch {
         break;
       }
-      if (n === 0) continue;
+      if (n === 0) { continue; }
 
       const key = buf.slice(0, n).toString("binary");
 
@@ -218,7 +218,7 @@ export function pickToTTY(config: PickConfig): string | null {
  */
 export function pickFallback(config: PickConfig): string | null {
   const { message, options, defaultValue } = config;
-  if (options.length === 0) return defaultValue ?? null;
+  if (options.length === 0) { return defaultValue ?? null; }
 
   const defaultIdx = Math.max(
     options.findIndex((o) => o.value === defaultValue) + 1,
@@ -229,7 +229,7 @@ export function pickFallback(config: PickConfig): string | null {
   options.forEach((opt, i) => {
     const marker = opt.value === defaultValue ? "*" : " ";
     let line = `  ${marker} ${i + 1}) ${opt.label}`;
-    if (opt.hint) line += `  — ${opt.hint}`;
+    if (opt.hint) { line += `  — ${opt.hint}`; }
     process.stderr.write(line + "\n");
   });
   process.stderr.write(`\nSelect [${defaultIdx}]: `);
@@ -253,10 +253,10 @@ export function pickFallback(config: PickConfig): string | null {
   } catch {
     // ignore
   } finally {
-    if (openedTTY) try { fs.closeSync(inputFd); } catch {}
+    if (openedTTY) { try { fs.closeSync(inputFd); } catch {} }
   }
 
-  const choice = parseInt(line, 10);
+  const choice = Number.parseInt(line, 10);
   if (choice >= 1 && choice <= options.length) {
     return options[choice - 1].value;
   }

@@ -3,7 +3,7 @@
  * SECURITY-CRITICAL: These functions protect against injection attacks
  */
 
-import { resolve } from "path";
+import { resolve } from "node:path";
 
 // Allowlist pattern for agent and cloud identifiers
 // Only lowercase alphanumeric, hyphens, and underscores allowed
@@ -63,13 +63,13 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
       `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names can only contain:\n` +
-      `  • Lowercase letters (a-z)\n` +
-      `  • Numbers (0-9)\n` +
-      `  • Hyphens (-) and underscores (_)\n\n` +
-      `Examples of valid names:\n` +
-      `  • claude\n` +
-      `  • github-codespaces\n` +
-      `  • e2b\n\n` +
+      "  • Lowercase letters (a-z)\n" +
+      "  • Numbers (0-9)\n" +
+      "  • Hyphens (-) and underscores (_)\n\n" +
+      "Examples of valid names:\n" +
+      "  • claude\n" +
+      "  • github-codespaces\n" +
+      "  • e2b\n\n" +
       `To see all available ${entityType}s, run: ${listCmd}`
     );
   }
@@ -81,9 +81,9 @@ export function validateIdentifier(identifier: string, fieldName: string): void 
     throw new Error(
       `Invalid ${fieldName.toLowerCase()}: "${identifier}"\n\n` +
       `The name contains path-like characters that aren't allowed:\n` +
-      `  • Forward slashes (/)\n` +
-      `  • Backslashes (\\)\n` +
-      `  • Parent directory references (..)\n\n` +
+      "  • Forward slashes (/)\n" +
+      "  • Backslashes (\\)\n" +
+      "  • Parent directory references (..)\n\n" +
       `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} names must be simple identifiers without paths.\n\n` +
       `To see all available ${entityType}s, run: ${listCmd}`
     );
@@ -121,10 +121,10 @@ export function validateScriptContent(script: string): void {
   for (const { pattern, description } of dangerousPatterns) {
     if (pattern.test(script)) {
       throw new Error(
-        `Security check failed: the downloaded script contains a dangerous pattern.\n\n` +
+        "Security check failed: the downloaded script contains a dangerous pattern.\n\n" +
         `Pattern detected: ${description}\n\n` +
-        `This is unexpected and may indicate the file was tampered with or corrupted.\n` +
-        `Please report this at: https://github.com/OpenRouterTeam/spawn/issues`
+        "This is unexpected and may indicate the file was tampered with or corrupted.\n" +
+        "Please report this at: https://github.com/OpenRouterTeam/spawn/issues"
       );
     }
   }
@@ -177,14 +177,14 @@ export function validateConnectionIP(ip: string): void {
     // Additional check: ensure each octet is 0-255
     const octets = ip.split(".");
     const validOctets = octets.every((octet) => {
-      const num = parseInt(octet, 10);
+      const num = Number.parseInt(octet, 10);
       return num >= 0 && num <= 255;
     });
     if (!validOctets) {
       throw new Error(
         `Invalid connection IP address: "${ip}"\n\n` +
-        `IPv4 addresses must have octets in the range 0-255.\n\n` +
-        `Your spawn history file may be corrupted or tampered with.\n` +
+        "IPv4 addresses must have octets in the range 0-255.\n\n" +
+        "Your spawn history file may be corrupted or tampered with.\n" +
         `To fix: run 'spawn list --clear' to reset history`
       );
     }
@@ -204,7 +204,7 @@ export function validateConnectionIP(ip: string): void {
   throw new Error(
     `Invalid connection IP address: "${ip}"\n\n` +
     `Expected a valid IPv4 or IPv6 address, hostname, or one of: ${CONNECTION_SENTINELS.join(", ")}\n\n` +
-    `Your spawn history file may be corrupted or tampered with.\n` +
+    "Your spawn history file may be corrupted or tampered with.\n" +
     `To fix: run 'spawn list --clear' to reset history`
   );
 }
@@ -227,7 +227,7 @@ export function validateUsername(username: string): void {
   if (username.length > 32) {
     throw new Error(
       `Username is too long: "${username}" (${username.length} characters, maximum is 32)\n\n` +
-      `Your spawn history file may be corrupted or tampered with.\n` +
+      "Your spawn history file may be corrupted or tampered with.\n" +
       `To fix: run 'spawn list --clear' to reset history`
     );
   }
@@ -235,12 +235,12 @@ export function validateUsername(username: string): void {
   if (!USERNAME_PATTERN.test(username)) {
     throw new Error(
       `Invalid username: "${username}"\n\n` +
-      `Unix usernames must:\n` +
-      `  • Start with a lowercase letter or underscore\n` +
-      `  • Contain only lowercase letters, digits, underscores, hyphens\n` +
-      `  • Optionally end with $ (for system accounts)\n\n` +
-      `Examples of valid usernames: root, ubuntu, user-123, _system\n\n` +
-      `Your spawn history file may be corrupted or tampered with.\n` +
+      "Unix usernames must:\n" +
+      "  • Start with a lowercase letter or underscore\n" +
+      "  • Contain only lowercase letters, digits, underscores, hyphens\n" +
+      "  • Optionally end with $ (for system accounts)\n\n" +
+      "Examples of valid usernames: root, ubuntu, user-123, _system\n\n" +
+      "Your spawn history file may be corrupted or tampered with.\n" +
       `To fix: run 'spawn list --clear' to reset history`
     );
   }
@@ -264,7 +264,7 @@ export function validateServerIdentifier(id: string): void {
   if (id.length > 128) {
     throw new Error(
       `Server identifier is too long: "${id}" (${id.length} characters, maximum is 128)\n\n` +
-      `Your spawn history file may be corrupted or tampered with.\n` +
+      "Your spawn history file may be corrupted or tampered with.\n" +
       `To fix: run 'spawn list --clear' to reset history`
     );
   }
@@ -273,8 +273,8 @@ export function validateServerIdentifier(id: string): void {
   if (id.includes("..") || id.startsWith("/") || id.startsWith("\\")) {
     throw new Error(
       `Invalid server identifier: "${id}"\n\n` +
-      `Server identifiers cannot contain path-like patterns (/, \\, ..)\n\n` +
-      `Your spawn history file may be corrupted or tampered with.\n` +
+      "Server identifiers cannot contain path-like patterns (/, \\, ..)\n\n" +
+      "Your spawn history file may be corrupted or tampered with.\n" +
       `To fix: run 'spawn list --clear' to reset history`
     );
   }
@@ -285,10 +285,10 @@ export function validateServerIdentifier(id: string): void {
   if (!serverIdPattern.test(id)) {
     throw new Error(
       `Invalid server identifier: "${id}"\n\n` +
-      `Server identifiers can only contain:\n` +
-      `  • Letters and digits (a-z, A-Z, 0-9)\n` +
-      `  • Hyphens (-), underscores (_), dots (.)\n\n` +
-      `Your spawn history file may be corrupted or tampered with.\n` +
+      "Server identifiers can only contain:\n" +
+      "  • Letters and digits (a-z, A-Z, 0-9)\n" +
+      "  • Hyphens (-), underscores (_), dots (.)\n\n" +
+      "Your spawn history file may be corrupted or tampered with.\n" +
       `To fix: run 'spawn list --clear' to reset history`
     );
   }
@@ -313,7 +313,7 @@ export function validateMetadataValue(value: string, fieldName: string): void {
   if (value.length > 128) {
     throw new Error(
       `${fieldName} is too long: "${value}" (${value.length} characters, maximum is 128)\n\n` +
-      `Your spawn history file may be corrupted or tampered with.\n` +
+      "Your spawn history file may be corrupted or tampered with.\n" +
       `To fix: run 'spawn list --clear' to reset history`
     );
   }
@@ -323,7 +323,7 @@ export function validateMetadataValue(value: string, fieldName: string): void {
     throw new Error(
       `Invalid ${fieldName}: "${value}"\n\n` +
       `${fieldName} can only contain letters, digits, hyphens, underscores, and dots.\n\n` +
-      `Your spawn history file may be corrupted or tampered with.\n` +
+      "Your spawn history file may be corrupted or tampered with.\n" +
       `To fix: run 'spawn list --clear' to reset history`
     );
   }
@@ -375,10 +375,10 @@ export function validatePromptFilePath(filePath: string): void {
       throw new Error(
         `Security check failed: cannot use '${filePath}' as a prompt file.\n\n` +
         `This path points to ${description}.\n` +
-        `Prompt contents are sent to the agent and may be logged or stored remotely.\n\n` +
-        `For security, use a plain text file instead:\n` +
+        "Prompt contents are sent to the agent and may be logged or stored remotely.\n\n" +
+        "For security, use a plain text file instead:\n" +
         `  1. Create a new file: echo "Your instructions here" > prompt.txt\n` +
-        `  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt`
+        "  2. Use it: spawn <agent> <cloud> --prompt-file prompt.txt"
       );
     }
   }
@@ -395,8 +395,8 @@ export function validatePromptFileStats(filePath: string, stats: { isFile: () =>
   if (!stats.isFile()) {
     throw new Error(
       `Cannot read prompt: '${filePath}' is not a regular file.\n\n` +
-      `The path points to a directory, device, or other non-file object.\n` +
-      `Provide a path to a text file containing your prompt.`
+      "The path points to a directory, device, or other non-file object.\n" +
+      "Provide a path to a text file containing your prompt."
     );
   }
 
@@ -404,18 +404,18 @@ export function validatePromptFileStats(filePath: string, stats: { isFile: () =>
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
     throw new Error(
       `Prompt file is too large: ${sizeMB}MB (maximum is 1MB).\n\n` +
-      `How to fix:\n` +
-      `  • Use a shorter, more focused prompt\n` +
-      `  • Break the work into multiple smaller tasks\n` +
-      `  • Remove unnecessary context or examples`
+      "How to fix:\n" +
+      "  • Use a shorter, more focused prompt\n" +
+      "  • Break the work into multiple smaller tasks\n" +
+      "  • Remove unnecessary context or examples"
     );
   }
 
   if (stats.size === 0) {
     throw new Error(
       `Prompt file is empty: ${filePath}\n\n` +
-      `The file exists but contains no text.\n` +
-      `Add your instructions to the file and try again.`
+      "The file exists but contains no text.\n" +
+      "Add your instructions to the file and try again."
     );
   }
 }
@@ -444,10 +444,10 @@ export function validatePrompt(prompt: string): void {
     const lengthKB = (prompt.length / 1024).toFixed(1);
     throw new Error(
       `Your prompt is too long (${lengthKB}KB, maximum is 10KB).\n\n` +
-      `For longer instructions, save them to a file instead:\n\n` +
+      "For longer instructions, save them to a file instead:\n\n" +
       `  1. Save your prompt: echo "Your long instructions..." > instructions.txt\n` +
-      `  2. Use the file: spawn <agent> <cloud> --prompt-file instructions.txt\n\n` +
-      `This also makes it easier to edit and reuse your prompts.`
+      "  2. Use the file: spawn <agent> <cloud> --prompt-file instructions.txt\n\n" +
+      "This also makes it easier to edit and reuse your prompts."
     );
   }
 
@@ -491,8 +491,8 @@ export function validatePrompt(prompt: string): void {
         `Issue: ${description}\n\n` +
         `${suggestion}\n\n` +
         `Important: You don't need to write shell commands in your prompt!\n` +
-        `Just describe what you want in plain English, and the agent will write the code for you.\n\n` +
-        `Example:\n` +
+        "Just describe what you want in plain English, and the agent will write the code for you.\n\n" +
+        "Example:\n" +
         `  Instead of: "Fix $(ls -la)"\n` +
         `  Write: "Fix the directory listing issues"`
       );
@@ -507,9 +507,9 @@ export function validatePrompt(prompt: string): void {
 
   if (hasDoubledOperators && !looksLikeComparison) {
     throw new Error(
-      `Your prompt contains shell operators that could be unsafe.\n\n` +
-      `Please describe what you want in plain English without shell syntax.\n\n` +
-      `Example:\n` +
+      "Your prompt contains shell operators that could be unsafe.\n\n" +
+      "Please describe what you want in plain English without shell syntax.\n\n" +
+      "Example:\n" +
       `  Instead of: "Build a web server && deploy it"\n` +
       `  Write: "Build a web server and deploy it"`
     );

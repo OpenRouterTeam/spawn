@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
-import { readFileSync, existsSync } from "fs";
-import { join, resolve } from "path";
-import type { Manifest, AgentDef, CloudDef } from "../manifest";
+import { readFileSync, existsSync } from "node:fs";
+import { join, resolve } from "node:path";
+import type { Manifest, } from "../manifest";
 
 /**
  * Manifest integrity tests.
@@ -224,7 +224,7 @@ describe("Manifest Integrity", () => {
 
       if (badScripts.length > 0) {
         throw new Error(
-          `Scripts missing shebang:\n` +
+          "Scripts missing shebang:\n" +
           badScripts.map((f) => `  - ${f}`).join("\n")
         );
       }

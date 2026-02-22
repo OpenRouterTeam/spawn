@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, mock, type spyOn } from "bun:test";
 import { loadManifest, type Manifest } from "../manifest";
 import { createConsoleMocks, restoreMocks } from "./test-helpers";
 

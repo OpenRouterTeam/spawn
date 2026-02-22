@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { getScriptFailureGuidance as _getScriptFailureGuidance, getSignalGuidance as _getSignalGuidance, getStatusDescription, buildRetryCommand } from "../commands";
+import { getScriptFailureGuidance as _getScriptFailureGuidance, getSignalGuidance as _getSignalGuidance, buildRetryCommand } from "../commands";
 
 /** Strip ANSI escape codes from a string so assertions work regardless of color support. */
 function stripAnsi(s: string): string {
@@ -347,7 +347,7 @@ describe("getScriptFailureGuidance", () => {
         expect(joined).toContain("spawn hetzner");
         expect(joined).toContain("setup");
       } finally {
-        if (savedOR !== undefined) process.env.OPENROUTER_API_KEY = savedOR;
+        if (savedOR !== undefined) { process.env.OPENROUTER_API_KEY = savedOR; }
       }
     });
 
@@ -369,7 +369,7 @@ describe("getScriptFailureGuidance", () => {
         expect(joined).toContain("spawn digitalocean");
         expect(joined).toContain("setup");
       } finally {
-        if (savedOR !== undefined) process.env.OPENROUTER_API_KEY = savedOR;
+        if (savedOR !== undefined) { process.env.OPENROUTER_API_KEY = savedOR; }
       }
     });
 

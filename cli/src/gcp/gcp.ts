@@ -1,6 +1,6 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import {
   logInfo,
   logWarn,
@@ -93,7 +93,7 @@ function getGcloudCmd(): string | null {
     "/snap/bin/gcloud",
   ];
   for (const p of paths) {
-    if (existsSync(p)) return p;
+    if (existsSync(p)) { return p; }
   }
   return null;
 }
@@ -178,7 +178,7 @@ export async function ensureGcloudCli(): Promise<void> {
   // Linux / macOS without brew: use Google's installer
   const proc = Bun.spawn(
     ["bash", "-c", [
-      `_gcp_tmp=$(mktemp -d)`,
+      "_gcp_tmp=$(mktemp -d)",
       `curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" -o "$_gcp_tmp/gcloud.tar.gz"`,
       `tar -xzf "$_gcp_tmp/gcloud.tar.gz" -C "$HOME"`,
       `"$HOME/google-cloud-sdk/install.sh" --quiet --path-update true`,
@@ -215,7 +215,7 @@ export async function authenticate(): Promise<void> {
   ]);
   const activeAccount = result.stdout.split("\n")[0]?.trim();
 
-  if (activeAccount && activeAccount.includes("@")) {
+  if (activeAccount?.includes("@")) {
     logInfo(`Authenticated as: ${activeAccount}`);
     return;
   }
@@ -243,7 +243,7 @@ export async function resolveProject(): Promise<void> {
   // 2. gcloud config
   const configResult = gcloudSync(["config", "get-value", "project"]);
   let project = configResult.stdout;
-  if (project === "(unset)") project = "";
+  if (project === "(unset)") { project = ""; }
 
   // 3. Confirm or pick
   if (project && process.env.SPAWN_NON_INTERACTIVE !== "1") {
@@ -354,7 +354,7 @@ function ensureSshKey(): string {
 // ─── Username ───────────────────────────────────────────────────────────────
 
 function resolveUsername(): string {
-  if (gcpUsername) return gcpUsername;
+  if (gcpUsername) { return gcpUsername; }
   const result = Bun.spawnSync(["whoami"], { stdio: ["ignore", "pipe", "ignore"] });
   const username = new TextDecoder().decode(result.stdout).trim();
   if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
@@ -384,7 +384,7 @@ export async function getServerName(): Promise<string> {
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) { return; }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {
@@ -417,7 +417,7 @@ function getStartupScript(username: string, tier: CloudInitTier = "full"): strin
     lines.push(
       "# Install Node.js 22 via n",
       `su - "${username}" -c '${NODE_INSTALL_CMD}'`,
-      `# Install Claude Code as the login user`,
+      "# Install Claude Code as the login user",
       `su - "${username}" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true`,
       "# Configure npm global prefix",
       `su - "${username}" -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'`,
@@ -425,7 +425,7 @@ function getStartupScript(username: string, tier: CloudInitTier = "full"): strin
   }
   if (needsBun(tier)) {
     lines.push(
-      `# Install Bun as the login user`,
+      "# Install Bun as the login user",
       `su - "${username}" -c 'curl -fsSL https://bun.sh/install | bash' || true`,
       `ln -sf /home/${username}/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true`,
     );
@@ -486,7 +486,7 @@ export async function createInstance(
 
   if (result.exitCode !== 0) {
     logError("Failed to create GCP instance");
-    if (result.stderr) logError(`gcloud error: ${result.stderr}`);
+    if (result.stderr) { logError(`gcloud error: ${result.stderr}`); }
     logWarn("Common issues:");
     logWarn("  - Billing not enabled (enable at https://console.cloud.google.com/billing)");
     logWarn("  - Compute Engine API not enabled (enable at https://console.cloud.google.com/apis)");
@@ -512,8 +512,8 @@ export async function createInstance(
   // Save connection info
   const dir = `${process.env.HOME}/.spawn`;
   mkdirSync(dir, { recursive: true });
-  const zoneEscaped = jsonEscape(zone);
-  const projectEscaped = jsonEscape(gcpProject);
+  const _zoneEscaped = jsonEscape(zone);
+  const _projectEscaped = jsonEscape(gcpProject);
   const json = JSON.stringify({
     ip: gcpServerIp,
     user: username,
@@ -610,21 +610,21 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
   clearTimeout(timer);
-  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
   return stdout.trim();
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
   const username = resolveUsername();
   // Expand $HOME on remote side
-  const expandedPath = remotePath.replace(/^\$HOME/, `~`);
+  const expandedPath = remotePath.replace(/^\$HOME/, "~");
 
   const proc = Bun.spawn(
     ["scp", ...SSH_OPTS.split(" "), localPath, `${username}@${gcpServerIp}:${expandedPath}`],
     { stdio: ["ignore", "inherit", "inherit"], env: process.env },
   );
   const exitCode = await proc.exited;
-  if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
+  if (exitCode !== 0) { throw new Error(`upload_file failed for ${remotePath}`); }
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
@@ -668,7 +668,7 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
-      if (attempt < maxAttempts) await sleep(sleepSec * 1000);
+      if (attempt < maxAttempts) { await sleep(sleepSec * 1000); }
     }
   }
   logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);

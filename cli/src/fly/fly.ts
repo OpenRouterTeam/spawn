@@ -1,6 +1,6 @@
 // fly/lib/fly.ts — Core Fly.io provider: API, auth, orgs, provisioning, execution
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import {
   logInfo,
   logWarn,
@@ -106,7 +106,7 @@ async function flyApi(
       }
       return text;
     } catch (err) {
-      if (attempt >= maxRetries) throw err;
+      if (attempt >= maxRetries) { throw err; }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
       await sleep(interval * 1000);
       interval = Math.min(interval * 2, 30);
@@ -145,7 +145,7 @@ function getCmd(): string | null {
   const flyBin = `${process.env.HOME}/.fly/bin`;
   for (const name of ["fly", "flyctl"]) {
     const fullPath = `${flyBin}/${name}`;
-    if (existsSync(fullPath)) return fullPath;
+    if (existsSync(fullPath)) { return fullPath; }
   }
   return null;
 }
@@ -161,7 +161,7 @@ export function sanitizeFlyToken(raw: string): string {
     // Macaroon token — may have comma-separated discharge tokens (fm2_xxx,fm2_yyy,fo1_zzz).
     // Extract from the first fm2_ to end-of-string, preserving all segments.
     const m = t.match(/(fm2_\S+)/);
-    if (m) t = "FlyV1 " + m[1];
+    if (m) { t = "FlyV1 " + m[1]; }
   } else if (t.startsWith("m2.")) {
     t = "FlyV1 " + t;
   }
@@ -171,11 +171,11 @@ export function sanitizeFlyToken(raw: string): string {
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testFlyToken(): Promise<boolean> {
-  if (!flyApiToken) return false;
+  if (!flyApiToken) { return false; }
   try {
     const org = flyOrg || "personal";
     const resp = await flyApi("GET", `/apps?org_slug=${org}`, undefined, 1);
-    if (!hasError(resp)) return true;
+    if (!hasError(resp)) { return true; }
   } catch {
     // fall through
   }
@@ -190,7 +190,7 @@ async function testFlyToken(): Promise<boolean> {
     });
     if (resp.ok) {
       const text = await resp.text();
-      if (text && !hasError(text)) return true;
+      if (text && !hasError(text)) { return true; }
     }
   } catch {
     // fall through
@@ -226,9 +226,9 @@ function loadTokenFromConfig(): string | null {
       readFileSync(FLY_CONFIG_PATH, "utf-8"),
     );
     const token = data.api_key || data.token || "";
-    if (!token) return null;
+    if (!token) { return null; }
     // Security: validate token chars
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) return null;
+    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) { return null; }
     return token;
   } catch {
     return null;
@@ -248,10 +248,10 @@ export function saveVmConnection(
   const dir = `${process.env.HOME}/.spawn`;
   mkdirSync(dir, { recursive: true });
   const json: Record<string, string> = { ip, user };
-  if (serverId) json.server_id = serverId;
-  if (serverName) json.server_name = serverName;
-  if (cloud) json.cloud = cloud;
-  if (launchCmd) json.launch_cmd = launchCmd;
+  if (serverId) { json.server_id = serverId; }
+  if (serverName) { json.server_name = serverName; }
+  if (cloud) { json.cloud = cloud; }
+  if (launchCmd) { json.launch_cmd = launchCmd; }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -313,16 +313,16 @@ function extractTokenFromCli(flyCmd: string, args: string[]): string {
     for (const output of [stdout, stderr]) {
       for (const line of output.split("\n")) {
         const cleaned = line.replace(/\x1b\[[0-9;]*m/g, "").trim();
-        if (!cleaned) continue;
+        if (!cleaned) { continue; }
         // Match "FlyV1 fm2_..." (the standard output format)
-        if (/^FlyV1\s+\S+/.test(cleaned)) return cleaned;
+        if (/^FlyV1\s+\S+/.test(cleaned)) { return cleaned; }
         // Match bare macaroon tokens: fm2_..., m2....
-        if (/^(fm2_|m2\.)\S+/.test(cleaned)) return cleaned;
+        if (/^(fm2_|m2\.)\S+/.test(cleaned)) { return cleaned; }
         // Skip deprecation notices, help text, error messages
-        if (/deprecated|command|usage|error|failed|help|available|flags/i.test(cleaned)) continue;
-        if (cleaned.startsWith("-") || cleaned.startsWith("The ") || cleaned.startsWith("Use ")) continue;
+        if (/deprecated|command|usage|error|failed|help|available|flags/i.test(cleaned)) { continue; }
+        if (cleaned.startsWith("-") || cleaned.startsWith("The ") || cleaned.startsWith("Use ")) { continue; }
         // A long alphanumeric string is likely a token
-        if (/^[a-zA-Z0-9_.,+/=: -]{40,}$/.test(cleaned)) return cleaned;
+        if (/^[a-zA-Z0-9_.,+/=: -]{40,}$/.test(cleaned)) { return cleaned; }
       }
     }
   } catch {
@@ -415,7 +415,7 @@ export async function ensureFlyToken(): Promise<void> {
   logWarn("Get a token from: https://fly.io/dashboard -> Tokens");
   logWarn("Or run: fly tokens create org");
   const token = await prompt("Enter your Fly.io API token: ");
-  if (!token) throw new Error("No token provided");
+  if (!token) { throw new Error("No token provided"); }
   flyApiToken = sanitizeFlyToken(token);
   if (!(await testFlyToken())) {
     logError("Token is invalid");
@@ -436,7 +436,7 @@ interface OrgEntry {
 
 function parseOrgsJson(json: string): OrgEntry[] {
   const data = parseJson(json);
-  if (!data) return [];
+  if (!data) { return []; }
 
   // Handle different org response formats
   let orgs: any[] = [];
@@ -477,7 +477,7 @@ async function listOrgs(): Promise<OrgEntry[]> {
       const json = new TextDecoder().decode(proc.stdout).trim();
       if (json) {
         const orgs = parseOrgsJson(json);
-        if (orgs.length > 0) return orgs;
+        if (orgs.length > 0) { return orgs; }
       }
     } catch {
       // fall through
@@ -485,7 +485,7 @@ async function listOrgs(): Promise<OrgEntry[]> {
   }
 
   // 2. Fall back to GraphQL
-  if (!flyApiToken) return [];
+  if (!flyApiToken) { return []; }
   const authHeader = flyApiToken.startsWith("FlyV1 ")
     ? flyApiToken
     : `Bearer ${flyApiToken}`;
@@ -502,7 +502,7 @@ async function listOrgs(): Promise<OrgEntry[]> {
     });
     const json = await resp.text();
     const orgs = parseOrgsJson(json);
-    if (orgs.length > 0) return orgs;
+    if (orgs.length > 0) { return orgs; }
   } catch {
     // fall through
   }
@@ -624,7 +624,7 @@ async function waitForMachineStart(
       return;
     }
     if (attempt < retries) {
-      logWarn(`Machine not ready yet, retrying...`);
+      logWarn("Machine not ready yet, retrying...");
       continue;
     }
     const data = parseJson(resp);
@@ -669,7 +669,7 @@ async function createVolume(
 export async function listVolumes(appName: string): Promise<Array<{ id: string; name: string; size_gb: number }>> {
   const resp = await flyApi("GET", `/apps/${appName}/volumes`);
   const data = parseJson(resp);
-  if (!Array.isArray(data)) return [];
+  if (!Array.isArray(data)) { return []; }
   return data
     .filter((v: any) => v.id)
     .map((v: any) => ({
@@ -771,7 +771,7 @@ export async function runServerCapture(
   try { proc.stdin!.end(); } catch { /* already closed */ }
   clearTimeout(timer);
 
-  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
   return stdout.trim();
 }
 
@@ -792,7 +792,7 @@ export async function uploadFile(
   );
   const exitCode = await proc.exited;
   try { proc.stdin!.end(); } catch { /* already closed */ }
-  if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
+  if (exitCode !== 0) { throw new Error(`upload_file failed for ${remotePath}`); }
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
@@ -838,7 +838,7 @@ export async function runWithRetry(
       return;
     } catch {
       logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
-      if (attempt < maxAttempts) await sleep(sleepSec * 1000);
+      if (attempt < maxAttempts) { await sleep(sleepSec * 1000); }
     }
   }
   logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);
@@ -874,7 +874,7 @@ export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<vo
     `echo "==> Setting up workspace volume..."`,
     `if [ -d /data ]; then mkdir -p /data/work && ln -sf /data/work /root/work && echo 'cd /root/work 2>/dev/null' >> ~/.bashrc; fi`,
     `echo "==> Installing base packages..."`,
-    `export DEBIAN_FRONTEND=noninteractive`,
+    "export DEBIAN_FRONTEND=noninteractive",
     `apt-get update -y && apt-get install -y --no-install-recommends ${packages.join(" ")} || true`,
     ...(needsNode(tier) ? [
       `echo "==> Installing Node.js 22..."`,
@@ -915,7 +915,7 @@ export async function getServerName(): Promise<string> {
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) { return; }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {

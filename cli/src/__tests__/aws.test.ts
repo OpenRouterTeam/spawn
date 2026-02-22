@@ -4,7 +4,6 @@ import {
   BUNDLES,
   DEFAULT_BUNDLE,
 } from "../aws/aws";
-import type { Bundle } from "../aws/aws";
 
 import { resolveAgent, agents } from "../aws/agents";
 import { generateEnvConfig } from "../shared/agents";

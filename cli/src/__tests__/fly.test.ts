@@ -1,11 +1,7 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, } from "bun:test";
 
 // Import modules under test — these are pure functions, no side effects
 import {
-  logInfo,
-  logWarn,
-  logError,
-  logStep,
   jsonEscape,
   validateServerName,
   validateRegionName,
@@ -14,7 +10,6 @@ import {
 } from "../shared/ui";
 
 import { sanitizeFlyToken, FLY_VM_TIERS, DEFAULT_VM_TIER } from "../fly/fly";
-import type { ServerOptions } from "../fly/fly";
 
 import { generateEnvConfig, resolveAgent, agents } from "../fly/agents";
 

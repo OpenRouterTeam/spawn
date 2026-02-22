@@ -1,6 +1,6 @@
 // daytona/daytona.ts — Core Daytona provider: API, SSH, provisioning, execution
 
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import {
   logInfo,
   logWarn,
@@ -76,7 +76,7 @@ async function daytonaApi(
       }
       return text;
     } catch (err) {
-      if (attempt >= maxRetries) throw err;
+      if (attempt >= maxRetries) { throw err; }
       logWarn(`API request failed (attempt ${attempt}/${maxRetries}), retrying...`);
       await sleep(interval * 1000);
       interval = Math.min(interval * 2, 30);
@@ -86,12 +86,12 @@ async function daytonaApi(
 }
 
 function hasApiError(text: string): boolean {
-  return /\"statusCode\"\s*:\s*4|\"unauthorized\"|\"forbidden\"/i.test(text);
+  return /"statusCode"\s*:\s*4|"unauthorized"|"forbidden"/i.test(text);
 }
 
 function extractApiError(text: string, fallback = "Unknown error"): string {
   const data = parseJson(text);
-  if (!data) return fallback;
+  if (!data) { return fallback; }
   return data.message || data.error || data.detail || fallback;
 }
 
@@ -114,8 +114,8 @@ function loadTokenFromConfig(): string | null {
   try {
     const data = JSON.parse(readFileSync(DAYTONA_CONFIG_PATH, "utf-8"));
     const token = data.api_key || data.token || "";
-    if (!token) return null;
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) return null;
+    if (!token) { return null; }
+    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) { return null; }
     return token;
   } catch {
     return null;
@@ -123,10 +123,10 @@ function loadTokenFromConfig(): string | null {
 }
 
 async function testDaytonaToken(): Promise<boolean> {
-  if (!daytonaApiKey) return false;
+  if (!daytonaApiKey) { return false; }
   try {
     const resp = await daytonaApi("GET", "/sandbox?page=1&limit=1", undefined, 1);
-    if (hasApiError(resp)) return false;
+    if (hasApiError(resp)) { return false; }
     return true;
   } catch {
     return false;
@@ -162,7 +162,7 @@ export async function ensureDaytonaToken(): Promise<void> {
   logStep("Manual token entry");
   logWarn("Get your API key from: https://app.daytona.io/dashboard/keys");
   const token = await prompt("Enter your Daytona API key: ");
-  if (!token) throw new Error("No token provided");
+  if (!token) { throw new Error("No token provided"); }
   daytonaApiKey = token.trim();
   if (!(await testDaytonaToken())) {
     logError("Token is invalid");
@@ -186,10 +186,10 @@ function saveVmConnection(
   const dir = `${process.env.HOME}/.spawn`;
   mkdirSync(dir, { recursive: true });
   const json: Record<string, string> = { ip, user };
-  if (serverId) json.server_id = serverId;
-  if (serverName) json.server_name = serverName;
-  if (cloud) json.cloud = cloud;
-  if (launchCmd) json.launch_cmd = launchCmd;
+  if (serverId) { json.server_id = serverId; }
+  if (serverName) { json.server_name = serverName; }
+  if (cloud) { json.cloud = cloud; }
+  if (launchCmd) { json.launch_cmd = launchCmd; }
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
 }
 
@@ -259,9 +259,9 @@ async function setupSshAccess(): Promise<void> {
 }
 
 export async function createServer(name: string): Promise<void> {
-  const cpu = parseInt(process.env.DAYTONA_CPU || "2", 10);
-  const memory = parseInt(process.env.DAYTONA_MEMORY || "4", 10);
-  const disk = parseInt(process.env.DAYTONA_DISK || "30", 10);
+  const cpu = Number.parseInt(process.env.DAYTONA_CPU || "2", 10);
+  const memory = Number.parseInt(process.env.DAYTONA_MEMORY || "4", 10);
+  const disk = Number.parseInt(process.env.DAYTONA_DISK || "30", 10);
 
   logStep(`Creating Daytona sandbox '${name}' (${cpu} vCPU, ${memory} GiB RAM, ${disk} GiB disk)...`);
 
@@ -378,7 +378,7 @@ export async function runServerCapture(cmd: string): Promise<string> {
 
   await sleep(1000);
 
-  if (exitCode !== 0) throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  if (exitCode !== 0) { throw new Error(`run_server_capture failed (exit ${exitCode})`); }
   return stdout.trim();
 }
 
@@ -420,7 +420,7 @@ export async function uploadFile(
 
   await sleep(1000);
 
-  if (exitCode !== 0) throw new Error(`upload_file failed for ${remotePath}`);
+  if (exitCode !== 0) { throw new Error(`upload_file failed for ${remotePath}`); }
 }
 
 export async function interactiveSession(cmd: string): Promise<number> {
@@ -482,15 +482,15 @@ export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<vo
   const packages = getPackagesForTier(tier);
   logStep("Installing base tools in sandbox...");
   const parts = [
-    `export DEBIAN_FRONTEND=noninteractive`,
-    `apt-get update -y`,
+    "export DEBIAN_FRONTEND=noninteractive",
+    "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
   ];
   if (needsNode(tier)) {
     parts.push(NODE_INSTALL_CMD);
   }
   if (needsBun(tier)) {
-    parts.push(`curl -fsSL https://bun.sh/install | bash`);
+    parts.push("curl -fsSL https://bun.sh/install | bash");
   }
   parts.push(
     `echo 'export PATH="\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}"' >> ~/.bashrc`,
@@ -524,7 +524,7 @@ export async function getServerName(): Promise<string> {
 }
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) { return; }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {

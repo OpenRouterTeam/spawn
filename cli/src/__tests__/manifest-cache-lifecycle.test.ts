@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { existsSync, writeFileSync, mkdirSync, rmSync, utimesSync } from "fs";
-import { join } from "path";
+import { existsSync, writeFileSync, mkdirSync, rmSync, utimesSync } from "node:fs";
+import { join } from "node:path";
 import {
   loadManifest,
   agentKeys,
@@ -41,7 +41,7 @@ const mockManifest = createMockManifest();
 // or first falsy value, NOT a boolean. Tests use toBeTruthy/toBeFalsy.
 
 function isValidManifest(data: any): data is Manifest {
-  return data && data.agents && data.clouds && data.matrix;
+  return data?.agents && data.clouds && data.matrix;
 }
 
 describe("Manifest Cache Lifecycle", () => {

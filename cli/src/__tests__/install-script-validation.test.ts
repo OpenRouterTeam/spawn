@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
-import { readFileSync, existsSync } from "fs";
-import { resolve, join } from "path";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, join } from "node:path";
 
 /**
  * Validation tests for cli/install.sh.

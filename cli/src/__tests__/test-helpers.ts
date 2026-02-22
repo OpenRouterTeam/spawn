@@ -1,7 +1,7 @@
 import { spyOn, mock } from "bun:test";
-import { existsSync, mkdirSync, rmSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { Manifest } from "../manifest";
 
 // ── Mock Data ──────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ export function createProcessExitMock() {
 }
 
 export function restoreMocks(...mocks: Array<{ mockRestore?: () => void } | undefined>) {
-  mocks.forEach(mock => mock?.mockRestore());
+  mocks.forEach(mock => { mock?.mockRestore(); });
 }
 
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ export function mockSuccessfulFetch(data: any) {
   }) as any);
 }
 
-export function mockFailedFetch(error: string = "Network error") {
+export function mockFailedFetch(error = "Network error") {
   return mock(() => Promise.reject(new Error(error)));
 }
 

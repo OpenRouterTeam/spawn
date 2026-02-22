@@ -23,9 +23,9 @@
  * - Subprocesses (execSync, spawnSync) inherit the sandboxed environment
  */
 
-import { mkdirSync, readdirSync, rmSync, mkdtempSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import { mkdirSync, readdirSync, rmSync, mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 // ── Stray test file cleanup ──────────────────────────────────────────────────
 //
@@ -39,7 +39,7 @@ import { tmpdir } from "os";
 const REAL_HOME = process.env.HOME ?? "";
 
 function cleanupStrayTestFiles(): void {
-  if (!REAL_HOME) return;
+  if (!REAL_HOME) { return; }
   try {
     for (const f of readdirSync(REAL_HOME)) {
       if (f.startsWith("subprocess-test-") && f.endsWith(".txt")) {

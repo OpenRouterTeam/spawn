@@ -7,8 +7,6 @@ import {
   countImplemented,
   type Manifest,
 } from "../manifest";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
-import { join } from "path";
 import {
   createMockManifest,
   setupTestEnvironment,

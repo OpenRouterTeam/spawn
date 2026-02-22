@@ -13,7 +13,7 @@ import {
 // ─── Key Validation ──────────────────────────────────────────────────────────
 
 export async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
-  if (!apiKey) return false;
+  if (!apiKey) { return false; }
   if (process.env.SPAWN_SKIP_API_VALIDATION || process.env.BUN_ENV === "test" || process.env.NODE_ENV === "test") {
     return true;
   }
@@ -23,7 +23,7 @@ export async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(10_000),
     });
-    if (resp.status === 200) return true;
+    if (resp.status === 200) { return true; }
     if (resp.status === 401 || resp.status === 403) {
       logError("OpenRouter API key is invalid or expired");
       logError("Get a new key at: https://openrouter.ai/settings/keys");
@@ -43,7 +43,7 @@ function generateCsrfState(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-const OAUTH_CSS = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}`;
+const OAUTH_CSS = "*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;color:#090a0b}@media(prefers-color-scheme:dark){body{background:#090a0b;color:#fafafa}}.card{text-align:center;max-width:400px;padding:2rem}.icon{font-size:2.5rem;margin-bottom:1rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:.5rem}p{font-size:.875rem;color:#6b7280}@media(prefers-color-scheme:dark){p{color:#9ca3af}}";
 
 const SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>Authentication Successful</h1><p>You can close this tab and return to your terminal.</p></div><script>setTimeout(function(){try{window.close()}catch(e){}},3000)</script></body></html>`;
 
@@ -105,7 +105,6 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
       actualPort = p;
       break;
     } catch {
-      continue;
     }
   }
 
@@ -118,8 +117,8 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
 
   const callbackUrl = `http://localhost:${actualPort}/callback`;
   let authUrl = `https://openrouter.ai/auth?callback_url=${callbackUrl}&state=${csrfState}`;
-  if (agentSlug) authUrl += `&spawn_agent=${encodeURIComponent(agentSlug)}`;
-  if (cloudSlug) authUrl += `&spawn_cloud=${encodeURIComponent(cloudSlug)}`;
+  if (agentSlug) { authUrl += `&spawn_agent=${encodeURIComponent(agentSlug)}`; }
+  if (cloudSlug) { authUrl += `&spawn_cloud=${encodeURIComponent(cloudSlug)}`; }
   logStep("Opening browser to authenticate with OpenRouter...");
   openBrowser(authUrl);
 
@@ -155,7 +154,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
     }
     logError("Failed to exchange OAuth code for API key");
     return null;
-  } catch (err) {
+  } catch (_err) {
     logError("Failed to contact OpenRouter API");
     return null;
   }
@@ -176,7 +175,7 @@ async function promptAndValidateApiKey(): Promise<string | null> {
     if (!/^sk-or-v1-[a-f0-9]{64}$/.test(key)) {
       logWarn("This doesn't look like an OpenRouter API key (expected format: sk-or-v1-...)");
       const confirm = await prompt("Use this key anyway? (y/N): ");
-      if (!/^[Yy]$/.test(confirm)) continue;
+      if (!/^[Yy]$/.test(confirm)) { continue; }
     }
     return key;
   }

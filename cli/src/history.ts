@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
-import { join, resolve, isAbsolute } from "path";
-import { homedir } from "os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { join, resolve, isAbsolute } from "node:path";
+import { homedir } from "node:os";
 import { validateConnectionIP, validateUsername, validateServerIdentifier } from "./security.js";
 
 export interface VMConnection {
@@ -29,12 +29,12 @@ export interface SpawnRecord {
  *  to prevent unintended file writes. */
 export function getSpawnDir(): string {
   const spawnHome = process.env.SPAWN_HOME;
-  if (!spawnHome) return join(homedir(), ".spawn");
+  if (!spawnHome) { return join(homedir(), ".spawn"); }
   // Require absolute path to prevent path traversal via relative paths
   if (!isAbsolute(spawnHome)) {
     throw new Error(
       `SPAWN_HOME must be an absolute path (got "${spawnHome}").\n` +
-      `Example: export SPAWN_HOME=/home/user/.spawn`
+      "Example: export SPAWN_HOME=/home/user/.spawn"
     );
   }
   // Resolve to canonical form (collapses .. segments)
@@ -47,7 +47,7 @@ export function getSpawnDir(): string {
   const userHome = homedir();
   if (!resolved.startsWith(userHome + "/") && resolved !== userHome) {
     throw new Error(
-      `SPAWN_HOME must be within your home directory.\n` +
+      "SPAWN_HOME must be within your home directory.\n" +
       `Got: ${resolved}\n` +
       `Home: ${userHome}`
     );
@@ -66,7 +66,7 @@ export function getConnectionPath(): string {
 
 export function loadHistory(): SpawnRecord[] {
   const path = getHistoryPath();
-  if (!existsSync(path)) return [];
+  if (!existsSync(path)) { return []; }
   try {
     const data = JSON.parse(readFileSync(path, "utf-8"));
     return Array.isArray(data) ? data : [];
@@ -93,7 +93,7 @@ export function saveSpawnRecord(record: SpawnRecord): void {
 
 export function clearHistory(): number {
   const path = getHistoryPath();
-  if (!existsSync(path)) return 0;
+  if (!existsSync(path)) { return 0; }
   const records = loadHistory();
   const count = records.length;
   if (count > 0) {
@@ -107,7 +107,7 @@ export function clearHistory(): number {
  *  This function merges that data into the history and persists it. */
 export function mergeLastConnection(): void {
   const connPath = getConnectionPath();
-  if (!existsSync(connPath)) return;
+  if (!existsSync(connPath)) { return; }
 
   try {
     const connData = JSON.parse(readFileSync(connPath, "utf-8")) as VMConnection;
@@ -158,9 +158,9 @@ export function markRecordDeleted(record: SpawnRecord): boolean {
       r.agent === record.agent &&
       r.cloud === record.cloud
   );
-  if (index < 0) return false;
+  if (index < 0) { return false; }
   const found = history[index];
-  if (!found.connection) return false;
+  if (!found.connection) { return false; }
   found.connection.deleted = true;
   found.connection.deleted_at = new Date().toISOString();
   writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
@@ -172,8 +172,7 @@ export function getActiveServers(): SpawnRecord[] {
   const records = loadHistory();
   return records.filter(
     (r) =>
-      r.connection &&
-      r.connection.cloud &&
+      r.connection?.cloud &&
       r.connection.cloud !== "local" &&
       !r.connection.deleted
   );

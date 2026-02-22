@@ -1,6 +1,6 @@
 // sprite/sprite.ts — Core Sprite provider: CLI installation, auth, provisioning, execution
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import {
   logInfo,
   logWarn,
@@ -14,7 +14,7 @@ import {
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
 
-const CONNECTIVITY_POLL_DELAY = parseInt(process.env.SPRITE_CONNECTIVITY_POLL_DELAY || "5", 10);
+const CONNECTIVITY_POLL_DELAY = Number.parseInt(process.env.SPRITE_CONNECTIVITY_POLL_DELAY || "5", 10);
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ async function spriteRetry<T>(
       lastError = err;
       const msg = err instanceof Error ? err.message : String(err);
 
-      if (attempt >= maxRetries) break;
+      if (attempt >= maxRetries) { break; }
 
       // Only retry on transient network errors
       if (/TLS handshake timeout|connection closed|connection reset|connection refused/i.test(msg)) {
@@ -90,7 +90,7 @@ function getSpriteCmd(): string | null {
     "/usr/bin/sprite",
   ];
   for (const p of commonPaths) {
-    if (existsSync(p)) return p;
+    if (existsSync(p)) { return p; }
   }
   return null;
 }
@@ -98,7 +98,7 @@ function getSpriteCmd(): string | null {
 // ─── Sprite CLI Installation ─────────────────────────────────────────────────
 
 export async function ensureSpriteCli(): Promise<void> {
-  let cmd = getSpriteCmd();
+  const cmd = getSpriteCmd();
   if (cmd) {
     // Log version if available
     const { stdout } = spawnSync([cmd, "version"]);
@@ -185,14 +185,14 @@ function detectOrg(output: string): void {
 }
 
 function orgFlags(): string[] {
-  if (spriteOrg) return ["-o", spriteOrg];
+  if (spriteOrg) { return ["-o", spriteOrg]; }
   return [];
 }
 
 // ─── Server Name ─────────────────────────────────────────────────────────────
 
 export async function promptSpawnName(): Promise<void> {
-  if (process.env.SPAWN_NAME_KEBAB) return;
+  if (process.env.SPAWN_NAME_KEBAB) { return; }
 
   let kebab: string;
   if (process.env.SPAWN_NAME) {
@@ -318,7 +318,7 @@ export async function setupShellEnvironment(): Promise<void> {
   // Switch bash to zsh if available
   try {
     await runSpriteSilent("command -v zsh");
-    const bashConfig = `# [spawn:bash]\nexec /usr/bin/zsh -l\n`;
+    const bashConfig = "# [spawn:bash]\nexec /usr/bin/zsh -l\n";
     const bashB64 = Buffer.from(bashConfig).toString("base64");
     await runSprite(`printf '%s' '${bashB64}' | base64 -d > ~/.bash_profile && printf '%s' '${bashB64}' | base64 -d > ~/.bashrc`);
   } catch {

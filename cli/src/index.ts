@@ -41,11 +41,11 @@ function handleError(err: unknown): never {
 function extractFlagValue(
   args: string[],
   flags: string[],
-  flagLabel: string,
+  _flagLabel: string,
   usageHint: string
 ): [string | undefined, string[]] {
   const idx = args.findIndex(arg => flags.includes(arg));
-  if (idx === -1) return [undefined, args];
+  if (idx === -1) { return [undefined, args]; }
 
   if (!args[idx + 1] || args[idx + 1].startsWith("-")) {
     console.error(pc.red(`Error: ${pc.bold(args[idx])} requires a value`));
@@ -95,7 +95,7 @@ function checkUnknownFlags(args: string[]): void {
     if ((arg.startsWith("--") || (arg.startsWith("-") && arg.length > 1 && !/^-\d/.test(arg))) && !KNOWN_FLAGS.has(arg)) {
       console.error(pc.red(`Unknown flag: ${pc.bold(arg)}`));
       console.error();
-      console.error(`  Supported flags:`);
+      console.error("  Supported flags:");
       console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
       console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
       console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
@@ -129,8 +129,8 @@ function showUnknownCommandError(name: string, manifest: { agents: Record<string
   console.error();
   if (agentMatch || cloudMatch) {
     const suggestions: string[] = [];
-    if (agentMatch) suggestions.push(`${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})`);
-    if (cloudMatch) suggestions.push(`${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})`);
+    if (agentMatch) { suggestions.push(`${pc.cyan(agentMatch)} (agent: ${manifest.agents[agentMatch].name})`); }
+    if (cloudMatch) { suggestions.push(`${pc.cyan(cloudMatch)} (cloud: ${manifest.clouds[cloudMatch].name})`); }
     console.error(`  Did you mean ${suggestions.join(" or ")}?`);
   }
   console.error();
@@ -180,7 +180,7 @@ async function handleDefaultCommand(agent: string, cloud: string | undefined, pr
   }
   if (dryRun) {
     console.error(pc.red("Error: --dry-run requires both <agent> and <cloud>"));
-    console.error(`\nUsage: ${pc.cyan(`spawn <agent> <cloud> --dry-run`)}`);
+    console.error(`\nUsage: ${pc.cyan("spawn <agent> <cloud> --dry-run")}`);
     process.exit(1);
   }
   if (prompt) {
@@ -205,12 +205,12 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
   try {
     const manifest = await loadManifest();
     const resolvedAgent = resolveAgentKey(manifest, agent);
-    if (!resolvedAgent) return;
+    if (!resolvedAgent) { return; }
 
     const clouds = cloudKeys(manifest).filter(
       (c: string) => manifest.matrix[`${c}/${resolvedAgent}`] === "implemented"
     );
-    if (clouds.length === 0) return;
+    if (clouds.length === 0) { return; }
 
     const agentName = manifest.agents[resolvedAgent].name;
     console.error(`\nAvailable clouds for ${pc.bold(agentName)}:`);
@@ -220,7 +220,7 @@ async function suggestCloudsForPrompt(agent: string): Promise<void> {
     if (clouds.length > 5) {
       console.error(`  Run ${pc.cyan(`spawn ${resolvedAgent}`)} to see all ${clouds.length} clouds.`);
     }
-  } catch (err) {
+  } catch (_err) {
     // Manifest unavailable — skip cloud suggestions
   }
 }
@@ -230,13 +230,13 @@ function handlePromptFileError(promptFile: string, err: unknown): never {
   const code = err && typeof err === "object" && "code" in err ? err.code : "";
   if (code === "ENOENT") {
     console.error(pc.red(`Prompt file not found: ${pc.bold(promptFile)}`));
-    console.error(`\nCheck the path and try again.`);
+    console.error("\nCheck the path and try again.");
   } else if (code === "EACCES") {
     console.error(pc.red(`Permission denied reading prompt file: ${pc.bold(promptFile)}`));
     console.error(`\nCheck file permissions: ${pc.cyan(`ls -la ${promptFile}`)}`);
   } else if (code === "EISDIR") {
     console.error(pc.red(`'${promptFile}' is a directory, not a file.`));
-    console.error(`\nProvide a path to a text file containing your prompt.`);
+    console.error("\nProvide a path to a text file containing your prompt.");
   } else {
     const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
     console.error(pc.red(`Error reading prompt file '${promptFile}': ${msg}`));
@@ -247,7 +247,7 @@ function handlePromptFileError(promptFile: string, err: unknown): never {
 /** Read and validate a prompt file, exiting on any error */
 async function readPromptFile(promptFile: string): Promise<string> {
   const { validatePromptFilePath, validatePromptFileStats } = await import("./security.js");
-  const { readFileSync, statSync } = await import("fs");
+  const { readFileSync, statSync } = await import("node:fs");
 
   try {
     validatePromptFilePath(promptFile);
@@ -296,7 +296,7 @@ async function resolvePrompt(args: string[]): Promise<[string | undefined, strin
 
   if (prompt && promptFile) {
     console.error(pc.red("Error: --prompt and --prompt-file cannot be used together"));
-    console.error(`\nUse one or the other:`);
+    console.error("\nUse one or the other:");
     console.error(`  ${pc.cyan('spawn <agent> <cloud> --prompt "your prompt here"')}`);
     console.error(`  ${pc.cyan("spawn <agent> <cloud> --prompt-file instructions.txt")}`);
     process.exit(1);
@@ -338,10 +338,10 @@ async function handleNoCommand(prompt: string | undefined, dryRun?: boolean): Pr
 }
 
 function formatCacheAge(seconds: number): string {
-  if (!isFinite(seconds)) return "no cache";
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (!Number.isFinite(seconds)) { return "no cache"; }
+  if (seconds < 60) { return "just now"; }
+  if (seconds < 3600) { return `${Math.floor(seconds / 60)}m ago`; }
+  if (seconds < 86400) { return `${Math.floor(seconds / 3600)}h ago`; }
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
@@ -354,7 +354,7 @@ function showVersion(): void {
   console.log(pc.dim(`  ${process.versions.bun ? "bun" : "node"} ${process.versions.bun ?? process.versions.node}  ${process.platform} ${process.arch}`));
   const age = getCacheAge();
   console.log(pc.dim(`  manifest cache: ${formatCacheAge(age)}`));
-  console.log(pc.dim(`  https://github.com/OpenRouterTeam/spawn`));
+  console.log(pc.dim("  https://github.com/OpenRouterTeam/spawn"));
   console.log(pc.dim(`  Run ${pc.cyan("spawn update")} to check for updates.`));
 }
 
@@ -513,7 +513,7 @@ async function dispatchCommand(cmd: string, filteredArgs: string[], prompt: stri
   if (VERB_ALIASES.has(cmd)) { await dispatchVerbAlias(cmd, filteredArgs, prompt, dryRun, debug, headless, outputFormat); return; }
 
   if (filteredArgs.length === 1 && cmd.includes("/")) {
-    if (await dispatchSlashNotation(cmd, prompt, dryRun, debug, headless, outputFormat)) return;
+    if (await dispatchSlashNotation(cmd, prompt, dryRun, debug, headless, outputFormat)) { return; }
   }
 
   warnExtraArgs(filteredArgs, 2);
@@ -544,20 +544,20 @@ async function main(): Promise<void> {
   // Extract --dry-run / -n boolean flag
   const dryRunIdx = filteredArgs.findIndex(a => a === "--dry-run" || a === "-n");
   const dryRun = dryRunIdx !== -1;
-  if (dryRun) filteredArgs.splice(dryRunIdx, 1);
+  if (dryRun) { filteredArgs.splice(dryRunIdx, 1); }
 
   // Extract --debug boolean flag
-  const debugIdx = filteredArgs.findIndex(a => a === "--debug");
+  const debugIdx = filteredArgs.indexOf("--debug");
   const debug = debugIdx !== -1;
-  if (debug) filteredArgs.splice(debugIdx, 1);
+  if (debug) { filteredArgs.splice(debugIdx, 1); }
 
   // Extract --headless boolean flag
-  const headlessIdx = filteredArgs.findIndex(a => a === "--headless");
+  const headlessIdx = filteredArgs.indexOf("--headless");
   const headless = headlessIdx !== -1;
-  if (headless) filteredArgs.splice(headlessIdx, 1);
+  if (headless) { filteredArgs.splice(headlessIdx, 1); }
 
   // Extract --output <format> flag
-  let [outputFormat, outputFilteredArgs] = extractFlagValue(
+  const [outputFormat, outputFilteredArgs] = extractFlagValue(
     filteredArgs,
     ["--output"],
     "output format",

@@ -288,7 +288,7 @@ describe("Script download and execution", () => {
   });
 
   it("should show troubleshooting info when download throws network error", async () => {
-    let callCount = 0;
+    const callCount = 0;
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
         return {
@@ -313,7 +313,7 @@ describe("Script download and execution", () => {
   });
 
   it("should use fallback URL when primary returns non-OK status", async () => {
-    let fetchedUrls: string[] = [];
+    const fetchedUrls: string[] = [];
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string") {
         fetchedUrls.push(url);
@@ -478,7 +478,7 @@ describe("Script download and execution", () => {
   });
 
   it("should show network error message when primary 500 and fallback 502", async () => {
-    let callIndex = 0;
+    const callIndex = 0;
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
         return {

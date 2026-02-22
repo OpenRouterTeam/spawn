@@ -7,10 +7,8 @@ import {
   countImplemented,
   type Manifest,
 } from "../manifest";
-import { mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
-import { join } from "path";
+import { mkdirSync, writeFileSync, } from "node:fs";
 import {
-  createMockManifest,
   setupTestEnvironment,
   teardownTestEnvironment,
   type TestEnvironment,

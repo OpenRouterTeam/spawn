@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
 
@@ -450,7 +450,7 @@ describe("cmdRun happy-path pipeline", () => {
 
     it("should handle prompts with special characters", async () => {
       const prompt = 'Fix the "login" page & add tests';
-      const checkScript = `#!/bin/bash\nset -eo pipefail\ntest -n "\$SPAWN_PROMPT"`;
+      const checkScript = `#!/bin/bash\nset -eo pipefail\ntest -n "$SPAWN_PROMPT"`;
       global.fetch = mockFetchForDownload({
         primaryOk: true,
         scriptContent: checkScript,

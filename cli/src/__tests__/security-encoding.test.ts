@@ -169,9 +169,9 @@ describe("stripDangerousKeys", () => {
   it("strips __proto__ from parsed JSON", () => {
     // JSON.parse produces an own-property __proto__ key (not inherited)
     const input = JSON.parse('{"agents":{},"clouds":{},"matrix":{},"__proto__":{"polluted":true}}');
-    expect(Object.prototype.hasOwnProperty.call(input, "__proto__")).toBe(true);
+    expect(Object.hasOwn(input, "__proto__")).toBe(true);
     const result = stripDangerousKeys(input);
-    expect(Object.prototype.hasOwnProperty.call(result, "__proto__")).toBe(false);
+    expect(Object.hasOwn(result, "__proto__")).toBe(false);
     expect(result.agents).toEqual({});
   });
 
