@@ -764,10 +764,10 @@ run_test() {
         return 0
     fi
 
-    # fly/ scripts use TypeScript (bun) with native fetch() for API calls.
-    # Fixture-based mock tests (which intercept curl) don't apply.
-    # Fly coverage comes from: bun test (44 tests) + fly failure mode tests (4 tests).
-    if [[ "$cloud" == "fly" && -z "${MOCK_ERROR_SCENARIO:-}" ]]; then
+    # TypeScript-based providers (fly, digitalocean) use bun with native fetch()
+    # for API calls. Fixture-based mock tests (which intercept curl) don't apply.
+    # Coverage comes from: bun test + failure mode tests.
+    if [[ ("$cloud" == "fly" || "$cloud" == "digitalocean") && -z "${MOCK_ERROR_SCENARIO:-}" ]]; then
         printf '%b\n' "  ${YELLOW}skip${NC} ${cloud}/${agent}.sh — TS provider (tested via bun test + failure modes)"
         SKIPPED=$((SKIPPED + 1))
         return 0
