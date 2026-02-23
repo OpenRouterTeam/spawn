@@ -349,14 +349,28 @@ refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
 
 ### EVERY Change Goes Through a PR — NO EXCEPTIONS
 
-**This is the #1 most important workflow rule.** If you edit ANY file — even CLAUDE.md itself, even a one-line typo fix — you MUST:
+**This is the #1 most important workflow rule.** Before editing ANY file, check your branch:
 
-1. **Create a branch BEFORE making changes** — `git checkout -b descriptive-branch-name`
-2. **Make your changes** on the branch
-3. **Commit immediately** after the first meaningful change
-4. **Open a draft PR right away** — `gh pr create --draft` after your first commit
-5. **Push incremental commits** as you work — small, frequent commits are better than one big one
-6. **When done: convert from draft, then merge** — `gh pr ready NUMBER && gh pr merge --squash NUMBER`
+```bash
+branch=$(git rev-parse --abbrev-ref HEAD)
+```
+
+**If you are on `main`** — create a branch FIRST, before touching any file:
+```bash
+git checkout -b descriptive-branch-name
+```
+
+**If you already have uncommitted changes on `main`** — stash, branch, unstash:
+```bash
+git stash && git checkout -b descriptive-branch-name && git stash pop
+```
+
+Then follow this workflow:
+1. **Make your changes** on the branch
+2. **Commit** after the first meaningful change
+3. **Push and open a draft PR** — `git push -u origin HEAD && gh pr create --draft`
+4. **Push incremental commits** as you work
+5. **When done: convert from draft, then merge** — `gh pr ready NUMBER && gh pr merge --squash NUMBER`
 
 **There is NO category of change exempt from this rule:**
 - CLAUDE.md edits → PR
