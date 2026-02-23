@@ -322,7 +322,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   return {
     claude: {
       name: "Claude Code",
-      cloudInitTier: "node",
+      cloudInitTier: "minimal",
       preProvision: promptGithubAuth,
       install: () => installClaudeCode(runner),
       envVars: (apiKey) => [
