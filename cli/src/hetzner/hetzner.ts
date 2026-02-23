@@ -17,7 +17,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
@@ -539,9 +539,8 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
     const child = spawn(
       "ssh",
       [
-        ...SSH_BASE_OPTS,
+        ...SSH_INTERACTIVE_OPTS,
         ...keyOpts,
-        "-t",
         `root@${serverIp}`,
         fullCmd,
       ],
