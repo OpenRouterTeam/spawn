@@ -21,6 +21,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
+import { getSpawnDir, getConnectionPath } from "../history.js";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 
@@ -863,7 +864,7 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
 // ─── Connection Tracking ────────────────────────────────────────────────────
 
 function saveVmConnection(ip: string, user: string, serverId: string, serverName: string, cloud: string): void {
-  const dir = `${process.env.HOME}/.spawn`;
+  const dir = getSpawnDir();
   mkdirSync(dir, {
     recursive: true,
   });
@@ -884,7 +885,7 @@ function saveVmConnection(ip: string, user: string, serverId: string, serverName
 }
 
 export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = `${process.env.HOME}/.spawn/last-connection.json`;
+  const connFile = getConnectionPath();
   try {
     const data = JSON.parse(readFileSync(connFile, "utf-8"));
     data.launch_cmd = launchCmd;

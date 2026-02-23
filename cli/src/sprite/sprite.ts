@@ -13,6 +13,7 @@ import {
   defaultSpawnName,
 } from "../shared/ui";
 import { sleep } from "../shared/ssh";
+import { getSpawnDir, getConnectionPath } from "../history.js";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
 
@@ -426,7 +427,7 @@ export async function setupShellEnvironment(): Promise<void> {
 // ─── Connection Tracking ─────────────────────────────────────────────────────
 
 export function saveVmConnection(): void {
-  const dir = `${process.env.HOME}/.spawn`;
+  const dir = getSpawnDir();
   mkdirSync(dir, {
     recursive: true,
   });
@@ -440,7 +441,7 @@ export function saveVmConnection(): void {
 }
 
 export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = `${process.env.HOME}/.spawn/last-connection.json`;
+  const connFile = getConnectionPath();
   try {
     const data = JSON.parse(readFileSync(connFile, "utf-8"));
     data.launch_cmd = launchCmd;

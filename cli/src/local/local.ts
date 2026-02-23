@@ -3,6 +3,7 @@
 import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { spawn } from "node:child_process";
+import { getSpawnDir, getConnectionPath } from "../history.js";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
 // ─── Connection Tracking ─────────────────────────────────────────────────────
 
 export function saveLocalConnection(): void {
-  const dir = `${process.env.HOME}/.spawn`;
+  const dir = getSpawnDir();
   mkdirSync(dir, {
     recursive: true,
   });
@@ -111,7 +112,7 @@ export function saveLocalConnection(): void {
 
 /** Save launch command to the last-connection.json file. */
 export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = `${process.env.HOME}/.spawn/last-connection.json`;
+  const connFile = getConnectionPath();
   try {
     const data = JSON.parse(readFileSync(connFile, "utf-8"));
     data.launch_cmd = launchCmd;

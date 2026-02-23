@@ -18,6 +18,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import { getSpawnDir, getConnectionPath } from "../history.js";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 
@@ -750,7 +751,7 @@ export async function createInstance(
   logInfo(`Instance created: IP=${gcpServerIp}`);
 
   // Save connection info
-  const dir = `${process.env.HOME}/.spawn`;
+  const dir = getSpawnDir();
   mkdirSync(dir, {
     recursive: true,
   });
@@ -1007,7 +1008,7 @@ export async function destroyInstance(name?: string): Promise<void> {
 // ─── Connection Tracking ────────────────────────────────────────────────────
 
 export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = `${process.env.HOME}/.spawn/last-connection.json`;
+  const connFile = getConnectionPath();
   try {
     const data = JSON.parse(readFileSync(connFile, "utf-8"));
     data.launch_cmd = launchCmd;
