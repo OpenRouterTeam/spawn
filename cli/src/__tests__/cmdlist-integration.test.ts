@@ -232,7 +232,7 @@ describe("cmdList integration", () => {
       },
     ];
 
-    it("should render table header with AGENT, CLOUD, WHEN columns", async () => {
+    it("should render multi-line entries with name and subtitle", async () => {
       writeHistory(sampleRecords);
 
       // Mock fetch to return manifest (for display names)
@@ -247,26 +247,9 @@ describe("cmdList integration", () => {
       await cmdList();
 
       const output = consoleOutput();
-      expect(output).toContain("AGENT");
-      expect(output).toContain("CLOUD");
-      expect(output).toContain("WHEN");
-    });
-
-    it("should show separator line under header", async () => {
-      writeHistory(sampleRecords);
-
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
-
-      await cmdList();
-
-      const output = consoleOutput();
-      expect(output).toContain("-".repeat(10));
+      // Subtitle lines should contain agent · cloud · time
+      expect(output).toContain("Claude Code");
+      expect(output).toContain("·");
     });
 
     it("should render records in reverse chronological order (newest first)", async () => {
@@ -313,7 +296,7 @@ describe("cmdList integration", () => {
       expect(output).toContain("Codex");
     });
 
-    it("should fall back to raw keys when manifest is unavailable", async () => {
+    it("should still render when manifest is unavailable", async () => {
       writeHistory(sampleRecords);
 
       // Clear in-memory cache and mock fetch to fail
@@ -323,11 +306,9 @@ describe("cmdList integration", () => {
       await cmdList();
 
       const output = consoleOutput();
-      // Should still render the table (with raw keys)
-      expect(output).toContain("AGENT");
-      expect(output).toContain("CLOUD");
-      // Raw keys should appear since manifest is unavailable
-      expect(output).toContain("claude");
+      // Should still render entries (with raw keys or cached display names)
+      expect(output).toContain("·");
+      expect(output).toContain("unnamed");
     });
 
     it("should show rerun hint in footer", async () => {
@@ -394,7 +375,7 @@ describe("cmdList integration", () => {
   // ── Prompt display in history ─────────────────────────────────────────────
 
   describe("prompt display in history records", () => {
-    it("should show prompt preview in table row", async () => {
+    it("should render multi-line entry for record with prompt", async () => {
       writeHistory([
         {
           agent: "claude",
@@ -415,32 +396,9 @@ describe("cmdList integration", () => {
       await cmdList();
 
       const output = consoleOutput();
-      expect(output).toContain("Fix all linter errors");
-    });
-
-    it("should truncate long prompts with ellipsis", async () => {
-      writeHistory([
-        {
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-01T10:00:00Z",
-          prompt:
-            "This is a very long prompt that should be truncated because it exceeds the display limit in the table",
-        },
-      ]);
-
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
-
-      await cmdList();
-
-      const output = consoleOutput();
-      expect(output).toContain("...");
+      // Should show agent and cloud in subtitle
+      expect(output).toContain("Claude Code");
+      expect(output).toContain("Sprite");
     });
 
     it("should include prompt in rerun hint for latest record with prompt", async () => {
