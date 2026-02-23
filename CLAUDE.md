@@ -349,20 +349,15 @@ refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
 
 ### EVERY Change Goes Through a PR — NO EXCEPTIONS
 
-**This is the #1 most important workflow rule.** Before editing ANY file, check your branch:
+**This is the #1 most important workflow rule.** A PreToolUse hook in `.claude/settings.json` **blocks all Write/Edit calls while on `main`**. If you hit this block:
 
-```bash
-branch=$(git rev-parse --abbrev-ref HEAD)
-```
+1. **Create a branch** — `git checkout -b descriptive-branch-name`
+2. **Retry your edit** — the hook will allow it now
 
-**If you are on `main`** — create a branch FIRST, before touching any file:
+**If you already committed to `main` by mistake** — cherry-pick the commits onto a new branch:
 ```bash
 git checkout -b descriptive-branch-name
-```
-
-**If you already have uncommitted changes on `main`** — stash, branch, unstash:
-```bash
-git stash && git checkout -b descriptive-branch-name && git stash pop
+git cherry-pick main
 ```
 
 Then follow this workflow:
