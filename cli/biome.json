@@ -97,6 +97,7 @@
       "bracketSameLine": false
     }
   },
+  "plugins": ["./lint/no-type-assertion.grit"],
   "assist": {
     "enabled": false
   }

@@ -142,11 +142,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
   let processExitSpy: ReturnType<typeof spyOn>;
 
   function setManifest(manifest: any) {
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => manifest,
-      text: async () => JSON.stringify(manifest),
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify(manifest)));
     return loadManifest(true);
   }
 
@@ -159,9 +155,9 @@ describe("Display Name Suggestions in Validation Errors", () => {
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
     await setManifest(manifestWithDistinctNames);

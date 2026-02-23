@@ -1,6 +1,6 @@
 {
   "name": "@openrouter/spawn",
-  "version": "0.6.20",
+  "version": "0.7.0",
   "type": "module",
   "bin": {
     "spawn": "cli.js"
@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.0",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "valibot": "^1.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.3",

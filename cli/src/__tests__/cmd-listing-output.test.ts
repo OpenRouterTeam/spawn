@@ -162,11 +162,9 @@ const { cmdMatrix, cmdAgents, cmdClouds, getTerminalWidth } = await import("../c
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function setManifest(manifest: Manifest) {
-  global.fetch = mock(async () => ({
-    ok: true,
-    json: async () => manifest,
-    text: async () => JSON.stringify(manifest),
-  })) as any;
+  global.fetch = mock(async () =>
+    new Response(JSON.stringify(manifest)),
+  );
   return loadManifest(true);
 }
 

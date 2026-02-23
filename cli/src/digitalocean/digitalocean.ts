@@ -1,6 +1,7 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import * as v from "valibot";
 import {
   logInfo,
   logWarn,
@@ -16,6 +17,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
+import { parseJsonWith } from "../shared/parse";
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
 const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
@@ -118,12 +120,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
+const LooseObject = v.record(v.string(), v.unknown());
+
+function parseJson(text: string): Record<string, unknown> | null {
+  return parseJsonWith(text, LooseObject);
+}
+
+function toObjectArray(val: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(val)) {
+    return [];
   }
+  return val.filter((item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item));
 }
 
 // ─── Token Persistence ───────────────────────────────────────────────────────
@@ -275,15 +282,18 @@ async function tryRefreshDoToken(): Promise<string | null> {
       return null;
     }
 
-    const data = (await resp.json()) as any;
-    if (!data.access_token) {
+    const data = parseJson(await resp.text());
+    if (!data?.access_token) {
       logWarn("Token refresh returned no access token");
       return null;
     }
 
-    await saveTokenToConfig(data.access_token, data.refresh_token || refreshToken, data.expires_in);
+    const accessToken = typeof data.access_token === "string" ? data.access_token : "";
+    const newRefreshToken = typeof data.refresh_token === "string" ? data.refresh_token : undefined;
+    const expiresIn = typeof data.expires_in === "number" ? data.expires_in : undefined;
+    await saveTokenToConfig(accessToken, newRefreshToken || refreshToken, expiresIn);
     logInfo("DigitalOcean token refreshed successfully");
-    return data.access_token;
+    return accessToken;
   } catch {
     logWarn("Token refresh request failed");
     return null;
@@ -454,15 +464,18 @@ async function tryDoOAuth(): Promise<string | null> {
       return null;
     }
 
-    const data = (await resp.json()) as any;
-    if (!data.access_token) {
+    const data = parseJson(await resp.text());
+    if (!data?.access_token) {
       logError("Token exchange returned no access token");
       return null;
     }
 
-    await saveTokenToConfig(data.access_token, data.refresh_token, data.expires_in);
+    const accessToken = typeof data.access_token === "string" ? data.access_token : "";
+    const oauthRefreshToken = typeof data.refresh_token === "string" ? data.refresh_token : undefined;
+    const expiresIn = typeof data.expires_in === "number" ? data.expires_in : undefined;
+    await saveTokenToConfig(accessToken, oauthRefreshToken, expiresIn);
     logInfo("Successfully obtained DigitalOcean access token via OAuth!");
-    return data.access_token;
+    return accessToken;
   } catch (_err) {
     logError("Failed to exchange authorization code");
     return null;
@@ -574,7 +587,7 @@ function generateSshKeyIfMissing(): {
   mkdirSync(sshDir, {
     recursive: true,
     mode: 0o700,
-  } as any);
+  });
   logStep("Generating SSH key...");
   const result = Bun.spawnSync(
     [
@@ -640,9 +653,9 @@ export async function ensureSshKey(): Promise<void> {
   // Check if key is registered with DigitalOcean
   const { text } = await doApi("GET", "/account/keys");
   const data = parseJson(text);
-  const keys: any[] = data?.ssh_keys || [];
+  const keys = toObjectArray(data?.ssh_keys);
 
-  const found = keys.some((k: any) => {
+  const found = keys.some((k: Record<string, unknown>) => {
     const fp = k.fingerprint || "";
     return fp === fingerprint;
   });
@@ -762,7 +775,7 @@ export async function createServer(name: string, tier?: CloudInitTier): Promise<
   // Get all SSH key IDs
   const { text: keysText } = await doApi("GET", "/account/keys");
   const keysData = parseJson(keysText);
-  const sshKeyIds: number[] = (keysData?.ssh_keys || []).map((k: any) => k.id).filter(Boolean);
+  const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys).map((k) => typeof k.id === "number" ? k.id : 0).filter((n) => n > 0);
 
   const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
@@ -808,10 +821,10 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
     const status = data?.droplet?.status;
 
     if (status === "active") {
-      const networks = data?.droplet?.networks?.v4 || [];
-      const publicNet = networks.find((n: any) => n.type === "public");
+      const v4Networks = toObjectArray(data?.droplet?.networks?.v4);
+      const publicNet = v4Networks.find((n) => n.type === "public");
       if (publicNet?.ip_address) {
-        doServerIp = publicNet.ip_address;
+        doServerIp = typeof publicNet.ip_address === "string" ? publicNet.ip_address : "";
         logInfo(`Droplet active, IP: ${doServerIp}`);
         return;
       }
@@ -1194,7 +1207,7 @@ export async function destroyServer(dropletId?: string): Promise<void> {
 export async function listServers(): Promise<void> {
   const { text } = await doApi("GET", "/droplets");
   const data = parseJson(text);
-  const droplets: any[] = data?.droplets || [];
+  const droplets = toObjectArray(data?.droplets);
 
   if (droplets.length === 0) {
     console.log("No droplets found");
@@ -1205,13 +1218,17 @@ export async function listServers(): Promise<void> {
   console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("SIZE", 15));
   console.log("-".repeat(80));
   for (const d of droplets) {
-    const ip = (d.networks?.v4 || []).find((n: any) => n.type === "public")?.ip_address || "N/A";
+    const networks = d.networks;
+    const v4 = (networks && typeof networks === "object" && "v4" in networks) ? networks.v4 : undefined;
+    const v4Arr = toObjectArray(v4);
+    const publicNet = v4Arr.find((n) => n.type === "public");
+    const ip = String(publicNet?.ip_address ?? "N/A");
     console.log(
-      pad((d.name ?? "N/A").slice(0, 24), 25) +
+      pad(String(d.name ?? "N/A").slice(0, 24), 25) +
         pad(String(d.id ?? "N/A").slice(0, 11), 12) +
-        pad((d.status ?? "N/A").slice(0, 11), 12) +
+        pad(String(d.status ?? "N/A").slice(0, 11), 12) +
         pad(ip.slice(0, 15), 16) +
-        pad((d.size_slug ?? "N/A").slice(0, 14), 15),
+        pad(String(d.size_slug ?? "N/A").slice(0, 14), 15),
     );
   }
 }

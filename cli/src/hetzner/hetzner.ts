@@ -16,6 +16,8 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
+import * as v from "valibot";
+import { parseJsonWith } from "../shared/parse";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
@@ -80,12 +82,32 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
+const LooseObject = v.record(v.string(), v.unknown());
+
+function parseJson(text: string): Record<string, unknown> | null {
+  return parseJsonWith(text, LooseObject);
+}
+
+/** Narrow an unknown value to a Record if it is a non-array object */
+function rec(val: unknown): Record<string, unknown> | undefined {
+  if (val && typeof val === "object" && !Array.isArray(val)) {
+    return Object.fromEntries(Object.entries(val));
   }
+  return undefined;
+}
+
+/** Extract an array of record objects from an unknown value */
+function toObjectArray(val: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(val)) {
+    return [];
+  }
+  const result: Record<string, unknown>[] = [];
+  for (const item of val) {
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      result.push(Object.fromEntries(Object.entries(item)));
+    }
+  }
+  return result;
 }
 
 // ─── Token Persistence ───────────────────────────────────────────────────────
@@ -134,7 +156,7 @@ async function testHcloudToken(): Promise<boolean> {
     // Hetzner returns { "error": { ... } } on auth failure.
     // Success responses may contain "error": null inside action objects,
     // so check for a real error object with a message.
-    if (data?.error?.message) {
+    if (rec(data?.error)?.message) {
       return false;
     }
     return true;
@@ -214,7 +236,7 @@ function generateSshKeyIfMissing(): {
   mkdirSync(sshDir, {
     recursive: true,
     mode: 0o700,
-  } as any);
+  });
   logStep("Generating SSH key...");
   const result = Bun.spawnSync(
     [
@@ -277,7 +299,7 @@ export async function ensureSshKey(): Promise<void> {
   // Check if key is already registered
   const resp = await hetznerApi("GET", "/ssh_keys");
   const data = parseJson(resp);
-  const sshKeys: any[] = data?.ssh_keys || [];
+  const sshKeys = toObjectArray(data?.ssh_keys);
 
   for (const key of sshKeys) {
     if (fingerprint && key.fingerprint === fingerprint) {
@@ -295,13 +317,15 @@ export async function ensureSshKey(): Promise<void> {
   });
   const regResp = await hetznerApi("POST", "/ssh_keys", body);
   const regData = parseJson(regResp);
-  if (regData?.error?.message) {
+  const regError = rec(regData?.error);
+  const regErrMsg = typeof regError?.message === "string" ? regError.message : "";
+  if (regErrMsg) {
     // Key may already exist under a different name — non-fatal
-    if (/already/.test(regData.error.message)) {
+    if (/already/.test(regErrMsg)) {
       logInfo("SSH key already registered (different name)");
       return;
     }
-    logError(`Failed to register SSH key: ${regData.error.message}`);
+    logError(`Failed to register SSH key: ${regErrMsg}`);
     throw new Error("SSH key registration failed");
   }
   logInfo("SSH key registered with Hetzner");
@@ -402,7 +426,9 @@ export async function createServer(
   // Get all SSH key IDs
   const keysResp = await hetznerApi("GET", "/ssh_keys");
   const keysData = parseJson(keysResp);
-  const sshKeyIds: number[] = (keysData?.ssh_keys || []).map((k: any) => k.id).filter(Boolean);
+  const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
+    .map((k) => (typeof k.id === "number" ? k.id : 0))
+    .filter(Boolean);
 
   const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
@@ -420,8 +446,9 @@ export async function createServer(
 
   // Hetzner success responses contain "error": null in action objects,
   // so check for presence of .server object, not absence of "error" string.
-  if (!data?.server) {
-    const errMsg = data?.error?.message || "Unknown error";
+  const server = rec(data?.server);
+  if (!server) {
+    const errMsg = rec(data?.error)?.message || "Unknown error";
     logError(`Failed to create Hetzner server: ${errMsg}`);
     logWarn("Common issues:");
     logWarn("  - Insufficient account balance or payment method required");
@@ -431,8 +458,10 @@ export async function createServer(
     throw new Error(`Server creation failed: ${errMsg}`);
   }
 
-  hetznerServerId = String(data.server.id);
-  hetznerServerIp = data.server.public_net?.ipv4?.ip || "";
+  hetznerServerId = String(server.id);
+  const publicNet = rec(server.public_net);
+  const ipv4 = rec(publicNet?.ipv4);
+  hetznerServerIp = typeof ipv4?.ip === "string" ? ipv4.ip : "";
 
   if (!hetznerServerId || hetznerServerId === "null") {
     logError("Failed to extract server ID from API response");
@@ -761,7 +790,7 @@ export async function destroyServer(serverId?: string): Promise<void> {
 
   // Hetzner returns { action: {...} } on success. "error": null in action is normal.
   if (!data?.action) {
-    const errMsg = data?.error?.message || "Unknown error";
+    const errMsg = rec(data?.error)?.message || "Unknown error";
     logError(`Failed to destroy server ${id}: ${errMsg}`);
     logWarn("The server may still be running and incurring charges.");
     logWarn(`Delete it manually at: ${HETZNER_DASHBOARD_URL}`);
@@ -773,23 +802,28 @@ export async function destroyServer(serverId?: string): Promise<void> {
 export async function listServers(): Promise<void> {
   const resp = await hetznerApi("GET", "/servers");
   const data = parseJson(resp);
-  const servers: any[] = data?.servers || [];
+  const servers = toObjectArray(data?.servers);
 
   if (servers.length === 0) {
     console.log("No servers found");
     return;
   }
 
-  const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
+  const pad = (str: string, n: number) => (str + " ".repeat(n)).slice(0, n);
+  const str = (val: unknown, fallback = "N/A"): string =>
+    typeof val === "string" ? val : (val != null ? String(val) : fallback);
   console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10));
   console.log("-".repeat(75));
   for (const s of servers) {
+    const publicNet = rec(s.public_net);
+    const ipv4 = rec(publicNet?.ipv4);
+    const serverType = rec(s.server_type);
     console.log(
-      pad((s.name ?? "N/A").slice(0, 24), 25) +
-        pad(String(s.id ?? "N/A").slice(0, 11), 12) +
-        pad((s.status ?? "N/A").slice(0, 11), 12) +
-        pad((s.public_net?.ipv4?.ip ?? "N/A").slice(0, 15), 16) +
-        pad((s.server_type?.name ?? "N/A").slice(0, 9), 10),
+      pad(str(s.name).slice(0, 24), 25) +
+        pad(str(s.id).slice(0, 11), 12) +
+        pad(str(s.status).slice(0, 11), 12) +
+        pad(str(ipv4?.ip).slice(0, 15), 16) +
+        pad(str(serverType?.name).slice(0, 9), 10),
     );
   }
 }

@@ -1,0 +1,10 @@
+language js(typescript)
+
+`$value as $type` as $expr where {
+  !$expr <: `$_ as const`,
+  register_diagnostic(
+    span = $expr,
+    message = "Type assertions (`as`) are banned. Use schema validation (parseJsonWith), type guards, or `satisfies` instead.",
+    severity = "error"
+  )
+}

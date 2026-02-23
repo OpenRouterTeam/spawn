@@ -27,7 +27,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 function makeManifest(cloudAuth: string): Manifest {
-  return {
+  const m: Manifest = {
     agents: {},
     clouds: {
       testcloud: {
@@ -42,7 +42,8 @@ function makeManifest(cloudAuth: string): Manifest {
       },
     },
     matrix: {},
-  } as Manifest;
+  };
+  return m;
 }
 
 describe("preflightCredentialCheck", () => {

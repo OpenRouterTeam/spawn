@@ -124,19 +124,17 @@ describe("cmdCloudInfo", () => {
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     savedORKey = process.env.OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
 
     originalFetch = global.fetch;
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => extendedManifest,
-      text: async () => JSON.stringify(extendedManifest),
-    })) as any;
+    global.fetch = mock(async () =>
+      new Response(JSON.stringify(extendedManifest)),
+    );
 
     await loadManifest(true);
   });

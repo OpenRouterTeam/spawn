@@ -99,7 +99,11 @@ function logError(message: string, err?: unknown): void {
 function readCache(): Manifest | null {
   try {
     const raw = JSON.parse(readFileSync(getCacheFile(), "utf-8"));
-    return stripDangerousKeys(raw) as Manifest;
+    const cleaned = stripDangerousKeys(raw);
+    if (isValidManifest(cleaned)) {
+      return cleaned;
+    }
+    return null;
   } catch (err) {
     // Cache file missing, corrupted, or unreadable
     logError(`Failed to read cache from ${getCacheFile()}`, err);
@@ -128,25 +132,25 @@ function writeCache(data: Manifest): void {
 
 /** Recursively strip __proto__, constructor, and prototype keys from parsed JSON
  *  to prevent prototype pollution attacks (defense in depth). */
-function stripDangerousKeys(obj: any): any {
+function stripDangerousKeys(obj: unknown): unknown {
   if (obj === null || typeof obj !== "object") {
     return obj;
   }
   if (Array.isArray(obj)) {
     return obj.map(stripDangerousKeys);
   }
-  const clean: Record<string, any> = {};
-  for (const key of Object.keys(obj)) {
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       continue;
     }
-    clean[key] = stripDangerousKeys(obj[key]);
+    clean[key] = stripDangerousKeys(value);
   }
   return clean;
 }
 
-function isValidManifest(data: any): data is Manifest {
-  return data && typeof data === "object" && !Array.isArray(data) && data.agents && data.clouds && data.matrix;
+function isValidManifest(data: unknown): data is Manifest {
+  return data !== null && typeof data === "object" && !Array.isArray(data) && "agents" in data && "clouds" in data && "matrix" in data && !!data.agents && !!data.clouds && !!data.matrix;
 }
 
 async function fetchManifestFromGitHub(): Promise<Manifest | null> {
@@ -159,7 +163,7 @@ async function fetchManifestFromGitHub(): Promise<Manifest | null> {
       return null;
     }
     const raw = await res.json();
-    const data = stripDangerousKeys(raw) as Manifest;
+    const data = stripDangerousKeys(raw);
     if (!isValidManifest(data)) {
       logError("Manifest structure validation failed: missing required fields (agents, clouds, or matrix)");
       return null;
@@ -202,7 +206,7 @@ function tryLoadLocalManifest(): Manifest | null {
       const raw = JSON.parse(readFileSync(localPath, "utf-8"));
       const data = stripDangerousKeys(raw);
       if (isValidManifest(data)) {
-        return data as Manifest;
+        return data;
       }
     }
   } catch (_err) {

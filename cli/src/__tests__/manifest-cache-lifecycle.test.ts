@@ -213,13 +213,7 @@ describe("Manifest Cache Lifecycle", () => {
       });
       writeFileSync(env.cacheFile, "{ invalid json content !!!");
 
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       const manifest = await loadManifest(true);
       expect(manifest).toHaveProperty("agents");
@@ -233,13 +227,7 @@ describe("Manifest Cache Lifecycle", () => {
       });
       writeFileSync(env.cacheFile, "");
 
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       const manifest = await loadManifest(true);
       expect(manifest).toHaveProperty("agents");
@@ -251,13 +239,7 @@ describe("Manifest Cache Lifecycle", () => {
       });
       writeFileSync(env.cacheFile, "[1, 2, 3]");
 
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       const manifest = await loadManifest(true);
       expect(manifest).toHaveProperty("agents");
@@ -269,13 +251,7 @@ describe("Manifest Cache Lifecycle", () => {
       });
       writeFileSync(env.cacheFile, '"just a string"');
 
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       const manifest = await loadManifest(true);
       expect(manifest).toHaveProperty("agents");
@@ -293,13 +269,7 @@ describe("Manifest Cache Lifecycle", () => {
         }),
       );
 
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       const manifest = await loadManifest(true);
       expect(manifest).toHaveProperty("agents");
@@ -319,13 +289,8 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache on HTTP 500", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: false,
-            status: 500,
-            statusText: "Internal Server Error",
-          }) as any,
+      global.fetch = mock(() =>
+        Promise.resolve(new Response("Internal Server Error", { status: 500, statusText: "Internal Server Error" })),
       );
 
       mkdirSync(join(env.testDir, "spawn"), {
@@ -341,13 +306,8 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache on HTTP 403 (rate limited)", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: false,
-            status: 403,
-            statusText: "Forbidden",
-          }) as any,
+      global.fetch = mock(() =>
+        Promise.resolve(new Response("Forbidden", { status: 403, statusText: "Forbidden" })),
       );
 
       mkdirSync(join(env.testDir, "spawn"), {
@@ -362,15 +322,7 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache when fetch response json() throws", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => {
-              throw new SyntaxError("Unexpected token");
-            },
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response("not valid json {{{", { status: 200 })));
 
       mkdirSync(join(env.testDir, "spawn"), {
         recursive: true,
@@ -398,17 +350,17 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back when fetch returns invalid manifest structure", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({
+      global.fetch = mock(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
               agents: {
                 claude: {},
               },
-            }), // missing clouds and matrix
-          }) as any,
-      );
+            }),
+          ),
+        ),
+      ); // missing clouds and matrix
 
       mkdirSync(join(env.testDir, "spawn"), {
         recursive: true,
@@ -454,29 +406,18 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should bypass in-memory cache with forceRefresh", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
+      const fetchMock = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
+      global.fetch = fetchMock;
 
       await loadManifest(true);
       await loadManifest(true);
 
       // fetch should have been called at least twice (once per forceRefresh)
-      expect((global.fetch as any).mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
     it("should return same instance without forceRefresh", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       const manifest1 = await loadManifest(true);
       const manifest2 = await loadManifest(false);
@@ -504,15 +445,15 @@ describe("Manifest Cache Lifecycle", () => {
       const oldTime = Date.now() - 2 * 60 * 60 * 1000;
       utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
 
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({
+      global.fetch = mock(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
               version: 1,
               data: "not a manifest",
             }),
-          }) as any,
+          ),
+        ),
       );
 
       const manifest = await loadManifest(true);
@@ -529,16 +470,16 @@ describe("Manifest Cache Lifecycle", () => {
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
       // Cache is fresh (just written)
 
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({
+      global.fetch = mock(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
               agents: {},
               clouds: {},
               matrix: {},
             }),
-          }) as any,
+          ),
+        ),
       );
 
       // loadManifest(false) should check disk cache first

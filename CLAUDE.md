@@ -1,5 +1,16 @@
 # Spawn
 
+## Culture: Embrace Bold Changes
+
+**This is mandatory.** When a change is right, helps the user, and is tasteful — make it. Do not shy away from large-scope work.
+
+- **Do NOT refuse work because it's "too big."** If the user asks for a codebase-wide refactor touching 50+ files, do it. Parallelize with agents. Ship it.
+- **Do NOT water down scope.** If the plan says "replace all 119 `as` casts across the codebase," you replace ALL 119, not 5 with a TODO for the rest.
+- **Do NOT propose half-measures.** Don't suggest "we could start with just one module" when the user wants the whole thing. The whole thing is the point.
+- **Parallelize aggressively.** Use the Task tool to spawn multiple agents working on independent files simultaneously. A 50-file change should NOT be sequential.
+- **Fix tests too.** If a new lint rule or code change breaks tests, fix every single test. Don't exclude test files from rules to avoid the work.
+- **Verify exhaustively.** After a big change: full lint (0 errors), full test suite (0 failures), full build (succeeds). No partial checks.
+
 Spawn is a matrix of **agents x clouds**. Every script provisions a cloud server, installs an agent, injects OpenRouter credentials, and drops the user into an interactive session.
 
 ## The Matrix
@@ -184,6 +195,72 @@ All TypeScript code in `cli/src/` MUST use ESM (`import`/`export`):
 - The project is `"type": "module"` in `package.json` — CJS is not supported
 - For Node.js built-ins: `import fs from "fs"`, `import path from "path"`, etc.
 - For dynamic imports: `const mod = await import("./module.ts")`
+
+## Type Safety — No `as` Type Assertions
+
+**`as` type assertions are banned in all TypeScript code (production AND tests).** This is enforced by a GritQL biome plugin (`cli/no-type-assertion.grit`).
+
+### Exemptions
+- `as const` — allowed (compile-time only, no runtime risk)
+- That's it. `as unknown` is also banned.
+
+### What to use instead
+
+**For API responses / parsed JSON — use valibot schema validation:**
+```typescript
+import * as v from "valibot";
+import { parseJsonWith } from "../shared/parse";
+
+// Declare schemas at module top level, not inside functions
+const UserSchema = v.object({ id: v.number(), name: v.string() });
+
+// Returns typed data or null — no `as` needed
+const user = parseJsonWith(responseText, UserSchema);
+```
+
+**For loose JSON objects (many optional fields):**
+```typescript
+const LooseObject = v.record(v.string(), v.unknown());
+function parseJson(text: string): Record<string, unknown> | null {
+  return parseJsonWith(text, LooseObject);
+}
+```
+
+**For narrowing `unknown` values — use type guards:**
+```typescript
+typeof val === "string" ? val : ""
+typeof val === "number" ? val : 0
+Array.isArray(val) ? val : []
+```
+
+**For array-of-objects narrowing:**
+```typescript
+function toObjectArray(val: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(val)) return [];
+  return val.filter((item): item is Record<string, unknown> =>
+    item !== null && typeof item === "object" && !Array.isArray(item));
+}
+```
+
+**For test mocks — use proper Response objects instead of `as any`:**
+```typescript
+// WRONG: global.fetch = mock(() => Promise.resolve({ ok: true, json: async () => data }) as any);
+// RIGHT:
+global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(data))));
+// For errors:
+global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 })));
+```
+
+**For type literals — use `satisfies` or typed variables:**
+```typescript
+// WRONG: const config = { ... } as AgentConfig;
+// RIGHT: const config: AgentConfig = { ... };
+// OR:    const config = { ... } satisfies AgentConfig;
+```
+
+### Shared utilities
+- `cli/src/shared/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonRaw(text)`
+- `cli/src/shared/type-guards.ts` — `isString`, `isNumber`, `hasStatus`, `hasMessage`
 
 ## Testing
 

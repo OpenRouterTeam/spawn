@@ -93,7 +93,7 @@ export async function selectFromList(items: string[], promptText: string, defaul
   if (p.isCancel(result)) {
     return defaultValue;
   }
-  return result as string;
+  return typeof result === "string" ? result : String(result);
 }
 
 /** Open a URL in the user's browser. */

@@ -17,6 +17,8 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
+import * as v from "valibot";
+import { parseJsonWith, parseJsonRaw } from "../shared/parse";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
 const FLY_DASHBOARD_URL = "https://fly.io/dashboard";
@@ -158,12 +160,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
+const LooseObject = v.record(v.string(), v.unknown());
+
+function parseJson(text: string): Record<string, unknown> | null {
+  return parseJsonWith(text, LooseObject);
+}
+
+function toObjectArray(val: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(val)) { return []; }
+  return val
+    .filter((item): item is Record<string, unknown> =>
+      item !== null && typeof item === "object" && !Array.isArray(item),
+    );
 }
 
 function hasError(text: string): boolean {
@@ -586,36 +594,45 @@ interface OrgEntry {
 }
 
 function parseOrgsJson(json: string): OrgEntry[] {
-  const data = parseJson(json);
-  if (!data) {
-    return [];
-  }
+  const raw = parseJsonRaw(json);
+  if (!raw || typeof raw !== "object") { return []; }
 
-  // Handle different org response formats
-  let orgs: any[] = [];
-  if (Array.isArray(data)) {
-    orgs = data;
-  } else if (data.nodes) {
-    orgs = data.nodes;
-  } else if (data.organizations) {
-    orgs = data.organizations;
-  } else if (data.data?.organizations?.nodes) {
-    orgs = data.data.organizations.nodes;
-  } else if (typeof data === "object" && !Array.isArray(data)) {
-    // {slug: name} format
-    return Object.entries(data)
-      .filter(([slug]) => slug)
-      .map(([slug, name]) => ({
-        slug,
-        label: String(name),
-      }));
+  let orgs: Record<string, unknown>[] = [];
+  if (Array.isArray(raw)) {
+    orgs = toObjectArray(raw);
+  } else {
+    // Re-parse as Record<string, unknown> via valibot schema
+    const data = parseJson(json);
+    if (!data) { return []; }
+
+    if (data.nodes) {
+      orgs = toObjectArray(data.nodes);
+    } else if (data.organizations) {
+      orgs = toObjectArray(data.organizations);
+    } else if (data.data && typeof data.data === "object") {
+      const inner = parseJson(JSON.stringify(data.data));
+      if (inner?.organizations) {
+        const orgData = parseJson(JSON.stringify(inner.organizations));
+        if (orgData) {
+          orgs = toObjectArray(orgData.nodes);
+        }
+      }
+    } else {
+      // {slug: name} format
+      return Object.entries(data)
+        .filter(([slug]) => slug)
+        .map(([slug, name]) => ({
+          slug,
+          label: String(name),
+        }));
+    }
   }
 
   return orgs
-    .filter((o: any) => o.slug || o.name)
-    .map((o: any) => {
-      const slug = o.slug || o.name || "";
-      const name = o.name || slug;
+    .filter((o) => o.slug || o.name)
+    .map((o) => {
+      const slug = String(o.slug || o.name || "");
+      const name = String(o.name || slug);
       const suffix = o.type ? ` (${o.type})` : "";
       return {
         slug,
@@ -723,12 +740,12 @@ async function createApp(name: string): Promise<void> {
   if (resp.includes('"error"')) {
     const data = parseJson(resp);
     const errMsg = data?.error || "Unknown error";
-    if (/already exists/i.test(errMsg)) {
+    if (/already exists/i.test(String(errMsg))) {
       logInfo(`App '${name}' already exists, reusing it`);
       return;
     }
     logError(`Failed to create Fly.io app: ${errMsg}`);
-    if (/taken|Name.*valid/i.test(errMsg)) {
+    if (/taken|Name.*valid/i.test(String(errMsg))) {
       logWarn("Fly.io app names are globally unique. Set a different name with: FLY_APP_NAME=my-unique-name");
     }
     throw new Error(`App creation failed: ${errMsg}`);
@@ -785,7 +802,7 @@ async function createMachine(
   }
 
   const data = parseJson(resp);
-  const machineId = data?.id;
+  const machineId = typeof data?.id === "string" ? data.id : undefined;
   if (!machineId) {
     logError("Failed to extract machine ID from API response");
     throw new Error("No machine ID");
@@ -835,8 +852,9 @@ async function createVolume(name: string, region: string, sizeGb: number): Promi
     logError("Failed to create volume");
     throw new Error("Volume creation failed");
   }
-  logInfo(`Volume created: ${data.id}`);
-  return data.id;
+  const volumeId = typeof data.id === "string" ? data.id : String(data.id);
+  logInfo(`Volume created: ${volumeId}`);
+  return volumeId;
 }
 
 export async function listVolumes(appName: string): Promise<
@@ -847,16 +865,17 @@ export async function listVolumes(appName: string): Promise<
   }>
 > {
   const resp = await flyApi("GET", `/apps/${appName}/volumes`);
-  const data = parseJson(resp);
+  const data = parseJsonRaw(resp);
   if (!Array.isArray(data)) {
     return [];
   }
-  return data
-    .filter((v: any) => v.id)
-    .map((v: any) => ({
-      id: v.id as string,
-      name: (v.name || "unnamed") as string,
-      size_gb: (v.size_gb || 0) as number,
+  const items = toObjectArray(data);
+  return items
+    .filter((item) => item.id)
+    .map((item) => ({
+      id: String(item.id),
+      name: String(item.name || "unnamed"),
+      size_gb: typeof item.size_gb === "number" ? item.size_gb : 0,
     }));
 }
 
@@ -1209,8 +1228,9 @@ export async function destroyServer(appName?: string): Promise<void> {
   logStep(`Destroying Fly.io app '${name}'...`);
 
   const resp = await flyApi("GET", `/apps/${name}/machines`);
-  const machines = parseJson(resp);
-  const ids: string[] = (Array.isArray(machines) ? machines : []).map((m: any) => m.id).filter(Boolean);
+  const machines = parseJsonRaw(resp);
+  const machineList = toObjectArray(Array.isArray(machines) ? machines : []);
+  const ids: string[] = machineList.map((m) => typeof m.id === "string" ? m.id : "").filter(Boolean);
 
   for (const mid of ids) {
     logStep(`Stopping machine ${mid}...`);
@@ -1240,8 +1260,14 @@ export async function destroyServer(appName?: string): Promise<void> {
 export async function listServers(): Promise<void> {
   const org = flyOrg || process.env.FLY_ORG || "personal";
   const resp = await flyApi("GET", `/apps?org_slug=${org}`);
-  const data = parseJson(resp);
-  const apps: any[] = Array.isArray(data) ? data : (data?.apps ?? []);
+  const raw = parseJsonRaw(resp);
+  let apps: Record<string, unknown>[] = [];
+  if (Array.isArray(raw)) {
+    apps = toObjectArray(raw);
+  } else {
+    const record = parseJson(resp);
+    apps = record ? toObjectArray(record.apps) : [];
+  }
   if (apps.length === 0) {
     console.log("No apps found");
     return;
@@ -1251,10 +1277,10 @@ export async function listServers(): Promise<void> {
   console.log("-".repeat(77));
   for (const a of apps) {
     console.log(
-      pad((a.name ?? "N/A").slice(0, 24), 25) +
-        pad((a.id ?? "N/A").slice(0, 19), 20) +
-        pad((a.status ?? "N/A").slice(0, 11), 12) +
-        pad((a.network ?? "N/A").slice(0, 19), 20),
+      pad(String(a.name ?? "N/A").slice(0, 24), 25) +
+        pad(String(a.id ?? "N/A").slice(0, 19), 20) +
+        pad(String(a.status ?? "N/A").slice(0, 11), 12) +
+        pad(String(a.network ?? "N/A").slice(0, 19), 20),
     );
   }
 }

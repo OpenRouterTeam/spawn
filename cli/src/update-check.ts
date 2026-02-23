@@ -8,6 +8,8 @@ import {
 import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
+import * as v from "valibot";
+import { parseJsonWith } from "./shared/parse";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE } from "./manifest.js";
 
@@ -20,6 +22,10 @@ export const executor = {
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
+
+// ── Schemas ──────────────────────────────────────────────────────────────────
+
+const PkgVersionSchema = v.object({ version: v.string() });
 
 const FETCH_TIMEOUT = 10000; // 10 seconds
 const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
@@ -47,10 +53,8 @@ async function fetchLatestVersion(): Promise<string | null> {
       return null;
     }
 
-    const pkg = (await res.json()) as {
-      version: string;
-    };
-    return pkg.version;
+    const data = parseJsonWith(await res.text(), PkgVersionSchema);
+    return data?.version ?? null;
   } catch {
     return null;
   }
@@ -182,12 +186,8 @@ function reExecWithArgs(): void {
     process.exit(0);
   } catch (reexecErr) {
     const code =
-      reexecErr && typeof reexecErr === "object" && "status" in reexecErr
-        ? (
-            reexecErr as {
-              status: number;
-            }
-          ).status
+      reexecErr && typeof reexecErr === "object" && "status" in reexecErr && typeof reexecErr.status === "number"
+        ? reexecErr.status
         : 1;
     process.exit(code);
   }

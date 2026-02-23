@@ -65,17 +65,10 @@ describe("detectAndFixSwappedArgs via cmdRun", () => {
   function setManifestAndScript(manifest: any) {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => manifest,
-          text: async () => JSON.stringify(manifest),
-        };
+        return new Response(JSON.stringify(manifest));
       }
-      return {
-        ok: true,
-        text: async () => "#!/bin/bash\necho test",
-      };
-    }) as any;
+      return new Response("#!/bin/bash\necho test");
+    });
     return loadManifest(true);
   }
 
@@ -88,9 +81,9 @@ describe("detectAndFixSwappedArgs via cmdRun", () => {
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
     await setManifestAndScript(mockManifest);
@@ -241,17 +234,10 @@ describe("resolveAndLog via cmdRun", () => {
   function setManifestAndScript(manifest: any) {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => manifest,
-          text: async () => JSON.stringify(manifest),
-        };
+        return new Response(JSON.stringify(manifest));
       }
-      return {
-        ok: true,
-        text: async () => "#!/bin/bash\necho test",
-      };
-    }) as any;
+      return new Response("#!/bin/bash\necho test");
+    });
     return loadManifest(true);
   }
 
@@ -264,9 +250,9 @@ describe("resolveAndLog via cmdRun", () => {
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
     await setManifestAndScript(mockManifest);
@@ -381,13 +367,7 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should reject manifest missing 'agents' field", async () => {
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => ({
-        clouds: {},
-        matrix: {},
-      }),
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify({ clouds: {}, matrix: {} })));
 
     // Force refresh to avoid cache, should reject invalid manifest
     try {
@@ -404,13 +384,7 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should reject manifest missing 'clouds' field", async () => {
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => ({
-        agents: {},
-        matrix: {},
-      }),
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify({ agents: {}, matrix: {} })));
 
     try {
       await loadManifest(true);
@@ -425,13 +399,7 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should reject manifest missing 'matrix' field", async () => {
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => ({
-        agents: {},
-        clouds: {},
-      }),
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify({ agents: {}, clouds: {} })));
 
     try {
       await loadManifest(true);
@@ -446,10 +414,7 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should reject null manifest data", async () => {
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => null,
-    })) as any;
+    global.fetch = mock(async () => new Response("null"));
 
     try {
       await loadManifest(true);
@@ -465,10 +430,7 @@ describe("manifest validation (isValidManifest)", () => {
 
   it("should accept valid manifest with all required fields", async () => {
     const validManifest = createMockManifest();
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => validManifest,
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify(validManifest)));
 
     const result = await loadManifest(true);
     expect(result).toHaveProperty("agents");
@@ -482,10 +444,7 @@ describe("manifest validation (isValidManifest)", () => {
       clouds: {},
       matrix: {},
     };
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => emptyManifest,
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify(emptyManifest)));
 
     const result = await loadManifest(true);
     expect(result).toHaveProperty("agents");
@@ -494,11 +453,7 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should handle HTTP error response gracefully", async () => {
-    global.fetch = mock(async () => ({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-    })) as any;
+    global.fetch = mock(async () => new Response("Internal Server Error", { status: 500 }));
 
     try {
       await loadManifest(true);
@@ -521,17 +476,10 @@ describe("prompt handling with swapped args", () => {
   function setManifestAndScript(manifest: any) {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => manifest,
-          text: async () => JSON.stringify(manifest),
-        };
+        return new Response(JSON.stringify(manifest));
       }
-      return {
-        ok: true,
-        text: async () => "#!/bin/bash\necho test",
-      };
-    }) as any;
+      return new Response("#!/bin/bash\necho test");
+    });
     return loadManifest(true);
   }
 
@@ -544,9 +492,9 @@ describe("prompt handling with swapped args", () => {
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
     await setManifestAndScript(mockManifest);

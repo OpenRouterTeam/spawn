@@ -95,18 +95,16 @@ describe("cmdInteractive", () => {
     selectReturnValues = [];
     isCancelValues = new Set();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
 
     // Pre-load manifest
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => mockManifest,
-      text: async () => JSON.stringify(mockManifest),
-    })) as any;
+    global.fetch = mock(async () =>
+      new Response(JSON.stringify(mockManifest)),
+    );
     await loadManifest(true);
   });
 
@@ -220,11 +218,9 @@ describe("cmdInteractive", () => {
         },
       };
 
-      global.fetch = mock(async () => ({
-        ok: true,
-        json: async () => noCloudManifest,
-        text: async () => JSON.stringify(noCloudManifest),
-      })) as any;
+      global.fetch = mock(async () =>
+        new Response(JSON.stringify(noCloudManifest)),
+      );
       await loadManifest(true);
 
       selectReturnValues = [
@@ -247,11 +243,9 @@ describe("cmdInteractive", () => {
         },
       };
 
-      global.fetch = mock(async () => ({
-        ok: true,
-        json: async () => noCloudManifest,
-        text: async () => JSON.stringify(noCloudManifest),
-      })) as any;
+      global.fetch = mock(async () =>
+        new Response(JSON.stringify(noCloudManifest)),
+      );
       await loadManifest(true);
 
       selectReturnValues = [
@@ -280,11 +274,9 @@ describe("cmdInteractive", () => {
         },
       };
 
-      global.fetch = mock(async () => ({
-        ok: true,
-        json: async () => noCloudManifest,
-        text: async () => JSON.stringify(noCloudManifest),
-      })) as any;
+      global.fetch = mock(async () =>
+        new Response(JSON.stringify(noCloudManifest)),
+      );
       await loadManifest(true);
 
       selectReturnValues = [
@@ -315,17 +307,10 @@ describe("cmdInteractive", () => {
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();
@@ -343,17 +328,10 @@ describe("cmdInteractive", () => {
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();
@@ -373,17 +351,10 @@ describe("cmdInteractive", () => {
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();
@@ -402,17 +373,10 @@ describe("cmdInteractive", () => {
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();
@@ -430,17 +394,10 @@ describe("cmdInteractive", () => {
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();
@@ -468,17 +425,10 @@ describe("cmdInteractive", () => {
           fetchedUrls.push(url);
         }
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();
@@ -497,19 +447,11 @@ describe("cmdInteractive", () => {
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
         // Both primary and fallback fail
-        return {
-          ok: false,
-          status: 404,
-          text: async () => "Not Found",
-        };
-      }) as any;
+        return new Response("Not Found", { status: 404 });
+      });
       await loadManifest(true);
 
       await expect(cmdInteractive()).rejects.toThrow("process.exit");
@@ -541,17 +483,10 @@ describe("cmdInteractive", () => {
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => credManifest,
-            text: async () => JSON.stringify(credManifest),
-          };
+          return new Response(JSON.stringify(credManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();
@@ -584,17 +519,10 @@ describe("cmdInteractive", () => {
 
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => credManifest,
-            text: async () => JSON.stringify(credManifest),
-          };
+          return new Response(JSON.stringify(credManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();
@@ -640,17 +568,10 @@ describe("cmdInteractive", () => {
           fetchedUrls.push(url);
         }
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => credManifest,
-            text: async () => JSON.stringify(credManifest),
-          };
+          return new Response(JSON.stringify(credManifest));
         }
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-        };
-      }) as any;
+        return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+      });
       await loadManifest(true);
 
       await cmdInteractive();

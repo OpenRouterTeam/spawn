@@ -93,8 +93,10 @@ function getTTYCols(ttyFd: number): number {
     if (res.status === 0 && res.stdout) {
       const parts = res.stdout.toString().trim().split(/\s+/);
       if (parts.length >= 2) {
-        const c = parseInt(parts[1], 10);
-        if (c > 0) return c;
+        const c = Number.parseInt(parts[1], 10);
+        if (c > 0) {
+          return c;
+        }
       }
     }
   } catch {}

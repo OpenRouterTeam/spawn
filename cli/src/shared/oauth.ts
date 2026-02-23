@@ -1,6 +1,12 @@
 // shared/oauth.ts — OpenRouter OAuth flow + API key management
 
+import * as v from "valibot";
+import { parseJsonWith } from "./parse";
 import { logInfo, logWarn, logError, logStep, prompt, openBrowser, validateModelId } from "./ui";
+
+// ─── Schemas ─────────────────────────────────────────────────────────────────
+
+const OAuthKeySchema = v.object({ key: v.string() });
 
 // ─── Key Validation ──────────────────────────────────────────────────────────
 
@@ -163,8 +169,8 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
       }),
       signal: AbortSignal.timeout(30_000),
     });
-    const data = (await resp.json()) as any;
-    if (data.key) {
+    const data = parseJsonWith(await resp.text(), OAuthKeySchema);
+    if (data?.key) {
       logInfo("Successfully obtained OpenRouter API key via OAuth!");
       return data.key;
     }

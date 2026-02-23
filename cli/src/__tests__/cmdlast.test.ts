@@ -105,18 +105,14 @@ describe("cmdLast", () => {
 
     // Prime the manifest cache with mock data
     global.fetch = mock(
-      () =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any,
+      () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
     );
     await loadManifest(true);
     global.fetch = originalFetch;
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
-    }) as any);
+    });
   });
 
   afterEach(() => {
@@ -207,11 +203,7 @@ describe("cmdLast", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       // We need to mock cmdRun to prevent actual execution
@@ -230,11 +222,7 @@ describe("cmdLast", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -253,11 +241,7 @@ describe("cmdLast", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -299,11 +283,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -332,11 +312,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -361,11 +337,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -469,11 +441,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -498,11 +466,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -536,11 +500,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {

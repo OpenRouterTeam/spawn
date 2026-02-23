@@ -17,6 +17,8 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
+import * as v from "valibot";
+import { parseJsonWith } from "../shared/parse";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 
@@ -137,13 +139,29 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
+// ─── Valibot Schemas for AWS API Responses ──────────────────────────────────
+
+const InstanceStateSchema = v.object({
+  instance: v.object({
+    state: v.object({
+      name: v.string(),
+    }),
+    publicIpAddress: v.optional(v.string()),
+  }),
+});
+
+const InstanceListSchema = v.object({
+  instances: v.optional(
+    v.array(
+      v.object({
+        name: v.optional(v.string()),
+        state: v.optional(v.object({ name: v.optional(v.string()) })),
+        publicIpAddress: v.optional(v.string()),
+        bundleId: v.optional(v.string()),
+      }),
+    ),
+  ),
+});
 
 // ─── AWS CLI Wrapper ────────────────────────────────────────────────────────
 
@@ -236,15 +254,13 @@ async function lightsailRest(target: string, body = "{}"): Promise<string> {
       amzDate,
     ],
     ...(awsSessionToken
-      ? [
-          [
+      ? (() => {
+          const tokenHeader: [string, string] = [
             "x-amz-security-token",
             awsSessionToken,
-          ] as [
-            string,
-            string,
-          ],
-        ]
+          ];
+          return [tokenHeader];
+        })()
       : []),
     [
       "x-amz-target",
@@ -813,7 +829,7 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
             instanceName,
           }),
         );
-        const data = parseJson(resp);
+        const data = parseJsonWith(resp, InstanceStateSchema);
         state = data?.instance?.state?.name || "";
       }
     } catch {
@@ -840,7 +856,7 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
               instanceName,
             }),
           );
-          const data = parseJson(resp);
+          const data = parseJsonWith(resp, InstanceStateSchema);
           ip = data?.instance?.publicIpAddress || "";
         }
       } catch {
@@ -1223,8 +1239,8 @@ export async function listServers(): Promise<void> {
     await proc.exited;
   } else {
     const resp = await lightsailRest("Lightsail_20161128.GetInstances", "{}");
-    const data = parseJson(resp);
-    const instances: any[] = data?.instances ?? [];
+    const data = parseJsonWith(resp, InstanceListSchema);
+    const instances = data?.instances ?? [];
     const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
     console.log(pad("Name", 30) + pad("State", 12) + pad("IP", 16) + "Bundle");
     console.log("-".repeat(72));
