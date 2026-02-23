@@ -1,6 +1,7 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import * as v from "valibot";
 import {
   logInfo,
@@ -1034,23 +1035,13 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
 
-  const proc = Bun.spawn(
-    [
-      "ssh",
-      ...SSH_OPTS,
-      "-t",
-      `root@${serverIp}`,
-      fullCmd,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
-      ],
-    },
-  );
-  const exitCode = await proc.exited;
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    const child = spawn("ssh", [...SSH_OPTS, "-t", `root@${serverIp}`, fullCmd], {
+      stdio: "inherit",
+    });
+    child.on("close", (code) => resolve(code ?? 0));
+    child.on("error", reject);
+  });
 
   // Post-session summary
   process.stderr.write("\n");

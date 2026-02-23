@@ -1,6 +1,7 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import {
   logInfo,
   logWarn,
@@ -919,24 +920,19 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
 
-  const proc = Bun.spawn(
-    [
-      "ssh",
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    const child = spawn("ssh", [
       ...SSH_OPTS,
       "-t",
       `${username}@${gcpServerIp}`,
       `bash -c ${shellQuote(fullCmd)}`,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
-      ],
+    ], {
+      stdio: "inherit",
       env: process.env,
-    },
-  );
-  const exitCode = await proc.exited;
+    });
+    child.on("close", (code) => resolve(code ?? 0));
+    child.on("error", reject);
+  });
 
   // Post-session summary
   process.stderr.write("\n");

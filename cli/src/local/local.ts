@@ -2,6 +2,7 @@
 
 import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { spawn } from "node:child_process";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
@@ -68,22 +69,14 @@ export function uploadFile(localPath: string, remotePath: string): void {
 
 /** Launch an interactive shell session locally. */
 export async function interactiveSession(cmd: string): Promise<number> {
-  const proc = Bun.spawn(
-    [
-      "bash",
-      "-c",
-      cmd,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
-      ],
+  return new Promise<number>((resolve, reject) => {
+    const child = spawn("bash", ["-c", cmd], {
+      stdio: "inherit",
       env: process.env,
-    },
-  );
-  return proc.exited;
+    });
+    child.on("close", (code) => resolve(code ?? 0));
+    child.on("error", reject);
+  });
 }
 
 // ─── Connection Tracking ─────────────────────────────────────────────────────
