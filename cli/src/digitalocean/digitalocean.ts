@@ -19,6 +19,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
+import { isString, isNumber } from "../shared/type-guards";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import { saveVmConnection } from "../history.js";
@@ -290,9 +291,9 @@ async function tryRefreshDoToken(): Promise<string | null> {
       return null;
     }
 
-    const accessToken = typeof data.access_token === "string" ? data.access_token : "";
-    const newRefreshToken = typeof data.refresh_token === "string" ? data.refresh_token : undefined;
-    const expiresIn = typeof data.expires_in === "number" ? data.expires_in : undefined;
+    const accessToken = isString(data.access_token) ? data.access_token : "";
+    const newRefreshToken = isString(data.refresh_token) ? data.refresh_token : undefined;
+    const expiresIn = isNumber(data.expires_in) ? data.expires_in : undefined;
     await saveTokenToConfig(accessToken, newRefreshToken || refreshToken, expiresIn);
     logInfo("DigitalOcean token refreshed successfully");
     return accessToken;
@@ -472,9 +473,9 @@ async function tryDoOAuth(): Promise<string | null> {
       return null;
     }
 
-    const accessToken = typeof data.access_token === "string" ? data.access_token : "";
-    const oauthRefreshToken = typeof data.refresh_token === "string" ? data.refresh_token : undefined;
-    const expiresIn = typeof data.expires_in === "number" ? data.expires_in : undefined;
+    const accessToken = isString(data.access_token) ? data.access_token : "";
+    const oauthRefreshToken = isString(data.refresh_token) ? data.refresh_token : undefined;
+    const expiresIn = isNumber(data.expires_in) ? data.expires_in : undefined;
     await saveTokenToConfig(accessToken, oauthRefreshToken, expiresIn);
     logInfo("Successfully obtained DigitalOcean access token via OAuth!");
     return accessToken;
@@ -664,7 +665,7 @@ export async function createServer(name: string, tier?: CloudInitTier): Promise<
   const { text: keysText } = await doApi("GET", "/account/keys");
   const keysData = parseJson(keysText);
   const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
-    .map((k) => (typeof k.id === "number" ? k.id : 0))
+    .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter((n) => n > 0);
 
   const userdata = getCloudInitUserdata(tier);
@@ -714,7 +715,7 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
       const v4Networks = toObjectArray(data?.droplet?.networks?.v4);
       const publicNet = v4Networks.find((n) => n.type === "public");
       if (publicNet?.ip_address) {
-        doServerIp = typeof publicNet.ip_address === "string" ? publicNet.ip_address : "";
+        doServerIp = isString(publicNet.ip_address) ? publicNet.ip_address : "";
         logInfo(`Droplet active, IP: ${doServerIp}`);
         return;
       }

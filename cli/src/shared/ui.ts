@@ -3,6 +3,7 @@
 
 import { createInterface } from "node:readline";
 import * as p from "@clack/prompts";
+import { isString } from "./type-guards";
 
 const RED = "\x1b[0;31m";
 const GREEN = "\x1b[0;32m";
@@ -102,7 +103,7 @@ export async function selectFromList(items: string[], promptText: string, defaul
   if (p.isCancel(result)) {
     return defaultValue;
   }
-  return typeof result === "string" ? result : String(result);
+  return isString(result) ? result : String(result);
 }
 
 /** Open a URL in the user's browser. */

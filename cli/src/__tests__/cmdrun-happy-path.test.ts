@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
+import { isString } from "../shared/type-guards";
 
 /**
  * Tests for the cmdRun happy-path pipeline: successful download, history
@@ -95,7 +96,7 @@ function mockFetchForDownload(opts: {
   } = opts;
 
   return mock(async (url: string | URL | Request, _init?: RequestInit) => {
-    const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+    const urlStr = isString(url) ? url : url instanceof URL ? url.href : url.url;
     fetchCalls.push({
       url: urlStr,
     });
@@ -216,7 +217,7 @@ describe("cmdRun happy-path pipeline", () => {
       expect(startCalls.some((msg: string) => msg.includes("Downloading"))).toBe(true);
 
       const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c[0]);
-      expect(stopCalls.some((msg: string) => typeof msg === "string" && msg.includes("downloaded"))).toBe(true);
+      expect(stopCalls.some((msg: string) => isString(msg) && msg.includes("downloaded"))).toBe(true);
     });
 
     it("should not call process.exit on successful execution", async () => {
@@ -276,7 +277,7 @@ describe("cmdRun happy-path pipeline", () => {
       await cmdRun("claude", "sprite");
 
       const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c[0]);
-      expect(stopCalls.some((msg: string) => typeof msg === "string" && msg.includes("fallback"))).toBe(true);
+      expect(stopCalls.some((msg: string) => isString(msg) && msg.includes("fallback"))).toBe(true);
     });
   });
 

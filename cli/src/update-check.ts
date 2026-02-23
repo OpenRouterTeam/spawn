@@ -12,6 +12,7 @@ import * as v from "valibot";
 import { parseJsonWith } from "./shared/parse";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE } from "./manifest.js";
+import { hasStatus } from "./shared/type-guards";
 
 const VERSION = pkg.version;
 
@@ -187,10 +188,7 @@ function reExecWithArgs(): void {
     });
     process.exit(0);
   } catch (reexecErr) {
-    const code =
-      reexecErr && typeof reexecErr === "object" && "status" in reexecErr && typeof reexecErr.status === "number"
-        ? reexecErr.status
-        : 1;
+    const code = hasStatus(reexecErr) ? reexecErr.status : 1;
     process.exit(code);
   }
 }

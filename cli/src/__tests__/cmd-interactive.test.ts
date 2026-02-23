@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
+import { isString } from "../shared/type-guards";
 
 /**
  * Tests for cmdInteractive() in commands.ts.
@@ -298,7 +299,7 @@ describe("cmdInteractive", () => {
       ];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
@@ -319,7 +320,7 @@ describe("cmdInteractive", () => {
       ];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
@@ -342,7 +343,7 @@ describe("cmdInteractive", () => {
       ];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
@@ -364,7 +365,7 @@ describe("cmdInteractive", () => {
       ];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
@@ -385,7 +386,7 @@ describe("cmdInteractive", () => {
       ];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
@@ -413,10 +414,10 @@ describe("cmdInteractive", () => {
       ];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string") {
+        if (isString(url)) {
           fetchedUrls.push(url);
         }
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
@@ -438,7 +439,7 @@ describe("cmdInteractive", () => {
       ];
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         // Both primary and fallback fail
@@ -476,7 +477,7 @@ describe("cmdInteractive", () => {
       delete process.env.SPRITE_API_KEY;
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(credManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
@@ -512,7 +513,7 @@ describe("cmdInteractive", () => {
       process.env.OPENROUTER_API_KEY = "sk-or-test";
 
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(credManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
@@ -558,10 +559,10 @@ describe("cmdInteractive", () => {
 
       const fetchedUrls: string[] = [];
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string") {
+        if (isString(url)) {
           fetchedUrls.push(url);
         }
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(credManifest));
         }
         return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");

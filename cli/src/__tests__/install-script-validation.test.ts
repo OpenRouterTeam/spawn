@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { isString } from "../shared/type-guards";
 
 /**
  * Validation tests for cli/install.sh.
@@ -409,7 +410,7 @@ describe("install.sh validation", () => {
       expect(content).toContain("OpenRouterTeam/spawn");
       // package.json should reference same repo
       if (pkg.repository) {
-        const repo = typeof pkg.repository === "string" ? pkg.repository : pkg.repository.url || "";
+        const repo = isString(pkg.repository) ? pkg.repository : pkg.repository.url || "";
         expect(repo.toLowerCase()).toContain("openrouterteam/spawn");
       }
     });

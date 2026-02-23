@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
+import { isString } from "../shared/type-guards";
 
 /**
  * Tests for the download fallback pipeline and script failure reporting
@@ -73,7 +74,7 @@ describe("Download and Failure Pipeline", () => {
   /** Set up fetch to return manifest from manifest URLs and custom responses for script URLs */
   function setupFetch(scriptHandler: (url: string) => Promise<Response>) {
     global.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
-      const urlStr = typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url;
+      const urlStr = isString(url) ? url : url instanceof URL ? url.toString() : url.url;
       if (urlStr.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }

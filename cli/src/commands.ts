@@ -40,6 +40,7 @@ import {
   type VMConnection,
 } from "./history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "./guidance-data.js";
+import { isString } from "./shared/type-guards";
 import { destroyServer as flyDestroyServer, ensureFlyCli, ensureFlyToken } from "./fly/fly.js";
 import { destroyServer as hetznerDestroyServer, ensureHcloudToken } from "./hetzner/hetzner.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "./digitalocean/digitalocean.js";
@@ -902,7 +903,7 @@ function hasCloudConfigCredentials(cloud: string): boolean {
     const content = fs.readFileSync(configPath, "utf-8");
     const config = JSON.parse(content);
     // Check if config has any non-empty credentials
-    return Object.values(config).some((v) => typeof v === "string" && v.trim().length > 0);
+    return Object.values(config).some((v) => isString(v) && v.trim().length > 0);
   } catch {
     // If config can't be read, assume no saved credentials
     return false;
