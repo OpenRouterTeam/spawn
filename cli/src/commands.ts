@@ -2291,13 +2291,28 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
       const project = conn.metadata?.project || "";
       // SECURITY: Validate metadata values to prevent injection via tampered history
       validateMetadataValue(zone, "GCP zone");
-      validateMetadataValue(project, "GCP project");
+      if (project) {
+        validateMetadataValue(project, "GCP project");
+      }
       return tryDelete(async () => {
         process.env.GCP_ZONE = zone;
-        process.env.GCP_PROJECT = project;
+        if (project) {
+          process.env.GCP_PROJECT = project;
+        }
         await gcpEnsureGcloudCli();
         await gcpAuthenticate();
-        await gcpResolveProject();
+        // Deletion runs under a spinner — suppress interactive prompts
+        const prevNonInteractive = process.env.SPAWN_NON_INTERACTIVE;
+        process.env.SPAWN_NON_INTERACTIVE = "1";
+        try {
+          await gcpResolveProject();
+        } finally {
+          if (prevNonInteractive === undefined) {
+            delete process.env.SPAWN_NON_INTERACTIVE;
+          } else {
+            process.env.SPAWN_NON_INTERACTIVE = prevNonInteractive;
+          }
+        }
         await gcpDestroyInstance(id);
       });
     }

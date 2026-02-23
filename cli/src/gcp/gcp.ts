@@ -436,6 +436,14 @@ export async function resolveProject(): Promise<void> {
   }
 
   if (!project) {
+    // In non-interactive mode (e.g. during deletion), fail fast instead of prompting
+    if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+      logError("No GCP project found in metadata or gcloud config");
+      logError("Set one before retrying:");
+      logError("  export GCP_PROJECT=your-project-id");
+      throw new Error("No GCP project");
+    }
+
     logInfo("Fetching your GCP projects...");
     const listResult = await gcloud([
       "projects",
