@@ -118,7 +118,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): any {
+function parseJson(text: string): Record<string, unknown> | null {
   try {
     return JSON.parse(text);
   } catch {
@@ -275,15 +275,15 @@ async function tryRefreshDoToken(): Promise<string | null> {
       return null;
     }
 
-    const data = (await resp.json()) as any;
+    const data = (await resp.json()) as Record<string, unknown>;
     if (!data.access_token) {
       logWarn("Token refresh returned no access token");
       return null;
     }
 
-    await saveTokenToConfig(data.access_token, data.refresh_token || refreshToken, data.expires_in);
+    await saveTokenToConfig(data.access_token as string, (data.refresh_token as string) || refreshToken, data.expires_in as number | undefined);
     logInfo("DigitalOcean token refreshed successfully");
-    return data.access_token;
+    return data.access_token as string;
   } catch {
     logWarn("Token refresh request failed");
     return null;
@@ -454,15 +454,15 @@ async function tryDoOAuth(): Promise<string | null> {
       return null;
     }
 
-    const data = (await resp.json()) as any;
+    const data = (await resp.json()) as Record<string, unknown>;
     if (!data.access_token) {
       logError("Token exchange returned no access token");
       return null;
     }
 
-    await saveTokenToConfig(data.access_token, data.refresh_token, data.expires_in);
+    await saveTokenToConfig(data.access_token as string, data.refresh_token as string | undefined, data.expires_in as number | undefined);
     logInfo("Successfully obtained DigitalOcean access token via OAuth!");
-    return data.access_token;
+    return data.access_token as string;
   } catch (_err) {
     logError("Failed to exchange authorization code");
     return null;
@@ -574,7 +574,7 @@ function generateSshKeyIfMissing(): {
   mkdirSync(sshDir, {
     recursive: true,
     mode: 0o700,
-  } as any);
+  } as { recursive: boolean; mode: number });
   logStep("Generating SSH key...");
   const result = Bun.spawnSync(
     [
@@ -640,9 +640,9 @@ export async function ensureSshKey(): Promise<void> {
   // Check if key is registered with DigitalOcean
   const { text } = await doApi("GET", "/account/keys");
   const data = parseJson(text);
-  const keys: any[] = data?.ssh_keys || [];
+  const keys: Record<string, unknown>[] = (data?.ssh_keys || []) as Record<string, unknown>[];
 
-  const found = keys.some((k: any) => {
+  const found = keys.some((k: Record<string, unknown>) => {
     const fp = k.fingerprint || "";
     return fp === fingerprint;
   });
@@ -762,7 +762,7 @@ export async function createServer(name: string, tier?: CloudInitTier): Promise<
   // Get all SSH key IDs
   const { text: keysText } = await doApi("GET", "/account/keys");
   const keysData = parseJson(keysText);
-  const sshKeyIds: number[] = (keysData?.ssh_keys || []).map((k: any) => k.id).filter(Boolean);
+  const sshKeyIds: number[] = ((keysData?.ssh_keys || []) as Record<string, unknown>[]).map((k: Record<string, unknown>) => k.id as number).filter(Boolean);
 
   const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
@@ -809,9 +809,9 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 
     if (status === "active") {
       const networks = data?.droplet?.networks?.v4 || [];
-      const publicNet = networks.find((n: any) => n.type === "public");
+      const publicNet = (networks as Record<string, unknown>[]).find((n: Record<string, unknown>) => n.type === "public");
       if (publicNet?.ip_address) {
-        doServerIp = publicNet.ip_address;
+        doServerIp = publicNet.ip_address as string;
         logInfo(`Droplet active, IP: ${doServerIp}`);
         return;
       }
@@ -1194,7 +1194,7 @@ export async function destroyServer(dropletId?: string): Promise<void> {
 export async function listServers(): Promise<void> {
   const { text } = await doApi("GET", "/droplets");
   const data = parseJson(text);
-  const droplets: any[] = data?.droplets || [];
+  const droplets: Record<string, unknown>[] = (data?.droplets || []) as Record<string, unknown>[];
 
   if (droplets.length === 0) {
     console.log("No droplets found");
@@ -1205,13 +1205,14 @@ export async function listServers(): Promise<void> {
   console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("SIZE", 15));
   console.log("-".repeat(80));
   for (const d of droplets) {
-    const ip = (d.networks?.v4 || []).find((n: any) => n.type === "public")?.ip_address || "N/A";
+    const networks = (d.networks as Record<string, unknown> | undefined)?.v4 as Record<string, unknown>[] | undefined;
+    const ip = (networks || []).find((n: Record<string, unknown>) => n.type === "public")?.ip_address as string || "N/A";
     console.log(
-      pad((d.name ?? "N/A").slice(0, 24), 25) +
+      pad(((d.name as string) ?? "N/A").slice(0, 24), 25) +
         pad(String(d.id ?? "N/A").slice(0, 11), 12) +
-        pad((d.status ?? "N/A").slice(0, 11), 12) +
+        pad(((d.status as string) ?? "N/A").slice(0, 11), 12) +
         pad(ip.slice(0, 15), 16) +
-        pad((d.size_slug ?? "N/A").slice(0, 14), 15),
+        pad(((d.size_slug as string) ?? "N/A").slice(0, 14), 15),
     );
   }
 }

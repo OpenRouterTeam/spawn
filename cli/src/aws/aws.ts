@@ -137,7 +137,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): any {
+function parseJson(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
@@ -1224,7 +1224,8 @@ export async function listServers(): Promise<void> {
   } else {
     const resp = await lightsailRest("Lightsail_20161128.GetInstances", "{}");
     const data = parseJson(resp);
-    const instances: any[] = data?.instances ?? [];
+    const parsed = data as Record<string, unknown> | null;
+    const instances: Record<string, unknown>[] = (parsed?.instances ?? []) as Record<string, unknown>[];
     const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
     console.log(pad("Name", 30) + pad("State", 12) + pad("IP", 16) + "Bundle");
     console.log("-".repeat(72));

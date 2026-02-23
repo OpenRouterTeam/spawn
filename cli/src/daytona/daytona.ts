@@ -43,7 +43,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): any {
+function parseJson(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
@@ -639,7 +639,8 @@ export async function destroyServer(id?: string): Promise<void> {
 export async function listServers(): Promise<void> {
   const response = await daytonaApi("GET", "/sandbox");
   const data = parseJson(response);
-  const items: any[] = Array.isArray(data) ? data : (data?.items ?? data?.sandboxes ?? []);
+  const parsed = data as Record<string, unknown> | null;
+  const items: Record<string, unknown>[] = Array.isArray(data) ? data : ((parsed?.items ?? parsed?.sandboxes ?? []) as Record<string, unknown>[]);
 
   if (items.length === 0) {
     console.log("No sandboxes found");

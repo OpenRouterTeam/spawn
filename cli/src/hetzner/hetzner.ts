@@ -74,13 +74,21 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
   throw new Error("hetznerApi: unreachable");
 }
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+// biome-lint-safe replacement for `any` on parsed JSON
+// Allows arbitrary nested property access via optional chaining
+interface JsonObject {
+  [key: string]: JsonObject | string | number | boolean | null | undefined | JsonObject[];
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): any {
+function parseJson(text: string): JsonObject | null {
   try {
     return JSON.parse(text);
   } catch {
@@ -214,7 +222,7 @@ function generateSshKeyIfMissing(): {
   mkdirSync(sshDir, {
     recursive: true,
     mode: 0o700,
-  } as any);
+  } as { recursive: boolean; mode: number });
   logStep("Generating SSH key...");
   const result = Bun.spawnSync(
     [
@@ -277,7 +285,7 @@ export async function ensureSshKey(): Promise<void> {
   // Check if key is already registered
   const resp = await hetznerApi("GET", "/ssh_keys");
   const data = parseJson(resp);
-  const sshKeys: any[] = data?.ssh_keys || [];
+  const sshKeys: JsonObject[] = (data?.ssh_keys as JsonObject[]) || [];
 
   for (const key of sshKeys) {
     if (fingerprint && key.fingerprint === fingerprint) {
@@ -402,7 +410,7 @@ export async function createServer(
   // Get all SSH key IDs
   const keysResp = await hetznerApi("GET", "/ssh_keys");
   const keysData = parseJson(keysResp);
-  const sshKeyIds: number[] = (keysData?.ssh_keys || []).map((k: any) => k.id).filter(Boolean);
+  const sshKeyIds: number[] = ((keysData?.ssh_keys as JsonObject[]) || []).map((k: JsonObject) => k.id as number).filter(Boolean);
 
   const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
@@ -773,7 +781,7 @@ export async function destroyServer(serverId?: string): Promise<void> {
 export async function listServers(): Promise<void> {
   const resp = await hetznerApi("GET", "/servers");
   const data = parseJson(resp);
-  const servers: any[] = data?.servers || [];
+  const servers: JsonObject[] = (data?.servers as JsonObject[]) || [];
 
   if (servers.length === 0) {
     console.log("No servers found");

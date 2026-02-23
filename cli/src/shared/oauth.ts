@@ -163,7 +163,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
       }),
       signal: AbortSignal.timeout(30_000),
     });
-    const data = (await resp.json()) as any;
+    const data = (await resp.json()) as Record<string, unknown>;
     if (data.key) {
       logInfo("Successfully obtained OpenRouter API key via OAuth!");
       return data.key;

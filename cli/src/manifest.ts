@@ -128,24 +128,24 @@ function writeCache(data: Manifest): void {
 
 /** Recursively strip __proto__, constructor, and prototype keys from parsed JSON
  *  to prevent prototype pollution attacks (defense in depth). */
-function stripDangerousKeys(obj: any): any {
+function stripDangerousKeys(obj: unknown): unknown {
   if (obj === null || typeof obj !== "object") {
     return obj;
   }
   if (Array.isArray(obj)) {
     return obj.map(stripDangerousKeys);
   }
-  const clean: Record<string, any> = {};
+  const clean: Record<string, unknown> = {};
   for (const key of Object.keys(obj)) {
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       continue;
     }
-    clean[key] = stripDangerousKeys(obj[key]);
+    clean[key] = stripDangerousKeys((obj as Record<string, unknown>)[key]);
   }
   return clean;
 }
 
-function isValidManifest(data: any): data is Manifest {
+function isValidManifest(data: unknown): data is Manifest {
   return data && typeof data === "object" && !Array.isArray(data) && data.agents && data.clouds && data.matrix;
 }
 
