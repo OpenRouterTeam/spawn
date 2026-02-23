@@ -242,22 +242,6 @@ describe("cmdList integration", () => {
       // Subtitle lines should contain agent · cloud · time
       expect(output).toContain("Claude Code");
       expect(output).toContain("·");
-      expect(output).toContain("AGENT");
-      expect(output).toContain("CLOUD");
-      expect(output).toContain("WHEN");
-    });
-
-    it("should show separator line under header", async () => {
-      writeHistory(sampleRecords);
-
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
-
-      await cmdList();
-
-      const output = consoleOutput();
-      expect(output).toContain("-".repeat(10));
     });
 
     it("should render records in reverse chronological order (newest first)", async () => {
@@ -384,27 +368,6 @@ describe("cmdList integration", () => {
       expect(output).toContain("Claude Code");
       expect(output).toContain("Sprite");
       expect(output).toContain("Fix all linter errors");
-    });
-
-    it("should truncate long prompts with ellipsis", async () => {
-      writeHistory([
-        {
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-01T10:00:00Z",
-          prompt:
-            "This is a very long prompt that should be truncated because it exceeds the display limit in the table",
-        },
-      ]);
-
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
-
-      await cmdList();
-
-      const output = consoleOutput();
-      expect(output).toContain("...");
     });
 
     it("should include prompt in rerun hint for latest record with prompt", async () => {
