@@ -3,7 +3,7 @@ set -eo pipefail
 
 _ensure_bun() {
     if command -v bun &>/dev/null; then return 0; fi
-    curl -fsSL https://bun.sh/install | bash >/dev/null 2>&1
+    curl -fsSL --show-error https://bun.sh/install | bash >/dev/null
     export PATH="$HOME/.bun/bin:$PATH"
 }
 _ensure_bun

@@ -238,6 +238,8 @@ ensure_gh_auth() {
             export GITHUB_TOKEN="${_gh_token}"
             return 1
         }
+        # Restrict token file permissions to owner-only (prevents exposure on multi-user systems)
+        chmod 600 "${HOME}/.config/gh/hosts.yml" 2>/dev/null || true
         export GITHUB_TOKEN="${_gh_token}"
     elif gh auth status &>/dev/null; then
         log_info "Authenticated with GitHub CLI"
