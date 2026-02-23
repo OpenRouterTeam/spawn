@@ -381,7 +381,7 @@ export async function createServer(name: string): Promise<void> {
   // Set up SSH access
   await setupSshAccess();
 
-  saveVmConnection(sshHost, sshToken, sandboxId, name, "daytona");
+  saveVmConnection("daytona-sandbox", "daytona", sandboxId, name, "daytona");
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────
