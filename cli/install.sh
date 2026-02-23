@@ -205,6 +205,14 @@ clone_cli() {
     curl -fsSL "${SPAWN_RAW_BASE}/cli/bun.lock"       -o "${dest}/cli/bun.lock"
     curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"  -o "${dest}/cli/tsconfig.json"
     for f in $files; do
+        # SECURITY: Reject non-ASCII characters (Unicode lookalikes/homoglyphs)
+        if [[ "$f" =~ [^[:ascii:]] ]]; then
+            log_error "Security: Non-ASCII characters in filename: $f"
+            log_error "Only ASCII filenames are allowed."
+            log_error "Installation aborted for safety."
+            exit 1
+        fi
+
         # SECURITY: Strict allowlist — only alphanumeric, underscore, hyphen, .ts extension
         if [[ ! "$f" =~ ^[a-zA-Z0-9_-]+\.ts$ ]]; then
             log_error "Security: Invalid filename from API: $f"
