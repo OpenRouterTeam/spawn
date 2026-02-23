@@ -293,13 +293,76 @@ export async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, m
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 }
 
+export async function setupOpenclawBatched(
+  runner: CloudRunner,
+  envContent: string,
+  apiKey: string,
+  modelId: string,
+): Promise<void> {
+  logStep("Setting up OpenClaw (install check + env + config)...");
+
+  const envB64 = Buffer.from(envContent).toString("base64");
+
+  const gatewayToken = crypto.randomUUID().replace(/-/g, "");
+  const configJson = JSON.stringify({
+    env: {
+      OPENROUTER_API_KEY: apiKey,
+    },
+    gateway: {
+      mode: "local",
+      auth: {
+        token: gatewayToken,
+      },
+    },
+    agents: {
+      defaults: {
+        model: {
+          primary: modelId,
+        },
+      },
+    },
+  });
+  const configB64 = Buffer.from(configJson).toString("base64");
+
+  const script = [
+    'echo "==> Checking openclaw..."',
+    'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
+    "if command -v openclaw >/dev/null 2>&1; then",
+    '  echo "    openclaw found at $(command -v openclaw)"',
+    "else",
+    '  echo "    openclaw not found, installing..."',
+    "  bun install -g openclaw",
+    '  command -v openclaw || { echo "ERROR: openclaw install failed"; exit 1; }',
+    "fi",
+    'echo "==> Writing environment variables..."',
+    `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc`,
+    "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc",
+    "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc",
+    'echo "==> Writing openclaw config..."',
+    "mkdir -p ~/.openclaw",
+    `printf '%s' '${configB64}' | base64 -d > ~/.openclaw/openclaw.json && chmod 600 ~/.openclaw/openclaw.json`,
+    'echo "==> Setup complete"',
+  ].join("\n");
+
+  await runner.runServer(script);
+  logInfo("OpenClaw setup complete (install + env + config)");
+}
+
 export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
-  await runner.runServer(
-    "source ~/.spawnrc 2>/dev/null; export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-      "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
-      "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi",
-  );
+  // Start the daemon AND wait for port 18789 in a single SSH session.
+  // The polling loop doubles as a keepalive for flyctl.
+  const script =
+    "source ~/.spawnrc 2>/dev/null; " +
+    "export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+    "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
+    "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; " +
+    "elapsed=0; while [ $elapsed -lt 60 ]; do " +
+    'if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo "Gateway ready after ${elapsed}s"; exit 0; fi; ' +
+    "printf '.'; sleep 1; elapsed=$((elapsed + 1)); " +
+    "done; " +
+    'echo "Gateway failed to start after 60s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1';
+  await runner.runServer(script);
   logInfo("OpenClaw gateway started");
 }
 

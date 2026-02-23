@@ -56,42 +56,48 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
   // 7. Wait for readiness
   await cloud.waitForReady();
 
-  // 8. Install agent
-  await agent.install();
-
-  // 9. Inject environment variables via .spawnrc
-  logStep("Setting up environment variables...");
   const envContent = generateEnvConfig(agent.envVars(apiKey));
-  const envB64 = Buffer.from(envContent).toString("base64");
-  try {
-    await withRetry(
-      "env setup",
-      () =>
-        wrapSshCall(
-          cloud.runner.runServer(
-            `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
-              `grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc; ` +
-              `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc`,
+
+  if (agent.setup) {
+    // Batched path: install + env + config in a single SSH session
+    await agent.setup(envContent, apiKey, modelId);
+  } else {
+    // 8. Install agent
+    await agent.install();
+
+    // 9. Inject environment variables via .spawnrc
+    logStep("Setting up environment variables...");
+    const envB64 = Buffer.from(envContent).toString("base64");
+    try {
+      await withRetry(
+        "env setup",
+        () =>
+          wrapSshCall(
+            cloud.runner.runServer(
+              `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc; ` +
+                `grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc; ` +
+                `grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc`,
+            ),
           ),
-        ),
-      2,
-      5,
-    );
-  } catch {
-    logWarn("Environment setup had errors");
+        2,
+        5,
+      );
+    } catch {
+      logWarn("Environment setup had errors");
+    }
+
+    // 10. Agent-specific configuration
+    if (agent.configure) {
+      try {
+        await withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId)), 2, 5);
+      } catch {
+        logWarn("Agent configuration failed (continuing with defaults)");
+      }
+    }
   }
 
   // GitHub CLI setup
   await offerGithubAuth(cloud.runner);
-
-  // 10. Agent-specific configuration
-  if (agent.configure) {
-    try {
-      await withRetry("agent config", () => wrapSshCall(agent.configure!(apiKey, modelId)), 2, 5);
-    } catch {
-      logWarn("Agent configuration failed (continuing with defaults)");
-    }
-  }
 
   // 11. Pre-launch hooks (e.g. OpenClaw gateway)
   if (agent.preLaunch) {
