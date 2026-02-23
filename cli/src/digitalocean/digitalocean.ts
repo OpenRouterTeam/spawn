@@ -841,7 +841,8 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
-const SSH_OPTS = SSH_BASE_OPTS;
+const SSH_KEY_PATH = `${process.env.HOME}/.ssh/id_ed25519`;
+const SSH_OPTS = [...SSH_BASE_OPTS, "-i", SSH_KEY_PATH];
 
 export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<void> {
   const serverIp = ip || doServerIp;
@@ -849,6 +850,7 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
     host: serverIp,
     user: "root",
     maxAttempts: 36,
+    sshKeyPath: SSH_KEY_PATH,
   });
 
   // Stream cloud-init output so the user sees progress in real time
