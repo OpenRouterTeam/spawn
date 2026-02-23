@@ -79,7 +79,7 @@ function compareVersions(current: string, latest: string): boolean {
     }
   }
 
-  return false; // Versions are equal
+  return false;
 }
 
 // ── Failure Backoff ──────────────────────────────────────────────────────────

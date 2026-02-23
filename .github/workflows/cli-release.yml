@@ -7,6 +7,11 @@ on:
       - 'cli/src/**'
       - 'cli/package.json'
       - 'cli/bun.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: cli-release
+  cancel-in-progress: true
 
 jobs:
   build:
