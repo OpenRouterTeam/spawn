@@ -34,6 +34,14 @@ async function promptVmOptions(): Promise<ServerOptions> {
     };
   }
 
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return {
+      cpuKind: DEFAULT_VM_TIER.cpuKind,
+      cpus: DEFAULT_VM_TIER.cpus,
+      memoryMb: DEFAULT_VM_TIER.memoryMb,
+    };
+  }
+
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     return {
       cpuKind: DEFAULT_VM_TIER.cpuKind,

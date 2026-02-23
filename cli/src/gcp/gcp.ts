@@ -487,6 +487,10 @@ export async function promptMachineType(): Promise<string> {
     return process.env.GCP_MACHINE_TYPE;
   }
 
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return DEFAULT_MACHINE_TYPE;
+  }
+
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     return DEFAULT_MACHINE_TYPE;
   }
@@ -500,6 +504,10 @@ export async function promptZone(): Promise<string> {
   if (process.env.GCP_ZONE) {
     logInfo(`Using zone from environment: ${process.env.GCP_ZONE}`);
     return process.env.GCP_ZONE;
+  }
+
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return DEFAULT_ZONE;
   }
 
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {

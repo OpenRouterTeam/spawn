@@ -338,6 +338,7 @@ describe("KNOWN_FLAGS completeness", () => {
       "--agent",
       "--cloud",
       "--clear",
+      "--custom",
     ];
     for (const flag of expected) {
       expect(KNOWN_FLAGS.has(flag)).toBe(true);

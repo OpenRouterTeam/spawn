@@ -92,6 +92,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--debug")}             Show all commands being executed`);
     console.error(`    ${pc.cyan("--headless")}          Non-interactive mode (no prompts, no SSH session)`);
     console.error(`    ${pc.cyan("--output json")}       Output structured JSON to stdout`);
+    console.error(`    ${pc.cyan("--custom")}            Show interactive size/region pickers`);
     console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
@@ -703,6 +704,14 @@ async function main(): Promise<void> {
     filteredArgs.splice(headlessIdx, 1);
   }
 
+  // Extract --custom boolean flag
+  const customIdx = filteredArgs.indexOf("--custom");
+  const custom = customIdx !== -1;
+  if (custom) {
+    filteredArgs.splice(customIdx, 1);
+    process.env.SPAWN_CUSTOM = "1";
+  }
+
   // Extract --output <format> flag
   const [outputFormat, outputFilteredArgs] = extractFlagValue(
     filteredArgs,
@@ -738,6 +747,25 @@ async function main(): Promise<void> {
 
   // --output implies --headless
   const effectiveHeadless = headless || !!outputFormat;
+
+  // Validate --custom + --headless incompatibility
+  if (custom && effectiveHeadless) {
+    if (outputFormat === "json") {
+      console.log(
+        JSON.stringify({
+          status: "error",
+          error_code: "VALIDATION_ERROR",
+          error_message: "--custom and --headless cannot be used together",
+        }),
+      );
+    } else {
+      console.error(pc.red("Error: --custom and --headless cannot be used together"));
+      console.error(
+        `\n${pc.cyan("--custom")} enables interactive pickers, but ${pc.cyan("--headless")} disables all prompts.`,
+      );
+    }
+    process.exit(3);
+  }
 
   // Validate headless-incompatible flags
   if (effectiveHeadless && dryRun) {
