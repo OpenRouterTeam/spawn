@@ -279,24 +279,16 @@ describe("install.sh validation", () => {
   // ── clone_cli function ──────────────────────────────────────────────
 
   describe("clone_cli", () => {
-    it("should check for git availability", () => {
-      expect(content).toContain("command -v git");
+    it("should not require git (avoids macOS Xcode CLT trigger)", () => {
+      expect(content).not.toContain("command -v git");
+      expect(content).not.toContain("git clone");
+      expect(content).not.toContain("sparse-checkout");
     });
 
-    it("should use sparse checkout for git clone", () => {
-      expect(content).toContain("sparse-checkout");
-    });
-
-    it("should use --depth 1 for shallow clone", () => {
-      expect(content).toContain("--depth 1");
-    });
-
-    it("should fall back to curl download when git is not available", () => {
-      // Extract clone_cli function body up to the next top-level function
+    it("should download source via curl and GitHub API", () => {
       const fnStart = content.indexOf("clone_cli()");
       const fnEnd = content.indexOf("\n# --- Helper: build", fnStart);
       const fnBody = content.slice(fnStart, fnEnd > fnStart ? fnEnd : undefined);
-      // Should have an else branch that uses curl
       expect(fnBody).toContain("curl");
       expect(fnBody).toContain("api.github.com");
     });
@@ -312,13 +304,6 @@ describe("install.sh validation", () => {
 
     it("should exclude __tests__ directory from downloads", () => {
       expect(content).toContain("__tests__");
-    });
-
-    it("should clean up temporary repo directory after sparse checkout", () => {
-      const fnStart = content.indexOf("clone_cli()");
-      const fnBody = content.slice(fnStart);
-      // Should remove the temporary repo dir (uses safe canonical path validation)
-      expect(fnBody).toContain('rm -rf "${canonical_repo}"');
     });
   });
 

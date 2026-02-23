@@ -194,51 +194,27 @@ ensure_in_path() {
 
 clone_cli() {
     local dest="$1"
-    if command -v git &>/dev/null; then
-        log_step "Cloning CLI source..."
-        git clone --depth 1 --filter=blob:none --sparse \
-            "https://github.com/${SPAWN_REPO}.git" "${dest}/repo" 2>/dev/null
-        cd "${dest}/repo"
-        git sparse-checkout set cli 2>/dev/null
-        mv cli "${dest}/cli"
-        cd "${dest}"
-        # Safety check: resolve symlinks with pwd -P, then delete via canonical path
-        local repo_dir="${dest}/repo"
-        if [[ -d "${repo_dir}" ]]; then
-            local canonical_repo
-            canonical_repo=$(cd "${repo_dir}" 2>/dev/null && pwd -P) || true
-            local canonical_dest
-            canonical_dest=$(cd "${dest}" 2>/dev/null && pwd -P) || true
-
-            if [[ -n "${canonical_repo}" ]] && [[ -n "${canonical_dest}" ]] && [[ "${canonical_repo}" == "${canonical_dest}/repo" ]]; then
-                rm -rf "${canonical_repo}"
-            else
-                log_warn "Skipping cleanup: path validation failed"
-            fi
+    log_step "Downloading CLI source..."
+    mkdir -p "${dest}/cli/src"
+    # Download all source files via GitHub API
+    local files
+    files=$(curl -fsSL "https://api.github.com/repos/${SPAWN_REPO}/contents/cli/src" \
+        | grep '"name"' | grep '\.ts"' | grep -v '__tests__' \
+        | sed 's/.*"name": "//;s/".*//')
+    curl -fsSL "${SPAWN_RAW_BASE}/cli/package.json"  -o "${dest}/cli/package.json"
+    curl -fsSL "${SPAWN_RAW_BASE}/cli/bun.lock"       -o "${dest}/cli/bun.lock"
+    curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"  -o "${dest}/cli/tsconfig.json"
+    for f in $files; do
+        # SECURITY: Strict allowlist — only alphanumeric, underscore, hyphen, .ts extension
+        if [[ ! "$f" =~ ^[a-zA-Z0-9_-]+\.ts$ ]]; then
+            log_error "Security: Invalid filename from API: $f"
+            log_error "Only alphanumeric .ts filenames are allowed."
+            log_error "Installation aborted for safety."
+            exit 1
         fi
-    else
-        log_step "Downloading CLI source..."
-        mkdir -p "${dest}/cli/src"
-        # Download all source files via GitHub API
-        local files
-        files=$(curl -fsSL "https://api.github.com/repos/${SPAWN_REPO}/contents/cli/src" \
-            | grep '"name"' | grep '\.ts"' | grep -v '__tests__' \
-            | sed 's/.*"name": "//;s/".*//')
-        curl -fsSL "${SPAWN_RAW_BASE}/cli/package.json"  -o "${dest}/cli/package.json"
-        curl -fsSL "${SPAWN_RAW_BASE}/cli/bun.lock"       -o "${dest}/cli/bun.lock"
-        curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"  -o "${dest}/cli/tsconfig.json"
-        for f in $files; do
-            # SECURITY: Strict allowlist — only alphanumeric, underscore, hyphen, .ts extension
-            if [[ ! "$f" =~ ^[a-zA-Z0-9_-]+\.ts$ ]]; then
-                log_error "Security: Invalid filename from API: $f"
-                log_error "Only alphanumeric .ts filenames are allowed."
-                log_error "Installation aborted for safety."
-                exit 1
-            fi
 
-            curl -fsSL "${SPAWN_RAW_BASE}/cli/src/${f}" -o "${dest}/cli/src/${f}"
-        done
-    fi
+        curl -fsSL "${SPAWN_RAW_BASE}/cli/src/${f}" -o "${dest}/cli/src/${f}"
+    done
 }
 
 # --- Helper: build and install the CLI using bun ---
