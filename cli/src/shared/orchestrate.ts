@@ -3,7 +3,7 @@
 
 import type { AgentConfig } from "./agents";
 import { generateEnvConfig } from "./agents";
-import { logInfo, logStep, logWarn, withRetry } from "./ui";
+import { logInfo, logStep, logWarn, withRetry, prepareStdinForHandoff } from "./ui";
 import { getOrPromptApiKey, getModelIdInteractive } from "./oauth";
 import type { CloudRunner } from "./agent-setup";
 import { offerGithubAuth, wrapSshCall } from "./agent-setup";
@@ -104,7 +104,11 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
   logInfo(`${cloud.cloudLabel} setup completed successfully!`);
   process.stderr.write("\n");
   logStep("Starting agent...");
-  await new Promise((r) => setTimeout(r, 1000));
+
+  // Clean up stdin state accumulated during provisioning (readline, @clack/prompts
+  // raw mode, keypress listeners) so child_process.spawn gets a pristine FD handoff
+  prepareStdinForHandoff();
+  await new Promise((r) => setTimeout(r, 500));
 
   const launchCmd = agent.launchCmd();
   cloud.saveLaunchCmd(launchCmd);
