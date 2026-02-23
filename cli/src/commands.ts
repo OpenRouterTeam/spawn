@@ -52,6 +52,7 @@ import {
 import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAuthenticate } from "./aws/aws.js";
 import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "./daytona/daytona.js";
 import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "./sprite/sprite.js";
+import { SSH_INTERACTIVE_OPTS } from "./shared/ssh.js";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -2757,13 +2758,12 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
 
   // Handle SSH connections
   p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
-  const sshCmd = `ssh -o StrictHostKeyChecking=accept-new ${connection.user}@${connection.ip}`;
+  const sshCmd = `ssh ${connection.user}@${connection.ip}`;
 
   return runInteractiveCommand(
     "ssh",
     [
-      "-o",
-      "StrictHostKeyChecking=accept-new",
+      ...SSH_INTERACTIVE_OPTS,
       `${connection.user}@${connection.ip}`,
     ],
     "SSH connection failed",
@@ -2873,9 +2873,7 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
   return runInteractiveCommand(
     "ssh",
     [
-      "-t",
-      "-o",
-      "StrictHostKeyChecking=accept-new",
+      ...SSH_INTERACTIVE_OPTS,
       `${connection.user}@${connection.ip}`,
       "--",
       `bash -lc '${remoteCmd}'`,

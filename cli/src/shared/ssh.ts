@@ -27,6 +27,40 @@ export const SSH_BASE_OPTS: string[] = [
   "BatchMode=yes",
 ];
 
+/**
+ * SSH options for interactive sessions (user-facing TTY).
+ *
+ * Differences from SSH_BASE_OPTS:
+ * - No BatchMode (interactive sessions need TTY prompts to work)
+ * - StrictHostKeyChecking=accept-new instead of =no (safer for reconnects)
+ * - Compression=yes (reduces latency on slow/distant links)
+ * - IPQoS=lowdelay (mark packets for low-latency QoS treatment)
+ * - RequestTTY=yes (force TTY allocation for the session)
+ */
+export const SSH_INTERACTIVE_OPTS: string[] = [
+  "-o",
+  "StrictHostKeyChecking=accept-new",
+  "-o",
+  "UserKnownHostsFile=/dev/null",
+  "-o",
+  "LogLevel=ERROR",
+  "-o",
+  "ConnectTimeout=10",
+  "-o",
+  "ServerAliveInterval=15",
+  "-o",
+  "ServerAliveCountMax=3",
+  "-o",
+  "GSSAPIAuthentication=no",
+  "-o",
+  "TCPKeepAlive=no",
+  "-o",
+  "Compression=yes",
+  "-o",
+  "IPQoS=lowdelay",
+  "-t",
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Async sleep — shared across all cloud providers. */
