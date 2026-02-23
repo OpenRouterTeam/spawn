@@ -16,7 +16,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import { saveVmConnection } from "../history.js";
 
@@ -898,9 +898,8 @@ export async function interactiveSession(cmd: string): Promise<number> {
     const child = spawn(
       "ssh",
       [
-        ...SSH_BASE_OPTS,
+        ...SSH_INTERACTIVE_OPTS,
         ...keyOpts,
-        "-t",
         `${username}@${gcpServerIp}`,
         `bash -c ${shellQuote(fullCmd)}`,
       ],
