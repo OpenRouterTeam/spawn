@@ -1,6 +1,6 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   logInfo,
@@ -17,6 +17,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import { saveVmConnection } from "../history.js";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
@@ -512,43 +513,16 @@ export async function promptZone(): Promise<string> {
 
 // ─── SSH Key ────────────────────────────────────────────────────────────────
 
-function ensureSshKey(): string {
-  const keyPath = `${process.env.HOME}/.ssh/id_ed25519`;
-  const pubKeyPath = `${keyPath}.pub`;
-
-  if (!existsSync(pubKeyPath)) {
-    logStep("Generating SSH key...");
-    mkdirSync(`${process.env.HOME}/.ssh`, {
-      recursive: true,
-    });
-    const result = Bun.spawnSync(
-      [
-        "ssh-keygen",
-        "-t",
-        "ed25519",
-        "-f",
-        keyPath,
-        "-N",
-        "",
-        "-q",
-      ],
-      {
-        stdio: [
-          "ignore",
-          "ignore",
-          "ignore",
-        ],
-      },
-    );
-    if (result.exitCode !== 0) {
-      logError("Failed to generate SSH key");
-      throw new Error("SSH keygen failed");
-    }
+async function ensureSshKey(): Promise<string> {
+  const selectedKeys = await ensureSshKeys();
+  // GCP accepts multiple ssh-keys in metadata, one per line
+  const pubKeys: string[] = [];
+  for (const key of selectedKeys) {
+    const pubKey = readFileSync(key.pubPath, "utf-8").trim();
+    pubKeys.push(pubKey);
   }
-
-  const pubKey = readFileSync(pubKeyPath, "utf-8").trim();
-  logInfo("SSH key ready");
-  return pubKey;
+  logInfo(`${selectedKeys.length} SSH key(s) ready`);
+  return pubKeys.join("\n");
 }
 
 // ─── Username ───────────────────────────────────────────────────────────────
@@ -661,7 +635,12 @@ export async function createInstance(
   tier?: CloudInitTier,
 ): Promise<void> {
   const username = resolveUsername();
-  const pubKey = ensureSshKey();
+  const pubKeys = await ensureSshKey();
+  // Build ssh-keys metadata: one "user:key" entry per line
+  const sshKeysMetadata = pubKeys
+    .split("\n")
+    .map((k) => `${username}:${k}`)
+    .join("\n");
 
   logStep(`Creating GCP instance '${name}' (type: ${machineType}, zone: ${zone})...`);
 
@@ -679,7 +658,7 @@ export async function createInstance(
     "--image-family=ubuntu-2404-lts-amd64",
     "--image-project=ubuntu-os-cloud",
     `--metadata-from-file=startup-script=${tmpFile}`,
-    `--metadata=ssh-keys=${username}:${pubKey}`,
+    `--metadata=ssh-keys=${sshKeysMetadata}`,
     `--project=${gcpProject}`,
     "--quiet",
   ];
@@ -755,14 +734,14 @@ export async function createInstance(
 
 // ─── SSH Operations ─────────────────────────────────────────────────────────
 
-const SSH_OPTS = SSH_BASE_OPTS;
-
 export async function waitForSsh(maxAttempts = 36): Promise<void> {
   const username = resolveUsername();
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   await sharedWaitForSsh({
     host: gcpServerIp,
     user: username,
     maxAttempts,
+    extraSshOpts: keyOpts,
   });
 }
 
@@ -771,13 +750,15 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 
   logStep("Waiting for startup script completion...");
   const username = resolveUsername();
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const proc = Bun.spawn(
         [
           "ssh",
-          ...SSH_OPTS,
+          ...SSH_BASE_OPTS,
+          ...keyOpts,
           `${username}@${gcpServerIp}`,
           "test -f /tmp/.cloud-init-complete",
         ],
@@ -805,11 +786,13 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
   const username = resolveUsername();
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       `${username}@${gcpServerIp}`,
       `bash -c ${shellQuote(fullCmd)}`,
     ],
@@ -838,11 +821,13 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
 export async function runServerCapture(cmd: string, timeoutSecs?: number): Promise<string> {
   const username = resolveUsername();
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       `${username}@${gcpServerIp}`,
       `bash -c ${shellQuote(fullCmd)}`,
     ],
@@ -878,11 +863,13 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
   const username = resolveUsername();
   // Expand $HOME on remote side
   const expandedPath = remotePath.replace(/^\$HOME/, "~");
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
     [
       "scp",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       localPath,
       `${username}@${gcpServerIp}:${expandedPath}`,
     ],
@@ -905,10 +892,12 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const username = resolveUsername();
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = await new Promise<number>((resolve, reject) => {
     const child = spawn("ssh", [
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       "-t",
       `${username}@${gcpServerIp}`,
       `bash -c ${shellQuote(fullCmd)}`,

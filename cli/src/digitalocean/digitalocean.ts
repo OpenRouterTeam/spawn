@@ -1,6 +1,6 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import * as v from "valibot";
 import {
@@ -20,6 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import { saveVmConnection } from "../history.js";
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
@@ -568,123 +569,53 @@ export async function ensureDoToken(): Promise<boolean> {
 
 // ─── SSH Key Management ──────────────────────────────────────────────────────
 
-function generateSshKeyIfMissing(): {
-  pubPath: string;
-  privPath: string;
-} {
-  const sshDir = `${process.env.HOME}/.ssh`;
-  const privPath = `${sshDir}/id_ed25519`;
-  const pubPath = `${privPath}.pub`;
-
-  if (existsSync(pubPath) && existsSync(privPath)) {
-    return {
-      pubPath,
-      privPath,
-    };
-  }
-
-  mkdirSync(sshDir, {
-    recursive: true,
-    mode: 0o700,
-  });
-  logStep("Generating SSH key...");
-  const result = Bun.spawnSync(
-    [
-      "ssh-keygen",
-      "-t",
-      "ed25519",
-      "-f",
-      privPath,
-      "-N",
-      "",
-      "-C",
-      "spawn",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  if (result.exitCode !== 0) {
-    throw new Error("SSH key generation failed");
-  }
-  logInfo("SSH key generated");
-  return {
-    pubPath,
-    privPath,
-  };
-}
-
-function getSshFingerprint(pubPath: string): string {
-  const result = Bun.spawnSync(
-    [
-      "ssh-keygen",
-      "-l",
-      "-E",
-      "md5",
-      "-f",
-      pubPath,
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  const output = new TextDecoder().decode(result.stdout).trim();
-  const match = output.match(/MD5:([a-f0-9:]+)/);
-  return match ? match[1] : "";
-}
-
 export async function ensureSshKey(): Promise<void> {
-  const { pubPath } = generateSshKeyIfMissing();
-  const fingerprint = getSshFingerprint(pubPath);
-  if (!fingerprint) {
-    logWarn("Could not determine SSH key fingerprint");
-    return;
+  const selectedKeys = await ensureSshKeys();
+
+  for (const key of selectedKeys) {
+    const fingerprint = getSshFingerprint(key.pubPath);
+    if (!fingerprint) {
+      logWarn(`Could not determine fingerprint for SSH key '${key.name}'`);
+      continue;
+    }
+
+    // Check if key is registered with DigitalOcean
+    const { text } = await doApi("GET", "/account/keys");
+    const data = parseJson(text);
+    const keys = toObjectArray(data?.ssh_keys);
+
+    const found = keys.some((k: Record<string, unknown>) => {
+      const fp = k.fingerprint || "";
+      return fp === fingerprint;
+    });
+
+    if (found) {
+      logInfo(`SSH key '${key.name}' already registered with DigitalOcean`);
+      continue;
+    }
+
+    // Register key
+    logStep(`Registering SSH key '${key.name}' with DigitalOcean...`);
+    const pubKey = readFileSync(key.pubPath, "utf-8").trim();
+    const body = JSON.stringify({
+      name: `spawn-${key.name}`,
+      public_key: pubKey,
+    });
+    const { text: regText } = await doApi("POST", "/account/keys", body);
+
+    if (regText.includes('"id"')) {
+      logInfo(`SSH key '${key.name}' registered with DigitalOcean`);
+      continue;
+    }
+
+    // Key may already exist under a different name — non-fatal
+    if (regText.includes("already been taken") || regText.includes("already in use")) {
+      logInfo(`SSH key '${key.name}' already registered (under a different name)`);
+      continue;
+    }
+
+    logWarn(`SSH key '${key.name}' registration may have failed, continuing...`);
   }
-
-  // Check if key is registered with DigitalOcean
-  const { text } = await doApi("GET", "/account/keys");
-  const data = parseJson(text);
-  const keys = toObjectArray(data?.ssh_keys);
-
-  const found = keys.some((k: Record<string, unknown>) => {
-    const fp = k.fingerprint || "";
-    return fp === fingerprint;
-  });
-
-  if (found) {
-    logInfo("SSH key already registered with DigitalOcean");
-    return;
-  }
-
-  // Register key
-  logStep("Registering SSH key with DigitalOcean...");
-  const pubKey = readFileSync(pubPath, "utf-8").trim();
-  const body = JSON.stringify({
-    name: "spawn",
-    public_key: pubKey,
-  });
-  const { text: regText } = await doApi("POST", "/account/keys", body);
-
-  if (regText.includes('"id"')) {
-    logInfo("SSH key registered with DigitalOcean");
-    return;
-  }
-
-  // Key may already exist under a different name — non-fatal
-  if (regText.includes("already been taken") || regText.includes("already in use")) {
-    logInfo("SSH key already registered (under a different name)");
-    return;
-  }
-
-  logWarn("SSH key registration may have failed, continuing...");
 }
 
 // ─── Provisioning ────────────────────────────────────────────────────────────
@@ -797,16 +728,15 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
-const SSH_KEY_PATH = `${process.env.HOME}/.ssh/id_ed25519`;
-const SSH_OPTS = [...SSH_BASE_OPTS, "-i", SSH_KEY_PATH];
-
 export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<void> {
   const serverIp = ip || doServerIp;
+  const selectedKeys = await ensureSshKeys();
+  const keyOpts = getSshKeyOpts(selectedKeys);
   await sharedWaitForSsh({
     host: serverIp,
     user: "root",
     maxAttempts: 36,
-    sshKeyPath: SSH_KEY_PATH,
+    extraSshOpts: keyOpts,
   });
 
   // Stream cloud-init output so the user sees progress in real time
@@ -827,7 +757,8 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
     const proc = Bun.spawn(
       [
         "ssh",
-        ...SSH_OPTS,
+        ...SSH_BASE_OPTS,
+        ...keyOpts,
         `root@${serverIp}`,
         remoteScript,
       ],
@@ -855,7 +786,8 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
       const proc = Bun.spawn(
         [
           "ssh",
-          ...SSH_OPTS,
+          ...SSH_BASE_OPTS,
+          ...keyOpts,
           `root@${serverIp}`,
           "test -f /root/.cloud-init-complete && echo done",
         ],
@@ -884,11 +816,13 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
   const serverIp = ip || doServerIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       `root@${serverIp}`,
       fullCmd,
     ],
@@ -923,11 +857,13 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: string): Promise<string> {
   const serverIp = ip || doServerIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       `root@${serverIp}`,
       fullCmd,
     ],
@@ -968,10 +904,12 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
     throw new Error("Invalid remote path");
   }
 
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const proc = Bun.spawn(
     [
       "scp",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       localPath,
       `root@${serverIp}:${remotePath}`,
     ],
@@ -993,9 +931,10 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const serverIp = ip || doServerIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = await new Promise<number>((resolve, reject) => {
-    const child = spawn("ssh", [...SSH_OPTS, "-t", `root@${serverIp}`, fullCmd], {
+    const child = spawn("ssh", [...SSH_BASE_OPTS, ...keyOpts, "-t", `root@${serverIp}`, fullCmd], {
       stdio: "inherit",
     });
     child.on("close", (code) => resolve(code ?? 0));

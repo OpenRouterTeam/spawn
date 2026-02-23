@@ -1,6 +1,6 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   logInfo,
@@ -18,6 +18,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
 import { saveVmConnection } from "../history.js";
@@ -217,117 +218,49 @@ export async function ensureHcloudToken(): Promise<void> {
 
 // ─── SSH Key Management ──────────────────────────────────────────────────────
 
-function generateSshKeyIfMissing(): {
-  pubPath: string;
-  privPath: string;
-} {
-  const sshDir = `${process.env.HOME}/.ssh`;
-  const privPath = `${sshDir}/id_ed25519`;
-  const pubPath = `${privPath}.pub`;
-
-  if (existsSync(pubPath) && existsSync(privPath)) {
-    return {
-      pubPath,
-      privPath,
-    };
-  }
-
-  mkdirSync(sshDir, {
-    recursive: true,
-    mode: 0o700,
-  });
-  logStep("Generating SSH key...");
-  const result = Bun.spawnSync(
-    [
-      "ssh-keygen",
-      "-t",
-      "ed25519",
-      "-f",
-      privPath,
-      "-N",
-      "",
-      "-C",
-      "spawn",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  if (result.exitCode !== 0) {
-    throw new Error("SSH key generation failed");
-  }
-  logInfo("SSH key generated");
-  return {
-    pubPath,
-    privPath,
-  };
-}
-
-function getSshFingerprint(pubPath: string): string {
-  const result = Bun.spawnSync(
-    [
-      "ssh-keygen",
-      "-lf",
-      pubPath,
-      "-E",
-      "md5",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  const output = new TextDecoder().decode(result.stdout).trim();
-  // Format: "2048 MD5:xx:xx:xx... user@host (ED25519)"
-  const match = output.match(/MD5:([a-f0-9:]+)/i);
-  return match ? match[1] : "";
-}
-
 export async function ensureSshKey(): Promise<void> {
-  const { pubPath } = generateSshKeyIfMissing();
-  const fingerprint = getSshFingerprint(pubPath);
-  const pubKey = readFileSync(pubPath, "utf-8").trim();
+  const selectedKeys = await ensureSshKeys();
 
-  // Check if key is already registered
-  const resp = await hetznerApi("GET", "/ssh_keys");
-  const data = parseJson(resp);
-  const sshKeys = toObjectArray(data?.ssh_keys);
+  for (const key of selectedKeys) {
+    const fingerprint = getSshFingerprint(key.pubPath);
+    const pubKey = readFileSync(key.pubPath, "utf-8").trim();
 
-  for (const key of sshKeys) {
-    if (fingerprint && key.fingerprint === fingerprint) {
-      logInfo("SSH key already registered with Hetzner");
-      return;
+    // Check if key is already registered
+    const resp = await hetznerApi("GET", "/ssh_keys");
+    const data = parseJson(resp);
+    const sshKeys = toObjectArray(data?.ssh_keys);
+
+    const alreadyRegistered = sshKeys.some(
+      (k) => fingerprint && k.fingerprint === fingerprint,
+    );
+
+    if (alreadyRegistered) {
+      logInfo(`SSH key '${key.name}' already registered with Hetzner`);
+      continue;
     }
-  }
 
-  // Register key
-  logStep("Registering SSH key with Hetzner...");
-  const keyName = `spawn-${Date.now()}`;
-  const body = JSON.stringify({
-    name: keyName,
-    public_key: pubKey,
-  });
-  const regResp = await hetznerApi("POST", "/ssh_keys", body);
-  const regData = parseJson(regResp);
-  const regError = rec(regData?.error);
-  const regErrMsg = typeof regError?.message === "string" ? regError.message : "";
-  if (regErrMsg) {
-    // Key may already exist under a different name — non-fatal
-    if (/already/.test(regErrMsg)) {
-      logInfo("SSH key already registered (different name)");
-      return;
+    // Register key
+    logStep(`Registering SSH key '${key.name}' with Hetzner...`);
+    const keyName = `spawn-${key.name}-${Date.now()}`;
+    const body = JSON.stringify({
+      name: keyName,
+      public_key: pubKey,
+    });
+    const regResp = await hetznerApi("POST", "/ssh_keys", body);
+    const regData = parseJson(regResp);
+    const regError = rec(regData?.error);
+    const regErrMsg = typeof regError?.message === "string" ? regError.message : "";
+    if (regErrMsg) {
+      // Key may already exist under a different name — non-fatal
+      if (/already/.test(regErrMsg)) {
+        logInfo(`SSH key '${key.name}' already registered (different name)`);
+        continue;
+      }
+      logError(`Failed to register SSH key '${key.name}': ${regErrMsg}`);
+      throw new Error("SSH key registration failed");
     }
-    logError(`Failed to register SSH key: ${regErrMsg}`);
-    throw new Error("SSH key registration failed");
+    logInfo(`SSH key '${key.name}' registered with Hetzner`);
   }
-  logInfo("SSH key registered with Hetzner");
 }
 
 // ─── Cloud Init Userdata ────────────────────────────────────────────────────
@@ -433,14 +366,15 @@ export async function createServer(
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
-const SSH_OPTS = SSH_BASE_OPTS;
-
 export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<void> {
   const serverIp = ip || hetznerServerIp;
+  const selectedKeys = await ensureSshKeys();
+  const keyOpts = getSshKeyOpts(selectedKeys);
   await sharedWaitForSsh({
     host: serverIp,
     user: "root",
     maxAttempts: 36,
+    extraSshOpts: keyOpts,
   });
 
   logStep("Waiting for cloud-init to complete...");
@@ -449,7 +383,8 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
       const proc = Bun.spawn(
         [
           "ssh",
-          ...SSH_OPTS,
+          ...SSH_BASE_OPTS,
+          ...keyOpts,
           `root@${serverIp}`,
           "test -f /root/.cloud-init-complete && echo done",
         ],
@@ -482,11 +417,13 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
   const serverIp = ip || hetznerServerIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       `root@${serverIp}`,
       fullCmd,
     ],
@@ -521,11 +458,13 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
 export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: string): Promise<string> {
   const serverIp = ip || hetznerServerIp;
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       `root@${serverIp}`,
       fullCmd,
     ],
@@ -566,10 +505,13 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
     throw new Error("Invalid remote path");
   }
 
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
+
   const proc = Bun.spawn(
     [
       "scp",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       localPath,
       `root@${serverIp}:${remotePath}`,
     ],
@@ -592,8 +534,10 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
 
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
+
   const exitCode = await new Promise<number>((resolve, reject) => {
-    const child = spawn("ssh", [...SSH_OPTS, "-t", `root@${serverIp}`, fullCmd], {
+    const child = spawn("ssh", [...SSH_BASE_OPTS, ...keyOpts, "-t", `root@${serverIp}`, fullCmd], {
       stdio: "inherit",
     });
     child.on("close", (code) => resolve(code ?? 0));
