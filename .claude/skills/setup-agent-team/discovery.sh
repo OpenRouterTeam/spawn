@@ -34,6 +34,17 @@ log_info()  { printf "${GREEN}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m
 log_warn()  { printf "${YELLOW}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] WARN: $1" >> "${LOG_FILE}"; }
 log_error() { printf "${RED}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] ERROR: $1" >> "${LOG_FILE}"; }
 
+# --- Safe rm -rf for worktree paths (defense-in-depth) ---
+safe_rm_worktree() {
+    local target="${1:-}"
+    if [[ -z "${target}" ]]; then return; fi
+    if [[ "${target}" != /tmp/spawn-worktrees/* ]]; then
+        log_error "Refusing to rm -rf: '${target}' is not under /tmp/spawn-worktrees/"
+        return 1
+    fi
+    rm -rf "${target}" 2>/dev/null || true
+}
+
 # --- Cleanup trap ---
 cleanup() {
     if [[ -n "${_cleanup_done:-}" ]]; then return; fi
@@ -42,7 +53,7 @@ cleanup() {
     log_info "Running cleanup (exit_code=${exit_code})..."
     cd "${REPO_ROOT}" 2>/dev/null || true
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    safe_rm_worktree "${WORKTREE_BASE}"
     rm -f "${PROMPT_FILE:-}" 2>/dev/null || true
     log_info "=== Cycle Done (exit_code=${exit_code}) ==="
     exit $exit_code
@@ -99,7 +110,7 @@ _cleanup_stale_artifacts() {
     log_info "Pre-cycle cleanup..."
     git worktree prune 2>/dev/null || true
     if [[ -d "${WORKTREE_BASE}" ]]; then
-        rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+        safe_rm_worktree "${WORKTREE_BASE}"
         log_info "Removed stale ${WORKTREE_BASE} directory"
     fi
 
@@ -212,7 +223,7 @@ run_team_cycle() {
     rm -f "${PROMPT_FILE}" 2>/dev/null || true
     PROMPT_FILE=""
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    safe_rm_worktree "${WORKTREE_BASE}"
 
     return $CLAUDE_EXIT
 }
@@ -224,7 +235,7 @@ cleanup_between_cycles() {
     git fetch --prune origin 2>/dev/null || true
     git pull --rebase origin main 2>/dev/null || true
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    safe_rm_worktree "${WORKTREE_BASE}"
     git branch --merged main | grep -v 'main' | grep -v '^\*' | xargs -r git branch -d 2>/dev/null || true
     log_info "Cleanup complete"
 }

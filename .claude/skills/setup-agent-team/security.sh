@@ -87,6 +87,17 @@ log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] [${RUN_MODE}] $*" | tee -a "${LOG_FILE}"
 }
 
+# --- Safe rm -rf for worktree paths (defense-in-depth) ---
+safe_rm_worktree() {
+    local target="${1:-}"
+    if [[ -z "${target}" ]]; then return; fi
+    if [[ "${target}" != /tmp/spawn-worktrees/* ]]; then
+        log "ERROR: Refusing to rm -rf: '${target}' is not under /tmp/spawn-worktrees/"
+        return 1
+    fi
+    rm -rf "${target}" 2>/dev/null || true
+}
+
 # Cleanup function — runs on normal exit, SIGTERM, and SIGINT
 cleanup() {
     # Guard against re-entry (SIGTERM trap calls exit, which fires EXIT trap again)
@@ -100,7 +111,7 @@ cleanup() {
 
     # Prune worktrees and clean up only OUR worktree base
     git worktree prune 2>/dev/null || true
-    rm -rf "${WORKTREE_BASE}" 2>/dev/null || true
+    safe_rm_worktree "${WORKTREE_BASE}"
 
     # Clean up test directories from CLI integration tests
     TEST_DIR_COUNT=$(find "${HOME}" -maxdepth 1 -type d -name 'spawn-cmdlist-test-*' 2>/dev/null | wc -l)
@@ -138,7 +149,7 @@ git pull --rebase origin main 2>&1 | tee -a "${LOG_FILE}" || true
 # Clean stale worktrees
 git worktree prune 2>&1 | tee -a "${LOG_FILE}" || true
 if [[ -d "${WORKTREE_BASE}" ]]; then
-    rm -rf "${WORKTREE_BASE}" 2>&1 | tee -a "${LOG_FILE}" || true
+    safe_rm_worktree "${WORKTREE_BASE}"
     log "Removed stale ${WORKTREE_BASE} directory"
 fi
 
