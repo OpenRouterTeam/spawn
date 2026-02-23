@@ -174,7 +174,7 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await fn(); // throws → not retried (non-retryable)
     if (result.ok) {
-      return result.value;
+      return result.data;
     }
     if (attempt >= maxAttempts) {
       throw result.error;

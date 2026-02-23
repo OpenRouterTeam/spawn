@@ -5,6 +5,6 @@
 // is retryable (return Err) or fatal (throw), instead of relying on brittle
 // error-message pattern matching after the fact.
 
-export type Result<T> = { ok: true; value: T } | { ok: false; error: Error };
-export const Ok = <T>(value: T): Result<T> => ({ ok: true, value });
+export type Result<T> = { ok: true; data: T } | { ok: false; error: Error };
+export const Ok = <T>(data: T): Result<T> => ({ ok: true, data });
 export const Err = <T>(error: Error): Result<T> => ({ ok: false, error });

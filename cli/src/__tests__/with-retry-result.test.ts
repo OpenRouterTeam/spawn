@@ -12,7 +12,7 @@ describe("Result constructors", () => {
   it("Ok creates a success result", () => {
     const r = Ok(42);
     expect(r.ok).toBe(true);
-    expect(r).toEqual({ ok: true, value: 42 });
+    expect(r).toEqual({ ok: true, data: 42 });
   });
 
   it("Ok works with void", () => {
@@ -106,7 +106,7 @@ describe("withRetry", () => {
 describe("wrapSshCall", () => {
   it("returns Ok on success", async () => {
     const result = await wrapSshCall(Promise.resolve());
-    expect(result).toEqual({ ok: true, value: undefined });
+    expect(result).toEqual({ ok: true, data: undefined });
   });
 
   it("returns Err for transient SSH error (retryable)", async () => {
