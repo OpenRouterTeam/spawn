@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pre-commit hook: validates all staged .sh files
+# Pre-commit hook: validates staged .sh and .ts files
 # Install: git config core.hooksPath .githooks
 
 set -eo pipefail
@@ -10,58 +10,51 @@ NC='\033[0m'
 
 errors=0
 
-# Get staged .sh files
-staged_files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.sh$' || true)
+# ─── Shell script validation ──────────────────────────────────────────
 
-if [[ -z "$staged_files" ]]; then
-    exit 0
+staged_sh=$(git diff --cached --name-only --diff-filter=ACM | grep '\.sh$' || true)
+
+if [[ -n "$staged_sh" ]]; then
+    echo "Validating staged shell scripts..."
+
+    for file in $staged_sh; do
+        # 1. Syntax check
+        if ! bash -n "$file" 2>/dev/null; then
+            printf "${RED}FAIL${NC} %s: syntax error\n" "$file"
+            bash -n "$file" 2>&1 | head -3
+            errors=$((errors + 1))
+            continue
+        fi
+
+        # 2. No relative source (breaks curl|bash)
+        if grep -qn 'source \.\./' "$file" 2>/dev/null || grep -qn 'source \./' "$file" 2>/dev/null; then
+            printf "${RED}FAIL${NC} %s: relative source path (breaks curl|bash)\n" "$file"
+            grep -n 'source \.\.' "$file" 2>/dev/null || true
+            errors=$((errors + 1))
+        fi
+
+        # 3. No echo -e (breaks macOS bash 3.x)
+        if grep -qn 'echo -e ' "$file" 2>/dev/null; then
+            printf "${RED}FAIL${NC} %s: echo -e (use printf for macOS compat)\n" "$file"
+            errors=$((errors + 1))
+        fi
+
+        # 4. No set -u / set -euo (breaks env var checks)
+        if grep -qn 'set -euo' "$file" 2>/dev/null; then
+            printf "${RED}FAIL${NC} %s: set -euo pipefail (drop the 'u', use set -eo pipefail)\n" "$file"
+            errors=$((errors + 1))
+        fi
+    done
+
+    if [[ $errors -gt 0 ]]; then
+        echo ""
+        printf "${RED}%d error(s) found. Commit blocked.${NC}\n" "$errors"
+        echo "Fix the issues above and try again."
+        exit 1
+    fi
+
+    printf "${GREEN}All %d scripts passed validation.${NC}\n" "$(echo "$staged_sh" | wc -w | tr -d ' ')"
 fi
-
-echo "Validating staged shell scripts..."
-
-for file in $staged_files; do
-    # 1. Syntax check
-    if ! bash -n "$file" 2>/dev/null; then
-        echo -e "${RED}FAIL${NC} $file: syntax error"
-        bash -n "$file" 2>&1 | head -3
-        errors=$((errors + 1))
-        continue
-    fi
-
-    # 2. No relative source (breaks curl|bash)
-    if grep -qn 'source \.\./' "$file" 2>/dev/null || grep -qn 'source \./' "$file" 2>/dev/null; then
-        echo -e "${RED}FAIL${NC} $file: relative source path (breaks curl|bash)"
-        grep -n 'source \.\.' "$file" 2>/dev/null || true
-        errors=$((errors + 1))
-    fi
-
-    # 3. No echo -e (breaks macOS bash 3.x)
-    if grep -qn 'echo -e ' "$file" 2>/dev/null; then
-        echo -e "${RED}FAIL${NC} $file: echo -e (use printf for macOS compat)"
-        errors=$((errors + 1))
-    fi
-
-    # 4. No set -u / set -euo (breaks env var checks)
-    if grep -qn 'set -euo' "$file" 2>/dev/null; then
-        echo -e "${RED}FAIL${NC} $file: set -euo pipefail (drop the 'u', use set -eo pipefail)"
-        errors=$((errors + 1))
-    fi
-
-    # 5. Check for calls to deleted functions
-    if grep -qn 'write_oauth_response_file\|create_oauth_response_html' "$file" 2>/dev/null; then
-        echo -e "${RED}FAIL${NC} $file: references deleted function"
-        errors=$((errors + 1))
-    fi
-done
-
-if [[ $errors -gt 0 ]]; then
-    echo ""
-    echo -e "${RED}$errors error(s) found. Commit blocked.${NC}"
-    echo "Fix the issues above and try again."
-    exit 1
-fi
-
-echo -e "${GREEN}All $( echo "$staged_files" | wc -w | tr -d ' ') scripts passed validation.${NC}"
 
 # ─── Biome lint for TypeScript ─────────────────────────────────────────
 
@@ -71,9 +64,9 @@ if [[ -n "$staged_ts" ]]; then
     echo "Running Biome lint on staged TypeScript files..."
     if ! (cd cli && bunx @biomejs/biome lint src/); then
         echo ""
-        echo -e "${RED}Biome lint failed. Commit blocked.${NC}"
+        printf "${RED}Biome lint failed. Commit blocked.${NC}\n"
         echo "Run 'cd cli && bunx @biomejs/biome lint src/' to see details."
         exit 1
     fi
-    echo -e "${GREEN}Biome lint passed.${NC}"
+    printf "${GREEN}Biome lint passed.${NC}\n"
 fi
