@@ -1,6 +1,6 @@
 // fly/lib/fly.ts — Core Fly.io provider: API, auth, orgs, provisioning, execution
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   logInfo,
@@ -20,7 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import * as v from "valibot";
 import { parseJsonWith, parseJsonRaw } from "../shared/parse";
-import { getSpawnDir, getConnectionPath } from "../history.js";
+import { getConnectionPath, saveVmConnection } from "../history.js";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
 const FLY_DASHBOARD_URL = "https://fly.io/dashboard";
@@ -317,37 +317,6 @@ function loadTokenFromConfig(): string | null {
 }
 
 // ─── Connection Tracking ─────────────────────────────────────────────────────
-
-export function saveVmConnection(
-  ip: string,
-  user: string,
-  serverId: string,
-  serverName: string,
-  cloud: string,
-  launchCmd?: string,
-): void {
-  const dir = getSpawnDir();
-  mkdirSync(dir, {
-    recursive: true,
-  });
-  const json: Record<string, string> = {
-    ip,
-    user,
-  };
-  if (serverId) {
-    json.server_id = serverId;
-  }
-  if (serverName) {
-    json.server_name = serverName;
-  }
-  if (cloud) {
-    json.cloud = cloud;
-  }
-  if (launchCmd) {
-    json.launch_cmd = launchCmd;
-  }
-  writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
-}
 
 /** Append launch_cmd to the last-connection.json file */
 export function saveLaunchCmd(launchCmd: string): void {
