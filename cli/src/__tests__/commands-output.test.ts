@@ -53,11 +53,7 @@ describe("Command Output Functions", () => {
 
     // Mock fetch to return our controlled manifest data
     originalFetch = global.fetch;
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => mockManifest,
-      text: async () => JSON.stringify(mockManifest),
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
 
     // Force-refresh the manifest cache so it picks up our mocked fetch data.
     // This ensures the in-memory _cached in manifest.ts is set to our test data,

@@ -75,9 +75,10 @@ export function createConsoleMocks() {
 }
 
 export function createProcessExitMock() {
-  return spyOn(process, "exit").mockImplementation((() => {
+  const impl: () => never = () => {
     throw new Error("process.exit");
-  }) as any);
+  };
+  return spyOn(process, "exit").mockImplementation(impl);
 }
 
 export function restoreMocks(
@@ -96,13 +97,7 @@ export function restoreMocks(
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────
 
 export function mockSuccessfulFetch(data: any) {
-  return mock(
-    () =>
-      Promise.resolve({
-        ok: true,
-        json: async () => data,
-      }) as any,
-  );
+  return mock(() => Promise.resolve(new Response(JSON.stringify(data))));
 }
 
 export function mockFailedFetch(error = "Network error") {
@@ -110,14 +105,13 @@ export function mockFailedFetch(error = "Network error") {
 }
 
 export function mockFetchWithStatus(status: number, data?: any) {
-  return mock(
-    () =>
-      Promise.resolve({
-        ok: status >= 200 && status < 300,
+  return mock(() =>
+    Promise.resolve(
+      new Response(JSON.stringify(data || {}), {
         status,
         statusText: status === 404 ? "Not Found" : "Error",
-        json: async () => data || {},
-      }) as any,
+      }),
+    ),
   );
 }
 

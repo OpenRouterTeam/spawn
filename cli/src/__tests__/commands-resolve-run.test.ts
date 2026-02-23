@@ -173,19 +173,12 @@ describe("cmdRun - display name resolution", () => {
   function setManifestAndScript(manifest: any) {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => manifest,
-          text: async () => JSON.stringify(manifest),
-        };
+        return new Response(JSON.stringify(manifest));
       }
       // Script download returns a valid script that will fail at execution
       // but pass validateScriptContent
-      return {
-        ok: true,
-        text: async () => "#!/bin/bash\necho test",
-      };
-    }) as any;
+      return new Response("#!/bin/bash\necho test");
+    });
     return loadManifest(true);
   }
 
@@ -198,9 +191,9 @@ describe("cmdRun - display name resolution", () => {
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
     await setManifestAndScript(mockManifest);

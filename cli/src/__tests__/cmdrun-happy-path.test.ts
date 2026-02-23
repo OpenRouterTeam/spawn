@@ -94,7 +94,7 @@ function mockFetchForDownload(opts: {
     scriptContent = VALID_SCRIPT,
   } = opts;
 
-  return mock(async (url: string | URL | Request, init?: any) => {
+  return mock(async (url: string | URL | Request, _init?: RequestInit) => {
     const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
     fetchCalls.push({
       url: urlStr,
@@ -102,53 +102,27 @@ function mockFetchForDownload(opts: {
 
     // Manifest fetch
     if (urlStr.includes("manifest.json")) {
-      return {
-        ok: true,
-        json: async () => mockManifest,
-        text: async () => JSON.stringify(mockManifest),
-      };
+      return new Response(JSON.stringify(mockManifest));
     }
 
     // Primary script URL (openrouter.ai)
     if (urlStr.includes("openrouter.ai")) {
       if (primaryOk) {
-        return {
-          ok: true,
-          status: primaryStatus,
-          text: async () => scriptContent,
-        };
+        return new Response(scriptContent, { status: primaryStatus });
       }
-      return {
-        ok: false,
-        status: primaryStatus,
-        statusText: `HTTP ${primaryStatus}`,
-        text: async () => "error",
-      };
+      return new Response("error", { status: primaryStatus, statusText: `HTTP ${primaryStatus}` });
     }
 
     // Fallback script URL (raw.githubusercontent.com)
     if (urlStr.includes("raw.githubusercontent.com")) {
       if (fallbackOk) {
-        return {
-          ok: true,
-          status: fallbackStatus,
-          text: async () => scriptContent,
-        };
+        return new Response(scriptContent, { status: fallbackStatus });
       }
-      return {
-        ok: false,
-        status: fallbackStatus,
-        statusText: `HTTP ${fallbackStatus}`,
-        text: async () => "error",
-      };
+      return new Response("error", { status: fallbackStatus, statusText: `HTTP ${fallbackStatus}` });
     }
 
-    return {
-      ok: false,
-      status: 404,
-      text: async () => "not found",
-    };
-  }) as any;
+    return new Response("not found", { status: 404 });
+  });
 }
 
 // ── Test suite ───────────────────────────────────────────────────────────────
@@ -171,9 +145,9 @@ describe("cmdRun happy-path pipeline", () => {
     fetchCalls = [];
     spawnCalls = [];
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
 

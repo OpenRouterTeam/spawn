@@ -96,16 +96,14 @@ describe("cmdCloudInfo", () => {
     mockSpinnerStart.mockClear();
     mockSpinnerStop.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => mockManifest,
-      text: async () => JSON.stringify(mockManifest),
-    })) as any;
+    global.fetch = mock(async () =>
+      new Response(JSON.stringify(mockManifest)),
+    );
 
     await loadManifest(true);
   });
@@ -177,11 +175,9 @@ describe("cmdCloudInfo", () => {
 
   describe("cloud with notes field", () => {
     it("should display notes when cloud has notes", async () => {
-      global.fetch = mock(async () => ({
-        ok: true,
-        json: async () => manifestWithCloudNotes,
-        text: async () => JSON.stringify(manifestWithCloudNotes),
-      })) as any;
+      global.fetch = mock(async () =>
+        new Response(JSON.stringify(manifestWithCloudNotes)),
+      );
       await loadManifest(true);
 
       await cmdCloudInfo("sprite");
@@ -194,11 +190,9 @@ describe("cmdCloudInfo", () => {
 
   describe("cloud with no implemented agents", () => {
     it("should show no-agents message", async () => {
-      global.fetch = mock(async () => ({
-        ok: true,
-        json: async () => manifestWithNotes,
-        text: async () => JSON.stringify(manifestWithNotes),
-      })) as any;
+      global.fetch = mock(async () =>
+        new Response(JSON.stringify(manifestWithNotes)),
+      );
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
@@ -207,11 +201,9 @@ describe("cmdCloudInfo", () => {
     });
 
     it("should still show cloud name for agent-less cloud", async () => {
-      global.fetch = mock(async () => ({
-        ok: true,
-        json: async () => manifestWithNotes,
-        text: async () => JSON.stringify(manifestWithNotes),
-      })) as any;
+      global.fetch = mock(async () =>
+        new Response(JSON.stringify(manifestWithNotes)),
+      );
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
@@ -221,11 +213,9 @@ describe("cmdCloudInfo", () => {
     });
 
     it("should display notes for agent-less cloud", async () => {
-      global.fetch = mock(async () => ({
-        ok: true,
-        json: async () => manifestWithNotes,
-        text: async () => JSON.stringify(manifestWithNotes),
-      })) as any;
+      global.fetch = mock(async () =>
+        new Response(JSON.stringify(manifestWithNotes)),
+      );
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");

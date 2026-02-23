@@ -138,13 +138,7 @@ describe("manifest", () => {
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
 
       // Mock fetch (should not be called for fresh cache)
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       const manifest = await loadManifest();
 
@@ -165,13 +159,7 @@ describe("manifest", () => {
         ...mockManifest,
         agents: {},
       };
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => updatedManifest,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(updatedManifest))));
 
       const manifest = await loadManifest(true);
 
@@ -234,15 +222,15 @@ describe("manifest", () => {
 
     it("should validate manifest structure", async () => {
       // Mock fetch with invalid data (missing required fields)
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({
+      global.fetch = mock(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
               agents: {},
-            }), // missing clouds and matrix
-          }) as any,
-      );
+            }),
+          ),
+        ),
+      ); // missing clouds and matrix
 
       // Write valid cache as fallback
       mkdirSync(join(env.testDir, "spawn"), {
@@ -263,9 +251,9 @@ describe("manifest", () => {
 
     it("should handle fetch timeout", async () => {
       // Mock timeout
-      global.fetch = mock(async () => {
-        await new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 100));
-      }) as any;
+      const timeoutFetch: typeof fetch = () =>
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 100));
+      global.fetch = mock(timeoutFetch);
 
       // Write cache as fallback
       mkdirSync(join(env.testDir, "spawn"), {

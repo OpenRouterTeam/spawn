@@ -68,9 +68,9 @@ describe("cmdUpdate", () => {
     mockSpinnerStop.mockClear();
     mockSpinnerMessage.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
   });
@@ -84,18 +84,10 @@ describe("cmdUpdate", () => {
   it("should report up-to-date when remote version matches current", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
-        return {
-          ok: true,
-          json: async () => ({
-            version: VERSION,
-          }),
-        };
+        return new Response(JSON.stringify({ version: VERSION }));
       }
-      return {
-        ok: false,
-        status: 404,
-      };
-    }) as any;
+      return new Response("Not Found", { status: 404 });
+    });
 
     await cmdUpdate();
 
@@ -109,18 +101,10 @@ describe("cmdUpdate", () => {
   it("should report available update when remote version differs", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
-        return {
-          ok: true,
-          json: async () => ({
-            version: "99.99.99",
-          }),
-        };
+        return new Response(JSON.stringify({ version: "99.99.99" }));
       }
-      return {
-        ok: false,
-        status: 404,
-      };
-    }) as any;
+      return new Response("Not Found", { status: 404 });
+    });
 
     await cmdUpdate();
 
@@ -131,11 +115,7 @@ describe("cmdUpdate", () => {
   });
 
   it("should handle package.json fetch failure gracefully", async () => {
-    global.fetch = mock(async () => ({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-    })) as any;
+    global.fetch = mock(async () => new Response("Internal Server Error", { status: 500 }));
 
     await cmdUpdate();
 
@@ -151,7 +131,7 @@ describe("cmdUpdate", () => {
   it("should handle network error gracefully", async () => {
     global.fetch = mock(async () => {
       throw new TypeError("Failed to fetch");
-    }) as any;
+    });
 
     await cmdUpdate();
 
@@ -163,18 +143,10 @@ describe("cmdUpdate", () => {
   it("should handle update failure gracefully", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
-        return {
-          ok: true,
-          json: async () => ({
-            version: "99.99.99",
-          }),
-        };
+        return new Response(JSON.stringify({ version: "99.99.99" }));
       }
-      return {
-        ok: false,
-        status: 404,
-      };
-    }) as any;
+      return new Response("Not Found", { status: 404 });
+    });
 
     // cmdUpdate now runs execSync which will fail in test env
     // The function catches errors internally, so it should not throw
@@ -186,12 +158,7 @@ describe("cmdUpdate", () => {
   });
 
   it("should start spinner with checking message", async () => {
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => ({
-        version: VERSION,
-      }),
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify({ version: VERSION })));
 
     await cmdUpdate();
 
@@ -202,17 +169,10 @@ describe("cmdUpdate", () => {
   it("should show version in spinner stop during update", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
-        return {
-          ok: true,
-          json: async () => ({
-            version: "2.0.0",
-          }),
-        };
+        return new Response(JSON.stringify({ version: "2.0.0" }));
       }
-      return {
-        ok: false,
-      };
-    }) as any;
+      return new Response("Error", { status: 500 });
+    });
 
     await cmdUpdate();
 
@@ -236,18 +196,14 @@ describe("Script download and execution", () => {
     mockSpinnerStop.mockClear();
     mockSpinnerMessage.mockClear();
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     originalFetch = global.fetch;
 
     // Set up manifest mock
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => mockManifest,
-      text: async () => JSON.stringify(mockManifest),
-    })) as any;
+    global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
     await loadManifest(true);
   });
 
@@ -260,19 +216,11 @@ describe("Script download and execution", () => {
   it("should exit when both primary and fallback URLs return 404", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
       // Both script URLs return 404
-      return {
-        ok: false,
-        status: 404,
-        text: async () => "Not Found",
-      };
-    }) as any;
+      return new Response("Not Found", { status: 404 });
+    });
 
     await loadManifest(true);
     await expect(cmdRun("claude", "sprite")).rejects.toThrow("process.exit");
@@ -287,18 +235,10 @@ describe("Script download and execution", () => {
   it("should exit when both primary and fallback URLs return server errors", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
-      return {
-        ok: false,
-        status: 500,
-        text: async () => "Server Error",
-      };
-    }) as any;
+      return new Response("Server Error", { status: 500 });
+    });
 
     await loadManifest(true);
     await expect(cmdRun("claude", "sprite")).rejects.toThrow("process.exit");
@@ -312,14 +252,10 @@ describe("Script download and execution", () => {
     const callCount = 0;
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
       throw new Error("Network timeout");
-    }) as any;
+    });
 
     await loadManifest(true);
 
@@ -340,33 +276,18 @@ describe("Script download and execution", () => {
         fetchedUrls.push(url);
       }
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
       if (typeof url === "string" && url.includes("openrouter.ai")) {
         // Primary fails
-        return {
-          ok: false,
-          status: 503,
-          text: async () => "Service Unavailable",
-        };
+        return new Response("Service Unavailable", { status: 503 });
       }
       if (typeof url === "string" && url.includes("raw.githubusercontent.com")) {
         // Fallback returns valid script
-        return {
-          ok: true,
-          text: async () => "#!/bin/bash\nset -eo pipefail\necho 'hello'",
-        };
+        return new Response("#!/bin/bash\nset -eo pipefail\necho 'hello'");
       }
-      return {
-        ok: false,
-        status: 404,
-        text: async () => "Not found",
-      };
-    }) as any;
+      return new Response("Not found", { status: 404 });
+    });
 
     await loadManifest(true);
 
@@ -393,18 +314,10 @@ describe("Script download and execution", () => {
   it("should show spinner with download message during script fetch", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
-      return {
-        ok: false,
-        status: 404,
-        text: async () => "Not found",
-      };
-    }) as any;
+      return new Response("Not found", { status: 404 });
+    });
 
     await loadManifest(true);
 
@@ -421,18 +334,11 @@ describe("Script download and execution", () => {
   it("should reject script without shebang via validateScriptContent", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
       // Return non-script content
-      return {
-        ok: true,
-        text: async () => "echo hello world",
-      };
-    }) as any;
+      return new Response("echo hello world");
+    });
 
     await loadManifest(true);
 
@@ -450,17 +356,10 @@ describe("Script download and execution", () => {
   it("should reject script with dangerous pattern (rm -rf /)", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
-      return {
-        ok: true,
-        text: async () => "#!/bin/bash\nrm -rf / --no-preserve-root",
-      };
-    }) as any;
+      return new Response("#!/bin/bash\nrm -rf / --no-preserve-root");
+    });
 
     await loadManifest(true);
 
@@ -488,18 +387,10 @@ describe("Script download and execution", () => {
   it("should show script-not-found message when both URLs 404", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
-      return {
-        ok: false,
-        status: 404,
-        text: async () => "Not Found",
-      };
-    }) as any;
+      return new Response("Not Found", { status: 404 });
+    });
 
     await loadManifest(true);
 
@@ -519,32 +410,16 @@ describe("Script download and execution", () => {
     const callIndex = 0;
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
       if (typeof url === "string" && url.includes("openrouter.ai")) {
-        return {
-          ok: false,
-          status: 500,
-          text: async () => "Error",
-        };
+        return new Response("Error", { status: 500 });
       }
       if (typeof url === "string" && url.includes("raw.githubusercontent.com")) {
-        return {
-          ok: false,
-          status: 502,
-          text: async () => "Bad Gateway",
-        };
+        return new Response("Bad Gateway", { status: 502 });
       }
-      return {
-        ok: false,
-        status: 404,
-        text: async () => "Not found",
-      };
-    }) as any;
+      return new Response("Not found", { status: 404 });
+    });
 
     await loadManifest(true);
 
@@ -563,17 +438,10 @@ describe("Script download and execution", () => {
     // when a valid prompt is provided
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("manifest.json")) {
-        return {
-          ok: true,
-          json: async () => mockManifest,
-          text: async () => JSON.stringify(mockManifest),
-        };
+        return new Response(JSON.stringify(mockManifest));
       }
-      return {
-        ok: true,
-        text: async () => "#!/bin/bash\nset -eo pipefail\nexit 0",
-      };
-    }) as any;
+      return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
+    });
 
     await loadManifest(true);
 

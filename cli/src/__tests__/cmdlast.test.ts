@@ -105,18 +105,14 @@ describe("cmdLast", () => {
 
     // Prime the manifest cache with mock data
     global.fetch = mock(
-      () =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any,
+      () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
     );
     await loadManifest(true);
     global.fetch = originalFetch;
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
-    }) as any);
+    });
   });
 
   afterEach(() => {
@@ -207,11 +203,7 @@ describe("cmdLast", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       // We need to mock cmdRun to prevent actual execution
@@ -230,11 +222,7 @@ describe("cmdLast", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -253,11 +241,7 @@ describe("cmdLast", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -299,11 +283,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -332,11 +312,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -361,11 +337,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -377,6 +349,87 @@ describe("cmdLast", () => {
       const step = logStepOutput();
       expect(step).toContain("Claude Code");
       expect(step).toContain("Sprite");
+      expect(step).toContain("Fix all linter errors");
+      expect(step).toContain("--prompt");
+    });
+
+    it("should not show prompt hint when record has no prompt", async () => {
+      writeHistory([
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T10:00:00Z",
+        },
+      ]);
+
+      global.fetch = mock(
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
+      );
+
+      try {
+        await cmdLast();
+      } catch {
+        // Expected
+      }
+
+      const step = logStepOutput();
+      expect(step).not.toContain("--prompt");
+    });
+
+    it("should truncate long prompts with ellipsis in hint", async () => {
+      const longPrompt =
+        "This is a very long prompt that should be truncated because it exceeds the preview limit and should show ellipsis";
+      writeHistory([
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T10:00:00Z",
+          prompt: longPrompt,
+        },
+      ]);
+
+      global.fetch = mock(
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
+      );
+
+      try {
+        await cmdLast();
+      } catch {
+        // Expected
+      }
+
+      const step = logStepOutput();
+      // Should contain truncated version with ellipsis
+      expect(step).toContain("...");
+      // The hint string should truncate the prompt to 30 chars + "..."
+      expect(step).toContain(longPrompt.slice(0, 30));
+    });
+
+    it("should show full short prompt without truncation", async () => {
+      const shortPrompt = "Short";
+      writeHistory([
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T10:00:00Z",
+          prompt: shortPrompt,
+        },
+      ]);
+
+      global.fetch = mock(
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
+      );
+
+      try {
+        await cmdLast();
+      } catch {
+        // Expected
+      }
+
+      const step = logStepOutput();
+      expect(step).toContain("Short");
+      // Short prompt should not be truncated
+      expect(step).not.toContain("Short...");
     });
   });
 
@@ -469,11 +522,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -498,11 +547,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {
@@ -536,11 +581,7 @@ describe("cmdLast", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       try {

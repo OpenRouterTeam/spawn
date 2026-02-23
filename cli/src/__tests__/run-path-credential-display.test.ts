@@ -21,7 +21,7 @@ import type { Manifest } from "../manifest";
 // ── Test manifest ───────────────────────────────────────────────────────
 
 function makeManifest(overrides?: Partial<Manifest>): Manifest {
-  return {
+  const base: Manifest = {
     agents: {
       claude: {
         name: "Claude Code",
@@ -110,15 +110,15 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
       "localcloud/claude": "implemented",
       "localcloud/codex": "implemented",
     },
-    ...overrides,
-  } as Manifest;
+  };
+  return overrides ? { ...base, ...overrides } : base;
 }
 
 // ── Mock @clack/prompts ─────────────────────────────────────────────────
 
-const mockExit = spyOn(process, "exit").mockImplementation((() => {
+const mockExit = spyOn(process, "exit").mockImplementation(() => {
   throw new Error("process.exit called");
-}) as any);
+});
 
 const mockLog = {
   step: mock(() => {}),

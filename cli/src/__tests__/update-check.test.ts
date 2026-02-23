@@ -39,7 +39,9 @@ describe("update-check", () => {
     clearUpdateBackoff();
     consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {});
     // Mock process.exit to prevent tests from exiting
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {}) as any);
+    processExitSpy = spyOn(process, "exit").mockImplementation(() => {
+      // no-op mock - prevent actual exit
+    });
   });
 
   afterEach(() => {
@@ -76,13 +78,7 @@ describe("update-check", () => {
 
     it("should check for updates on every run", async () => {
       const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              version: "99.0.0",
-            }),
-        } as Response),
+        Promise.resolve(new Response(JSON.stringify({ version: "99.0.0" }))),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -102,13 +98,7 @@ describe("update-check", () => {
 
     it("should auto-update when newer version is available", async () => {
       const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              version: "99.0.0",
-            }),
-        } as Response),
+        Promise.resolve(new Response(JSON.stringify({ version: "99.0.0" }))),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -140,13 +130,7 @@ describe("update-check", () => {
 
     it("should not update when up to date", async () => {
       const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              version: "0.2.3",
-            }),
-        } as Response),
+        Promise.resolve(new Response(JSON.stringify({ version: "0.2.3" }))),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -183,13 +167,7 @@ describe("update-check", () => {
 
     it("should handle update failures gracefully", async () => {
       const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              version: "99.0.0",
-            }),
-        } as Response),
+        Promise.resolve(new Response(JSON.stringify({ version: "99.0.0" }))),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -216,9 +194,7 @@ describe("update-check", () => {
 
     it("should handle bad response format", async () => {
       const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: false,
-        } as Response),
+        Promise.resolve(new Response("Not Found", { status: 404 })),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -241,13 +217,7 @@ describe("update-check", () => {
       ];
 
       const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              version: "99.0.0",
-            }),
-        } as Response),
+        Promise.resolve(new Response(JSON.stringify({ version: "99.0.0" }))),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -300,13 +270,7 @@ describe("update-check", () => {
       ];
 
       const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              version: "99.0.0",
-            }),
-        } as Response),
+        Promise.resolve(new Response(JSON.stringify({ version: "99.0.0" }))),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
@@ -314,10 +278,8 @@ describe("update-check", () => {
       const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {
         // Re-exec fails with exit code 42
-        const err = new Error("Command failed") as Error & {
-          status: number;
-        };
-        err.status = 42;
+        const err = new Error("Command failed");
+        Object.assign(err, { status: 42 });
         throw err;
       });
 
@@ -341,13 +303,7 @@ describe("update-check", () => {
       ];
 
       const mockFetch = mock(() =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              version: "99.0.0",
-            }),
-        } as Response),
+        Promise.resolve(new Response(JSON.stringify({ version: "99.0.0" }))),
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 

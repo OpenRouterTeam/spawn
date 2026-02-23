@@ -29,15 +29,8 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject manifest missing agents field", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({
-              clouds: {},
-              matrix: {},
-            }),
-          }) as any,
+      global.fetch = mock(() =>
+        Promise.resolve(new Response(JSON.stringify({ clouds: {}, matrix: {} }))),
       );
 
       try {
@@ -49,15 +42,8 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject manifest missing clouds field", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({
-              agents: {},
-              matrix: {},
-            }),
-          }) as any,
+      global.fetch = mock(() =>
+        Promise.resolve(new Response(JSON.stringify({ agents: {}, matrix: {} }))),
       );
 
       try {
@@ -68,15 +54,8 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject manifest missing matrix field", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({
-              agents: {},
-              clouds: {},
-            }),
-          }) as any,
+      global.fetch = mock(() =>
+        Promise.resolve(new Response(JSON.stringify({ agents: {}, clouds: {} }))),
       );
 
       try {
@@ -87,13 +66,7 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject null manifest data", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => null,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(null))));
 
       try {
         await loadManifest(true);
@@ -103,13 +76,7 @@ describe("Manifest Validation Edge Cases", () => {
     });
 
     it("should reject empty object manifest data", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => ({}),
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({}))));
 
       try {
         await loadManifest(true);
@@ -124,13 +91,7 @@ describe("Manifest Validation Edge Cases", () => {
         clouds: {},
         matrix: {},
       };
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => validEmpty,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(validEmpty))));
 
       const manifest = await loadManifest(true);
       expect(manifest).toHaveProperty("agents");
@@ -141,13 +102,8 @@ describe("Manifest Validation Edge Cases", () => {
     it("should handle non-ok HTTP response from GitHub", async () => {
       // When GitHub returns a non-ok response, fetchManifestFromGitHub returns null
       // and loadManifest falls back to cache or throws
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: false,
-            status: 500,
-            statusText: "Internal Server Error",
-          }) as any,
+      global.fetch = mock(() =>
+        Promise.resolve(new Response("Internal Server Error", { status: 500, statusText: "Internal Server Error" })),
       );
 
       try {

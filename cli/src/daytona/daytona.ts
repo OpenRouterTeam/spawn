@@ -15,6 +15,8 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
+import { parseJsonWith, parseJsonRaw } from "../shared/parse";
+import * as v from "valibot";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -43,12 +45,26 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function parseJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
+const LooseObject = v.record(v.string(), v.unknown());
+
+/** Parse a JSON string into a Record<string, unknown> via valibot, or null. */
+function parseJson(text: string): Record<string, unknown> | null {
+  return parseJsonWith(text, LooseObject);
+}
+
+/** Narrow an already-parsed unknown value to a Record<string, unknown>, or null. */
+function toRecord(val: unknown): Record<string, unknown> | null {
+  const result = v.safeParse(LooseObject, val);
+  return result.success ? result.output : null;
+}
+
+/** Filter an array to only Record<string, unknown> entries. */
+function toObjectArray(val: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(val)) { return []; }
+  return val.filter(
+    (item): item is Record<string, unknown> =>
+      item !== null && typeof item === "object" && !Array.isArray(item),
+  );
 }
 
 async function daytonaApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
@@ -99,7 +115,8 @@ function extractApiError(text: string, fallback = "Unknown error"): string {
   if (!data) {
     return fallback;
   }
-  return data.message || data.error || data.detail || fallback;
+  const msg = data.message || data.error || data.detail;
+  return typeof msg === "string" ? msg : fallback;
 }
 
 // ─── Token Management ────────────────────────────────────────────────────────
@@ -275,8 +292,8 @@ async function setupSshAccess(): Promise<void> {
     throw new Error("SSH access parse failure");
   }
 
-  sshToken = data.token || "";
-  const sshCommand = data.sshCommand || "";
+  sshToken = typeof data.token === "string" ? data.token : "";
+  const sshCommand = typeof data.sshCommand === "string" ? data.sshCommand : "";
 
   if (!sshToken) {
     logError(`Failed to get SSH access: ${extractApiError(sshResp)}`);
@@ -323,7 +340,7 @@ export async function createServer(name: string): Promise<void> {
   const response = await daytonaApi("POST", "/sandbox", body);
   const data = parseJson(response);
 
-  sandboxId = data?.id || "";
+  sandboxId = typeof data?.id === "string" ? data.id : "";
   if (!sandboxId) {
     logError(`Failed to create sandbox: ${extractApiError(response)}`);
     throw new Error("Sandbox creation failed");
@@ -338,13 +355,13 @@ export async function createServer(name: string): Promise<void> {
   while (waited < maxWait) {
     const statusResp = await daytonaApi("GET", `/sandbox/${sandboxId}`);
     const statusData = parseJson(statusResp);
-    const state = statusData?.state || "";
+    const state = typeof statusData?.state === "string" ? statusData.state : "";
 
     if (state === "started" || state === "running") {
       break;
     }
     if (state === "error" || state === "failed") {
-      const reason = statusData?.errorReason || "unknown";
+      const reason = typeof statusData?.errorReason === "string" ? statusData.errorReason : "unknown";
       logError(`Sandbox entered error state: ${reason}`);
       throw new Error("Sandbox error state");
     }
@@ -638,9 +655,10 @@ export async function destroyServer(id?: string): Promise<void> {
 
 export async function listServers(): Promise<void> {
   const response = await daytonaApi("GET", "/sandbox");
-  const data = parseJson(response);
-  const parsed = data as Record<string, unknown> | null;
-  const items: Record<string, unknown>[] = Array.isArray(data) ? data : ((parsed?.items ?? parsed?.sandboxes ?? []) as Record<string, unknown>[]);
+  const raw = parseJsonRaw(response);
+  const parsed = toRecord(raw);
+  const rawItems = Array.isArray(raw) ? raw : (parsed?.items ?? parsed?.sandboxes ?? []);
+  const items = toObjectArray(rawItems);
 
   if (items.length === 0) {
     console.log("No sandboxes found");
@@ -651,10 +669,13 @@ export async function listServers(): Promise<void> {
   console.log(pad("NAME", 25) + pad("ID", 40) + pad("STATE", 12));
   console.log("-".repeat(77));
   for (const s of items) {
+    const name = typeof s.name === "string" ? s.name : "N/A";
+    const id = typeof s.id === "string" ? s.id : "N/A";
+    const state = typeof s.state === "string" ? s.state : "N/A";
     console.log(
-      pad((s.name ?? "N/A").slice(0, 24), 25) +
-        pad((s.id ?? "N/A").slice(0, 39), 40) +
-        pad((s.state ?? "N/A").slice(0, 11), 12),
+      pad(name.slice(0, 24), 25) +
+        pad(id.slice(0, 39), 40) +
+        pad(state.slice(0, 11), 12),
     );
   }
 }

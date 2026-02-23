@@ -70,17 +70,15 @@ describe("Commands Error Paths", () => {
     mockSpinnerStop.mockClear();
 
     // Mock process.exit to throw instead of exiting
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
-    }) as any);
+    });
 
     // Mock fetch to return our controlled manifest data
     originalFetch = global.fetch;
-    global.fetch = mock(async () => ({
-      ok: true,
-      json: async () => mockManifest,
-      text: async () => JSON.stringify(mockManifest),
-    })) as any;
+    global.fetch = mock(async () =>
+      new Response(JSON.stringify(mockManifest)),
+    );
 
     // Force-refresh the manifest cache
     await loadManifest(true);
@@ -295,18 +293,11 @@ describe("Commands Error Paths", () => {
       // Mock fetch to simulate script download failure (not a valid script)
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
         // Script download returns non-script content
-        return {
-          ok: true,
-          text: async () => "not a valid script",
-        };
-      }) as any;
+        return new Response("not a valid script");
+      });
 
       // Force refresh manifest with updated fetch
       await loadManifest(true);
@@ -328,17 +319,10 @@ describe("Commands Error Paths", () => {
     it("should show prompt indicator when prompt is provided", async () => {
       global.fetch = mock(async (url: string) => {
         if (typeof url === "string" && url.includes("manifest.json")) {
-          return {
-            ok: true,
-            json: async () => mockManifest,
-            text: async () => JSON.stringify(mockManifest),
-          };
+          return new Response(JSON.stringify(mockManifest));
         }
-        return {
-          ok: true,
-          text: async () => "not a valid script",
-        };
-      }) as any;
+        return new Response("not a valid script");
+      });
 
       await loadManifest(true);
 

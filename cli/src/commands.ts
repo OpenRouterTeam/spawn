@@ -1,6 +1,8 @@
 import "./unicode-detect.js"; // Must be first: configures TERM before clack reads it
 import * as p from "@clack/prompts";
 import pc from "picocolors";
+import * as v from "valibot";
+import { parseJsonWith } from "./shared/parse";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -50,6 +52,10 @@ import {
 import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAuthenticate } from "./aws/aws.js";
 import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "./daytona/daytona.js";
 import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "./sprite/sprite.js";
+
+// ── Schemas ──────────────────────────────────────────────────────────────────
+
+const PkgVersionSchema = v.object({ version: v.string() });
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -3192,10 +3198,11 @@ async function fetchRemoteVersion(): Promise<string> {
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} ${res.statusText}`);
   }
-  const remotePkg = (await res.json()) as {
-    version: string;
-  };
-  return remotePkg.version;
+  const data = parseJsonWith(await res.text(), PkgVersionSchema);
+  if (!data?.version) {
+    throw new Error("Invalid package.json: no version field");
+  }
+  return data.version;
 }
 
 const INSTALL_CMD = `curl -fsSL ${RAW_BASE}/cli/install.sh | bash`;

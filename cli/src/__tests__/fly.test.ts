@@ -232,7 +232,7 @@ describe("fly/lib/agents", () => {
 
     it("agents have no vmMemory field (VM sizing is user-chosen)", () => {
       for (const [key, agent] of Object.entries(agents)) {
-        expect((agent as any).vmMemory).toBeUndefined();
+        expect("vmMemory" in agent).toBe(false);
       }
     });
 

@@ -115,7 +115,20 @@ export function mergeLastConnection(): void {
   }
 
   try {
-    const connData = JSON.parse(readFileSync(connPath, "utf-8")) as VMConnection;
+    const raw: unknown = JSON.parse(readFileSync(connPath, "utf-8"));
+    if (!raw || typeof raw !== "object" || !("ip" in raw) || !("user" in raw)) {
+      unlinkSync(connPath);
+      return;
+    }
+    const entries = Object.fromEntries(Object.entries(raw));
+    const connData: VMConnection = {
+      ip: String(entries.ip ?? ""),
+      user: String(entries.user ?? ""),
+      server_id: typeof entries.server_id === "string" ? entries.server_id : undefined,
+      server_name: typeof entries.server_name === "string" ? entries.server_name : undefined,
+      cloud: typeof entries.cloud === "string" ? entries.cloud : undefined,
+      launch_cmd: typeof entries.launch_cmd === "string" ? entries.launch_cmd : undefined,
+    };
 
     // SECURITY: Validate connection data before merging into history
     // This prevents malicious bash scripts from injecting invalid data

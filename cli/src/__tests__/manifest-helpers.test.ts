@@ -29,16 +29,16 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject array as manifest data", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => [
+      global.fetch = mock(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify([
               1,
               2,
               3,
-            ],
-          }) as any,
+            ]),
+          ),
+        ),
       );
 
       try {
@@ -49,13 +49,7 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject string as manifest data", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => "not a manifest",
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify("not a manifest"))));
 
       try {
         await loadManifest(true);
@@ -65,13 +59,7 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject number as manifest data", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => 42,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(42))));
 
       try {
         await loadManifest(true);
@@ -81,13 +69,7 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject boolean false as manifest data", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => false,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(false))));
 
       try {
         await loadManifest(true);
@@ -97,13 +79,7 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should reject undefined as manifest data", async () => {
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => undefined,
-          }) as any,
-      );
+      global.fetch = mock(() => Promise.resolve(new Response("undefined")));
 
       try {
         await loadManifest(true);

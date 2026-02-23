@@ -56,7 +56,13 @@ export const agents: Record<string, FlyAgentConfig> = (() => {
 })();
 
 export function resolveAgent(name: string): FlyAgentConfig {
-  return _resolveAgent(agents, name) as FlyAgentConfig;
+  const agent = agents[name.toLowerCase()];
+  if (!agent) {
+    // Fall back to shared resolver for error handling
+    _resolveAgent(agents, name);
+    throw new Error(`Unknown agent: ${name}`);
+  }
+  return agent;
 }
 
 export function offerGithubAuth(): Promise<void> {

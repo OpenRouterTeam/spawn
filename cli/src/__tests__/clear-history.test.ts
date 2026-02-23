@@ -349,7 +349,7 @@ describe("cmdListClear", () => {
   it("should call log.info when no history exists", async () => {
     await cmdListClear();
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
-    const msg = mockLogInfo.mock.calls[0][0] as string;
+    const msg = String(mockLogInfo.mock.calls[0][0]);
     expect(msg).toContain("No spawn history to clear");
   });
 
@@ -370,7 +370,7 @@ describe("cmdListClear", () => {
 
     await cmdListClear();
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
-    const msg = mockLogSuccess.mock.calls[0][0] as string;
+    const msg = String(mockLogSuccess.mock.calls[0][0]);
     expect(msg).toContain("Cleared 2 spawn records from history");
   });
 
@@ -386,7 +386,7 @@ describe("cmdListClear", () => {
 
     await cmdListClear();
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
-    const msg = mockLogSuccess.mock.calls[0][0] as string;
+    const msg = String(mockLogSuccess.mock.calls[0][0]);
     expect(msg).toContain("Cleared 1 spawn record from history");
     // Should NOT say "records" (plural)
     expect(msg).not.toContain("Cleared 1 spawn records");
@@ -412,7 +412,7 @@ describe("cmdListClear", () => {
     await cmdListClear();
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     expect(mockLogSuccess).not.toHaveBeenCalled();
-    const msg = mockLogInfo.mock.calls[0][0] as string;
+    const msg = String(mockLogInfo.mock.calls[0][0]);
     expect(msg).toContain("No spawn history to clear");
   });
 
@@ -422,7 +422,7 @@ describe("cmdListClear", () => {
     await cmdListClear();
     expect(mockLogInfo).toHaveBeenCalledTimes(1);
     expect(mockLogSuccess).not.toHaveBeenCalled();
-    const msg = mockLogInfo.mock.calls[0][0] as string;
+    const msg = String(mockLogInfo.mock.calls[0][0]);
     expect(msg).toContain("No spawn history to clear");
   });
 
@@ -439,7 +439,7 @@ describe("cmdListClear", () => {
 
     await cmdListClear();
     expect(mockLogSuccess).toHaveBeenCalledTimes(1);
-    const msg = mockLogSuccess.mock.calls[0][0] as string;
+    const msg = String(mockLogSuccess.mock.calls[0][0]);
     expect(msg).toContain("Cleared 50 spawn records from history");
   });
 

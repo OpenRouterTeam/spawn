@@ -119,18 +119,14 @@ describe("cmdList integration", () => {
     // Prime the manifest in-memory cache with mock data so tests don't
     // depend on network availability or stale values from other test files.
     global.fetch = mock(
-      () =>
-        Promise.resolve({
-          ok: true,
-          json: async () => mockManifest,
-        }) as any,
+      () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
     );
     await loadManifest(true);
     global.fetch = originalFetch;
 
-    processExitSpy = spyOn(process, "exit").mockImplementation((() => {
+    processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
-    }) as any);
+    });
   });
 
   afterEach(() => {
@@ -237,11 +233,7 @@ describe("cmdList integration", () => {
 
       // Mock fetch to return manifest (for display names)
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -250,17 +242,29 @@ describe("cmdList integration", () => {
       // Subtitle lines should contain agent · cloud · time
       expect(output).toContain("Claude Code");
       expect(output).toContain("·");
+      expect(output).toContain("AGENT");
+      expect(output).toContain("CLOUD");
+      expect(output).toContain("WHEN");
+    });
+
+    it("should show separator line under header", async () => {
+      writeHistory(sampleRecords);
+
+      global.fetch = mock(
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
+      );
+
+      await cmdList();
+
+      const output = consoleOutput();
+      expect(output).toContain("-".repeat(10));
     });
 
     it("should render records in reverse chronological order (newest first)", async () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -281,11 +285,7 @@ describe("cmdList integration", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -315,11 +315,7 @@ describe("cmdList integration", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -334,11 +330,7 @@ describe("cmdList integration", () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -357,11 +349,7 @@ describe("cmdList integration", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -386,11 +374,7 @@ describe("cmdList integration", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -399,6 +383,28 @@ describe("cmdList integration", () => {
       // Should show agent and cloud in subtitle
       expect(output).toContain("Claude Code");
       expect(output).toContain("Sprite");
+      expect(output).toContain("Fix all linter errors");
+    });
+
+    it("should truncate long prompts with ellipsis", async () => {
+      writeHistory([
+        {
+          agent: "claude",
+          cloud: "sprite",
+          timestamp: "2026-01-01T10:00:00Z",
+          prompt:
+            "This is a very long prompt that should be truncated because it exceeds the display limit in the table",
+        },
+      ]);
+
+      global.fetch = mock(
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
+      );
+
+      await cmdList();
+
+      const output = consoleOutput();
+      expect(output).toContain("...");
     });
 
     it("should include prompt in rerun hint for latest record with prompt", async () => {
@@ -412,11 +418,7 @@ describe("cmdList integration", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -457,11 +459,7 @@ describe("cmdList integration", () => {
       writeHistory(records);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList("claude");
@@ -475,11 +473,7 @@ describe("cmdList integration", () => {
       writeHistory(records);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList(undefined, "hetzner");
@@ -492,11 +486,7 @@ describe("cmdList integration", () => {
       writeHistory(records);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList("claude", "sprite");
@@ -509,11 +499,7 @@ describe("cmdList integration", () => {
       writeHistory(records);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList("claude");
@@ -527,11 +513,7 @@ describe("cmdList integration", () => {
       writeHistory(records);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -546,11 +528,7 @@ describe("cmdList integration", () => {
       writeHistory(records);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList("CLAUDE");
@@ -600,11 +578,7 @@ describe("cmdList integration", () => {
       writeHistory(manyRecords);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
@@ -623,11 +597,7 @@ describe("cmdList integration", () => {
       ]);
 
       global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
+        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
       );
 
       await cmdList();
