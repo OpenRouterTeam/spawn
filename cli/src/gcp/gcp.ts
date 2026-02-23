@@ -9,7 +9,6 @@ import {
   logStep,
   prompt,
   selectFromList,
-  jsonEscape,
   validateServerName,
   toKebabCase,
   defaultSpawnName,
@@ -18,7 +17,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
-import { getSpawnDir, getConnectionPath } from "../history.js";
+import { getConnectionPath, saveVmConnection } from "../history.js";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 
@@ -751,21 +750,7 @@ export async function createInstance(
   logInfo(`Instance created: IP=${gcpServerIp}`);
 
   // Save connection info
-  const dir = getSpawnDir();
-  mkdirSync(dir, {
-    recursive: true,
-  });
-  const _zoneEscaped = jsonEscape(zone);
-  const _projectEscaped = jsonEscape(gcpProject);
-  const json = JSON.stringify({
-    ip: gcpServerIp,
-    user: username,
-    server_name: name,
-    cloud: "gcp",
-    zone,
-    project: gcpProject,
-  });
-  writeFileSync(`${dir}/last-connection.json`, json + "\n");
+  saveVmConnection(gcpServerIp, username, "", name, "gcp");
 }
 
 // ─── SSH Operations ─────────────────────────────────────────────────────────

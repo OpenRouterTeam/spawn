@@ -20,7 +20,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
-import { getSpawnDir, getConnectionPath } from "../history.js";
+import { getConnectionPath, saveVmConnection } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
@@ -331,37 +331,6 @@ export async function ensureSshKey(): Promise<void> {
 }
 
 // ─── Connection Tracking ─────────────────────────────────────────────────────
-
-export function saveVmConnection(
-  ip: string,
-  user: string,
-  serverId: string,
-  serverName: string,
-  cloud: string,
-  launchCmd?: string,
-): void {
-  const dir = getSpawnDir();
-  mkdirSync(dir, {
-    recursive: true,
-  });
-  const json: Record<string, string> = {
-    ip,
-    user,
-  };
-  if (serverId) {
-    json.server_id = serverId;
-  }
-  if (serverName) {
-    json.server_name = serverName;
-  }
-  if (cloud) {
-    json.cloud = cloud;
-  }
-  if (launchCmd) {
-    json.launch_cmd = launchCmd;
-  }
-  writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
-}
 
 export function saveLaunchCmd(launchCmd: string): void {
   const connFile = getConnectionPath();

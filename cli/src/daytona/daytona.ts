@@ -1,6 +1,6 @@
 // daytona/daytona.ts — Core Daytona provider: API, SSH, provisioning, execution
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   logInfo,
@@ -18,7 +18,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { parseJsonWith, parseJsonRaw } from "../shared/parse";
 import * as v from "valibot";
-import { getSpawnDir, getConnectionPath } from "../history.js";
+import { getConnectionPath, saveVmConnection } from "../history.js";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -212,37 +212,6 @@ export async function ensureDaytonaToken(): Promise<void> {
 }
 
 // ─── Connection Tracking ─────────────────────────────────────────────────────
-
-function saveVmConnection(
-  ip: string,
-  user: string,
-  serverId: string,
-  serverName: string,
-  cloud: string,
-  launchCmd?: string,
-): void {
-  const dir = getSpawnDir();
-  mkdirSync(dir, {
-    recursive: true,
-  });
-  const json: Record<string, string> = {
-    ip,
-    user,
-  };
-  if (serverId) {
-    json.server_id = serverId;
-  }
-  if (serverName) {
-    json.server_name = serverName;
-  }
-  if (cloud) {
-    json.cloud = cloud;
-  }
-  if (launchCmd) {
-    json.launch_cmd = launchCmd;
-  }
-  writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
-}
 
 export function saveLaunchCmd(launchCmd: string): void {
   const connFile = getConnectionPath();

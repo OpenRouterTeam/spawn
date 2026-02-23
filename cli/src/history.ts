@@ -61,6 +61,38 @@ export function getConnectionPath(): string {
   return join(getSpawnDir(), "last-connection.json");
 }
 
+/** Save VM connection info to last-connection.json for later reconnection/deletion. */
+export function saveVmConnection(
+  ip: string,
+  user: string,
+  serverId: string,
+  serverName: string,
+  cloud: string,
+  launchCmd?: string,
+): void {
+  const dir = getSpawnDir();
+  mkdirSync(dir, {
+    recursive: true,
+  });
+  const json: Record<string, string> = {
+    ip,
+    user,
+  };
+  if (serverId) {
+    json.server_id = serverId;
+  }
+  if (serverName) {
+    json.server_name = serverName;
+  }
+  if (cloud) {
+    json.cloud = cloud;
+  }
+  if (launchCmd) {
+    json.launch_cmd = launchCmd;
+  }
+  writeFileSync(join(dir, "last-connection.json"), JSON.stringify(json) + "\n");
+}
+
 export function loadHistory(): SpawnRecord[] {
   const path = getHistoryPath();
   if (!existsSync(path)) {
