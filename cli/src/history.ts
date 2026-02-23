@@ -70,12 +70,13 @@ export function saveVmConnection(
   serverName: string,
   cloud: string,
   launchCmd?: string,
+  metadata?: Record<string, string>,
 ): void {
   const dir = getSpawnDir();
   mkdirSync(dir, {
     recursive: true,
   });
-  const json: Record<string, string> = {
+  const json: Record<string, unknown> = {
     ip,
     user,
   };
@@ -90,6 +91,9 @@ export function saveVmConnection(
   }
   if (launchCmd) {
     json.launch_cmd = launchCmd;
+  }
+  if (metadata && Object.keys(metadata).length > 0) {
+    json.metadata = metadata;
   }
   writeFileSync(join(dir, "last-connection.json"), JSON.stringify(json) + "\n");
 }
@@ -166,6 +170,20 @@ export function mergeLastConnection(): void {
       return;
     }
     const entries = Object.fromEntries(Object.entries(raw));
+    // Parse metadata if present
+    let metadata: Record<string, string> | undefined;
+    if (entries.metadata && typeof entries.metadata === "object" && !Array.isArray(entries.metadata)) {
+      metadata = {};
+      for (const [k, v] of Object.entries(entries.metadata)) {
+        if (isString(v)) {
+          metadata[k] = v;
+        }
+      }
+      if (Object.keys(metadata).length === 0) {
+        metadata = undefined;
+      }
+    }
+
     const connData: VMConnection = {
       ip: String(entries.ip ?? ""),
       user: String(entries.user ?? ""),
@@ -173,6 +191,7 @@ export function mergeLastConnection(): void {
       server_name: isString(entries.server_name) ? entries.server_name : undefined,
       cloud: isString(entries.cloud) ? entries.cloud : undefined,
       launch_cmd: isString(entries.launch_cmd) ? entries.launch_cmd : undefined,
+      metadata,
     };
 
     // SECURITY: Validate connection data before merging into history

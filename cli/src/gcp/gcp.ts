@@ -728,8 +728,11 @@ export async function createInstance(
 
   logInfo(`Instance created: IP=${gcpServerIp}`);
 
-  // Save connection info
-  saveVmConnection(gcpServerIp, username, "", name, "gcp");
+  // Save connection info with zone/project for later deletion
+  saveVmConnection(gcpServerIp, username, "", name, "gcp", undefined, {
+    zone,
+    project: gcpProject,
+  });
 }
 
 // ─── SSH Operations ─────────────────────────────────────────────────────────
