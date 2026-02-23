@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'BRANCH=$(git -C \"$CLAUDE_PROJECT_DIR\" rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$BRANCH\" = \"main\" ]; then echo \"BLOCKED: You are on main. Create a feature branch first (git checkout -b branch-name), then retry your edit. If you already committed to main by mistake, use: git checkout -b branch-name && git cherry-pick main\" >&2; exit 2; fi'"
+            "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r \".tool_input.file_path // empty\"); [ -z \"$FILE\" ] && exit 0; DIR=$(dirname \"$FILE\"); [ ! -d \"$DIR\" ] && exit 0; GD=$(cd \"$DIR\" && git rev-parse --git-dir 2>/dev/null) || exit 0; GC=$(cd \"$DIR\" && git rev-parse --git-common-dir 2>/dev/null) || exit 0; AGD=$(cd \"$DIR\" && cd \"$GD\" && pwd); AGC=$(cd \"$DIR\" && cd \"$GC\" && pwd); if [ \"$AGD\" = \"$AGC\" ]; then echo \"BLOCKED: Edits must happen in a git worktree, not the main checkout.\" >&2; echo \"Create a worktree first: git worktree add /tmp/spawn-worktrees/FEATURE -b branch-name\" >&2; echo \"Then use absolute paths under /tmp/spawn-worktrees/FEATURE/ for all edits.\" >&2; exit 2; fi; BRANCH=$(cd \"$DIR\" && git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$BRANCH\" = \"main\" ]; then echo \"BLOCKED: Cannot edit on main branch, even in a worktree.\" >&2; echo \"Create a worktree with a feature branch: git worktree add /tmp/spawn-worktrees/FEATURE -b branch-name\" >&2; exit 2; fi'"
           }
         ]
       }
