@@ -13,6 +13,7 @@ import {
   defaultSpawnName,
 } from "../shared/ui";
 import { sleep } from "../shared/ssh";
+import { hasMessage } from "../shared/type-guards";
 import { getSpawnDir, getConnectionPath } from "../history.js";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
@@ -68,7 +69,7 @@ async function spriteRetry<T>(desc: string, fn: () => Promise<T>): Promise<T> {
       return await fn();
     } catch (err) {
       lastError = err;
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = hasMessage(err) ? err.message : String(err);
 
       if (attempt >= maxRetries) {
         break;

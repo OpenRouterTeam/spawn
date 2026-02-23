@@ -5,6 +5,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logInfo, logWarn, logError, logStep, prompt, jsonEscape, withRetry, Ok, Err, type Result } from "./ui";
+import { hasMessage } from "./type-guards";
 import type { AgentConfig } from "./agents";
 
 /**
@@ -18,14 +19,14 @@ export async function wrapSshCall(op: Promise<void>): Promise<Result<void>> {
     await op;
     return Ok(undefined);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = hasMessage(err) ? err.message : String(err);
     // Timeouts are NOT retryable — the command may have completed on the
     // remote but we lost the connection before seeing the exit code.
     if (msg.includes("timed out") || msg.includes("timeout")) {
       throw err;
     }
     // All other SSH errors (connection refused, reset, etc.) are retryable.
-    return Err(err instanceof Error ? err : new Error(msg));
+    return Err(new Error(msg));
   }
 }
 
