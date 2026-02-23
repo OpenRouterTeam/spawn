@@ -24,6 +24,7 @@ export interface PickOption {
   value: string;
   label: string;
   hint?: string;
+  subtitle?: string;
 }
 
 export interface PickConfig {
@@ -368,8 +369,9 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
     ? "\u2191/\u2193 move  \u23ce select  d delete  Ctrl-C cancel"
     : "\u2191/\u2193 move  \u23ce select  Ctrl-C cancel";
 
-  // header line + one line per option + footer line
-  const pickerHeight = config.options.length + 2;
+  // header line + lines per option (2 if subtitle, 1 otherwise) + footer line
+  const linesPerOption = config.options.map((o) => (o.subtitle ? 2 : 1));
+  const pickerHeight = 1 + linesPerOption.reduce((a, b) => a + b, 0) + 1;
 
   const render = (first: boolean) => {
     if (!first) {
@@ -381,16 +383,22 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
       if (i === selected) {
         const label = trunc(opt.label, maxW - 2);
         w(`${A.green}${A.bold}> ${label}${A.reset}`);
-        if (opt.hint) {
+        if (!opt.subtitle && opt.hint) {
           const remaining = maxW - 2 - label.length - 2;
           if (remaining > 3) {
             w(`  ${A.dim}${trunc(opt.hint, remaining)}${A.reset}`);
           }
         }
+        w("\r\n");
+        if (opt.subtitle) {
+          w(`  ${A.dim}${trunc(opt.subtitle, maxW - 2)}${A.reset}\r\n`);
+        }
       } else {
-        w(`  ${A.dim}${trunc(opt.label, maxW - 2)}${A.reset}`);
+        w(`  ${A.dim}${trunc(opt.label, maxW - 2)}${A.reset}\r\n`);
+        if (opt.subtitle) {
+          w(`  ${A.dim}${trunc(opt.subtitle, maxW - 2)}${A.reset}\r\n`);
+        }
       }
-      w("\r\n");
     }
     w(`${A.dim}  ${trunc(footerHint, maxW - 2)}${A.reset}\r\n`);
   };

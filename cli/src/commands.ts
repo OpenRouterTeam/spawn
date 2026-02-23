@@ -2126,29 +2126,14 @@ export function resolveDisplayName(manifest: Manifest | null, key: string, kind:
 
 function renderListTable(records: SpawnRecord[], manifest: Manifest | null): void {
   console.log();
-  console.log(pc.bold("AGENT".padEnd(20)) + pc.bold("CLOUD".padEnd(20)) + pc.bold("WHEN"));
-  console.log(pc.dim("-".repeat(60)));
-
-  for (const r of records) {
-    const relative = formatRelativeTime(r.timestamp);
-    const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
-    const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
-    let line = pc.green(agentDisplay.padEnd(20)) + cloudDisplay.padEnd(20) + pc.dim(relative);
-    if (r.name) {
-      line += pc.cyan(`  "${r.name}"`);
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const name = r.name || r.connection?.server_name || "unnamed";
+    console.log(pc.bold(name));
+    console.log(`  ${buildRecordSubtitle(r, manifest)}`);
+    if (i < records.length - 1) {
+      console.log();
     }
-    if (r.connection) {
-      if (r.connection.ip === "sprite-console" && r.connection.server_name) {
-        line += pc.green(`  sprite console -s ${r.connection.server_name}`);
-      } else {
-        line += pc.green(`  ssh ${r.connection.user}@${r.connection.ip}`);
-      }
-    }
-    if (r.prompt) {
-      const preview = r.prompt.length > 40 ? r.prompt.slice(0, 40) + "..." : r.prompt;
-      line += pc.dim(`  --prompt "${preview}"`);
-    }
-    console.log(line);
   }
   console.log();
 }
@@ -2157,44 +2142,21 @@ export function isInteractiveTTY(): boolean {
   return !!(process.stdin.isTTY && process.stdout.isTTY);
 }
 
-/** Build a display label for a spawn record in the interactive picker */
-export function buildRecordLabel(r: SpawnRecord, manifest: Manifest | null): string {
-  const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
-  const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
-  let label = `${agentDisplay} on ${cloudDisplay}`;
-  if (r.name) {
-    label += ` -- ${r.name}`;
-  }
-  return label;
+/** Build a display label (line 1: name) for a spawn record in the interactive picker */
+export function buildRecordLabel(r: SpawnRecord, _manifest: Manifest | null): string {
+  return r.name || r.connection?.server_name || "unnamed";
 }
 
-/** Build a hint string (relative timestamp + connection status + optional prompt preview) for the interactive picker */
-export function buildRecordHint(r: SpawnRecord): string {
+/** Build a subtitle (line 2: agent · cloud · time) for the interactive picker */
+export function buildRecordSubtitle(r: SpawnRecord, manifest: Manifest | null): string {
+  const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
+  const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
   const relative = formatRelativeTime(r.timestamp);
-  const parts: string[] = [
-    relative,
-  ];
-
+  const parts = [agentDisplay, cloudDisplay, relative];
   if (r.connection?.deleted) {
-    parts.push(pc.dim("[deleted]"));
-  } else if (r.connection) {
-    if (r.connection.ip === "sprite-console" && r.connection.server_name) {
-      parts.push(pc.green(`sprite console -s ${r.connection.server_name}`));
-    } else if (r.connection.ip === "fly-ssh" && r.connection.server_name) {
-      parts.push(pc.green(`fly ssh console -a ${r.connection.server_name}`));
-    } else if (r.connection.ip === "daytona-sandbox" && r.connection.server_id) {
-      parts.push(pc.green(`daytona ssh ${r.connection.server_id}`));
-    } else {
-      parts.push(pc.green(`ssh ${r.connection.user}@${r.connection.ip}`));
-    }
+    parts.push("[deleted]");
   }
-
-  if (r.prompt) {
-    const preview = r.prompt.length > 30 ? r.prompt.slice(0, 30) + "..." : r.prompt;
-    parts.push(`--prompt "${preview}"`);
-  }
-
-  return parts.join("  ");
+  return parts.join(" · ");
 }
 
 /** Try to load manifest and resolve filter display names to keys.
@@ -2483,7 +2445,7 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
   if (selected.name) {
     process.env.SPAWN_NAME = selected.name;
   }
-  p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))}`);
+  p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))} ${pc.dim(`(${buildRecordSubtitle(selected, manifest)})`)}`);
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
 
@@ -2498,7 +2460,7 @@ async function activeServerPicker(records: SpawnRecord[], manifest: Manifest | n
     const options = remaining.map((r) => ({
       value: r.timestamp,
       label: buildRecordLabel(r, manifest),
-      hint: buildRecordHint(r),
+      subtitle: buildRecordSubtitle(r, manifest),
     }));
 
     const result = pickToTTYWithActions({
@@ -2689,8 +2651,9 @@ export async function cmdLast(): Promise<void> {
   }
 
   const label = buildRecordLabel(latest, manifest);
-  const hint = buildRecordHint(latest);
-  p.log.step(`Rerunning last spawn: ${pc.bold(label)} ${pc.dim(hint)}`);
+  const subtitle = buildRecordSubtitle(latest, manifest);
+  p.log.step(`Rerunning last spawn: ${pc.bold(label)} ${pc.dim(`(${subtitle})`)}`);
+
   if (latest.name) {
     process.env.SPAWN_NAME = latest.name;
   }

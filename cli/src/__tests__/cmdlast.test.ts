@@ -51,7 +51,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import after mock setup
-const { cmdLast, buildRecordLabel, buildRecordHint } = await import("../commands.js");
+const { cmdLast, buildRecordLabel, buildRecordSubtitle } = await import("../commands.js");
 const { loadManifest, _resetCacheForTesting } = await import("../manifest.js");
 
 // ── Test Setup ──────────────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ describe("cmdLast", () => {
       expect(step).toMatch(/now|ago|hours|seconds|minutes/i);
     });
 
-    it("should show prompt preview in rerun message when prompt exists", async () => {
+    it("should show subtitle with agent and cloud in rerun message", async () => {
       writeHistory([
         {
           agent: "claude",
@@ -375,116 +375,60 @@ describe("cmdLast", () => {
       }
 
       const step = logStepOutput();
-      expect(step).toContain("Fix all linter errors");
-      expect(step).toContain("--prompt");
-    });
-
-    it("should not show prompt hint when record has no prompt", async () => {
-      writeHistory([
-        {
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-01T10:00:00Z",
-        },
-      ]);
-
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
-
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
-
-      const step = logStepOutput();
-      expect(step).not.toContain("--prompt");
-    });
-
-    it("should truncate long prompts with ellipsis in hint", async () => {
-      const longPrompt =
-        "This is a very long prompt that should be truncated because it exceeds the preview limit and should show ellipsis";
-      writeHistory([
-        {
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-01T10:00:00Z",
-          prompt: longPrompt,
-        },
-      ]);
-
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
-
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
-
-      const step = logStepOutput();
-      // Should contain truncated version with ellipsis
-      expect(step).toContain("...");
-      // The hint string should truncate the prompt to 30 chars + "..."
-      expect(step).toContain(longPrompt.slice(0, 30));
-    });
-
-    it("should show full short prompt without truncation", async () => {
-      const shortPrompt = "Short";
-      writeHistory([
-        {
-          agent: "claude",
-          cloud: "sprite",
-          timestamp: "2026-01-01T10:00:00Z",
-          prompt: shortPrompt,
-        },
-      ]);
-
-      global.fetch = mock(
-        () =>
-          Promise.resolve({
-            ok: true,
-            json: async () => mockManifest,
-          }) as any,
-      );
-
-      try {
-        await cmdLast();
-      } catch {
-        // Expected
-      }
-
-      const step = logStepOutput();
-      expect(step).toContain("Short");
-      // Short prompt should not be truncated
-      expect(step).not.toContain("Short...");
+      expect(step).toContain("Claude Code");
+      expect(step).toContain("Sprite");
     });
   });
 
-  // ── Helper function tests (buildRecordLabel and buildRecordHint) ────────────
+  // ── Helper function tests (buildRecordLabel and buildRecordSubtitle) ────────
 
   describe("buildRecordLabel helper", () => {
-    it("should format as 'AgentName on CloudName' with manifest", () => {
+    it("should return spawn name when present", () => {
+      const record: SpawnRecord = {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00Z",
+        name: "my-server",
+      };
+      const label = buildRecordLabel(record, mockManifest);
+      expect(label).toBe("my-server");
+    });
+
+    it("should fall back to server_name when no name", () => {
+      const record: SpawnRecord = {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: "2026-01-01T00:00:00Z",
+        connection: { ip: "1.2.3.4", user: "root", server_name: "spawn-abc" },
+      };
+      const label = buildRecordLabel(record, mockManifest);
+      expect(label).toBe("spawn-abc");
+    });
+
+    it("should fall back to 'unnamed' when no name or server_name", () => {
       const record: SpawnRecord = {
         agent: "claude",
         cloud: "sprite",
         timestamp: "2026-01-01T00:00:00Z",
       };
-      const label = buildRecordLabel(record, mockManifest);
+      const label = buildRecordLabel(record, null);
+      expect(label).toBe("unnamed");
+    });
+  });
 
-      expect(label).toContain("Claude Code");
-      expect(label).toContain("on");
-      expect(label).toContain("Sprite");
+  describe("buildRecordSubtitle helper", () => {
+    it("should include agent, cloud, and relative timestamp", () => {
+      const now = new Date().toISOString();
+      const record: SpawnRecord = {
+        agent: "claude",
+        cloud: "sprite",
+        timestamp: now,
+      };
+      const subtitle = buildRecordSubtitle(record, mockManifest);
+
+      expect(subtitle).toContain("Claude Code");
+      expect(subtitle).toContain("Sprite");
+      expect(subtitle).toContain("·");
     });
 
     it("should use raw keys when manifest is null", () => {
@@ -493,99 +437,22 @@ describe("cmdLast", () => {
         cloud: "sprite",
         timestamp: "2026-01-01T00:00:00Z",
       };
-      const label = buildRecordLabel(record, null);
+      const subtitle = buildRecordSubtitle(record, null);
 
-      expect(label).toContain("claude");
-      expect(label).toContain("sprite");
+      expect(subtitle).toContain("claude");
+      expect(subtitle).toContain("sprite");
     });
 
-    it("should handle unknown agent keys", () => {
-      const record: SpawnRecord = {
-        agent: "unknown-agent",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00Z",
-      };
-      const label = buildRecordLabel(record, mockManifest);
-
-      // Should fall back to raw key when not in manifest
-      expect(label).toContain("unknown-agent");
-    });
-
-    it("should handle unknown cloud keys", () => {
-      const record: SpawnRecord = {
-        agent: "claude",
-        cloud: "unknown-cloud",
-        timestamp: "2026-01-01T00:00:00Z",
-      };
-      const label = buildRecordLabel(record, mockManifest);
-
-      expect(label).toContain("unknown-cloud");
-    });
-  });
-
-  describe("buildRecordHint helper", () => {
-    it("should include relative timestamp", () => {
-      const now = new Date().toISOString();
-      const record: SpawnRecord = {
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: now,
-      };
-      const hint = buildRecordHint(record);
-
-      expect(hint).toMatch(/now|seconds ago|minutes ago|hours ago|days ago/i);
-    });
-
-    it("should include prompt preview when prompt exists", () => {
+    it("should include [deleted] when connection is deleted", () => {
       const record: SpawnRecord = {
         agent: "claude",
         cloud: "sprite",
         timestamp: "2026-01-01T00:00:00Z",
-        prompt: "Fix the bug",
+        connection: { ip: "1.2.3.4", user: "root", deleted: true },
       };
-      const hint = buildRecordHint(record);
+      const subtitle = buildRecordSubtitle(record, mockManifest);
 
-      expect(hint).toContain("--prompt");
-      expect(hint).toContain("Fix the bug");
-    });
-
-    it("should not include prompt when not in record", () => {
-      const record: SpawnRecord = {
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00Z",
-      };
-      const hint = buildRecordHint(record);
-
-      expect(hint).not.toContain("--prompt");
-    });
-
-    it("should truncate long prompts", () => {
-      const longPrompt = "a".repeat(50);
-      const record: SpawnRecord = {
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00Z",
-        prompt: longPrompt,
-      };
-      const hint = buildRecordHint(record);
-
-      expect(hint).toContain("...");
-      expect(hint.length).toBeLessThan(longPrompt.length + 20);
-    });
-
-    it("should not truncate short prompts", () => {
-      const shortPrompt = "Test";
-      const record: SpawnRecord = {
-        agent: "claude",
-        cloud: "sprite",
-        timestamp: "2026-01-01T00:00:00Z",
-        prompt: shortPrompt,
-      };
-      const hint = buildRecordHint(record);
-
-      expect(hint).toContain("Test");
-      expect(hint).not.toContain("Test...");
+      expect(subtitle).toContain("[deleted]");
     });
   });
 
@@ -646,7 +513,7 @@ describe("cmdLast", () => {
 
       const step = logStepOutput();
       expect(step).toContain("Rerunning");
-      expect(step).toContain("Update documentation");
+      expect(step).toContain("Claude Code");
     });
 
     it("should properly select most recent when records have same day", async () => {
