@@ -1,6 +1,6 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
 import {
@@ -21,7 +21,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
-import { getConnectionPath, saveVmConnection } from "../history.js";
+import { saveVmConnection } from "../history.js";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 
@@ -859,19 +859,6 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
 
   logError(`Instance did not become running after ${maxAttempts} checks`);
   throw new Error("Instance start timeout");
-}
-
-// ─── Connection Tracking ────────────────────────────────────────────────────
-
-export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n");
-  } catch {
-    // non-fatal
-  }
 }
 
 // ─── SSH Execution ──────────────────────────────────────────────────────────

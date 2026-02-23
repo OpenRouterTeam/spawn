@@ -1,6 +1,6 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   logInfo,
@@ -20,7 +20,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
-import { getConnectionPath, saveVmConnection } from "../history.js";
+import { saveVmConnection } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
@@ -328,19 +328,6 @@ export async function ensureSshKey(): Promise<void> {
     throw new Error("SSH key registration failed");
   }
   logInfo("SSH key registered with Hetzner");
-}
-
-// ─── Connection Tracking ─────────────────────────────────────────────────────
-
-export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n");
-  } catch {
-    // non-fatal
-  }
 }
 
 // ─── Cloud Init Userdata ────────────────────────────────────────────────────

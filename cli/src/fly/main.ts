@@ -13,12 +13,12 @@ import {
   runServer,
   uploadFile,
   interactiveSession,
-  saveLaunchCmd,
   FLY_VM_TIERS,
   DEFAULT_VM_TIER,
 } from "./fly";
 import type { ServerOptions } from "./fly";
 import { resolveAgent } from "./agents";
+import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
 import type { CloudOrchestrator } from "../shared/orchestrate";
 import { selectFromList } from "../shared/ui";

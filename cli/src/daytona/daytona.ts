@@ -1,6 +1,6 @@
 // daytona/daytona.ts — Core Daytona provider: API, SSH, provisioning, execution
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   logInfo,
@@ -18,7 +18,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { parseJsonWith, parseJsonRaw } from "../shared/parse";
 import * as v from "valibot";
-import { getConnectionPath, saveVmConnection } from "../history.js";
+import { saveVmConnection } from "../history.js";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -212,17 +212,6 @@ export async function ensureDaytonaToken(): Promise<void> {
 }
 
 // ─── Connection Tracking ─────────────────────────────────────────────────────
-
-export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n");
-  } catch {
-    // non-fatal
-  }
-}
 
 // ─── SSH Helpers ─────────────────────────────────────────────────────────────
 

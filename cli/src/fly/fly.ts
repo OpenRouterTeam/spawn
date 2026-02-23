@@ -1,6 +1,6 @@
 // fly/lib/fly.ts — Core Fly.io provider: API, auth, orgs, provisioning, execution
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   logInfo,
@@ -20,7 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import * as v from "valibot";
 import { parseJsonWith, parseJsonRaw } from "../shared/parse";
-import { getConnectionPath, saveVmConnection } from "../history.js";
+import { saveVmConnection } from "../history.js";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
 const FLY_DASHBOARD_URL = "https://fly.io/dashboard";
@@ -313,20 +313,6 @@ function loadTokenFromConfig(): string | null {
     return token;
   } catch {
     return null;
-  }
-}
-
-// ─── Connection Tracking ─────────────────────────────────────────────────────
-
-/** Append launch_cmd to the last-connection.json file */
-export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n");
-  } catch {
-    // Connection file may not exist — non-fatal
   }
 }
 

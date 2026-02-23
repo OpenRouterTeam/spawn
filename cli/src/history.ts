@@ -93,6 +93,18 @@ export function saveVmConnection(
   writeFileSync(join(dir, "last-connection.json"), JSON.stringify(json) + "\n");
 }
 
+/** Save launch command to the last-connection.json file. */
+export function saveLaunchCmd(launchCmd: string): void {
+  const connFile = getConnectionPath();
+  try {
+    const data = JSON.parse(readFileSync(connFile, "utf-8"));
+    data.launch_cmd = launchCmd;
+    writeFileSync(connFile, JSON.stringify(data) + "\n");
+  } catch {
+    // non-fatal
+  }
+}
+
 export function loadHistory(): SpawnRecord[] {
   const path = getHistoryPath();
   if (!existsSync(path)) {
