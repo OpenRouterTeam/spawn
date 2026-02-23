@@ -149,21 +149,34 @@ export function openBrowser(url: string): void {
   logStep(`Please open: ${url}`);
 }
 
-/** Generic async retry helper. Retries `fn` up to `maxAttempts` times with a delay between attempts. */
+// ─── Result-based retry ────────────────────────────────────────────────
+
+import { type Result } from "./result";
+export { type Result, Ok, Err } from "./result";
+
+/**
+ * Phase-aware retry helper using the Result monad.
+ *
+ * - `fn` returns `Ok(value)` on success — stops retrying, returns `value`.
+ * - `fn` returns `Err(error)` on a retryable failure — retries up to `maxAttempts`.
+ * - `fn` **throws** on a non-retryable failure — immediately propagates (no retry).
+ *
+ * This lets each caller decide at the point of failure whether the error is
+ * retryable (return Err) or fatal (throw), instead of relying on brittle
+ * error-message pattern matching after the fact.
+ */
 export async function withRetry<T>(
   label: string,
-  fn: () => Promise<T>,
+  fn: () => Promise<Result<T>>,
   maxAttempts = 3,
   delaySec = 5,
 ): Promise<T> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if (attempt >= maxAttempts) throw err;
-      logWarn(`${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delaySec}s...`);
-      await new Promise((r) => setTimeout(r, delaySec * 1000));
-    }
+    const result = await fn(); // throws → not retried (non-retryable)
+    if (result.ok) return result.value; // success
+    if (attempt >= maxAttempts) throw result.error;
+    logWarn(`${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delaySec}s...`);
+    await new Promise((r) => setTimeout(r, delaySec * 1000));
   }
   throw new Error("unreachable");
 }
