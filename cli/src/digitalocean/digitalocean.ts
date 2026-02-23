@@ -18,6 +18,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
+import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
 const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
@@ -115,10 +116,6 @@ async function doApi(
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 const LooseObject = v.record(v.string(), v.unknown());
 
@@ -842,58 +839,15 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────
 
-const SSH_OPTS = [
-  "-o",
-  "StrictHostKeyChecking=no",
-  "-o",
-  "UserKnownHostsFile=/dev/null",
-  "-o",
-  "LogLevel=ERROR",
-  "-o",
-  "ConnectTimeout=10",
-  "-o",
-  "ServerAliveInterval=15",
-  "-o",
-  "ServerAliveCountMax=3",
-];
+const SSH_OPTS = SSH_BASE_OPTS;
 
-export async function waitForCloudInit(ip?: string, maxAttempts = 60): Promise<void> {
+export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<void> {
   const serverIp = ip || doServerIp;
-  logStep("Waiting for SSH connectivity...");
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const proc = Bun.spawn(
-        [
-          "ssh",
-          ...SSH_OPTS,
-          `root@${serverIp}`,
-          "echo ok",
-        ],
-        {
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe",
-          ],
-        },
-      );
-      const stdout = await new Response(proc.stdout).text();
-      const exitCode = await proc.exited;
-      if (exitCode === 0 && stdout.includes("ok")) {
-        logInfo("SSH is ready");
-        break;
-      }
-    } catch {
-      // ignore
-    }
-    if (attempt >= maxAttempts) {
-      logError("SSH connectivity failed");
-      throw new Error("SSH wait timeout");
-    }
-    logStep(`SSH not ready yet (${attempt}/${maxAttempts})`);
-    await sleep(5000);
-  }
+  await sharedWaitForSsh({
+    host: serverIp,
+    user: "root",
+    maxAttempts: 36,
+  });
 
   // Stream cloud-init output so the user sees progress in real time
   logStep("Streaming cloud-init output (timeout: 5min)...");

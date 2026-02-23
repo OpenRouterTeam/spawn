@@ -16,6 +16,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
+import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 
@@ -139,12 +140,6 @@ export function getState() {
     gcpServerIp,
     gcpUsername,
   };
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 // ─── gcloud CLI Wrapper ─────────────────────────────────────────────────────
@@ -773,45 +768,15 @@ export async function createInstance(
 
 // ─── SSH Operations ─────────────────────────────────────────────────────────
 
-const SSH_OPTS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=15 -o ServerAliveCountMax=3";
+const SSH_OPTS = SSH_BASE_OPTS;
 
-export async function waitForSsh(maxAttempts = 30): Promise<void> {
-  logStep("Waiting for SSH connectivity...");
+export async function waitForSsh(maxAttempts = 36): Promise<void> {
   const username = resolveUsername();
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const proc = Bun.spawn(
-        [
-          "ssh",
-          ...SSH_OPTS.split(" "),
-          "-o",
-          "ConnectTimeout=5",
-          `${username}@${gcpServerIp}`,
-          "echo ok",
-        ],
-        {
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe",
-          ],
-        },
-      );
-      const stdout = await new Response(proc.stdout).text();
-      const exitCode = await proc.exited;
-      if (exitCode === 0 && stdout.includes("ok")) {
-        logInfo("SSH is ready");
-        return;
-      }
-    } catch {
-      // ignore
-    }
-    logStep(`SSH not ready yet (${attempt}/${maxAttempts})`);
-    await sleep(5000);
-  }
-  logError(`SSH connectivity failed after ${maxAttempts} attempts`);
-  throw new Error("SSH wait timeout");
+  await sharedWaitForSsh({
+    host: gcpServerIp,
+    user: username,
+    maxAttempts,
+  });
 }
 
 export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
@@ -825,9 +790,7 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
       const proc = Bun.spawn(
         [
           "ssh",
-          ...SSH_OPTS.split(" "),
-          "-o",
-          "ConnectTimeout=5",
+          ...SSH_OPTS,
           `${username}@${gcpServerIp}`,
           "test -f /tmp/.cloud-init-complete",
         ],
@@ -859,7 +822,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS.split(" "),
+      ...SSH_OPTS,
       `${username}@${gcpServerIp}`,
       `bash -c ${shellQuote(fullCmd)}`,
     ],
@@ -892,7 +855,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS.split(" "),
+      ...SSH_OPTS,
       `${username}@${gcpServerIp}`,
       `bash -c ${shellQuote(fullCmd)}`,
     ],
@@ -932,7 +895,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
   const proc = Bun.spawn(
     [
       "scp",
-      ...SSH_OPTS.split(" "),
+      ...SSH_OPTS,
       localPath,
       `${username}@${gcpServerIp}:${expandedPath}`,
     ],
@@ -959,7 +922,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS.split(" "),
+      ...SSH_OPTS,
       "-t",
       `${username}@${gcpServerIp}`,
       `bash -c ${shellQuote(fullCmd)}`,
