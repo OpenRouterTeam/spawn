@@ -11,6 +11,7 @@ import {
   toKebabCase,
   defaultSpawnName,
 } from "../shared/ui";
+import { sleep } from "../shared/ssh";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
 
@@ -29,10 +30,6 @@ export function getState() {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 /** Run a command locally and return { exitCode, stdout, stderr }. */
 function spawnSync(args: string[]): {

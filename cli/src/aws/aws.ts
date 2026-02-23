@@ -17,6 +17,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
+import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
 
@@ -116,28 +117,7 @@ export function getState() {
 const SSH_USER = "ubuntu";
 const SSH_KEY_PATH = `${process.env.HOME}/.ssh/id_ed25519`;
 
-const SSH_OPTS = [
-  "-o",
-  "StrictHostKeyChecking=no",
-  "-o",
-  "UserKnownHostsFile=/dev/null",
-  "-o",
-  "LogLevel=ERROR",
-  "-o",
-  "ConnectTimeout=10",
-  "-o",
-  "ServerAliveInterval=15",
-  "-o",
-  "ServerAliveCountMax=3",
-  "-i",
-  SSH_KEY_PATH,
-];
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
+const SSH_OPTS = [...SSH_BASE_OPTS, "-i", SSH_KEY_PATH];
 
 // ─── Valibot Schemas for AWS API Responses ──────────────────────────────────
 
@@ -915,40 +895,13 @@ export function saveLaunchCmd(launchCmd: string): void {
 
 // ─── SSH Execution ──────────────────────────────────────────────────────────
 
-export async function waitForSsh(maxAttempts = 30): Promise<void> {
-  logStep("Waiting for SSH connectivity...");
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const proc = Bun.spawn(
-        [
-          "ssh",
-          ...SSH_OPTS,
-          `${SSH_USER}@${instanceIp}`,
-          "echo ok",
-        ],
-        {
-          stdio: [
-            "ignore",
-            "pipe",
-            "ignore",
-          ],
-        },
-      );
-      const stdout = await new Response(proc.stdout).text();
-      const exitCode = await proc.exited;
-      if (exitCode === 0 && stdout.includes("ok")) {
-        logInfo("SSH is ready");
-        return;
-      }
-    } catch {
-      // ignore
-    }
-    logStep(`SSH not ready yet (${attempt}/${maxAttempts})`);
-    await sleep(5000);
-  }
-
-  throw new Error("SSH connectivity timeout");
+export async function waitForSsh(maxAttempts = 36): Promise<void> {
+  await sharedWaitForSsh({
+    host: instanceIp,
+    user: SSH_USER,
+    maxAttempts,
+    sshKeyPath: SSH_KEY_PATH,
+  });
 }
 
 export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
