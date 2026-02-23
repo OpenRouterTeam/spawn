@@ -17,7 +17,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
-import { getConnectionPath, saveVmConnection } from "../history.js";
+import { saveVmConnection } from "../history.js";
 
 const DASHBOARD_URL = "https://console.cloud.google.com/compute/instances";
 
@@ -988,19 +988,6 @@ export async function destroyInstance(name?: string): Promise<void> {
     throw new Error("Instance deletion failed");
   }
   logInfo(`Instance '${instanceName}' destroyed`);
-}
-
-// ─── Connection Tracking ────────────────────────────────────────────────────
-
-export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n");
-  } catch {
-    // non-fatal
-  }
 }
 
 // ─── Shell Quoting ──────────────────────────────────────────────────────────

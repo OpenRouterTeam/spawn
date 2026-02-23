@@ -1,6 +1,6 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import * as v from "valibot";
 import {
@@ -20,7 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
-import { getConnectionPath, saveVmConnection } from "../history.js";
+import { saveVmConnection } from "../history.js";
 
 const DO_API_BASE = "https://api.digitalocean.com/v2";
 const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
@@ -685,19 +685,6 @@ export async function ensureSshKey(): Promise<void> {
   }
 
   logWarn("SSH key registration may have failed, continuing...");
-}
-
-// ─── Connection Tracking ─────────────────────────────────────────────────────
-
-export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n");
-  } catch {
-    // Connection file may not exist — non-fatal
-  }
 }
 
 // ─── Provisioning ────────────────────────────────────────────────────────────

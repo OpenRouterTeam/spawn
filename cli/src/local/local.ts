@@ -1,9 +1,9 @@
 // local/local.ts — Core local provider: runs commands on the user's machine
 
-import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { spawn } from "node:child_process";
-import { getSpawnDir, getConnectionPath } from "../history.js";
+import { getSpawnDir } from "../history.js";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
@@ -110,14 +110,3 @@ export function saveLocalConnection(): void {
   Bun.write(`${dir}/last-connection.json`, json + "\n");
 }
 
-/** Save launch command to the last-connection.json file. */
-export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    Bun.write(connFile, JSON.stringify(data) + "\n");
-  } catch {
-    // non-fatal
-  }
-}

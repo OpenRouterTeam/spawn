@@ -1,6 +1,6 @@
 // sprite/sprite.ts — Core Sprite provider: CLI installation, auth, provisioning, execution
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
 import {
   logInfo,
@@ -14,7 +14,7 @@ import {
 } from "../shared/ui";
 import { sleep } from "../shared/ssh";
 import { hasMessage } from "../shared/type-guards";
-import { getSpawnDir, getConnectionPath } from "../history.js";
+import { getSpawnDir } from "../history.js";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
 
@@ -439,17 +439,6 @@ export function saveVmConnection(): void {
     cloud: "sprite",
   };
   writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
-}
-
-export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = getConnectionPath();
-  try {
-    const data = JSON.parse(readFileSync(connFile, "utf-8"));
-    data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n");
-  } catch {
-    // Connection file may not exist — non-fatal
-  }
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────
