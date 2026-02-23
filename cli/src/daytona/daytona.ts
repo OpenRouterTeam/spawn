@@ -62,10 +62,11 @@ function toRecord(val: unknown): Record<string, unknown> | null {
 
 /** Filter an array to only Record<string, unknown> entries. */
 function toObjectArray(val: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(val)) { return []; }
+  if (!Array.isArray(val)) {
+    return [];
+  }
   return val.filter(
-    (item): item is Record<string, unknown> =>
-      item !== null && typeof item === "object" && !Array.isArray(item),
+    (item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item),
   );
 }
 
@@ -631,10 +632,6 @@ export async function listServers(): Promise<void> {
     const name = typeof s.name === "string" ? s.name : "N/A";
     const id = typeof s.id === "string" ? s.id : "N/A";
     const state = typeof s.state === "string" ? s.state : "N/A";
-    console.log(
-      pad(name.slice(0, 24), 25) +
-        pad(id.slice(0, 39), 40) +
-        pad(state.slice(0, 11), 12),
-    );
+    console.log(pad(name.slice(0, 24), 25) + pad(id.slice(0, 39), 40) + pad(state.slice(0, 11), 12));
   }
 }

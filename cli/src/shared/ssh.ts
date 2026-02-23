@@ -7,15 +7,24 @@ import { connect } from "node:net";
 
 /** Base SSH options shared across all clouds (array form for Bun.spawn). */
 export const SSH_BASE_OPTS: string[] = [
-  "-o", "StrictHostKeyChecking=no",
-  "-o", "UserKnownHostsFile=/dev/null",
-  "-o", "LogLevel=ERROR",
-  "-o", "ConnectTimeout=10",
-  "-o", "ServerAliveInterval=15",
-  "-o", "ServerAliveCountMax=3",
-  "-o", "GSSAPIAuthentication=no",
-  "-o", "TCPKeepAlive=no",
-  "-o", "BatchMode=yes",
+  "-o",
+  "StrictHostKeyChecking=no",
+  "-o",
+  "UserKnownHostsFile=/dev/null",
+  "-o",
+  "LogLevel=ERROR",
+  "-o",
+  "ConnectTimeout=10",
+  "-o",
+  "ServerAliveInterval=15",
+  "-o",
+  "ServerAliveCountMax=3",
+  "-o",
+  "GSSAPIAuthentication=no",
+  "-o",
+  "TCPKeepAlive=no",
+  "-o",
+  "BatchMode=yes",
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -34,7 +43,10 @@ export function sleep(ms: number): Promise<void> {
  */
 export function tcpCheck(host: string, port: number, timeoutMs = 2000): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = connect({ host, port });
+    const socket = connect({
+      host,
+      port,
+    });
     const timer = setTimeout(() => {
       socket.destroy();
       resolve(false);
@@ -83,7 +95,9 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   const maxAttempts = opts.maxAttempts ?? 36;
 
   // Build SSH args
-  const sshArgs: string[] = [...SSH_BASE_OPTS];
+  const sshArgs: string[] = [
+    ...SSH_BASE_OPTS,
+  ];
   if (sshKeyPath) {
     sshArgs.push("-i", sshKeyPath);
   }
@@ -119,8 +133,19 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   for (let i = 1; i <= handshakeAttempts; i++) {
     try {
       const proc = Bun.spawn(
-        ["ssh", ...sshArgs, `${user}@${host}`, "echo ok"],
-        { stdio: ["ignore", "pipe", "pipe"] },
+        [
+          "ssh",
+          ...sshArgs,
+          `${user}@${host}`,
+          "echo ok",
+        ],
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
       );
       const [stdout, stderr] = await Promise.all([
         new Response(proc.stdout).text(),

@@ -55,7 +55,9 @@ import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuth
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
-const PkgVersionSchema = v.object({ version: v.string() });
+const PkgVersionSchema = v.object({
+  version: v.string(),
+});
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -2158,7 +2160,11 @@ export function buildRecordSubtitle(r: SpawnRecord, manifest: Manifest | null): 
   const agentDisplay = resolveDisplayName(manifest, r.agent, "agent");
   const cloudDisplay = resolveDisplayName(manifest, r.cloud, "cloud");
   const relative = formatRelativeTime(r.timestamp);
-  const parts = [agentDisplay, cloudDisplay, relative];
+  const parts = [
+    agentDisplay,
+    cloudDisplay,
+    relative,
+  ];
   if (r.connection?.deleted) {
     parts.push("[deleted]");
   }
@@ -2451,7 +2457,9 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
   if (selected.name) {
     process.env.SPAWN_NAME = selected.name;
   }
-  p.log.step(`Spawning ${pc.bold(buildRecordLabel(selected, manifest))} ${pc.dim(`(${buildRecordSubtitle(selected, manifest)})`)}`);
+  p.log.step(
+    `Spawning ${pc.bold(buildRecordLabel(selected, manifest))} ${pc.dim(`(${buildRecordSubtitle(selected, manifest)})`)}`,
+  );
   await cmdRun(selected.agent, selected.cloud, selected.prompt);
 }
 
@@ -2460,7 +2468,9 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
 async function activeServerPicker(records: SpawnRecord[], manifest: Manifest | null): Promise<void> {
   const { pickToTTYWithActions } = await import("./picker.js");
 
-  const remaining = [...records];
+  const remaining = [
+    ...records,
+  ];
 
   while (remaining.length > 0) {
     const options = remaining.map((r) => ({
@@ -2485,7 +2495,11 @@ async function activeServerPicker(records: SpawnRecord[], manifest: Manifest | n
       const conn = picked.connection;
       const canDestroy = conn?.cloud && conn.cloud !== "local" && !conn.deleted && (conn.server_id || conn.server_name);
 
-      const deleteOptions: { value: string; label: string; hint?: string }[] = [];
+      const deleteOptions: {
+        value: string;
+        label: string;
+        hint?: string;
+      }[] = [];
       if (canDestroy) {
         deleteOptions.push({
           value: "destroy",

@@ -118,9 +118,7 @@ describe("cmdList integration", () => {
 
     // Prime the manifest in-memory cache with mock data so tests don't
     // depend on network availability or stale values from other test files.
-    global.fetch = mock(
-      () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-    );
+    global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
     await loadManifest(true);
     global.fetch = originalFetch;
 
@@ -232,9 +230,7 @@ describe("cmdList integration", () => {
       writeHistory(sampleRecords);
 
       // Mock fetch to return manifest (for display names)
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -247,9 +243,7 @@ describe("cmdList integration", () => {
     it("should render records in reverse chronological order (newest first)", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -268,9 +262,7 @@ describe("cmdList integration", () => {
     it("should show display names when manifest is available", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -298,9 +290,7 @@ describe("cmdList integration", () => {
     it("should show rerun hint in footer", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -313,9 +303,7 @@ describe("cmdList integration", () => {
     it("should show record count in footer", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -332,9 +320,7 @@ describe("cmdList integration", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -357,9 +343,7 @@ describe("cmdList integration", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -380,9 +364,7 @@ describe("cmdList integration", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -421,9 +403,7 @@ describe("cmdList integration", () => {
     it("should filter by agent name", async () => {
       writeHistory(records);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList("claude");
 
@@ -435,9 +415,7 @@ describe("cmdList integration", () => {
     it("should filter by cloud name", async () => {
       writeHistory(records);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList(undefined, "hetzner");
 
@@ -448,9 +426,7 @@ describe("cmdList integration", () => {
     it("should filter by both agent and cloud", async () => {
       writeHistory(records);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList("claude", "sprite");
 
@@ -461,9 +437,7 @@ describe("cmdList integration", () => {
     it("should show 'Clear filter' hint when filters are active", async () => {
       writeHistory(records);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList("claude");
 
@@ -475,9 +449,7 @@ describe("cmdList integration", () => {
     it("should show filter suggestion hint when no filters active", async () => {
       writeHistory(records);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -490,9 +462,7 @@ describe("cmdList integration", () => {
     it("should show case-insensitive filter results", async () => {
       writeHistory(records);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList("CLAUDE");
 
@@ -540,9 +510,7 @@ describe("cmdList integration", () => {
       }
       writeHistory(manyRecords);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 
@@ -559,9 +527,7 @@ describe("cmdList integration", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       await cmdList();
 

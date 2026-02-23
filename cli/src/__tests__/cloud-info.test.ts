@@ -132,9 +132,7 @@ describe("cmdCloudInfo", () => {
     delete process.env.OPENROUTER_API_KEY;
 
     originalFetch = global.fetch;
-    global.fetch = mock(async () =>
-      new Response(JSON.stringify(extendedManifest)),
-    );
+    global.fetch = mock(async () => new Response(JSON.stringify(extendedManifest)));
 
     await loadManifest(true);
   });

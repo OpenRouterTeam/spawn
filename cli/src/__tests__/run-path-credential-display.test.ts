@@ -111,7 +111,12 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
       "localcloud/codex": "implemented",
     },
   };
-  return overrides ? { ...base, ...overrides } : base;
+  return overrides
+    ? {
+        ...base,
+        ...overrides,
+      }
+    : base;
 }
 
 // ── Mock @clack/prompts ─────────────────────────────────────────────────

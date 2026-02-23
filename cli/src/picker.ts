@@ -83,13 +83,24 @@ const A = {
 };
 
 /** Truncate a string to `max` visible characters, adding \u2026 if needed. */
-const trunc = (s: string, max: number): string =>
-  s.length <= max ? s : s.slice(0, Math.max(max - 1, 0)) + "\u2026";
+const trunc = (s: string, max: number): string => (s.length <= max ? s : s.slice(0, Math.max(max - 1, 0)) + "\u2026");
 
 /** Get terminal column width from a tty file descriptor. */
 function getTTYCols(ttyFd: number): number {
   try {
-    const res = spawnSync("stty", ["size"], { stdio: [ttyFd, "pipe", "pipe"] });
+    const res = spawnSync(
+      "stty",
+      [
+        "size",
+      ],
+      {
+        stdio: [
+          ttyFd,
+          "pipe",
+          "pipe",
+        ],
+      },
+    );
     if (res.status === 0 && res.stdout) {
       const parts = res.stdout.toString().trim().split(/\s+/);
       if (parts.length >= 2) {
@@ -270,7 +281,10 @@ export function pickToTTY(config: PickConfig): string | null {
           // Replace picker with a one-line confirmation
           w(A.up(pickerHeight) + A.col1 + A.clearBelow);
           const opt = config.options[selected];
-          w(`${A.green}${A.bold}> ${config.message}:${A.reset} ` + `${A.cyan}${trunc(opt.label, maxW - config.message.length - 4)}${A.reset}\r\n`);
+          w(
+            `${A.green}${A.bold}> ${config.message}:${A.reset} ` +
+              `${A.cyan}${trunc(opt.label, maxW - config.message.length - 4)}${A.reset}\r\n`,
+          );
           break outer;
         }
 
@@ -305,10 +319,20 @@ export function pickToTTY(config: PickConfig): string | null {
  * When deleteKey is enabled, pressing 'd' returns { action: "delete" }.
  */
 export function pickToTTYWithActions(config: PickConfig): PickResult {
-  const cancel: PickResult = { action: "cancel", value: null, index: -1 };
+  const cancel: PickResult = {
+    action: "cancel",
+    value: null,
+    index: -1,
+  };
 
   if (config.options.length === 0) {
-    return config.defaultValue ? { action: "select", value: config.defaultValue, index: 0 } : cancel;
+    return config.defaultValue
+      ? {
+          action: "select",
+          value: config.defaultValue,
+          index: 0,
+        }
+      : cancel;
   }
 
   // ── open /dev/tty ──────────────────────────────────────────────────────────
@@ -318,24 +342,67 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
   } catch {
     // Fall back to basic pickFallback which returns a value
     const val = pickFallback(config);
-    return val ? { action: "select", value: val, index: config.options.findIndex((o) => o.value === val) } : cancel;
+    return val
+      ? {
+          action: "select",
+          value: val,
+          index: config.options.findIndex((o) => o.value === val),
+        }
+      : cancel;
   }
 
   // ── save terminal settings ────────────────────────────────────────────────
-  const savedRes = spawnSync("stty", ["-g"], { stdio: [ttyFd, "pipe", "pipe"] });
+  const savedRes = spawnSync(
+    "stty",
+    [
+      "-g",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
   if (savedRes.status !== 0 || !savedRes.stdout) {
     fs.closeSync(ttyFd);
     const val = pickFallback(config);
-    return val ? { action: "select", value: val, index: config.options.findIndex((o) => o.value === val) } : cancel;
+    return val
+      ? {
+          action: "select",
+          value: val,
+          index: config.options.findIndex((o) => o.value === val),
+        }
+      : cancel;
   }
   const savedSettings = savedRes.stdout.toString().trim();
 
   // ── enable raw / no-echo mode ─────────────────────────────────────────────
-  const rawRes = spawnSync("stty", ["raw", "-echo"], { stdio: [ttyFd, "pipe", "pipe"] });
+  const rawRes = spawnSync(
+    "stty",
+    [
+      "raw",
+      "-echo",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
   if (rawRes.status !== 0) {
     fs.closeSync(ttyFd);
     const val = pickFallback(config);
-    return val ? { action: "select", value: val, index: config.options.findIndex((o) => o.value === val) } : cancel;
+    return val
+      ? {
+          action: "select",
+          value: val,
+          index: config.options.findIndex((o) => o.value === val),
+        }
+      : cancel;
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
@@ -347,7 +414,19 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
 
   const restore = () => {
     try {
-      spawnSync("stty", [savedSettings], { stdio: [ttyFd, "pipe", "pipe"] });
+      spawnSync(
+        "stty",
+        [
+          savedSettings,
+        ],
+        {
+          stdio: [
+            ttyFd,
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
     } catch {}
     w(A.showC);
     try {
@@ -435,18 +514,28 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
         // ── confirm ────────────────────────────────────────────────────────
         case "\r":
         case "\n": {
-          result = { action: "select", value: config.options[selected].value, index: selected };
+          result = {
+            action: "select",
+            value: config.options[selected].value,
+            index: selected,
+          };
           // Replace picker with a one-line confirmation
           w(A.up(pickerHeight) + A.col1 + A.clearBelow);
           const opt = config.options[selected];
-          w(`${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${trunc(opt.label, maxW - config.message.length - 4)}${A.reset}\r\n`);
+          w(
+            `${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${trunc(opt.label, maxW - config.message.length - 4)}${A.reset}\r\n`,
+          );
           break outer;
         }
 
         // ── delete ───────────────────────────────────────────────────────
         case "d":
           if (config.deleteKey) {
-            result = { action: "delete", value: config.options[selected].value, index: selected };
+            result = {
+              action: "delete",
+              value: config.options[selected].value,
+              index: selected,
+            };
             w(A.up(pickerHeight) + A.col1 + A.clearBelow);
             break outer;
           }

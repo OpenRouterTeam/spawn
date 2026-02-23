@@ -76,9 +76,7 @@ describe("Commands Error Paths", () => {
 
     // Mock fetch to return our controlled manifest data
     originalFetch = global.fetch;
-    global.fetch = mock(async () =>
-      new Response(JSON.stringify(mockManifest)),
-    );
+    global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
 
     // Force-refresh the manifest cache
     await loadManifest(true);

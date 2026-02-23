@@ -146,9 +146,7 @@ describe("Commands Display Output", () => {
     });
 
     originalFetch = global.fetch;
-    global.fetch = mock(async () =>
-      new Response(JSON.stringify(mockManifest)),
-    );
+    global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
 
     await loadManifest(true);
   });
@@ -200,9 +198,7 @@ describe("Commands Display Output", () => {
     });
 
     it("should show no-clouds message when agent has no implementations", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(noImplManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(noImplManifest)));
       await loadManifest(true);
 
       await cmdAgentInfo("claude");
@@ -256,9 +252,7 @@ describe("Commands Display Output", () => {
     });
 
     it("should show 0 implemented when nothing is implemented", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(noImplManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(noImplManifest)));
       await loadManifest(true);
 
       await cmdMatrix();
@@ -443,8 +437,13 @@ describe("Commands Display Output", () => {
   describe("cmdUpdate", () => {
     it("should show already up to date when versions match", async () => {
       const pkg = await import("../../package.json");
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify({ version: pkg.default.version })),
+      global.fetch = mock(
+        async () =>
+          new Response(
+            JSON.stringify({
+              version: pkg.default.version,
+            }),
+          ),
       );
 
       await cmdUpdate();
@@ -472,8 +471,11 @@ describe("Commands Display Output", () => {
     });
 
     it("should handle non-ok fetch response", async () => {
-      global.fetch = mock(async () =>
-        new Response("error", { status: 500 }),
+      global.fetch = mock(
+        async () =>
+          new Response("error", {
+            status: 500,
+          }),
       );
 
       await cmdUpdate();
@@ -487,9 +489,7 @@ describe("Commands Display Output", () => {
 
   describe("cmdList - edge cases", () => {
     it("should handle single implementation correctly", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(singleImplManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(singleImplManifest)));
       await loadManifest(true);
 
       await cmdMatrix();
@@ -498,9 +498,7 @@ describe("Commands Display Output", () => {
     });
 
     it("should handle manifest with many clouds", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(manyCloudManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(manyCloudManifest)));
       await loadManifest(true);
 
       await cmdMatrix();
@@ -537,9 +535,7 @@ describe("Commands Display Output", () => {
           },
         },
       };
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(manifestWithNotes)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(manifestWithNotes)));
       await loadManifest(true);
 
       await cmdAgentInfo("codex");
@@ -559,9 +555,7 @@ describe("Commands Display Output", () => {
 
   describe("cmdAgentInfo - many clouds", () => {
     it("should list all implemented clouds for agent with many options", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(manyCloudManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(manyCloudManifest)));
       await loadManifest(true);
 
       await cmdAgentInfo("claude");
@@ -578,9 +572,7 @@ describe("Commands Display Output", () => {
 
   describe("cmdAgents - zero implementations", () => {
     it("should show 0 clouds for all agents", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(noImplManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(noImplManifest)));
       await loadManifest(true);
 
       await cmdAgents();
@@ -599,9 +591,7 @@ describe("Commands Display Output", () => {
 
   describe("cmdClouds - zero implementations", () => {
     it("should show 0 agents for all clouds", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(noImplManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(noImplManifest)));
       await loadManifest(true);
 
       await cmdClouds();

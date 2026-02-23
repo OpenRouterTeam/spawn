@@ -367,7 +367,15 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should reject manifest missing 'agents' field", async () => {
-    global.fetch = mock(async () => new Response(JSON.stringify({ clouds: {}, matrix: {} })));
+    global.fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            clouds: {},
+            matrix: {},
+          }),
+        ),
+    );
 
     // Force refresh to avoid cache, should reject invalid manifest
     try {
@@ -384,7 +392,15 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should reject manifest missing 'clouds' field", async () => {
-    global.fetch = mock(async () => new Response(JSON.stringify({ agents: {}, matrix: {} })));
+    global.fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            agents: {},
+            matrix: {},
+          }),
+        ),
+    );
 
     try {
       await loadManifest(true);
@@ -399,7 +415,15 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should reject manifest missing 'matrix' field", async () => {
-    global.fetch = mock(async () => new Response(JSON.stringify({ agents: {}, clouds: {} })));
+    global.fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            agents: {},
+            clouds: {},
+          }),
+        ),
+    );
 
     try {
       await loadManifest(true);
@@ -453,7 +477,12 @@ describe("manifest validation (isValidManifest)", () => {
   });
 
   it("should handle HTTP error response gracefully", async () => {
-    global.fetch = mock(async () => new Response("Internal Server Error", { status: 500 }));
+    global.fetch = mock(
+      async () =>
+        new Response("Internal Server Error", {
+          status: 500,
+        }),
+    );
 
     try {
       await loadManifest(true);

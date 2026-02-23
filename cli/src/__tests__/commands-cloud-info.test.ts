@@ -101,9 +101,7 @@ describe("cmdCloudInfo", () => {
     });
 
     originalFetch = global.fetch;
-    global.fetch = mock(async () =>
-      new Response(JSON.stringify(mockManifest)),
-    );
+    global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
 
     await loadManifest(true);
   });
@@ -175,9 +173,7 @@ describe("cmdCloudInfo", () => {
 
   describe("cloud with notes field", () => {
     it("should display notes when cloud has notes", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(manifestWithCloudNotes)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(manifestWithCloudNotes)));
       await loadManifest(true);
 
       await cmdCloudInfo("sprite");
@@ -190,9 +186,7 @@ describe("cmdCloudInfo", () => {
 
   describe("cloud with no implemented agents", () => {
     it("should show no-agents message", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(manifestWithNotes)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(manifestWithNotes)));
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
@@ -201,9 +195,7 @@ describe("cmdCloudInfo", () => {
     });
 
     it("should still show cloud name for agent-less cloud", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(manifestWithNotes)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(manifestWithNotes)));
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
@@ -213,9 +205,7 @@ describe("cmdCloudInfo", () => {
     });
 
     it("should display notes for agent-less cloud", async () => {
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(manifestWithNotes)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(manifestWithNotes)));
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
