@@ -8,7 +8,13 @@ describe("--custom flag", () => {
     });
 
     it("should not be detected as unknown flag", () => {
-      expect(findUnknownFlag(["claude", "sprite", "--custom"])).toBeNull();
+      expect(
+        findUnknownFlag([
+          "claude",
+          "sprite",
+          "--custom",
+        ]),
+      ).toBeNull();
     });
   });
 

@@ -300,12 +300,30 @@ export interface ServerTypeTier {
 }
 
 export const SERVER_TYPES: ServerTypeTier[] = [
-  { id: "cx22", label: "2 vCPU \u00b7 4 GB RAM \u00b7 40 GB (~\u20AC3.29/mo)" },
-  { id: "cx32", label: "4 vCPU \u00b7 8 GB RAM \u00b7 80 GB (~\u20AC5.39/mo)" },
-  { id: "cx42", label: "8 vCPU \u00b7 16 GB RAM \u00b7 160 GB (~\u20AC14.49/mo)" },
-  { id: "cx52", label: "16 vCPU \u00b7 32 GB RAM \u00b7 320 GB (~\u20AC28.49/mo)" },
-  { id: "cpx21", label: "3 AMD vCPU \u00b7 4 GB RAM \u00b7 80 GB (~\u20AC4.35/mo)" },
-  { id: "cpx31", label: "4 AMD vCPU \u00b7 8 GB RAM \u00b7 160 GB (~\u20AC7.59/mo)" },
+  {
+    id: "cx22",
+    label: "2 vCPU \u00b7 4 GB RAM \u00b7 40 GB (~\u20AC3.29/mo)",
+  },
+  {
+    id: "cx32",
+    label: "4 vCPU \u00b7 8 GB RAM \u00b7 80 GB (~\u20AC5.39/mo)",
+  },
+  {
+    id: "cx42",
+    label: "8 vCPU \u00b7 16 GB RAM \u00b7 160 GB (~\u20AC14.49/mo)",
+  },
+  {
+    id: "cx52",
+    label: "16 vCPU \u00b7 32 GB RAM \u00b7 320 GB (~\u20AC28.49/mo)",
+  },
+  {
+    id: "cpx21",
+    label: "3 AMD vCPU \u00b7 4 GB RAM \u00b7 80 GB (~\u20AC4.35/mo)",
+  },
+  {
+    id: "cpx31",
+    label: "4 AMD vCPU \u00b7 8 GB RAM \u00b7 160 GB (~\u20AC7.59/mo)",
+  },
 ];
 
 export const DEFAULT_SERVER_TYPE = "cx22";
@@ -318,11 +336,26 @@ export interface LocationOption {
 }
 
 export const LOCATIONS: LocationOption[] = [
-  { id: "fsn1", label: "Falkenstein, Germany" },
-  { id: "nbg1", label: "Nuremberg, Germany" },
-  { id: "hel1", label: "Helsinki, Finland" },
-  { id: "ash", label: "Ashburn, VA, US" },
-  { id: "hil", label: "Hillsboro, OR, US" },
+  {
+    id: "fsn1",
+    label: "Falkenstein, Germany",
+  },
+  {
+    id: "nbg1",
+    label: "Nuremberg, Germany",
+  },
+  {
+    id: "hel1",
+    label: "Helsinki, Finland",
+  },
+  {
+    id: "ash",
+    label: "Ashburn, VA, US",
+  },
+  {
+    id: "hil",
+    label: "Hillsboro, OR, US",
+  },
 ];
 
 export const DEFAULT_LOCATION = "nbg1";

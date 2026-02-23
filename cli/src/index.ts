@@ -760,7 +760,9 @@ async function main(): Promise<void> {
       );
     } else {
       console.error(pc.red("Error: --custom and --headless cannot be used together"));
-      console.error(`\n${pc.cyan("--custom")} enables interactive pickers, but ${pc.cyan("--headless")} disables all prompts.`);
+      console.error(
+        `\n${pc.cyan("--custom")} enables interactive pickers, but ${pc.cyan("--headless")} disables all prompts.`,
+      );
     }
     process.exit(3);
   }

@@ -630,12 +630,30 @@ export interface DropletSize {
 }
 
 export const DROPLET_SIZES: DropletSize[] = [
-  { id: "s-1vcpu-1gb", label: "1 vCPU \u00b7 1 GB RAM \u00b7 $6/mo" },
-  { id: "s-1vcpu-2gb", label: "1 vCPU \u00b7 2 GB RAM \u00b7 $12/mo" },
-  { id: "s-2vcpu-2gb", label: "2 vCPU \u00b7 2 GB RAM \u00b7 $18/mo" },
-  { id: "s-2vcpu-4gb", label: "2 vCPU \u00b7 4 GB RAM \u00b7 $24/mo" },
-  { id: "s-4vcpu-8gb", label: "4 vCPU \u00b7 8 GB RAM \u00b7 $48/mo" },
-  { id: "s-8vcpu-16gb", label: "8 vCPU \u00b7 16 GB RAM \u00b7 $96/mo" },
+  {
+    id: "s-1vcpu-1gb",
+    label: "1 vCPU \u00b7 1 GB RAM \u00b7 $6/mo",
+  },
+  {
+    id: "s-1vcpu-2gb",
+    label: "1 vCPU \u00b7 2 GB RAM \u00b7 $12/mo",
+  },
+  {
+    id: "s-2vcpu-2gb",
+    label: "2 vCPU \u00b7 2 GB RAM \u00b7 $18/mo",
+  },
+  {
+    id: "s-2vcpu-4gb",
+    label: "2 vCPU \u00b7 4 GB RAM \u00b7 $24/mo",
+  },
+  {
+    id: "s-4vcpu-8gb",
+    label: "4 vCPU \u00b7 8 GB RAM \u00b7 $48/mo",
+  },
+  {
+    id: "s-8vcpu-16gb",
+    label: "8 vCPU \u00b7 16 GB RAM \u00b7 $96/mo",
+  },
 ];
 
 export const DEFAULT_DROPLET_SIZE = "s-2vcpu-4gb";
@@ -648,16 +666,46 @@ export interface DoRegion {
 }
 
 export const DO_REGIONS: DoRegion[] = [
-  { id: "nyc1", label: "New York 1" },
-  { id: "nyc3", label: "New York 3" },
-  { id: "sfo3", label: "San Francisco 3" },
-  { id: "ams3", label: "Amsterdam 3" },
-  { id: "sgp1", label: "Singapore 1" },
-  { id: "lon1", label: "London 1" },
-  { id: "fra1", label: "Frankfurt 1" },
-  { id: "tor1", label: "Toronto 1" },
-  { id: "blr1", label: "Bangalore 1" },
-  { id: "syd1", label: "Sydney 1" },
+  {
+    id: "nyc1",
+    label: "New York 1",
+  },
+  {
+    id: "nyc3",
+    label: "New York 3",
+  },
+  {
+    id: "sfo3",
+    label: "San Francisco 3",
+  },
+  {
+    id: "ams3",
+    label: "Amsterdam 3",
+  },
+  {
+    id: "sgp1",
+    label: "Singapore 1",
+  },
+  {
+    id: "lon1",
+    label: "London 1",
+  },
+  {
+    id: "fra1",
+    label: "Frankfurt 1",
+  },
+  {
+    id: "tor1",
+    label: "Toronto 1",
+  },
+  {
+    id: "blr1",
+    label: "Bangalore 1",
+  },
+  {
+    id: "syd1",
+    label: "Sydney 1",
+  },
 ];
 
 export const DEFAULT_DO_REGION = "nyc3";
@@ -730,7 +778,12 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   return lines.join("\n");
 }
 
-export async function createServer(name: string, tier?: CloudInitTier, dropletSize?: string, region?: string): Promise<void> {
+export async function createServer(
+  name: string,
+  tier?: CloudInitTier,
+  dropletSize?: string,
+  region?: string,
+): Promise<void> {
   const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
   const effectiveRegion = region || process.env.DO_REGION || "nyc3";
   const image = "ubuntu-24-04-x64";
