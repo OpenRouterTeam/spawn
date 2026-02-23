@@ -220,7 +220,12 @@ elif [[ "${RUN_MODE}" == "review_all" ]]; then
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
     sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
     sed -i "s|SLACK_WEBHOOK_PLACEHOLDER|${SLACK_WEBHOOK:-NOT_SET}|g" "${PROMPT_FILE}"
-    sed -i "s|SLACK_WEBHOOK_STATUS_PLACEHOLDER|$(if [ -n "${SLACK_WEBHOOK}" ]; then echo "yes"; else echo "no"; fi)|g" "${PROMPT_FILE}"
+    if [ -n "${SLACK_WEBHOOK:-}" ]; then
+        SLACK_STATUS="yes"
+    else
+        SLACK_STATUS="no"
+    fi
+    sed -i "s|SLACK_WEBHOOK_STATUS_PLACEHOLDER|${SLACK_STATUS}|g" "${PROMPT_FILE}"
 
 else
     # --- Scan mode: full repo security audit + issue filing ---
