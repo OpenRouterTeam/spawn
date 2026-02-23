@@ -4,8 +4,30 @@
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { logInfo, logWarn, logError, logStep, prompt, jsonEscape, withRetry } from "./ui";
+import { logInfo, logWarn, logError, logStep, prompt, jsonEscape, withRetry, Ok, Err, type Result } from "./ui";
 import type { AgentConfig } from "./agents";
+
+/**
+ * Wrap an SSH-based async operation into a Result for use with withRetry.
+ * - Transient SSH/connection errors → Err (retryable)
+ * - Timeouts → throw (non-retryable: command may have already run)
+ * - Everything else → throw (non-retryable: unknown failure)
+ */
+export async function wrapSshCall(op: Promise<void>): Promise<Result<void>> {
+  try {
+    await op;
+    return Ok(undefined);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Timeouts are NOT retryable — the command may have completed on the
+    // remote but we lost the connection before seeing the exit code.
+    if (msg.includes("timed out") || msg.includes("timeout")) {
+      throw err;
+    }
+    // All other SSH errors (connection refused, reset, etc.) are retryable.
+    return Err(err instanceof Error ? err : new Error(msg));
+  }
+}
 
 // Re-export so cloud modules can re-export from here
 export type { AgentConfig };
@@ -30,7 +52,7 @@ export async function installAgent(
   try {
     await withRetry(
       `${agentName} install`,
-      () => runner.runServer(installCmd, timeoutSecs),
+      () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)),
       2,
       10,
     );
@@ -53,13 +75,16 @@ export async function uploadConfigFile(runner: CloudRunner, content: string, rem
   try {
     await withRetry(
       "config upload",
-      async () => {
-        const tempRemote = `/tmp/spawn_config_${Date.now()}`;
-        await runner.uploadFile(tmpFile, tempRemote);
-        await runner.runServer(
-          `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
-        );
-      },
+      () =>
+        wrapSshCall(
+          (async () => {
+            const tempRemote = `/tmp/spawn_config_${Date.now()}`;
+            await runner.uploadFile(tmpFile, tempRemote);
+            await runner.runServer(
+              `mkdir -p $(dirname "${remotePath}") && chmod 600 '${tempRemote}' && mv '${tempRemote}' "${remotePath}"`,
+            );
+          })(),
+        ),
       2,
       5,
     );

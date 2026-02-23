@@ -270,20 +270,26 @@ refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
 - If a PR can't be merged (conflicts, superseded, wrong approach), close it with `gh pr close {number} --comment "Reason"`
 - Never rebase main or use `--force` unless explicitly asked
 
-### Draft PR Workflow (for autonomous agents)
+### Draft PR First — MANDATORY
 
-- **Commit early and often** — make small, incremental commits as you work
-- **Push and open a draft PR immediately** — `gh pr create --draft` after your first commit
-- **Keep working on the draft PR** — push additional commits to the same branch
-- **Convert to non-draft when ready for review** — `gh pr ready NUMBER`
-- Draft PRs that go stale (no updates for 1 week) will be auto-closed
+**NEVER make changes without opening a PR.** Every change MUST go through a draft PR:
+
+1. **Create a branch and commit immediately** after the first meaningful change
+2. **Open a draft PR right away** — `gh pr create --draft` after your first commit
+3. **Push incremental commits** as you work — small, frequent commits are better than one big one
+4. **Convert to non-draft when done** — `gh pr ready NUMBER`
+
+This applies to ALL work — features, bug fixes, refactors, test additions, config changes. No exceptions. If code was changed, there must be a PR for it.
+
+Draft PRs that go stale (no updates for 1 week) will be auto-closed.
 
 ## After Each Change
 
 1. `bash -n {file}` syntax check on all modified scripts
-2. Update `manifest.json` matrix status to `"implemented"`
-3. Update the cloud's `README.md` with usage instructions
-4. Commit with a descriptive message
+2. `cd cli && bunx @biomejs/biome lint src/` — **must pass with zero errors** on all modified TypeScript
+3. Update `manifest.json` matrix status to `"implemented"`
+4. Update the cloud's `README.md` with usage instructions
+5. Commit with a descriptive message
 
 ## Filing Issues for Discovered Problems
 

@@ -1621,12 +1621,7 @@ function reportScriptFailure(
   process.exit(1);
 }
 
-const MAX_RETRIES = 2;
-const RETRY_DELAYS = [
-  5,
-  10,
-]; // seconds
-
+/** Check if an error message indicates an SSH connection failure (exit code 255). */
 export function isRetryableExitCode(errMsg: string): boolean {
   const exitCodeMatch = errMsg.match(/exited with code (\d+)/);
   if (!exitCodeMatch) {
@@ -1652,32 +1647,34 @@ function handleUserInterrupt(errMsg: string, dashboardUrl?: string): void {
   process.exit(130);
 }
 
-async function runWithRetries(
+/**
+ * Run a bash script once. Does NOT retry — the script includes server creation
+ * and an interactive session, so retrying would create duplicate servers.
+ * On SSH disconnect (exit 255), shows a reconnect hint instead.
+ */
+async function runBashScript(
   script: string,
   prompt?: string,
   dashboardUrl?: string,
   debug?: boolean,
   spawnName?: string,
 ): Promise<string | undefined> {
-  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
-    try {
-      await runBash(script, prompt, debug, spawnName);
-      return undefined; // success
-    } catch (err) {
-      const errMsg = getErrorMessage(err);
-      handleUserInterrupt(errMsg, dashboardUrl);
+  try {
+    await runBash(script, prompt, debug, spawnName);
+    return undefined; // success
+  } catch (err) {
+    const errMsg = getErrorMessage(err);
+    handleUserInterrupt(errMsg, dashboardUrl);
 
-      if (attempt <= MAX_RETRIES && isRetryableExitCode(errMsg)) {
-        const delay = RETRY_DELAYS[attempt - 1];
-        p.log.warn(`Script failed (${errMsg}). Retrying in ${delay}s (attempt ${attempt + 1}/${MAX_RETRIES + 1})...`);
-        await new Promise((r) => setTimeout(r, delay * 1000));
-        continue;
-      }
-
-      return errMsg;
+    // SSH disconnect after the server was already created — don't retry
+    if (isRetryableExitCode(errMsg)) {
+      console.error();
+      p.log.warn("SSH connection lost. Your server is likely still running.");
+      p.log.warn("To reconnect, re-run the same spawn command.");
     }
+
+    return errMsg;
   }
-  return "Script failed after all retries";
 }
 
 async function execScript(
@@ -1725,7 +1722,7 @@ async function execScript(
     }
   }
 
-  const lastErr = await runWithRetries(scriptContent, prompt, dashboardUrl, debug, spawnName);
+  const lastErr = await runBashScript(scriptContent, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {
     reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl, spawnName);
   }
