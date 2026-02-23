@@ -20,6 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import * as v from "valibot";
 import { parseJsonWith, parseJsonRaw } from "../shared/parse";
+import { isString, isNumber } from "../shared/type-guards";
 import { saveVmConnection } from "../history.js";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
@@ -764,7 +765,7 @@ async function createMachine(
   }
 
   const data = parseJson(resp);
-  const machineId = typeof data?.id === "string" ? data.id : undefined;
+  const machineId = isString(data?.id) ? data.id : undefined;
   if (!machineId) {
     logError("Failed to extract machine ID from API response");
     throw new Error("No machine ID");
@@ -814,7 +815,7 @@ async function createVolume(name: string, region: string, sizeGb: number): Promi
     logError("Failed to create volume");
     throw new Error("Volume creation failed");
   }
-  const volumeId = typeof data.id === "string" ? data.id : String(data.id);
+  const volumeId = isString(data.id) ? data.id : String(data.id);
   logInfo(`Volume created: ${volumeId}`);
   return volumeId;
 }
@@ -837,7 +838,7 @@ export async function listVolumes(appName: string): Promise<
     .map((item) => ({
       id: String(item.id),
       name: String(item.name || "unnamed"),
-      size_gb: typeof item.size_gb === "number" ? item.size_gb : 0,
+      size_gb: isNumber(item.size_gb) ? item.size_gb : 0,
     }));
 }
 
@@ -1191,7 +1192,7 @@ export async function destroyServer(appName?: string): Promise<void> {
   const resp = await flyApi("GET", `/apps/${name}/machines`);
   const machines = parseJsonRaw(resp);
   const machineList = toObjectArray(Array.isArray(machines) ? machines : []);
-  const ids: string[] = machineList.map((m) => (typeof m.id === "string" ? m.id : "")).filter(Boolean);
+  const ids: string[] = machineList.map((m) => (isString(m.id) ? m.id : "")).filter(Boolean);
 
   for (const mid of ids) {
     logStep(`Stopping machine ${mid}...`);

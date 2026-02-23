@@ -19,6 +19,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { parseJsonWith, parseJsonRaw } from "../shared/parse";
 import * as v from "valibot";
 import { saveVmConnection } from "../history.js";
+import { isString } from "../shared/type-guards";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -119,7 +120,7 @@ function extractApiError(text: string, fallback = "Unknown error"): string {
     return fallback;
   }
   const msg = data.message || data.error || data.detail;
-  return typeof msg === "string" ? msg : fallback;
+  return isString(msg) ? msg : fallback;
 }
 
 // ─── Token Management ────────────────────────────────────────────────────────
@@ -253,8 +254,8 @@ async function setupSshAccess(): Promise<void> {
     throw new Error("SSH access parse failure");
   }
 
-  sshToken = typeof data.token === "string" ? data.token : "";
-  const sshCommand = typeof data.sshCommand === "string" ? data.sshCommand : "";
+  sshToken = isString(data.token) ? data.token : "";
+  const sshCommand = isString(data.sshCommand) ? data.sshCommand : "";
 
   if (!sshToken) {
     logError(`Failed to get SSH access: ${extractApiError(sshResp)}`);
@@ -301,7 +302,7 @@ export async function createServer(name: string): Promise<void> {
   const response = await daytonaApi("POST", "/sandbox", body);
   const data = parseJson(response);
 
-  sandboxId = typeof data?.id === "string" ? data.id : "";
+  sandboxId = isString(data?.id) ? data.id : "";
   if (!sandboxId) {
     logError(`Failed to create sandbox: ${extractApiError(response)}`);
     throw new Error("Sandbox creation failed");
@@ -316,13 +317,13 @@ export async function createServer(name: string): Promise<void> {
   while (waited < maxWait) {
     const statusResp = await daytonaApi("GET", `/sandbox/${sandboxId}`);
     const statusData = parseJson(statusResp);
-    const state = typeof statusData?.state === "string" ? statusData.state : "";
+    const state = isString(statusData?.state) ? statusData.state : "";
 
     if (state === "started" || state === "running") {
       break;
     }
     if (state === "error" || state === "failed") {
-      const reason = typeof statusData?.errorReason === "string" ? statusData.errorReason : "unknown";
+      const reason = isString(statusData?.errorReason) ? statusData.errorReason : "unknown";
       logError(`Sandbox entered error state: ${reason}`);
       throw new Error("Sandbox error state");
     }
@@ -629,9 +630,9 @@ export async function listServers(): Promise<void> {
   console.log(pad("NAME", 25) + pad("ID", 40) + pad("STATE", 12));
   console.log("-".repeat(77));
   for (const s of items) {
-    const name = typeof s.name === "string" ? s.name : "N/A";
-    const id = typeof s.id === "string" ? s.id : "N/A";
-    const state = typeof s.state === "string" ? s.state : "N/A";
+    const name = isString(s.name) ? s.name : "N/A";
+    const id = isString(s.id) ? s.id : "N/A";
+    const state = isString(s.state) ? s.state : "N/A";
     console.log(pad(name.slice(0, 24), 25) + pad(id.slice(0, 39), 40) + pad(state.slice(0, 11), 12));
   }
 }

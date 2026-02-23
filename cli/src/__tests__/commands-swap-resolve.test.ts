@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
+import { isString } from "../shared/type-guards";
 
 /**
  * Tests for detectAndFixSwappedArgs and resolveAndLog logic in commands.ts.
@@ -64,7 +65,7 @@ describe("detectAndFixSwappedArgs via cmdRun", () => {
 
   function setManifestAndScript(manifest: any) {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(manifest));
       }
       return new Response("#!/bin/bash\necho test");
@@ -233,7 +234,7 @@ describe("resolveAndLog via cmdRun", () => {
 
   function setManifestAndScript(manifest: any) {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(manifest));
       }
       return new Response("#!/bin/bash\necho test");
@@ -504,7 +505,7 @@ describe("prompt handling with swapped args", () => {
 
   function setManifestAndScript(manifest: any) {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(manifest));
       }
       return new Response("#!/bin/bash\necho test");

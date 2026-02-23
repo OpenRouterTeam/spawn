@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
+import { isString } from "../shared/type-guards";
 
 /**
  * Tests for commands.ts error/validation paths that call process.exit(1).
@@ -290,7 +291,7 @@ describe("Commands Error Paths", () => {
     it("should pass validation for valid agent and cloud and attempt download", async () => {
       // Mock fetch to simulate script download failure (not a valid script)
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         // Script download returns non-script content
@@ -316,7 +317,7 @@ describe("Commands Error Paths", () => {
 
     it("should show prompt indicator when prompt is provided", async () => {
       global.fetch = mock(async (url: string) => {
-        if (typeof url === "string" && url.includes("manifest.json")) {
+        if (isString(url) && url.includes("manifest.json")) {
           return new Response(JSON.stringify(mockManifest));
         }
         return new Response("not a valid script");

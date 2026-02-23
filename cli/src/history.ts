@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "
 import { join, resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { validateConnectionIP, validateUsername, validateServerIdentifier } from "./security.js";
+import { isString } from "./shared/type-guards";
 
 export interface VMConnection {
   ip: string;
@@ -168,10 +169,10 @@ export function mergeLastConnection(): void {
     const connData: VMConnection = {
       ip: String(entries.ip ?? ""),
       user: String(entries.user ?? ""),
-      server_id: typeof entries.server_id === "string" ? entries.server_id : undefined,
-      server_name: typeof entries.server_name === "string" ? entries.server_name : undefined,
-      cloud: typeof entries.cloud === "string" ? entries.cloud : undefined,
-      launch_cmd: typeof entries.launch_cmd === "string" ? entries.launch_cmd : undefined,
+      server_id: isString(entries.server_id) ? entries.server_id : undefined,
+      server_name: isString(entries.server_name) ? entries.server_name : undefined,
+      cloud: isString(entries.cloud) ? entries.cloud : undefined,
+      launch_cmd: isString(entries.launch_cmd) ? entries.launch_cmd : undefined,
     };
 
     // SECURITY: Validate connection data before merging into history

@@ -97,7 +97,7 @@
       "bracketSameLine": false
     }
   },
-  "plugins": ["./lint/no-type-assertion.grit"],
+  "plugins": ["./lint/no-type-assertion.grit", "./lint/no-typeof-string-number.grit"],
   "assist": {
     "enabled": false
   }

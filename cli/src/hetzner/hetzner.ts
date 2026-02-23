@@ -21,6 +21,7 @@ import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
+import { isString, isNumber } from "../shared/type-guards";
 import { saveVmConnection } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
@@ -247,7 +248,7 @@ export async function ensureSshKey(): Promise<void> {
     const regResp = await hetznerApi("POST", "/ssh_keys", body);
     const regData = parseJson(regResp);
     const regError = rec(regData?.error);
-    const regErrMsg = typeof regError?.message === "string" ? regError.message : "";
+    const regErrMsg = isString(regError?.message) ? regError.message : "";
     if (regErrMsg) {
       // Key may already exist under a different name — non-fatal
       if (/already/.test(regErrMsg)) {
@@ -313,7 +314,7 @@ export async function createServer(
   const keysResp = await hetznerApi("GET", "/ssh_keys");
   const keysData = parseJson(keysResp);
   const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
-    .map((k) => (typeof k.id === "number" ? k.id : 0))
+    .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter(Boolean);
 
   const userdata = getCloudInitUserdata(tier);
@@ -347,7 +348,7 @@ export async function createServer(
   hetznerServerId = String(server.id);
   const publicNet = rec(server.public_net);
   const ipv4 = rec(publicNet?.ipv4);
-  hetznerServerIp = typeof ipv4?.ip === "string" ? ipv4.ip : "";
+  hetznerServerIp = isString(ipv4?.ip) ? ipv4.ip : "";
 
   if (!hetznerServerId || hetznerServerId === "null") {
     logError("Failed to extract server ID from API response");
@@ -664,8 +665,7 @@ export async function listServers(): Promise<void> {
   }
 
   const pad = (str: string, n: number) => (str + " ".repeat(n)).slice(0, n);
-  const str = (val: unknown, fallback = "N/A"): string =>
-    typeof val === "string" ? val : val != null ? String(val) : fallback;
+  const str = (val: unknown, fallback = "N/A"): string => (isString(val) ? val : val != null ? String(val) : fallback);
   console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10));
   console.log("-".repeat(75));
   for (const s of servers) {

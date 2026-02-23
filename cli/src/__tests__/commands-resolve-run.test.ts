@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
+import { isString } from "../shared/type-guards";
 
 /**
  * Tests for cmdRun display-name resolution and validateImplementation
@@ -172,7 +173,7 @@ describe("cmdRun - display name resolution", () => {
   // Helper: set up fetch to return a specific manifest and serve script downloads
   function setManifestAndScript(manifest: any) {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(manifest));
       }
       // Script download returns a valid script that will fail at execution

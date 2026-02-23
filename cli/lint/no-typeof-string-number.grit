@@ -1,0 +1,12 @@
+language js(typescript)
+
+or {
+  `typeof $val === "string"`,
+  `typeof $val === "number"`
+} as $expr where {
+  register_diagnostic(
+    span = $expr,
+    message = "Use `isString()` or `isNumber()` from `shared/type-guards` instead of raw `typeof` checks.",
+    severity = "error"
+  )
+}

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
 import { loadManifest } from "../manifest";
+import { isString } from "../shared/type-guards";
 import pkg from "../../package.json" with { type: "json" };
 const VERSION = pkg.version;
 
@@ -83,7 +84,7 @@ describe("cmdUpdate", () => {
 
   it("should report up-to-date when remote version matches current", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("package.json")) {
+      if (isString(url) && url.includes("package.json")) {
         return new Response(
           JSON.stringify({
             version: VERSION,
@@ -106,7 +107,7 @@ describe("cmdUpdate", () => {
 
   it("should report available update when remote version differs", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("package.json")) {
+      if (isString(url) && url.includes("package.json")) {
         return new Response(
           JSON.stringify({
             version: "99.99.99",
@@ -159,7 +160,7 @@ describe("cmdUpdate", () => {
 
   it("should handle update failure gracefully", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("package.json")) {
+      if (isString(url) && url.includes("package.json")) {
         return new Response(
           JSON.stringify({
             version: "99.99.99",
@@ -198,7 +199,7 @@ describe("cmdUpdate", () => {
 
   it("should show version in spinner stop during update", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("package.json")) {
+      if (isString(url) && url.includes("package.json")) {
         return new Response(
           JSON.stringify({
             version: "2.0.0",
@@ -251,7 +252,7 @@ describe("Script download and execution", () => {
 
   it("should exit when both primary and fallback URLs return 404", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
       // Both script URLs return 404
@@ -272,7 +273,7 @@ describe("Script download and execution", () => {
 
   it("should exit when both primary and fallback URLs return server errors", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
       return new Response("Server Error", {
@@ -291,7 +292,7 @@ describe("Script download and execution", () => {
   it("should show troubleshooting info when download throws network error", async () => {
     const callCount = 0;
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
       throw new Error("Network timeout");
@@ -312,19 +313,19 @@ describe("Script download and execution", () => {
   it("should use fallback URL when primary returns non-OK status", async () => {
     const fetchedUrls: string[] = [];
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string") {
+      if (isString(url)) {
         fetchedUrls.push(url);
       }
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
-      if (typeof url === "string" && url.includes("openrouter.ai")) {
+      if (isString(url) && url.includes("openrouter.ai")) {
         // Primary fails
         return new Response("Service Unavailable", {
           status: 503,
         });
       }
-      if (typeof url === "string" && url.includes("raw.githubusercontent.com")) {
+      if (isString(url) && url.includes("raw.githubusercontent.com")) {
         // Fallback returns valid script
         return new Response("#!/bin/bash\nset -eo pipefail\necho 'hello'");
       }
@@ -357,7 +358,7 @@ describe("Script download and execution", () => {
 
   it("should show spinner with download message during script fetch", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
       return new Response("Not found", {
@@ -379,7 +380,7 @@ describe("Script download and execution", () => {
 
   it("should reject script without shebang via validateScriptContent", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
       // Return non-script content
@@ -401,7 +402,7 @@ describe("Script download and execution", () => {
 
   it("should reject script with dangerous pattern (rm -rf /)", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
       return new Response("#!/bin/bash\nrm -rf / --no-preserve-root");
@@ -432,7 +433,7 @@ describe("Script download and execution", () => {
 
   it("should show script-not-found message when both URLs 404", async () => {
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
       return new Response("Not Found", {
@@ -457,15 +458,15 @@ describe("Script download and execution", () => {
   it("should show network error message when primary 500 and fallback 502", async () => {
     const callIndex = 0;
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
-      if (typeof url === "string" && url.includes("openrouter.ai")) {
+      if (isString(url) && url.includes("openrouter.ai")) {
         return new Response("Error", {
           status: 500,
         });
       }
-      if (typeof url === "string" && url.includes("raw.githubusercontent.com")) {
+      if (isString(url) && url.includes("raw.githubusercontent.com")) {
         return new Response("Bad Gateway", {
           status: 502,
         });
@@ -491,7 +492,7 @@ describe("Script download and execution", () => {
     // We can verify the launch step message includes "with prompt"
     // when a valid prompt is provided
     global.fetch = mock(async (url: string) => {
-      if (typeof url === "string" && url.includes("manifest.json")) {
+      if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
       return new Response("#!/bin/bash\nset -eo pipefail\nexit 0");
