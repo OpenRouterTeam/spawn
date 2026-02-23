@@ -81,6 +81,25 @@ const A = {
   col1: "\x1b[1G",
 };
 
+/** Truncate a string to `max` visible characters, adding \u2026 if needed. */
+const trunc = (s: string, max: number): string =>
+  s.length <= max ? s : s.slice(0, Math.max(max - 1, 0)) + "\u2026";
+
+/** Get terminal column width from a tty file descriptor. */
+function getTTYCols(ttyFd: number): number {
+  try {
+    const res = spawnSync("stty", ["size"], { stdio: [ttyFd, "pipe", "pipe"] });
+    if (res.status === 0 && res.stdout) {
+      const parts = res.stdout.toString().trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const c = parseInt(parts[1], 10);
+        if (c > 0) return c;
+      }
+    }
+  } catch {}
+  return 80;
+}
+
 // ── TTY picker ────────────────────────────────────────────────────────────────
 
 /**
@@ -181,6 +200,9 @@ export function pickToTTY(config: PickConfig): string | null {
     }
   }
 
+  const cols = getTTYCols(ttyFd);
+  const maxW = cols - 1; // leave 1 char margin to prevent terminal auto-wrap
+
   // header line + one line per option + footer line
   const pickerHeight = config.options.length + 2;
 
@@ -188,20 +210,24 @@ export function pickToTTY(config: PickConfig): string | null {
     if (!first) {
       w(A.up(pickerHeight) + A.col1 + A.clearBelow);
     }
-    w(`${A.bold}${A.cyan}? ${config.message}${A.reset}\r\n`);
+    w(`${A.bold}${A.cyan}? ${trunc(config.message, maxW - 2)}${A.reset}\r\n`);
     for (let i = 0; i < config.options.length; i++) {
       const opt = config.options[i];
       if (i === selected) {
-        w(`${A.green}${A.bold}> ${opt.label}${A.reset}`);
+        const label = trunc(opt.label, maxW - 2);
+        w(`${A.green}${A.bold}> ${label}${A.reset}`);
         if (opt.hint) {
-          w(`  ${A.dim}${opt.hint}${A.reset}`);
+          const remaining = maxW - 2 - label.length - 2;
+          if (remaining > 3) {
+            w(`  ${A.dim}${trunc(opt.hint, remaining)}${A.reset}`);
+          }
         }
       } else {
-        w(`  ${A.dim}${opt.label}${A.reset}`);
+        w(`  ${A.dim}${trunc(opt.label, maxW - 2)}${A.reset}`);
       }
       w("\r\n");
     }
-    w(`${A.dim}  \u2191/\u2193 move  \u23ce select  Ctrl-C cancel${A.reset}\r\n`);
+    w(`${A.dim}  ${trunc("\u2191/\u2193 move  \u23ce select  Ctrl-C cancel", maxW - 2)}${A.reset}\r\n`);
   };
 
   // ── render & key loop ─────────────────────────────────────────────────────
@@ -241,7 +267,7 @@ export function pickToTTY(config: PickConfig): string | null {
           // Replace picker with a one-line confirmation
           w(A.up(pickerHeight) + A.col1 + A.clearBelow);
           const opt = config.options[selected];
-          w(`${A.green}${A.bold}> ${config.message}:${A.reset} ` + `${A.cyan}${opt.label}${A.reset}\r\n`);
+          w(`${A.green}${A.bold}> ${config.message}:${A.reset} ` + `${A.cyan}${trunc(opt.label, maxW - config.message.length - 4)}${A.reset}\r\n`);
           break outer;
         }
 
@@ -335,6 +361,9 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
     }
   }
 
+  const cols = getTTYCols(ttyFd);
+  const maxW = cols - 1; // leave 1 char margin to prevent terminal auto-wrap
+
   const footerHint = config.deleteKey
     ? "\u2191/\u2193 move  \u23ce select  d delete  Ctrl-C cancel"
     : "\u2191/\u2193 move  \u23ce select  Ctrl-C cancel";
@@ -346,20 +375,24 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
     if (!first) {
       w(A.up(pickerHeight) + A.col1 + A.clearBelow);
     }
-    w(`${A.bold}${A.cyan}? ${config.message}${A.reset}\r\n`);
+    w(`${A.bold}${A.cyan}? ${trunc(config.message, maxW - 2)}${A.reset}\r\n`);
     for (let i = 0; i < config.options.length; i++) {
       const opt = config.options[i];
       if (i === selected) {
-        w(`${A.green}${A.bold}> ${opt.label}${A.reset}`);
+        const label = trunc(opt.label, maxW - 2);
+        w(`${A.green}${A.bold}> ${label}${A.reset}`);
         if (opt.hint) {
-          w(`  ${A.dim}${opt.hint}${A.reset}`);
+          const remaining = maxW - 2 - label.length - 2;
+          if (remaining > 3) {
+            w(`  ${A.dim}${trunc(opt.hint, remaining)}${A.reset}`);
+          }
         }
       } else {
-        w(`  ${A.dim}${opt.label}${A.reset}`);
+        w(`  ${A.dim}${trunc(opt.label, maxW - 2)}${A.reset}`);
       }
       w("\r\n");
     }
-    w(`${A.dim}  ${footerHint}${A.reset}\r\n`);
+    w(`${A.dim}  ${trunc(footerHint, maxW - 2)}${A.reset}\r\n`);
   };
 
   // ── render & key loop ─────────────────────────────────────────────────────
@@ -396,7 +429,7 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
           // Replace picker with a one-line confirmation
           w(A.up(pickerHeight) + A.col1 + A.clearBelow);
           const opt = config.options[selected];
-          w(`${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${opt.label}${A.reset}\r\n`);
+          w(`${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${trunc(opt.label, maxW - config.message.length - 4)}${A.reset}\r\n`);
           break outer;
         }
 
