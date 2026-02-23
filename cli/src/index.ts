@@ -26,7 +26,7 @@ import pc from "picocolors";
 import pkg from "../package.json" with { type: "json" };
 import { checkForUpdates } from "./update-check.js";
 import { loadManifest, agentKeys, cloudKeys, getCacheAge } from "./manifest.js";
-import { KNOWN_FLAGS, findUnknownFlag, expandEqualsFlags } from "./flags.js";
+import { findUnknownFlag, expandEqualsFlags } from "./flags.js";
 
 const VERSION = pkg.version;
 
@@ -85,7 +85,7 @@ function checkUnknownFlags(args: string[]): void {
   if (unknown) {
     console.error(pc.red(`Unknown flag: ${pc.bold(unknown)}`));
     console.error();
-    console.error(`  Supported flags:`);
+    console.error("  Supported flags:");
     console.error(`    ${pc.cyan("--prompt, -p")}        Provide a prompt for non-interactive execution`);
     console.error(`    ${pc.cyan("--prompt-file, -f")}   Read prompt from a file`);
     console.error(`    ${pc.cyan("--dry-run, -n")}       Preview what would be provisioned`);
