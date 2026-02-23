@@ -4,6 +4,7 @@ import { runServer, uploadFile } from "./fly";
 import {
   createAgents,
   installAgent,
+  setupOpenclawBatched,
   resolveAgent as _resolveAgent,
   offerGithubAuth as _offerGithubAuth,
 } from "../shared/agent-setup";
@@ -32,7 +33,7 @@ export const agents: Record<string, FlyAgentConfig> = (() => {
     ...base,
   };
 
-  // Fly openclaw uses a pre-built Docker image
+  // Fly openclaw uses a pre-built Docker image + batched setup (2 SSH sessions total)
   fly.openclaw = {
     ...base.openclaw,
     image: "ghcr.io/openrouterteam/spawn-openclaw:latest",
@@ -50,6 +51,8 @@ export const agents: Record<string, FlyAgentConfig> = (() => {
         );
       }
     },
+    setup: (envContent, apiKey, modelId) =>
+      setupOpenclawBatched(runner, envContent, apiKey, modelId || "openrouter/auto"),
   };
 
   return fly;
