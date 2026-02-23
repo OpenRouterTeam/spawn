@@ -260,3 +260,22 @@ export function sanitizeTermValue(term: string): string {
   }
   return "xterm-256color";
 }
+
+/** Prepare stdin for clean handoff to an interactive child process.
+ *  Closes readline, removes listeners, resets raw mode, and pauses stdin
+ *  so that child_process.spawn gets a pristine file descriptor. */
+export function prepareStdinForHandoff(): void {
+  // Close the shared readline interface so it stops consuming stdin
+  if (sharedRl) {
+    sharedRl.close();
+    sharedRl = null;
+  }
+  // Remove any leftover keypress/data listeners (from @clack/prompts, etc.)
+  process.stdin.removeAllListeners();
+  // Reset raw mode if it was left on by @clack/prompts
+  if (process.stdin.isTTY && process.stdin.isRaw) {
+    process.stdin.setRawMode(false);
+  }
+  // Pause stdin so Node/Bun stops buffering input before the child takes over
+  process.stdin.pause();
+}
