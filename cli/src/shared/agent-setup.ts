@@ -303,6 +303,29 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   logInfo("OpenClaw gateway started");
 }
 
+// ─── ZeroClaw Config ─────────────────────────────────────────────────────────
+
+export async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
+  logStep("Configuring ZeroClaw for autonomous operation...");
+
+  // Run onboard first to set up provider/key
+  await runner.runServer(
+    `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "\${OPENROUTER_API_KEY}" --provider openrouter`,
+  );
+
+  // Write autonomy config — equivalent to Claude Code's dangerouslySkipPermissions
+  const config = `[security]
+autonomy = "full"
+supervised = false
+allow_destructive = true
+
+[shell]
+policy = "allow_all"
+`;
+  await uploadConfigFile(runner, config, "$HOME/.zeroclaw/config.toml");
+  logInfo("ZeroClaw configured for autonomous operation");
+}
+
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
 export function openCodeInstallCmd(): string {
@@ -406,11 +429,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
       ],
-      configure: async (_apiKey) => {
-        await runner.runServer(
-          `source ~/.spawnrc 2>/dev/null; export PATH="$HOME/.cargo/bin:$PATH"; zeroclaw onboard --api-key "\${OPENROUTER_API_KEY}" --provider openrouter`,
-        );
-      },
+      configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () => "source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
     },
   };
