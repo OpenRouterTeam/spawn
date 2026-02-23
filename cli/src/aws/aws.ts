@@ -1,6 +1,6 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
 import {
@@ -19,6 +19,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
 import { saveVmConnection } from "../history.js";
@@ -117,9 +118,6 @@ export function getState() {
 // ─── SSH Config ─────────────────────────────────────────────────────────────
 
 const SSH_USER = "ubuntu";
-const SSH_KEY_PATH = `${process.env.HOME}/.ssh/id_ed25519`;
-
-const SSH_OPTS = [...SSH_BASE_OPTS, "-i", SSH_KEY_PATH];
 
 // ─── Valibot Schemas for AWS API Responses ──────────────────────────────────
 
@@ -543,45 +541,12 @@ export async function promptBundle(): Promise<void> {
 
 // ─── SSH Key Management ─────────────────────────────────────────────────────
 
-async function generateSshKeyIfMissing(): Promise<void> {
-  if (existsSync(SSH_KEY_PATH)) {
-    return;
-  }
-
-  logStep("Generating SSH key...");
-  const dir = SSH_KEY_PATH.replace(/\/[^/]+$/, "");
-  mkdirSync(dir, {
-    recursive: true,
-  });
-  const proc = Bun.spawn(
-    [
-      "ssh-keygen",
-      "-t",
-      "ed25519",
-      "-f",
-      SSH_KEY_PATH,
-      "-N",
-      "",
-      "-q",
-    ],
-    {
-      stdio: [
-        "ignore",
-        "ignore",
-        "ignore",
-      ],
-    },
-  );
-  if ((await proc.exited) !== 0) {
-    throw new Error("SSH key generation failed");
-  }
-  logInfo("SSH key generated");
-}
-
 export async function ensureSshKey(): Promise<void> {
-  await generateSshKeyIfMissing();
+  const selectedKeys = await ensureSshKeys();
+  // Lightsail associates one key pair per instance — use the first selected key
+  const key = selectedKeys[0];
 
-  const pubPath = `${SSH_KEY_PATH}.pub`;
+  const pubPath = key.pubPath;
   if (!existsSync(pubPath)) {
     throw new Error(`SSH public key not found: ${pubPath}`);
   }
@@ -864,16 +829,18 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
 // ─── SSH Execution ──────────────────────────────────────────────────────────
 
 export async function waitForSsh(maxAttempts = 36): Promise<void> {
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   await sharedWaitForSsh({
     host: instanceIp,
     user: SSH_USER,
     maxAttempts,
-    sshKeyPath: SSH_KEY_PATH,
+    extraSshOpts: keyOpts,
   });
 }
 
 export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
   await waitForSsh();
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   logStep("Waiting for cloud-init to complete...");
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -881,7 +848,8 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
       const proc = Bun.spawn(
         [
           "ssh",
-          ...SSH_OPTS,
+          ...SSH_BASE_OPTS,
+          ...keyOpts,
           `${SSH_USER}@${instanceIp}`,
           "test -f /home/ubuntu/.cloud-init-complete",
         ],
@@ -909,10 +877,12 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
 
 export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       `${SSH_USER}@${instanceIp}`,
       `bash -c '${fullCmd.replace(/'/g, "'\\''")}'`,
     ],
@@ -941,10 +911,12 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
 
 export async function runServerCapture(cmd: string, timeoutSecs?: number): Promise<string> {
   const fullCmd = `export PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const proc = Bun.spawn(
     [
       "ssh",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       `${SSH_USER}@${instanceIp}`,
       `bash -c '${fullCmd.replace(/'/g, "'\\''")}'`,
     ],
@@ -977,10 +949,12 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
   if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
     throw new Error(`Invalid remote path: ${remotePath}`);
   }
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const proc = Bun.spawn(
     [
       "scp",
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       localPath,
       `${SSH_USER}@${instanceIp}:${remotePath}`,
     ],
@@ -1001,9 +975,11 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
+  const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const exitCode = await new Promise<number>((resolve, reject) => {
     const child = spawn("ssh", [
-      ...SSH_OPTS,
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
       "-t",
       `${SSH_USER}@${instanceIp}`,
       `bash -c '${escapedCmd}'`,
