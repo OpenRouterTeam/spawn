@@ -6,7 +6,9 @@ import { logInfo, logWarn, logError, logStep, prompt, openBrowser, validateModel
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
-const OAuthKeySchema = v.object({ key: v.string() });
+const OAuthKeySchema = v.object({
+  key: v.string(),
+});
 
 // ─── Key Validation ──────────────────────────────────────────────────────────
 

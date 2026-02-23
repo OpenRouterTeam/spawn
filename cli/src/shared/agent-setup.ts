@@ -51,12 +51,7 @@ export async function installAgent(
 ): Promise<void> {
   logStep(`Installing ${agentName}...`);
   try {
-    await withRetry(
-      `${agentName} install`,
-      () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)),
-      2,
-      10,
-    );
+    await withRetry(`${agentName} install`, () => wrapSshCall(runner.runServer(installCmd, timeoutSecs)), 2, 10);
   } catch {
     logError(`${agentName} installation failed`);
     throw new Error(`${agentName} install failed`);

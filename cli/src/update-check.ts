@@ -25,7 +25,9 @@ export const executor = {
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
-const PkgVersionSchema = v.object({ version: v.string() });
+const PkgVersionSchema = v.object({
+  version: v.string(),
+});
 
 const FETCH_TIMEOUT = 10000; // 10 seconds
 const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour

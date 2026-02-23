@@ -8,10 +8,14 @@ export function isNumber(val: unknown): val is number {
   return typeof val === "number";
 }
 
-export function hasStatus(err: unknown): err is { status: number } {
+export function hasStatus(err: unknown): err is {
+  status: number;
+} {
   return err !== null && typeof err === "object" && "status" in err && typeof err.status === "number";
 }
 
-export function hasMessage(err: unknown): err is { message: string } {
+export function hasMessage(err: unknown): err is {
+  message: string;
+} {
   return err !== null && typeof err === "object" && "message" in err && typeof err.message === "string";
 }

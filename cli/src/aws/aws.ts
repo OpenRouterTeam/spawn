@@ -135,7 +135,11 @@ const InstanceListSchema = v.object({
     v.array(
       v.object({
         name: v.optional(v.string()),
-        state: v.optional(v.object({ name: v.optional(v.string()) })),
+        state: v.optional(
+          v.object({
+            name: v.optional(v.string()),
+          }),
+        ),
         publicIpAddress: v.optional(v.string()),
         bundleId: v.optional(v.string()),
       }),
@@ -235,11 +239,16 @@ async function lightsailRest(target: string, body = "{}"): Promise<string> {
     ],
     ...(awsSessionToken
       ? (() => {
-          const tokenHeader: [string, string] = [
+          const tokenHeader: [
+            string,
+            string,
+          ] = [
             "x-amz-security-token",
             awsSessionToken,
           ];
-          return [tokenHeader];
+          return [
+            tokenHeader,
+          ];
         })()
       : []),
     [
@@ -977,15 +986,19 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const exitCode = await new Promise<number>((resolve, reject) => {
-    const child = spawn("ssh", [
-      ...SSH_BASE_OPTS,
-      ...keyOpts,
-      "-t",
-      `${SSH_USER}@${instanceIp}`,
-      `bash -c '${escapedCmd}'`,
-    ], {
-      stdio: "inherit",
-    });
+    const child = spawn(
+      "ssh",
+      [
+        ...SSH_BASE_OPTS,
+        ...keyOpts,
+        "-t",
+        `${SSH_USER}@${instanceIp}`,
+        `bash -c '${escapedCmd}'`,
+      ],
+      {
+        stdio: "inherit",
+      },
+    );
     child.on("close", (code) => resolve(code ?? 0));
     child.on("error", reject);
   });

@@ -130,7 +130,9 @@ function toObjectArray(val: unknown): Record<string, unknown>[] {
   if (!Array.isArray(val)) {
     return [];
   }
-  return val.filter((item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item));
+  return val.filter(
+    (item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item),
+  );
 }
 
 // ─── Token Persistence ───────────────────────────────────────────────────────
@@ -661,7 +663,9 @@ export async function createServer(name: string, tier?: CloudInitTier): Promise<
   // Get all SSH key IDs
   const { text: keysText } = await doApi("GET", "/account/keys");
   const keysData = parseJson(keysText);
-  const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys).map((k) => typeof k.id === "number" ? k.id : 0).filter((n) => n > 0);
+  const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
+    .map((k) => (typeof k.id === "number" ? k.id : 0))
+    .filter((n) => n > 0);
 
   const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
@@ -934,9 +938,19 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = await new Promise<number>((resolve, reject) => {
-    const child = spawn("ssh", [...SSH_BASE_OPTS, ...keyOpts, "-t", `root@${serverIp}`, fullCmd], {
-      stdio: "inherit",
-    });
+    const child = spawn(
+      "ssh",
+      [
+        ...SSH_BASE_OPTS,
+        ...keyOpts,
+        "-t",
+        `root@${serverIp}`,
+        fullCmd,
+      ],
+      {
+        stdio: "inherit",
+      },
+    );
     child.on("close", (code) => resolve(code ?? 0));
     child.on("error", reject);
   });
@@ -1062,7 +1076,7 @@ export async function listServers(): Promise<void> {
   console.log("-".repeat(80));
   for (const d of droplets) {
     const networks = d.networks;
-    const v4 = (networks && typeof networks === "object" && "v4" in networks) ? networks.v4 : undefined;
+    const v4 = networks && typeof networks === "object" && "v4" in networks ? networks.v4 : undefined;
     const v4Arr = toObjectArray(v4);
     const publicNet = v4Arr.find((n) => n.type === "public");
     const ip = String(publicNet?.ip_address ?? "N/A");

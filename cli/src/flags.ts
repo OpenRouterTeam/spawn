@@ -1,16 +1,26 @@
 /** CLI flag definitions and utilities — single source of truth for flag validation */
 
 export const KNOWN_FLAGS = new Set([
-  "--help", "-h",
-  "--version", "-v", "-V",
-  "--prompt", "-p", "--prompt-file", "-f",
-  "--dry-run", "-n",
+  "--help",
+  "-h",
+  "--version",
+  "-v",
+  "-V",
+  "--prompt",
+  "-p",
+  "--prompt-file",
+  "-f",
+  "--dry-run",
+  "-n",
   "--debug",
   "--headless",
   "--output",
   "--name",
   "--default",
-  "-a", "-c", "--agent", "--cloud",
+  "-a",
+  "-c",
+  "--agent",
+  "--cloud",
   "--clear",
 ]);
 

@@ -150,7 +150,17 @@ function stripDangerousKeys(obj: unknown): unknown {
 }
 
 function isValidManifest(data: unknown): data is Manifest {
-  return data !== null && typeof data === "object" && !Array.isArray(data) && "agents" in data && "clouds" in data && "matrix" in data && !!data.agents && !!data.clouds && !!data.matrix;
+  return (
+    data !== null &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    "agents" in data &&
+    "clouds" in data &&
+    "matrix" in data &&
+    !!data.agents &&
+    !!data.clouds &&
+    !!data.matrix
+  );
 }
 
 async function fetchManifestFromGitHub(): Promise<Manifest | null> {

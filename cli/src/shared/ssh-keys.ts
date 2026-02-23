@@ -87,8 +87,18 @@ export function discoverSshKeys(): SshKeyPair[] {
 function getKeyType(pubPath: string): string {
   try {
     const result = Bun.spawnSync(
-      ["ssh-keygen", "-lf", pubPath],
-      { stdio: ["ignore", "pipe", "pipe"] },
+      [
+        "ssh-keygen",
+        "-lf",
+        pubPath,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "pipe",
+        ],
+      },
     );
     const output = new TextDecoder().decode(result.stdout).trim();
     // Format: "256 SHA256:xxx user@host (ED25519)"
@@ -107,12 +117,31 @@ export function generateSshKey(): SshKeyPair {
   const privPath = `${sshDir}/id_ed25519`;
   const pubPath = `${privPath}.pub`;
 
-  mkdirSync(sshDir, { recursive: true, mode: 0o700 });
+  mkdirSync(sshDir, {
+    recursive: true,
+    mode: 0o700,
+  });
 
   logStep("Generating SSH key...");
   const result = Bun.spawnSync(
-    ["ssh-keygen", "-t", "ed25519", "-f", privPath, "-N", "", "-C", "spawn"],
-    { stdio: ["ignore", "pipe", "pipe"] },
+    [
+      "ssh-keygen",
+      "-t",
+      "ed25519",
+      "-f",
+      privPath,
+      "-N",
+      "",
+      "-C",
+      "spawn",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
   );
   if (result.exitCode !== 0) {
     throw new Error("SSH key generation failed");
@@ -132,8 +161,20 @@ export function generateSshKey(): SshKeyPair {
 /** Get the MD5 fingerprint of a public key (for cloud provider matching). */
 export function getSshFingerprint(pubPath: string): string {
   const result = Bun.spawnSync(
-    ["ssh-keygen", "-lf", pubPath, "-E", "md5"],
-    { stdio: ["ignore", "pipe", "pipe"] },
+    [
+      "ssh-keygen",
+      "-lf",
+      pubPath,
+      "-E",
+      "md5",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
   );
   const output = new TextDecoder().decode(result.stdout).trim();
   // Format: "2048 MD5:xx:xx:xx... user@host (ED25519)"
@@ -162,7 +203,9 @@ export async function ensureSshKeys(): Promise<SshKeyPair[]> {
 
   if (discovered.length === 0) {
     const generated = generateSshKey();
-    cachedKeys = [generated];
+    cachedKeys = [
+      generated,
+    ];
     return cachedKeys;
   }
 

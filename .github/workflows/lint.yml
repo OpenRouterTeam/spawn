@@ -50,6 +50,10 @@ jobs:
         working-directory: cli
         run: bun install
 
+      - name: Run Biome format check
+        working-directory: cli
+        run: bunx @biomejs/biome format src/
+
       - name: Run Biome lint
         working-directory: cli
         run: bunx @biomejs/biome lint src/

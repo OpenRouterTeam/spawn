@@ -71,9 +71,7 @@ describe("Download and Failure Pipeline", () => {
   let processExitSpy: ReturnType<typeof spyOn>;
 
   /** Set up fetch to return manifest from manifest URLs and custom responses for script URLs */
-  function setupFetch(
-    scriptHandler: (url: string) => Promise<Response>,
-  ) {
+  function setupFetch(scriptHandler: (url: string) => Promise<Response>) {
     global.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
       const urlStr = typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url;
       if (urlStr.includes("manifest.json")) {
@@ -161,13 +159,17 @@ describe("Download and Failure Pipeline", () => {
     it("should fall back to GitHub raw URL when primary returns 404", async () => {
       await setupFetch(async (url) => {
         if (url.includes("openrouter.ai")) {
-          return new Response("Not Found", { status: 404 });
+          return new Response("Not Found", {
+            status: 404,
+          });
         }
         // GitHub raw fallback succeeds
         if (url.includes("raw.githubusercontent.com")) {
           return new Response("#!/bin/bash\nexit 0");
         }
-        return new Response("Server Error", { status: 500 });
+        return new Response("Server Error", {
+          status: 500,
+        });
       });
 
       try {
@@ -188,12 +190,16 @@ describe("Download and Failure Pipeline", () => {
     it("should fall back to GitHub raw URL when primary returns 500", async () => {
       await setupFetch(async (url) => {
         if (url.includes("openrouter.ai")) {
-          return new Response("Server Error", { status: 500 });
+          return new Response("Server Error", {
+            status: 500,
+          });
         }
         if (url.includes("raw.githubusercontent.com")) {
           return new Response("#!/bin/bash\nexit 0");
         }
-        return new Response("Server Error", { status: 500 });
+        return new Response("Server Error", {
+          status: 500,
+        });
       });
 
       try {
@@ -213,7 +219,9 @@ describe("Download and Failure Pipeline", () => {
   describe("download - both URLs fail", () => {
     it("should show 'script not found' when both return 404", async () => {
       await setupFetch(async () => {
-        return new Response("Not Found", { status: 404 });
+        return new Response("Not Found", {
+          status: 404,
+        });
       });
 
       try {
@@ -230,7 +238,12 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should suggest verifying the combination when both return 404", async () => {
-      await setupFetch(async () => new Response("Not Found", { status: 404 }));
+      await setupFetch(
+        async () =>
+          new Response("Not Found", {
+            status: 404,
+          }),
+      );
 
       try {
         await cmdRun("claude", "sprite");
@@ -243,7 +256,12 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should suggest reporting the issue when both return 404", async () => {
-      await setupFetch(async () => new Response("Not Found", { status: 404 }));
+      await setupFetch(
+        async () =>
+          new Response("Not Found", {
+            status: 404,
+          }),
+      );
 
       try {
         await cmdRun("claude", "sprite");
@@ -256,7 +274,12 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should show server error message when both return 500", async () => {
-      await setupFetch(async () => new Response("Server Error", { status: 500 }));
+      await setupFetch(
+        async () =>
+          new Response("Server Error", {
+            status: 500,
+          }),
+      );
 
       try {
         await cmdRun("claude", "sprite");
@@ -269,7 +292,12 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should mention temporary server issues on 500 errors", async () => {
-      await setupFetch(async () => new Response("Server Error", { status: 500 }));
+      await setupFetch(
+        async () =>
+          new Response("Server Error", {
+            status: 500,
+          }),
+      );
 
       try {
         await cmdRun("claude", "sprite");
@@ -286,9 +314,13 @@ describe("Download and Failure Pipeline", () => {
       await setupFetch(async (url) => {
         callCount++;
         if (url.includes("openrouter.ai")) {
-          return new Response("Not Found", { status: 404 });
+          return new Response("Not Found", {
+            status: 404,
+          });
         }
-        return new Response("Server Error", { status: 500 });
+        return new Response("Server Error", {
+          status: 500,
+        });
       });
 
       try {
@@ -380,7 +412,9 @@ describe("Download and Failure Pipeline", () => {
         if (url.includes("openrouter.ai")) {
           return new Response("no shebang here");
         }
-        return new Response("Not Found", { status: 404 });
+        return new Response("Not Found", {
+          status: 404,
+        });
       });
 
       try {
@@ -397,7 +431,9 @@ describe("Download and Failure Pipeline", () => {
         if (url.includes("openrouter.ai")) {
           return new Response("<!DOCTYPE html>\n<html><body>Error page</body></html>");
         }
-        return new Response("Not Found", { status: 404 });
+        return new Response("Not Found", {
+          status: 404,
+        });
       });
 
       try {

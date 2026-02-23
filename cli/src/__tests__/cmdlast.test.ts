@@ -104,9 +104,7 @@ describe("cmdLast", () => {
     cmdRunMock = mock(() => Promise.resolve());
 
     // Prime the manifest cache with mock data
-    global.fetch = mock(
-      () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-    );
+    global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
     await loadManifest(true);
     global.fetch = originalFetch;
 
@@ -202,9 +200,7 @@ describe("cmdLast", () => {
     it("should show 'Rerunning last spawn' when history exists", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       // We need to mock cmdRun to prevent actual execution
       // For now, just verify the message is shown
@@ -221,9 +217,7 @@ describe("cmdLast", () => {
     it("should select the most recent record (newest first)", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       try {
         await cmdLast();
@@ -240,9 +234,7 @@ describe("cmdLast", () => {
     it("should display the record label with manifest display names", async () => {
       writeHistory(sampleRecords);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       try {
         await cmdLast();
@@ -282,9 +274,7 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       try {
         await cmdLast();
@@ -311,9 +301,7 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       try {
         await cmdLast();
@@ -336,9 +324,7 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       try {
         await cmdLast();
@@ -371,7 +357,11 @@ describe("cmdLast", () => {
         agent: "claude",
         cloud: "sprite",
         timestamp: "2026-01-01T00:00:00Z",
-        connection: { ip: "1.2.3.4", user: "root", server_name: "spawn-abc" },
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          server_name: "spawn-abc",
+        },
       };
       const label = buildRecordLabel(record, mockManifest);
       expect(label).toBe("spawn-abc");
@@ -420,7 +410,11 @@ describe("cmdLast", () => {
         agent: "claude",
         cloud: "sprite",
         timestamp: "2026-01-01T00:00:00Z",
-        connection: { ip: "1.2.3.4", user: "root", deleted: true },
+        connection: {
+          ip: "1.2.3.4",
+          user: "root",
+          deleted: true,
+        },
       };
       const subtitle = buildRecordSubtitle(record, mockManifest);
 
@@ -440,9 +434,7 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       try {
         await cmdLast();
@@ -465,9 +457,7 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       try {
         await cmdLast();
@@ -499,9 +489,7 @@ describe("cmdLast", () => {
         },
       ]);
 
-      global.fetch = mock(
-        () => Promise.resolve(new Response(JSON.stringify(mockManifest))),
-      );
+      global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       try {
         await cmdLast();

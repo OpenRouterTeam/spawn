@@ -30,7 +30,14 @@ describe("Manifest Validation Edge Cases", () => {
 
     it("should reject manifest missing agents field", async () => {
       global.fetch = mock(() =>
-        Promise.resolve(new Response(JSON.stringify({ clouds: {}, matrix: {} }))),
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              clouds: {},
+              matrix: {},
+            }),
+          ),
+        ),
       );
 
       try {
@@ -43,7 +50,14 @@ describe("Manifest Validation Edge Cases", () => {
 
     it("should reject manifest missing clouds field", async () => {
       global.fetch = mock(() =>
-        Promise.resolve(new Response(JSON.stringify({ agents: {}, matrix: {} }))),
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              agents: {},
+              matrix: {},
+            }),
+          ),
+        ),
       );
 
       try {
@@ -55,7 +69,14 @@ describe("Manifest Validation Edge Cases", () => {
 
     it("should reject manifest missing matrix field", async () => {
       global.fetch = mock(() =>
-        Promise.resolve(new Response(JSON.stringify({ agents: {}, clouds: {} }))),
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              agents: {},
+              clouds: {},
+            }),
+          ),
+        ),
       );
 
       try {
@@ -103,7 +124,12 @@ describe("Manifest Validation Edge Cases", () => {
       // When GitHub returns a non-ok response, fetchManifestFromGitHub returns null
       // and loadManifest falls back to cache or throws
       global.fetch = mock(() =>
-        Promise.resolve(new Response("Internal Server Error", { status: 500, statusText: "Internal Server Error" })),
+        Promise.resolve(
+          new Response("Internal Server Error", {
+            status: 500,
+            statusText: "Internal Server Error",
+          }),
+        ),
       );
 
       try {

@@ -169,11 +169,12 @@ function parseJson(text: string): Record<string, unknown> | null {
 }
 
 function toObjectArray(val: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(val)) { return []; }
-  return val
-    .filter((item): item is Record<string, unknown> =>
-      item !== null && typeof item === "object" && !Array.isArray(item),
-    );
+  if (!Array.isArray(val)) {
+    return [];
+  }
+  return val.filter(
+    (item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item),
+  );
 }
 
 function hasError(text: string): boolean {
@@ -552,7 +553,9 @@ interface OrgEntry {
 
 function parseOrgsJson(json: string): OrgEntry[] {
   const raw = parseJsonRaw(json);
-  if (!raw || typeof raw !== "object") { return []; }
+  if (!raw || typeof raw !== "object") {
+    return [];
+  }
 
   let orgs: Record<string, unknown>[] = [];
   if (Array.isArray(raw)) {
@@ -560,7 +563,9 @@ function parseOrgsJson(json: string): OrgEntry[] {
   } else {
     // Re-parse as Record<string, unknown> via valibot schema
     const data = parseJson(json);
-    if (!data) { return []; }
+    if (!data) {
+      return [];
+    }
 
     if (data.nodes) {
       orgs = toObjectArray(data.nodes);
@@ -1020,18 +1025,22 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const flyCmd = getCmd()!;
 
   const exitCode = await new Promise<number>((resolve, reject) => {
-    const child = spawn(flyCmd, [
-      "ssh",
-      "console",
-      "-a",
-      flyAppName,
-      "--pty",
-      "-C",
-      `bash -c '${escapedCmd}'`,
-    ], {
-      stdio: "inherit",
-      env: process.env,
-    });
+    const child = spawn(
+      flyCmd,
+      [
+        "ssh",
+        "console",
+        "-a",
+        flyAppName,
+        "--pty",
+        "-C",
+        `bash -c '${escapedCmd}'`,
+      ],
+      {
+        stdio: "inherit",
+        env: process.env,
+      },
+    );
     child.on("close", (code) => resolve(code ?? 0));
     child.on("error", reject);
   });
@@ -1182,7 +1191,7 @@ export async function destroyServer(appName?: string): Promise<void> {
   const resp = await flyApi("GET", `/apps/${name}/machines`);
   const machines = parseJsonRaw(resp);
   const machineList = toObjectArray(Array.isArray(machines) ? machines : []);
-  const ids: string[] = machineList.map((m) => typeof m.id === "string" ? m.id : "").filter(Boolean);
+  const ids: string[] = machineList.map((m) => (typeof m.id === "string" ? m.id : "")).filter(Boolean);
 
   for (const mid of ids) {
     logStep(`Stopping machine ${mid}...`);
