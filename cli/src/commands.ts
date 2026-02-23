@@ -2835,6 +2835,11 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
   // Handle Fly.io SSH connections
   if (connection.ip === "fly-ssh" && connection.server_name) {
     p.log.step(`Entering ${pc.bold(agentName)} on Fly.io app ${pc.bold(connection.server_name)}...`);
+    // Wrap in bash -c to ensure shell builtins (source, export) and operators (;) are
+    // interpreted correctly — fly ssh console -C exec's the command directly without a
+    // shell, so semicolons and builtins would fail without this wrapper.
+    // This matches how interactiveSession() and runServer() handle fly commands.
+    const escapedCmd = remoteCmd.replace(/'/g, "'\\''");
     return runInteractiveCommand(
       "fly",
       [
@@ -2844,10 +2849,10 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
         connection.server_name,
         "--pty",
         "-C",
-        remoteCmd,
+        `bash -c '${escapedCmd}'`,
       ],
       `Failed to enter ${agentName}`,
-      `fly ssh console -a ${connection.server_name} --pty -C '${remoteCmd}'`,
+      `fly ssh console -a ${connection.server_name} --pty -C 'bash -c ${escapedCmd}'`,
     );
   }
 
