@@ -102,6 +102,21 @@ process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
 " 2>/dev/null)
         fi
         if [[ -n "${val}" ]]; then
+            # SECURITY: Strip leading/trailing whitespace before validation
+            val="$(printf '%s' "${val}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+            # SECURITY: Reject tokens containing newlines, tabs, or carriage returns
+            # These could bypass downstream validation or cause header injection
+            if [[ "${val}" =~ $'\n' ]] || [[ "${val}" =~ $'\t' ]] || [[ "${val}" =~ $'\r' ]]; then
+                log "SECURITY: Token contains newlines/tabs for ${var_name}"
+                return 1
+            fi
+
+            # Re-check non-empty after whitespace stripping
+            if [[ -z "${val}" ]]; then
+                return 1
+            fi
+
             # SECURITY: Defense-in-depth — prevent malicious values from being misused
             # downstream in unquoted expansions, eval contexts, or logging
             # Allow alphanumeric plus safe chars needed by real tokens:
@@ -224,37 +239,48 @@ process.stdout.write(JSON.stringify(providers));
 
     # Fire-and-forget — don't block the QA cycle, but log failures
     # Use positional parameters to safely pass variables to subshell (prevents command injection)
+    # Pre-construct the full JSON body to avoid shell expansion risks in subshell
+    local request_body
+    request_body="{\"providers\": ${providers_json}}"
+
     if command -v timeout &>/dev/null; then
         # Linux/GNU timeout available - wrap the subshell with timeout
+        # Use --data-binary @- with heredoc to pass body via stdin (no shell expansion)
         timeout 15s bash -c '
             http_code=$(curl -s -o /dev/stderr -w "%{http_code}" --max-time 10 \
                 -X POST "$1/request-batch" \
                 -H "Authorization: Bearer $2" \
                 -H "Content-Type: application/json" \
-                -d "{\"providers\": $3}" 2>/dev/null) || http_code="000"
+                --data-binary @- 2>/dev/null <<CURL_BODY
+$3
+CURL_BODY
+            ) || http_code="000"
             case "${http_code}" in
                 2*) ;; # success
                 000) printf "[%s] [keys] Key preflight: WARNING — key-server unreachable at %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "$1" ;;
                 401) printf "[%s] [keys] Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)\n" "$(date +"%Y-%m-%d %H:%M:%S")" ;;
                 *)   printf "[%s] [keys] Key preflight: WARNING — key-server returned HTTP %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "${http_code}" ;;
             esac
-        ' -- "${key_server_url}" "${key_server_secret}" "${providers_json}" &
+        ' -- "${key_server_url}" "${key_server_secret}" "${request_body}" &
     else
         # macOS fallback - no timeout command, rely on curl --max-time only
-        # Use positional parameters to safely pass variables to subshell (prevents command injection)
+        # Use --data-binary @- with heredoc to pass body via stdin (no shell expansion)
         bash -c '
             http_code=$(curl -s -o /dev/stderr -w "%{http_code}" --max-time 10 \
                 -X POST "$1/request-batch" \
                 -H "Authorization: Bearer $2" \
                 -H "Content-Type: application/json" \
-                -d "{\"providers\": $3}" 2>/dev/null) || http_code="000"
+                --data-binary @- 2>/dev/null <<CURL_BODY
+$3
+CURL_BODY
+            ) || http_code="000"
             case "${http_code}" in
                 2*) ;; # success
                 000) printf "[%s] [keys] Key preflight: WARNING — key-server unreachable at %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "$1" ;;
                 401) printf "[%s] [keys] Key preflight: WARNING — 401 Unauthorized (check KEY_SERVER_SECRET)\n" "$(date +"%Y-%m-%d %H:%M:%S")" ;;
                 *)   printf "[%s] [keys] Key preflight: WARNING — key-server returned HTTP %s\n" "$(date +"%Y-%m-%d %H:%M:%S")" "${http_code}" ;;
             esac
-        ' -- "${key_server_url}" "${key_server_secret}" "${providers_json}" &
+        ' -- "${key_server_url}" "${key_server_secret}" "${request_body}" &
     fi
 }
 
