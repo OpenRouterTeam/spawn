@@ -347,16 +347,28 @@ refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
 - If a PR can't be merged (conflicts, superseded, wrong approach), close it with `gh pr close {number} --comment "Reason"`
 - Never rebase main or use `--force` unless explicitly asked
 
-### Draft PR First — MANDATORY
+### EVERY Change Goes Through a PR — NO EXCEPTIONS
 
-**NEVER make changes without opening a PR.** Every change MUST go through a draft PR:
+**This is the #1 most important workflow rule.** If you edit ANY file — even CLAUDE.md itself, even a one-line typo fix — you MUST:
 
-1. **Create a branch and commit immediately** after the first meaningful change
-2. **Open a draft PR right away** — `gh pr create --draft` after your first commit
-3. **Push incremental commits** as you work — small, frequent commits are better than one big one
-4. **Convert to non-draft when done** — `gh pr ready NUMBER`
+1. **Create a branch BEFORE making changes** — `git checkout -b descriptive-branch-name`
+2. **Make your changes** on the branch
+3. **Commit immediately** after the first meaningful change
+4. **Open a draft PR right away** — `gh pr create --draft` after your first commit
+5. **Push incremental commits** as you work — small, frequent commits are better than one big one
+6. **When done: convert from draft, then merge** — `gh pr ready NUMBER && gh pr merge --squash NUMBER`
 
-This applies to ALL work — features, bug fixes, refactors, test additions, config changes. No exceptions. If code was changed, there must be a PR for it.
+**There is NO category of change exempt from this rule:**
+- CLAUDE.md edits → PR
+- Config file tweaks → PR
+- One-line bug fixes → PR
+- Test additions → PR
+- Documentation updates → PR
+- Manifest changes → PR
+
+**If you catch yourself about to commit directly to main — STOP.** Create a branch first. The only exception is if the user explicitly says "commit directly to main."
+
+**A finished PR (tests pass, lint clean) MUST be converted from draft and merged immediately.** Do not leave completed PRs in draft state.
 
 Draft PRs that go stale (no updates for 1 week) will be auto-closed.
 
