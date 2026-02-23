@@ -84,9 +84,15 @@ describe("cmdUpdate", () => {
   it("should report up-to-date when remote version matches current", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
-        return new Response(JSON.stringify({ version: VERSION }));
+        return new Response(
+          JSON.stringify({
+            version: VERSION,
+          }),
+        );
       }
-      return new Response("Not Found", { status: 404 });
+      return new Response("Not Found", {
+        status: 404,
+      });
     });
 
     await cmdUpdate();
@@ -101,9 +107,15 @@ describe("cmdUpdate", () => {
   it("should report available update when remote version differs", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
-        return new Response(JSON.stringify({ version: "99.99.99" }));
+        return new Response(
+          JSON.stringify({
+            version: "99.99.99",
+          }),
+        );
       }
-      return new Response("Not Found", { status: 404 });
+      return new Response("Not Found", {
+        status: 404,
+      });
     });
 
     await cmdUpdate();
@@ -115,7 +127,12 @@ describe("cmdUpdate", () => {
   });
 
   it("should handle package.json fetch failure gracefully", async () => {
-    global.fetch = mock(async () => new Response("Internal Server Error", { status: 500 }));
+    global.fetch = mock(
+      async () =>
+        new Response("Internal Server Error", {
+          status: 500,
+        }),
+    );
 
     await cmdUpdate();
 
@@ -143,9 +160,15 @@ describe("cmdUpdate", () => {
   it("should handle update failure gracefully", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
-        return new Response(JSON.stringify({ version: "99.99.99" }));
+        return new Response(
+          JSON.stringify({
+            version: "99.99.99",
+          }),
+        );
       }
-      return new Response("Not Found", { status: 404 });
+      return new Response("Not Found", {
+        status: 404,
+      });
     });
 
     // cmdUpdate now runs execSync which will fail in test env
@@ -158,7 +181,14 @@ describe("cmdUpdate", () => {
   });
 
   it("should start spinner with checking message", async () => {
-    global.fetch = mock(async () => new Response(JSON.stringify({ version: VERSION })));
+    global.fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            version: VERSION,
+          }),
+        ),
+    );
 
     await cmdUpdate();
 
@@ -169,9 +199,15 @@ describe("cmdUpdate", () => {
   it("should show version in spinner stop during update", async () => {
     global.fetch = mock(async (url: string) => {
       if (typeof url === "string" && url.includes("package.json")) {
-        return new Response(JSON.stringify({ version: "2.0.0" }));
+        return new Response(
+          JSON.stringify({
+            version: "2.0.0",
+          }),
+        );
       }
-      return new Response("Error", { status: 500 });
+      return new Response("Error", {
+        status: 500,
+      });
     });
 
     await cmdUpdate();
@@ -219,7 +255,9 @@ describe("Script download and execution", () => {
         return new Response(JSON.stringify(mockManifest));
       }
       // Both script URLs return 404
-      return new Response("Not Found", { status: 404 });
+      return new Response("Not Found", {
+        status: 404,
+      });
     });
 
     await loadManifest(true);
@@ -237,7 +275,9 @@ describe("Script download and execution", () => {
       if (typeof url === "string" && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
-      return new Response("Server Error", { status: 500 });
+      return new Response("Server Error", {
+        status: 500,
+      });
     });
 
     await loadManifest(true);
@@ -280,13 +320,17 @@ describe("Script download and execution", () => {
       }
       if (typeof url === "string" && url.includes("openrouter.ai")) {
         // Primary fails
-        return new Response("Service Unavailable", { status: 503 });
+        return new Response("Service Unavailable", {
+          status: 503,
+        });
       }
       if (typeof url === "string" && url.includes("raw.githubusercontent.com")) {
         // Fallback returns valid script
         return new Response("#!/bin/bash\nset -eo pipefail\necho 'hello'");
       }
-      return new Response("Not found", { status: 404 });
+      return new Response("Not found", {
+        status: 404,
+      });
     });
 
     await loadManifest(true);
@@ -316,7 +360,9 @@ describe("Script download and execution", () => {
       if (typeof url === "string" && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
-      return new Response("Not found", { status: 404 });
+      return new Response("Not found", {
+        status: 404,
+      });
     });
 
     await loadManifest(true);
@@ -389,7 +435,9 @@ describe("Script download and execution", () => {
       if (typeof url === "string" && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
       }
-      return new Response("Not Found", { status: 404 });
+      return new Response("Not Found", {
+        status: 404,
+      });
     });
 
     await loadManifest(true);
@@ -413,12 +461,18 @@ describe("Script download and execution", () => {
         return new Response(JSON.stringify(mockManifest));
       }
       if (typeof url === "string" && url.includes("openrouter.ai")) {
-        return new Response("Error", { status: 500 });
+        return new Response("Error", {
+          status: 500,
+        });
       }
       if (typeof url === "string" && url.includes("raw.githubusercontent.com")) {
-        return new Response("Bad Gateway", { status: 502 });
+        return new Response("Bad Gateway", {
+          status: 502,
+        });
       }
-      return new Response("Not found", { status: 404 });
+      return new Response("Not found", {
+        status: 404,
+      });
     });
 
     await loadManifest(true);

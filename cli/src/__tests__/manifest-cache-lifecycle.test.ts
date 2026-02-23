@@ -290,7 +290,12 @@ describe("Manifest Cache Lifecycle", () => {
 
     it("should fall back to stale cache on HTTP 500", async () => {
       global.fetch = mock(() =>
-        Promise.resolve(new Response("Internal Server Error", { status: 500, statusText: "Internal Server Error" })),
+        Promise.resolve(
+          new Response("Internal Server Error", {
+            status: 500,
+            statusText: "Internal Server Error",
+          }),
+        ),
       );
 
       mkdirSync(join(env.testDir, "spawn"), {
@@ -307,7 +312,12 @@ describe("Manifest Cache Lifecycle", () => {
 
     it("should fall back to stale cache on HTTP 403 (rate limited)", async () => {
       global.fetch = mock(() =>
-        Promise.resolve(new Response("Forbidden", { status: 403, statusText: "Forbidden" })),
+        Promise.resolve(
+          new Response("Forbidden", {
+            status: 403,
+            statusText: "Forbidden",
+          }),
+        ),
       );
 
       mkdirSync(join(env.testDir, "spawn"), {
@@ -322,7 +332,13 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should fall back to stale cache when fetch response json() throws", async () => {
-      global.fetch = mock(() => Promise.resolve(new Response("not valid json {{{", { status: 200 })));
+      global.fetch = mock(() =>
+        Promise.resolve(
+          new Response("not valid json {{{", {
+            status: 200,
+          }),
+        ),
+      );
 
       mkdirSync(join(env.testDir, "spawn"), {
         recursive: true,

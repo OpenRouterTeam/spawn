@@ -108,20 +108,32 @@ function mockFetchForDownload(opts: {
     // Primary script URL (openrouter.ai)
     if (urlStr.includes("openrouter.ai")) {
       if (primaryOk) {
-        return new Response(scriptContent, { status: primaryStatus });
+        return new Response(scriptContent, {
+          status: primaryStatus,
+        });
       }
-      return new Response("error", { status: primaryStatus, statusText: `HTTP ${primaryStatus}` });
+      return new Response("error", {
+        status: primaryStatus,
+        statusText: `HTTP ${primaryStatus}`,
+      });
     }
 
     // Fallback script URL (raw.githubusercontent.com)
     if (urlStr.includes("raw.githubusercontent.com")) {
       if (fallbackOk) {
-        return new Response(scriptContent, { status: fallbackStatus });
+        return new Response(scriptContent, {
+          status: fallbackStatus,
+        });
       }
-      return new Response("error", { status: fallbackStatus, statusText: `HTTP ${fallbackStatus}` });
+      return new Response("error", {
+        status: fallbackStatus,
+        statusText: `HTTP ${fallbackStatus}`,
+      });
     }
 
-    return new Response("not found", { status: 404 });
+    return new Response("not found", {
+      status: 404,
+    });
   });
 }
 

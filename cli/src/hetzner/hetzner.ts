@@ -230,9 +230,7 @@ export async function ensureSshKey(): Promise<void> {
     const data = parseJson(resp);
     const sshKeys = toObjectArray(data?.ssh_keys);
 
-    const alreadyRegistered = sshKeys.some(
-      (k) => fingerprint && k.fingerprint === fingerprint,
-    );
+    const alreadyRegistered = sshKeys.some((k) => fingerprint && k.fingerprint === fingerprint);
 
     if (alreadyRegistered) {
       logInfo(`SSH key '${key.name}' already registered with Hetzner`);
@@ -537,9 +535,19 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = await new Promise<number>((resolve, reject) => {
-    const child = spawn("ssh", [...SSH_BASE_OPTS, ...keyOpts, "-t", `root@${serverIp}`, fullCmd], {
-      stdio: "inherit",
-    });
+    const child = spawn(
+      "ssh",
+      [
+        ...SSH_BASE_OPTS,
+        ...keyOpts,
+        "-t",
+        `root@${serverIp}`,
+        fullCmd,
+      ],
+      {
+        stdio: "inherit",
+      },
+    );
     child.on("close", (code) => resolve(code ?? 0));
     child.on("error", reject);
   });
@@ -657,7 +665,7 @@ export async function listServers(): Promise<void> {
 
   const pad = (str: string, n: number) => (str + " ".repeat(n)).slice(0, n);
   const str = (val: unknown, fallback = "N/A"): string =>
-    typeof val === "string" ? val : (val != null ? String(val) : fallback);
+    typeof val === "string" ? val : val != null ? String(val) : fallback;
   console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10));
   console.log("-".repeat(75));
   for (const s of servers) {

@@ -102,9 +102,7 @@ describe("cmdInteractive", () => {
     originalFetch = global.fetch;
 
     // Pre-load manifest
-    global.fetch = mock(async () =>
-      new Response(JSON.stringify(mockManifest)),
-    );
+    global.fetch = mock(async () => new Response(JSON.stringify(mockManifest)));
     await loadManifest(true);
   });
 
@@ -218,9 +216,7 @@ describe("cmdInteractive", () => {
         },
       };
 
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(noCloudManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(noCloudManifest)));
       await loadManifest(true);
 
       selectReturnValues = [
@@ -243,9 +239,7 @@ describe("cmdInteractive", () => {
         },
       };
 
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(noCloudManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(noCloudManifest)));
       await loadManifest(true);
 
       selectReturnValues = [
@@ -274,9 +268,7 @@ describe("cmdInteractive", () => {
         },
       };
 
-      global.fetch = mock(async () =>
-        new Response(JSON.stringify(noCloudManifest)),
-      );
+      global.fetch = mock(async () => new Response(JSON.stringify(noCloudManifest)));
       await loadManifest(true);
 
       selectReturnValues = [
@@ -450,7 +442,9 @@ describe("cmdInteractive", () => {
           return new Response(JSON.stringify(mockManifest));
         }
         // Both primary and fallback fail
-        return new Response("Not Found", { status: 404 });
+        return new Response("Not Found", {
+          status: 404,
+        });
       });
       await loadManifest(true);
 

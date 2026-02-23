@@ -213,7 +213,14 @@ describe("Unknown Flag Detection", () => {
     });
 
     it("should allow --name", () => {
-      expect(findUnknownFlag(["claude", "sprite", "--name", "my-box"])).toBeNull();
+      expect(
+        findUnknownFlag([
+          "claude",
+          "sprite",
+          "--name",
+          "my-box",
+        ]),
+      ).toBeNull();
     });
   });
 
@@ -310,16 +317,26 @@ describe("KNOWN_FLAGS completeness", () => {
 
   it("should contain all expected flags", () => {
     const expected = [
-      "--help", "-h",
-      "--version", "-v", "-V",
-      "--prompt", "-p", "--prompt-file", "-f",
-      "--dry-run", "-n",
+      "--help",
+      "-h",
+      "--version",
+      "-v",
+      "-V",
+      "--prompt",
+      "-p",
+      "--prompt-file",
+      "-f",
+      "--dry-run",
+      "-n",
       "--debug",
       "--headless",
       "--output",
       "--name",
       "--default",
-      "-a", "-c", "--agent", "--cloud",
+      "-a",
+      "-c",
+      "--agent",
+      "--cloud",
       "--clear",
     ];
     for (const flag of expected) {
@@ -330,23 +347,52 @@ describe("KNOWN_FLAGS completeness", () => {
 
 describe("expandEqualsFlags", () => {
   it("should expand --flag=value into two args", () => {
-    expect(expandEqualsFlags(["--prompt=hello"])).toEqual(["--prompt", "hello"]);
+    expect(
+      expandEqualsFlags([
+        "--prompt=hello",
+      ]),
+    ).toEqual([
+      "--prompt",
+      "hello",
+    ]);
   });
 
   it("should expand multiple --flag=value pairs", () => {
-    expect(expandEqualsFlags(["--prompt=hello", "--name=box"])).toEqual([
-      "--prompt", "hello", "--name", "box",
+    expect(
+      expandEqualsFlags([
+        "--prompt=hello",
+        "--name=box",
+      ]),
+    ).toEqual([
+      "--prompt",
+      "hello",
+      "--name",
+      "box",
     ]);
   });
 
   it("should pass through args without equals", () => {
-    expect(expandEqualsFlags(["--help", "claude", "sprite"])).toEqual([
-      "--help", "claude", "sprite",
+    expect(
+      expandEqualsFlags([
+        "--help",
+        "claude",
+        "sprite",
+      ]),
+    ).toEqual([
+      "--help",
+      "claude",
+      "sprite",
     ]);
   });
 
   it("should not expand short flags", () => {
-    expect(expandEqualsFlags(["-p=value"])).toEqual(["-p=value"]);
+    expect(
+      expandEqualsFlags([
+        "-p=value",
+      ]),
+    ).toEqual([
+      "-p=value",
+    ]);
   });
 
   it("should handle empty args", () => {
@@ -354,12 +400,30 @@ describe("expandEqualsFlags", () => {
   });
 
   it("should handle value containing equals sign", () => {
-    expect(expandEqualsFlags(["--prompt=a=b"])).toEqual(["--prompt", "a=b"]);
+    expect(
+      expandEqualsFlags([
+        "--prompt=a=b",
+      ]),
+    ).toEqual([
+      "--prompt",
+      "a=b",
+    ]);
   });
 
   it("should handle mixed args", () => {
-    expect(expandEqualsFlags(["claude", "--prompt=hello", "sprite", "--dry-run"])).toEqual([
-      "claude", "--prompt", "hello", "sprite", "--dry-run",
+    expect(
+      expandEqualsFlags([
+        "claude",
+        "--prompt=hello",
+        "sprite",
+        "--dry-run",
+      ]),
+    ).toEqual([
+      "claude",
+      "--prompt",
+      "hello",
+      "sprite",
+      "--dry-run",
     ]);
   });
 });
