@@ -366,8 +366,6 @@ refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
 - Documentation updates → PR
 - Manifest changes → PR
 
-**If you catch yourself about to commit directly to main — STOP.** Create a branch first. The only exception is if the user explicitly says "commit directly to main."
-
 **A finished PR (tests pass, lint clean) MUST be converted from draft and merged immediately.** Do not leave completed PRs in draft state.
 
 Draft PRs that go stale (no updates for 1 week) will be auto-closed.
