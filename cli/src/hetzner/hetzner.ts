@@ -20,6 +20,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { SSH_BASE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
+import { getSpawnDir, getConnectionPath } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
 const HETZNER_DASHBOARD_URL = "https://console.hetzner.cloud/";
@@ -339,7 +340,7 @@ export function saveVmConnection(
   cloud: string,
   launchCmd?: string,
 ): void {
-  const dir = `${process.env.HOME}/.spawn`;
+  const dir = getSpawnDir();
   mkdirSync(dir, {
     recursive: true,
   });
@@ -363,7 +364,7 @@ export function saveVmConnection(
 }
 
 export function saveLaunchCmd(launchCmd: string): void {
-  const connFile = `${process.env.HOME}/.spawn/last-connection.json`;
+  const connFile = getConnectionPath();
   try {
     const data = JSON.parse(readFileSync(connFile, "utf-8"));
     data.launch_cmd = launchCmd;
