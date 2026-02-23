@@ -13,6 +13,8 @@ export const SSH_BASE_OPTS: string[] = [
   "-o", "ConnectTimeout=10",
   "-o", "ServerAliveInterval=15",
   "-o", "ServerAliveCountMax=3",
+  "-o", "GSSAPIAuthentication=no",
+  "-o", "TCPKeepAlive=no",
   "-o", "BatchMode=yes",
 ];
 
