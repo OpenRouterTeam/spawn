@@ -15,6 +15,7 @@ import {
   toKebabCase,
   defaultSpawnName,
   sanitizeTermValue,
+  selectFromList,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
@@ -621,6 +622,86 @@ export async function ensureSshKey(): Promise<void> {
   }
 }
 
+// ─── Droplet Size Options ────────────────────────────────────────────────────
+
+export interface DropletSize {
+  id: string;
+  label: string;
+}
+
+export const DROPLET_SIZES: DropletSize[] = [
+  { id: "s-1vcpu-1gb", label: "1 vCPU \u00b7 1 GB RAM \u00b7 $6/mo" },
+  { id: "s-1vcpu-2gb", label: "1 vCPU \u00b7 2 GB RAM \u00b7 $12/mo" },
+  { id: "s-2vcpu-2gb", label: "2 vCPU \u00b7 2 GB RAM \u00b7 $18/mo" },
+  { id: "s-2vcpu-4gb", label: "2 vCPU \u00b7 4 GB RAM \u00b7 $24/mo" },
+  { id: "s-4vcpu-8gb", label: "4 vCPU \u00b7 8 GB RAM \u00b7 $48/mo" },
+  { id: "s-8vcpu-16gb", label: "8 vCPU \u00b7 16 GB RAM \u00b7 $96/mo" },
+];
+
+export const DEFAULT_DROPLET_SIZE = "s-2vcpu-4gb";
+
+// ─── Region Options ──────────────────────────────────────────────────────────
+
+export interface DoRegion {
+  id: string;
+  label: string;
+}
+
+export const DO_REGIONS: DoRegion[] = [
+  { id: "nyc1", label: "New York 1" },
+  { id: "nyc3", label: "New York 3" },
+  { id: "sfo3", label: "San Francisco 3" },
+  { id: "ams3", label: "Amsterdam 3" },
+  { id: "sgp1", label: "Singapore 1" },
+  { id: "lon1", label: "London 1" },
+  { id: "fra1", label: "Frankfurt 1" },
+  { id: "tor1", label: "Toronto 1" },
+  { id: "blr1", label: "Bangalore 1" },
+  { id: "syd1", label: "Sydney 1" },
+];
+
+export const DEFAULT_DO_REGION = "nyc3";
+
+// ─── Interactive Pickers ─────────────────────────────────────────────────────
+
+export async function promptDropletSize(): Promise<string> {
+  if (process.env.DO_DROPLET_SIZE) {
+    logInfo(`Using droplet size from environment: ${process.env.DO_DROPLET_SIZE}`);
+    return process.env.DO_DROPLET_SIZE;
+  }
+
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return DEFAULT_DROPLET_SIZE;
+  }
+
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return DEFAULT_DROPLET_SIZE;
+  }
+
+  process.stderr.write("\n");
+  const items = DROPLET_SIZES.map((s) => `${s.id}|${s.label}`);
+  return selectFromList(items, "DigitalOcean droplet size", DEFAULT_DROPLET_SIZE);
+}
+
+export async function promptDoRegion(): Promise<string> {
+  if (process.env.DO_REGION) {
+    logInfo(`Using region from environment: ${process.env.DO_REGION}`);
+    return process.env.DO_REGION;
+  }
+
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return DEFAULT_DO_REGION;
+  }
+
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return DEFAULT_DO_REGION;
+  }
+
+  process.stderr.write("\n");
+  const items = DO_REGIONS.map((r) => `${r.id}|${r.label}`);
+  return selectFromList(items, "DigitalOcean region", DEFAULT_DO_REGION);
+}
+
 // ─── Provisioning ────────────────────────────────────────────────────────────
 
 function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
@@ -649,17 +730,17 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   return lines.join("\n");
 }
 
-export async function createServer(name: string, tier?: CloudInitTier): Promise<void> {
-  const size = process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
-  const region = process.env.DO_REGION || "nyc3";
+export async function createServer(name: string, tier?: CloudInitTier, dropletSize?: string, region?: string): Promise<void> {
+  const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
+  const effectiveRegion = region || process.env.DO_REGION || "nyc3";
   const image = "ubuntu-24-04-x64";
 
-  if (!validateRegionName(region)) {
+  if (!validateRegionName(effectiveRegion)) {
     logError("Invalid DO_REGION");
     throw new Error("Invalid region");
   }
 
-  logStep(`Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${region})...`);
+  logStep(`Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion})...`);
 
   // Get all SSH key IDs
   const { text: keysText } = await doApi("GET", "/account/keys");
@@ -671,7 +752,7 @@ export async function createServer(name: string, tier?: CloudInitTier): Promise<
   const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
     name,
-    region,
+    region: effectiveRegion,
     size,
     image,
     ssh_keys: sshKeyIds,

@@ -5,6 +5,8 @@ import {
   ensureHcloudToken,
   ensureSshKey,
   promptSpawnName,
+  promptServerType,
+  promptLocation,
   createServer as createHetznerServer,
   getServerName,
   waitForCloudInit,
@@ -27,6 +29,9 @@ async function main() {
 
   const agent = resolveAgent(agentName);
 
+  let serverType = "";
+  let location = "";
+
   const cloud: CloudOrchestrator = {
     cloudName: "hetzner",
     cloudLabel: "Hetzner Cloud",
@@ -39,9 +44,12 @@ async function main() {
       await ensureHcloudToken();
       await ensureSshKey();
     },
-    async promptSize() {},
+    async promptSize() {
+      serverType = await promptServerType();
+      location = await promptLocation();
+    },
     async createServer(name: string) {
-      await createHetznerServer(name, undefined, undefined, agent.cloudInitTier);
+      await createHetznerServer(name, serverType, location, agent.cloudInitTier);
     },
     getServerName,
     async waitForReady() {

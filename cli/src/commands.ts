@@ -1785,6 +1785,9 @@ function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: s
   if (spawnName) {
     env.SPAWN_NAME = spawnName;
   }
+  if (process.env.SPAWN_CUSTOM === "1") {
+    env.SPAWN_CUSTOM = "1";
+  }
 
   return spawnBash(script, env);
 }
@@ -3274,6 +3277,7 @@ function getHelpUsageSection(): string {
   spawn                              Interactive agent + cloud picker
   spawn <agent> <cloud>              Launch agent on cloud directly
   spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
+  spawn <agent> <cloud> --custom      Show interactive size/region pickers
   spawn <agent> <cloud> --headless   Provision and exit (no interactive session)
   spawn <agent> <cloud> --output json
                                      Headless mode with structured JSON on stdout
@@ -3357,7 +3361,8 @@ function getHelpEnvVarsSection(): string {
   ${pc.cyan("SPAWN_UNICODE=1")}           Force Unicode output (override auto-detection)
   ${pc.cyan("SPAWN_HOME")}                Override spawn data directory (default: ~/.spawn)
   ${pc.cyan("SPAWN_DEBUG=1")}             Show debug output (unicode detection, etc.)
-  ${pc.cyan("SPAWN_HEADLESS=1")}          Set automatically in --headless mode (for scripts)`;
+  ${pc.cyan("SPAWN_HEADLESS=1")}          Set automatically in --headless mode (for scripts)
+  ${pc.cyan("SPAWN_CUSTOM=1")}           Set automatically in --custom mode (show size/region pickers)`;
 }
 
 function getHelpFooterSection(): string {

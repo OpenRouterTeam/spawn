@@ -5,6 +5,8 @@ import {
   ensureDoToken,
   ensureSshKey,
   promptSpawnName,
+  promptDropletSize,
+  promptDoRegion,
   createServer as createDroplet,
   getServerName,
   waitForCloudInit,
@@ -28,6 +30,9 @@ async function main() {
 
   const agent = resolveAgent(agentName);
 
+  let dropletSize = "";
+  let region = "";
+
   const cloud: CloudOrchestrator = {
     cloudName: "digitalocean",
     cloudLabel: "DigitalOcean",
@@ -44,9 +49,12 @@ async function main() {
         await new Promise((r) => setTimeout(r, 5000));
       }
     },
-    async promptSize() {},
+    async promptSize() {
+      dropletSize = await promptDropletSize();
+      region = await promptDoRegion();
+    },
     async createServer(name: string) {
-      await createDroplet(name, agent.cloudInitTier);
+      await createDroplet(name, agent.cloudInitTier, dropletSize, region);
     },
     getServerName,
     async waitForReady() {

@@ -13,6 +13,7 @@ import {
   toKebabCase,
   defaultSpawnName,
   sanitizeTermValue,
+  selectFromList,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
@@ -242,6 +243,46 @@ function sshBaseArgs(): string[] {
   return args;
 }
 
+// ─── Sandbox Size Options ────────────────────────────────────────────────────
+
+export interface SandboxSize {
+  id: string;
+  cpu: number;
+  memory: number;
+  disk: number;
+  label: string;
+}
+
+export const SANDBOX_SIZES: SandboxSize[] = [
+  { id: "small", cpu: 2, memory: 4, disk: 30, label: "2 vCPU \u00b7 4 GiB RAM \u00b7 30 GiB disk" },
+  { id: "medium", cpu: 4, memory: 8, disk: 50, label: "4 vCPU \u00b7 8 GiB RAM \u00b7 50 GiB disk" },
+  { id: "large", cpu: 8, memory: 16, disk: 100, label: "8 vCPU \u00b7 16 GiB RAM \u00b7 100 GiB disk" },
+];
+
+export const DEFAULT_SANDBOX_SIZE = SANDBOX_SIZES[0];
+
+export async function promptSandboxSize(): Promise<SandboxSize> {
+  if (process.env.DAYTONA_CPU || process.env.DAYTONA_MEMORY) {
+    const cpu = Number.parseInt(process.env.DAYTONA_CPU || "2", 10);
+    const memory = Number.parseInt(process.env.DAYTONA_MEMORY || "4", 10);
+    const disk = Number.parseInt(process.env.DAYTONA_DISK || "30", 10);
+    return { id: "env", cpu, memory, disk, label: `${cpu} vCPU \u00b7 ${memory} GiB RAM \u00b7 ${disk} GiB disk` };
+  }
+
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return DEFAULT_SANDBOX_SIZE;
+  }
+
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return DEFAULT_SANDBOX_SIZE;
+  }
+
+  process.stderr.write("\n");
+  const items = SANDBOX_SIZES.map((s) => `${s.id}|${s.label}`);
+  const selectedId = await selectFromList(items, "Daytona sandbox size", DEFAULT_SANDBOX_SIZE.id);
+  return SANDBOX_SIZES.find((s) => s.id === selectedId) || DEFAULT_SANDBOX_SIZE;
+}
+
 // ─── Provisioning ────────────────────────────────────────────────────────────
 
 async function setupSshAccess(): Promise<void> {
@@ -273,10 +314,10 @@ async function setupSshAccess(): Promise<void> {
   logInfo("SSH access ready");
 }
 
-export async function createServer(name: string): Promise<void> {
-  const cpu = Number.parseInt(process.env.DAYTONA_CPU || "2", 10);
-  const memory = Number.parseInt(process.env.DAYTONA_MEMORY || "4", 10);
-  const disk = Number.parseInt(process.env.DAYTONA_DISK || "30", 10);
+export async function createServer(name: string, sandboxSize?: SandboxSize): Promise<void> {
+  const cpu = sandboxSize?.cpu ?? Number.parseInt(process.env.DAYTONA_CPU || "2", 10);
+  const memory = sandboxSize?.memory ?? Number.parseInt(process.env.DAYTONA_MEMORY || "4", 10);
+  const disk = sandboxSize?.disk ?? Number.parseInt(process.env.DAYTONA_DISK || "30", 10);
 
   logStep(`Creating Daytona sandbox '${name}' (${cpu} vCPU, ${memory} GiB RAM, ${disk} GiB disk)...`);
 

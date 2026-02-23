@@ -516,6 +516,9 @@ export async function promptRegion(): Promise<void> {
     awsRegion = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || "us-east-1";
     return;
   }
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return;
+  }
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     return;
   }
@@ -535,6 +538,9 @@ let selectedBundle = DEFAULT_BUNDLE.id;
 export async function promptBundle(): Promise<void> {
   if (process.env.LIGHTSAIL_BUNDLE) {
     selectedBundle = process.env.LIGHTSAIL_BUNDLE;
+    return;
+  }
+  if (process.env.SPAWN_CUSTOM !== "1") {
     return;
   }
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {

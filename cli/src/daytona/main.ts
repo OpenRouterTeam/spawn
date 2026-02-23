@@ -4,6 +4,7 @@
 import {
   ensureDaytonaToken,
   promptSpawnName,
+  promptSandboxSize,
   getServerName,
   createServer as createDaytonaServer,
   waitForCloudInit,
@@ -11,6 +12,7 @@ import {
   uploadFile,
   interactiveSession,
 } from "./daytona";
+import type { SandboxSize } from "./daytona";
 import { resolveAgent } from "./agents";
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
@@ -26,6 +28,8 @@ async function main() {
 
   const agent = resolveAgent(agentName);
 
+  let sandboxSize: SandboxSize | undefined;
+
   const cloud: CloudOrchestrator = {
     cloudName: "daytona",
     cloudLabel: "Daytona",
@@ -37,9 +41,11 @@ async function main() {
       await promptSpawnName();
       await ensureDaytonaToken();
     },
-    async promptSize() {},
+    async promptSize() {
+      sandboxSize = await promptSandboxSize();
+    },
     async createServer(name: string) {
-      await createDaytonaServer(name);
+      await createDaytonaServer(name, sandboxSize);
     },
     getServerName,
     async waitForReady() {

@@ -14,6 +14,7 @@ import {
   toKebabCase,
   defaultSpawnName,
   sanitizeTermValue,
+  selectFromList,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
@@ -289,6 +290,81 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
     "touch /home/ubuntu/.cloud-init-complete 2>/dev/null; touch /root/.cloud-init-complete",
   );
   return lines.join("\n");
+}
+
+// ─── Server Type Options ─────────────────────────────────────────────────────
+
+export interface ServerTypeTier {
+  id: string;
+  label: string;
+}
+
+export const SERVER_TYPES: ServerTypeTier[] = [
+  { id: "cx22", label: "2 vCPU \u00b7 4 GB RAM \u00b7 40 GB (~\u20AC3.29/mo)" },
+  { id: "cx32", label: "4 vCPU \u00b7 8 GB RAM \u00b7 80 GB (~\u20AC5.39/mo)" },
+  { id: "cx42", label: "8 vCPU \u00b7 16 GB RAM \u00b7 160 GB (~\u20AC14.49/mo)" },
+  { id: "cx52", label: "16 vCPU \u00b7 32 GB RAM \u00b7 320 GB (~\u20AC28.49/mo)" },
+  { id: "cpx21", label: "3 AMD vCPU \u00b7 4 GB RAM \u00b7 80 GB (~\u20AC4.35/mo)" },
+  { id: "cpx31", label: "4 AMD vCPU \u00b7 8 GB RAM \u00b7 160 GB (~\u20AC7.59/mo)" },
+];
+
+export const DEFAULT_SERVER_TYPE = "cx22";
+
+// ─── Location Options ────────────────────────────────────────────────────────
+
+export interface LocationOption {
+  id: string;
+  label: string;
+}
+
+export const LOCATIONS: LocationOption[] = [
+  { id: "fsn1", label: "Falkenstein, Germany" },
+  { id: "nbg1", label: "Nuremberg, Germany" },
+  { id: "hel1", label: "Helsinki, Finland" },
+  { id: "ash", label: "Ashburn, VA, US" },
+  { id: "hil", label: "Hillsboro, OR, US" },
+];
+
+export const DEFAULT_LOCATION = "nbg1";
+
+// ─── Interactive Pickers ─────────────────────────────────────────────────────
+
+export async function promptServerType(): Promise<string> {
+  if (process.env.HETZNER_SERVER_TYPE) {
+    logInfo(`Using server type from environment: ${process.env.HETZNER_SERVER_TYPE}`);
+    return process.env.HETZNER_SERVER_TYPE;
+  }
+
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return DEFAULT_SERVER_TYPE;
+  }
+
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return DEFAULT_SERVER_TYPE;
+  }
+
+  process.stderr.write("\n");
+  const items = SERVER_TYPES.map((t) => `${t.id}|${t.label}`);
+  return selectFromList(items, "Hetzner server type", DEFAULT_SERVER_TYPE);
+}
+
+export async function promptLocation(): Promise<string> {
+  if (process.env.HETZNER_LOCATION) {
+    logInfo(`Using location from environment: ${process.env.HETZNER_LOCATION}`);
+    return process.env.HETZNER_LOCATION;
+  }
+
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return DEFAULT_LOCATION;
+  }
+
+  if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    return DEFAULT_LOCATION;
+  }
+
+  process.stderr.write("\n");
+  const items = LOCATIONS.map((l) => `${l.id}|${l.label}`);
+  return selectFromList(items, "Hetzner location", DEFAULT_LOCATION);
 }
 
 // ─── Provisioning ────────────────────────────────────────────────────────────
