@@ -90,6 +90,15 @@ export async function selectFromList(items: string[], promptText: string, defaul
     })),
     initialValue: defaultValue,
   });
+
+  // @clack/prompts creates and destroys its own readline interface on stdin.
+  // After it closes, our shared readline may be in a broken state (Bun #1707).
+  // Invalidate it so the next prompt() call creates a fresh one.
+  if (sharedRl) {
+    sharedRl.close();
+    sharedRl = null;
+  }
+
   if (p.isCancel(result)) {
     return defaultValue;
   }
@@ -126,9 +135,10 @@ export function openBrowser(url: string): void {
           ],
         ];
 
+  let opened = false;
   for (const [cmd, args] of cmds) {
     try {
-      Bun.spawnSync(
+      const result = Bun.spawnSync(
         [
           cmd,
           ...args,
@@ -141,12 +151,21 @@ export function openBrowser(url: string): void {
           ],
         },
       );
-      return;
+      if (result.exitCode === 0) {
+        opened = true;
+        break;
+      }
     } catch {
-      // try next
+      // command not found or failed to spawn — try next
     }
   }
-  logStep(`Please open: ${url}`);
+
+  // Always show the URL as fallback (headless VMs, VNC, SSH sessions)
+  if (opened) {
+    logStep(`If the browser didn't open, visit: ${url}`);
+  } else {
+    logStep(`Please open: ${url}`);
+  }
 }
 
 // ─── Result-based retry ────────────────────────────────────────────────
