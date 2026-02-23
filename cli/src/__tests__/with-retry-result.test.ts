@@ -43,7 +43,9 @@ describe("withRetry", () => {
     let calls = 0;
     const fn = mock(async () => {
       calls++;
-      if (calls < 3) return Err(new Error("transient"));
+      if (calls < 3) {
+        return Err(new Error("transient"));
+      }
       return Ok("recovered");
     });
     const result = await withRetry("test", fn, 3, 0);
@@ -77,7 +79,9 @@ describe("withRetry", () => {
     let calls = 0;
     const fn = mock(async () => {
       calls++;
-      if (calls === 1) return Err(new Error("transient"));
+      if (calls === 1) {
+        return Err(new Error("transient"));
+      }
       throw new Error("fatal on second try");
     });
     await expect(withRetry("test", fn, 5, 0)).rejects.toThrow("fatal on second try");
@@ -143,7 +147,9 @@ describe("wrapSshCall + withRetry integration", () => {
     let calls = 0;
     const mockOp = () => {
       calls++;
-      if (calls < 2) return Promise.reject(new Error("connection reset"));
+      if (calls < 2) {
+        return Promise.reject(new Error("connection reset"));
+      }
       return Promise.resolve();
     };
     const result = await withRetry("ssh op", () => wrapSshCall(mockOp()), 3, 0);

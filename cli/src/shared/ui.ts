@@ -173,8 +173,12 @@ export async function withRetry<T>(
 ): Promise<T> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await fn(); // throws → not retried (non-retryable)
-    if (result.ok) return result.value; // success
-    if (attempt >= maxAttempts) throw result.error;
+    if (result.ok) {
+      return result.value;
+    }
+    if (attempt >= maxAttempts) {
+      throw result.error;
+    }
     logWarn(`${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delaySec}s...`);
     await new Promise((r) => setTimeout(r, delaySec * 1000));
   }

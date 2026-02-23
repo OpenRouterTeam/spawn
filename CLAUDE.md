@@ -286,9 +286,10 @@ Draft PRs that go stale (no updates for 1 week) will be auto-closed.
 ## After Each Change
 
 1. `bash -n {file}` syntax check on all modified scripts
-2. Update `manifest.json` matrix status to `"implemented"`
-3. Update the cloud's `README.md` with usage instructions
-4. Commit with a descriptive message
+2. `cd cli && bunx @biomejs/biome lint src/` — **must pass with zero errors** on all modified TypeScript
+3. Update `manifest.json` matrix status to `"implemented"`
+4. Update the cloud's `README.md` with usage instructions
+5. Commit with a descriptive message
 
 ## Filing Issues for Discovered Problems
 

@@ -62,3 +62,18 @@ if [[ $errors -gt 0 ]]; then
 fi
 
 echo -e "${GREEN}All $( echo "$staged_files" | wc -w | tr -d ' ') scripts passed validation.${NC}"
+
+# ─── Biome lint for TypeScript ─────────────────────────────────────────
+
+staged_ts=$(git diff --cached --name-only --diff-filter=ACM | grep '^cli/src/.*\.ts$' || true)
+
+if [[ -n "$staged_ts" ]]; then
+    echo "Running Biome lint on staged TypeScript files..."
+    if ! (cd cli && bunx @biomejs/biome lint src/); then
+        echo ""
+        echo -e "${RED}Biome lint failed. Commit blocked.${NC}"
+        echo "Run 'cd cli && bunx @biomejs/biome lint src/' to see details."
+        exit 1
+    fi
+    echo -e "${GREEN}Biome lint passed.${NC}"
+fi
