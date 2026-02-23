@@ -408,7 +408,7 @@ export async function createServer(
   location?: string,
   tier?: CloudInitTier,
 ): Promise<void> {
-  const sType = serverType || process.env.HETZNER_SERVER_TYPE || "cx23";
+  const sType = serverType || process.env.HETZNER_SERVER_TYPE || DEFAULT_SERVER_TYPE;
   const loc = location || process.env.HETZNER_LOCATION || "nbg1";
   const image = "ubuntu-24.04";
 
