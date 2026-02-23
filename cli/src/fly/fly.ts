@@ -1,6 +1,7 @@
 // fly/lib/fly.ts — Core Fly.io provider: API, auth, orgs, provisioning, execution
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import {
   logInfo,
   logWarn,
@@ -1062,9 +1063,8 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const flyCmd = getCmd()!;
 
-  const proc = Bun.spawn(
-    [
-      flyCmd,
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    const child = spawn(flyCmd, [
       "ssh",
       "console",
       "-a",
@@ -1072,17 +1072,13 @@ export async function interactiveSession(cmd: string): Promise<number> {
       "--pty",
       "-C",
       `bash -c '${escapedCmd}'`,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
-      ],
+    ], {
+      stdio: "inherit",
       env: process.env,
-    },
-  );
-  const exitCode = await proc.exited;
+    });
+    child.on("close", (code) => resolve(code ?? 0));
+    child.on("error", reject);
+  });
 
   // Post-session summary
   process.stderr.write("\n");
