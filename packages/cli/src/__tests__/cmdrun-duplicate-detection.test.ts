@@ -68,7 +68,9 @@ function mockFetchOk(scriptContent = VALID_SCRIPT) {
     if (urlStr.includes("manifest.json")) {
       return new Response(JSON.stringify(mockManifest));
     }
-    return new Response(scriptContent, { status: 200 });
+    return new Response(scriptContent, {
+      status: 200,
+    });
   });
 }
 
@@ -119,7 +121,9 @@ describe("cmdRun --name duplicate detection", () => {
     originalSpawnName = process.env.SPAWN_NAME;
 
     historyDir = join(homedir(), `spawn-dup-test-${Date.now()}-${Math.random()}`);
-    mkdirSync(historyDir, { recursive: true });
+    mkdirSync(historyDir, {
+      recursive: true,
+    });
     process.env.SPAWN_HOME = historyDir;
     // Clean SPAWN_NAME before each test
     delete process.env.SPAWN_NAME;
@@ -138,7 +142,10 @@ describe("cmdRun --name duplicate detection", () => {
     }
 
     if (historyDir) {
-      rmSync(historyDir, { recursive: true, force: true });
+      rmSync(historyDir, {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -146,7 +153,9 @@ describe("cmdRun --name duplicate detection", () => {
     // Pre-populate history with an active server named "alexclaw-do"
     writeFileSync(
       join(historyDir, "history.json"),
-      JSON.stringify([activeRecord("alexclaw-do", "claude", "sprite")]),
+      JSON.stringify([
+        activeRecord("alexclaw-do", "claude", "sprite"),
+      ]),
     );
 
     global.fetch = mockFetchOk();
@@ -165,7 +174,9 @@ describe("cmdRun --name duplicate detection", () => {
   it("presents the action picker when a duplicate is found", async () => {
     writeFileSync(
       join(historyDir, "history.json"),
-      JSON.stringify([activeRecord("mydev", "claude", "sprite")]),
+      JSON.stringify([
+        activeRecord("mydev", "claude", "sprite"),
+      ]),
     );
 
     global.fetch = mockFetchOk();
@@ -182,7 +193,9 @@ describe("cmdRun --name duplicate detection", () => {
     // History contains a different name
     writeFileSync(
       join(historyDir, "history.json"),
-      JSON.stringify([activeRecord("other-instance", "claude", "sprite")]),
+      JSON.stringify([
+        activeRecord("other-instance", "claude", "sprite"),
+      ]),
     );
 
     global.fetch = mockFetchOk();
@@ -203,7 +216,9 @@ describe("cmdRun --name duplicate detection", () => {
     // No SPAWN_NAME — promptSpawnName returns undefined from text prompt
     writeFileSync(
       join(historyDir, "history.json"),
-      JSON.stringify([activeRecord("existing", "claude", "sprite")]),
+      JSON.stringify([
+        activeRecord("existing", "claude", "sprite"),
+      ]),
     );
 
     global.fetch = mockFetchOk();
@@ -221,7 +236,9 @@ describe("cmdRun --name duplicate detection", () => {
   it("does not match when agent differs", async () => {
     writeFileSync(
       join(historyDir, "history.json"),
-      JSON.stringify([activeRecord("mydev", "codex", "sprite")]),
+      JSON.stringify([
+        activeRecord("mydev", "codex", "sprite"),
+      ]),
     );
 
     global.fetch = mockFetchOk();
@@ -239,7 +256,9 @@ describe("cmdRun --name duplicate detection", () => {
   it("does not match when cloud differs", async () => {
     writeFileSync(
       join(historyDir, "history.json"),
-      JSON.stringify([activeRecord("mydev", "claude", "hetzner")]),
+      JSON.stringify([
+        activeRecord("mydev", "claude", "hetzner"),
+      ]),
     );
 
     global.fetch = mockFetchOk();
@@ -267,7 +286,12 @@ describe("cmdRun --name duplicate detection", () => {
         deleted_at: new Date().toISOString(),
       },
     };
-    writeFileSync(join(historyDir, "history.json"), JSON.stringify([deletedRecord]));
+    writeFileSync(
+      join(historyDir, "history.json"),
+      JSON.stringify([
+        deletedRecord,
+      ]),
+    );
 
     global.fetch = mockFetchOk();
     await loadManifest(true);
