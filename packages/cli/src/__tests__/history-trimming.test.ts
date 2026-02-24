@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { loadHistory, saveSpawnRecord, filterHistory, type SpawnRecord } from "../history.js";
+import type { SpawnRecord } from "../history.js";
+import { loadHistory, saveSpawnRecord, filterHistory } from "../history.js";
 
 /**
  * Tests for history trimming and boundary behavior.

@@ -1,14 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  getSpawnDir,
-  getHistoryPath,
-  loadHistory,
-  saveSpawnRecord,
-  filterHistory,
-  type SpawnRecord,
-} from "../history.js";
+import type { SpawnRecord } from "../history.js";
+import { getSpawnDir, getHistoryPath, loadHistory, saveSpawnRecord, filterHistory } from "../history.js";
 
 describe("history", () => {
   let testDir: string;

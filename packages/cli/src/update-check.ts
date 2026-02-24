@@ -1,10 +1,6 @@
 import "./unicode-detect.js"; // Ensure TERM is set before using symbols
-import {
-  execSync as nodeExecSync,
-  execFileSync as nodeExecFileSync,
-  type ExecSyncOptions,
-  type ExecFileSyncOptions,
-} from "node:child_process";
+import type { ExecSyncOptions, ExecFileSyncOptions } from "node:child_process";
+import { execSync as nodeExecSync, execFileSync as nodeExecFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";

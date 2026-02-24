@@ -4,7 +4,8 @@
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { logInfo, logWarn, logError, logStep, prompt, jsonEscape, withRetry, Ok, Err, type Result } from "./ui";
+import type { Result } from "./ui";
+import { logInfo, logWarn, logError, logStep, prompt, jsonEscape, withRetry, Ok, Err } from "./ui";
 import { hasMessage } from "@openrouter/spawn-shared";
 import type { AgentConfig } from "./agents";
 

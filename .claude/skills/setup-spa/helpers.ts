@@ -4,7 +4,8 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
-import { isString, toRecord, type Result, Ok, Err } from "@openrouter/spawn-shared";
+import type { Result } from "@openrouter/spawn-shared";
+import { isString, toRecord, Ok, Err } from "@openrouter/spawn-shared";
 import { slackifyMarkdown } from "slackify-markdown";
 
 // #region State
