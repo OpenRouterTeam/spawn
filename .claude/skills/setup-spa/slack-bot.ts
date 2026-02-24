@@ -1,4 +1,4 @@
-import App from "@slack/bolt";
+import { App } from "@slack/bolt";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
@@ -139,7 +139,7 @@ Below is the full Slack thread. The most recent message is the one you should re
  * Fetch full thread history from Slack and format as a prompt.
  */
 async function buildThreadPrompt(
-  client: InstanceType<typeof App.default>["client"],
+  client: InstanceType<typeof App>["client"],
   channel: string,
   threadTs: string,
 ): Promise<string> {
@@ -176,7 +176,7 @@ async function buildThreadPrompt(
  * and post chunked updates to a Slack thread.
  */
 async function runClaudeAndStream(
-  client: InstanceType<typeof App.default>["client"],
+  client: InstanceType<typeof App>["client"],
   channel: string,
   threadTs: string,
   prompt: string,
@@ -363,7 +363,7 @@ function stripMention(text: string): string {
 // #region Core handler
 
 async function handleThread(
-  client: InstanceType<typeof App.default>["client"],
+  client: InstanceType<typeof App>["client"],
   channel: string,
   threadTs: string,
   eventTs: string,
@@ -418,7 +418,7 @@ async function handleThread(
 
 // #region Slack App
 
-const app = new App.default({
+const app = new App({
   token: SLACK_BOT_TOKEN,
   appToken: SLACK_APP_TOKEN,
   socketMode: true,
