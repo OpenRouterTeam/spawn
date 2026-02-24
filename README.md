@@ -13,7 +13,7 @@ curl -fsSL https://openrouter.ai/labs/spawn/install.sh | bash
 
 **Windows PowerShell (outside WSL):**
 ```powershell
-irm https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.ps1 | iex
+irm https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/cli/install.ps1 | iex
 ```
 
 ## Usage

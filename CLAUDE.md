@@ -133,7 +133,7 @@ spawn/
     refactor.yml                 # Scheduled + issue-triggered refactor workflow
   manifest.json                  # The matrix (source of truth)
   discovery.sh                   # Run this to trigger one discovery cycle
-  test/fixtures/                 # API response fixtures for testing
+  fixtures/                      # API response fixtures for testing
   README.md                      # User-facing docs
   CLAUDE.md                      # This file - contributor guide
 ```
@@ -277,7 +277,7 @@ global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 })
 - Run tests with `bun test`
 - Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
 - All tests must be pure unit tests with mocked fetch/prompts — **no subprocess spawning** (`execSync`, `spawnSync`, `Bun.spawn`)
-- Test fixtures (API response snapshots) go in `test/fixtures/{cloud}/`
+- Test fixtures (API response snapshots) go in `fixtures/{cloud}/`
 
 ## CLI Version Management
 

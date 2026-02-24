@@ -1,10 +1,10 @@
 # Spawn CLI installer for Windows PowerShell
 #
 # Usage (PowerShell):
-#   irm https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/cli/install.ps1 | iex
 #
 # Or download and run:
-#   Invoke-WebRequest -Uri https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.ps1 -OutFile install.ps1
+#   Invoke-WebRequest -Uri https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/cli/install.ps1 -OutFile install.ps1
 #   .\install.ps1
 #
 # Override install directory:

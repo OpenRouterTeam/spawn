@@ -22,14 +22,14 @@ cd WORKTREE_BASE_PLACEHOLDER
 List clouds that have fixture directories:
 
 ```bash
-ls -d test/fixtures/*/
+ls -d fixtures/*/
 ```
 
-For each cloud directory, check if `_env.sh` exists — this contains the env vars needed for API auth.
+For each cloud directory, check if a corresponding `sh/test/fixtures/{cloud}/_env.sh` exists — this contains the env vars needed for API auth.
 
 ## Step 2 — Check Credentials
 
-For each cloud with `_env.sh`:
+For each cloud with `_env.sh` (in `sh/test/fixtures/{cloud}/`):
 1. Read `_env.sh` to see which env vars are needed
 2. Check if those env vars are set in the current environment
 3. Skip clouds where credentials are missing (log which ones)
@@ -69,12 +69,12 @@ For any other cloud directories found, read their TypeScript module in `cli/src/
 
 For each successful API response:
 1. Validate it is valid JSON: `echo "$response" | jq . > /dev/null 2>&1`
-2. Pretty-print and save: `echo "$response" | jq . > test/fixtures/{cloud}/{endpoint}.json`
+2. Pretty-print and save: `echo "$response" | jq . > fixtures/{cloud}/{endpoint}.json`
 3. Name convention: `ssh_keys.json`, `server_types.json`, `regions.json`, `account.json`
 
 ## Step 5 — Update Metadata
 
-Create or update `test/fixtures/{cloud}/_metadata.json` for each cloud:
+Create or update `fixtures/{cloud}/_metadata.json` for each cloud:
 
 ```json
 {
@@ -91,14 +91,14 @@ Create or update `test/fixtures/{cloud}/_metadata.json` for each cloud:
 Run a final validation pass:
 ```bash
 # Ensure all fixture files are valid JSON
-for f in test/fixtures/*/*.json; do
+for f in fixtures/*/*.json; do
   jq . "$f" > /dev/null 2>&1 || echo "INVALID: $f"
 done
 ```
 
 ## Step 7 — Commit and PR
 
-1. `git add test/fixtures/`
+1. `git add fixtures/`
 2. Commit with message: `test: Update API fixtures for {clouds}`
 3. Push and open draft PR:
    ```bash

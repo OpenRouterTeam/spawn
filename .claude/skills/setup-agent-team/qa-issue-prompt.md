@@ -39,7 +39,7 @@ Based on the issue type:
 3. Determine if the test is wrong or the source is wrong
 
 ### Fixture issue
-1. Check `test/fixtures/` for the affected cloud
+1. Check `fixtures/` for the affected cloud
 2. Verify fixture files are valid JSON
 3. Check if API endpoints have changed
 
