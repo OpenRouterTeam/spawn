@@ -17,11 +17,36 @@ If the issue has ANY of these labels: `discovery-team`, `cloud-proposal`, `agent
 Fetch the COMPLETE issue thread before starting:
 ```bash
 gh issue view SPAWN_ISSUE_PLACEHOLDER --repo OpenRouterTeam/spawn --comments
-gh pr list --repo OpenRouterTeam/spawn --search "SPAWN_ISSUE_PLACEHOLDER" --json number,title,url
+gh pr list --repo OpenRouterTeam/spawn --search "SPAWN_ISSUE_PLACEHOLDER" --json number,title,url,state,headRefName
 ```
 For each linked PR: `gh pr view PR_NUM --repo OpenRouterTeam/spawn --comments`
 
 Read ALL comments — prior discussion contains decisions, rejected approaches, and scope changes.
+
+## Guard: Existing PR Check
+
+After gathering context, check if there is ALREADY a PR addressing this issue (open or recently merged):
+
+```bash
+gh pr list --repo OpenRouterTeam/spawn --search "SPAWN_ISSUE_PLACEHOLDER" --state all --json number,title,url,state,headRefName
+```
+
+**If an OPEN PR exists:**
+1. Do NOT create a new PR or branch — that would be duplicative work
+2. Instead, check out the existing PR branch and REVIEW it:
+   - `gh pr checkout PR_NUM`
+   - Read the changed files, run `bun test` and `bash -n` on modified `.sh` files
+   - If the PR looks good and tests pass → approve and mark ready: `gh pr review PR_NUM --approve --body "Reviewed: tests pass, fix looks correct.\n\n-- refactor/issue-reviewer"` then `gh pr ready PR_NUM`
+   - If the PR has problems → leave a review comment explaining what needs fixing: `gh pr review PR_NUM --comment --body "Issues found:\n- [describe problems]\n\n-- refactor/issue-reviewer"`
+3. Post a status update on the issue if none exists from this review
+4. Exit — do NOT proceed to the fix workflow below
+
+**If a MERGED PR exists and the issue is still open:**
+1. The fix was already shipped — verify it actually resolved the issue
+2. If resolved: close the issue with a comment: `gh issue close SPAWN_ISSUE_PLACEHOLDER --comment "This was fixed by #PR_NUM.\n\n-- refactor/issue-fixer"`
+3. If NOT resolved (regression or incomplete fix): proceed to the fix workflow below, noting the prior PR in your new PR description
+
+**If no PR exists:** proceed to the fix workflow below.
 
 ## Time Budget
 
