@@ -15,6 +15,7 @@ import {
   toKebabCase,
   defaultSpawnName,
   sanitizeTermValue,
+  jsonEscape,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
@@ -25,6 +26,40 @@ import { parseJsonWith } from "../shared/parse";
 import { saveVmConnection } from "../history.js";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
+
+// ─── Credential Cache ────────────────────────────────────────────────────────
+
+export const AWS_CONFIG_PATH = `${process.env.HOME}/.config/spawn/aws.json`;
+
+const AwsCredsSchema = v.object({
+  accessKeyId: v.string(),
+  secretAccessKey: v.string(),
+  region: v.optional(v.string()),
+});
+
+export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
+  const dir = AWS_CONFIG_PATH.replace(/\/[^/]+$/, "");
+  await Bun.spawn(["mkdir", "-p", dir]).exited;
+  const payload = `{\n  "accessKeyId": ${jsonEscape(accessKeyId)},\n  "secretAccessKey": ${jsonEscape(secretAccessKey)},\n  "region": ${jsonEscape(region)}\n}\n`;
+  await Bun.write(AWS_CONFIG_PATH, payload, { mode: 0o600 });
+}
+
+export function loadCredsFromConfig(): { accessKeyId: string; secretAccessKey: string; region: string } | null {
+  try {
+    const raw = readFileSync(AWS_CONFIG_PATH, "utf-8");
+    const data = parseJsonWith(raw, AwsCredsSchema);
+    if (!data?.accessKeyId || !data?.secretAccessKey) { return null; }
+    if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) { return null; }
+    if (data.secretAccessKey.length < 16) { return null; }
+    return {
+      accessKeyId: data.accessKeyId,
+      secretAccessKey: data.secretAccessKey,
+      region: data.region || "us-east-1",
+    };
+  } catch {
+    return null;
+  }
+}
 
 // ─── Lightsail Bundles ────────────────────────────────────────────────────────
 
@@ -435,6 +470,7 @@ export async function ensureAwsCli(): Promise<void> {
 export async function authenticate(): Promise<void> {
   const region = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || "us-east-1";
   awsRegion = region;
+  const skipCache = process.env.SPAWN_REAUTH === "1";
 
   // 1. Try existing CLI with valid credentials
   if (hasAwsCli()) {
@@ -460,23 +496,62 @@ export async function authenticate(): Promise<void> {
     if (hasAwsCli()) {
       lightsailMode = "cli";
       process.env.AWS_DEFAULT_REGION = region;
+      await saveCredsToConfig(awsAccessKeyId, awsSecretAccessKey, region);
       logInfo(`AWS CLI ready with env credentials, using region: ${region}`);
       return;
     }
 
     lightsailMode = "rest";
+    await saveCredsToConfig(awsAccessKeyId, awsSecretAccessKey, region);
     logInfo("AWS CLI not available \u2014 using Lightsail REST API directly");
     logInfo(`Using region: ${region}`);
     return;
   }
 
-  // 3. Interactive credential entry
+  // 3. Try cached credentials from ~/.config/spawn/aws.json
+  if (!skipCache) {
+    const cached = loadCredsFromConfig();
+    if (cached) {
+      const cachedRegion = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || cached.region;
+      process.env.AWS_ACCESS_KEY_ID = cached.accessKeyId;
+      process.env.AWS_SECRET_ACCESS_KEY = cached.secretAccessKey;
+      process.env.AWS_DEFAULT_REGION = cachedRegion;
+      awsRegion = cachedRegion;
+      awsAccessKeyId = cached.accessKeyId;
+      awsSecretAccessKey = cached.secretAccessKey;
+
+      if (hasAwsCli()) {
+        const result = awsCliSync(["sts", "get-caller-identity"]);
+        if (result.exitCode === 0) {
+          lightsailMode = "cli";
+          logInfo(`AWS CLI ready with cached credentials, using region: ${cachedRegion}`);
+          return;
+        }
+        logWarn("Cached AWS credentials invalid or expired");
+        awsAccessKeyId = "";
+        awsSecretAccessKey = "";
+        delete process.env.AWS_ACCESS_KEY_ID;
+        delete process.env.AWS_SECRET_ACCESS_KEY;
+      } else {
+        lightsailMode = "rest";
+        logInfo("Using cached AWS credentials with Lightsail REST API");
+        logInfo(`Using region: ${cachedRegion}`);
+        return;
+      }
+    }
+  }
+
+  // 4. Interactive credential entry
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     logError("AWS credentials not found. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.");
     throw new Error("No AWS credentials");
   }
 
-  logStep("Enter your AWS credentials:");
+  if (skipCache) {
+    logStep("Re-entering AWS credentials (--reauth):");
+  } else {
+    logStep("Enter your AWS credentials:");
+  }
   const accessKey = await prompt("AWS Access Key ID: ");
   if (!accessKey) {
     throw new Error("No access key provided");
@@ -499,12 +574,14 @@ export async function authenticate(): Promise<void> {
     ]);
     if (result.exitCode === 0) {
       lightsailMode = "cli";
+      await saveCredsToConfig(accessKey, secretKey, region);
       logInfo(`AWS CLI configured, using region: ${region}`);
       return;
     }
   }
 
   lightsailMode = "rest";
+  await saveCredsToConfig(accessKey, secretKey, region);
   logInfo("Using Lightsail REST API directly");
   logInfo(`Using region: ${region}`);
 }

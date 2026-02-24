@@ -222,6 +222,16 @@ describe("Unknown Flag Detection", () => {
         ]),
       ).toBeNull();
     });
+
+    it("should allow --reauth", () => {
+      expect(
+        findUnknownFlag([
+          "claude",
+          "aws",
+          "--reauth",
+        ]),
+      ).toBeNull();
+    });
   });
 
   describe("ignores positional arguments", () => {
@@ -339,6 +349,7 @@ describe("KNOWN_FLAGS completeness", () => {
       "--cloud",
       "--clear",
       "--custom",
+      "--reauth",
     ];
     for (const flag of expected) {
       expect(KNOWN_FLAGS.has(flag)).toBe(true);
