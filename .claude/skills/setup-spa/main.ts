@@ -1,7 +1,7 @@
 // SPA (Spawn's Personal Agent) — Slack bot entry point.
 // Pipes Slack threads into Claude Code sessions and streams responses back.
 
-import { App } from "@slack/bolt";
+import { App, type SectionBlock, type ContextBlock, type KnownBlock } from "@slack/bolt";
 import * as v from "valibot";
 import { toRecord } from "@openrouter/spawn-shared";
 import {
@@ -165,9 +165,61 @@ async function buildThreadPrompt(
   return lines.join("\n\n");
 }
 
+// ─── Block Kit message builder ─────────────────────────────────────────────
+
+interface ToolEntry {
+  name: string;
+  errored?: boolean;
+}
+
+const MAX_SECTION_LEN = 2900; // Slack section block text limit is 3000
+
+/** Build Block Kit blocks: section(text) + context(tools + loading). */
+function buildBlocks(
+  mainText: string,
+  tools: ToolEntry[],
+  loading: boolean,
+): KnownBlock[] {
+  const blocks: KnownBlock[] = [];
+
+  if (mainText) {
+    // Truncate to section limit, showing the tail for long responses
+    const display =
+      mainText.length > MAX_SECTION_LEN ? `...${mainText.slice(-MAX_SECTION_LEN)}` : mainText;
+    const section: SectionBlock = {
+      type: "section",
+      text: { type: "mrkdwn", text: display },
+    };
+    blocks.push(section);
+  }
+
+  if (tools.length > 0) {
+    const parts = tools.map((t) => {
+      if (t.errored) return `${t.name} :x:`;
+      return t.name;
+    });
+    let toolLine = `:hammer_and_wrench: ${parts.join(" · ")}`;
+    if (loading) toolLine += " :openrouter-loading:";
+    const ctx: ContextBlock = {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: toolLine }],
+    };
+    blocks.push(ctx);
+  } else if (loading && !mainText) {
+    // No content yet — just show loading
+    const ctx: ContextBlock = {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: ":openrouter-loading:" }],
+    };
+    blocks.push(ctx);
+  }
+
+  return blocks;
+}
+
 /**
- * Run `claude -p` with stream-json output, collect assistant text,
- * and post chunked updates to a Slack thread.
+ * Run `claude -p` with stream-json output.
+ * Text → main section block. Tools → compact context footer.
  */
 async function runClaudeAndStream(
   client: InstanceType<typeof App>["client"],
@@ -213,72 +265,49 @@ async function runClaudeAndStream(
     startedAt: Date.now(),
   });
 
-  // Post initial "thinking" message
-  const thinkingMsg = await client.chat
-    .postMessage({
-      channel,
-      thread_ts: threadTs,
-      text: ":brain: Thinking...",
-    })
-    .catch(() => null);
-
-  let currentMsgTs = thinkingMsg?.ts;
-  let currentText = "";
+  // ─── Streaming state ─────────────────────────────────────────────────
+  let mainText = "";
+  const tools: ToolEntry[] = [];
+  let currentMsgTs: string | undefined;
   let returnedSessionId: string | null = null;
   let hasOutput = false;
 
-  // Throttle Slack updates — update at most every 2s
   let lastUpdateTime = 0;
   const UPDATE_INTERVAL_MS = 2000;
-  const MAX_MSG_LEN = 3800; // Slack limit ~4000, leave room for formatting
+  let dirty = false; // tracks whether state changed since last Slack update
 
-  /** Update the current Slack message, or post a new one if at limit. */
-  async function flushToSlack(text: string, forceNew = false): Promise<void> {
-    if (!text) {
-      return;
-    }
+  /** Post or update the Slack message with current blocks. */
+  async function updateMessage(loading: boolean): Promise<void> {
+    const blocks = buildBlocks(mainText, tools, loading);
+    if (blocks.length === 0) return;
+
+    const fallback = mainText || `Working... (${tools.length} tool${tools.length === 1 ? "" : "s"})`;
     hasOutput = true;
 
-    // Need a new message if text would exceed limit or forced
-    if (forceNew || !currentMsgTs || text.length > MAX_MSG_LEN) {
-      // If there's leftover text in the current message, finalize it first
-      if (currentMsgTs && currentText) {
-        await client.chat
-          .update({
-            channel,
-            ts: currentMsgTs,
-            text: currentText.slice(0, MAX_MSG_LEN),
-          })
-          .catch(() => {});
-      }
-
-      // Post a new message
-      const newMsg = await client.chat
+    if (!currentMsgTs) {
+      const msg = await client.chat
         .postMessage({
           channel,
           thread_ts: threadTs,
-          text: text.slice(0, MAX_MSG_LEN),
+          text: fallback,
+          blocks,
         })
         .catch(() => null);
-
-      currentMsgTs = newMsg?.ts;
-      currentText = text.slice(0, MAX_MSG_LEN);
-      return;
+      currentMsgTs = msg?.ts;
+    } else {
+      await client.chat
+        .update({
+          channel,
+          ts: currentMsgTs,
+          text: fallback,
+          blocks,
+        })
+        .catch(() => {});
     }
-
-    await client.chat
-      .update({
-        channel,
-        ts: currentMsgTs,
-        text: text.slice(0, MAX_MSG_LEN),
-      })
-      .catch(() => {});
-    currentText = text.slice(0, MAX_MSG_LEN);
+    dirty = false;
   }
 
-  // Accumulates text for the current "section" (consecutive text blocks)
-  let pendingText = "";
-
+  // ─── Stream processing ────────────────────────────────────────────────
   const decoder = new TextDecoder();
   const reader = proc.stdout.getReader();
   let buffer = "";
@@ -286,21 +315,15 @@ async function runClaudeAndStream(
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
+      if (done) break;
 
-      buffer += decoder.decode(value, {
-        stream: true,
-      });
+      buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed) {
-          continue;
-        }
+        if (!trimmed) continue;
 
         let parsed: unknown;
         try {
@@ -310,9 +333,7 @@ async function runClaudeAndStream(
         }
 
         const obj = toRecord(parsed);
-        if (!obj) {
-          continue;
-        }
+        if (!obj) continue;
 
         // Capture session ID from result event
         const resultEvent = v.safeParse(ResultSchema, obj);
@@ -322,26 +343,24 @@ async function runClaudeAndStream(
 
         // Parse event into typed segment
         const segment = parseStreamEvent(obj);
-        if (!segment) {
-          continue;
-        }
+        if (!segment) continue;
 
         if (segment.kind === "text") {
-          pendingText += segment.text;
-        } else {
-          // tool_use and tool_result get their own messages
-          if (pendingText) {
-            await flushToSlack(pendingText);
-            pendingText = "";
-          }
-          await flushToSlack(segment.text, true);
+          mainText += segment.text;
+          dirty = true;
+        } else if (segment.kind === "tool_use" && segment.toolName) {
+          tools.push({ name: segment.toolName });
+          dirty = true;
+        } else if (segment.kind === "tool_result" && segment.isError && tools.length > 0) {
+          tools[tools.length - 1].errored = true;
+          dirty = true;
         }
       }
 
-      // Throttled update for accumulated text
+      // Throttled Slack update
       const now = Date.now();
-      if (pendingText && now - lastUpdateTime >= UPDATE_INTERVAL_MS) {
-        await flushToSlack(pendingText);
+      if (dirty && now - lastUpdateTime >= UPDATE_INTERVAL_MS) {
+        await updateMessage(true);
         lastUpdateTime = now;
       }
     }
@@ -349,37 +368,52 @@ async function runClaudeAndStream(
     activeRuns.delete(threadTs);
   }
 
-  // Flush any remaining text
-  if (pendingText) {
-    await flushToSlack(pendingText);
-  }
+  // ─── Final update ─────────────────────────────────────────────────────
 
   // Read stderr for errors
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
 
-  if (exitCode !== 0 && !hasOutput) {
+  if (exitCode !== 0 && !hasOutput && !mainText) {
     console.error(`[spa] claude exited ${exitCode}: ${stderr}`);
-    if (currentMsgTs) {
+    const errSection: SectionBlock = {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `:x: Claude Code errored (exit ${exitCode}):\n\`\`\`\n${stderr.slice(0, 1500)}\n\`\`\``,
+      },
+    };
+    const errBlocks: KnownBlock[] = [errSection];
+    if (!currentMsgTs) {
       await client.chat
-        .update({
-          channel,
-          ts: currentMsgTs,
-          text: `:x: Claude Code errored (exit ${exitCode}):\n\`\`\`\n${stderr.slice(0, 1500)}\n\`\`\``,
-        })
+        .postMessage({ channel, thread_ts: threadTs, text: "Error", blocks: errBlocks })
+        .catch(() => {});
+    } else {
+      await client.chat
+        .update({ channel, ts: currentMsgTs, text: "Error", blocks: errBlocks })
         .catch(() => {});
     }
     return null;
   }
 
-  if (!hasOutput && currentMsgTs) {
-    await client.chat
-      .update({
-        channel,
-        ts: currentMsgTs,
-        text: ":white_check_mark: Done (no text output)",
-      })
-      .catch(() => {});
+  // Final update — remove loading indicator
+  await updateMessage(false);
+
+  if (!hasOutput && !mainText) {
+    const doneCtx: ContextBlock = {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: ":white_check_mark: Done (no text output)" }],
+    };
+    const doneBlocks: KnownBlock[] = [doneCtx];
+    if (!currentMsgTs) {
+      await client.chat
+        .postMessage({ channel, thread_ts: threadTs, text: "Done", blocks: doneBlocks })
+        .catch(() => {});
+    } else {
+      await client.chat
+        .update({ channel, ts: currentMsgTs, text: "Done", blocks: doneBlocks })
+        .catch(() => {});
+    }
   }
 
   console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId})`);
@@ -422,7 +456,7 @@ async function handleThread(
     .add({
       channel,
       timestamp: eventTs,
-      name: "robot_face",
+      name: "eyes",
     })
     .catch(() => {});
 
