@@ -23,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'FILE=\"$CLAUDE_FILE\"; if [[ \"$FILE\" == *.sh ]]; then bash -n \"$FILE\" 2>&1 || { echo \"SYNTAX ERROR in $FILE\"; exit 2; }; if grep -qn \"source \\.\\./\\|source \\./\" \"$FILE\" 2>/dev/null; then echo \"RELATIVE SOURCE detected in $FILE — breaks curl|bash execution\"; exit 2; fi; if grep -qn \"echo -e \" \"$FILE\" 2>/dev/null; then echo \"echo -e detected in $FILE — use printf instead (macOS bash 3.x compat)\"; exit 2; fi; if grep -qn \"set -.*u\" \"$FILE\" 2>/dev/null && ! grep -qn \"set -eo pipefail\" \"$FILE\" 2>/dev/null; then echo \"set -u (nounset) detected in $FILE — use set -eo pipefail instead\"; exit 2; fi; fi'"
+            "command": "bash -c 'FILE=\"$CLAUDE_FILE\"; if [[ \"$FILE\" == *.sh ]]; then bash -n \"$FILE\" 2>&1 || { echo \"SYNTAX ERROR in $FILE\"; exit 2; }; if grep -qn \"source \\.\\./\\|source \\./\" \"$FILE\" 2>/dev/null; then echo \"RELATIVE SOURCE detected in $FILE — breaks curl|bash execution\"; exit 2; fi; if grep -qn \"echo -e \" \"$FILE\" 2>/dev/null; then echo \"echo -e detected in $FILE — use printf instead (macOS bash 3.x compat)\"; exit 2; fi; if grep -qn \"set -.*u\" \"$FILE\" 2>/dev/null && ! grep -qn \"set -eo pipefail\" \"$FILE\" 2>/dev/null; then echo \"set -u (nounset) detected in $FILE — use set -eo pipefail instead\"; exit 2; fi; fi; if [[ \"$FILE\" == *.ts ]]; then if grep -Pn \"^\\s*//\\s*[-=*#]{10,}\\s*$\" \"$FILE\" 2>/dev/null; then echo \"BANNER COMMENT in $FILE — use // #region Name / // #endregion instead\"; exit 2; fi; fi'"
           }
         ]
       }
