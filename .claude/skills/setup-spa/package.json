@@ -8,6 +8,7 @@
   "dependencies": {
     "@openrouter/spawn-shared": "workspace:*",
     "@slack/bolt": "4.6.0",
+    "slackify-markdown": "^5.0.0",
     "valibot": "1.2.0"
   }
 }

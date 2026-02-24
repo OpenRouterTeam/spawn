@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync
 import { dirname } from "node:path";
 import * as v from "valibot";
 import { toRecord, type Result, Ok, Err } from "@openrouter/spawn-shared";
+import { slackifyMarkdown } from "slackify-markdown";
 
 // #region State
 
@@ -103,7 +104,7 @@ export function parseStreamEvent(event: Record<string, unknown>): SlackSegment |
       }
 
       if (block.type === "text" && typeof block.text === "string") {
-        textParts.push(block.text);
+        textParts.push(markdownToSlack(block.text));
       }
 
       if (block.type === "tool_use" && typeof block.name === "string") {
@@ -181,6 +182,11 @@ export function parseStreamEvent(event: Record<string, unknown>): SlackSegment |
 
 export function stripMention(text: string): string {
   return text.replace(/<@[A-Z0-9]+>/g, "").trim();
+}
+
+/** Convert standard Markdown to Slack mrkdwn using slackify-markdown. */
+export function markdownToSlack(text: string): string {
+  return slackifyMarkdown(text);
 }
 
 // #endregion

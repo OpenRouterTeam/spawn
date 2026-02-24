@@ -1,5 +1,5 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
-import { parseStreamEvent, stripMention, loadState, saveState, downloadSlackFile } from "./helpers";
+import { parseStreamEvent, stripMention, markdownToSlack, loadState, saveState, downloadSlackFile } from "./helpers";
 import { toRecord } from "@openrouter/spawn-shared";
 import streamEvents from "../../../fixtures/claude-code/stream-events.json";
 
@@ -14,10 +14,8 @@ describe("parseStreamEvent", () => {
   it("parses assistant text from fixture", () => {
     // fixture[0]: assistant with text "I'll look at the issue..."
     const result = parseStreamEvent(fixture(0));
-    expect(result).toEqual({
-      kind: "text",
-      text: "I'll look at the issue and check the repository structure.",
-    });
+    expect(result?.kind).toBe("text");
+    expect(result?.text).toContain("I'll look at the issue and check the repository structure.");
   });
 
   it("parses assistant tool_use (Bash) from fixture", () => {
@@ -61,11 +59,15 @@ describe("parseStreamEvent", () => {
     expect(result?.text).toContain("Permission denied");
   });
 
-  it("parses final assistant text from fixture", () => {
-    // fixture[7]: assistant with summary text
+  it("parses final assistant text from fixture with markdown→slack conversion", () => {
+    // fixture[7]: assistant with summary text containing **bold**
     const result = parseStreamEvent(fixture(7));
     expect(result?.kind).toBe("text");
-    expect(result?.text).toContain("#1234");
+    // **#1234** → *#1234* (Slack bold)
+    expect(result?.text).toContain("*#1234*");
+    expect(result?.text).not.toContain("**#1234**");
+    // inline code preserved
+    expect(result?.text).toContain("`--json`");
     expect(result?.text).toContain("Would you like me to create a new issue");
   });
 
@@ -178,6 +180,60 @@ describe("stripMention", () => {
 
   it("trims whitespace", () => {
     expect(stripMention("  <@U12345>  ")).toBe("");
+  });
+});
+
+describe("markdownToSlack", () => {
+  it("converts bold to Slack format", () => {
+    const result = markdownToSlack("This is **bold** text");
+    expect(result).toContain("*bold*");
+    expect(result).not.toContain("**bold**");
+  });
+
+  it("converts markdown links to Slack format", () => {
+    const result = markdownToSlack("[click here](https://example.com)");
+    expect(result).toContain("<https://example.com|click here>");
+    expect(result).not.toContain("](");
+  });
+
+  it("converts headers to bold", () => {
+    expect(markdownToSlack("## Summary")).toContain("*Summary*");
+  });
+
+  it("converts strikethrough", () => {
+    const result = markdownToSlack("~~removed~~");
+    expect(result).toContain("~removed~");
+    expect(result).not.toContain("~~");
+  });
+
+  it("preserves inline code", () => {
+    const result = markdownToSlack("Use `**not bold**` here");
+    expect(result).toContain("`**not bold**`");
+  });
+
+  it("preserves fenced code blocks", () => {
+    const input = "Before\n```\n**not bold**\n```\nAfter **bold**";
+    const result = markdownToSlack(input);
+    expect(result).toContain("**not bold**");
+    expect(result).toContain("*bold*");
+  });
+
+  it("handles the real SPA output pattern", () => {
+    const input =
+      "1. **[#1859 — Agent processes die](https://github.com/OpenRouterTeam/spawn/issues/1859)** — covers the root cause\n\n" +
+      "The SIGTERM is the **smoking gun**.";
+    const result = markdownToSlack(input);
+    expect(result).toContain("<https://github.com/OpenRouterTeam/spawn/issues/1859|#1859");
+    expect(result).toContain("*smoking gun*");
+    expect(result).not.toContain("](");
+  });
+
+  it("returns plain text unchanged", () => {
+    expect(markdownToSlack("no markdown here")).toContain("no markdown here");
+  });
+
+  it("handles empty string", () => {
+    expect(markdownToSlack("")).toBe("");
   });
 });
 
