@@ -36,6 +36,194 @@ fly_ssh() {
 }
 
 # ---------------------------------------------------------------------------
+# fly_ssh_long APP_NAME COMMAND TIMEOUT
+#
+# Same as fly_ssh() but with a configurable timeout for long-running commands
+# like input tests that send prompts to agents.
+# ---------------------------------------------------------------------------
+fly_ssh_long() {
+  local app="$1"
+  local cmd="$2"
+  local timeout="${3:-120}"
+
+  # Resolve machine ID (cached per app)
+  if [ "${_FLY_MACHINE_APP}" != "${app}" ] || [ -z "${_FLY_MACHINE_ID}" ]; then
+    _FLY_MACHINE_ID=$(flyctl machines list -a "${app}" --json 2>/dev/null | jq -r '.[0].id')
+    _FLY_MACHINE_APP="${app}"
+    if [ -z "${_FLY_MACHINE_ID}" ] || [ "${_FLY_MACHINE_ID}" = "null" ]; then
+      log_err "Could not resolve machine ID for app ${app}"
+      return 1
+    fi
+  fi
+
+  # Escape single quotes in command: each ' becomes '\''
+  local escaped_cmd
+  escaped_cmd=$(printf '%s' "${cmd}" | sed "s/'/'\\\\''/g")
+
+  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout "${timeout}" "bash -c '${escaped_cmd}'"
+}
+
+# ---------------------------------------------------------------------------
+# Input test constants
+# ---------------------------------------------------------------------------
+INPUT_TEST_PROMPT="Reply with exactly the text SPAWN_E2E_OK and nothing else."
+INPUT_TEST_MARKER="SPAWN_E2E_OK"
+
+# ---------------------------------------------------------------------------
+# Per-agent input test functions
+#
+# Each function:
+#   1. Sources env (.spawnrc, PATH)
+#   2. Creates a /tmp/e2e-test git repo (agents like claude require one)
+#   3. Runs the agent non-interactively with INPUT_TEST_PROMPT
+#   4. Greps output for INPUT_TEST_MARKER
+# ---------------------------------------------------------------------------
+
+input_test_claude() {
+  local app="$1"
+
+  log_step "Running input test for claude..."
+  local remote_cmd
+  remote_cmd="source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    claude -p '${INPUT_TEST_PROMPT}' 2>/dev/null"
+
+  local output
+  output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+
+  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+    log_ok "claude input test — marker found in response"
+    return 0
+  else
+    log_err "claude input test — marker '${INPUT_TEST_MARKER}' not found in response"
+    log_err "Response (last 5 lines):"
+    printf '%s\n' "${output}" | tail -5 >&2
+    return 1
+  fi
+}
+
+input_test_codex() {
+  local app="$1"
+
+  log_step "Running input test for codex..."
+  local remote_cmd
+  remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; \
+    export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    codex -q '${INPUT_TEST_PROMPT}' 2>/dev/null"
+
+  local output
+  output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+
+  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+    log_ok "codex input test — marker found in response"
+    return 0
+  else
+    log_err "codex input test — marker '${INPUT_TEST_MARKER}' not found in response"
+    log_err "Response (last 5 lines):"
+    printf '%s\n' "${output}" | tail -5 >&2
+    return 1
+  fi
+}
+
+input_test_openclaw() {
+  local app="$1"
+
+  log_step "Running input test for openclaw..."
+
+  # Pre-check: verify the gateway is running on :18789
+  log_step "Checking openclaw gateway on :18789..."
+  if ! fly_ssh "${app}" "curl -sf http://localhost:18789/health >/dev/null 2>&1 || ss -tlnp | grep -q 18789" >/dev/null 2>&1; then
+    log_warn "openclaw gateway not detected on :18789 — attempting test anyway"
+  fi
+
+  local remote_cmd
+  remote_cmd="source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    openclaw -p '${INPUT_TEST_PROMPT}' 2>/dev/null"
+
+  local output
+  output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+
+  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+    log_ok "openclaw input test — marker found in response"
+    return 0
+  else
+    log_err "openclaw input test — marker '${INPUT_TEST_MARKER}' not found in response"
+    log_err "Response (last 5 lines):"
+    printf '%s\n' "${output}" | tail -5 >&2
+    return 1
+  fi
+}
+
+input_test_zeroclaw() {
+  local app="$1"
+
+  log_step "Running input test for zeroclaw..."
+  local remote_cmd
+  remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
+    rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
+    zeroclaw agent -p '${INPUT_TEST_PROMPT}' 2>/dev/null"
+
+  local output
+  output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+
+  if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
+    log_ok "zeroclaw input test — marker found in response"
+    return 0
+  else
+    log_err "zeroclaw input test — marker '${INPUT_TEST_MARKER}' not found in response"
+    log_err "Response (last 5 lines):"
+    printf '%s\n' "${output}" | tail -5 >&2
+    return 1
+  fi
+}
+
+input_test_opencode() {
+  log_warn "opencode is TUI-only — skipping input test"
+  return 0
+}
+
+input_test_kilocode() {
+  log_warn "kilocode is TUI-only — skipping input test"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# run_input_test AGENT APP_NAME
+#
+# Dispatch: sends a real prompt to the agent and verifies a response.
+# Respects SKIP_INPUT_TEST=1 env var to bypass all input tests.
+# Returns 0 on success, 1 on failure.
+# ---------------------------------------------------------------------------
+run_input_test() {
+  local agent="$1"
+  local app="$2"
+
+  if [ "${SKIP_INPUT_TEST:-0}" = "1" ]; then
+    log_warn "Input test skipped (SKIP_INPUT_TEST=1)"
+    return 0
+  fi
+
+  log_header "Input test: ${agent} (${app})"
+
+  case "${agent}" in
+    claude)    input_test_claude "${app}"    ;;
+    codex)     input_test_codex "${app}"     ;;
+    openclaw)  input_test_openclaw "${app}"  ;;
+    zeroclaw)  input_test_zeroclaw "${app}"  ;;
+    opencode)  input_test_opencode          ;;
+    kilocode)  input_test_kilocode          ;;
+    *)
+      log_err "Unknown agent for input test: ${agent}"
+      return 1
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
 # verify_common APP_NAME AGENT
 #
 # Checks that apply to ALL agents:
