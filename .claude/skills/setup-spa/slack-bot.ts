@@ -116,47 +116,90 @@ function toObj(val: unknown): Record<string, unknown> | null {
   return obj;
 }
 
-/** Format a parsed stream event into a Slack-friendly text segment, or null to skip. */
+/**
+ * Format a Claude Code stream-json event into Slack-friendly text, or null to skip.
+ *
+ * Claude Code emits complete messages (not Anthropic streaming deltas):
+ *   {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
+ *   {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{...}}]}}
+ *   {"type":"user","message":{"content":[{"type":"tool_result","content":"..."}]}}
+ *   {"type":"result","result":"...","session_id":"..."}
+ */
 function formatStreamEvent(event: Record<string, unknown>): string | null {
   const type = event.type;
 
-  // stream_event wraps Anthropic API events
-  if (type === "stream_event") {
-    const inner = toObj(event.event);
-    if (!inner) {
+  // Assistant messages — contain text, tool_use, or thinking blocks
+  if (type === "assistant") {
+    const msg = toObj(event.message);
+    if (!msg) {
       return null;
     }
-    const innerType = inner.type;
+    const content = Array.isArray(msg.content) ? msg.content : [];
+    const parts: string[] = [];
 
-    // Tool use start — show tool name
-    if (innerType === "content_block_start") {
-      const block = toObj(inner.content_block);
-      if (block?.type === "tool_use" && typeof block.name === "string") {
-        return `\n:hammer_and_wrench: *${block.name}*\n`;
+    for (const rawBlock of content) {
+      const block = toObj(rawBlock);
+      if (!block) {
+        continue;
+      }
+
+      if (block.type === "text" && typeof block.text === "string") {
+        parts.push(block.text);
+      }
+
+      if (block.type === "tool_use" && typeof block.name === "string") {
+        const input = toObj(block.input);
+        // Show a short summary of the tool input
+        let summary = "";
+        if (input) {
+          const cmd = typeof input.command === "string" ? input.command : null;
+          const pattern = typeof input.pattern === "string" ? input.pattern : null;
+          const filePath = typeof input.file_path === "string" ? input.file_path : null;
+          const hint = cmd ?? pattern ?? filePath;
+          if (hint) {
+            const short = hint.length > 80 ? `${hint.slice(0, 80)}...` : hint;
+            summary = ` \`${short}\``;
+          }
+        }
+        parts.push(`\n:hammer_and_wrench: *${block.name}*${summary}\n`);
       }
     }
 
-    // Text delta — accumulate text
-    if (innerType === "content_block_delta") {
-      const delta = toObj(inner.delta);
-      if (delta?.type === "text_delta" && typeof delta.text === "string") {
-        return delta.text;
-      }
+    if (parts.length === 0) {
+      return null;
     }
-
-    return null;
+    return parts.join("");
   }
 
-  // Tool result — show output (truncated)
-  if (type === "tool_result") {
-    const result = typeof event.result === "string" ? event.result : "";
-    const isError = event.is_error === true;
-    const prefix = isError ? ":x: Error" : ":white_check_mark: Result";
-    const truncated = result.length > 500 ? `${result.slice(0, 500)}...` : result;
-    if (!truncated) {
-      return `${prefix}: (empty)\n`;
+  // User messages — contain tool_result blocks
+  if (type === "user") {
+    const msg = toObj(event.message);
+    if (!msg) {
+      return null;
     }
-    return `${prefix}:\n\`\`\`\n${truncated}\n\`\`\`\n`;
+    const content = Array.isArray(msg.content) ? msg.content : [];
+    const parts: string[] = [];
+
+    for (const rawBlock of content) {
+      const block = toObj(rawBlock);
+      if (!block || block.type !== "tool_result") {
+        continue;
+      }
+      const isError = block.is_error === true;
+      const prefix = isError ? ":x: Error" : ":white_check_mark: Result";
+      const resultText = typeof block.content === "string" ? block.content : "";
+      const truncated = resultText.length > 500 ? `${resultText.slice(0, 500)}...` : resultText;
+      if (!truncated) {
+        parts.push(`${prefix}: (empty)\n`);
+      } else {
+        parts.push(`${prefix}:\n\`\`\`\n${truncated}\n\`\`\`\n`);
+      }
+    }
+
+    if (parts.length === 0) {
+      return null;
+    }
+    return parts.join("");
   }
 
   return null;
