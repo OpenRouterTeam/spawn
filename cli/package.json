@@ -1,6 +1,6 @@
 {
   "name": "@openrouter/spawn",
-  "version": "0.8.4",
+  "version": "0.9.0",
   "type": "module",
   "bin": {
     "spawn": "cli.js"
@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --outfile cli.js --target bun --minify --packages bundle",
+    "build:spa": "bun run build-spa.ts",
     "compile": "bun build src/index.ts --compile --outfile spawn",
     "lint": "biome lint src/",
     "test": "bun test",
@@ -15,6 +16,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.0",
+    "@slack/bolt": "^4.3.0",
     "picocolors": "^1.1.1",
     "valibot": "^1.2.0"
   },

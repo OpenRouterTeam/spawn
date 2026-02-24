@@ -20,7 +20,7 @@ import {
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import { parseJsonWith } from "../shared/parse";
-import { isString, isNumber } from "../shared/type-guards";
+import { isString, isNumber, toObjectArray } from "../shared/type-guards";
 import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import { saveVmConnection } from "../history.js";
@@ -126,15 +126,6 @@ const LooseObject = v.record(v.string(), v.unknown());
 
 function parseJson(text: string): Record<string, unknown> | null {
   return parseJsonWith(text, LooseObject);
-}
-
-function toObjectArray(val: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(val)) {
-    return [];
-  }
-  return val.filter(
-    (item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item),
-  );
 }
 
 // ─── Token Persistence ───────────────────────────────────────────────────────

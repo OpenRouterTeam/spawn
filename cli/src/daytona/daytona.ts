@@ -20,7 +20,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { parseJsonWith, parseJsonRaw } from "../shared/parse";
 import * as v from "valibot";
 import { saveVmConnection } from "../history.js";
-import { isString } from "../shared/type-guards";
+import { isString, toRecord, toObjectArray } from "../shared/type-guards";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -54,22 +54,6 @@ const LooseObject = v.record(v.string(), v.unknown());
 /** Parse a JSON string into a Record<string, unknown> via valibot, or null. */
 function parseJson(text: string): Record<string, unknown> | null {
   return parseJsonWith(text, LooseObject);
-}
-
-/** Narrow an already-parsed unknown value to a Record<string, unknown>, or null. */
-function toRecord(val: unknown): Record<string, unknown> | null {
-  const result = v.safeParse(LooseObject, val);
-  return result.success ? result.output : null;
-}
-
-/** Filter an array to only Record<string, unknown> entries. */
-function toObjectArray(val: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(val)) {
-    return [];
-  }
-  return val.filter(
-    (item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item),
-  );
 }
 
 async function daytonaApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {

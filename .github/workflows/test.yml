@@ -21,7 +21,6 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        working-directory: cli
         run: bun install
 
       - name: Run bun tests
@@ -29,4 +28,7 @@ jobs:
 
       - name: Verify cloud bundles build
         run: bun run cli/build-clouds.ts
+
+      - name: Verify SPA bundle builds
+        run: bun run cli/build-spa.ts
 

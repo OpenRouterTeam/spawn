@@ -20,7 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import * as v from "valibot";
 import { parseJsonWith, parseJsonRaw } from "../shared/parse";
-import { isString, isNumber } from "../shared/type-guards";
+import { isString, isNumber, toObjectArray } from "../shared/type-guards";
 import { saveVmConnection } from "../history.js";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
@@ -167,15 +167,6 @@ const LooseObject = v.record(v.string(), v.unknown());
 
 function parseJson(text: string): Record<string, unknown> | null {
   return parseJsonWith(text, LooseObject);
-}
-
-function toObjectArray(val: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(val)) {
-    return [];
-  }
-  return val.filter(
-    (item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item),
-  );
 }
 
 function hasError(text: string): boolean {

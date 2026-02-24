@@ -22,7 +22,7 @@ import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, sleep, waitForSsh as sharedWaitFor
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
 import { parseJsonWith } from "../shared/parse";
-import { isString, isNumber } from "../shared/type-guards";
+import { isString, isNumber, toObjectArray } from "../shared/type-guards";
 import { saveVmConnection } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
@@ -96,20 +96,6 @@ function rec(val: unknown): Record<string, unknown> | undefined {
     return Object.fromEntries(Object.entries(val));
   }
   return undefined;
-}
-
-/** Extract an array of record objects from an unknown value */
-function toObjectArray(val: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(val)) {
-    return [];
-  }
-  const result: Record<string, unknown>[] = [];
-  for (const item of val) {
-    if (item && typeof item === "object" && !Array.isArray(item)) {
-      result.push(Object.fromEntries(Object.entries(item)));
-    }
-  }
-  return result;
 }
 
 // ─── Token Persistence ───────────────────────────────────────────────────────

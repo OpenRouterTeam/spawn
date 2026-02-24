@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "workspaces": ["cli", ".claude/skills/setup-spa"]
+}
