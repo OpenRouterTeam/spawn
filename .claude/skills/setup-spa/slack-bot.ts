@@ -1,5 +1,5 @@
 import { App } from "@slack/bolt";
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
 
@@ -179,6 +179,102 @@ When creating issues, include a footer: "_Filed from Slack by SPA_"
 
 Below is the full Slack thread. The most recent message is the one you should respond to. Prior messages are context.`;
 
+const DOWNLOADS_DIR = "/tmp/spa-downloads";
+
+/** Download a Slack-hosted file into a thread-scoped temp dir. Returns the local path or null. */
+async function downloadSlackFile(url: string, filename: string, threadTs: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+    });
+    if (!resp.ok) {
+      console.error(`[spa] Failed to download ${filename}: ${resp.status}`);
+      return null;
+    }
+    const dir = `${DOWNLOADS_DIR}/${threadTs}`;
+    mkdirSync(dir, {
+      recursive: true,
+    });
+    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const localPath = `${dir}/${safeName}`;
+    const buf = await resp.arrayBuffer();
+    writeFileSync(localPath, Buffer.from(buf));
+    return localPath;
+  } catch (err) {
+    console.error(`[spa] Error downloading ${filename}:`, err);
+    return null;
+  }
+}
+
+/** Remove download directories older than 30 days. */
+function cleanupStaleDownloads(): void {
+  if (!existsSync(DOWNLOADS_DIR)) {
+    return;
+  }
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - thirtyDaysMs;
+  let removed = 0;
+  try {
+    for (const entry of readdirSync(DOWNLOADS_DIR)) {
+      const entryPath = `${DOWNLOADS_DIR}/${entry}`;
+      try {
+        const stat = statSync(entryPath);
+        if (stat.isDirectory() && stat.mtimeMs < cutoff) {
+          rmSync(entryPath, {
+            recursive: true,
+            force: true,
+          });
+          removed++;
+        }
+      } catch {
+        // skip entries we can't stat
+      }
+    }
+  } catch {
+    // ignore if dir disappeared
+  }
+  if (removed > 0) {
+    console.log(`[spa] Cleaned up ${removed} stale download dir(s)`);
+  }
+}
+
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const CLEANUP_TIMESTAMP_PATH = `${DOWNLOADS_DIR}/.last-cleanup`;
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Run cleanup only if at least 1 hour since last run. Persists timestamp to disk. */
+function runCleanupIfDue(): void {
+  try {
+    if (existsSync(CLEANUP_TIMESTAMP_PATH)) {
+      const lastRun = Number.parseInt(readFileSync(CLEANUP_TIMESTAMP_PATH, "utf-8").trim(), 10);
+      if (Date.now() - lastRun < CLEANUP_INTERVAL_MS) {
+        return;
+      }
+    }
+  } catch {
+    // file missing or unreadable — run cleanup
+  }
+
+  cleanupStaleDownloads();
+
+  try {
+    mkdirSync(DOWNLOADS_DIR, {
+      recursive: true,
+    });
+    writeFileSync(CLEANUP_TIMESTAMP_PATH, String(Date.now()));
+  } catch {
+    // non-fatal
+  }
+}
+
+/** Start the hourly cleanup schedule. */
+function startCleanupSchedule(): void {
+  runCleanupIfDue();
+  cleanupTimer = setInterval(runCleanupIfDue, CLEANUP_INTERVAL_MS);
+}
+
 /**
  * Fetch full thread history from Slack and format as a prompt.
  */
@@ -205,11 +301,54 @@ async function buildThreadPrompt(
     if (msg.bot_id) {
       continue;
     }
+
+    const parts: string[] = [];
+
+    // Message text
     const text = stripMention(msg.text ?? "");
-    if (!text) {
-      continue;
+    if (text) {
+      parts.push(text);
     }
-    lines.push(text);
+
+    // Files (images, docs, etc.) — download to local tmp
+    if (msg.files && Array.isArray(msg.files)) {
+      for (const file of msg.files) {
+        const f = toObj(file);
+        if (!f) {
+          continue;
+        }
+        const name = typeof f.name === "string" ? f.name : "file";
+        const url = typeof f.url_private_download === "string" ? f.url_private_download : "";
+        if (!url) {
+          continue;
+        }
+        const localPath = await downloadSlackFile(url, name, threadTs);
+        if (localPath) {
+          parts.push(`[File: ${name}] → ${localPath}`);
+        }
+      }
+    }
+
+    // Attachments (link unfurls, bot cards)
+    if (msg.attachments && Array.isArray(msg.attachments)) {
+      for (const att of msg.attachments) {
+        const a = toObj(att);
+        if (!a) {
+          continue;
+        }
+        const title = typeof a.title === "string" ? a.title : "";
+        const attText = typeof a.text === "string" ? a.text : "";
+        const fallback = typeof a.fallback === "string" ? a.fallback : "";
+        const content = title || attText || fallback;
+        if (content) {
+          parts.push(`[Attachment: ${content}]`);
+        }
+      }
+    }
+
+    if (parts.length > 0) {
+      lines.push(parts.join("\n"));
+    }
   }
 
   return lines.join("\n\n");
@@ -475,49 +614,16 @@ app.event("app_mention", async ({ event, client }) => {
   await handleThread(client, event.channel, threadTs, event.ts);
 });
 
-// --- message: new thread replies in tracked threads trigger Claude ---
-app.event("message", async ({ event, client }) => {
-  if (!("channel" in event) || event.channel !== SLACK_CHANNEL_ID) {
-    return;
-  }
-
-  // Only thread replies
-  const threadTs = "thread_ts" in event && typeof event.thread_ts === "string" ? event.thread_ts : undefined;
-  if (!threadTs) {
-    return;
-  }
-
-  // Skip our own messages
-  if ("user" in event && event.user === BOT_USER_ID) {
-    return;
-  }
-  if ("bot_id" in event && event.bot_id) {
-    return;
-  }
-  if ("subtype" in event && event.subtype === "bot_message") {
-    return;
-  }
-
-  // Only respond in threads we're already tracking
-  const mapping = findMapping(state, event.channel, threadTs);
-  if (!mapping) {
-    return;
-  }
-
-  const ts = "ts" in event && typeof event.ts === "string" ? event.ts : "";
-  if (!ts) {
-    return;
-  }
-
-  await handleThread(client, event.channel, threadTs, ts);
-});
-
 // #endregion
 
 // #region Graceful shutdown
 
 function shutdown(signal: string): void {
   console.log(`[spa] Received ${signal}, shutting down...`);
+
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+  }
 
   for (const [threadTs, run] of activeRuns) {
     console.log(`[spa] Killing active run for thread ${threadTs}`);
@@ -536,6 +642,8 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 // #region Start
 
 (async () => {
+  startCleanupSchedule();
+
   // Resolve our own bot user ID
   const authResult = await app.client.auth.test({
     token: SLACK_BOT_TOKEN,
