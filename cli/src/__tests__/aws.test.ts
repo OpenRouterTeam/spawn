@@ -12,7 +12,6 @@ describe("aws/credential-cache", () => {
   let originalConfig: string | null = null;
 
   beforeEach(() => {
-    // Back up any existing config
     if (existsSync(AWS_CONFIG_PATH)) {
       originalConfig = readFileSync(AWS_CONFIG_PATH, "utf-8");
     } else {
@@ -21,7 +20,6 @@ describe("aws/credential-cache", () => {
   });
 
   afterEach(() => {
-    // Restore original config
     if (originalConfig !== null) {
       Bun.write(AWS_CONFIG_PATH, originalConfig);
     } else if (existsSync(AWS_CONFIG_PATH)) {

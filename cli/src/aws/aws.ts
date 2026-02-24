@@ -49,7 +49,6 @@ export function loadCredsFromConfig(): { accessKeyId: string; secretAccessKey: s
     const raw = readFileSync(AWS_CONFIG_PATH, "utf-8");
     const data = parseJsonWith(raw, AwsCredsSchema);
     if (!data?.accessKeyId || !data?.secretAccessKey) { return null; }
-    // Basic sanity check on key format
     if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) { return null; }
     if (data.secretAccessKey.length < 16) { return null; }
     return {
@@ -468,14 +467,13 @@ export async function ensureAwsCli(): Promise<void> {
 
 // ─── Authentication ─────────────────────────────────────────────────────────
 
-const forceReauth = process.argv.includes("--reauth") || process.env.SPAWN_REAUTH === "1";
-
 export async function authenticate(): Promise<void> {
   const region = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || "us-east-1";
   awsRegion = region;
+  const skipCache = process.env.SPAWN_REAUTH === "1";
 
-  // 1. Try existing AWS CLI credentials (configured via aws configure)
-  if (!forceReauth && hasAwsCli()) {
+  // 1. Try existing CLI with valid credentials
+  if (hasAwsCli()) {
     const result = awsCliSync([
       "sts",
       "get-caller-identity",
@@ -490,7 +488,7 @@ export async function authenticate(): Promise<void> {
   }
 
   // 2. Check env vars for REST mode
-  if (!forceReauth && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
     awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
     awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
     awsSessionToken = process.env.AWS_SESSION_TOKEN || "";
@@ -511,7 +509,7 @@ export async function authenticate(): Promise<void> {
   }
 
   // 3. Try cached credentials from ~/.config/spawn/aws.json
-  if (!forceReauth) {
+  if (!skipCache) {
     const cached = loadCredsFromConfig();
     if (cached) {
       const cachedRegion = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || cached.region;
@@ -529,7 +527,7 @@ export async function authenticate(): Promise<void> {
           logInfo(`AWS CLI ready with cached credentials, using region: ${cachedRegion}`);
           return;
         }
-        logWarn("Cached AWS credentials invalid or expired — please re-enter");
+        logWarn("Cached AWS credentials invalid or expired");
         awsAccessKeyId = "";
         awsSecretAccessKey = "";
         delete process.env.AWS_ACCESS_KEY_ID;
@@ -549,7 +547,7 @@ export async function authenticate(): Promise<void> {
     throw new Error("No AWS credentials");
   }
 
-  if (forceReauth) {
+  if (skipCache) {
     logStep("Re-entering AWS credentials (--reauth):");
   } else {
     logStep("Enter your AWS credentials:");
