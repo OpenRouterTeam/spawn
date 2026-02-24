@@ -1,7 +1,6 @@
 // shared/ui.ts — Logging, prompts, and browser opening
 // @clack/prompts is bundled into fly.js at build time.
 
-import { createInterface } from "node:readline";
 import * as p from "@clack/prompts";
 import { isString } from "@openrouter/spawn-shared";
 
@@ -27,35 +26,23 @@ export function logStep(msg: string): void {
   process.stderr.write(`${CYAN}${msg}${NC}\n`);
 }
 
-// Shared readline interface — reused across prompt() calls to avoid Bun's
-// issue where repeatedly creating/closing interfaces on the same stdin causes
-// the "close" event to fire immediately on subsequent interfaces (#1707).
-let sharedRl: ReturnType<typeof createInterface> | null = null;
-
-function getReadlineInterface(): ReturnType<typeof createInterface> {
-  if (!sharedRl) {
-    sharedRl = createInterface({
-      input: process.stdin,
-      output: process.stderr,
-    });
-    sharedRl.on("close", () => {
-      sharedRl = null;
-    });
-  }
-  return sharedRl;
-}
-
-/** Prompt for a line of user input. Throws if non-interactive. */
+/** Prompt for a line of user input. Throws if non-interactive.
+ *  Uses @clack/prompts instead of Node readline to avoid Bun #1707
+ *  where readline interfaces silently close after @clack/prompts runs
+ *  (e.g., SSH key multiselect kills subsequent readline prompts). */
 export async function prompt(question: string): Promise<string> {
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     throw new Error("Cannot prompt: SPAWN_NON_INTERACTIVE is set");
   }
-  const rl = getReadlineInterface();
-  return new Promise<string>((resolve) => {
-    rl.question(question, (answer) => {
-      resolve(answer.trim());
-    });
+  // Strip trailing ": " or ":" since clack adds its own formatting
+  const message = question.replace(/:\s*$/, "").trim();
+  const result = await p.text({
+    message,
   });
+  if (p.isCancel(result)) {
+    return "";
+  }
+  return (result || "").trim();
 }
 
 /**
@@ -91,14 +78,6 @@ export async function selectFromList(items: string[], promptText: string, defaul
     })),
     initialValue: defaultValue,
   });
-
-  // @clack/prompts creates and destroys its own readline interface on stdin.
-  // After it closes, our shared readline may be in a broken state (Bun #1707).
-  // Invalidate it so the next prompt() call creates a fresh one.
-  if (sharedRl) {
-    sharedRl.close();
-    sharedRl = null;
-  }
 
   if (p.isCancel(result)) {
     return defaultValue;
@@ -263,14 +242,9 @@ export function sanitizeTermValue(term: string): string {
 }
 
 /** Prepare stdin for clean handoff to an interactive child process.
- *  Closes readline, removes listeners, resets raw mode, and pauses stdin
+ *  Removes listeners, resets raw mode, and pauses stdin
  *  so that child_process.spawn gets a pristine file descriptor. */
 export function prepareStdinForHandoff(): void {
-  // Close the shared readline interface so it stops consuming stdin
-  if (sharedRl) {
-    sharedRl.close();
-    sharedRl = null;
-  }
   // Remove any leftover keypress/data listeners (from @clack/prompts, etc.)
   process.stdin.removeAllListeners();
   // Reset raw mode if it was left on by @clack/prompts
