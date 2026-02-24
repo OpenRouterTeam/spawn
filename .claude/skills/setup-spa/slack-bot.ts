@@ -173,6 +173,15 @@ Your primary job is to help manage GitHub issues based on Slack conversations:
 
 Always use the \`gh\` CLI for GitHub operations. You are already authenticated.
 
+**Issue title format — MANDATORY.** Titles MUST use a bracket prefix matching the repo's templates:
+- \`[Bug]: <description>\` — for bugs, broken behavior, errors
+- \`[CLI]: <description>\` — for CLI feature requests or improvements
+- \`[Agent]: <description>\` — for new agent requests
+- \`[Cloud]: <description>\` — for new cloud provider requests
+- \`[Team]: <description>\` — for agent team improvements
+
+Also apply the matching labels: \`bug\` + \`pending-review\`, or \`cli\` + \`enhancement\` + \`pending-review\`, etc.
+
 When creating issues, include a footer: "_Filed from Slack by SPA_"
 
 Below is the full Slack thread. The most recent message is the one you should respond to. Prior messages are context.`;
