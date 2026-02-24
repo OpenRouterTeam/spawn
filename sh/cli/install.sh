@@ -195,15 +195,15 @@ ensure_in_path() {
 clone_cli() {
     local dest="$1"
     log_step "Downloading CLI source..."
-    mkdir -p "${dest}/cli/src"
+    mkdir -p "${dest}/packages/cli/src"
     # Download all source files via GitHub API
     local files
-    files=$(curl -fsSL "https://api.github.com/repos/${SPAWN_REPO}/contents/cli/src" \
+    files=$(curl -fsSL "https://api.github.com/repos/${SPAWN_REPO}/contents/packages/cli/src" \
         | grep '"name"' | grep '\.ts"' | grep -v '__tests__' \
         | sed 's/.*"name": "//;s/".*//')
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/package.json"  -o "${dest}/cli/package.json"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/bun.lock"       -o "${dest}/cli/bun.lock"
-    curl -fsSL "${SPAWN_RAW_BASE}/cli/tsconfig.json"  -o "${dest}/cli/tsconfig.json"
+    curl -fsSL "${SPAWN_RAW_BASE}/packages/cli/package.json"  -o "${dest}/packages/cli/package.json"
+    curl -fsSL "${SPAWN_RAW_BASE}/packages/cli/bun.lock"       -o "${dest}/packages/cli/bun.lock"
+    curl -fsSL "${SPAWN_RAW_BASE}/packages/cli/tsconfig.json"  -o "${dest}/packages/cli/tsconfig.json"
     for f in $files; do
         # SECURITY: Reject non-ASCII characters (Unicode lookalikes/homoglyphs)
         if [[ "$f" =~ [^[:ascii:]] ]]; then
@@ -221,7 +221,7 @@ clone_cli() {
             exit 1
         fi
 
-        curl -fsSL "${SPAWN_RAW_BASE}/cli/src/${f}" -o "${dest}/cli/src/${f}"
+        curl -fsSL "${SPAWN_RAW_BASE}/packages/cli/src/${f}" -o "${dest}/packages/cli/src/${f}"
     done
 }
 
@@ -232,7 +232,7 @@ build_and_install() {
 
     clone_cli "${tmpdir}"
 
-    cd "${tmpdir}/cli"
+    cd "${tmpdir}/packages/cli"
     bun install
 
     if ! bun run build 2>/dev/null; then

@@ -9,8 +9,8 @@ _ensure_bun() {
 _ensure_bun
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/hetzner/main.ts" ]]; then
-    exec bun run "$SCRIPT_DIR/../cli/src/hetzner/main.ts" claude "$@"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../packages/cli/src/hetzner/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../../packages/cli/src/hetzner/main.ts" claude "$@"
 fi
 
 HETZNER_JS=$(mktemp)

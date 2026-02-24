@@ -58,14 +58,14 @@ fi
 
 # ─── Biome lint for TypeScript ─────────────────────────────────────────
 
-staged_ts=$(git diff --cached --name-only --diff-filter=ACM | grep '^cli/src/.*\.ts$' || true)
+staged_ts=$(git diff --cached --name-only --diff-filter=ACM | grep '^packages/cli/src/.*\.ts$' || true)
 
 if [[ -n "$staged_ts" ]]; then
     echo "Running Biome lint on staged TypeScript files..."
-    if ! (cd cli && bunx @biomejs/biome lint src/); then
+    if ! (cd packages/cli && bunx @biomejs/biome lint src/); then
         echo ""
         printf "${RED}Biome lint failed. Commit blocked.${NC}\n"
-        echo "Run 'cd cli && bunx @biomejs/biome lint src/' to see details."
+        echo "Run 'cd packages/cli && bunx @biomejs/biome lint src/' to see details."
         exit 1
     fi
     printf "${GREEN}Biome lint passed.${NC}\n"

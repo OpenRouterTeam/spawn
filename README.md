@@ -192,13 +192,13 @@ git config core.hooksPath .githooks
 
 ```
 sh/{cloud}/{agent}.sh     # Agent deployment script (thin bash → bun wrapper)
-cli/                      # TypeScript CLI — all provisioning logic (bun)
+packages/cli/             # TypeScript CLI — all provisioning logic (bun)
 manifest.json             # Source of truth for the matrix
 ```
 
 ### Adding a new cloud
 
-1. Add cloud-specific TypeScript module in `cli/src/{cloud}/`
+1. Add cloud-specific TypeScript module in `packages/cli/src/{cloud}/`
 2. Add to `manifest.json`
 3. Implement agent scripts
 4. See [CLAUDE.md](CLAUDE.md) for full contributor guide

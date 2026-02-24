@@ -63,7 +63,7 @@ curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" "https://api.digitalocean.com
 curl -s -H "Authorization: Bearer ${FLY_API_TOKEN}" "https://api.machines.dev/v1/apps?org_slug=personal"
 ```
 
-For any other cloud directories found, read their TypeScript module in `cli/src/{cloud}/` to discover the API base URL and auth pattern, then call equivalent GET-only endpoints.
+For any other cloud directories found, read their TypeScript module in `packages/cli/src/{cloud}/` to discover the API base URL and auth pattern, then call equivalent GET-only endpoints.
 
 ## Step 4 — Save Fixtures
 

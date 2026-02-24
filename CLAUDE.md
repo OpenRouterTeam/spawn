@@ -56,15 +56,15 @@ We are currently shipping with **9 curated clouds** (sorted by price):
 - **Prestige or unbeatable pricing** — must be a well-known brand OR beat our cheapest options
 - **Must be manually testable** — you need an account and can verify scripts work
 - **REST API or CLI with SSH/exec** — no proprietary-only access methods
-- **Test coverage is mandatory** — add unit tests in `cli/src/__tests__/`
+- **Test coverage is mandatory** — add unit tests in `packages/cli/src/__tests__/`
 
 Steps to add one:
-1. Add cloud-specific TypeScript module in `cli/src/{cloud}/`
+1. Add cloud-specific TypeScript module in `packages/cli/src/{cloud}/`
 2. Add an entry to `manifest.json` → `clouds`
 3. Add `"missing"` entries to the matrix for every existing agent
 4. Implement at least 2-3 agent scripts to prove the lib works
 5. Update the cloud's `sh/{cloud}/README.md`
-6. **Add test coverage** (mandatory) — add unit tests in `cli/src/__tests__/`
+6. **Add test coverage** (mandatory) — add unit tests in `packages/cli/src/__tests__/`
 
 **DO NOT add GPU clouds** (CoreWeave, RunPod, etc.). Spawn agents call remote LLM APIs for inference — they need cheap CPU instances with SSH, not expensive GPU VMs.
 
@@ -95,19 +95,24 @@ Check `gh issue list --repo OpenRouterTeam/spawn --state open` for user requests
 ### 4. Extend tests
 
 Tests use Bun's built-in test runner (`bun:test`). When adding a new cloud or agent:
-- Add unit tests in `cli/src/__tests__/` with mocked fetch/prompts
+- Add unit tests in `packages/cli/src/__tests__/` with mocked fetch/prompts
 - Run `bun test` to verify
 
 ## File Structure Convention
 
 ```
 spawn/
-  cli/
-    src/index.ts                 # CLI entry point (bun/TypeScript)
-    src/manifest.ts              # Manifest fetch + cache logic
-    src/commands.ts              # All subcommands (interactive, list, run, etc.)
-    src/version.ts               # Version constant
-    package.json                 # npm package (@openrouter/spawn)
+  packages/
+    cli/
+      src/index.ts               # CLI entry point (bun/TypeScript)
+      src/manifest.ts            # Manifest fetch + cache logic
+      src/commands.ts            # All subcommands (interactive, list, run, etc.)
+      src/version.ts             # Version constant
+      package.json               # npm package (@openrouter/spawn)
+    shared/
+      src/parse.ts               # parseJsonWith(text, schema) and parseJsonRaw(text)
+      src/type-guards.ts         # isString, isNumber, hasStatus, hasMessage
+      package.json               # npm package (@openrouter/spawn-shared)
   sh/
     cli/
       install.sh                 # One-liner installer (bun → npm → auto-install bun)
@@ -158,9 +163,9 @@ If you need to create documentation during development, write it to `.docs/` and
 
 ### Architecture
 
-All cloud provisioning and agent setup logic lives in TypeScript under `cli/src/`. Agent scripts (`sh/{cloud}/{agent}.sh`) are thin bash wrappers that bootstrap bun and invoke the CLI.
+All cloud provisioning and agent setup logic lives in TypeScript under `packages/cli/src/`. Agent scripts (`sh/{cloud}/{agent}.sh`) are thin bash wrappers that bootstrap bun and invoke the CLI.
 
-**`sh/shared/github-auth.sh`** — Standalone GitHub CLI installer + OAuth login helper. Used by `cli/src/shared/agent-setup.ts` to set up `gh` on remote VMs.
+**`sh/shared/github-auth.sh`** — Standalone GitHub CLI installer + OAuth login helper. Used by `packages/cli/src/shared/agent-setup.ts` to set up `gh` on remote VMs.
 
 **`sh/shared/key-request.sh`** — API key provisioning helpers sourced by the QA harness (`qa.sh`) for loading cloud credentials from `~/.config/spawn/{cloud}.json`.
 
@@ -196,7 +201,7 @@ When shell scripts need JSON processing, HTTP calls, crypto, or any non-trivial 
 - For complex operations (SigV4 signing, API calls with retries), write a heredoc `.ts` file and `bun run` it
 
 ### ESM Only — NEVER use require() or CommonJS
-All TypeScript code in `cli/src/` MUST use ESM (`import`/`export`):
+All TypeScript code in `packages/cli/src/` MUST use ESM (`import`/`export`):
 - **NEVER** use `require()` — always use `import` (static or dynamic `await import()`)
 - **NEVER** use `module.exports` — always use `export` / `export default`
 - **NEVER** use `createRequire` — it's a CJS compatibility hack that triggers Bun bugs
@@ -206,7 +211,7 @@ All TypeScript code in `cli/src/` MUST use ESM (`import`/`export`):
 
 ## Type Safety — No `as` Type Assertions
 
-**`as` type assertions are banned in all TypeScript code (production AND tests).** This is enforced by a GritQL biome plugin (`cli/no-type-assertion.grit`).
+**`as` type assertions are banned in all TypeScript code (production AND tests).** This is enforced by a GritQL biome plugin (`packages/cli/no-type-assertion.grit`).
 
 ### Exemptions
 - `as const` — allowed (compile-time only, no runtime risk)
@@ -267,13 +272,13 @@ global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 })
 ```
 
 ### Shared utilities
-- `cli/src/shared/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonRaw(text)`
-- `cli/src/shared/type-guards.ts` — `isString`, `isNumber`, `hasStatus`, `hasMessage`
+- `packages/shared/src/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonRaw(text)`
+- `packages/shared/src/type-guards.ts` — `isString`, `isNumber`, `hasStatus`, `hasMessage`
 
 ## Testing
 
 - **NEVER use vitest** — use Bun's built-in test runner (`bun:test`) exclusively
-- Test files go in `cli/src/__tests__/`
+- Test files go in `packages/cli/src/__tests__/`
 - Run tests with `bun test`
 - Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
 - All tests must be pure unit tests with mocked fetch/prompts — **no subprocess spawning** (`execSync`, `spawnSync`, `Bun.spawn`)
@@ -283,14 +288,14 @@ global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 })
 
 **CRITICAL: Bump the version on every CLI change!**
 
-- **ANY change to `cli/` requires a version bump** in `cli/package.json`
+- **ANY change to `packages/cli/` requires a version bump** in `packages/cli/package.json`
 - Use semantic versioning:
   - **Patch** (0.2.X → 0.2.X+1): Bug fixes, minor improvements, documentation
   - **Minor** (0.X.0 → 0.X+1.0): New features, significant improvements
   - **Major** (X.0.0 → X+1.0.0): Breaking changes
 - The CLI has auto-update enabled — users get new versions immediately on next run
 - Version bumps ensure users always have the latest fixes and features
-- **NEVER commit `cli/cli.js`** — it is a build artifact (already in `.gitignore`). It is produced during releases, not checked into the repo. Do NOT use `git add -f cli/cli.js`.
+- **NEVER commit `packages/cli/cli.js`** — it is a build artifact (already in `.gitignore`). It is produced during releases, not checked into the repo. Do NOT use `git add -f packages/cli/cli.js`.
 
 ## Autonomous Loops
 
@@ -367,8 +372,8 @@ Before editing ANY files:
    ```
 2. **Edit files using absolute paths** into the worktree:
    ```
-   /tmp/spawn-worktrees/FEATURE/cli/src/foo.ts   ← YES
-   /home/sprite/spawn/cli/src/foo.ts              ← BLOCKED
+   /tmp/spawn-worktrees/FEATURE/packages/cli/src/foo.ts   ← YES
+   /home/sprite/spawn/packages/cli/src/foo.ts              ← BLOCKED
    ```
 3. **Commit and push** from the worktree:
    ```bash
@@ -401,7 +406,7 @@ Draft PRs that go stale (no updates for 1 week) will be auto-closed.
 ## After Each Change
 
 1. `bash -n {file}` syntax check on all modified scripts
-2. `cd cli && bunx @biomejs/biome lint src/` — **must pass with zero errors** on all modified TypeScript
+2. `cd packages/cli && bunx @biomejs/biome lint src/` — **must pass with zero errors** on all modified TypeScript
 3. Update `manifest.json` matrix status to `"implemented"`
 4. Update the cloud's `sh/{cloud}/README.md` with usage instructions
 5. Commit with a descriptive message

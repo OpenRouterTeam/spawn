@@ -1,0 +1,9 @@
+{
+  "name": "@openrouter/spawn-shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "valibot": "1.2.0"
+  }
+}

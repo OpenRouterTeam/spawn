@@ -93,20 +93,20 @@ function Install-SpawnCli {
             git clone --depth 1 --filter=blob:none --sparse `
                 "https://github.com/$SPAWN_REPO.git" $repoDir 2>$null
             Push-Location $repoDir
-            git sparse-checkout set cli 2>$null
+            git sparse-checkout set packages/cli packages/shared 2>$null
             Pop-Location
-            Move-Item (Join-Path $repoDir "cli") $cliDir
+            Move-Item (Join-Path $repoDir "packages" "cli") $cliDir
             Remove-Item $repoDir -Recurse -Force -ErrorAction SilentlyContinue
         } else {
             # Fallback: download individual source files
             New-Item -ItemType Directory -Path (Join-Path $cliDir "src") | Out-Null
-            $apiUrl = "https://api.github.com/repos/$SPAWN_REPO/contents/cli/src"
+            $apiUrl = "https://api.github.com/repos/$SPAWN_REPO/contents/packages/cli/src"
             $files = (Invoke-RestMethod $apiUrl) |
                 Where-Object { $_.name -match '\.ts$' -and $_.name -notmatch '__tests__' } |
                 Select-Object -ExpandProperty name
 
             foreach ($f in @("package.json","bun.lock","tsconfig.json")) {
-                Invoke-WebRequest "$SPAWN_RAW_BASE/cli/$f" -OutFile (Join-Path $cliDir $f)
+                Invoke-WebRequest "$SPAWN_RAW_BASE/packages/cli/$f" -OutFile (Join-Path $cliDir $f)
             }
             foreach ($f in $files) {
                 # SECURITY: block path traversal
@@ -114,7 +114,7 @@ function Install-SpawnCli {
                     Write-Err "Security: invalid filename from API: $f -- aborting."
                     exit 1
                 }
-                Invoke-WebRequest "$SPAWN_RAW_BASE/cli/src/$f" -OutFile (Join-Path (Join-Path $cliDir "src") $f)
+                Invoke-WebRequest "$SPAWN_RAW_BASE/packages/cli/src/$f" -OutFile (Join-Path (Join-Path $cliDir "src") $f)
             }
         }
 

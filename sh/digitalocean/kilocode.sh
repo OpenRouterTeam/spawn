@@ -16,8 +16,8 @@ _ensure_bun
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 
 # Local checkout — run from source
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/digitalocean/main.ts" ]]; then
-    exec bun run "$SCRIPT_DIR/../cli/src/digitalocean/main.ts" kilocode "$@"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../packages/cli/src/digitalocean/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../../packages/cli/src/digitalocean/main.ts" kilocode "$@"
 fi
 
 # Remote — download bundled digitalocean.js from GitHub release

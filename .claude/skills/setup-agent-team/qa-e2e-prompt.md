@@ -42,7 +42,7 @@ For each failed agent, investigate the root cause. The failure categories are:
    - Missing env var for headless mode (e.g., `MODEL_ID` for openclaw)
    - Fly.io API auth issues
    - Agent-specific install script changed upstream
-3. Read the agent's provisioning code: `cli/src/fly/agents.ts` and `cli/src/shared/agent-setup.ts`
+3. Read the agent's provisioning code: `packages/cli/src/fly/agents.ts` and `packages/cli/src/shared/agent-setup.ts`
 4. Read the E2E provision script: `sh/e2e/lib/provision.sh`
 
 ### Verification failure (app exists but checks fail)
@@ -52,7 +52,7 @@ For each failed agent, investigate the root cause. The failure categories are:
    flyctl machines list -a APP_NAME --json | jq -r '.[0].id'
    flyctl machine exec MACHINE_ID -a APP_NAME --timeout 30 "bash -c 'ls -la ~; cat ~/.spawnrc; echo ---; env'"
    ```
-2. Check if the binary path changed — read the agent's install script in `cli/src/shared/agent-setup.ts`
+2. Check if the binary path changed — read the agent's install script in `packages/cli/src/shared/agent-setup.ts`
 3. Check if the env var names changed — read the agent's config in `manifest.json`
 4. Update the verification checks in `sh/e2e/lib/verify.sh` if they are stale
 
@@ -116,7 +116,7 @@ After fixing:
 
 - NEVER merge the PR — leave for review
 - Run `bash -n` on all modified scripts before committing
-- Only fix E2E infrastructure — do NOT modify the agent provisioning scripts in `cli/src/`
+- Only fix E2E infrastructure — do NOT modify the agent provisioning scripts in `packages/cli/src/`
 - **SIGN-OFF**: `-- qa/e2e-tester`
 
 Begin now. Run the E2E suite.

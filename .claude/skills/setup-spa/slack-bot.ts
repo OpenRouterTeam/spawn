@@ -2,6 +2,7 @@ import { App } from "@slack/bolt";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
+import { toRecord } from "@openrouter/spawn-shared";
 
 // #region Environment
 
@@ -104,18 +105,6 @@ const ResultSchema = v.object({
   session_id: v.string(),
 });
 
-function toObj(val: unknown): Record<string, unknown> | null {
-  if (typeof val !== "object" || val === null || Array.isArray(val)) {
-    return null;
-  }
-  // val is narrowed to `object` — safe to index
-  const obj: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(val)) {
-    obj[k] = v;
-  }
-  return obj;
-}
-
 /**
  * Format a Claude Code stream-json event into Slack-friendly text, or null to skip.
  *
@@ -130,7 +119,7 @@ function formatStreamEvent(event: Record<string, unknown>): string | null {
 
   // Assistant messages — contain text, tool_use, or thinking blocks
   if (type === "assistant") {
-    const msg = toObj(event.message);
+    const msg = toRecord(event.message);
     if (!msg) {
       return null;
     }
@@ -138,7 +127,7 @@ function formatStreamEvent(event: Record<string, unknown>): string | null {
     const parts: string[] = [];
 
     for (const rawBlock of content) {
-      const block = toObj(rawBlock);
+      const block = toRecord(rawBlock);
       if (!block) {
         continue;
       }
@@ -148,7 +137,7 @@ function formatStreamEvent(event: Record<string, unknown>): string | null {
       }
 
       if (block.type === "tool_use" && typeof block.name === "string") {
-        const input = toObj(block.input);
+        const input = toRecord(block.input);
         // Show a short summary of the tool input
         let summary = "";
         if (input) {
@@ -173,7 +162,7 @@ function formatStreamEvent(event: Record<string, unknown>): string | null {
 
   // User messages — contain tool_result blocks
   if (type === "user") {
-    const msg = toObj(event.message);
+    const msg = toRecord(event.message);
     if (!msg) {
       return null;
     }
@@ -181,7 +170,7 @@ function formatStreamEvent(event: Record<string, unknown>): string | null {
     const parts: string[] = [];
 
     for (const rawBlock of content) {
-      const block = toObj(rawBlock);
+      const block = toRecord(rawBlock);
       if (!block || block.type !== "tool_result") {
         continue;
       }
@@ -356,7 +345,7 @@ async function buildThreadPrompt(
     // Files (images, docs, etc.) — download to local tmp
     if (msg.files && Array.isArray(msg.files)) {
       for (const file of msg.files) {
-        const f = toObj(file);
+        const f = toRecord(file);
         if (!f) {
           continue;
         }
@@ -375,7 +364,7 @@ async function buildThreadPrompt(
     // Attachments (link unfurls, bot cards)
     if (msg.attachments && Array.isArray(msg.attachments)) {
       for (const att of msg.attachments) {
-        const a = toObj(att);
+        const a = toRecord(att);
         if (!a) {
           continue;
         }
@@ -488,7 +477,7 @@ async function runClaudeAndStream(
           continue;
         }
 
-        const obj = toObj(parsed);
+        const obj = toRecord(parsed);
         if (!obj) {
           continue;
         }
