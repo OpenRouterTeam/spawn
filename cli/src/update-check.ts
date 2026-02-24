@@ -196,6 +196,11 @@ function reExecWithArgs(): void {
 function performAutoUpdate(latestVersion: string): void {
   printUpdateBanner(latestVersion);
 
+  // Validate RAW_BASE immediately before use to prevent command injection (CWE-78, #1819)
+  if (!GITHUB_RAW_URL_PATTERN.test(RAW_BASE)) {
+    throw new Error(`Security: RAW_BASE failed pre-execution validation: ${RAW_BASE}`);
+  }
+
   try {
     executor.execSync(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`, {
       stdio: "inherit",
