@@ -6,7 +6,9 @@ import streamEvents from "../../../fixtures/claude-code/stream-events.json";
 // Helper: extract a fixture event by index and cast to Record<string, unknown>
 function fixture(index: number): Record<string, unknown> {
   const event = toRecord(streamEvents[index]);
-  if (!event) throw new Error(`Fixture at index ${index} is not a record`);
+  if (!event) {
+    throw new Error(`Fixture at index ${index} is not a record`);
+  }
   return event;
 }
 
@@ -84,7 +86,15 @@ describe("parseStreamEvent", () => {
     const event: Record<string, unknown> = {
       type: "assistant",
       message: {
-        content: [{ type: "tool_use", name: "Bash", input: { command: longCmd } }],
+        content: [
+          {
+            type: "tool_use",
+            name: "Bash",
+            input: {
+              command: longCmd,
+            },
+          },
+        ],
       },
     };
     const result = parseStreamEvent(event);
@@ -95,24 +105,39 @@ describe("parseStreamEvent", () => {
   it("returns null for empty assistant content", () => {
     const event: Record<string, unknown> = {
       type: "assistant",
-      message: { content: [] },
+      message: {
+        content: [],
+      },
     };
     expect(parseStreamEvent(event)).toBeNull();
   });
 
   it("returns null for unknown event types", () => {
-    expect(parseStreamEvent({ type: "unknown" })).toBeNull();
+    expect(
+      parseStreamEvent({
+        type: "unknown",
+      }),
+    ).toBeNull();
   });
 
   it("returns null for assistant without message", () => {
-    expect(parseStreamEvent({ type: "assistant" })).toBeNull();
+    expect(
+      parseStreamEvent({
+        type: "assistant",
+      }),
+    ).toBeNull();
   });
 
   it("returns null for user without tool_result blocks", () => {
     const event: Record<string, unknown> = {
       type: "user",
       message: {
-        content: [{ type: "text", text: "not a tool result" }],
+        content: [
+          {
+            type: "text",
+            text: "not a tool result",
+          },
+        ],
       },
     };
     expect(parseStreamEvent(event)).toBeNull();
@@ -122,7 +147,12 @@ describe("parseStreamEvent", () => {
     const event: Record<string, unknown> = {
       type: "assistant",
       message: {
-        content: [{ type: "tool_use", name: "Bash" }],
+        content: [
+          {
+            type: "tool_use",
+            name: "Bash",
+          },
+        ],
       },
     };
     const result = parseStreamEvent(event);
@@ -136,8 +166,17 @@ describe("parseStreamEvent", () => {
       type: "assistant",
       message: {
         content: [
-          { type: "text", text: "some text" },
-          { type: "tool_use", name: "Bash", input: { command: "echo hi" } },
+          {
+            type: "text",
+            text: "some text",
+          },
+          {
+            type: "tool_use",
+            name: "Bash",
+            input: {
+              command: "echo hi",
+            },
+          },
         ],
       },
     };
@@ -149,7 +188,12 @@ describe("parseStreamEvent", () => {
     const event: Record<string, unknown> = {
       type: "user",
       message: {
-        content: [{ type: "tool_result", content: "" }],
+        content: [
+          {
+            type: "tool_result",
+            content: "",
+          },
+        ],
       },
     };
     const result = parseStreamEvent(event);
@@ -161,7 +205,12 @@ describe("parseStreamEvent", () => {
     const event: Record<string, unknown> = {
       type: "user",
       message: {
-        content: [{ type: "tool_result", content: longResult }],
+        content: [
+          {
+            type: "tool_result",
+            content: longResult,
+          },
+        ],
       },
     };
     const result = parseStreamEvent(event);
@@ -257,7 +306,9 @@ describe("saveState", () => {
   it("returns a Result object", () => {
     // Write to a temp file by using the module's STATE_PATH (default).
     // If the default dir is writable, we get Ok; if not, Err. Either way it's a Result.
-    const result = saveState({ mappings: [] });
+    const result = saveState({
+      mappings: [],
+    });
     expect(typeof result.ok).toBe("boolean");
   });
 });
@@ -270,7 +321,11 @@ describe("downloadSlackFile", () => {
   it("returns Ok with local path on success", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() =>
-      Promise.resolve(new Response("file-content", { status: 200 })),
+      Promise.resolve(
+        new Response("file-content", {
+          status: 200,
+        }),
+      ),
     );
 
     try {
@@ -294,7 +349,11 @@ describe("downloadSlackFile", () => {
   it("returns Err on HTTP error", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() =>
-      Promise.resolve(new Response("Not Found", { status: 404 })),
+      Promise.resolve(
+        new Response("Not Found", {
+          status: 404,
+        }),
+      ),
     );
 
     try {

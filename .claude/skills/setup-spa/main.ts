@@ -26,7 +26,11 @@ const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN ?? "";
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID ?? "";
 const GITHUB_REPO = process.env.GITHUB_REPO ?? "OpenRouterTeam/spawn";
 
-for (const [name, value] of Object.entries({ SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_CHANNEL_ID })) {
+for (const [name, value] of Object.entries({
+  SLACK_BOT_TOKEN,
+  SLACK_APP_TOKEN,
+  SLACK_CHANNEL_ID,
+})) {
   if (!value) {
     console.error(`ERROR: ${name} env var is required`);
     process.exit(1);
@@ -44,7 +48,11 @@ let BOT_USER_ID = "";
 // #region State
 
 const stateResult = loadState();
-const state: State = stateResult.ok ? stateResult.data : { mappings: [] };
+const state: State = stateResult.ok
+  ? stateResult.data
+  : {
+      mappings: [],
+    };
 if (!stateResult.ok) {
   console.warn(`[spa] ${stateResult.error.message}, starting fresh`);
 }
@@ -52,7 +60,10 @@ if (!stateResult.ok) {
 // Active Claude Code processes — keyed by threadTs
 const activeRuns = new Map<
   string,
-  { proc: ReturnType<typeof Bun.spawn>; startedAt: number }
+  {
+    proc: ReturnType<typeof Bun.spawn>;
+    startedAt: number;
+  }
 >();
 
 // #endregion
@@ -89,12 +100,22 @@ async function postOrUpdate(
 ): Promise<string | undefined> {
   if (!existingTs) {
     const msg = await client.chat
-      .postMessage({ channel, thread_ts: threadTs, text: fallback, blocks })
+      .postMessage({
+        channel,
+        thread_ts: threadTs,
+        text: fallback,
+        blocks,
+      })
       .catch(() => null);
     return msg?.ts;
   }
   await client.chat
-    .update({ channel, ts: existingTs, text: fallback, blocks })
+    .update({
+      channel,
+      ts: existingTs,
+      text: fallback,
+      blocks,
+    })
     .catch(() => {});
   return existingTs;
 }
@@ -102,11 +123,7 @@ async function postOrUpdate(
 /**
  * Fetch full thread history from Slack and format as a prompt.
  */
-async function buildThreadPrompt(
-  client: SlackClient,
-  channel: string,
-  threadTs: string,
-): Promise<string> {
+async function buildThreadPrompt(client: SlackClient, channel: string, threadTs: string): Promise<string> {
   const result = await client.conversations.replies({
     channel,
     ts: threadTs,
@@ -118,22 +135,32 @@ async function buildThreadPrompt(
   const lines: string[] = [];
 
   for (const msg of messages) {
-    if (msg.user === BOT_USER_ID) continue;
-    if (msg.bot_id) continue;
+    if (msg.user === BOT_USER_ID) {
+      continue;
+    }
+    if (msg.bot_id) {
+      continue;
+    }
 
     const parts: string[] = [];
 
     const text = stripMention(msg.text ?? "");
-    if (text) parts.push(text);
+    if (text) {
+      parts.push(text);
+    }
 
     // Files (images, docs, etc.) — download to local tmp
     if (msg.files && Array.isArray(msg.files)) {
       for (const file of msg.files) {
         const f = toRecord(file);
-        if (!f) continue;
+        if (!f) {
+          continue;
+        }
         const name = isString(f.name) ? f.name : "file";
         const url = isString(f.url_private_download) ? f.url_private_download : "";
-        if (!url) continue;
+        if (!url) {
+          continue;
+        }
         const dlResult = await downloadSlackFile(url, name, threadTs, SLACK_BOT_TOKEN);
         if (dlResult.ok) {
           parts.push(`[File: ${name}] → ${dlResult.data}`);
@@ -147,16 +174,22 @@ async function buildThreadPrompt(
     if (msg.attachments && Array.isArray(msg.attachments)) {
       for (const att of msg.attachments) {
         const a = toRecord(att);
-        if (!a) continue;
+        if (!a) {
+          continue;
+        }
         const title = isString(a.title) ? a.title : "";
         const attText = isString(a.text) ? a.text : "";
         const fallback = isString(a.fallback) ? a.fallback : "";
         const content = title || attText || fallback;
-        if (content) parts.push(`[Attachment: ${content}]`);
+        if (content) {
+          parts.push(`[Attachment: ${content}]`);
+        }
       }
     }
 
-    if (parts.length > 0) lines.push(parts.join("\n"));
+    if (parts.length > 0) {
+      lines.push(parts.join("\n"));
+    }
   }
 
   return lines.join("\n\n");
@@ -172,19 +205,17 @@ interface ToolEntry {
 const MAX_SECTION_LEN = 2900; // Slack section block text limit is 3000
 
 /** Build Block Kit blocks: section(text) + context(tools + loading). */
-function buildBlocks(
-  mainText: string,
-  tools: ToolEntry[],
-  loading: boolean,
-): KnownBlock[] {
+function buildBlocks(mainText: string, tools: ToolEntry[], loading: boolean): KnownBlock[] {
   const blocks: KnownBlock[] = [];
 
   if (mainText) {
-    const display =
-      mainText.length > MAX_SECTION_LEN ? `...${mainText.slice(-MAX_SECTION_LEN)}` : mainText;
+    const display = mainText.length > MAX_SECTION_LEN ? `...${mainText.slice(-MAX_SECTION_LEN)}` : mainText;
     const section: SectionBlock = {
       type: "section",
-      text: { type: "mrkdwn", text: display },
+      text: {
+        type: "mrkdwn",
+        text: display,
+      },
     };
     blocks.push(section);
   }
@@ -192,16 +223,28 @@ function buildBlocks(
   if (tools.length > 0) {
     const parts = tools.map((t) => (t.errored ? `${t.name} :x:` : t.name));
     let toolLine = `:hammer_and_wrench: ${parts.join(" · ")}`;
-    if (loading) toolLine += " :openrouter-loading:";
+    if (loading) {
+      toolLine += " :openrouter-loading:";
+    }
     const ctx: ContextBlock = {
       type: "context",
-      elements: [{ type: "mrkdwn", text: toolLine }],
+      elements: [
+        {
+          type: "mrkdwn",
+          text: toolLine,
+        },
+      ],
     };
     blocks.push(ctx);
   } else if (loading && !mainText) {
     const ctx: ContextBlock = {
       type: "context",
-      elements: [{ type: "mrkdwn", text: ":openrouter-loading:" }],
+      elements: [
+        {
+          type: "mrkdwn",
+          text: ":openrouter-loading:",
+        },
+      ],
     };
     blocks.push(ctx);
   }
@@ -232,7 +275,9 @@ async function runClaudeAndStream(
     SYSTEM_PROMPT,
   ];
 
-  if (sessionId) args.push("--resume", sessionId);
+  if (sessionId) {
+    args.push("--resume", sessionId);
+  }
 
   // Pass prompt via stdin to avoid CLI flag parsing issues with user content
   args.push("-");
@@ -249,7 +294,10 @@ async function runClaudeAndStream(
   proc.stdin.write(prompt);
   proc.stdin.end();
 
-  activeRuns.set(threadTs, { proc, startedAt: Date.now() });
+  activeRuns.set(threadTs, {
+    proc,
+    startedAt: Date.now(),
+  });
 
   // ─── Streaming state ─────────────────────────────────────────────────
   let mainText = "";
@@ -264,7 +312,9 @@ async function runClaudeAndStream(
   /** Post or update the Slack message with current blocks. */
   async function updateMessage(loading: boolean): Promise<void> {
     const blocks = buildBlocks(mainText, tools, loading);
-    if (blocks.length === 0) return;
+    if (blocks.length === 0) {
+      return;
+    }
     const fallback = mainText || `Working... (${tools.length} tool${tools.length === 1 ? "" : "s"})`;
     hasOutput = true;
     msgTs = await postOrUpdate(client, channel, threadTs, msgTs, fallback, blocks);
@@ -279,15 +329,21 @@ async function runClaudeAndStream(
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        break;
+      }
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, {
+        stream: true,
+      });
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed) continue;
+        if (!trimmed) {
+          continue;
+        }
 
         let parsed: unknown;
         try {
@@ -297,7 +353,9 @@ async function runClaudeAndStream(
         }
 
         const obj = toRecord(parsed);
-        if (!obj) continue;
+        if (!obj) {
+          continue;
+        }
 
         // Capture session ID from result event
         const resultEvent = v.safeParse(ResultSchema, obj);
@@ -306,13 +364,17 @@ async function runClaudeAndStream(
         }
 
         const segment = parseStreamEvent(obj);
-        if (!segment) continue;
+        if (!segment) {
+          continue;
+        }
 
         if (segment.kind === "text") {
           mainText += segment.text;
           dirty = true;
         } else if (segment.kind === "tool_use" && segment.toolName) {
-          tools.push({ name: segment.toolName });
+          tools.push({
+            name: segment.toolName,
+          });
           dirty = true;
         } else if (segment.kind === "tool_result" && segment.isError && tools.length > 0) {
           tools[tools.length - 1].errored = true;
@@ -345,7 +407,9 @@ async function runClaudeAndStream(
         text: `:x: Claude Code errored (exit ${exitCode}):\n\`\`\`\n${stderr.slice(0, 1500)}\n\`\`\``,
       },
     };
-    const errBlocks: KnownBlock[] = [errSection];
+    const errBlocks: KnownBlock[] = [
+      errSection,
+    ];
     msgTs = await postOrUpdate(client, channel, threadTs, msgTs, "Error", errBlocks);
     return null;
   }
@@ -356,9 +420,16 @@ async function runClaudeAndStream(
   if (!hasOutput && !mainText) {
     const doneCtx: ContextBlock = {
       type: "context",
-      elements: [{ type: "mrkdwn", text: ":white_check_mark: Done (no text output)" }],
+      elements: [
+        {
+          type: "mrkdwn",
+          text: ":white_check_mark: Done (no text output)",
+        },
+      ],
     };
-    const doneBlocks: KnownBlock[] = [doneCtx];
+    const doneBlocks: KnownBlock[] = [
+      doneCtx,
+    ];
     msgTs = await postOrUpdate(client, channel, threadTs, msgTs, "Done", doneBlocks);
   }
 
@@ -370,27 +441,32 @@ async function runClaudeAndStream(
 
 // #region Core handler
 
-async function handleThread(
-  client: SlackClient,
-  channel: string,
-  threadTs: string,
-  eventTs: string,
-): Promise<void> {
+async function handleThread(client: SlackClient, channel: string, threadTs: string, eventTs: string): Promise<void> {
   // Prevent concurrent runs on the same thread
   if (activeRuns.has(threadTs)) {
     await client.reactions
-      .add({ channel, timestamp: eventTs, name: "hourglass_flowing_sand" })
+      .add({
+        channel,
+        timestamp: eventTs,
+        name: "hourglass_flowing_sand",
+      })
       .catch(() => {});
     return;
   }
 
   const prompt = await buildThreadPrompt(client, channel, threadTs);
-  if (!prompt) return;
+  if (!prompt) {
+    return;
+  }
 
   const existing = findMapping(state, channel, threadTs);
 
   await client.reactions
-    .add({ channel, timestamp: eventTs, name: "eyes" })
+    .add({
+      channel,
+      timestamp: eventTs,
+      name: "eyes",
+    })
     .catch(() => {});
 
   const newSessionId = await runClaudeAndStream(client, channel, threadTs, prompt, existing?.sessionId);
@@ -403,11 +479,15 @@ async function handleThread(
       sessionId: newSessionId,
       createdAt: new Date().toISOString(),
     });
-    if (!r.ok) console.error(`[spa] ${r.error.message}`);
+    if (!r.ok) {
+      console.error(`[spa] ${r.error.message}`);
+    }
   } else if (newSessionId && existing) {
     existing.sessionId = newSessionId;
     const r = saveState(state);
-    if (!r.ok) console.error(`[spa] ${r.error.message}`);
+    if (!r.ok) {
+      console.error(`[spa] ${r.error.message}`);
+    }
   }
 }
 
@@ -424,7 +504,9 @@ const app = new App({
 
 // --- app_mention: @Spawnis triggers a Claude run on this thread ---
 app.event("app_mention", async ({ event, client }) => {
-  if (event.channel !== SLACK_CHANNEL_ID) return;
+  if (event.channel !== SLACK_CHANNEL_ID) {
+    return;
+  }
   const threadTs = event.thread_ts ?? event.ts;
   await handleThread(client, event.channel, threadTs, event.ts);
 });
@@ -440,7 +522,9 @@ function shutdown(signal: string): void {
     run.proc.kill("SIGTERM");
   }
   const r = saveState(state);
-  if (!r.ok) console.error(`[spa] ${r.error.message}`);
+  if (!r.ok) {
+    console.error(`[spa] ${r.error.message}`);
+  }
   process.exit(0);
 }
 
@@ -454,7 +538,9 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 (async () => {
   runCleanupIfDue();
 
-  const authResult = await app.client.auth.test({ token: SLACK_BOT_TOKEN });
+  const authResult = await app.client.auth.test({
+    token: SLACK_BOT_TOKEN,
+  });
   BOT_USER_ID = authResult.user_id ?? "";
   if (BOT_USER_ID) {
     console.log(`[spa] Bot user ID: ${BOT_USER_ID}`);
