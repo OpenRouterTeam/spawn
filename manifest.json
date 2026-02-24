@@ -54,7 +54,7 @@
       "name": "OpenClaw",
       "description": "Personal AI assistant with multi-channel gateway + TUI",
       "url": "https://github.com/openclaw/openclaw",
-      "install": "bun install -g openclaw",
+      "install": "npm install -g openclaw",
       "launch": "openclaw tui",
       "pre_launch": "nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 &",
       "env": {
