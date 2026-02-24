@@ -354,7 +354,7 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   // The polling loop doubles as a keepalive for flyctl.
   const script =
     "source ~/.spawnrc 2>/dev/null; " +
-    "export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+    "export PATH=$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
     "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
     "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; " +
     "elapsed=0; while [ $elapsed -lt 60 ]; do " +
