@@ -6,5 +6,6 @@
   },
   "files": {
     "includes": ["**/*.ts"]
-  }
+  },
+  "plugins": ["../../../lint/no-type-assertion.grit"]
 }

@@ -29,5 +29,5 @@
       }
     }
   ],
-  "plugins": ["./lint/no-type-assertion.grit", "./lint/no-typeof-string-number.grit"]
+  "plugins": ["../lint/no-type-assertion.grit", "../lint/no-typeof-string-number.grit"]
 }
