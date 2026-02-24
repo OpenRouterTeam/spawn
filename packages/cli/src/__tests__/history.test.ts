@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   getSpawnDir,
@@ -16,7 +17,6 @@ describe("history", () => {
 
   beforeEach(() => {
     // Use a directory within home directory for testing (required by security validation)
-    const { homedir } = require("node:os");
     testDir = join(homedir(), `.spawn-test-${Date.now()}-${Math.random()}`);
     mkdirSync(testDir, {
       recursive: true,
@@ -41,7 +41,6 @@ describe("history", () => {
 
   describe("getSpawnDir", () => {
     it("returns SPAWN_HOME when set to valid path within home", () => {
-      const { homedir } = require("node:os");
       const validPath = join(homedir(), "custom", "spawn", "dir");
       process.env.SPAWN_HOME = validPath;
       expect(getSpawnDir()).toBe(validPath);
@@ -49,7 +48,6 @@ describe("history", () => {
 
     it("falls back to ~/.spawn when SPAWN_HOME is not set", () => {
       delete process.env.SPAWN_HOME;
-      const { homedir } = require("node:os");
       expect(getSpawnDir()).toBe(join(homedir(), ".spawn"));
     });
 
@@ -64,14 +62,12 @@ describe("history", () => {
     });
 
     it("resolves .. segments in absolute SPAWN_HOME within home", () => {
-      const { homedir } = require("node:os");
       const pathWithDots = join(homedir(), "foo", "..", "bar");
       process.env.SPAWN_HOME = pathWithDots;
       expect(getSpawnDir()).toBe(join(homedir(), "bar"));
     });
 
     it("accepts normal absolute SPAWN_HOME within home", () => {
-      const { homedir } = require("node:os");
       const validPath = join(homedir(), ".spawn");
       process.env.SPAWN_HOME = validPath;
       expect(getSpawnDir()).toBe(validPath);
@@ -83,7 +79,6 @@ describe("history", () => {
     });
 
     it("throws for SPAWN_HOME pointing to /root when user home is different", () => {
-      const { homedir } = require("node:os");
       // Only run this test if we're not actually running as root
       if (homedir() !== "/root") {
         process.env.SPAWN_HOME = "/root/.spawn";
@@ -92,7 +87,6 @@ describe("history", () => {
     });
 
     it("throws for path traversal attempt to escape home directory", () => {
-      const { homedir } = require("node:os");
       // Attempt to traverse outside home using .. segments
       // e.g., /home/user/../../etc/.spawn
       const traversalPath = join(homedir(), "..", "..", "etc", ".spawn");
@@ -101,7 +95,6 @@ describe("history", () => {
     });
 
     it("accepts home directory itself as SPAWN_HOME", () => {
-      const { homedir } = require("node:os");
       process.env.SPAWN_HOME = homedir();
       expect(getSpawnDir()).toBe(homedir());
     });
@@ -211,7 +204,6 @@ describe("history", () => {
 
   describe("saveSpawnRecord", () => {
     it("creates directory and file when neither exist", () => {
-      const { homedir } = require("node:os");
       const nestedDir = join(homedir(), ".spawn-test", "nested", "spawn");
       process.env.SPAWN_HOME = nestedDir;
 
