@@ -24,10 +24,14 @@ if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-# Validate SLACK_WEBHOOK format to prevent injection via heredoc expansion
-if [[ -n "${SLACK_WEBHOOK}" ]] && [[ ! "${SLACK_WEBHOOK}" =~ ^https://hooks\.slack\.com/ ]]; then
-    echo "WARNING: SLACK_WEBHOOK does not match expected format (https://hooks.slack.com/...), disabling" >&2
-    SLACK_WEBHOOK=""
+# Validate SLACK_WEBHOOK format to prevent sed delimiter injection via pipe chars
+# Slack webhooks are: https://hooks.slack.com/services/T.../B.../xxx or /workflows/...
+# Only allow alphanumeric, slashes, hyphens, and underscores in the path
+if [[ -n "${SLACK_WEBHOOK}" ]]; then
+    if [[ ! "${SLACK_WEBHOOK}" =~ ^https://hooks\.slack\.com/[a-zA-Z0-9/_-]+$ ]]; then
+        echo "WARNING: SLACK_WEBHOOK contains invalid characters or wrong domain, disabling" >&2
+        SLACK_WEBHOOK=""
+    fi
 fi
 
 if [[ "${SPAWN_REASON}" == "issues" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
