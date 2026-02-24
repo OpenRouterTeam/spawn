@@ -2,7 +2,13 @@
 
 AWS Lightsail instances via AWS CLI. [AWS Lightsail](https://aws.amazon.com/lightsail/)
 
-> Uses 'ubuntu' user instead of 'root'. Requires AWS CLI installed and configured.
+## Prerequisites
+
+1. **Enable AWS Lightsail** — New AWS accounts must activate Lightsail before first use. Visit the [Lightsail console](https://lightsail.aws.amazon.com/ls/webapp/home) and follow the activation prompt. Without this step, all provisioning commands will fail.
+
+2. **AWS CLI installed and configured** — Run `aws configure` with your Access Key ID and Secret Access Key.
+
+> Uses `ubuntu` user instead of `root`.
 
 ## Agents
 

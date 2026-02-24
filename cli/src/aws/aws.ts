@@ -733,6 +733,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
     } catch (err) {
       logError("Failed to create Lightsail instance");
       logWarn("Common issues:");
+      logWarn("  - Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate");
       logWarn("  - Instance limit reached for your account");
       logWarn("  - Bundle unavailable in region");
       logWarn("  - AWS credentials lack Lightsail permissions");
@@ -757,6 +758,7 @@ export async function createInstance(name: string, tier?: CloudInitTier): Promis
     } catch (err) {
       logError("Failed to create Lightsail instance");
       logWarn("Common issues:");
+      logWarn("  - Lightsail not enabled: visit https://lightsail.aws.amazon.com/ls/webapp/home to activate");
       logWarn("  - Instance limit reached for your account");
       logWarn("  - Bundle unavailable in region");
       logWarn("  - Credentials lack lightsail:CreateInstances permission");
