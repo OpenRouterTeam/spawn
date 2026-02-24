@@ -518,7 +518,9 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
 
 export async function interactiveSession(cmd: string): Promise<number> {
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
+  // Single-quote escaping prevents shell expansion ($(), ${}, backticks) unlike JSON.stringify double-quoting
+  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
+  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
 
   // Interactive mode — drop BatchMode so the PTY works
   const args = [
