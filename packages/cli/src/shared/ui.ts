@@ -55,7 +55,9 @@ export async function prompt(question: string): Promise<string> {
 
   try {
     const result = await Promise.race([
-      p.text({ message }),
+      p.text({
+        message,
+      }),
       stdinClosePromise,
     ]);
     return p.isCancel(result) ? "" : (result || "").trim();
