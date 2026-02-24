@@ -398,6 +398,9 @@ policy = "allow_all"
  * swap is already configured. Non-fatal if sudo is unavailable.
  */
 export async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void> {
+  if (typeof sizeMb !== "number" || sizeMb <= 0 || !Number.isInteger(sizeMb)) {
+    throw new Error(`Invalid swap size: ${sizeMb}`);
+  }
   logStep(`Ensuring ${sizeMb} MB swap space for compilation...`);
   const script = [
     "if swapon --show 2>/dev/null | grep -q /swapfile; then",
