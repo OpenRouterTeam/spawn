@@ -47,15 +47,15 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        working-directory: cli
+        working-directory: packages/cli
         run: bun install
 
       - name: Run Biome format check
-        working-directory: cli
+        working-directory: packages/cli
         run: bunx @biomejs/biome format src/
 
       - name: Run Biome lint
-        working-directory: cli
+        working-directory: packages/cli
         run: bunx @biomejs/biome lint src/
 
   macos-compat:

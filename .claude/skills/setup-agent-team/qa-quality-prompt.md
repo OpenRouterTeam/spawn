@@ -36,7 +36,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 **Protocol**:
 1. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER/test-runner -b qa/test-runner origin/main`
 2. `cd` into worktree
-3. Run `bun test` in `cli/` directory — capture full output
+3. Run `bun test` in `packages/cli/` directory — capture full output
 4. If any tests fail:
    - Read the failing test files and the source code they test
    - Determine if the test is wrong (outdated assertion, wrong mock) or the source is wrong
@@ -56,10 +56,10 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 **Protocol**:
 1. Create worktree: `git worktree add WORKTREE_BASE_PLACEHOLDER/dedup-scanner -b qa/dedup-scanner origin/main`
 2. `cd` into worktree
-3. Scan `cli/src/__tests__/` for these anti-patterns:
+3. Scan `packages/cli/src/__tests__/` for these anti-patterns:
 
    **a) Duplicate describe blocks**: Same function name tested in multiple files
-   - Use `grep -rn 'describe(' cli/src/__tests__/` to find all describe blocks
+   - Use `grep -rn 'describe(' packages/cli/src/__tests__/` to find all describe blocks
    - Flag any function name that appears in 2+ files
    - Consolidate into the most appropriate file, remove the duplicate
 
@@ -94,7 +94,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 2. `cd` into worktree
 3. Scan for these issues:
 
-   **a) Dead code**: Functions in `shared/*.sh` or `cli/src/` that are never called
+   **a) Dead code**: Functions in `shared/*.sh` or `packages/cli/src/` that are never called
    - Grep for the function name across all source files
    - If only the definition exists (no callers), remove the function
 
@@ -107,7 +107,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    - Replace with `bun eval` or `jq` as appropriate per CLAUDE.md rules
 
    **d) Duplicate utilities**: Same helper function defined in multiple TypeScript cloud modules
-   - If identical, move to `cli/src/shared/` and have cloud modules import it
+   - If identical, move to `packages/shared/src/` and have cloud modules import it
 
    **e) Stale comments**: Comments referencing removed infrastructure, old test files, or deleted functions
    - Remove or update these comments

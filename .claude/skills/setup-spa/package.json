@@ -6,7 +6,8 @@
     "start": "bun run slack-bot.ts"
   },
   "dependencies": {
-    "@slack/bolt": "^4.3.0",
-    "valibot": "^1.0.0"
+    "@openrouter/spawn-shared": "workspace:*",
+    "@slack/bolt": "4.6.0",
+    "valibot": "1.2.0"
   }
 }

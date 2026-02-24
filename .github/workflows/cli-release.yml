@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'cli/src/**'
-      - 'cli/package.json'
-      - 'cli/bun.lock'
+      - 'packages/cli/src/**'
+      - 'packages/cli/package.json'
+      - 'packages/cli/bun.lock'
   workflow_dispatch:
 
 concurrency:
@@ -28,17 +28,17 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies and build
-        working-directory: cli
+        working-directory: packages/cli
         run: |
           bun install
           bun run build
 
       - name: Build cloud bundles
-        run: bun run cli/build-clouds.ts
+        run: bun run packages/cli/build-clouds.ts
 
       - name: Get version
         id: version
-        working-directory: cli
+        working-directory: packages/cli
         run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Update cli-latest release
@@ -60,14 +60,14 @@ jobs:
           **Version:** ${{ steps.version.outputs.version }}
           **Built:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --prerelease \
-            cli/cli.js
+            packages/cli/cli.js
 
       - name: Upload cloud bundles
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Upload each cloud bundle as a separate release (fly-latest/fly.js, etc.)
-          for bundle in cli/*.js; do
+          for bundle in packages/cli/*.js; do
             name=$(basename "$bundle" .js)
             [[ "$name" == "cli" ]] && continue  # skip cli.js, already uploaded above
 

@@ -21,7 +21,7 @@ provision_agent() {
 
   # Resolve CLI entry point (relative to this script's location in e2e/lib/)
   local cli_entry
-  cli_entry="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/cli/src/index.ts"
+  cli_entry="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/packages/cli/src/index.ts"
 
   if [ ! -f "${cli_entry}" ]; then
     log_err "CLI entry point not found: ${cli_entry}"

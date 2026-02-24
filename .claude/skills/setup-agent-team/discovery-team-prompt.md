@@ -105,7 +105,7 @@ gh api graphql -f query='
 Spawn an **implementer** teammate to:
 1. Read the proposal issue for cloud/agent details
 2. Implement it following CLAUDE.md Shell Script Rules
-3. Add test coverage (`bun test` in `cli/src/__tests__/`)
+3. Add test coverage (`bun test` in `packages/cli/src/__tests__/`)
 4. Create PR referencing the proposal issue
 5. Label the proposal `ready-for-implementation`
 6. Comment on the proposal: "Implementation PR: #NUMBER -- discovery/implementer"

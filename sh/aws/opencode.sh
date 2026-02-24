@@ -16,8 +16,8 @@ _ensure_bun
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 
 # Local checkout — run from source
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/aws/main.ts" ]]; then
-    exec bun run "$SCRIPT_DIR/../cli/src/aws/main.ts" opencode "$@"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../packages/cli/src/aws/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../../packages/cli/src/aws/main.ts" opencode "$@"
 fi
 
 # Remote — download and run compiled TypeScript bundle

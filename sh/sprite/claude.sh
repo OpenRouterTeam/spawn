@@ -16,8 +16,8 @@ _ensure_bun
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 
 # Local checkout — run from source
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cli/src/sprite/main.ts" ]]; then
-    exec bun run "$SCRIPT_DIR/../cli/src/sprite/main.ts" claude "$@"
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../../packages/cli/src/sprite/main.ts" ]]; then
+    exec bun run "$SCRIPT_DIR/../../packages/cli/src/sprite/main.ts" claude "$@"
 fi
 
 # Remote — download bundled sprite.js from GitHub release

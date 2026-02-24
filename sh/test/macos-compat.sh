@@ -36,7 +36,7 @@ is_excluded() {
         */.claude/skills/*) return 0 ;;
         */.git/*) return 0 ;;
         */node_modules/*) return 0 ;;
-        */cli/*) return 0 ;;
+        */packages/cli/*) return 0 ;;
         */test/macos-compat.sh) return 0 ;;  # Don't lint ourselves
         *) return 1 ;;
     esac

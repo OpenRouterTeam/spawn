@@ -1,0 +1,14 @@
+node_modules/
+cli.js
+spawn
+dist/
+*.tgz
+# Cloud provider bundles (built by build-clouds.ts)
+aws.js
+daytona.js
+digitalocean.js
+fly.js
+gcp.js
+hetzner.js
+local.js
+sprite.js
