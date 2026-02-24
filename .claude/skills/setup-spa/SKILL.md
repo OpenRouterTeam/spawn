@@ -62,14 +62,14 @@ export SLACK_CHANNEL_ID="C0000000000"
 export GITHUB_REPO="OpenRouterTeam/spawn"
 export REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
-exec bun run "${REPO_ROOT}/cli/spa.js"
+exec bun run "${SCRIPT_DIR}/spa.js"
 ```
 
 ## Install
 
 ```bash
-bun install        # from repo root — workspace install
-bun run cli/build-spa.ts  # build SPA bundle
+bun install                                    # from repo root — workspace install
+bun run .claude/skills/setup-spa/build.ts      # build SPA bundle
 ```
 
 ## Systemd Service

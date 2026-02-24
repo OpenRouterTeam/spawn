@@ -4,7 +4,7 @@ __pycache__/
 .claude/skills/*/start-*.sh
 cli/cli.js
 cli/fly.js
-cli/spa.js
+.claude/skills/setup-spa/spa.js
 
 # Sensitive files — never commit secrets or private keys
 .env

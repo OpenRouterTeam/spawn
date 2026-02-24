@@ -1,22 +1,20 @@
 #!/usr/bin/env bun
 // Build the SPA (Spawn's Personal Agent) Slack bot into a single bundled JS file.
-// The source lives in .claude/skills/setup-spa/ and imports shared utilities from cli/src/.
 //
 // Usage:
-//   bun run cli/build-spa.ts
+//   bun run .claude/skills/setup-spa/build.ts
 
 import path from "path";
 
-const cliDir = path.dirname(new URL(import.meta.url).pathname);
-const repoRoot = path.dirname(cliDir);
-const entry = path.join(repoRoot, ".claude/skills/setup-spa/main.ts");
-const outfile = path.join(cliDir, "spa.js");
+const spaDir = path.dirname(new URL(import.meta.url).pathname);
+const entry = path.join(spaDir, "main.ts");
+const outfile = path.join(spaDir, "spa.js");
 
-console.log("build: .claude/skills/setup-spa/main.ts -> cli/spa.js");
+console.log("build: .claude/skills/setup-spa/main.ts -> .claude/skills/setup-spa/spa.js");
 
 const result = await Bun.build({
   entrypoints: [entry],
-  outdir: cliDir,
+  outdir: spaDir,
   naming: "spa.js",
   target: "bun",
   minify: true,

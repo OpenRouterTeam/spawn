@@ -36,7 +36,7 @@ jobs:
         run: bun run cli/build-clouds.ts
 
       - name: Build SPA bundle
-        run: bun run cli/build-spa.ts
+        run: bun run .claude/skills/setup-spa/build.ts
 
       - name: Get version
         id: version
@@ -71,7 +71,7 @@ jobs:
           # Upload each cloud bundle as a separate release (fly-latest/fly.js, etc.)
           for bundle in cli/*.js; do
             name=$(basename "$bundle" .js)
-            [[ "$name" == "cli" || "$name" == "spa" ]] && continue  # skip cli.js and spa.js
+            [[ "$name" == "cli" ]] && continue  # skip cli.js, already uploaded above
 
             gh release delete "${name}-latest" --yes 2>/dev/null || true
             git tag -d "${name}-latest" 2>/dev/null || true
