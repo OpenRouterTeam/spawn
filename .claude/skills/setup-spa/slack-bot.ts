@@ -99,26 +99,68 @@ const activeRuns = new Map<
 
 // #region Claude Code helpers
 
-const StreamEventSchema = v.object({
-  type: v.string(),
-});
-
-const AssistantMessageSchema = v.object({
-  type: v.literal("assistant"),
-  message: v.object({
-    content: v.array(
-      v.object({
-        type: v.string(),
-        text: v.optional(v.string()),
-      }),
-    ),
-  }),
-});
-
 const ResultSchema = v.object({
   type: v.literal("result"),
   session_id: v.string(),
 });
+
+function toObj(val: unknown): Record<string, unknown> | null {
+  if (typeof val !== "object" || val === null || Array.isArray(val)) {
+    return null;
+  }
+  // val is narrowed to `object` — safe to index
+  const obj: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(val)) {
+    obj[k] = v;
+  }
+  return obj;
+}
+
+/** Format a parsed stream event into a Slack-friendly text segment, or null to skip. */
+function formatStreamEvent(event: Record<string, unknown>): string | null {
+  const type = event.type;
+
+  // stream_event wraps Anthropic API events
+  if (type === "stream_event") {
+    const inner = toObj(event.event);
+    if (!inner) {
+      return null;
+    }
+    const innerType = inner.type;
+
+    // Tool use start — show tool name
+    if (innerType === "content_block_start") {
+      const block = toObj(inner.content_block);
+      if (block?.type === "tool_use" && typeof block.name === "string") {
+        return `\n:hammer_and_wrench: *${block.name}*\n`;
+      }
+    }
+
+    // Text delta — accumulate text
+    if (innerType === "content_block_delta") {
+      const delta = toObj(inner.delta);
+      if (delta?.type === "text_delta" && typeof delta.text === "string") {
+        return delta.text;
+      }
+    }
+
+    return null;
+  }
+
+  // Tool result — show output (truncated)
+  if (type === "tool_result") {
+    const result = typeof event.result === "string" ? event.result : "";
+    const isError = event.is_error === true;
+    const prefix = isError ? ":x: Error" : ":white_check_mark: Result";
+    const truncated = result.length > 500 ? `${result.slice(0, 500)}...` : result;
+    if (!truncated) {
+      return `${prefix}: (empty)\n`;
+    }
+    return `${prefix}:\n\`\`\`\n${truncated}\n\`\`\`\n`;
+  }
+
+  return null;
+}
 
 const SYSTEM_PROMPT = `You are SPA (Spawn's Personal Agent), a Slack bot for the Spawn project (${GITHUB_REPO}).
 
@@ -262,25 +304,21 @@ async function runClaudeAndStream(
           continue;
         }
 
-        const base = v.safeParse(StreamEventSchema, parsed);
-        if (!base.success) {
+        const obj = toObj(parsed);
+        if (!obj) {
           continue;
         }
 
-        // Extract assistant text
-        const assistant = v.safeParse(AssistantMessageSchema, parsed);
-        if (assistant.success) {
-          for (const block of assistant.output.message.content) {
-            if (block.type === "text" && block.text) {
-              fullText += block.text;
-            }
-          }
-        }
-
-        // Capture session ID from result
-        const resultEvent = v.safeParse(ResultSchema, parsed);
+        // Capture session ID from result event
+        const resultEvent = v.safeParse(ResultSchema, obj);
         if (resultEvent.success) {
           returnedSessionId = resultEvent.output.session_id;
+        }
+
+        // Format event for Slack display
+        const segment = formatStreamEvent(obj);
+        if (segment) {
+          fullText += segment;
         }
       }
 
