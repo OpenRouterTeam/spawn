@@ -8,7 +8,6 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --outfile cli.js --target bun --minify --packages bundle",
-    "build:spa": "bun run ../../.claude/skills/setup-spa/build.ts",
     "compile": "bun build src/index.ts --compile --outfile spawn",
     "lint": "biome lint src/",
     "test": "bun test",

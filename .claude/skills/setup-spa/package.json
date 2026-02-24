@@ -3,8 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "bun run main.ts",
-    "build": "bun run build.ts"
+    "start": "bun run main.ts"
   },
   "dependencies": {
     "@openrouter/spawn-shared": "workspace:*",
