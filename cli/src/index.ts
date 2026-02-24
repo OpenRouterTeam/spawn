@@ -229,6 +229,20 @@ async function handleDefaultCommand(
     process.exit(1);
   }
 
+  // Check if the single argument is a cloud name before routing to agent-interactive.
+  // This fixes: `spawn digitalocean` telling users to run `spawn digitalocean` for
+  // setup instructions, but `spawn digitalocean` routing to "Unknown agent: digitalocean".
+  try {
+    const manifest = await loadManifest();
+    const resolvedCloud = resolveCloudKey(manifest, agent);
+    if (resolvedCloud) {
+      await cmdCloudInfo(resolvedCloud, manifest);
+      return;
+    }
+  } catch {
+    // Manifest unavailable — fall through to cmdAgentInteractive which handles errors gracefully
+  }
+
   // Interactive cloud selection when agent is provided without cloud
   if (isInteractiveTTY()) {
     await cmdAgentInteractive(agent, prompt, dryRun);
