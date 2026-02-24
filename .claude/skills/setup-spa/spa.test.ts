@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, mock, afterEach } from "bun:test";
 import { parseStreamEvent, stripMention, markdownToSlack, loadState, saveState, downloadSlackFile } from "./helpers";
 import { toRecord } from "@openrouter/spawn-shared";
 import streamEvents from "../../../fixtures/claude-code/stream-events.json";

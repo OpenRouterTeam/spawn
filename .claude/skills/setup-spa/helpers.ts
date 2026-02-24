@@ -1,10 +1,18 @@
 // SPA helpers — pure functions for parsing Claude Code stream events,
 // Slack formatting, state management, and file download/cleanup.
 
-import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  rmSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
-import { toRecord, type Result, Ok, Err } from "@openrouter/spawn-shared";
+import { isString, toRecord, type Result, Ok, Err } from "@openrouter/spawn-shared";
 import { slackifyMarkdown } from "slackify-markdown";
 
 // #region State
@@ -27,9 +35,7 @@ export type State = v.InferOutput<typeof StateSchema>;
 
 export function loadState(): Result<State> {
   try {
-    if (!existsSync(STATE_PATH)) {
-      return Ok({ mappings: [] });
-    }
+    if (!existsSync(STATE_PATH)) return Ok({ mappings: [] });
     const raw = readFileSync(STATE_PATH, "utf-8");
     const parsed = v.parse(StateSchema, JSON.parse(raw));
     return Ok(parsed);
@@ -76,6 +82,83 @@ export interface SlackSegment {
   isError?: boolean; // set for tool_result
 }
 
+/** Format a tool_use input block into a truncated backtick hint string. */
+function formatToolHint(block: Record<string, unknown>): string {
+  const input = toRecord(block.input);
+  if (!input) return "";
+  const hint =
+    (isString(input.command) ? input.command : null) ??
+    (isString(input.pattern) ? input.pattern : null) ??
+    (isString(input.file_path) ? input.file_path : null);
+  if (!hint) return "";
+  const short = hint.length > 80 ? `${hint.slice(0, 80)}...` : hint;
+  return ` \`${short}\``;
+}
+
+/** Parse an assistant-type event into a SlackSegment. */
+function parseAssistantEvent(event: Record<string, unknown>): SlackSegment | null {
+  const msg = toRecord(event.message);
+  if (!msg) return null;
+  const content = Array.isArray(msg.content) ? msg.content : [];
+
+  const textParts: string[] = [];
+  const toolParts: string[] = [];
+  let firstToolName: string | undefined;
+
+  for (const rawBlock of content) {
+    const block = toRecord(rawBlock);
+    if (!block) continue;
+
+    if (block.type === "text" && isString(block.text)) {
+      textParts.push(markdownToSlack(block.text));
+    }
+
+    if (block.type === "tool_use" && isString(block.name)) {
+      if (!firstToolName) firstToolName = block.name;
+      toolParts.push(`:hammer_and_wrench: *${block.name}*${formatToolHint(block)}`);
+    }
+  }
+
+  // Tool use takes priority — it's a distinct event kind
+  if (toolParts.length > 0) {
+    return { kind: "tool_use", text: toolParts.join("\n"), toolName: firstToolName };
+  }
+  if (textParts.length > 0) {
+    return { kind: "text", text: textParts.join("") };
+  }
+  return null;
+}
+
+/** Parse a user-type event (tool results) into a SlackSegment. */
+function parseUserEvent(event: Record<string, unknown>): SlackSegment | null {
+  const msg = toRecord(event.message);
+  if (!msg) return null;
+  const content = Array.isArray(msg.content) ? msg.content : [];
+
+  const parts: string[] = [];
+  let hasError = false;
+
+  for (const rawBlock of content) {
+    const block = toRecord(rawBlock);
+    if (!block || block.type !== "tool_result") continue;
+
+    const isError = block.is_error === true;
+    if (isError) hasError = true;
+
+    const prefix = isError ? ":x: Error" : ":white_check_mark: Result";
+    const resultText = isString(block.content) ? block.content : "";
+    const truncated = resultText.length > 500 ? `${resultText.slice(0, 500)}...` : resultText;
+    if (!truncated) {
+      parts.push(`${prefix}: (empty)`);
+    } else {
+      parts.push(`${prefix}:\n\`\`\`\n${truncated}\n\`\`\``);
+    }
+  }
+
+  if (parts.length === 0) return null;
+  return { kind: "tool_result", text: parts.join("\n"), isError: hasError || undefined };
+}
+
 /**
  * Parse a Claude Code stream-json event into a typed Slack segment.
  *
@@ -87,104 +170,8 @@ export interface SlackSegment {
  */
 export function parseStreamEvent(event: Record<string, unknown>): SlackSegment | null {
   const type = event.type;
-
-  if (type === "assistant") {
-    const msg = toRecord(event.message);
-    if (!msg) {
-      return null;
-    }
-    const content = Array.isArray(msg.content) ? msg.content : [];
-
-    // Check what kind of content blocks this message has
-    const textParts: string[] = [];
-    const toolParts: string[] = [];
-
-    for (const rawBlock of content) {
-      const block = toRecord(rawBlock);
-      if (!block) {
-        continue;
-      }
-
-      if (block.type === "text" && typeof block.text === "string") {
-        textParts.push(markdownToSlack(block.text));
-      }
-
-      if (block.type === "tool_use" && typeof block.name === "string") {
-        const input = toRecord(block.input);
-        let summary = "";
-        if (input) {
-          const hint =
-            (typeof input.command === "string" ? input.command : null) ??
-            (typeof input.pattern === "string" ? input.pattern : null) ??
-            (typeof input.file_path === "string" ? input.file_path : null);
-          if (hint) {
-            const short = hint.length > 80 ? `${hint.slice(0, 80)}...` : hint;
-            summary = ` \`${short}\``;
-          }
-        }
-        toolParts.push(`:hammer_and_wrench: *${block.name}*${summary}`);
-      }
-    }
-
-    // Tool use takes priority — it's a distinct event kind
-    if (toolParts.length > 0) {
-      // Extract first tool name for compact footer display
-      const firstToolBlock = content.map((b: unknown) => toRecord(b)).find(
-        (b: Record<string, unknown> | null) => b?.type === "tool_use" && typeof b?.name === "string",
-      );
-      return {
-        kind: "tool_use",
-        text: toolParts.join("\n"),
-        toolName: typeof firstToolBlock?.name === "string" ? firstToolBlock.name : undefined,
-      };
-    }
-    if (textParts.length > 0) {
-      return {
-        kind: "text",
-        text: textParts.join(""),
-      };
-    }
-    return null;
-  }
-
-  if (type === "user") {
-    const msg = toRecord(event.message);
-    if (!msg) {
-      return null;
-    }
-    const content = Array.isArray(msg.content) ? msg.content : [];
-    const parts: string[] = [];
-
-    for (const rawBlock of content) {
-      const block = toRecord(rawBlock);
-      if (!block || block.type !== "tool_result") {
-        continue;
-      }
-      const isError = block.is_error === true;
-      const prefix = isError ? ":x: Error" : ":white_check_mark: Result";
-      const resultText = typeof block.content === "string" ? block.content : "";
-      const truncated = resultText.length > 500 ? `${resultText.slice(0, 500)}...` : resultText;
-      if (!truncated) {
-        parts.push(`${prefix}: (empty)`);
-      } else {
-        parts.push(`${prefix}:\n\`\`\`\n${truncated}\n\`\`\``);
-      }
-    }
-
-    if (parts.length === 0) {
-      return null;
-    }
-    const hasError = content.some((b: unknown) => {
-      const block = toRecord(b);
-      return block?.type === "tool_result" && block?.is_error === true;
-    });
-    return {
-      kind: "tool_result",
-      text: parts.join("\n"),
-      isError: hasError || undefined,
-    };
-  }
-
+  if (type === "assistant") return parseAssistantEvent(event);
+  if (type === "user") return parseUserEvent(event);
   return null;
 }
 
@@ -216,13 +203,9 @@ export async function downloadSlackFile(
 ): Promise<Result<string>> {
   try {
     const resp = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${botToken}`,
-      },
+      headers: { Authorization: `Bearer ${botToken}` },
     });
-    if (!resp.ok) {
-      return Err(new Error(`Failed to download ${filename}: ${resp.status}`));
-    }
+    if (!resp.ok) return Err(new Error(`Failed to download ${filename}: ${resp.status}`));
     const dir = `${DOWNLOADS_DIR}/${threadTs}`;
     mkdirSync(dir, { recursive: true });
     const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -245,9 +228,7 @@ const CLEANUP_TIMESTAMP_PATH = `${DOWNLOADS_DIR}/.last-cleanup`;
 
 /** Remove download directories older than 30 days. */
 export function cleanupStaleDownloads(): void {
-  if (!existsSync(DOWNLOADS_DIR)) {
-    return;
-  }
+  if (!existsSync(DOWNLOADS_DIR)) return;
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
   const cutoff = Date.now() - thirtyDaysMs;
   let removed = 0;
@@ -257,10 +238,7 @@ export function cleanupStaleDownloads(): void {
       try {
         const stat = statSync(entryPath);
         if (stat.isDirectory() && stat.mtimeMs < cutoff) {
-          rmSync(entryPath, {
-            recursive: true,
-            force: true,
-          });
+          rmSync(entryPath, { recursive: true, force: true });
           removed++;
         }
       } catch {
@@ -280,9 +258,7 @@ export function runCleanupIfDue(): void {
   try {
     if (existsSync(CLEANUP_TIMESTAMP_PATH)) {
       const lastRun = Number.parseInt(readFileSync(CLEANUP_TIMESTAMP_PATH, "utf-8").trim(), 10);
-      if (Date.now() - lastRun < CLEANUP_INTERVAL_MS) {
-        return;
-      }
+      if (Date.now() - lastRun < CLEANUP_INTERVAL_MS) return;
     }
   } catch {
     // file missing or unreadable — run cleanup
@@ -291,9 +267,7 @@ export function runCleanupIfDue(): void {
   cleanupStaleDownloads();
 
   try {
-    mkdirSync(DOWNLOADS_DIR, {
-      recursive: true,
-    });
+    mkdirSync(DOWNLOADS_DIR, { recursive: true });
     writeFileSync(CLEANUP_TIMESTAMP_PATH, String(Date.now()));
   } catch {
     // non-fatal

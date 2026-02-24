@@ -3,10 +3,9 @@
 
 import { App, type SectionBlock, type ContextBlock, type KnownBlock } from "@slack/bolt";
 import * as v from "valibot";
-import { toRecord } from "@openrouter/spawn-shared";
+import { toRecord, isString } from "@openrouter/spawn-shared";
 import {
   type State,
-  type Mapping,
   ResultSchema,
   loadState,
   saveState,
@@ -18,6 +17,8 @@ import {
   runCleanupIfDue,
 } from "./helpers";
 
+type SlackClient = InstanceType<typeof App>["client"];
+
 // #region Environment
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN ?? "";
@@ -25,13 +26,7 @@ const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN ?? "";
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID ?? "";
 const GITHUB_REPO = process.env.GITHUB_REPO ?? "OpenRouterTeam/spawn";
 
-const REQUIRED_VARS = {
-  SLACK_BOT_TOKEN,
-  SLACK_APP_TOKEN,
-  SLACK_CHANNEL_ID,
-};
-
-for (const [name, value] of Object.entries(REQUIRED_VARS)) {
+for (const [name, value] of Object.entries({ SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_CHANNEL_ID })) {
   if (!value) {
     console.error(`ERROR: ${name} env var is required`);
     process.exit(1);
@@ -57,10 +52,7 @@ if (!stateResult.ok) {
 // Active Claude Code processes — keyed by threadTs
 const activeRuns = new Map<
   string,
-  {
-    proc: ReturnType<typeof Bun.spawn>;
-    startedAt: number;
-  }
+  { proc: ReturnType<typeof Bun.spawn>; startedAt: number }
 >();
 
 // #endregion
@@ -85,10 +77,33 @@ When creating issues, include a footer: "_Filed from Slack by SPA_"
 Below is the full Slack thread. The most recent message is the one you should respond to. Prior messages are context.`;
 
 /**
+ * Post a new message or update an existing one. Returns the message timestamp.
+ */
+async function postOrUpdate(
+  client: SlackClient,
+  channel: string,
+  threadTs: string,
+  existingTs: string | undefined,
+  fallback: string,
+  blocks: KnownBlock[],
+): Promise<string | undefined> {
+  if (!existingTs) {
+    const msg = await client.chat
+      .postMessage({ channel, thread_ts: threadTs, text: fallback, blocks })
+      .catch(() => null);
+    return msg?.ts;
+  }
+  await client.chat
+    .update({ channel, ts: existingTs, text: fallback, blocks })
+    .catch(() => {});
+  return existingTs;
+}
+
+/**
  * Fetch full thread history from Slack and format as a prompt.
  */
 async function buildThreadPrompt(
-  client: InstanceType<typeof App>["client"],
+  client: SlackClient,
   channel: string,
   threadTs: string,
 ): Promise<string> {
@@ -103,34 +118,22 @@ async function buildThreadPrompt(
   const lines: string[] = [];
 
   for (const msg of messages) {
-    // Skip our own bot messages
-    if (msg.user === BOT_USER_ID) {
-      continue;
-    }
-    if (msg.bot_id) {
-      continue;
-    }
+    if (msg.user === BOT_USER_ID) continue;
+    if (msg.bot_id) continue;
 
     const parts: string[] = [];
 
-    // Message text
     const text = stripMention(msg.text ?? "");
-    if (text) {
-      parts.push(text);
-    }
+    if (text) parts.push(text);
 
     // Files (images, docs, etc.) — download to local tmp
     if (msg.files && Array.isArray(msg.files)) {
       for (const file of msg.files) {
         const f = toRecord(file);
-        if (!f) {
-          continue;
-        }
-        const name = typeof f.name === "string" ? f.name : "file";
-        const url = typeof f.url_private_download === "string" ? f.url_private_download : "";
-        if (!url) {
-          continue;
-        }
+        if (!f) continue;
+        const name = isString(f.name) ? f.name : "file";
+        const url = isString(f.url_private_download) ? f.url_private_download : "";
+        if (!url) continue;
         const dlResult = await downloadSlackFile(url, name, threadTs, SLACK_BOT_TOKEN);
         if (dlResult.ok) {
           parts.push(`[File: ${name}] → ${dlResult.data}`);
@@ -144,22 +147,16 @@ async function buildThreadPrompt(
     if (msg.attachments && Array.isArray(msg.attachments)) {
       for (const att of msg.attachments) {
         const a = toRecord(att);
-        if (!a) {
-          continue;
-        }
-        const title = typeof a.title === "string" ? a.title : "";
-        const attText = typeof a.text === "string" ? a.text : "";
-        const fallback = typeof a.fallback === "string" ? a.fallback : "";
+        if (!a) continue;
+        const title = isString(a.title) ? a.title : "";
+        const attText = isString(a.text) ? a.text : "";
+        const fallback = isString(a.fallback) ? a.fallback : "";
         const content = title || attText || fallback;
-        if (content) {
-          parts.push(`[Attachment: ${content}]`);
-        }
+        if (content) parts.push(`[Attachment: ${content}]`);
       }
     }
 
-    if (parts.length > 0) {
-      lines.push(parts.join("\n"));
-    }
+    if (parts.length > 0) lines.push(parts.join("\n"));
   }
 
   return lines.join("\n\n");
@@ -183,7 +180,6 @@ function buildBlocks(
   const blocks: KnownBlock[] = [];
 
   if (mainText) {
-    // Truncate to section limit, showing the tail for long responses
     const display =
       mainText.length > MAX_SECTION_LEN ? `...${mainText.slice(-MAX_SECTION_LEN)}` : mainText;
     const section: SectionBlock = {
@@ -194,10 +190,7 @@ function buildBlocks(
   }
 
   if (tools.length > 0) {
-    const parts = tools.map((t) => {
-      if (t.errored) return `${t.name} :x:`;
-      return t.name;
-    });
+    const parts = tools.map((t) => (t.errored ? `${t.name} :x:` : t.name));
     let toolLine = `:hammer_and_wrench: ${parts.join(" · ")}`;
     if (loading) toolLine += " :openrouter-loading:";
     const ctx: ContextBlock = {
@@ -206,7 +199,6 @@ function buildBlocks(
     };
     blocks.push(ctx);
   } else if (loading && !mainText) {
-    // No content yet — just show loading
     const ctx: ContextBlock = {
       type: "context",
       elements: [{ type: "mrkdwn", text: ":openrouter-loading:" }],
@@ -219,10 +211,10 @@ function buildBlocks(
 
 /**
  * Run `claude -p` with stream-json output.
- * Text → main section block. Tools → compact context footer.
+ * Text -> main section block. Tools -> compact context footer.
  */
 async function runClaudeAndStream(
-  client: InstanceType<typeof App>["client"],
+  client: SlackClient,
   channel: string,
   threadTs: string,
   prompt: string,
@@ -240,9 +232,7 @@ async function runClaudeAndStream(
     SYSTEM_PROMPT,
   ];
 
-  if (sessionId) {
-    args.push("--resume", sessionId);
-  }
+  if (sessionId) args.push("--resume", sessionId);
 
   // Pass prompt via stdin to avoid CLI flag parsing issues with user content
   args.push("-");
@@ -256,54 +246,28 @@ async function runClaudeAndStream(
     cwd: process.env.REPO_ROOT ?? process.cwd(),
   });
 
-  // Write prompt to stdin and close
   proc.stdin.write(prompt);
   proc.stdin.end();
 
-  activeRuns.set(threadTs, {
-    proc,
-    startedAt: Date.now(),
-  });
+  activeRuns.set(threadTs, { proc, startedAt: Date.now() });
 
   // ─── Streaming state ─────────────────────────────────────────────────
   let mainText = "";
   const tools: ToolEntry[] = [];
-  let currentMsgTs: string | undefined;
+  let msgTs: string | undefined;
   let returnedSessionId: string | null = null;
   let hasOutput = false;
-
   let lastUpdateTime = 0;
   const UPDATE_INTERVAL_MS = 2000;
-  let dirty = false; // tracks whether state changed since last Slack update
+  let dirty = false;
 
   /** Post or update the Slack message with current blocks. */
   async function updateMessage(loading: boolean): Promise<void> {
     const blocks = buildBlocks(mainText, tools, loading);
     if (blocks.length === 0) return;
-
     const fallback = mainText || `Working... (${tools.length} tool${tools.length === 1 ? "" : "s"})`;
     hasOutput = true;
-
-    if (!currentMsgTs) {
-      const msg = await client.chat
-        .postMessage({
-          channel,
-          thread_ts: threadTs,
-          text: fallback,
-          blocks,
-        })
-        .catch(() => null);
-      currentMsgTs = msg?.ts;
-    } else {
-      await client.chat
-        .update({
-          channel,
-          ts: currentMsgTs,
-          text: fallback,
-          blocks,
-        })
-        .catch(() => {});
-    }
+    msgTs = await postOrUpdate(client, channel, threadTs, msgTs, fallback, blocks);
     dirty = false;
   }
 
@@ -341,7 +305,6 @@ async function runClaudeAndStream(
           returnedSessionId = resultEvent.output.session_id;
         }
 
-        // Parse event into typed segment
         const segment = parseStreamEvent(obj);
         if (!segment) continue;
 
@@ -370,7 +333,6 @@ async function runClaudeAndStream(
 
   // ─── Final update ─────────────────────────────────────────────────────
 
-  // Read stderr for errors
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
 
@@ -384,15 +346,7 @@ async function runClaudeAndStream(
       },
     };
     const errBlocks: KnownBlock[] = [errSection];
-    if (!currentMsgTs) {
-      await client.chat
-        .postMessage({ channel, thread_ts: threadTs, text: "Error", blocks: errBlocks })
-        .catch(() => {});
-    } else {
-      await client.chat
-        .update({ channel, ts: currentMsgTs, text: "Error", blocks: errBlocks })
-        .catch(() => {});
-    }
+    msgTs = await postOrUpdate(client, channel, threadTs, msgTs, "Error", errBlocks);
     return null;
   }
 
@@ -405,19 +359,10 @@ async function runClaudeAndStream(
       elements: [{ type: "mrkdwn", text: ":white_check_mark: Done (no text output)" }],
     };
     const doneBlocks: KnownBlock[] = [doneCtx];
-    if (!currentMsgTs) {
-      await client.chat
-        .postMessage({ channel, thread_ts: threadTs, text: "Done", blocks: doneBlocks })
-        .catch(() => {});
-    } else {
-      await client.chat
-        .update({ channel, ts: currentMsgTs, text: "Done", blocks: doneBlocks })
-        .catch(() => {});
-    }
+    msgTs = await postOrUpdate(client, channel, threadTs, msgTs, "Done", doneBlocks);
   }
 
   console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId})`);
-
   return returnedSessionId;
 }
 
@@ -426,7 +371,7 @@ async function runClaudeAndStream(
 // #region Core handler
 
 async function handleThread(
-  client: InstanceType<typeof App>["client"],
+  client: SlackClient,
   channel: string,
   threadTs: string,
   eventTs: string,
@@ -434,33 +379,20 @@ async function handleThread(
   // Prevent concurrent runs on the same thread
   if (activeRuns.has(threadTs)) {
     await client.reactions
-      .add({
-        channel,
-        timestamp: eventTs,
-        name: "hourglass_flowing_sand",
-      })
+      .add({ channel, timestamp: eventTs, name: "hourglass_flowing_sand" })
       .catch(() => {});
     return;
   }
 
-  // Build prompt from full thread (skipping bot messages)
   const prompt = await buildThreadPrompt(client, channel, threadTs);
-  if (!prompt) {
-    return;
-  }
+  if (!prompt) return;
 
-  // Check for existing session to resume
   const existing = findMapping(state, channel, threadTs);
 
   await client.reactions
-    .add({
-      channel,
-      timestamp: eventTs,
-      name: "eyes",
-    })
+    .add({ channel, timestamp: eventTs, name: "eyes" })
     .catch(() => {});
 
-  // Run Claude Code and stream back
   const newSessionId = await runClaudeAndStream(client, channel, threadTs, prompt, existing?.sessionId);
 
   // Save session mapping
@@ -492,9 +424,7 @@ const app = new App({
 
 // --- app_mention: @Spawnis triggers a Claude run on this thread ---
 app.event("app_mention", async ({ event, client }) => {
-  if (event.channel !== SLACK_CHANNEL_ID) {
-    return;
-  }
+  if (event.channel !== SLACK_CHANNEL_ID) return;
   const threadTs = event.thread_ts ?? event.ts;
   await handleThread(client, event.channel, threadTs, event.ts);
 });
@@ -505,12 +435,10 @@ app.event("app_mention", async ({ event, client }) => {
 
 function shutdown(signal: string): void {
   console.log(`[spa] Received ${signal}, shutting down...`);
-
   for (const [threadTs, run] of activeRuns) {
     console.log(`[spa] Killing active run for thread ${threadTs}`);
     run.proc.kill("SIGTERM");
   }
-
   const r = saveState(state);
   if (!r.ok) console.error(`[spa] ${r.error.message}`);
   process.exit(0);
@@ -526,10 +454,7 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 (async () => {
   runCleanupIfDue();
 
-  // Resolve our own bot user ID
-  const authResult = await app.client.auth.test({
-    token: SLACK_BOT_TOKEN,
-  });
+  const authResult = await app.client.auth.test({ token: SLACK_BOT_TOKEN });
   BOT_USER_ID = authResult.user_id ?? "";
   if (BOT_USER_ID) {
     console.log(`[spa] Bot user ID: ${BOT_USER_ID}`);
