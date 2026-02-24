@@ -192,61 +192,21 @@ ensure_in_path() {
     fi
 }
 
-clone_cli() {
-    local dest="$1"
-    log_step "Downloading CLI source..."
-    mkdir -p "${dest}/packages/cli/src"
-    # Download all source files via GitHub API
-    local files
-    files=$(curl -fsSL "https://api.github.com/repos/${SPAWN_REPO}/contents/packages/cli/src" \
-        | grep '"name"' | grep '\.ts"' | grep -v '__tests__' \
-        | sed 's/.*"name": "//;s/".*//')
-    curl -fsSL "${SPAWN_RAW_BASE}/packages/cli/package.json"  -o "${dest}/packages/cli/package.json"
-    curl -fsSL "${SPAWN_RAW_BASE}/packages/cli/bun.lock"       -o "${dest}/packages/cli/bun.lock"
-    curl -fsSL "${SPAWN_RAW_BASE}/packages/cli/tsconfig.json"  -o "${dest}/packages/cli/tsconfig.json"
-    for f in $files; do
-        # SECURITY: Reject non-ASCII characters (Unicode lookalikes/homoglyphs)
-        if [[ "$f" =~ [^[:ascii:]] ]]; then
-            log_error "Security: Non-ASCII characters in filename: $f"
-            log_error "Only ASCII filenames are allowed."
-            log_error "Installation aborted for safety."
-            exit 1
-        fi
-
-        # SECURITY: Strict allowlist — only alphanumeric, underscore, hyphen, .ts extension
-        if [[ ! "$f" =~ ^[a-zA-Z0-9_-]+\.ts$ ]]; then
-            log_error "Security: Invalid filename from API: $f"
-            log_error "Only alphanumeric .ts filenames are allowed."
-            log_error "Installation aborted for safety."
-            exit 1
-        fi
-
-        curl -fsSL "${SPAWN_RAW_BASE}/packages/cli/src/${f}" -o "${dest}/packages/cli/src/${f}"
-    done
-}
-
 # --- Helper: build and install the CLI using bun ---
 build_and_install() {
     tmpdir=$(mktemp -d)
     trap 'rm -rf "${tmpdir}"' EXIT
 
-    clone_cli "${tmpdir}"
-
-    cd "${tmpdir}/packages/cli"
-    bun install
-
-    if ! bun run build 2>/dev/null; then
-        log_warn "Local build failed, downloading pre-built binary..."
-        curl -fsSL "https://github.com/${SPAWN_REPO}/releases/download/cli-latest/cli.js" -o cli.js
-        if [ ! -s cli.js ]; then
-            log_error "Failed to download pre-built binary"
-            exit 1
-        fi
+    log_step "Downloading pre-built CLI binary..."
+    curl -fsSL "https://github.com/${SPAWN_REPO}/releases/download/cli-latest/cli.js" -o "${tmpdir}/cli.js"
+    if [ ! -s "${tmpdir}/cli.js" ]; then
+        log_error "Failed to download pre-built binary"
+        exit 1
     fi
 
     INSTALL_DIR="${SPAWN_INSTALL_DIR:-${HOME}/.local/bin}"
     mkdir -p "${INSTALL_DIR}"
-    cp cli.js "${INSTALL_DIR}/spawn"
+    cp "${tmpdir}/cli.js" "${INSTALL_DIR}/spawn"
     chmod +x "${INSTALL_DIR}/spawn"
 
     log_info "Installed spawn to ${INSTALL_DIR}/spawn"
