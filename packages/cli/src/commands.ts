@@ -1001,9 +1001,7 @@ export async function cmdRun(
   // second VM.
   if (spawnName) {
     const activeServers = getActiveServers();
-    const existingRecord = activeServers.find(
-      (r) => r.name === spawnName && r.agent === agent && r.cloud === cloud,
-    );
+    const existingRecord = activeServers.find((r) => r.name === spawnName && r.agent === agent && r.cloud === cloud);
     if (existingRecord) {
       p.log.warn(
         `An active instance named ${pc.bold(spawnName)} already exists on ${pc.bold(manifest.clouds[cloud].name)}.`,
