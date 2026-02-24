@@ -1,0 +1,12 @@
+{
+  "name": "spawn-slack-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run slack-bot.ts"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.3.0",
+    "valibot": "^1.0.0"
+  }
+}
