@@ -185,6 +185,7 @@ async function runClaudeAndStream(
   const args = [
     "claude",
     "-p",
+    "--verbose",
     "--output-format",
     "stream-json",
     "--dangerously-skip-permissions",

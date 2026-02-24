@@ -90,7 +90,7 @@ Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-Environment="PATH=/home/lab/.bun/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/home/lab/.local/bin:/home/lab/.bun/bin:/usr/local/bin:/usr/bin:/bin"
 
 [Install]
 WantedBy=multi-user.target
