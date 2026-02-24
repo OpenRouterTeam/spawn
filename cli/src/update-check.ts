@@ -202,7 +202,7 @@ function performAutoUpdate(latestVersion: string): void {
   }
 
   try {
-    executor.execSync(`curl -fsSL ${RAW_BASE}/cli/install.sh | bash`, {
+    executor.execSync(`curl -fsSL ${RAW_BASE}/sh/cli/install.sh | bash`, {
       stdio: "inherit",
       shell: "/bin/bash",
     });
@@ -217,7 +217,7 @@ function performAutoUpdate(latestVersion: string): void {
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
     console.error(pc.dim("  Please update manually:"));
     console.error();
-    console.error(pc.cyan(`  curl -fsSL ${RAW_BASE}/cli/install.sh | bash`));
+    console.error(pc.cyan(`  curl -fsSL ${RAW_BASE}/sh/cli/install.sh | bash`));
     console.error();
     // Continue with original command despite update failure
   }

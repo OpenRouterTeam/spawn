@@ -159,8 +159,8 @@ log "Pre-cycle cleanup done."
 
 # --- Fixtures mode: load cloud credentials ---
 if [[ "${RUN_MODE}" == "fixtures" ]]; then
-    if [[ -f "${REPO_ROOT}/shared/key-request.sh" ]]; then
-        source "${REPO_ROOT}/shared/key-request.sh"
+    if [[ -f "${REPO_ROOT}/sh/shared/key-request.sh" ]]; then
+        source "${REPO_ROOT}/sh/shared/key-request.sh"
         load_cloud_keys_from_config
         if [[ -n "${MISSING_KEY_PROVIDERS:-}" ]]; then
             log "Missing keys for: ${MISSING_KEY_PROVIDERS}"
@@ -172,7 +172,7 @@ if [[ "${RUN_MODE}" == "fixtures" ]]; then
             log "All cloud keys available"
         fi
     else
-        log "shared/key-request.sh not found, skipping key preflight"
+        log "sh/shared/key-request.sh not found, skipping key preflight"
     fi
 fi
 

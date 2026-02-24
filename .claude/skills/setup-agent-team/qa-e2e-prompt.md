@@ -21,8 +21,8 @@ cd WORKTREE_BASE_PLACEHOLDER
 
 ```bash
 cd REPO_ROOT_PLACEHOLDER
-chmod +x e2e/fly-e2e.sh
-./e2e/fly-e2e.sh --parallel 6
+chmod +x sh/e2e/fly-e2e.sh
+./sh/e2e/fly-e2e.sh --parallel 6
 ```
 
 Capture the full output. Note which agents passed and which failed.
@@ -43,7 +43,7 @@ For each failed agent, investigate the root cause. The failure categories are:
    - Fly.io API auth issues
    - Agent-specific install script changed upstream
 3. Read the agent's provisioning code: `cli/src/fly/agents.ts` and `cli/src/shared/agent-setup.ts`
-4. Read the E2E provision script: `e2e/lib/provision.sh`
+4. Read the E2E provision script: `sh/e2e/lib/provision.sh`
 
 ### Verification failure (app exists but checks fail)
 
@@ -54,7 +54,7 @@ For each failed agent, investigate the root cause. The failure categories are:
    ```
 2. Check if the binary path changed — read the agent's install script in `cli/src/shared/agent-setup.ts`
 3. Check if the env var names changed — read the agent's config in `manifest.json`
-4. Update the verification checks in `e2e/lib/verify.sh` if they are stale
+4. Update the verification checks in `sh/e2e/lib/verify.sh` if they are stale
 
 ### Timeout (provision took too long)
 
@@ -65,17 +65,17 @@ For each failed agent, investigate the root cause. The failure categories are:
 
 Make fixes in the worktree at WORKTREE_BASE_PLACEHOLDER. Fixes may be in:
 
-- `e2e/lib/provision.sh` — env vars, timeouts, headless flags
-- `e2e/lib/verify.sh` — binary paths, config file locations, env var checks
-- `e2e/lib/common.sh` — API helpers, constants
-- `e2e/lib/teardown.sh` — cleanup logic
-- `e2e/lib/cleanup.sh` — stale app detection
+- `sh/e2e/lib/provision.sh` — env vars, timeouts, headless flags
+- `sh/e2e/lib/verify.sh` — binary paths, config file locations, env var checks
+- `sh/e2e/lib/common.sh` — API helpers, constants
+- `sh/e2e/lib/teardown.sh` — cleanup logic
+- `sh/e2e/lib/cleanup.sh` — stale app detection
 
 After fixing:
 1. Run `bash -n` on every modified `.sh` file
 2. Re-run the E2E suite for the failed agent(s) only to verify the fix:
    ```bash
-   ./e2e/fly-e2e.sh AGENT_NAME
+   ./sh/e2e/fly-e2e.sh AGENT_NAME
    ```
 
 ## Step 5 — Commit and PR

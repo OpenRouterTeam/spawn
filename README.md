@@ -8,7 +8,7 @@ Launch any AI agent on any cloud with a single command. Coding agents, research 
 
 **macOS / Linux — and Windows users inside a WSL2 terminal (Ubuntu, Debian, etc.):**
 ```bash
-curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash
+curl -fsSL https://openrouter.ai/labs/spawn/install.sh | bash
 ```
 
 **Windows PowerShell (outside WSL):**
@@ -116,7 +116,7 @@ If spawn fails to install, try these steps:
    ```bash
    curl -fsSL https://bun.sh/install | bash
    source ~/.bashrc  # or ~/.zshrc for zsh
-   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/cli/install.sh | bash
    ```
 
 3. **PATH issues**: If `spawn` command not found after install
@@ -160,7 +160,7 @@ If an agent fails to install or launch on a cloud:
 
 ## Matrix
 
-| | [Local Machine](local/) | [Hetzner Cloud](hetzner/) | [Fly.io](fly/) | [AWS Lightsail](aws/) | [Daytona](daytona/) | [DigitalOcean](digitalocean/) | [GCP Compute Engine](gcp/) | [Sprite](sprite/) |
+| | [Local Machine](sh/local/) | [Hetzner Cloud](sh/hetzner/) | [Fly.io](sh/fly/) | [AWS Lightsail](sh/aws/) | [Daytona](sh/daytona/) | [DigitalOcean](sh/digitalocean/) | [GCP Compute Engine](sh/gcp/) | [Sprite](sh/sprite/) |
 |---|---|---|---|---|---|---|---|---|
 | [**Claude Code**](https://claude.ai) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenClaw**](https://github.com/openclaw/openclaw) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -191,7 +191,7 @@ git config core.hooksPath .githooks
 ### Structure
 
 ```
-{cloud}/{agent}.sh        # Agent deployment script (thin bash → bun wrapper)
+sh/{cloud}/{agent}.sh     # Agent deployment script (thin bash → bun wrapper)
 cli/                      # TypeScript CLI — all provisioning logic (bun)
 manifest.json             # Source of truth for the matrix
 ```

@@ -4,7 +4,7 @@ import { resolve, join } from "node:path";
 import { isString } from "../shared/type-guards";
 
 /**
- * Validation tests for cli/install.sh.
+ * Validation tests for sh/cli/install.sh.
  *
  * install.sh is the critical entry point for all new users
  * (curl -fsSL ... | bash). It has been modified in multiple recent PRs
@@ -15,7 +15,7 @@ import { isString } from "../shared/type-guards";
  */
 
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
-const INSTALL_SH = join(REPO_ROOT, "cli", "install.sh");
+const INSTALL_SH = join(REPO_ROOT, "sh", "cli", "install.sh");
 const content = readFileSync(INSTALL_SH, "utf-8");
 const lines = content.split("\n");
 
@@ -450,7 +450,7 @@ describe("install.sh validation", () => {
 
   describe("error handling", () => {
     it("should show re-run instructions on bun install failure", () => {
-      expect(content).toContain("curl -fsSL ${SPAWN_RAW_BASE}/cli/install.sh | bash");
+      expect(content).toContain("curl -fsSL ${SPAWN_RAW_BASE}/sh/cli/install.sh | bash");
     });
 
     it("should show manual bun install instructions on failure", () => {

@@ -6,11 +6,11 @@ set -eo pipefail
 # This script itself is bash 3.2 compatible.
 #
 # Usage:
-#   bash test/macos-compat.sh                    # Scan all .sh files
-#   bash test/macos-compat.sh --warn-only        # Always exit 0
-#   bash test/macos-compat.sh path/to/file.sh    # Scan specific file(s)
+#   bash sh/test/macos-compat.sh                    # Scan all .sh files
+#   bash sh/test/macos-compat.sh --warn-only        # Always exit 0
+#   bash sh/test/macos-compat.sh path/to/file.sh    # Scan specific file(s)
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WARN_ONLY=false
 FILES_CHECKED=0
 

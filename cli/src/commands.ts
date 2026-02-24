@@ -834,7 +834,7 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   printDryRunSection("Agent", buildAgentLines(manifest.agents[agent]));
   printDryRunSection("Cloud", buildCloudLines(manifest.clouds[cloud]));
   printDryRunSection("Script", [
-    `  URL: ${RAW_BASE}/${cloud}/${agent}.sh`,
+    `  URL: ${RAW_BASE}/sh/${cloud}/${agent}.sh`,
   ]);
 
   const envLines = buildEnvironmentLines(manifest, agent);
@@ -1186,7 +1186,7 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
 
   // Phase 2: Download script (exit code 2)
   const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
-  const ghUrl = `${RAW_BASE}/${resolvedCloud}/${resolvedAgent}.sh`;
+  const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
 
   let scriptContent: string;
   try {
@@ -1697,7 +1697,7 @@ async function execScript(
   spawnName?: string,
 ): Promise<void> {
   const url = `https://openrouter.ai/labs/spawn/${cloud}/${agent}.sh`;
-  const ghUrl = `${RAW_BASE}/${cloud}/${agent}.sh`;
+  const ghUrl = `${RAW_BASE}/sh/${cloud}/${agent}.sh`;
 
   let scriptContent: string;
   try {
@@ -3241,7 +3241,7 @@ async function fetchRemoteVersion(): Promise<string> {
   return data.version;
 }
 
-const INSTALL_CMD = `curl -fsSL ${RAW_BASE}/cli/install.sh | bash`;
+const INSTALL_CMD = `curl -fsSL ${RAW_BASE}/sh/cli/install.sh | bash`;
 
 async function performUpdate(_remoteVersion: string): Promise<void> {
   const { execSync } = await import("node:child_process");
@@ -3355,7 +3355,7 @@ function getHelpAuthSection(): string {
 
 function getHelpInstallSection(): string {
   return `${pc.bold("INSTALL")}
-  curl -fsSL ${RAW_BASE}/cli/install.sh | bash`;
+  curl -fsSL ${RAW_BASE}/sh/cli/install.sh | bash`;
 }
 
 function getHelpTroubleshootingSection(): string {

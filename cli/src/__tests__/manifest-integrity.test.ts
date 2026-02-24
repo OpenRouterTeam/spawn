@@ -190,7 +190,7 @@ describe("Manifest Integrity", () => {
       const missing: string[] = [];
 
       for (const [key] of implemented) {
-        const scriptPath = join(REPO_ROOT, key + ".sh");
+        const scriptPath = join(REPO_ROOT, "sh", key + ".sh");
         if (!existsSync(scriptPath)) {
           missing.push(key + ".sh");
         }
@@ -216,7 +216,7 @@ describe("Manifest Integrity", () => {
       const badScripts: string[] = [];
 
       for (const [key] of sample) {
-        const scriptPath = join(REPO_ROOT, key + ".sh");
+        const scriptPath = join(REPO_ROOT, "sh", key + ".sh");
         if (existsSync(scriptPath)) {
           const content = readFileSync(scriptPath, "utf-8");
           if (!content.trimStart().startsWith("#!")) {
@@ -234,7 +234,7 @@ describe("Manifest Integrity", () => {
       const badScripts: string[] = [];
 
       for (const [key] of sample) {
-        const scriptPath = join(REPO_ROOT, key + ".sh");
+        const scriptPath = join(REPO_ROOT, "sh", key + ".sh");
         if (existsSync(scriptPath)) {
           const content = readFileSync(scriptPath, "utf-8");
           if (!content.includes("set -eo pipefail")) {
@@ -257,7 +257,7 @@ describe("Manifest Integrity", () => {
       const orphaned: string[] = [];
 
       for (const [key] of missingEntries) {
-        const scriptPath = join(REPO_ROOT, key + ".sh");
+        const scriptPath = join(REPO_ROOT, "sh", key + ".sh");
         if (existsSync(scriptPath)) {
           orphaned.push(key + ".sh");
         }
