@@ -98,10 +98,6 @@ describe("install.sh validation", () => {
       expect(content).toContain("ensure_in_path()");
     });
 
-    it("should define clone_cli function", () => {
-      expect(content).toContain("clone_cli()");
-    });
-
     it("should define build_and_install function", () => {
       expect(content).toContain("build_and_install()");
     });
@@ -207,16 +203,11 @@ describe("install.sh validation", () => {
       expect(content).toContain("rm -rf");
     });
 
-    it("should clone CLI source", () => {
-      expect(content).toContain("clone_cli");
-    });
-
-    it("should run bun install", () => {
-      expect(content).toContain("bun install");
-    });
-
-    it("should attempt bun run build", () => {
-      expect(content).toContain("bun run build");
+    it("should download pre-built binary from GitHub releases", () => {
+      const fnStart = content.indexOf("build_and_install()");
+      const fnBody = content.slice(fnStart);
+      expect(fnBody).toContain("cli-latest");
+      expect(fnBody).toContain("cli.js");
     });
 
     it("should default install dir to ~/.local/bin", () => {
@@ -242,18 +233,9 @@ describe("install.sh validation", () => {
     });
   });
 
-  // ── Build fallback (binary download) ────────────────────────────────
+  // ── Binary download ─────────────────────────────────────────────────
 
-  describe("build fallback and binary download", () => {
-    it("should attempt local build first via bun run build", () => {
-      expect(content).toContain("bun run build");
-    });
-
-    it("should fall back to downloading pre-built binary if build fails", () => {
-      expect(content).toContain("log_warn");
-      expect(content).toContain("downloading pre-built binary");
-    });
-
+  describe("binary download", () => {
     it("should download from GitHub releases with cli-latest tag", () => {
       expect(content).toContain("github.com");
       expect(content).toContain("releases/download");
@@ -262,11 +244,16 @@ describe("install.sh validation", () => {
     });
 
     it("should validate that downloaded binary is not empty", () => {
-      expect(content).toContain("[ ! -s cli.js ]");
+      const fnStart = content.indexOf("build_and_install()");
+      const fnBody = content.slice(fnStart);
+      expect(fnBody).toContain("! -s");
     });
 
-    it("should copy built or downloaded cli.js to install directory", () => {
-      expect(content).toContain('cp cli.js "${INSTALL_DIR}/spawn"');
+    it("should copy downloaded cli.js to install directory", () => {
+      const fnStart = content.indexOf("build_and_install()");
+      const fnBody = content.slice(fnStart);
+      expect(fnBody).toContain("cli.js");
+      expect(fnBody).toContain("${INSTALL_DIR}/spawn");
     });
 
     it("should show helpful message after installation", () => {
@@ -275,36 +262,11 @@ describe("install.sh validation", () => {
       expect(fnBody).toContain('spawn" version');
       expect(fnBody).toContain("to get started");
     });
-  });
 
-  // ── clone_cli function ──────────────────────────────────────────────
-
-  describe("clone_cli", () => {
-    it("should not require git (avoids macOS Xcode CLT trigger)", () => {
-      expect(content).not.toContain("command -v git");
-      expect(content).not.toContain("git clone");
-      expect(content).not.toContain("sparse-checkout");
-    });
-
-    it("should download source via curl and GitHub API", () => {
-      const fnStart = content.indexOf("clone_cli()");
-      const fnEnd = content.indexOf("\n# --- Helper: build", fnStart);
-      const fnBody = content.slice(fnStart, fnEnd > fnStart ? fnEnd : undefined);
-      expect(fnBody).toContain("curl");
-      expect(fnBody).toContain("api.github.com");
-    });
-
-    it("should download package.json and bun.lock", () => {
-      expect(content).toContain("package.json");
-      expect(content).toContain("bun.lock");
-    });
-
-    it("should download tsconfig.json", () => {
-      expect(content).toContain("tsconfig.json");
-    });
-
-    it("should exclude __tests__ directory from downloads", () => {
-      expect(content).toContain("__tests__");
+    it("should not use clone_cli or source builds (removed)", () => {
+      expect(content).not.toContain("clone_cli");
+      expect(content).not.toContain("api.github.com");
+      expect(content).not.toContain("bun run build");
     });
   });
 
