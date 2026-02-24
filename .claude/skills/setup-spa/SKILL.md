@@ -1,5 +1,5 @@
 ---
-name: slack-bot
+name: setup-spa
 description: "SPA (Spawn's Personal Agent) — Slack bot that pipes threads into Claude Code sessions"
 disable-model-invocation: true
 ---
@@ -46,9 +46,9 @@ Subsequent thread replies in tracked threads auto-trigger new Claude Code runs.
 
 GitHub auth uses the `gh` CLI — run `gh auth login` before starting.
 
-## `start-slack-bot.sh` Template
+## `start-spa.sh` Template
 
-Create `.claude/skills/slack-bot/start-slack-bot.sh` (gitignored):
+Create `.claude/skills/setup-spa/start-spa.sh` (gitignored):
 
 ```bash
 #!/bin/bash
@@ -68,12 +68,12 @@ exec bun run "${SCRIPT_DIR}/slack-bot.ts"
 ## Install
 
 ```bash
-cd .claude/skills/slack-bot && bun install
+cd .claude/skills/setup-spa && bun install
 ```
 
 ## Systemd Service
 
-Create `/etc/systemd/system/spawn-slack-bot.service`:
+Create `/etc/systemd/system/spawn-spa.service`:
 
 ```ini
 [Unit]
@@ -84,8 +84,8 @@ After=network.target
 Type=simple
 User=lab
 Group=lab
-WorkingDirectory=/home/lab/spawn/.claude/skills/slack-bot
-ExecStart=/bin/bash /home/lab/spawn/.claude/skills/slack-bot/start-slack-bot.sh
+WorkingDirectory=/home/lab/spawn/.claude/skills/setup-spa
+ExecStart=/bin/bash /home/lab/spawn/.claude/skills/setup-spa/start-spa.sh
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -100,14 +100,14 @@ Then:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now spawn-slack-bot
+sudo systemctl enable --now spawn-spa
 ```
 
 ## Verify
 
 ```bash
-sudo systemctl status spawn-slack-bot
-journalctl -u spawn-slack-bot -f
+sudo systemctl status spawn-spa
+journalctl -u spawn-spa -f
 
 # Test: @mention spa in channel → Claude Code runs, response streams back
 # Test: Reply and @mention again → resumes same session
@@ -121,7 +121,7 @@ Thread-to-session mappings are persisted at `~/.config/spawn/slack-issues.json`.
 
 | Symptom | Fix |
 |---------|-----|
-| `ERROR: SLACK_BOT_TOKEN env var is required` | Set all required env vars in `start-slack-bot.sh` |
+| `ERROR: SLACK_BOT_TOKEN env var is required` | Set all required env vars in `start-spa.sh` |
 | Bot doesn't respond to @mentions | Verify bot is invited to the channel; check `SLACK_CHANNEL_ID` |
 | Claude errors with permission denied | Ensure `--dangerously-skip-permissions` is working, or run in a sandbox |
 | Responses truncated | Slack has ~4000 char limit per message; long responses show the tail |
