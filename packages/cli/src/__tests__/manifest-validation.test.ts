@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented, type Manifest } from "../manifest";
-import {
-  createMockManifest,
-  setupTestEnvironment,
-  teardownTestEnvironment,
-  type TestEnvironment,
-} from "./test-helpers";
+import type { Manifest } from "../manifest";
+import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented } from "../manifest";
+import type { TestEnvironment } from "./test-helpers";
+import { createMockManifest, setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
 
 /**
  * Tests for manifest.ts validation and edge cases that are not covered

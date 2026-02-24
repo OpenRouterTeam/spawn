@@ -2,14 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import {
-  clearHistory,
-  loadHistory,
-  saveSpawnRecord,
-  filterHistory,
-  getHistoryPath,
-  type SpawnRecord,
-} from "../history.js";
+import type { SpawnRecord } from "../history.js";
+import { clearHistory, loadHistory, saveSpawnRecord, filterHistory, getHistoryPath } from "../history.js";
 
 /**
  * Tests for clearHistory (history.ts) and cmdListClear (commands.ts).

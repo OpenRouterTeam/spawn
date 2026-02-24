@@ -1,13 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import type { Manifest } from "../manifest";
-import {
-  mockSuccessfulFetch,
-  mockFailedFetch,
-  setupTestEnvironment,
-  teardownTestEnvironment,
-  type TestEnvironment,
-} from "./test-helpers";
+import type { TestEnvironment } from "./test-helpers";
+import { mockSuccessfulFetch, mockFailedFetch, setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
 
 describe("CLI Integration Tests", () => {
   let env: TestEnvironment;

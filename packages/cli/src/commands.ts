@@ -6,6 +6,7 @@ import { parseJsonWith, isString } from "@openrouter/spawn-shared";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { Manifest } from "./manifest.js";
 import {
   loadManifest,
   agentKeys,
@@ -15,7 +16,6 @@ import {
   isStaleCache,
   RAW_BASE,
   REPO,
-  type Manifest,
 } from "./manifest.js";
 import pkg from "../package.json" with { type: "json" };
 const VERSION = pkg.version;
@@ -28,6 +28,7 @@ import {
   validateServerIdentifier,
   validateMetadataValue,
 } from "./security.js";
+import type { SpawnRecord, VMConnection } from "./history.js";
 import {
   saveSpawnRecord,
   filterHistory,
@@ -36,8 +37,6 @@ import {
   removeRecord,
   getActiveServers,
   getHistoryPath,
-  type SpawnRecord,
-  type VMConnection,
 } from "./history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "./guidance-data.js";
 import { destroyServer as flyDestroyServer, ensureFlyCli, ensureFlyToken } from "./fly/fly.js";

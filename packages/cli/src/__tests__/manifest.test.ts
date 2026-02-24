@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented, type Manifest } from "../manifest";
+import type { Manifest } from "../manifest";
+import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented } from "../manifest";
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import type { TestEnvironment } from "./test-helpers";
 import {
   createMockManifest,
   createEmptyManifest,
@@ -9,7 +11,6 @@ import {
   mockFailedFetch,
   setupTestEnvironment,
   teardownTestEnvironment,
-  type TestEnvironment,
 } from "./test-helpers";
 
 const mockManifest = createMockManifest();
