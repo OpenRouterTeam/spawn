@@ -1,0 +1,107 @@
+[
+  {
+    "type": "assistant",
+    "message": {
+      "id": "msg_01ABC",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {"type": "text", "text": "I'll look at the issue and check the repository structure."}
+      ],
+      "model": "claude-sonnet-4-20250514",
+      "stop_reason": "end_turn"
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "id": "msg_01DEF",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {"type": "tool_use", "id": "toolu_01ABC", "name": "Bash", "input": {"command": "gh issue list --repo OpenRouterTeam/spawn --state open --limit 5"}}
+      ],
+      "model": "claude-sonnet-4-20250514",
+      "stop_reason": "tool_use"
+    }
+  },
+  {
+    "type": "user",
+    "message": {
+      "id": "msg_user_01",
+      "type": "message",
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "toolu_01ABC", "content": "#1234 [Bug]: Fly.io deploy fails on arm64\n#1235 [CLI]: Add --json flag to list command", "is_error": false}
+      ]
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "id": "msg_01GHI",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {"type": "tool_use", "id": "toolu_01DEF", "name": "Glob", "input": {"pattern": "**/*.ts"}}
+      ],
+      "model": "claude-sonnet-4-20250514",
+      "stop_reason": "tool_use"
+    }
+  },
+  {
+    "type": "user",
+    "message": {
+      "id": "msg_user_02",
+      "type": "message",
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "toolu_01DEF", "content": "packages/cli/src/index.ts\npackages/cli/src/commands.ts\npackages/cli/src/manifest.ts", "is_error": false}
+      ]
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "id": "msg_01JKL",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {"type": "tool_use", "id": "toolu_01GHI", "name": "Read", "input": {"file_path": "/home/user/spawn/packages/cli/src/index.ts"}}
+      ],
+      "model": "claude-sonnet-4-20250514",
+      "stop_reason": "tool_use"
+    }
+  },
+  {
+    "type": "user",
+    "message": {
+      "id": "msg_user_03",
+      "type": "message",
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "toolu_01GHI", "content": "Command execution failed: Permission denied", "is_error": true}
+      ]
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "id": "msg_01MNO",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {"type": "text", "text": "I've reviewed the open issues. Here's a summary:\n\n1. **#1234** - Fly.io deploy fails on arm64 architecture\n2. **#1235** - Request to add `--json` flag to the list command\n\nWould you like me to create a new issue or work on one of these?"}
+      ],
+      "model": "claude-sonnet-4-20250514",
+      "stop_reason": "end_turn"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "success",
+    "session_id": "abc123-def456-ghi789",
+    "is_error": false,
+    "result": "I've reviewed the open issues and provided a summary."
+  }
+]

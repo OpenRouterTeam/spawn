@@ -39,18 +39,34 @@ const AwsCredsSchema = v.object({
 
 export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
   const dir = AWS_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn(["mkdir", "-p", dir]).exited;
+  await Bun.spawn([
+    "mkdir",
+    "-p",
+    dir,
+  ]).exited;
   const payload = `{\n  "accessKeyId": ${jsonEscape(accessKeyId)},\n  "secretAccessKey": ${jsonEscape(secretAccessKey)},\n  "region": ${jsonEscape(region)}\n}\n`;
-  await Bun.write(AWS_CONFIG_PATH, payload, { mode: 0o600 });
+  await Bun.write(AWS_CONFIG_PATH, payload, {
+    mode: 0o600,
+  });
 }
 
-export function loadCredsFromConfig(): { accessKeyId: string; secretAccessKey: string; region: string } | null {
+export function loadCredsFromConfig(): {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+} | null {
   try {
     const raw = readFileSync(AWS_CONFIG_PATH, "utf-8");
     const data = parseJsonWith(raw, AwsCredsSchema);
-    if (!data?.accessKeyId || !data?.secretAccessKey) { return null; }
-    if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) { return null; }
-    if (data.secretAccessKey.length < 16) { return null; }
+    if (!data?.accessKeyId || !data?.secretAccessKey) {
+      return null;
+    }
+    if (!/^[A-Za-z0-9/+]{16,128}$/.test(data.accessKeyId)) {
+      return null;
+    }
+    if (data.secretAccessKey.length < 16) {
+      return null;
+    }
     return {
       accessKeyId: data.accessKeyId,
       secretAccessKey: data.secretAccessKey,
@@ -521,7 +537,10 @@ export async function authenticate(): Promise<void> {
       awsSecretAccessKey = cached.secretAccessKey;
 
       if (hasAwsCli()) {
-        const result = awsCliSync(["sts", "get-caller-identity"]);
+        const result = awsCliSync([
+          "sts",
+          "get-caller-identity",
+        ]);
         if (result.exitCode === 0) {
           lightsailMode = "cli";
           logInfo(`AWS CLI ready with cached credentials, using region: ${cachedRegion}`);

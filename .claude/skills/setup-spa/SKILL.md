@@ -60,15 +60,15 @@ export SLACK_BOT_TOKEN="xoxb-YOUR-BOT-TOKEN"
 export SLACK_APP_TOKEN="xapp-YOUR-APP-TOKEN"
 export SLACK_CHANNEL_ID="C0000000000"
 export GITHUB_REPO="OpenRouterTeam/spawn"
-export REPO_ROOT="/home/lab/spawn"
+export REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
-exec bun run "${SCRIPT_DIR}/slack-bot.ts"
+exec bun run "${SCRIPT_DIR}/main.ts"
 ```
 
 ## Install
 
 ```bash
-cd .claude/skills/setup-spa && bun install
+bun install    # from repo root — workspace install
 ```
 
 ## Systemd Service
