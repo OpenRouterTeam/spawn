@@ -2724,26 +2724,19 @@ export async function cmdLast(): Promise<void> {
 // ── Connect ────────────────────────────────────────────────────────────────────
 
 /** Execute a shell command and resolve/reject on process close/error */
-function runInteractiveCommand(cmd: string, args: string[], failureMsg: string, manualCmd: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(cmd, args, {
-      stdio: "inherit",
-    });
-
-    child.on("close", (code: number | null) => {
-      if (code === 0 || code === null) {
-        resolve();
-      } else {
-        reject(new Error(`${failureMsg} with exit code ${code}`));
-      }
-    });
-
-    child.on("error", (err) => {
-      p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
-      p.log.info(`Try manually: ${pc.cyan(manualCmd)}`);
-      reject(err);
-    });
-  });
+async function runInteractiveCommand(cmd: string, args: string[], failureMsg: string, manualCmd: string): Promise<void> {
+  let proc: ReturnType<typeof Bun.spawn> | undefined;
+  try {
+    proc = Bun.spawn([cmd, ...args], { stdio: ["inherit", "inherit", "inherit"] });
+  } catch (err) {
+    p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
+    p.log.info(`Try manually: ${pc.cyan(manualCmd)}`);
+    throw err;
+  }
+  const code = await proc.exited;
+  if (code !== 0) {
+    throw new Error(`${failureMsg} with exit code ${code}`);
+  }
 }
 
 /** Connect to an existing VM via SSH */
