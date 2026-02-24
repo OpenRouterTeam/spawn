@@ -1,8 +1,21 @@
+// SPA (Spawn's Personal Agent) — Slack bot entry point.
+// Pipes Slack threads into Claude Code sessions and streams responses back.
+
 import { App } from "@slack/bolt";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
-import { dirname } from "node:path";
 import * as v from "valibot";
 import { toRecord } from "@openrouter/spawn-shared";
+import {
+  type State,
+  ResultSchema,
+  loadState,
+  saveState,
+  findMapping,
+  addMapping,
+  parseStreamEvent,
+  stripMention,
+  downloadSlackFile,
+  runCleanupIfDue,
+} from "./helpers";
 
 // #region Environment
 
@@ -34,57 +47,6 @@ let BOT_USER_ID = "";
 
 // #region State
 
-const STATE_PATH = process.env.STATE_PATH ?? `${process.env.HOME ?? "/root"}/.config/spawn/slack-issues.json`;
-
-const MappingSchema = v.object({
-  channel: v.string(),
-  threadTs: v.string(),
-  sessionId: v.string(),
-  createdAt: v.string(),
-});
-
-const StateSchema = v.object({
-  mappings: v.array(MappingSchema),
-});
-
-type Mapping = v.InferOutput<typeof MappingSchema>;
-type State = v.InferOutput<typeof StateSchema>;
-
-function loadState(): State {
-  try {
-    if (!existsSync(STATE_PATH)) {
-      return {
-        mappings: [],
-      };
-    }
-    const raw = readFileSync(STATE_PATH, "utf-8");
-    const parsed = v.parse(StateSchema, JSON.parse(raw));
-    return parsed;
-  } catch {
-    console.warn("[spa] Could not load state, starting fresh");
-    return {
-      mappings: [],
-    };
-  }
-}
-
-function saveState(s: State): void {
-  const dir = dirname(STATE_PATH);
-  mkdirSync(dir, {
-    recursive: true,
-  });
-  writeFileSync(STATE_PATH, `${JSON.stringify(s, null, 2)}\n`);
-}
-
-function findMapping(s: State, channel: string, threadTs: string): Mapping | undefined {
-  return s.mappings.find((m) => m.channel === channel && m.threadTs === threadTs);
-}
-
-function addMapping(s: State, mapping: Mapping): void {
-  s.mappings.push(mapping);
-  saveState(s);
-}
-
 const state = loadState();
 
 // Active Claude Code processes — keyed by threadTs
@@ -99,100 +61,6 @@ const activeRuns = new Map<
 // #endregion
 
 // #region Claude Code helpers
-
-const ResultSchema = v.object({
-  type: v.literal("result"),
-  session_id: v.string(),
-});
-
-/**
- * Format a Claude Code stream-json event into Slack-friendly text, or null to skip.
- *
- * Claude Code emits complete messages (not Anthropic streaming deltas):
- *   {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
- *   {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{...}}]}}
- *   {"type":"user","message":{"content":[{"type":"tool_result","content":"..."}]}}
- *   {"type":"result","result":"...","session_id":"..."}
- */
-function formatStreamEvent(event: Record<string, unknown>): string | null {
-  const type = event.type;
-
-  // Assistant messages — contain text, tool_use, or thinking blocks
-  if (type === "assistant") {
-    const msg = toRecord(event.message);
-    if (!msg) {
-      return null;
-    }
-    const content = Array.isArray(msg.content) ? msg.content : [];
-    const parts: string[] = [];
-
-    for (const rawBlock of content) {
-      const block = toRecord(rawBlock);
-      if (!block) {
-        continue;
-      }
-
-      if (block.type === "text" && typeof block.text === "string") {
-        parts.push(block.text);
-      }
-
-      if (block.type === "tool_use" && typeof block.name === "string") {
-        const input = toRecord(block.input);
-        // Show a short summary of the tool input
-        let summary = "";
-        if (input) {
-          const cmd = typeof input.command === "string" ? input.command : null;
-          const pattern = typeof input.pattern === "string" ? input.pattern : null;
-          const filePath = typeof input.file_path === "string" ? input.file_path : null;
-          const hint = cmd ?? pattern ?? filePath;
-          if (hint) {
-            const short = hint.length > 80 ? `${hint.slice(0, 80)}...` : hint;
-            summary = ` \`${short}\``;
-          }
-        }
-        parts.push(`\n:hammer_and_wrench: *${block.name}*${summary}\n`);
-      }
-    }
-
-    if (parts.length === 0) {
-      return null;
-    }
-    return parts.join("");
-  }
-
-  // User messages — contain tool_result blocks
-  if (type === "user") {
-    const msg = toRecord(event.message);
-    if (!msg) {
-      return null;
-    }
-    const content = Array.isArray(msg.content) ? msg.content : [];
-    const parts: string[] = [];
-
-    for (const rawBlock of content) {
-      const block = toRecord(rawBlock);
-      if (!block || block.type !== "tool_result") {
-        continue;
-      }
-      const isError = block.is_error === true;
-      const prefix = isError ? ":x: Error" : ":white_check_mark: Result";
-      const resultText = typeof block.content === "string" ? block.content : "";
-      const truncated = resultText.length > 500 ? `${resultText.slice(0, 500)}...` : resultText;
-      if (!truncated) {
-        parts.push(`${prefix}: (empty)\n`);
-      } else {
-        parts.push(`${prefix}:\n\`\`\`\n${truncated}\n\`\`\`\n`);
-      }
-    }
-
-    if (parts.length === 0) {
-      return null;
-    }
-    return parts.join("");
-  }
-
-  return null;
-}
 
 const SYSTEM_PROMPT = `You are SPA (Spawn's Personal Agent), a Slack bot for the Spawn project (${GITHUB_REPO}).
 
@@ -210,102 +78,6 @@ Always use the \`gh\` CLI for GitHub operations. You are already authenticated.
 When creating issues, include a footer: "_Filed from Slack by SPA_"
 
 Below is the full Slack thread. The most recent message is the one you should respond to. Prior messages are context.`;
-
-const DOWNLOADS_DIR = "/tmp/spa-downloads";
-
-/** Download a Slack-hosted file into a thread-scoped temp dir. Returns the local path or null. */
-async function downloadSlackFile(url: string, filename: string, threadTs: string): Promise<string | null> {
-  try {
-    const resp = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-    });
-    if (!resp.ok) {
-      console.error(`[spa] Failed to download ${filename}: ${resp.status}`);
-      return null;
-    }
-    const dir = `${DOWNLOADS_DIR}/${threadTs}`;
-    mkdirSync(dir, {
-      recursive: true,
-    });
-    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const localPath = `${dir}/${safeName}`;
-    const buf = await resp.arrayBuffer();
-    writeFileSync(localPath, Buffer.from(buf));
-    return localPath;
-  } catch (err) {
-    console.error(`[spa] Error downloading ${filename}:`, err);
-    return null;
-  }
-}
-
-/** Remove download directories older than 30 days. */
-function cleanupStaleDownloads(): void {
-  if (!existsSync(DOWNLOADS_DIR)) {
-    return;
-  }
-  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-  const cutoff = Date.now() - thirtyDaysMs;
-  let removed = 0;
-  try {
-    for (const entry of readdirSync(DOWNLOADS_DIR)) {
-      const entryPath = `${DOWNLOADS_DIR}/${entry}`;
-      try {
-        const stat = statSync(entryPath);
-        if (stat.isDirectory() && stat.mtimeMs < cutoff) {
-          rmSync(entryPath, {
-            recursive: true,
-            force: true,
-          });
-          removed++;
-        }
-      } catch {
-        // skip entries we can't stat
-      }
-    }
-  } catch {
-    // ignore if dir disappeared
-  }
-  if (removed > 0) {
-    console.log(`[spa] Cleaned up ${removed} stale download dir(s)`);
-  }
-}
-
-const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-const CLEANUP_TIMESTAMP_PATH = `${DOWNLOADS_DIR}/.last-cleanup`;
-let cleanupTimer: ReturnType<typeof setInterval> | null = null;
-
-/** Run cleanup only if at least 1 hour since last run. Persists timestamp to disk. */
-function runCleanupIfDue(): void {
-  try {
-    if (existsSync(CLEANUP_TIMESTAMP_PATH)) {
-      const lastRun = Number.parseInt(readFileSync(CLEANUP_TIMESTAMP_PATH, "utf-8").trim(), 10);
-      if (Date.now() - lastRun < CLEANUP_INTERVAL_MS) {
-        return;
-      }
-    }
-  } catch {
-    // file missing or unreadable — run cleanup
-  }
-
-  cleanupStaleDownloads();
-
-  try {
-    mkdirSync(DOWNLOADS_DIR, {
-      recursive: true,
-    });
-    writeFileSync(CLEANUP_TIMESTAMP_PATH, String(Date.now()));
-  } catch {
-    // non-fatal
-  }
-}
-
-/** Start the hourly cleanup schedule. */
-function startCleanupSchedule(): void {
-  runCleanupIfDue();
-  cleanupTimer = setInterval(runCleanupIfDue, CLEANUP_INTERVAL_MS);
-}
 
 /**
  * Fetch full thread history from Slack and format as a prompt.
@@ -354,7 +126,7 @@ async function buildThreadPrompt(
         if (!url) {
           continue;
         }
-        const localPath = await downloadSlackFile(url, name, threadTs);
+        const localPath = await downloadSlackFile(url, name, threadTs, SLACK_BOT_TOKEN);
         if (localPath) {
           parts.push(`[File: ${name}] → ${localPath}`);
         }
@@ -413,15 +185,21 @@ async function runClaudeAndStream(
     args.push("--resume", sessionId);
   }
 
-  args.push(prompt);
+  // Pass prompt via stdin to avoid CLI flag parsing issues with user content
+  args.push("-");
 
   console.log(`[spa] Starting claude session (thread=${threadTs}, resume=${sessionId ?? "new"})`);
 
   const proc = Bun.spawn(args, {
     stdout: "pipe",
     stderr: "pipe",
+    stdin: "pipe",
     cwd: process.env.REPO_ROOT ?? process.cwd(),
   });
+
+  // Write prompt to stdin and close
+  proc.stdin.write(prompt);
+  proc.stdin.end();
 
   activeRuns.set(threadTs, {
     proc,
@@ -437,15 +215,62 @@ async function runClaudeAndStream(
     })
     .catch(() => null);
 
-  const updateTs = thinkingMsg?.ts;
-  let fullText = "";
-  let lastUpdateLen = 0;
+  let currentMsgTs = thinkingMsg?.ts;
+  let currentText = "";
   let returnedSessionId: string | null = null;
+  let hasOutput = false;
 
   // Throttle Slack updates — update at most every 2s
   let lastUpdateTime = 0;
   const UPDATE_INTERVAL_MS = 2000;
-  const MAX_MSG_LEN = 3900; // Slack limit ~4000, leave room
+  const MAX_MSG_LEN = 3800; // Slack limit ~4000, leave room for formatting
+
+  /** Update the current Slack message, or post a new one if at limit. */
+  async function flushToSlack(text: string, forceNew = false): Promise<void> {
+    if (!text) {
+      return;
+    }
+    hasOutput = true;
+
+    // Need a new message if text would exceed limit or forced
+    if (forceNew || !currentMsgTs || text.length > MAX_MSG_LEN) {
+      // If there's leftover text in the current message, finalize it first
+      if (currentMsgTs && currentText) {
+        await client.chat
+          .update({
+            channel,
+            ts: currentMsgTs,
+            text: currentText.slice(0, MAX_MSG_LEN),
+          })
+          .catch(() => {});
+      }
+
+      // Post a new message
+      const newMsg = await client.chat
+        .postMessage({
+          channel,
+          thread_ts: threadTs,
+          text: text.slice(0, MAX_MSG_LEN),
+        })
+        .catch(() => null);
+
+      currentMsgTs = newMsg?.ts;
+      currentText = text.slice(0, MAX_MSG_LEN);
+      return;
+    }
+
+    await client.chat
+      .update({
+        channel,
+        ts: currentMsgTs,
+        text: text.slice(0, MAX_MSG_LEN),
+      })
+      .catch(() => {});
+    currentText = text.slice(0, MAX_MSG_LEN);
+  }
+
+  // Accumulates text for the current "section" (consecutive text blocks)
+  let pendingText = "";
 
   const decoder = new TextDecoder();
   const reader = proc.stdout.getReader();
@@ -488,27 +313,28 @@ async function runClaudeAndStream(
           returnedSessionId = resultEvent.output.session_id;
         }
 
-        // Format event for Slack display
-        const segment = formatStreamEvent(obj);
-        if (segment) {
-          fullText += segment;
+        // Parse event into typed segment
+        const segment = parseStreamEvent(obj);
+        if (!segment) {
+          continue;
+        }
+
+        if (segment.kind === "text") {
+          pendingText += segment.text;
+        } else {
+          // tool_use and tool_result get their own messages
+          if (pendingText) {
+            await flushToSlack(pendingText);
+            pendingText = "";
+          }
+          await flushToSlack(segment.text, true);
         }
       }
 
-      // Throttled Slack update
+      // Throttled update for accumulated text
       const now = Date.now();
-      if (updateTs && fullText.length > lastUpdateLen && now - lastUpdateTime >= UPDATE_INTERVAL_MS) {
-        const displayText = fullText.length > MAX_MSG_LEN ? `...${fullText.slice(-MAX_MSG_LEN)}` : fullText;
-
-        await client.chat
-          .update({
-            channel,
-            ts: updateTs,
-            text: displayText,
-          })
-          .catch(() => {});
-
-        lastUpdateLen = fullText.length;
+      if (pendingText && now - lastUpdateTime >= UPDATE_INTERVAL_MS) {
+        await flushToSlack(pendingText);
         lastUpdateTime = now;
       }
     }
@@ -516,17 +342,22 @@ async function runClaudeAndStream(
     activeRuns.delete(threadTs);
   }
 
+  // Flush any remaining text
+  if (pendingText) {
+    await flushToSlack(pendingText);
+  }
+
   // Read stderr for errors
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
 
-  if (exitCode !== 0 && !fullText) {
+  if (exitCode !== 0 && !hasOutput) {
     console.error(`[spa] claude exited ${exitCode}: ${stderr}`);
-    if (updateTs) {
+    if (currentMsgTs) {
       await client.chat
         .update({
           channel,
-          ts: updateTs,
+          ts: currentMsgTs,
           text: `:x: Claude Code errored (exit ${exitCode}):\n\`\`\`\n${stderr.slice(0, 1500)}\n\`\`\``,
         })
         .catch(() => {});
@@ -534,40 +365,19 @@ async function runClaudeAndStream(
     return null;
   }
 
-  // Final update with complete text
-  if (updateTs && fullText) {
-    const displayText = fullText.length > MAX_MSG_LEN ? `...${fullText.slice(-MAX_MSG_LEN)}` : fullText;
-
+  if (!hasOutput && currentMsgTs) {
     await client.chat
       .update({
         channel,
-        ts: updateTs,
-        text: displayText,
-      })
-      .catch(() => {});
-  }
-
-  if (!fullText && updateTs) {
-    await client.chat
-      .update({
-        channel,
-        ts: updateTs,
+        ts: currentMsgTs,
         text: ":white_check_mark: Done (no text output)",
       })
       .catch(() => {});
   }
 
-  console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${fullText.length})`);
+  console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId})`);
 
   return returnedSessionId;
-}
-
-// #endregion
-
-// #region Text helpers
-
-function stripMention(text: string): string {
-  return text.replace(/<@[A-Z0-9]+>/g, "").trim();
 }
 
 // #endregion
@@ -610,18 +420,18 @@ async function handleThread(
     .catch(() => {});
 
   // Run Claude Code and stream back
-  const sessionId = await runClaudeAndStream(client, channel, threadTs, prompt, existing?.sessionId);
+  const newSessionId = await runClaudeAndStream(client, channel, threadTs, prompt, existing?.sessionId);
 
   // Save session mapping
-  if (sessionId && !existing) {
+  if (newSessionId && !existing) {
     addMapping(state, {
       channel,
       threadTs,
-      sessionId,
+      sessionId: newSessionId,
       createdAt: new Date().toISOString(),
     });
-  } else if (sessionId && existing) {
-    existing.sessionId = sessionId;
+  } else if (newSessionId && existing) {
+    existing.sessionId = newSessionId;
     saveState(state);
   }
 }
@@ -653,10 +463,6 @@ app.event("app_mention", async ({ event, client }) => {
 function shutdown(signal: string): void {
   console.log(`[spa] Received ${signal}, shutting down...`);
 
-  if (cleanupTimer) {
-    clearInterval(cleanupTimer);
-  }
-
   for (const [threadTs, run] of activeRuns) {
     console.log(`[spa] Killing active run for thread ${threadTs}`);
     run.proc.kill("SIGTERM");
@@ -674,7 +480,7 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 // #region Start
 
 (async () => {
-  startCleanupSchedule();
+  runCleanupIfDue();
 
   // Resolve our own bot user ID
   const authResult = await app.client.auth.test({

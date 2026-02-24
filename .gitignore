@@ -2,6 +2,7 @@ node_modules/
 .docs/
 __pycache__/
 .claude/skills/*/start-*.sh
+.claude/skills/setup-spa/spa.js
 # Build artifacts handled by packages/cli/.gitignore
 
 # Sensitive files — never commit secrets or private keys
