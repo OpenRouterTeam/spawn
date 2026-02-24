@@ -60,7 +60,7 @@ function loadState(): State {
     const parsed = v.parse(StateSchema, JSON.parse(raw));
     return parsed;
   } catch {
-    console.warn("[spawnis] Could not load state, starting fresh");
+    console.warn("[spa] Could not load state, starting fresh");
     return { mappings: [] };
   }
 }
@@ -119,7 +119,7 @@ const ResultSchema = v.object({
   session_id: v.string(),
 });
 
-const SYSTEM_PROMPT = `You are Spawnis, a Slack bot for the Spawn project (${GITHUB_REPO}).
+const SYSTEM_PROMPT = `You are SPA (Spawn Processes Autonomously), a Slack bot for the Spawn project (${GITHUB_REPO}).
 
 Your primary job is to help manage GitHub issues based on Slack conversations:
 
@@ -130,7 +130,7 @@ Your primary job is to help manage GitHub issues based on Slack conversations:
 
 Always use the \`gh\` CLI for GitHub operations. You are already authenticated.
 
-When creating issues, include a footer: "_Filed from Slack by Spawnis_"
+When creating issues, include a footer: "_Filed from Slack by SPA_"
 
 Below is the full Slack thread. The most recent message is the one you should respond to. Prior messages are context.`;
 
@@ -193,7 +193,7 @@ async function runClaudeAndStream(
   args.push(prompt);
 
   console.log(
-    `[spawnis] Starting claude session (thread=${threadTs}, resume=${sessionId ?? "new"})`,
+    `[spa] Starting claude session (thread=${threadTs}, resume=${sessionId ?? "new"})`,
   );
 
   const proc = Bun.spawn(args, {
@@ -300,7 +300,7 @@ async function runClaudeAndStream(
   const exitCode = await proc.exited;
 
   if (exitCode !== 0 && !fullText) {
-    console.error(`[spawnis] claude exited ${exitCode}: ${stderr}`);
+    console.error(`[spa] claude exited ${exitCode}: ${stderr}`);
     if (updateTs) {
       await client.chat
         .update({
@@ -336,7 +336,7 @@ async function runClaudeAndStream(
   }
 
   console.log(
-    `[spawnis] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${fullText.length})`,
+    `[spa] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${fullText.length})`,
   );
 
   return returnedSessionId;
@@ -455,10 +455,10 @@ app.event("message", async ({ event, client }) => {
 // ---------------------------------------------------------------------------
 
 function shutdown(signal: string): void {
-  console.log(`[spawnis] Received ${signal}, shutting down...`);
+  console.log(`[spa] Received ${signal}, shutting down...`);
 
   for (const [threadTs, run] of activeRuns) {
-    console.log(`[spawnis] Killing active run for thread ${threadTs}`);
+    console.log(`[spa] Killing active run for thread ${threadTs}`);
     run.proc.kill("SIGTERM");
   }
 
@@ -478,13 +478,13 @@ process.on("SIGINT", () => shutdown("SIGINT"));
   const authResult = await app.client.auth.test({ token: SLACK_BOT_TOKEN });
   BOT_USER_ID = authResult.user_id ?? "";
   if (BOT_USER_ID) {
-    console.log(`[spawnis] Bot user ID: ${BOT_USER_ID}`);
+    console.log(`[spa] Bot user ID: ${BOT_USER_ID}`);
   } else {
-    console.warn("[spawnis] Could not resolve bot user ID — may echo own messages");
+    console.warn("[spa] Could not resolve bot user ID — may echo own messages");
   }
 
   await app.start();
   console.log(
-    `[spawnis] Running (channel=${SLACK_CHANNEL_ID}, repo=${GITHUB_REPO})`,
+    `[spa] Running (channel=${SLACK_CHANNEL_ID}, repo=${GITHUB_REPO})`,
   );
 })();

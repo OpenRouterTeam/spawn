@@ -1,14 +1,14 @@
 ---
 name: slack-bot
-description: Spawnis — Slack bot that pipes threads into Claude Code sessions and streams responses back
+description: "SPA (Spawn Processes Autonomously) — Slack bot that pipes threads into Claude Code sessions"
 disable-model-invocation: true
 ---
 
-# Spawnis
+# SPA — Spawn Processes Autonomously
 
 Slack bot that listens in `#proj-spawn` via Socket Mode. When @mentioned, it collects the full thread, pipes it into a `claude -p` session, and streams Claude Code's responses back to the Slack thread in real-time.
 
-Subsequent @mentions in the same thread resume the same Claude Code session.
+Subsequent thread replies in tracked threads auto-trigger new Claude Code runs.
 
 ## Slack App Setup
 
@@ -21,13 +21,13 @@ Subsequent @mentions in the same thread resume the same Claude Code session.
 5. Click **Create**
 6. **Socket Mode**: Settings > Basic Information > scroll to "App-Level Tokens" > **Generate Token and Scopes** > add `connections:write` scope > copy the `xapp-...` token
 7. **Install to Workspace**: Features > OAuth & Permissions > Install > copy the `xoxb-...` Bot User OAuth Token
-8. **Invite the bot** to the target channel: `/invite @Spawnis`
+8. **Invite the bot** to the target channel: `/invite @spa`
 9. **Get the channel ID**: Right-click channel name > View channel details > copy the ID (starts with `C`)
 
 ### Option B: Manual setup
 
 1. Go to https://api.slack.com/apps > **Create New App** > **From scratch**
-2. Name it `Spawnis`, select the workspace
+2. Name it `SPA`, select the workspace
 3. **Socket Mode**: Settings > Socket Mode > Enable > generate app-level token with `connections:write` scope > save `xapp-...`
 4. **Event Subscriptions**: Features > Event Subscriptions > Enable > subscribe to bot events: `app_mention`, `message.channels`
 5. **OAuth Scopes**: Features > OAuth & Permissions > Bot Token Scopes: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `reactions:write`
@@ -77,7 +77,7 @@ Create `/etc/systemd/system/spawn-slack-bot.service`:
 
 ```ini
 [Unit]
-Description=Spawnis — Slack Claude Code Bot
+Description=SPA — Spawn Processes Autonomously
 After=network.target
 
 [Service]
@@ -109,7 +109,7 @@ sudo systemctl enable --now spawn-slack-bot
 sudo systemctl status spawn-slack-bot
 journalctl -u spawn-slack-bot -f
 
-# Test: @mention Spawnis in channel → Claude Code runs, response streams back
+# Test: @mention spa in channel → Claude Code runs, response streams back
 # Test: Reply and @mention again → resumes same session
 ```
 

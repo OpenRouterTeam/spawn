@@ -1,12 +1,12 @@
 _metadata:
   major_version: 1
 display_information:
-  name: Spawnis
-  description: Pipes Slack threads into Claude Code sessions and streams responses back
+  name: SPA
+  description: "Spawn Processes Autonomously — pipes Slack threads into Claude Code sessions"
   background_color: "#1a1a2e"
 features:
   bot_user:
-    display_name: spawnis
+    display_name: spa
     always_online: true
 oauth_config:
   scopes:
