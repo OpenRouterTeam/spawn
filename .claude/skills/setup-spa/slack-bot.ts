@@ -454,15 +454,62 @@ async function runClaudeAndStream(
     })
     .catch(() => null);
 
-  const updateTs = thinkingMsg?.ts;
-  let fullText = "";
-  let lastUpdateLen = 0;
+  let currentMsgTs = thinkingMsg?.ts;
+  let currentText = "";
   let returnedSessionId: string | null = null;
+  let hasOutput = false;
 
   // Throttle Slack updates — update at most every 2s
   let lastUpdateTime = 0;
   const UPDATE_INTERVAL_MS = 2000;
-  const MAX_MSG_LEN = 3900; // Slack limit ~4000, leave room
+  const MAX_MSG_LEN = 3800; // Slack limit ~4000, leave room for formatting
+
+  /** Update the current Slack message, or post a new one if at limit. */
+  async function flushToSlack(text: string, forceNew = false): Promise<void> {
+    if (!text) {
+      return;
+    }
+    hasOutput = true;
+
+    // Need a new message if text would exceed limit or forced
+    if (forceNew || !currentMsgTs || text.length > MAX_MSG_LEN) {
+      // If there's leftover text in the current message, finalize it first
+      if (currentMsgTs && currentText) {
+        await client.chat
+          .update({
+            channel,
+            ts: currentMsgTs,
+            text: currentText.slice(0, MAX_MSG_LEN),
+          })
+          .catch(() => {});
+      }
+
+      // Post a new message
+      const newMsg = await client.chat
+        .postMessage({
+          channel,
+          thread_ts: threadTs,
+          text: text.slice(0, MAX_MSG_LEN),
+        })
+        .catch(() => null);
+
+      currentMsgTs = newMsg?.ts;
+      currentText = text.slice(0, MAX_MSG_LEN);
+      return;
+    }
+
+    await client.chat
+      .update({
+        channel,
+        ts: currentMsgTs,
+        text: text.slice(0, MAX_MSG_LEN),
+      })
+      .catch(() => {});
+    currentText = text.slice(0, MAX_MSG_LEN);
+  }
+
+  // Accumulates text for the current "section" (consecutive text blocks)
+  let pendingText = "";
 
   const decoder = new TextDecoder();
   const reader = proc.stdout.getReader();
@@ -507,25 +554,30 @@ async function runClaudeAndStream(
 
         // Format event for Slack display
         const segment = formatStreamEvent(obj);
-        if (segment) {
-          fullText += segment;
+        if (!segment) {
+          continue;
+        }
+
+        // Tool calls and results start new messages; text accumulates
+        const isToolEvent =
+          segment.includes(":hammer_and_wrench:") || segment.includes(":white_check_mark:") || segment.includes(":x:");
+        if (isToolEvent) {
+          // Flush any pending text first
+          if (pendingText) {
+            await flushToSlack(pendingText);
+            pendingText = "";
+          }
+          // Post tool event as its own message
+          await flushToSlack(segment, true);
+        } else {
+          pendingText += segment;
         }
       }
 
-      // Throttled Slack update
+      // Throttled update for accumulated text
       const now = Date.now();
-      if (updateTs && fullText.length > lastUpdateLen && now - lastUpdateTime >= UPDATE_INTERVAL_MS) {
-        const displayText = fullText.length > MAX_MSG_LEN ? `...${fullText.slice(-MAX_MSG_LEN)}` : fullText;
-
-        await client.chat
-          .update({
-            channel,
-            ts: updateTs,
-            text: displayText,
-          })
-          .catch(() => {});
-
-        lastUpdateLen = fullText.length;
+      if (pendingText && now - lastUpdateTime >= UPDATE_INTERVAL_MS) {
+        await flushToSlack(pendingText);
         lastUpdateTime = now;
       }
     }
@@ -533,45 +585,23 @@ async function runClaudeAndStream(
     activeRuns.delete(threadTs);
   }
 
+  // Flush remaining text
+  if (pendingText) {
+    await flushToSlack(pendingText);
+  }
+
   // Read stderr for errors
   const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
 
-  if (exitCode !== 0 && !fullText) {
+  if (exitCode !== 0 && !hasOutput) {
     console.error(`[spa] claude exited ${exitCode}: ${stderr}`);
-    if (updateTs) {
-      await client.chat
-        .update({
-          channel,
-          ts: updateTs,
-          text: `:x: Claude Code errored (exit ${exitCode}):\n\`\`\`\n${stderr.slice(0, 1500)}\n\`\`\``,
-        })
-        .catch(() => {});
-    }
+    await flushToSlack(`:x: Claude Code errored (exit ${exitCode}):\n\`\`\`\n${stderr.slice(0, 1500)}\n\`\`\``, true);
     return null;
   }
 
-  // Final update with complete text
-  if (updateTs && fullText) {
-    const displayText = fullText.length > MAX_MSG_LEN ? `...${fullText.slice(-MAX_MSG_LEN)}` : fullText;
-
-    await client.chat
-      .update({
-        channel,
-        ts: updateTs,
-        text: displayText,
-      })
-      .catch(() => {});
-  }
-
-  if (!fullText && updateTs) {
-    await client.chat
-      .update({
-        channel,
-        ts: updateTs,
-        text: ":white_check_mark: Done (no text output)",
-      })
-      .catch(() => {});
+  if (!hasOutput) {
+    await flushToSlack(":white_check_mark: Done (no text output)", true);
   }
 
   console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${fullText.length})`);
