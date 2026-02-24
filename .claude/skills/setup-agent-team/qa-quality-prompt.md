@@ -94,14 +94,14 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 2. `cd` into worktree
 3. Scan for these issues:
 
-   **a) Dead code**: Functions in `shared/*.sh` or `packages/cli/src/` that are never called
+   **a) Dead code**: Functions in `sh/shared/*.sh` or `packages/cli/src/` that are never called
    - Grep for the function name across all source files
    - If only the definition exists (no callers), remove the function
 
-   **b) Stale references**: Scripts or code referencing deleted files:
-   - `test/record.sh`, `test/mock.sh`, `test/e2e.sh`, `test/run.sh`
-   - Any file in `test/` that no longer exists
-   - Remove or update these references
+   **b) Stale references**: Scripts or code referencing files that no longer exist
+   - Shell scripts are under `sh/` (e.g., `sh/shared/`, `sh/e2e/`, `sh/test/`, `sh/{cloud}/`)
+   - TypeScript is under `packages/cli/src/` and `packages/shared/src/`
+   - Grep for paths that reference old locations or deleted files and fix them
 
    **c) Python usage**: Any `python3 -c` or `python -c` calls in shell scripts
    - Replace with `bun eval` or `jq` as appropriate per CLAUDE.md rules
