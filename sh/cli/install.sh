@@ -226,8 +226,10 @@ if ! command -v bun &>/dev/null; then
     log_step "bun not found. Installing bun..."
     curl -fsSL https://bun.sh/install | bash
 
-    # Re-export so bun is available in this session immediately
-    export PATH="${BUN_INSTALL}/bin:${PATH}"
+    # Re-export so bun is available in this session immediately.
+    # Use hard-coded paths alongside BUN_INSTALL — the bun installer may
+    # have placed the binary in $HOME/.bun/bin even if BUN_INSTALL differs.
+    export PATH="$HOME/.bun/bin:${BUN_INSTALL}/bin:$HOME/.local/bin:${PATH}"
 
     if ! command -v bun &>/dev/null; then
         log_error "Failed to install bun automatically"
