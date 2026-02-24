@@ -29,20 +29,39 @@ export function logStep(msg: string): void {
 /** Prompt for a line of user input. Throws if non-interactive.
  *  Uses @clack/prompts instead of Node readline to avoid Bun #1707
  *  where readline interfaces silently close after @clack/prompts runs
- *  (e.g., SSH key multiselect kills subsequent readline prompts). */
+ *  (e.g., SSH key multiselect kills subsequent readline prompts).
+ *  Rejects if stdin closes unexpectedly (e.g., post-clack state corruption)
+ *  instead of hanging forever. */
 export async function prompt(question: string): Promise<string> {
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     throw new Error("Cannot prompt: SPAWN_NON_INTERACTIVE is set");
   }
   // Strip trailing ": " or ":" since clack adds its own formatting
   const message = question.replace(/:\s*$/, "").trim();
-  const result = await p.text({
-    message,
+
+  // Race the prompt against stdin closing unexpectedly.
+  // If stdin dies (e.g., after @clack/prompts corrupts its state),
+  // the close listener rejects so we don't hang forever.
+  let cleanupStdinListener: (() => void) | undefined;
+  const stdinClosePromise = new Promise<never>((_resolve, reject) => {
+    const onClose = () => {
+      reject(new Error("stdin closed unexpectedly during prompt"));
+    };
+    process.stdin.once("close", onClose);
+    cleanupStdinListener = () => {
+      process.stdin.removeListener("close", onClose);
+    };
   });
-  if (p.isCancel(result)) {
-    return "";
+
+  try {
+    const result = await Promise.race([
+      p.text({ message }),
+      stdinClosePromise,
+    ]);
+    return p.isCancel(result) ? "" : (result || "").trim();
+  } finally {
+    cleanupStdinListener?.();
   }
-  return (result || "").trim();
 }
 
 /**
