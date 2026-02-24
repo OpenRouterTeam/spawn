@@ -604,7 +604,11 @@ export async function ensureSshKey(): Promise<void> {
         logInfo("SSH key already registered with Lightsail");
         return;
       }
-      throw new Error("Failed to import SSH key to Lightsail");
+      throw new Error(
+        "Failed to import SSH key to Lightsail. " +
+          "On new AWS accounts, Lightsail may not be enabled. " +
+          "Visit https://lightsail.aws.amazon.com/ to activate it, then try again.",
+      );
     }
     logInfo("SSH key imported to Lightsail");
   } else {
@@ -643,7 +647,11 @@ export async function ensureSshKey(): Promise<void> {
         logInfo("SSH key already registered with Lightsail");
         return;
       } catch {
-        throw new Error("Failed to import SSH key to Lightsail");
+        throw new Error(
+          "Failed to import SSH key to Lightsail. " +
+            "On new AWS accounts, Lightsail may not be enabled. " +
+            "Visit https://lightsail.aws.amazon.com/ to activate it, then try again.",
+        );
       }
     }
     logInfo("SSH key imported to Lightsail");
