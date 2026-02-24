@@ -9,6 +9,7 @@ ALL_AGENTS="claude openclaw zeroclaw codex opencode kilocode"
 FLY_API_BASE="https://api.machines.dev/v1"
 PROVISION_TIMEOUT="${PROVISION_TIMEOUT:-480}"
 INSTALL_WAIT="${INSTALL_WAIT:-120}"
+INPUT_TEST_TIMEOUT="${INPUT_TEST_TIMEOUT:-120}"
 FLY_REGION="${FLY_REGION:-iad}"
 FLY_VM_MEMORY="${FLY_VM_MEMORY:-2048}"
 

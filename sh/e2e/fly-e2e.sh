@@ -7,6 +7,7 @@
 #   ./sh/e2e/fly-e2e.sh claude codex opencode # Specific agents
 #   ./sh/e2e/fly-e2e.sh --parallel 2          # Parallel (2 at a time)
 #   ./sh/e2e/fly-e2e.sh --skip-cleanup        # Skip stale app cleanup
+#   ./sh/e2e/fly-e2e.sh --skip-input-test     # Skip live input tests
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
@@ -25,6 +26,7 @@ source "${SCRIPT_DIR}/lib/cleanup.sh"
 AGENTS_TO_TEST=""
 PARALLEL_COUNT=0
 SKIP_CLEANUP=0
+SKIP_INPUT_TEST="${SKIP_INPUT_TEST:-0}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -41,13 +43,18 @@ while [ $# -gt 0 ]; do
       SKIP_CLEANUP=1
       shift
       ;;
+    --skip-input-test)
+      SKIP_INPUT_TEST=1
+      shift
+      ;;
     --help|-h)
-      printf "Usage: %s [agent1 agent2 ...] [--parallel N] [--skip-cleanup]\n" "$0"
+      printf "Usage: %s [agent1 agent2 ...] [--parallel N] [--skip-cleanup] [--skip-input-test]\n" "$0"
       printf "\nAgents: %s\n" "${ALL_AGENTS}"
       printf "\nOptions:\n"
-      printf "  --parallel N    Run N agents in parallel (default: sequential)\n"
-      printf "  --skip-cleanup  Skip stale e2e-* app cleanup\n"
-      printf "  --help          Show this help\n"
+      printf "  --parallel N       Run N agents in parallel (default: sequential)\n"
+      printf "  --skip-cleanup     Skip stale e2e-* app cleanup\n"
+      printf "  --skip-input-test  Skip live input tests (send prompt, check response)\n"
+      printf "  --help             Show this help\n"
       exit 0
       ;;
     -*)
@@ -107,6 +114,9 @@ trap final_cleanup EXIT
 log_header "Spawn E2E Test Suite (Fly.io)"
 log_info "Agents: ${AGENTS_TO_TEST}"
 log_info "Parallel: ${PARALLEL_COUNT:-sequential}"
+if [ "${SKIP_INPUT_TEST}" -eq 1 ]; then
+  log_info "Input tests: SKIPPED"
+fi
 
 # Validate environment
 if ! require_env; then
@@ -145,11 +155,14 @@ run_single_agent() {
 
   local status="fail"
 
-  # Provision
+  # Provision → Verify → Input Test
   if provision_agent "${agent}" "${app_name}" "${LOG_DIR}"; then
     # Verify
     if verify_agent "${agent}" "${app_name}"; then
-      status="pass"
+      # Input test (only runs if verify passes)
+      if run_input_test "${agent}" "${app_name}"; then
+        status="pass"
+      fi
     fi
   fi
 
