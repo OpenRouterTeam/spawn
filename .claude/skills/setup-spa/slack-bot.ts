@@ -424,15 +424,21 @@ async function runClaudeAndStream(
     args.push("--resume", sessionId);
   }
 
-  args.push(prompt);
+  // Pass prompt via stdin to avoid CLI flag parsing issues with user content
+  args.push("-");
 
   console.log(`[spa] Starting claude session (thread=${threadTs}, resume=${sessionId ?? "new"})`);
 
   const proc = Bun.spawn(args, {
     stdout: "pipe",
     stderr: "pipe",
+    stdin: "pipe",
     cwd: process.env.REPO_ROOT ?? process.cwd(),
   });
+
+  // Write prompt to stdin and close
+  proc.stdin.write(prompt);
+  proc.stdin.end();
 
   activeRuns.set(threadTs, {
     proc,
