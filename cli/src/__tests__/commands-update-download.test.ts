@@ -70,8 +70,12 @@ mock.module("node:child_process", () => ({
         }
         return child;
       }),
-      stdout: { on: mock(() => {}) },
-      stderr: { on: mock(() => {}) },
+      stdout: {
+        on: mock(() => {}),
+      },
+      stderr: {
+        on: mock(() => {}),
+      },
     };
     return child;
   }),
