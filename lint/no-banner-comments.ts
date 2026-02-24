@@ -8,7 +8,6 @@
  *
  * Suggests instead:
  *   // #region Section Name ... // #endregion
- *   /** Section Name *​/
  *
  * Usage: bun run lint/no-banner-comments.ts [files...]
  * If no files given, checks all .ts files under cli/src/ and .claude/skills/.
@@ -67,12 +66,12 @@ for (const file of files) {
   const violations = check(file);
   for (const v of violations) {
     console.error(`${v.file}:${v.line} — banner comment: ${v.text}`);
-    console.error("  Use `// #region Name` / `// #endregion` or `/** Name */` instead.\n");
+    console.error("  Use `// #region Name` / `// #endregion` instead.\n");
   }
   total += violations.length;
 }
 
 if (total > 0) {
-  console.error(`Found ${total} banner comment(s). Use region comments or /** */ section headers instead.`);
+  console.error(`Found ${total} banner comment(s). Use // #region Name / // #endregion instead.`);
   process.exit(1);
 }

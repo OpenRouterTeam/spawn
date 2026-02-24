@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
 
-/** Environment */
+// #region Environment
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN ?? "";
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN ?? "";
@@ -23,11 +23,15 @@ for (const [name, value] of Object.entries(REQUIRED_VARS)) {
   }
 }
 
-/** Resolve our own bot user ID so we can skip our own messages */
+// #endregion
+
+// #region Bot identity
 
 let BOT_USER_ID = "";
 
-/** State — thread-to-session mappings persisted to disk */
+// #endregion
+
+// #region State
 
 const STATE_PATH = process.env.STATE_PATH ?? `${process.env.HOME ?? "/root"}/.config/spawn/slack-issues.json`;
 
@@ -91,7 +95,9 @@ const activeRuns = new Map<
   }
 >();
 
-/** Claude Code helpers */
+// #endregion
+
+// #region Claude Code helpers
 
 const StreamEventSchema = v.object({
   type: v.string(),
@@ -344,13 +350,17 @@ async function runClaudeAndStream(
   return returnedSessionId;
 }
 
-/** Text helpers */
+// #endregion
+
+// #region Text helpers
 
 function stripMention(text: string): string {
   return text.replace(/<@[A-Z0-9]+>/g, "").trim();
 }
 
-/** Core handler — shared by app_mention and message events */
+// #endregion
+
+// #region Core handler
 
 async function handleThread(
   client: InstanceType<typeof App.default>["client"],
@@ -404,7 +414,9 @@ async function handleThread(
   }
 }
 
-/** Slack App */
+// #endregion
+
+// #region Slack App
 
 const app = new App.default({
   token: SLACK_BOT_TOKEN,
@@ -459,7 +471,9 @@ app.event("message", async ({ event, client }) => {
   await handleThread(client, event.channel, threadTs, ts);
 });
 
-/** Graceful shutdown */
+// #endregion
+
+// #region Graceful shutdown
 
 function shutdown(signal: string): void {
   console.log(`[spa] Received ${signal}, shutting down...`);
@@ -476,7 +490,9 @@ function shutdown(signal: string): void {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
-/** Start */
+// #endregion
+
+// #region Start
 
 (async () => {
   // Resolve our own bot user ID
@@ -493,3 +509,4 @@ process.on("SIGINT", () => shutdown("SIGINT"));
   await app.start();
   console.log(`[spa] Running (channel=${SLACK_CHANNEL_ID}, repo=${GITHUB_REPO})`);
 })();
+// #endregion
