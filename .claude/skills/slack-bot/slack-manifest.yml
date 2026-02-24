@@ -2,7 +2,7 @@ _metadata:
   major_version: 1
 display_information:
   name: Spa
-  description: "Spawn's Personal Agent — pipes Slack threads into Claude Code sessions"
+  description: "Spawn's Personal Agent"
   background_color: "#1a1a2e"
 features:
   bot_user:
