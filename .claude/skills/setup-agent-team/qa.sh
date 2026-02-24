@@ -1,12 +1,13 @@
 #!/bin/bash
 set -eo pipefail
 
-# QA Service — Single Cycle (Tri-Mode)
+# QA Service — Single Cycle (Quad-Mode)
 # Triggered by trigger-server.ts via GitHub Actions
 #
 # RUN_MODE=quality  — agent team: test-runner + dedup-scanner + code-quality-reviewer (reason=schedule/workflow_dispatch, 35 min)
 # RUN_MODE=fixtures — single agent: collect API fixtures from cloud providers (reason=fixtures, 20 min)
 # RUN_MODE=issue    — single agent: investigate and fix a specific issue (reason=issues, 15 min)
+# RUN_MODE=e2e      — single agent: run Fly.io E2E tests, investigate failures (reason=e2e, 20 min)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -22,7 +23,12 @@ if [[ -n "${SPAWN_ISSUE}" ]] && [[ ! "${SPAWN_ISSUE}" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-if [[ "${SPAWN_REASON}" == "issues" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
+if [[ "${SPAWN_REASON}" == "e2e" ]]; then
+    RUN_MODE="e2e"
+    WORKTREE_BASE="/tmp/spawn-worktrees/qa-e2e"
+    TEAM_NAME="spawn-qa-e2e"
+    CYCLE_TIMEOUT=1200  # 20 min for E2E tests + investigation
+elif [[ "${SPAWN_REASON}" == "issues" ]] && [[ -n "${SPAWN_ISSUE}" ]]; then
     RUN_MODE="issue"
     ISSUE_NUM="${SPAWN_ISSUE}"
     WORKTREE_BASE="/tmp/spawn-worktrees/qa-issue-${ISSUE_NUM}"
@@ -214,6 +220,17 @@ elif [[ "${RUN_MODE}" == "issue" ]]; then
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
     sed -i "s|ISSUE_NUM_PLACEHOLDER|${ISSUE_NUM}|g" "${PROMPT_FILE}"
+    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+
+elif [[ "${RUN_MODE}" == "e2e" ]]; then
+    PROMPT_TEMPLATE="${SCRIPT_DIR}/qa-e2e-prompt.md"
+    if [[ ! -f "$PROMPT_TEMPLATE" ]]; then
+        log "ERROR: qa-e2e-prompt.md not found at $PROMPT_TEMPLATE"
+        exit 1
+    fi
+    cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
+
     sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
     sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
 
