@@ -52,6 +52,31 @@ mock.module("@clack/prompts", () => ({
   isCancel: () => false,
 }));
 
+// Mock node:child_process to prevent real subprocess calls in tests:
+// - execSync: used by performUpdate() to run curl|bash install — without this mock,
+//   "should handle update failure gracefully" downloads the real install script from
+//   the network, causing a 58s timeout under full-suite concurrency (CLAUDE.md violation).
+// - spawn: used by spawnBash() to run downloaded scripts — mock must fire the "close"
+//   event immediately (code 0) so Promise-based callers resolve rather than hanging.
+mock.module("node:child_process", () => ({
+  execSync: mock(() => {}),
+  execFileSync: mock(() => {}),
+  spawn: mock(() => {
+    type Handler = (...args: unknown[]) => void;
+    const child = {
+      on: mock((event: string, cb: Handler) => {
+        if (event === "close") {
+          queueMicrotask(() => cb(0, null));
+        }
+        return child;
+      }),
+      stdout: { on: mock(() => {}) },
+      stderr: { on: mock(() => {}) },
+    };
+    return child;
+  }),
+}));
+
 // Import commands after mock setup
 const { cmdUpdate, cmdRun } = await import("../commands.js");
 
