@@ -34,6 +34,7 @@ TARGETS="$(printf '%s' "$TARGETS" | sed 's/^ //')"
 is_excluded() {
     case "$1" in
         */.claude/skills/*) return 0 ;;
+        */.claude/worktrees/*) return 0 ;;
         */.git/*) return 0 ;;
         */node_modules/*) return 0 ;;
         */packages/cli/*) return 0 ;;
@@ -150,6 +151,30 @@ while IFS= read -r _f; do
     # MC013: printf -v (variable assignment via printf)
     grep_rule "error" "MC013" "'printf -v' requires bash 4.0+ — use eval or stdout capture" \
         "$_f" "$_r" 'printf[[:space:]]+-v[[:space:]]'
+
+    # MC014: readarray / mapfile (bash 4.0+)
+    grep_rule "error" "MC014" "'readarray'/'mapfile' requires bash 4.0+ — use while read loop" \
+        "$_f" "$_r" '\b(readarray|mapfile)\b'
+
+    # MC015: coproc (bash 4.0+)
+    grep_rule "error" "MC015" "'coproc' requires bash 4.0+" \
+        "$_f" "$_r" '\bcoproc\b'
+
+    # MC016: &>> (append redirect stderr+stdout, bash 4.0+)
+    grep_rule "error" "MC016" "'&>>' requires bash 4.0+ — use >> file 2>&1 instead" \
+        "$_f" "$_r" '&>>'
+
+    # MC017: relative source paths (breaks bash <(curl ...) execution)
+    grep_rule "error" "MC017" "relative source path breaks bash <(curl...) — use absolute path or eval" \
+        "$_f" "$_r" '(source|\.)[[:space:]]+\.\.?/'
+
+    # MC018: wait -n (bash 4.3+)
+    grep_rule "error" "MC018" "'wait -n' requires bash 4.3+ — use wait with specific PID" \
+        "$_f" "$_r" 'wait[[:space:]]+-n\b'
+
+    # MC019: declare -g (bash 4.2+)
+    grep_rule "error" "MC019" "'declare -g' requires bash 4.2+ — use global assignment instead" \
+        "$_f" "$_r" 'declare[[:space:]]+-[a-zA-Z]*g'
 
 done <<FILELIST
 $_all_files
