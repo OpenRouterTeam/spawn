@@ -389,6 +389,37 @@ policy = "allow_all"
   logInfo("ZeroClaw configured for autonomous operation");
 }
 
+// ─── Swap Space Setup ─────────────────────────────────────────────────────────
+
+/**
+ * Ensure swap space exists on the remote machine.
+ * Used before memory-intensive builds (e.g., Rust compilation) on
+ * resource-constrained instances (512 MB RAM). Idempotent — skips if
+ * swap is already configured. Requires sudo, which is available on all
+ * supported cloud instances.
+ */
+export async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void> {
+  logStep(`Ensuring ${sizeMb} MB swap space for compilation...`);
+  const script = [
+    "if swapon --show 2>/dev/null | grep -q /swapfile; then",
+    "  echo '==> Swap already configured, skipping'",
+    "else",
+    `  echo '==> Creating ${sizeMb} MB swap file for Rust compilation...'`,
+    `  sudo fallocate -l ${sizeMb}M /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=${sizeMb} status=none`,
+    "  sudo chmod 600 /swapfile",
+    "  sudo mkswap /swapfile >/dev/null",
+    "  sudo swapon /swapfile",
+    "  echo '==> Swap enabled'",
+    "fi",
+  ].join("\n");
+  try {
+    await runner.runServer(script);
+    logInfo("Swap space ready");
+  } catch {
+    logWarn("Swap setup failed (non-fatal) — build may still succeed on larger instances");
+  }
+}
+
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
 export function openCodeInstallCmd(): string {
@@ -482,12 +513,19 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     zeroclaw: {
       name: "ZeroClaw",
       cloudInitTier: "minimal",
-      install: () =>
-        installAgent(
+      install: async () => {
+        // Rust compilation requires ~1 GB RAM. Add swap before building so
+        // low-memory instances (e.g., AWS nano 512 MB) don't OOM mid-compile.
+        // --prefer-prebuilt avoids compilation entirely when a release binary exists,
+        // but swap is kept as a safety net for platforms without pre-built releases.
+        await ensureSwapSpace(runner);
+        await installAgent(
           runner,
           "ZeroClaw",
           `curl -LsSf ${ZEROCLAW_INSTALL_URL} | bash -s -- --install-rust --install-system-deps --prefer-prebuilt`,
-        ),
+          600, // 10-minute timeout: Rust compilation takes longer than the 5-min default
+        );
+      },
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
