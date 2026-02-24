@@ -996,6 +996,24 @@ export async function cmdRun(
 
   const spawnName = await promptSpawnName();
 
+  // If a name was given, check whether an active instance with that name already
+  // exists for this agent + cloud combination.  When it does, route the user into
+  // the same action picker they get from `spawn ls` instead of blindly creating a
+  // second VM.
+  if (spawnName) {
+    const activeServers = getActiveServers();
+    const existingRecord = activeServers.find(
+      (r) => r.name === spawnName && r.agent === agent && r.cloud === cloud,
+    );
+    if (existingRecord) {
+      p.log.warn(
+        `An active instance named ${pc.bold(spawnName)} already exists on ${pc.bold(manifest.clouds[cloud].name)}.`,
+      );
+      await handleRecordAction(existingRecord, manifest);
+      return;
+    }
+  }
+
   const agentName = manifest.agents[agent].name;
   const cloudName = manifest.clouds[cloud].name;
   const suffix = prompt ? " with prompt..." : "...";
@@ -2472,10 +2490,10 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
     return;
   }
 
-  // Rerun (create new spawn), reusing the existing spawn name
-  if (selected.name) {
-    process.env.SPAWN_NAME = selected.name;
-  }
+  // Rerun (create new spawn).  Clear any pre-set name so the user is prompted for
+  // a fresh one — this prevents cmdRun's duplicate-detection from immediately
+  // routing them back here in an infinite loop.
+  delete process.env.SPAWN_NAME;
   p.log.step(
     `Spawning ${pc.bold(buildRecordLabel(selected, manifest))} ${pc.dim(`(${buildRecordSubtitle(selected, manifest)})`)}`,
   );
