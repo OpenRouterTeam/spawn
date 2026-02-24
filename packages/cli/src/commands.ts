@@ -52,6 +52,7 @@ import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAut
 import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "./daytona/daytona.js";
 import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "./sprite/sprite.js";
 import { SSH_INTERACTIVE_OPTS } from "./shared/ssh.js";
+import { toKebabCase, prepareStdinForHandoff } from "./shared/ui.js";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -1106,6 +1107,7 @@ function runBashHeadless(script: string, prompt?: string, debug?: boolean, spawn
   }
   if (spawnName) {
     env.SPAWN_NAME = spawnName;
+    env.SPAWN_NAME_KEBAB = toKebabCase(spawnName);
   }
 
   return new Promise<number>((resolve, reject) => {
@@ -1798,10 +1800,15 @@ function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: s
   }
   if (spawnName) {
     env.SPAWN_NAME = spawnName;
+    env.SPAWN_NAME_KEBAB = toKebabCase(spawnName);
   }
   if (process.env.SPAWN_CUSTOM === "1") {
     env.SPAWN_CUSTOM = "1";
   }
+
+  // Clean up stdin state left by @clack/prompts so the child process
+  // gets a pristine file descriptor (prevents silent hangs / early exit)
+  prepareStdinForHandoff();
 
   return spawnBash(script, env);
 }
