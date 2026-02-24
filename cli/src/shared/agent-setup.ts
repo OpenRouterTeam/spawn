@@ -331,7 +331,7 @@ export async function setupOpenclawBatched(
     '  echo "    openclaw found at $(command -v openclaw)"',
     "else",
     '  echo "    openclaw not found, installing..."',
-    "  npm install -g openclaw",
+    "  bun install -g openclaw",
     '  command -v openclaw || { echo "ERROR: openclaw install failed"; exit 1; }',
     "fi",
     'echo "==> Writing environment variables..."',
@@ -354,7 +354,7 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   // The polling loop doubles as a keepalive for flyctl.
   const script =
     "source ~/.spawnrc 2>/dev/null; " +
-    "export PATH=$(npm prefix -g 2>/dev/null)/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+    "export PATH=$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
     "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
     "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; " +
     "elapsed=0; while [ $elapsed -lt 60 ]; do " +
@@ -441,7 +441,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "full",
       modelPrompt: true,
       modelDefault: "openrouter/auto",
-      install: () => installAgent(runner, "openclaw", "source ~/.bashrc && npm install -g openclaw"),
+      install: () => installAgent(runner, "openclaw", "source ~/.bashrc && bun install -g openclaw"),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,
