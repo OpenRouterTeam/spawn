@@ -94,6 +94,7 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--output json")}       Output structured JSON to stdout`);
     console.error(`    ${pc.cyan("--custom")}            Show interactive size/region pickers`);
     console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
+    console.error(`    ${pc.cyan("--reauth")}            Force re-prompting for cloud credentials`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
     console.error(`    ${pc.cyan("--version, -v")}       Show version`);
     console.error();
@@ -724,6 +725,13 @@ async function main(): Promise<void> {
   if (custom) {
     filteredArgs.splice(customIdx, 1);
     process.env.SPAWN_CUSTOM = "1";
+  }
+
+  // Extract --reauth boolean flag
+  const reauthIdx = filteredArgs.indexOf("--reauth");
+  if (reauthIdx !== -1) {
+    filteredArgs.splice(reauthIdx, 1);
+    process.env.SPAWN_REAUTH = "1";
   }
 
   // Extract --output <format> flag
