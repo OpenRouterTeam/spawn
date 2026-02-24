@@ -389,6 +389,39 @@ policy = "allow_all"
   logInfo("ZeroClaw configured for autonomous operation");
 }
 
+// ─── Swap Space Setup ─────────────────────────────────────────────────────────
+
+/**
+ * Ensure swap space exists on the remote machine.
+ * Used before memory-intensive builds (e.g., Rust compilation) on
+ * resource-constrained instances (512 MB RAM). Idempotent — skips if
+ * swap is already configured. Non-fatal if sudo is unavailable.
+ */
+export async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void> {
+  if (typeof sizeMb !== "number" || sizeMb <= 0 || !Number.isInteger(sizeMb)) {
+    throw new Error(`Invalid swap size: ${sizeMb}`);
+  }
+  logStep(`Ensuring ${sizeMb} MB swap space for compilation...`);
+  const script = [
+    "if swapon --show 2>/dev/null | grep -q /swapfile; then",
+    "  echo '==> Swap already configured, skipping'",
+    "else",
+    `  echo '==> Creating ${sizeMb} MB swap file...'`,
+    `  sudo fallocate -l ${sizeMb}M /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=${sizeMb} status=none`,
+    "  sudo chmod 600 /swapfile",
+    "  sudo mkswap /swapfile >/dev/null",
+    "  sudo swapon /swapfile",
+    "  echo '==> Swap enabled'",
+    "fi",
+  ].join("\n");
+  try {
+    await runner.runServer(script);
+    logInfo("Swap space ready");
+  } catch {
+    logWarn("Swap setup failed (non-fatal) — build may still succeed on larger instances");
+  }
+}
+
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
 export function openCodeInstallCmd(): string {
@@ -482,12 +515,17 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     zeroclaw: {
       name: "ZeroClaw",
       cloudInitTier: "minimal",
-      install: () =>
-        installAgent(
+      install: async () => {
+        // Add swap before building — low-memory instances (e.g., AWS nano 512 MB)
+        // OOM during Rust compilation if --prefer-prebuilt falls back to source.
+        await ensureSwapSpace(runner);
+        await installAgent(
           runner,
           "ZeroClaw",
           `curl -LsSf ${ZEROCLAW_INSTALL_URL} | bash -s -- --install-rust --install-system-deps --prefer-prebuilt`,
-        ),
+          600, // 10 min: swap-backed compilation is slower than the 5-min default
+        );
+      },
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
