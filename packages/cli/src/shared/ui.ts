@@ -171,8 +171,8 @@ export function openBrowser(url: string): void {
 
 // ─── Result-based retry ────────────────────────────────────────────────
 
-import type { Result } from "./result";
-export { type Result, Ok, Err } from "./result";
+import type { Result } from "@openrouter/spawn-shared";
+export { type Result, Ok, Err } from "@openrouter/spawn-shared";
 
 /**
  * Phase-aware retry helper using the Result monad.

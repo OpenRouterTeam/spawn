@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
-import { toRecord } from "@openrouter/spawn-shared";
+import { toRecord, type Result, Ok, Err } from "@openrouter/spawn-shared";
 
 // #region State
 
@@ -24,39 +24,39 @@ const StateSchema = v.object({
 export type Mapping = v.InferOutput<typeof MappingSchema>;
 export type State = v.InferOutput<typeof StateSchema>;
 
-export function loadState(): State {
+export function loadState(): Result<State> {
   try {
     if (!existsSync(STATE_PATH)) {
-      return {
-        mappings: [],
-      };
+      return Ok({ mappings: [] });
     }
     const raw = readFileSync(STATE_PATH, "utf-8");
     const parsed = v.parse(StateSchema, JSON.parse(raw));
-    return parsed;
-  } catch {
-    console.warn("[spa] Could not load state, starting fresh");
-    return {
-      mappings: [],
-    };
+    return Ok(parsed);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return Err(new Error(`Failed to load state: ${msg}`));
   }
 }
 
-export function saveState(s: State): void {
-  const dir = dirname(STATE_PATH);
-  mkdirSync(dir, {
-    recursive: true,
-  });
-  writeFileSync(STATE_PATH, `${JSON.stringify(s, null, 2)}\n`);
+export function saveState(s: State): Result<void> {
+  try {
+    const dir = dirname(STATE_PATH);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(STATE_PATH, `${JSON.stringify(s, null, 2)}\n`);
+    return Ok(undefined);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return Err(new Error(`Failed to save state: ${msg}`));
+  }
 }
 
 export function findMapping(s: State, channel: string, threadTs: string): Mapping | undefined {
   return s.mappings.find((m) => m.channel === channel && m.threadTs === threadTs);
 }
 
-export function addMapping(s: State, mapping: Mapping): void {
+export function addMapping(s: State, mapping: Mapping): Result<void> {
   s.mappings.push(mapping);
-  saveState(s);
+  return saveState(s);
 }
 
 // #endregion
@@ -189,13 +189,13 @@ export function stripMention(text: string): string {
 
 const DOWNLOADS_DIR = "/tmp/spa-downloads";
 
-/** Download a Slack-hosted file into a thread-scoped temp dir. Returns the local path or null. */
+/** Download a Slack-hosted file into a thread-scoped temp dir. */
 export async function downloadSlackFile(
   url: string,
   filename: string,
   threadTs: string,
   botToken: string,
-): Promise<string | null> {
+): Promise<Result<string>> {
   try {
     const resp = await fetch(url, {
       headers: {
@@ -203,21 +203,18 @@ export async function downloadSlackFile(
       },
     });
     if (!resp.ok) {
-      console.error(`[spa] Failed to download ${filename}: ${resp.status}`);
-      return null;
+      return Err(new Error(`Failed to download ${filename}: ${resp.status}`));
     }
     const dir = `${DOWNLOADS_DIR}/${threadTs}`;
-    mkdirSync(dir, {
-      recursive: true,
-    });
+    mkdirSync(dir, { recursive: true });
     const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const localPath = `${dir}/${safeName}`;
     const buf = await resp.arrayBuffer();
     writeFileSync(localPath, Buffer.from(buf));
-    return localPath;
+    return Ok(localPath);
   } catch (err) {
-    console.error(`[spa] Error downloading ${filename}:`, err);
-    return null;
+    const msg = err instanceof Error ? err.message : String(err);
+    return Err(new Error(`Error downloading ${filename}: ${msg}`));
   }
 }
 

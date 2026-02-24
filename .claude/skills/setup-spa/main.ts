@@ -6,6 +6,7 @@ import * as v from "valibot";
 import { toRecord } from "@openrouter/spawn-shared";
 import {
   type State,
+  type Mapping,
   ResultSchema,
   loadState,
   saveState,
@@ -47,7 +48,11 @@ let BOT_USER_ID = "";
 
 // #region State
 
-const state = loadState();
+const stateResult = loadState();
+const state: State = stateResult.ok ? stateResult.data : { mappings: [] };
+if (!stateResult.ok) {
+  console.warn(`[spa] ${stateResult.error.message}, starting fresh`);
+}
 
 // Active Claude Code processes — keyed by threadTs
 const activeRuns = new Map<
@@ -126,9 +131,11 @@ async function buildThreadPrompt(
         if (!url) {
           continue;
         }
-        const localPath = await downloadSlackFile(url, name, threadTs, SLACK_BOT_TOKEN);
-        if (localPath) {
-          parts.push(`[File: ${name}] → ${localPath}`);
+        const dlResult = await downloadSlackFile(url, name, threadTs, SLACK_BOT_TOKEN);
+        if (dlResult.ok) {
+          parts.push(`[File: ${name}] → ${dlResult.data}`);
+        } else {
+          console.error(`[spa] ${dlResult.error.message}`);
         }
       }
     }
@@ -424,15 +431,17 @@ async function handleThread(
 
   // Save session mapping
   if (newSessionId && !existing) {
-    addMapping(state, {
+    const r = addMapping(state, {
       channel,
       threadTs,
       sessionId: newSessionId,
       createdAt: new Date().toISOString(),
     });
+    if (!r.ok) console.error(`[spa] ${r.error.message}`);
   } else if (newSessionId && existing) {
     existing.sessionId = newSessionId;
-    saveState(state);
+    const r = saveState(state);
+    if (!r.ok) console.error(`[spa] ${r.error.message}`);
   }
 }
 
@@ -468,7 +477,8 @@ function shutdown(signal: string): void {
     run.proc.kill("SIGTERM");
   }
 
-  saveState(state);
+  const r = saveState(state);
+  if (!r.ok) console.error(`[spa] ${r.error.message}`);
   process.exit(0);
 }
 
