@@ -618,7 +618,7 @@ async function runClaudeAndStream(
     await flushToSlack(":white_check_mark: Done (no text output)", true);
   }
 
-  console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${fullText.length})`);
+  console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${currentText.length})`);
 
   return returnedSessionId;
 }
