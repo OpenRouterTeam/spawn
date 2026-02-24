@@ -1059,7 +1059,9 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
 export async function interactiveSession(cmd: string, ip?: string): Promise<number> {
   const serverIp = ip || doServerIp;
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
+  // Single-quote escaping prevents premature shell expansion of $variables in cmd
+  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
+  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = await Bun.spawn(
