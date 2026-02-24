@@ -35,9 +35,7 @@ let BOT_USER_ID = "";
 // State — thread-to-session mappings persisted to disk
 // ---------------------------------------------------------------------------
 
-const STATE_PATH =
-  process.env.STATE_PATH ??
-  `${process.env.HOME ?? "/root"}/.config/spawn/slack-issues.json`;
+const STATE_PATH = process.env.STATE_PATH ?? `${process.env.HOME ?? "/root"}/.config/spawn/slack-issues.json`;
 
 const MappingSchema = v.object({
   channel: v.string(),
@@ -55,30 +53,32 @@ type State = v.InferOutput<typeof StateSchema>;
 
 function loadState(): State {
   try {
-    if (!existsSync(STATE_PATH)) return { mappings: [] };
+    if (!existsSync(STATE_PATH)) {
+      return {
+        mappings: [],
+      };
+    }
     const raw = readFileSync(STATE_PATH, "utf-8");
     const parsed = v.parse(StateSchema, JSON.parse(raw));
     return parsed;
   } catch {
     console.warn("[spa] Could not load state, starting fresh");
-    return { mappings: [] };
+    return {
+      mappings: [],
+    };
   }
 }
 
 function saveState(s: State): void {
   const dir = dirname(STATE_PATH);
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, {
+    recursive: true,
+  });
   writeFileSync(STATE_PATH, `${JSON.stringify(s, null, 2)}\n`);
 }
 
-function findMapping(
-  s: State,
-  channel: string,
-  threadTs: string,
-): Mapping | undefined {
-  return s.mappings.find(
-    (m) => m.channel === channel && m.threadTs === threadTs,
-  );
+function findMapping(s: State, channel: string, threadTs: string): Mapping | undefined {
+  return s.mappings.find((m) => m.channel === channel && m.threadTs === threadTs);
 }
 
 function addMapping(s: State, mapping: Mapping): void {
@@ -91,7 +91,10 @@ const state = loadState();
 // Active Claude Code processes — keyed by threadTs
 const activeRuns = new Map<
   string,
-  { proc: ReturnType<typeof Bun.spawn>; startedAt: number }
+  {
+    proc: ReturnType<typeof Bun.spawn>;
+    startedAt: number;
+  }
 >();
 
 // ---------------------------------------------------------------------------
@@ -154,10 +157,16 @@ async function buildThreadPrompt(
 
   for (const msg of messages) {
     // Skip our own bot messages
-    if (msg.user === BOT_USER_ID) continue;
-    if (msg.bot_id) continue;
+    if (msg.user === BOT_USER_ID) {
+      continue;
+    }
+    if (msg.bot_id) {
+      continue;
+    }
     const text = stripMention(msg.text ?? "");
-    if (!text) continue;
+    if (!text) {
+      continue;
+    }
     lines.push(text);
   }
 
@@ -192,9 +201,7 @@ async function runClaudeAndStream(
 
   args.push(prompt);
 
-  console.log(
-    `[spa] Starting claude session (thread=${threadTs}, resume=${sessionId ?? "new"})`,
-  );
+  console.log(`[spa] Starting claude session (thread=${threadTs}, resume=${sessionId ?? "new"})`);
 
   const proc = Bun.spawn(args, {
     stdout: "pipe",
@@ -202,7 +209,10 @@ async function runClaudeAndStream(
     cwd: process.env.REPO_ROOT ?? process.cwd(),
   });
 
-  activeRuns.set(threadTs, { proc, startedAt: Date.now() });
+  activeRuns.set(threadTs, {
+    proc,
+    startedAt: Date.now(),
+  });
 
   // Post initial "thinking" message
   const thinkingMsg = await client.chat
@@ -230,15 +240,21 @@ async function runClaudeAndStream(
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        break;
+      }
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, {
+        stream: true,
+      });
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed) continue;
+        if (!trimmed) {
+          continue;
+        }
 
         let parsed: unknown;
         try {
@@ -248,7 +264,9 @@ async function runClaudeAndStream(
         }
 
         const base = v.safeParse(StreamEventSchema, parsed);
-        if (!base.success) continue;
+        if (!base.success) {
+          continue;
+        }
 
         // Extract assistant text
         const assistant = v.safeParse(AssistantMessageSchema, parsed);
@@ -269,15 +287,8 @@ async function runClaudeAndStream(
 
       // Throttled Slack update
       const now = Date.now();
-      if (
-        updateTs &&
-        fullText.length > lastUpdateLen &&
-        now - lastUpdateTime >= UPDATE_INTERVAL_MS
-      ) {
-        const displayText =
-          fullText.length > MAX_MSG_LEN
-            ? `...${fullText.slice(-MAX_MSG_LEN)}`
-            : fullText;
+      if (updateTs && fullText.length > lastUpdateLen && now - lastUpdateTime >= UPDATE_INTERVAL_MS) {
+        const displayText = fullText.length > MAX_MSG_LEN ? `...${fullText.slice(-MAX_MSG_LEN)}` : fullText;
 
         await client.chat
           .update({
@@ -315,13 +326,14 @@ async function runClaudeAndStream(
 
   // Final update with complete text
   if (updateTs && fullText) {
-    const displayText =
-      fullText.length > MAX_MSG_LEN
-        ? `...${fullText.slice(-MAX_MSG_LEN)}`
-        : fullText;
+    const displayText = fullText.length > MAX_MSG_LEN ? `...${fullText.slice(-MAX_MSG_LEN)}` : fullText;
 
     await client.chat
-      .update({ channel, ts: updateTs, text: displayText })
+      .update({
+        channel,
+        ts: updateTs,
+        text: displayText,
+      })
       .catch(() => {});
   }
 
@@ -335,9 +347,7 @@ async function runClaudeAndStream(
       .catch(() => {});
   }
 
-  console.log(
-    `[spa] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${fullText.length})`,
-  );
+  console.log(`[spa] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${fullText.length})`);
 
   return returnedSessionId;
 }
@@ -374,23 +384,23 @@ async function handleThread(
 
   // Build prompt from full thread (skipping bot messages)
   const prompt = await buildThreadPrompt(client, channel, threadTs);
-  if (!prompt) return;
+  if (!prompt) {
+    return;
+  }
 
   // Check for existing session to resume
   const existing = findMapping(state, channel, threadTs);
 
   await client.reactions
-    .add({ channel, timestamp: eventTs, name: "robot_face" })
+    .add({
+      channel,
+      timestamp: eventTs,
+      name: "robot_face",
+    })
     .catch(() => {});
 
   // Run Claude Code and stream back
-  const sessionId = await runClaudeAndStream(
-    client,
-    channel,
-    threadTs,
-    prompt,
-    existing?.sessionId,
-  );
+  const sessionId = await runClaudeAndStream(client, channel, threadTs, prompt, existing?.sessionId);
 
   // Save session mapping
   if (sessionId && !existing) {
@@ -419,33 +429,46 @@ const app = new App.default({
 
 // --- app_mention: @Spawnis triggers a Claude run on this thread ---
 app.event("app_mention", async ({ event, client }) => {
-  if (event.channel !== SLACK_CHANNEL_ID) return;
+  if (event.channel !== SLACK_CHANNEL_ID) {
+    return;
+  }
   const threadTs = event.thread_ts ?? event.ts;
   await handleThread(client, event.channel, threadTs, event.ts);
 });
 
 // --- message: new thread replies in tracked threads trigger Claude ---
 app.event("message", async ({ event, client }) => {
-  if (!("channel" in event) || event.channel !== SLACK_CHANNEL_ID) return;
+  if (!("channel" in event) || event.channel !== SLACK_CHANNEL_ID) {
+    return;
+  }
 
   // Only thread replies
-  const threadTs =
-    "thread_ts" in event && typeof event.thread_ts === "string"
-      ? event.thread_ts
-      : undefined;
-  if (!threadTs) return;
+  const threadTs = "thread_ts" in event && typeof event.thread_ts === "string" ? event.thread_ts : undefined;
+  if (!threadTs) {
+    return;
+  }
 
   // Skip our own messages
-  if ("user" in event && event.user === BOT_USER_ID) return;
-  if ("bot_id" in event && event.bot_id) return;
-  if ("subtype" in event && event.subtype === "bot_message") return;
+  if ("user" in event && event.user === BOT_USER_ID) {
+    return;
+  }
+  if ("bot_id" in event && event.bot_id) {
+    return;
+  }
+  if ("subtype" in event && event.subtype === "bot_message") {
+    return;
+  }
 
   // Only respond in threads we're already tracking
   const mapping = findMapping(state, event.channel, threadTs);
-  if (!mapping) return;
+  if (!mapping) {
+    return;
+  }
 
   const ts = "ts" in event && typeof event.ts === "string" ? event.ts : "";
-  if (!ts) return;
+  if (!ts) {
+    return;
+  }
 
   await handleThread(client, event.channel, threadTs, ts);
 });
@@ -475,7 +498,9 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 
 (async () => {
   // Resolve our own bot user ID
-  const authResult = await app.client.auth.test({ token: SLACK_BOT_TOKEN });
+  const authResult = await app.client.auth.test({
+    token: SLACK_BOT_TOKEN,
+  });
   BOT_USER_ID = authResult.user_id ?? "";
   if (BOT_USER_ID) {
     console.log(`[spa] Bot user ID: ${BOT_USER_ID}`);
@@ -484,7 +509,5 @@ process.on("SIGINT", () => shutdown("SIGINT"));
   }
 
   await app.start();
-  console.log(
-    `[spa] Running (channel=${SLACK_CHANNEL_ID}, repo=${GITHUB_REPO})`,
-  );
+  console.log(`[spa] Running (channel=${SLACK_CHANNEL_ID}, repo=${GITHUB_REPO})`);
 })();
