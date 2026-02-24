@@ -648,10 +648,10 @@ export async function ensureSshKey(): Promise<void> {
         return;
       } catch {
         throw new Error(
-        "Failed to import SSH key to Lightsail. " +
-          "On new AWS accounts, Lightsail may not be enabled. " +
-          "Visit https://lightsail.aws.amazon.com/ to activate it, then try again.",
-      );
+          "Failed to import SSH key to Lightsail. " +
+            "On new AWS accounts, Lightsail may not be enabled. " +
+            "Visit https://lightsail.aws.amazon.com/ to activate it, then try again.",
+        );
       }
     }
     logInfo("SSH key imported to Lightsail");
