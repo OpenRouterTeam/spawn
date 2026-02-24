@@ -72,6 +72,8 @@ export const ResultSchema = v.object({
 export interface SlackSegment {
   kind: "text" | "tool_use" | "tool_result";
   text: string;
+  toolName?: string; // set for tool_use
+  isError?: boolean; // set for tool_result
 }
 
 /**
@@ -126,9 +128,14 @@ export function parseStreamEvent(event: Record<string, unknown>): SlackSegment |
 
     // Tool use takes priority — it's a distinct event kind
     if (toolParts.length > 0) {
+      // Extract first tool name for compact footer display
+      const firstToolBlock = content.map((b: unknown) => toRecord(b)).find(
+        (b: Record<string, unknown> | null) => b?.type === "tool_use" && typeof b?.name === "string",
+      );
       return {
         kind: "tool_use",
         text: toolParts.join("\n"),
+        toolName: typeof firstToolBlock?.name === "string" ? firstToolBlock.name : undefined,
       };
     }
     if (textParts.length > 0) {
@@ -167,9 +174,14 @@ export function parseStreamEvent(event: Record<string, unknown>): SlackSegment |
     if (parts.length === 0) {
       return null;
     }
+    const hasError = content.some((b: unknown) => {
+      const block = toRecord(b);
+      return block?.type === "tool_result" && block?.is_error === true;
+    });
     return {
       kind: "tool_result",
       text: parts.join("\n"),
+      isError: hasError || undefined,
     };
   }
 

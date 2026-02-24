@@ -18,29 +18,30 @@ describe("parseStreamEvent", () => {
     expect(result?.text).toContain("I'll look at the issue and check the repository structure.");
   });
 
-  it("parses assistant tool_use (Bash) from fixture", () => {
+  it("parses assistant tool_use (Bash) from fixture with toolName", () => {
     // fixture[1]: assistant with tool_use Bash
     const result = parseStreamEvent(fixture(1));
     expect(result?.kind).toBe("tool_use");
+    expect(result?.toolName).toBe("Bash");
     expect(result?.text).toContain(":hammer_and_wrench: *Bash*");
     expect(result?.text).toContain("gh issue list");
   });
 
-  it("parses user tool_result (success) from fixture", () => {
+  it("parses user tool_result (success) from fixture without isError", () => {
     // fixture[2]: user with successful tool_result
     const result = parseStreamEvent(fixture(2));
     expect(result?.kind).toBe("tool_result");
+    expect(result?.isError).toBeUndefined();
     expect(result?.text).toContain(":white_check_mark: Result");
     expect(result?.text).toContain("Fly.io deploy fails on arm64");
   });
 
-  it("parses assistant tool_use (Glob) from fixture", () => {
+  it("parses assistant tool_use (Glob) from fixture with toolName", () => {
     // fixture[3]: assistant with tool_use Glob
     const result = parseStreamEvent(fixture(3));
-    expect(result).toEqual({
-      kind: "tool_use",
-      text: ":hammer_and_wrench: *Glob* `**/*.ts`",
-    });
+    expect(result?.kind).toBe("tool_use");
+    expect(result?.toolName).toBe("Glob");
+    expect(result?.text).toBe(":hammer_and_wrench: *Glob* `**/*.ts`");
   });
 
   it("parses assistant tool_use (Read) from fixture", () => {
@@ -51,10 +52,11 @@ describe("parseStreamEvent", () => {
     expect(result?.text).toContain("index.ts");
   });
 
-  it("parses user tool_result (error) from fixture", () => {
+  it("parses user tool_result (error) from fixture with isError", () => {
     // fixture[6]: user with is_error: true
     const result = parseStreamEvent(fixture(6));
     expect(result?.kind).toBe("tool_result");
+    expect(result?.isError).toBe(true);
     expect(result?.text).toContain(":x: Error");
     expect(result?.text).toContain("Permission denied");
   });
@@ -124,7 +126,9 @@ describe("parseStreamEvent", () => {
       },
     };
     const result = parseStreamEvent(event);
-    expect(result).toEqual({ kind: "tool_use", text: ":hammer_and_wrench: *Bash*" });
+    expect(result?.kind).toBe("tool_use");
+    expect(result?.toolName).toBe("Bash");
+    expect(result?.text).toBe(":hammer_and_wrench: *Bash*");
   });
 
   it("prefers tool_use over text when both present", () => {
