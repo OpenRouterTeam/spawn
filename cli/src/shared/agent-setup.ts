@@ -398,7 +398,7 @@ export function openCodeInstallCmd(): string {
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
 const ZEROCLAW_INSTALL_URL =
-  "https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/install.sh";
+  "https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh";
 
 export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   return {
