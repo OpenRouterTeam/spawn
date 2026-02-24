@@ -3,9 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import * as v from "valibot";
 
-// ---------------------------------------------------------------------------
-// Environment
-// ---------------------------------------------------------------------------
+/** Environment */
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN ?? "";
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN ?? "";
@@ -25,15 +23,11 @@ for (const [name, value] of Object.entries(REQUIRED_VARS)) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Resolve our own bot user ID so we can skip our own messages
-// ---------------------------------------------------------------------------
+/** Resolve our own bot user ID so we can skip our own messages */
 
 let BOT_USER_ID = "";
 
-// ---------------------------------------------------------------------------
-// State — thread-to-session mappings persisted to disk
-// ---------------------------------------------------------------------------
+/** State — thread-to-session mappings persisted to disk */
 
 const STATE_PATH = process.env.STATE_PATH ?? `${process.env.HOME ?? "/root"}/.config/spawn/slack-issues.json`;
 
@@ -97,9 +91,7 @@ const activeRuns = new Map<
   }
 >();
 
-// ---------------------------------------------------------------------------
-// Claude Code helpers
-// ---------------------------------------------------------------------------
+/** Claude Code helpers */
 
 const StreamEventSchema = v.object({
   type: v.string(),
@@ -352,17 +344,13 @@ async function runClaudeAndStream(
   return returnedSessionId;
 }
 
-// ---------------------------------------------------------------------------
-// Text helpers
-// ---------------------------------------------------------------------------
+/** Text helpers */
 
 function stripMention(text: string): string {
   return text.replace(/<@[A-Z0-9]+>/g, "").trim();
 }
 
-// ---------------------------------------------------------------------------
-// Core handler — shared by app_mention and message events
-// ---------------------------------------------------------------------------
+/** Core handler — shared by app_mention and message events */
 
 async function handleThread(
   client: InstanceType<typeof App.default>["client"],
@@ -416,9 +404,7 @@ async function handleThread(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Slack App
-// ---------------------------------------------------------------------------
+/** Slack App */
 
 const app = new App.default({
   token: SLACK_BOT_TOKEN,
@@ -473,9 +459,7 @@ app.event("message", async ({ event, client }) => {
   await handleThread(client, event.channel, threadTs, ts);
 });
 
-// ---------------------------------------------------------------------------
-// Graceful shutdown
-// ---------------------------------------------------------------------------
+/** Graceful shutdown */
 
 function shutdown(signal: string): void {
   console.log(`[spa] Received ${signal}, shutting down...`);
@@ -492,9 +476,7 @@ function shutdown(signal: string): void {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
-// ---------------------------------------------------------------------------
-// Start
-// ---------------------------------------------------------------------------
+/** Start */
 
 (async () => {
   // Resolve our own bot user ID
