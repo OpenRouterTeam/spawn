@@ -26,7 +26,13 @@ for (const [name, value] of Object.entries(REQUIRED_VARS)) {
 }
 
 // ---------------------------------------------------------------------------
-// State — thread-to-issue mappings persisted to disk
+// Resolve our own bot user ID so we can skip our own messages
+// ---------------------------------------------------------------------------
+
+let BOT_USER_ID = "";
+
+// ---------------------------------------------------------------------------
+// State — thread-to-session mappings persisted to disk
 // ---------------------------------------------------------------------------
 
 const STATE_PATH =
@@ -36,9 +42,7 @@ const STATE_PATH =
 const MappingSchema = v.object({
   channel: v.string(),
   threadTs: v.string(),
-  issueNumber: v.number(),
-  issueUrl: v.string(),
-  repo: v.string(),
+  sessionId: v.string(),
   createdAt: v.string(),
 });
 
@@ -56,104 +60,286 @@ function loadState(): State {
     const parsed = v.parse(StateSchema, JSON.parse(raw));
     return parsed;
   } catch {
-    console.warn("[slack-bot] Could not load state, starting fresh");
+    console.warn("[spawnis] Could not load state, starting fresh");
     return { mappings: [] };
   }
 }
 
-function saveState(state: State): void {
+function saveState(s: State): void {
   const dir = dirname(STATE_PATH);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`);
+  writeFileSync(STATE_PATH, `${JSON.stringify(s, null, 2)}\n`);
 }
 
 function findMapping(
-  state: State,
+  s: State,
   channel: string,
   threadTs: string,
 ): Mapping | undefined {
-  return state.mappings.find(
+  return s.mappings.find(
     (m) => m.channel === channel && m.threadTs === threadTs,
   );
 }
 
-function addMapping(state: State, mapping: Mapping): void {
-  state.mappings.push(mapping);
-  saveState(state);
+function addMapping(s: State, mapping: Mapping): void {
+  s.mappings.push(mapping);
+  saveState(s);
 }
 
 const state = loadState();
 
+// Active Claude Code processes — keyed by threadTs
+const activeRuns = new Map<
+  string,
+  { proc: ReturnType<typeof Bun.spawn>; startedAt: number }
+>();
+
 // ---------------------------------------------------------------------------
-// GitHub helpers — uses `gh` CLI (assumes `gh auth login` is done)
+// Claude Code helpers
 // ---------------------------------------------------------------------------
 
-const GhIssueSchema = v.object({
-  number: v.number(),
-  url: v.string(),
+const StreamEventSchema = v.object({
+  type: v.string(),
 });
 
-async function ghExec(
-  args: string[],
-): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  const proc = Bun.spawn(["gh", ...args], {
+const AssistantMessageSchema = v.object({
+  type: v.literal("assistant"),
+  message: v.object({
+    content: v.array(
+      v.object({
+        type: v.string(),
+        text: v.optional(v.string()),
+      }),
+    ),
+  }),
+});
+
+const ResultSchema = v.object({
+  type: v.literal("result"),
+  session_id: v.string(),
+});
+
+const SYSTEM_PROMPT = `You are Spawnis, a Slack bot for the Spawn project (${GITHUB_REPO}).
+
+Your primary job is to help manage GitHub issues based on Slack conversations:
+
+1. **Create issues**: When a thread describes a bug, feature request, or task — create a GitHub issue with \`gh issue create --repo ${GITHUB_REPO}\`. Use a clear title and include the Slack context in the body.
+2. **Update issues**: When a thread references an existing issue (by number like #123) — add comments, update labels, or close issues as appropriate using \`gh issue comment\`, \`gh issue edit\`, etc.
+3. **Search issues**: When asked about existing issues, search with \`gh issue list --repo ${GITHUB_REPO}\` or \`gh issue view\`.
+4. **General help**: Answer questions about the Spawn codebase, suggest fixes, or help triage.
+
+Always use the \`gh\` CLI for GitHub operations. You are already authenticated.
+
+When creating issues, include a footer: "_Filed from Slack by Spawnis_"
+
+Below is the full Slack thread. The most recent message is the one you should respond to. Prior messages are context.`;
+
+/**
+ * Fetch full thread history from Slack and format as a prompt.
+ */
+async function buildThreadPrompt(
+  client: InstanceType<typeof App.default>["client"],
+  channel: string,
+  threadTs: string,
+): Promise<string> {
+  const result = await client.conversations.replies({
+    channel,
+    ts: threadTs,
+    inclusive: true,
+    limit: 100,
+  });
+
+  const messages = result.messages ?? [];
+  const lines: string[] = [];
+
+  for (const msg of messages) {
+    // Skip our own bot messages
+    if (msg.user === BOT_USER_ID) continue;
+    if (msg.bot_id) continue;
+    const text = stripMention(msg.text ?? "");
+    if (!text) continue;
+    lines.push(text);
+  }
+
+  return lines.join("\n\n");
+}
+
+/**
+ * Run `claude -p` with stream-json output, collect assistant text,
+ * and post chunked updates to a Slack thread.
+ */
+async function runClaudeAndStream(
+  client: InstanceType<typeof App.default>["client"],
+  channel: string,
+  threadTs: string,
+  prompt: string,
+  sessionId: string | undefined,
+): Promise<string | null> {
+  const args = [
+    "claude",
+    "-p",
+    "--output-format",
+    "stream-json",
+    "--dangerously-skip-permissions",
+    "--no-session-persistence",
+    "--system-prompt",
+    SYSTEM_PROMPT,
+  ];
+
+  if (sessionId) {
+    args.push("--resume", sessionId);
+  }
+
+  args.push(prompt);
+
+  console.log(
+    `[spawnis] Starting claude session (thread=${threadTs}, resume=${sessionId ?? "new"})`,
+  );
+
+  const proc = Bun.spawn(args, {
     stdout: "pipe",
     stderr: "pipe",
+    cwd: process.env.REPO_ROOT ?? process.cwd(),
   });
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ]);
+
+  activeRuns.set(threadTs, { proc, startedAt: Date.now() });
+
+  // Post initial "thinking" message
+  const thinkingMsg = await client.chat
+    .postMessage({
+      channel,
+      thread_ts: threadTs,
+      text: ":brain: Thinking...",
+    })
+    .catch(() => null);
+
+  const updateTs = thinkingMsg?.ts;
+  let fullText = "";
+  let lastUpdateLen = 0;
+  let returnedSessionId: string | null = null;
+
+  // Throttle Slack updates — update at most every 2s
+  let lastUpdateTime = 0;
+  const UPDATE_INTERVAL_MS = 2000;
+  const MAX_MSG_LEN = 3900; // Slack limit ~4000, leave room
+
+  const decoder = new TextDecoder();
+  const reader = proc.stdout.getReader();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          continue;
+        }
+
+        const base = v.safeParse(StreamEventSchema, parsed);
+        if (!base.success) continue;
+
+        // Extract assistant text
+        const assistant = v.safeParse(AssistantMessageSchema, parsed);
+        if (assistant.success) {
+          for (const block of assistant.output.message.content) {
+            if (block.type === "text" && block.text) {
+              fullText += block.text;
+            }
+          }
+        }
+
+        // Capture session ID from result
+        const resultEvent = v.safeParse(ResultSchema, parsed);
+        if (resultEvent.success) {
+          returnedSessionId = resultEvent.output.session_id;
+        }
+      }
+
+      // Throttled Slack update
+      const now = Date.now();
+      if (
+        updateTs &&
+        fullText.length > lastUpdateLen &&
+        now - lastUpdateTime >= UPDATE_INTERVAL_MS
+      ) {
+        const displayText =
+          fullText.length > MAX_MSG_LEN
+            ? `...${fullText.slice(-MAX_MSG_LEN)}`
+            : fullText;
+
+        await client.chat
+          .update({
+            channel,
+            ts: updateTs,
+            text: displayText,
+          })
+          .catch(() => {});
+
+        lastUpdateLen = fullText.length;
+        lastUpdateTime = now;
+      }
+    }
+  } finally {
+    activeRuns.delete(threadTs);
+  }
+
+  // Read stderr for errors
+  const stderr = await new Response(proc.stderr).text();
   const exitCode = await proc.exited;
-  return { ok: exitCode === 0, stdout: stdout.trim(), stderr: stderr.trim() };
-}
 
-async function createGitHubIssue(
-  title: string,
-  body: string,
-): Promise<{ number: number; url: string } | null> {
-  const result = await ghExec([
-    "issue",
-    "create",
-    "--repo",
-    GITHUB_REPO,
-    "--title",
-    title,
-    "--body",
-    body,
-    "--json",
-    "number,url",
-  ]);
-  if (!result.ok) {
-    console.error(`[slack-bot] gh issue create failed: ${result.stderr}`);
+  if (exitCode !== 0 && !fullText) {
+    console.error(`[spawnis] claude exited ${exitCode}: ${stderr}`);
+    if (updateTs) {
+      await client.chat
+        .update({
+          channel,
+          ts: updateTs,
+          text: `:x: Claude Code errored (exit ${exitCode}):\n\`\`\`\n${stderr.slice(0, 1500)}\n\`\`\``,
+        })
+        .catch(() => {});
+    }
     return null;
   }
-  const parsed = v.safeParse(GhIssueSchema, JSON.parse(result.stdout));
-  if (!parsed.success) {
-    console.error("[slack-bot] Unexpected gh output shape");
-    return null;
-  }
-  return { number: parsed.output.number, url: parsed.output.url };
-}
 
-async function addGitHubComment(
-  issueNumber: number,
-  body: string,
-): Promise<boolean> {
-  const result = await ghExec([
-    "issue",
-    "comment",
-    String(issueNumber),
-    "--repo",
-    GITHUB_REPO,
-    "--body",
-    body,
-  ]);
-  if (!result.ok) {
-    console.error(`[slack-bot] gh issue comment failed: ${result.stderr}`);
-    return false;
+  // Final update with complete text
+  if (updateTs && fullText) {
+    const displayText =
+      fullText.length > MAX_MSG_LEN
+        ? `...${fullText.slice(-MAX_MSG_LEN)}`
+        : fullText;
+
+    await client.chat
+      .update({ channel, ts: updateTs, text: displayText })
+      .catch(() => {});
   }
-  return true;
+
+  if (!fullText && updateTs) {
+    await client.chat
+      .update({
+        channel,
+        ts: updateTs,
+        text: ":white_check_mark: Done (no text output)",
+      })
+      .catch(() => {});
+  }
+
+  console.log(
+    `[spawnis] Claude done (thread=${threadTs}, session=${returnedSessionId}, len=${fullText.length})`,
+  );
+
+  return returnedSessionId;
 }
 
 // ---------------------------------------------------------------------------
@@ -164,14 +350,60 @@ function stripMention(text: string): string {
   return text.replace(/<@[A-Z0-9]+>/g, "").trim();
 }
 
-function parseIssueText(text: string): { title: string; body: string } {
-  const cleaned = stripMention(text);
-  const lines = cleaned.split("\n");
-  const firstLine = (lines[0] ?? "").trim();
-  const title =
-    firstLine.length > 100 ? `${firstLine.slice(0, 100)}...` : firstLine;
-  const rest = lines.slice(1).join("\n").trim();
-  return { title, body: rest };
+// ---------------------------------------------------------------------------
+// Core handler — shared by app_mention and message events
+// ---------------------------------------------------------------------------
+
+async function handleThread(
+  client: InstanceType<typeof App.default>["client"],
+  channel: string,
+  threadTs: string,
+  eventTs: string,
+): Promise<void> {
+  // Prevent concurrent runs on the same thread
+  if (activeRuns.has(threadTs)) {
+    await client.reactions
+      .add({
+        channel,
+        timestamp: eventTs,
+        name: "hourglass_flowing_sand",
+      })
+      .catch(() => {});
+    return;
+  }
+
+  // Build prompt from full thread (skipping bot messages)
+  const prompt = await buildThreadPrompt(client, channel, threadTs);
+  if (!prompt) return;
+
+  // Check for existing session to resume
+  const existing = findMapping(state, channel, threadTs);
+
+  await client.reactions
+    .add({ channel, timestamp: eventTs, name: "robot_face" })
+    .catch(() => {});
+
+  // Run Claude Code and stream back
+  const sessionId = await runClaudeAndStream(
+    client,
+    channel,
+    threadTs,
+    prompt,
+    existing?.sessionId,
+  );
+
+  // Save session mapping
+  if (sessionId && !existing) {
+    addMapping(state, {
+      channel,
+      threadTs,
+      sessionId,
+      createdAt: new Date().toISOString(),
+    });
+  } else if (sessionId && existing) {
+    existing.sessionId = sessionId;
+    saveState(state);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -185,99 +417,15 @@ const app = new App.default({
   logLevel: "INFO",
 });
 
-// --- app_mention: create issue or add comment if thread already tracked ---
+// --- app_mention: @Spawnis triggers a Claude run on this thread ---
 app.event("app_mention", async ({ event, client }) => {
   if (event.channel !== SLACK_CHANNEL_ID) return;
-
   const threadTs = event.thread_ts ?? event.ts;
-  const existing = findMapping(state, event.channel, threadTs);
-
-  if (existing) {
-    // Thread already mapped — add as comment
-    const text = stripMention(event.text ?? "");
-    const userName = event.user ? `<@${event.user}>` : "Someone";
-    const commentBody = `**${userName}** mentioned the bot in [Slack thread](https://slack.com/archives/${event.channel}/p${threadTs.replace(".", "")}):\n\n${text}`;
-
-    const ok = await addGitHubComment(existing.issueNumber, commentBody);
-    if (ok) {
-      await client.reactions
-        .add({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: "speech_balloon",
-        })
-        .catch(() => {});
-    }
-    return;
-  }
-
-  // New issue
-  const { title, body } = parseIssueText(event.text ?? "");
-  if (!title) {
-    await client.chat
-      .postMessage({
-        channel: event.channel,
-        thread_ts: threadTs,
-        text: "Please include a description for the issue after mentioning me.",
-      })
-      .catch(() => {});
-    return;
-  }
-
-  const userName = event.user ? `<@${event.user}>` : "Someone";
-  const slackLink = `https://slack.com/archives/${event.channel}/p${threadTs.replace(".", "")}`;
-  const fullBody = [
-    body,
-    "",
-    "---",
-    `_Filed from Slack by ${userName} ([thread](${slackLink}))_`,
-  ].join("\n");
-
-  const issue = await createGitHubIssue(title, fullBody);
-  if (!issue) {
-    await client.chat
-      .postMessage({
-        channel: event.channel,
-        thread_ts: threadTs,
-        text: "Failed to create GitHub issue. Check bot logs.",
-      })
-      .catch(() => {});
-    return;
-  }
-
-  addMapping(state, {
-    channel: event.channel,
-    threadTs,
-    issueNumber: issue.number,
-    issueUrl: issue.url,
-    repo: GITHUB_REPO,
-    createdAt: new Date().toISOString(),
-  });
-
-  await client.reactions
-    .add({
-      channel: event.channel,
-      timestamp: event.ts,
-      name: "white_check_mark",
-    })
-    .catch(() => {});
-
-  await client.chat
-    .postMessage({
-      channel: event.channel,
-      thread_ts: threadTs,
-      text: `Created issue: <${issue.url}|#${issue.number} — ${title}>`,
-    })
-    .catch(() => {});
-
-  console.log(
-    `[slack-bot] Created issue #${issue.number} from thread ${threadTs}`,
-  );
+  await handleThread(client, event.channel, threadTs, event.ts);
 });
 
-// --- message: sync thread replies as comments ---
+// --- message: new thread replies in tracked threads trigger Claude ---
 app.event("message", async ({ event, client }) => {
-  // Type narrowing for message events
   if (!("channel" in event) || event.channel !== SLACK_CHANNEL_ID) return;
 
   // Only thread replies
@@ -287,28 +435,19 @@ app.event("message", async ({ event, client }) => {
       : undefined;
   if (!threadTs) return;
 
-  // Ignore bot messages
+  // Skip our own messages
+  if ("user" in event && event.user === BOT_USER_ID) return;
   if ("bot_id" in event && event.bot_id) return;
   if ("subtype" in event && event.subtype === "bot_message") return;
 
+  // Only respond in threads we're already tracking
   const mapping = findMapping(state, event.channel, threadTs);
   if (!mapping) return;
 
-  const text =
-    "text" in event && typeof event.text === "string" ? event.text : "";
-  const userId =
-    "user" in event && typeof event.user === "string" ? event.user : "Someone";
-  const userName = `<@${userId}>`;
   const ts = "ts" in event && typeof event.ts === "string" ? event.ts : "";
+  if (!ts) return;
 
-  const commentBody = `**${userName}** commented in [Slack thread](https://slack.com/archives/${event.channel}/p${threadTs.replace(".", "")}):\n\n${text}`;
-
-  const ok = await addGitHubComment(mapping.issueNumber, commentBody);
-  if (ok && ts) {
-    await client.reactions
-      .add({ channel: event.channel, timestamp: ts, name: "speech_balloon" })
-      .catch(() => {});
-  }
+  await handleThread(client, event.channel, threadTs, ts);
 });
 
 // ---------------------------------------------------------------------------
@@ -316,7 +455,13 @@ app.event("message", async ({ event, client }) => {
 // ---------------------------------------------------------------------------
 
 function shutdown(signal: string): void {
-  console.log(`[slack-bot] Received ${signal}, shutting down...`);
+  console.log(`[spawnis] Received ${signal}, shutting down...`);
+
+  for (const [threadTs, run] of activeRuns) {
+    console.log(`[spawnis] Killing active run for thread ${threadTs}`);
+    run.proc.kill("SIGTERM");
+  }
+
   saveState(state);
   process.exit(0);
 }
@@ -329,8 +474,17 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 // ---------------------------------------------------------------------------
 
 (async () => {
+  // Resolve our own bot user ID
+  const authResult = await app.client.auth.test({ token: SLACK_BOT_TOKEN });
+  BOT_USER_ID = authResult.user_id ?? "";
+  if (BOT_USER_ID) {
+    console.log(`[spawnis] Bot user ID: ${BOT_USER_ID}`);
+  } else {
+    console.warn("[spawnis] Could not resolve bot user ID — may echo own messages");
+  }
+
   await app.start();
   console.log(
-    `[slack-bot] Running (channel=${SLACK_CHANNEL_ID}, repo=${GITHUB_REPO})`,
+    `[spawnis] Running (channel=${SLACK_CHANNEL_ID}, repo=${GITHUB_REPO})`,
   );
 })();
