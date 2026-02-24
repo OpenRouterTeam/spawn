@@ -6,7 +6,7 @@ display_information:
   background_color: "#1a1a2e"
 features:
   bot_user:
-    display_name: Spawnis
+    display_name: spawnis
     always_online: true
 oauth_config:
   scopes:
