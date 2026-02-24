@@ -1,10 +1,10 @@
 ---
 name: slack-bot
-description: "SPA (Spawn Processes Autonomously) — Slack bot that pipes threads into Claude Code sessions"
+description: "SPA (Spawn's Personal Agent) — Slack bot that pipes threads into Claude Code sessions"
 disable-model-invocation: true
 ---
 
-# SPA — Spawn Processes Autonomously
+# SPA — Spawn's Personal Agent
 
 Slack bot that listens in `#proj-spawn` via Socket Mode. When @mentioned, it collects the full thread, pipes it into a `claude -p` session, and streams Claude Code's responses back to the Slack thread in real-time.
 
@@ -77,7 +77,7 @@ Create `/etc/systemd/system/spawn-slack-bot.service`:
 
 ```ini
 [Unit]
-Description=SPA — Spawn Processes Autonomously
+Description=SPA — Spawn's Personal Agent
 After=network.target
 
 [Service]

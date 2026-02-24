@@ -119,7 +119,7 @@ const ResultSchema = v.object({
   session_id: v.string(),
 });
 
-const SYSTEM_PROMPT = `You are SPA (Spawn Processes Autonomously), a Slack bot for the Spawn project (${GITHUB_REPO}).
+const SYSTEM_PROMPT = `You are SPA (Spawn's Personal Agent), a Slack bot for the Spawn project (${GITHUB_REPO}).
 
 Your primary job is to help manage GitHub issues based on Slack conversations:
 
