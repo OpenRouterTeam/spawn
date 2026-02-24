@@ -4,7 +4,18 @@ name: Daily QA
 #   schedule:
 #     - cron: '0 6 * * *'
 #   workflow_dispatch:
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'QA mode to trigger'
+        required: false
+        default: 'e2e'
+        type: choice
+        options:
+          - e2e
+          - schedule
+          - fixtures
 jobs:
   trigger:
     runs-on: ubuntu-latest
@@ -15,6 +26,7 @@ jobs:
           SPRITE_URL: ${{ secrets.QA_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.QA_TRIGGER_SECRET }}
         run: |
+          REASON="${{ github.event.inputs.reason || 'e2e' }}"
           curl -sS --fail-with-body -X POST \
-            "${SPRITE_URL}/trigger?reason=${{ github.event_name }}" \
+            "${SPRITE_URL}/trigger?reason=${REASON}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"
