@@ -33,7 +33,7 @@ cli/
 │   ├── update-check.ts # Auto-update check (once per day)
 │   ├── version.ts      # Version constant
 │   └── __tests__/      # Test suite (Bun test runner)
-├── install.sh          # Installer (auto-installs bun if needed)
+├── ../sh/cli/install.sh # Installer (auto-installs bun if needed, lives in sh/cli/)
 ├── package.json        # Package metadata and dependencies
 └── tsconfig.json       # TypeScript configuration
 ```
@@ -57,7 +57,7 @@ The TypeScript CLI (`src/*.ts`) provides:
 ### Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/cli/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/cli/install.sh | bash
 ```
 
 The installer will:

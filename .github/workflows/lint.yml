@@ -68,4 +68,4 @@ jobs:
 
       # Warn-only for initial rollout — switch to blocking after burn-in
       - name: Run macOS compat linter
-        run: bash test/macos-compat.sh --warn-only
+        run: bash sh/test/macos-compat.sh --warn-only

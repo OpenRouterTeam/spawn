@@ -79,7 +79,7 @@ jobs:
               --title "${name} bundle v${{ steps.version.outputs.version }}" \
               --notes "Pre-built ${name} cloud provider bundle.
 
-          Downloaded by \`${name}/*.sh\` shims for \`bash <(curl ...)\` execution.
+          Downloaded by \`sh/${name}/*.sh\` shims for \`bash <(curl ...)\` execution.
 
           **Built:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
               --prerelease \

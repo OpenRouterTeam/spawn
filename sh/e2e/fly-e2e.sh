@@ -1,12 +1,12 @@
 #!/bin/bash
-# e2e/fly-e2e.sh — Main E2E test orchestrator for Spawn on Fly.io
+# sh/e2e/fly-e2e.sh — Main E2E test orchestrator for Spawn on Fly.io
 #
 # Usage:
-#   ./e2e/fly-e2e.sh                       # All agents, sequential
-#   ./e2e/fly-e2e.sh claude                # Single agent
-#   ./e2e/fly-e2e.sh claude codex opencode # Specific agents
-#   ./e2e/fly-e2e.sh --parallel 2          # Parallel (2 at a time)
-#   ./e2e/fly-e2e.sh --skip-cleanup        # Skip stale app cleanup
+#   ./sh/e2e/fly-e2e.sh                       # All agents, sequential
+#   ./sh/e2e/fly-e2e.sh claude                # Single agent
+#   ./sh/e2e/fly-e2e.sh claude codex opencode # Specific agents
+#   ./sh/e2e/fly-e2e.sh --parallel 2          # Parallel (2 at a time)
+#   ./sh/e2e/fly-e2e.sh --skip-cleanup        # Skip stale app cleanup
 set -eo pipefail
 
 # ---------------------------------------------------------------------------

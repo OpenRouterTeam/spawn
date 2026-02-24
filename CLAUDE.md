@@ -30,7 +30,7 @@ Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 
 - Find the **agent's** existing script on another cloud — it shows the install steps, config files, env vars, and launch command
 - The agent scripts are thin bash wrappers that bootstrap bun and run the TypeScript CLI
-- The script goes at `{cloud}/{agent}.sh`
+- The script goes at `sh/{cloud}/{agent}.sh`
 
 **OpenRouter injection is mandatory.** Every agent script MUST:
 - Set `OPENROUTER_API_KEY` in the shell environment
@@ -63,7 +63,7 @@ Steps to add one:
 2. Add an entry to `manifest.json` → `clouds`
 3. Add `"missing"` entries to the matrix for every existing agent
 4. Implement at least 2-3 agent scripts to prove the lib works
-5. Update the cloud's `README.md`
+5. Update the cloud's `sh/{cloud}/README.md`
 6. **Add test coverage** (mandatory) — add unit tests in `cli/src/__tests__/`
 
 **DO NOT add GPU clouds** (CoreWeave, RunPod, etc.). Spawn agents call remote LLM APIs for inference — they need cheap CPU instances with SSH, not expensive GPU VMs.
@@ -108,12 +108,20 @@ spawn/
     src/commands.ts              # All subcommands (interactive, list, run, etc.)
     src/version.ts               # Version constant
     package.json                 # npm package (@openrouter/spawn)
-    install.sh                   # One-liner installer (bun → npm → auto-install bun)
-  shared/
-    github-auth.sh               # Standalone GitHub CLI auth helper
-    key-request.sh               # API key provisioning helpers (used by QA)
-  {cloud}/
-    {agent}.sh                   # Agent deployment scripts (thin bash → bun wrappers)
+  sh/
+    cli/
+      install.sh                 # One-liner installer (bun → npm → auto-install bun)
+    shared/
+      github-auth.sh             # Standalone GitHub CLI auth helper
+      key-request.sh             # API key provisioning helpers (used by QA)
+    e2e/
+      fly-e2e.sh                 # Fly.io E2E test suite
+      lib/*.sh                   # E2E helper libraries
+    test/
+      macos-compat.sh            # macOS compatibility test script
+    {cloud}/
+      {agent}.sh                 # Agent deployment scripts (thin bash → bun wrappers)
+      README.md                  # Cloud-specific usage docs
   .claude/skills/setup-agent-team/
     trigger-server.ts            # HTTP trigger server (concurrent runs, dedup)
     discovery.sh                 # Discovery cycle script (fill gaps, scout new clouds/agents)
@@ -144,17 +152,17 @@ Examples of files that should NOT be committed:
 The only documentation files allowed in the repository are:
 - `README.md` (user-facing)
 - `CLAUDE.md` (contributor guide)
-- Cloud-specific `README.md` files in `{cloud}/README.md`
+- Cloud-specific `README.md` files in `sh/{cloud}/README.md`
 
 If you need to create documentation during development, write it to `.docs/` and add `.docs/` to `.gitignore`.
 
 ### Architecture
 
-All cloud provisioning and agent setup logic lives in TypeScript under `cli/src/`. Agent scripts (`{cloud}/{agent}.sh`) are thin bash wrappers that bootstrap bun and invoke the CLI.
+All cloud provisioning and agent setup logic lives in TypeScript under `cli/src/`. Agent scripts (`sh/{cloud}/{agent}.sh`) are thin bash wrappers that bootstrap bun and invoke the CLI.
 
-**`shared/github-auth.sh`** — Standalone GitHub CLI installer + OAuth login helper. Used by `cli/src/shared/agent-setup.ts` to set up `gh` on remote VMs.
+**`sh/shared/github-auth.sh`** — Standalone GitHub CLI installer + OAuth login helper. Used by `cli/src/shared/agent-setup.ts` to set up `gh` on remote VMs.
 
-**`shared/key-request.sh`** — API key provisioning helpers sourced by the QA harness (`qa.sh`) for loading cloud credentials from `~/.config/spawn/{cloud}.json`.
+**`sh/shared/key-request.sh`** — API key provisioning helpers sourced by the QA harness (`qa.sh`) for loading cloud credentials from `~/.config/spawn/{cloud}.json`.
 
 ## Shell Script Rules
 
@@ -176,8 +184,8 @@ macOS ships bash 3.2. All scripts MUST work on it:
 ### Conventions
 - `#!/bin/bash` + `set -eo pipefail` (no `u` flag)
 - Use `${VAR:-}` for all optional env var checks (`OPENROUTER_API_KEY`, cloud tokens, etc.)
-- Remote fallback URL: `https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/{path}`
-- All env vars documented in the cloud's README.md
+- Remote fallback URL: `https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/{path}` (shell scripts are under `sh/`, e.g., `sh/{cloud}/{agent}.sh`)
+- All env vars documented in the cloud's `sh/{cloud}/README.md`
 
 ### Use Bun + TypeScript for Inline Scripting — NEVER python/python3
 When shell scripts need JSON processing, HTTP calls, crypto, or any non-trivial logic:
@@ -395,7 +403,7 @@ Draft PRs that go stale (no updates for 1 week) will be auto-closed.
 1. `bash -n {file}` syntax check on all modified scripts
 2. `cd cli && bunx @biomejs/biome lint src/` — **must pass with zero errors** on all modified TypeScript
 3. Update `manifest.json` matrix status to `"implemented"`
-4. Update the cloud's `README.md` with usage instructions
+4. Update the cloud's `sh/{cloud}/README.md` with usage instructions
 5. Commit with a descriptive message
 
 ## Filing Issues for Discovered Problems

@@ -3,12 +3,12 @@
 # Sourceable by any agent script, or executable directly via curl|bash
 #
 # Usage (sourced):
-#   source shared/github-auth.sh
+#   source sh/shared/github-auth.sh
 #   ensure_github_auth
 #
 # Usage (direct):
-#   bash shared/github-auth.sh
-#   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash
+#   bash sh/shared/github-auth.sh
+#   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/shared/github-auth.sh | bash
 
 # ============================================================
 # Logging helpers

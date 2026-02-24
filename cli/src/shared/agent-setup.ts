@@ -207,7 +207,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
     return;
   }
 
-  let ghCmd = "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/shared/github-auth.sh | bash";
+  let ghCmd = "curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/shared/github-auth.sh | bash";
   let localTmpFile = "";
   if (githubToken) {
     const escaped = githubToken.replace(/'/g, "'\\''");
