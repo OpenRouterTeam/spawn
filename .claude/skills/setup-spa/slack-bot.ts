@@ -116,8 +116,13 @@ function toObj(val: unknown): Record<string, unknown> | null {
   return obj;
 }
 
+interface SlackSegment {
+  kind: "text" | "tool_use" | "tool_result";
+  text: string;
+}
+
 /**
- * Format a Claude Code stream-json event into Slack-friendly text, or null to skip.
+ * Parse a Claude Code stream-json event into a typed Slack segment.
  *
  * Claude Code emits complete messages (not Anthropic streaming deltas):
  *   {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
@@ -125,17 +130,19 @@ function toObj(val: unknown): Record<string, unknown> | null {
  *   {"type":"user","message":{"content":[{"type":"tool_result","content":"..."}]}}
  *   {"type":"result","result":"...","session_id":"..."}
  */
-function formatStreamEvent(event: Record<string, unknown>): string | null {
+function parseStreamEvent(event: Record<string, unknown>): SlackSegment | null {
   const type = event.type;
 
-  // Assistant messages — contain text, tool_use, or thinking blocks
   if (type === "assistant") {
     const msg = toObj(event.message);
     if (!msg) {
       return null;
     }
     const content = Array.isArray(msg.content) ? msg.content : [];
-    const parts: string[] = [];
+
+    // Check what kind of content blocks this message has
+    const textParts: string[] = [];
+    const toolParts: string[] = [];
 
     for (const rawBlock of content) {
       const block = toObj(rawBlock);
@@ -144,34 +151,42 @@ function formatStreamEvent(event: Record<string, unknown>): string | null {
       }
 
       if (block.type === "text" && typeof block.text === "string") {
-        parts.push(block.text);
+        textParts.push(block.text);
       }
 
       if (block.type === "tool_use" && typeof block.name === "string") {
         const input = toObj(block.input);
-        // Show a short summary of the tool input
         let summary = "";
         if (input) {
-          const cmd = typeof input.command === "string" ? input.command : null;
-          const pattern = typeof input.pattern === "string" ? input.pattern : null;
-          const filePath = typeof input.file_path === "string" ? input.file_path : null;
-          const hint = cmd ?? pattern ?? filePath;
+          const hint =
+            (typeof input.command === "string" ? input.command : null) ??
+            (typeof input.pattern === "string" ? input.pattern : null) ??
+            (typeof input.file_path === "string" ? input.file_path : null);
           if (hint) {
             const short = hint.length > 80 ? `${hint.slice(0, 80)}...` : hint;
             summary = ` \`${short}\``;
           }
         }
-        parts.push(`\n:hammer_and_wrench: *${block.name}*${summary}\n`);
+        toolParts.push(`:hammer_and_wrench: *${block.name}*${summary}`);
       }
     }
 
-    if (parts.length === 0) {
-      return null;
+    // Tool use takes priority — it's a distinct event kind
+    if (toolParts.length > 0) {
+      return {
+        kind: "tool_use",
+        text: toolParts.join("\n"),
+      };
     }
-    return parts.join("");
+    if (textParts.length > 0) {
+      return {
+        kind: "text",
+        text: textParts.join(""),
+      };
+    }
+    return null;
   }
 
-  // User messages — contain tool_result blocks
   if (type === "user") {
     const msg = toObj(event.message);
     if (!msg) {
@@ -190,16 +205,19 @@ function formatStreamEvent(event: Record<string, unknown>): string | null {
       const resultText = typeof block.content === "string" ? block.content : "";
       const truncated = resultText.length > 500 ? `${resultText.slice(0, 500)}...` : resultText;
       if (!truncated) {
-        parts.push(`${prefix}: (empty)\n`);
+        parts.push(`${prefix}: (empty)`);
       } else {
-        parts.push(`${prefix}:\n\`\`\`\n${truncated}\n\`\`\`\n`);
+        parts.push(`${prefix}:\n\`\`\`\n${truncated}\n\`\`\``);
       }
     }
 
     if (parts.length === 0) {
       return null;
     }
-    return parts.join("");
+    return {
+      kind: "tool_result",
+      text: parts.join("\n"),
+    };
   }
 
   return null;
@@ -552,25 +570,21 @@ async function runClaudeAndStream(
           returnedSessionId = resultEvent.output.session_id;
         }
 
-        // Format event for Slack display
-        const segment = formatStreamEvent(obj);
+        // Parse event into typed segment
+        const segment = parseStreamEvent(obj);
         if (!segment) {
           continue;
         }
 
-        // Tool calls and results start new messages; text accumulates
-        const isToolEvent =
-          segment.includes(":hammer_and_wrench:") || segment.includes(":white_check_mark:") || segment.includes(":x:");
-        if (isToolEvent) {
-          // Flush any pending text first
+        if (segment.kind === "text") {
+          pendingText += segment.text;
+        } else {
+          // tool_use and tool_result get their own messages
           if (pendingText) {
             await flushToSlack(pendingText);
             pendingText = "";
           }
-          // Post tool event as its own message
-          await flushToSlack(segment, true);
-        } else {
-          pendingText += segment;
+          await flushToSlack(segment.text, true);
         }
       }
 
