@@ -103,7 +103,7 @@ export function parseStreamEvent(event: Record<string, unknown>): SlackSegment |
       }
 
       if (block.type === "text" && typeof block.text === "string") {
-        textParts.push(block.text);
+        textParts.push(markdownToSlack(block.text));
       }
 
       if (block.type === "tool_use" && typeof block.name === "string") {
@@ -181,6 +181,83 @@ export function parseStreamEvent(event: Record<string, unknown>): SlackSegment |
 
 export function stripMention(text: string): string {
   return text.replace(/<@[A-Z0-9]+>/g, "").trim();
+}
+
+/**
+ * Convert standard Markdown to Slack mrkdwn format.
+ *
+ * Key differences between Markdown and Slack mrkdwn:
+ *   - Bold:    **text**  → *text*
+ *   - Links:   [text](url) → <url|text>
+ *   - Images:  ![alt](url) → <url|alt>
+ *   - Headers: ## text → *text*
+ *   - Strike:  ~~text~~ → ~text~
+ *
+ * Code blocks (```) and inline code (`) are preserved as-is since
+ * Slack renders them the same way Markdown does.
+ */
+export function markdownToSlack(text: string): string {
+  // Split into code-protected and convertible segments.
+  // We alternate: prose, code, prose, code, ...
+  // Fenced code blocks and inline code are left untouched.
+  const segments: { text: string; isCode: boolean }[] = [];
+
+  // Step 1: split on fenced code blocks (``` ... ```)
+  const fencedRe = /(```[\s\S]*?```)/g;
+  let lastIdx = 0;
+  let m: RegExpExecArray | null = null;
+  fencedRe.lastIndex = 0;
+  while ((m = fencedRe.exec(text)) !== null) {
+    if (m.index > lastIdx) {
+      segments.push({ text: text.slice(lastIdx, m.index), isCode: false });
+    }
+    segments.push({ text: m[0], isCode: true });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) {
+    segments.push({ text: text.slice(lastIdx), isCode: false });
+  }
+
+  // Step 2: within non-code segments, split on inline code (` ... `)
+  const result: string[] = [];
+  for (const seg of segments) {
+    if (seg.isCode) {
+      result.push(seg.text);
+      continue;
+    }
+    const inlineRe = /(`[^`]+`)/g;
+    let innerLast = 0;
+    let im: RegExpExecArray | null = null;
+    inlineRe.lastIndex = 0;
+    while ((im = inlineRe.exec(seg.text)) !== null) {
+      if (im.index > innerLast) {
+        result.push(convertMd(seg.text.slice(innerLast, im.index)));
+      }
+      result.push(im[0]);
+      innerLast = im.index + im[0].length;
+    }
+    if (innerLast < seg.text.length) {
+      result.push(convertMd(seg.text.slice(innerLast)));
+    }
+  }
+
+  return result.join("");
+}
+
+/** Convert Markdown syntax to Slack mrkdwn in a code-free string. */
+function convertMd(s: string): string {
+  let r = s;
+  // Images: ![alt](url) → <url|alt>  (before links)
+  r = r.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "<$2|$1>");
+  // Links: [text](url) → <url|text>
+  r = r.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<$2|$1>");
+  // Bold: **text** → *text*  (must come before header conversion)
+  r = r.replace(/\*\*(.+?)\*\*/g, "*$1*");
+  // Headers: # text → *text* (bold line)
+  r = r.replace(/^#{1,6}\s+(.+)$/gm, "*$1*");
+  // Strikethrough: ~~text~~ → ~text~
+  r = r.replace(/~~(.+?)~~/g, "~$1~");
+  return r;
 }
 
 // #endregion

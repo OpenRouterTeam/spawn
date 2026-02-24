@@ -1,5 +1,5 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
-import { parseStreamEvent, stripMention, loadState, saveState, downloadSlackFile } from "./helpers";
+import { parseStreamEvent, stripMention, markdownToSlack, loadState, saveState, downloadSlackFile } from "./helpers";
 import { toRecord } from "@openrouter/spawn-shared";
 import streamEvents from "../../../fixtures/claude-code/stream-events.json";
 
@@ -61,11 +61,15 @@ describe("parseStreamEvent", () => {
     expect(result?.text).toContain("Permission denied");
   });
 
-  it("parses final assistant text from fixture", () => {
-    // fixture[7]: assistant with summary text
+  it("parses final assistant text from fixture with markdown→slack conversion", () => {
+    // fixture[7]: assistant with summary text containing **bold**
     const result = parseStreamEvent(fixture(7));
     expect(result?.kind).toBe("text");
-    expect(result?.text).toContain("#1234");
+    // **#1234** → *#1234* (Slack bold)
+    expect(result?.text).toContain("*#1234*");
+    expect(result?.text).not.toContain("**#1234**");
+    // inline code preserved
+    expect(result?.text).toContain("`--json`");
     expect(result?.text).toContain("Would you like me to create a new issue");
   });
 
@@ -178,6 +182,78 @@ describe("stripMention", () => {
 
   it("trims whitespace", () => {
     expect(stripMention("  <@U12345>  ")).toBe("");
+  });
+});
+
+describe("markdownToSlack", () => {
+  it("converts bold **text** to *text*", () => {
+    expect(markdownToSlack("This is **bold** text")).toBe("This is *bold* text");
+  });
+
+  it("converts multiple bold spans", () => {
+    expect(markdownToSlack("**one** and **two**")).toBe("*one* and *two*");
+  });
+
+  it("converts markdown links to Slack format", () => {
+    expect(markdownToSlack("[click here](https://example.com)")).toBe(
+      "<https://example.com|click here>",
+    );
+  });
+
+  it("converts bold links", () => {
+    expect(markdownToSlack("**[text](https://example.com)**")).toBe(
+      "*<https://example.com|text>*",
+    );
+  });
+
+  it("converts images to Slack links", () => {
+    expect(markdownToSlack("![alt text](https://img.png)")).toBe(
+      "<https://img.png|alt text>",
+    );
+  });
+
+  it("converts headers to bold", () => {
+    expect(markdownToSlack("## Summary")).toBe("*Summary*");
+    expect(markdownToSlack("### Details")).toBe("*Details*");
+    expect(markdownToSlack("# Title")).toBe("*Title*");
+  });
+
+  it("converts strikethrough", () => {
+    expect(markdownToSlack("~~removed~~")).toBe("~removed~");
+  });
+
+  it("preserves inline code", () => {
+    expect(markdownToSlack("Use `**not bold**` here")).toBe(
+      "Use `**not bold**` here",
+    );
+  });
+
+  it("preserves fenced code blocks", () => {
+    const input = "Before\n```\n**not bold**\n[not a link](url)\n```\nAfter **bold**";
+    const result = markdownToSlack(input);
+    expect(result).toContain("```\n**not bold**\n[not a link](url)\n```");
+    expect(result).toContain("After *bold*");
+  });
+
+  it("handles the real SPA output pattern", () => {
+    const input =
+      '1. **[#1859 — Agent processes die](https://github.com/OpenRouterTeam/spawn/issues/1859)** — covers the root cause\n\n' +
+      "The SIGTERM is the **smoking gun**.";
+    const result = markdownToSlack(input);
+    expect(result).toContain(
+      "*<https://github.com/OpenRouterTeam/spawn/issues/1859|#1859 — Agent processes die>*",
+    );
+    expect(result).toContain("*smoking gun*");
+    expect(result).not.toContain("**");
+    expect(result).not.toContain("](");
+  });
+
+  it("returns plain text unchanged", () => {
+    expect(markdownToSlack("no markdown here")).toBe("no markdown here");
+  });
+
+  it("handles empty string", () => {
+    expect(markdownToSlack("")).toBe("");
   });
 });
 
