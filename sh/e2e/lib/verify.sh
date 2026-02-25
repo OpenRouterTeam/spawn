@@ -12,8 +12,9 @@ _FLY_MACHINE_APP=""
 # fly_ssh APP_NAME COMMAND
 #
 # Resolves machine ID, base64-encodes the command, and runs it via
-# flyctl machine exec. Base64 encoding eliminates all shell metacharacter
-# injection risks (no quoting issues with $, `, ', ", ;, |, etc.).
+# flyctl machine exec. Safety relies on two properties together:
+# 1. Base64 output alphabet [A-Za-z0-9+/=] cannot contain single quotes
+# 2. Single-quote wrapping in the exec command prevents shell expansion
 # Returns the exit code of the remote command.
 # ---------------------------------------------------------------------------
 fly_ssh() {
@@ -30,8 +31,8 @@ fly_ssh() {
     fi
   fi
 
-  # Base64-encode command to avoid all shell metacharacter injection.
-  # base64 output contains only [A-Za-z0-9+/=], safe to embed in any quoting.
+  # Base64-encode command for safe embedding in single quotes.
+  # base64 output [A-Za-z0-9+/=] cannot break out of single-quote context.
   # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
   local encoded_cmd
   encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
@@ -61,8 +62,8 @@ fly_ssh_long() {
     fi
   fi
 
-  # Base64-encode command to avoid all shell metacharacter injection.
-  # base64 output contains only [A-Za-z0-9+/=], safe to embed in any quoting.
+  # Base64-encode command for safe embedding in single quotes.
+  # base64 output [A-Za-z0-9+/=] cannot break out of single-quote context.
   # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
   local encoded_cmd
   encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
@@ -91,7 +92,7 @@ input_test_claude() {
   local app="$1"
 
   log_step "Running input test for claude..."
-  # Base64-encode prompt to prevent shell injection from special characters.
+  # Base64-encode prompt for safe embedding in single quotes below.
   # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
@@ -119,7 +120,7 @@ input_test_codex() {
   local app="$1"
 
   log_step "Running input test for codex..."
-  # Base64-encode prompt to prevent shell injection from special characters.
+  # Base64-encode prompt for safe embedding in single quotes below.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
@@ -153,7 +154,7 @@ input_test_openclaw() {
     log_warn "openclaw gateway not detected on :18789 — attempting test anyway"
   fi
 
-  # Base64-encode prompt to prevent shell injection from special characters.
+  # Base64-encode prompt for safe embedding in single quotes below.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
@@ -180,7 +181,7 @@ input_test_zeroclaw() {
   local app="$1"
 
   log_step "Running input test for zeroclaw..."
-  # Base64-encode prompt to prevent shell injection from special characters.
+  # Base64-encode prompt for safe embedding in single quotes below.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
