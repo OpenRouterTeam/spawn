@@ -977,17 +977,23 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
           ...SSH_BASE_OPTS,
           ...keyOpts,
           `${SSH_USER}@${instanceIp}`,
-          "test -f /home/ubuntu/.cloud-init-complete",
+          "test -f /home/ubuntu/.cloud-init-complete && echo done",
         ],
         {
           stdio: [
             "ignore",
             "pipe",
-            "ignore",
+            "pipe",
           ],
         },
       );
-      if ((await proc.exited) === 0) {
+      // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+      const [stdout] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
+      const exitCode = await proc.exited;
+      if (exitCode === 0 && stdout.includes("done")) {
         logInfo("Cloud-init complete");
         return;
       }
