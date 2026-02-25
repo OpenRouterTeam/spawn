@@ -4,7 +4,7 @@ set -eo pipefail
 # QA Service — Single Cycle (Quad-Mode)
 # Triggered by trigger-server.ts via GitHub Actions
 #
-# RUN_MODE=quality  — agent team: test-runner + dedup-scanner + code-quality-reviewer (reason=schedule/workflow_dispatch, 35 min)
+# RUN_MODE=quality  — agent team: test-runner + dedup-scanner + code-quality-reviewer + e2e-tester (reason=schedule/workflow_dispatch, 40 min)
 # RUN_MODE=fixtures — single agent: collect API fixtures from cloud providers (reason=fixtures, 20 min)
 # RUN_MODE=issue    — single agent: investigate and fix a specific issue (reason=issues, 15 min)
 # RUN_MODE=e2e      — single agent: run Fly.io E2E tests, investigate failures (reason=e2e, 20 min)
@@ -43,12 +43,12 @@ elif [[ "${SPAWN_REASON}" == "schedule" ]] || [[ "${SPAWN_REASON}" == "workflow_
     RUN_MODE="quality"
     WORKTREE_BASE="/tmp/spawn-worktrees/qa-quality"
     TEAM_NAME="spawn-qa-quality"
-    CYCLE_TIMEOUT=2100  # 35 min for quality sweep
+    CYCLE_TIMEOUT=2400  # 40 min for quality sweep (includes E2E)
 else
     RUN_MODE="quality"
     WORKTREE_BASE="/tmp/spawn-worktrees/qa-quality"
     TEAM_NAME="spawn-qa-quality"
-    CYCLE_TIMEOUT=2100  # 35 min for quality sweep
+    CYCLE_TIMEOUT=2400  # 40 min for quality sweep (includes E2E)
 fi
 
 LOG_FILE="${REPO_ROOT}/.docs/${TEAM_NAME}.log"

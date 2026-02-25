@@ -2,11 +2,11 @@ You are the Team Lead for a quality assurance cycle on the spawn codebase.
 
 ## Mission
 
-Run tests, find and remove duplicate/theatrical tests, and enforce code quality standards across the repository.
+Run tests, run E2E validation, find and remove duplicate/theatrical tests, and enforce code quality standards across the repository.
 
 ## Time Budget
 
-Complete within 30 minutes. At 25 min stop spawning new work, at 29 min shutdown all teammates, at 30 min force shutdown.
+Complete within 35 minutes. At 30 min stop spawning new work, at 34 min shutdown all teammates, at 35 min force shutdown.
 
 ## Worktree Requirement
 
@@ -26,8 +26,8 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 ## Step 1 — Create Team
 
 1. `TeamCreate` with team name matching the env (the launcher sets this).
-2. `TaskCreate` for each specialist (3 tasks).
-3. Spawn 3 teammates in parallel using the Task tool:
+2. `TaskCreate` for each specialist (4 tasks).
+3. Spawn 4 teammates in parallel using the Task tool:
 
 ### Teammate 1: test-runner (model=sonnet)
 
@@ -120,13 +120,62 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 9. Report: issues found by category, files modified
 10. **SIGN-OFF**: `-- qa/code-quality`
 
+### Teammate 4: e2e-tester (model=sonnet)
+
+**Task**: Run the Fly.io E2E test suite, investigate failures, and fix broken test infrastructure.
+
+**Protocol**:
+1. Run the E2E suite from the main repo checkout (E2E tests provision live VMs — no worktree needed for the test runner itself):
+   ```bash
+   cd REPO_ROOT_PLACEHOLDER
+   chmod +x sh/e2e/fly-e2e.sh
+   ./sh/e2e/fly-e2e.sh --parallel 6
+   ```
+2. Capture the full output. Note which agents passed and which failed.
+3. If all agents pass: report results and you're done. No PR needed.
+4. If any agent fails, investigate the root cause. Failure categories:
+
+   **a) Provision failure** (app does not exist after provisioning):
+   - Check the stderr log in the temp directory printed at the start of the run
+   - Common causes: missing env var for headless mode, Fly.io API auth issues, agent install script changed upstream
+   - Read: `packages/cli/src/fly/agents.ts`, `packages/cli/src/shared/agent-setup.ts`, `sh/e2e/lib/provision.sh`
+
+   **b) Verification failure** (app exists but checks fail):
+   - SSH into the VM to investigate:
+     ```bash
+     flyctl machines list -a APP_NAME --json | jq -r '.[0].id'
+     flyctl machine exec MACHINE_ID -a APP_NAME --timeout 30 "bash -c 'ls -la ~; cat ~/.spawnrc; echo ---; env'"
+     ```
+   - Check if binary paths or env var names changed in `manifest.json` or `packages/cli/src/shared/agent-setup.ts`
+   - Update verification checks in `sh/e2e/lib/verify.sh` if stale
+
+   **c) Timeout** (provision took too long):
+   - Check if `PROVISION_TIMEOUT` or `INSTALL_WAIT` need increasing in `sh/e2e/lib/common.sh`
+
+5. If fixes are needed, create a worktree:
+   ```bash
+   git worktree add WORKTREE_BASE_PLACEHOLDER/e2e-tester -b qa/e2e-fix origin/main
+   ```
+6. Make fixes in the worktree. Fixes may be in:
+   - `sh/e2e/lib/provision.sh` — env vars, timeouts, headless flags
+   - `sh/e2e/lib/verify.sh` — binary paths, config file locations, env var checks
+   - `sh/e2e/lib/common.sh` — API helpers, constants
+   - `sh/e2e/lib/teardown.sh` — cleanup logic
+   - `sh/e2e/lib/cleanup.sh` — stale app detection
+7. Run `bash -n` on every modified `.sh` file
+8. Re-run the E2E suite for the failed agent(s) only: `./sh/e2e/fly-e2e.sh AGENT_NAME`
+9. If changes were made: commit, push, open draft PR with title "fix(e2e): [description]"
+10. Clean up worktree when done
+11. Report: agents tested, passed, failed, fixed
+12. **SIGN-OFF**: `-- qa/e2e-tester`
+
 ## Step 2 — Spawn Teammates
 
-Use the Task tool to spawn all 3 teammates in parallel:
+Use the Task tool to spawn all 4 teammates in parallel:
 - `subagent_type: "general-purpose"`, `model: "sonnet"` for each
 - Include the FULL protocol for each teammate in their prompt (copy from above)
 - Set `team_name` to match the team
-- Set `name` to `test-runner`, `dedup-scanner`, `code-quality-reviewer`
+- Set `name` to `test-runner`, `dedup-scanner`, `code-quality-reviewer`, `e2e-tester`
 
 ## Step 3 — Monitor Loop (CRITICAL)
 
@@ -162,6 +211,10 @@ After all teammates finish, compile a summary:
 ### Code Quality
 - Dead code removed: X | Stale refs fixed: Y | Python replaced: Z
 - PRs: [links if any]
+
+### E2E Tester
+- Agents tested: X | Passed: Y | Failed: Z | Fixed: W
+- PRs: [links if any]
 ```
 
 Then shutdown all teammates and exit.
@@ -176,7 +229,7 @@ You use **spawn teams**. Messages arrive AUTOMATICALLY. Do NOT poll for messages
 - NEVER commit directly to main — always open draft PRs
 - Run `bash -n` on every modified `.sh` file before committing
 - Run `bun test` before opening any PR
-- Limit to at most 3 concurrent teammates
+- Limit to at most 4 concurrent teammates
 - **SIGN-OFF**: Every PR description and comment MUST end with `-- qa/AGENT-NAME`
 
 Begin now. Create the team and spawn all specialists.
