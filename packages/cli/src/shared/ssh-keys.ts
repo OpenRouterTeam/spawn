@@ -2,6 +2,7 @@
 
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { logInfo, logStep } from "./ui";
+import { multiPickToTTY } from "../picker";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -222,29 +223,23 @@ export async function ensureSshKeys(): Promise<SshKeyPair[]> {
     return cachedKeys;
   }
 
-  // Dynamic import to avoid global mock.module conflicts in test suites
-  let result: unknown;
-  try {
-    const p = await import("@clack/prompts");
-    result = await p.multiselect({
-      message: "Select SSH keys to use",
-      options: discovered.map((k) => ({
-        value: k.name,
-        label: `${k.name} (${k.type})`,
-        hint: k.privPath,
-      })),
-      initialValues: discovered.map((k) => k.name),
-      required: true,
-    });
+  // Use /dev/tty-based multiselect instead of @clack/prompts.
+  // When the CLI spawns a child bun process (bash → bun), the parent's
+  // process.stdin stays registered in its event loop and races with the
+  // child for terminal input.  Reading /dev/tty directly sidesteps this.
+  const result = multiPickToTTY({
+    message: "Select SSH keys to use",
+    options: discovered.map((k) => ({
+      value: k.name,
+      label: `${k.name} (${k.type})`,
+      hint: k.privPath,
+      selected: true,
+    })),
+    minRequired: 1,
+  });
 
-    if (p.isCancel(result) || !Array.isArray(result) || result.length === 0) {
-      logInfo("Using all SSH keys");
-      cachedKeys = discovered;
-      return cachedKeys;
-    }
-  } catch {
-    // multiselect unavailable — use all keys
-    logInfo(`Found ${discovered.length} SSH keys, using all`);
+  if (!result || result.length === 0) {
+    logInfo("Using all SSH keys");
     cachedKeys = discovered;
     return cachedKeys;
   }
