@@ -584,7 +584,13 @@ export async function interactiveSession(cmd: string): Promise<number> {
         cmd,
       ];
 
-  const exitCode = await Bun.spawn(args, { stdio: ["inherit", "inherit", "inherit"] }).exited;
+  const exitCode = await Bun.spawn(args, {
+    stdio: [
+      "inherit",
+      "inherit",
+      "inherit",
+    ],
+  }).exited;
 
   // Post-session summary
   process.stderr.write("\n");
