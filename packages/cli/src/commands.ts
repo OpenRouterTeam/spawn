@@ -2282,7 +2282,6 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
       }
       p.log.error(`Delete failed: ${errMsg}`);
       p.log.info("The server may still be running. Check your cloud provider dashboard.");
-      markRecordDeleted(record);
       return false;
     }
   };
