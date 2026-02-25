@@ -1100,8 +1100,20 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const exitCode = await Bun.spawn(
-    ["ssh", ...SSH_INTERACTIVE_OPTS, ...keyOpts, `${SSH_USER}@${instanceIp}`, `bash -c '${escapedCmd}'`],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_INTERACTIVE_OPTS,
+      ...keyOpts,
+      `${SSH_USER}@${instanceIp}`,
+      `bash -c '${escapedCmd}'`,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+    },
   ).exited;
 
   // Post-session summary
