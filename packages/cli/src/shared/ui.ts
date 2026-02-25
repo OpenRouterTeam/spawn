@@ -263,28 +263,44 @@ export function sanitizeTermValue(term: string): string {
 }
 
 /** Prepare stdin for clean handoff to an interactive child process.
- *  Removes listeners, unconditionally resets raw mode, resets the terminal
- *  line discipline via `stty sane`, and resumes stdin so the child's fd 0
- *  inheritance works correctly.
- *
- *  The unconditional setRawMode(false) is intentional: @clack/prompts may
- *  toggle raw mode off (so isRaw === false) but leave the terminal line
- *  discipline in a dirty state. Calling setRawMode(false) regardless
- *  ensures the kernel-level tty state is reset. */
+ *  Removes listeners, resets raw mode, and restores the terminal
+ *  so that Bun.spawn with stdio:"inherit" gets a clean fd 0. */
 export function prepareStdinForHandoff(): void {
-  // Remove any leftover keypress/data listeners (from @clack/prompts, etc.)
+  // Remove any leftover keypress/data listeners (from @clack/prompts, readline, etc.)
   process.stdin.removeAllListeners();
-  // Unconditionally reset raw mode — even if isRaw is already false,
-  // the terminal line discipline may still be dirty after @clack
+
+  // Unconditionally reset raw mode — @clack/core's close() may have already
+  // called setRawMode(false) making isRaw report false, but the terminal
+  // can still be in a dirty state after multiple readline instances
   if (process.stdin.isTTY) {
-    process.stdin.setRawMode(false);
+    try {
+      process.stdin.setRawMode(false);
+    } catch {
+      // ignore — not a TTY or already closed
+    }
   }
-  // Reset terminal line discipline (handles edge cases setRawMode can't fix)
+
+  // Reset terminal line discipline via stty to undo any damage from
+  // readline's emitKeypressEvents or leftover raw mode. This is the
+  // nuclear option that guarantees the terminal is in cooked mode with
+  // proper echo and line editing before SSH takes over.
   try {
-    Bun.spawnSync(["stty", "sane"], { stdin: "inherit" });
+    Bun.spawnSync(
+      [
+        "stty",
+        "sane",
+      ],
+      {
+        stdin: "inherit",
+        stdout: "ignore",
+        stderr: "ignore",
+      },
+    );
   } catch {
-    // stty may not exist in non-Unix environments — safe to ignore
+    // ignore — stty may not be available
   }
-  // Resume stdin so Bun.spawn inherits an active fd 0 (paused stdin blocks it)
+
+  // Resume stdin so Bun.spawn inherits an active fd 0. A paused stream
+  // can cause the child process to see a blocked/empty stdin on Bun.
   process.stdin.resume();
 }
