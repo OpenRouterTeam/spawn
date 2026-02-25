@@ -1091,8 +1091,8 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     {
       stdio: [
         "ignore",
-        "ignore",
-        "pipe",
+        "inherit",
+        "inherit",
       ],
     },
   );

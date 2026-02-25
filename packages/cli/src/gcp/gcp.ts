@@ -352,7 +352,7 @@ export async function ensureGcloudCli(): Promise<void> {
       stdio: [
         "ignore",
         "inherit",
-        "pipe",
+        "inherit",
       ],
     },
   );

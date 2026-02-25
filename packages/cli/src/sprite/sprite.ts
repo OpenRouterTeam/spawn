@@ -153,7 +153,7 @@ export async function ensureSpriteCli(): Promise<void> {
       stdio: [
         "ignore",
         "inherit",
-        "pipe",
+        "inherit",
       ],
     },
   );

@@ -325,8 +325,8 @@ export async function ensureFlyCli(): Promise<void> {
     {
       stdio: [
         "ignore",
-        "ignore",
-        "pipe",
+        "inherit",
+        "inherit",
       ],
     },
   );
