@@ -10,7 +10,7 @@ _MAX_RETRIES=3
 _ensure_bun() {
     if command -v bun &>/dev/null; then return 0; fi
     printf '\033[0;36mInstalling bun...\033[0m\n' >&2
-    curl -fsSL --show-error https://bun.sh/install | bash >/dev/null || { printf '\033[0;31mFailed to install bun\033[0m\n' >&2; exit 1; }
+    curl -fsSL --proto '=https' --show-error https://bun.sh/install | bash >/dev/null || { printf '\033[0;31mFailed to install bun\033[0m\n' >&2; exit 1; }
     export PATH="$HOME/.bun/bin:$PATH"
     command -v bun &>/dev/null || { printf '\033[0;31mbun not found after install\033[0m\n' >&2; exit 1; }
 }
@@ -71,7 +71,7 @@ fi
 # Remote — download bundled digitalocean.js from GitHub release
 DO_JS=$(mktemp)
 trap 'rm -f "$DO_JS"' EXIT
-curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/digitalocean-latest/digitalocean.js" -o "$DO_JS" \
+curl -fsSL --proto '=https' "https://github.com/OpenRouterTeam/spawn/releases/download/digitalocean-latest/digitalocean.js" -o "$DO_JS" \
     || { printf '\033[0;31mFailed to download digitalocean.js\033[0m\n' >&2; exit 1; }
 
 _run_with_restart bun run "$DO_JS" "$_AGENT_NAME" "$@"
