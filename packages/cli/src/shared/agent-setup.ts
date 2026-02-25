@@ -332,7 +332,7 @@ export async function setupOpenclawBatched(
     '  echo "    openclaw found at $(command -v openclaw)"',
     "else",
     '  echo "    openclaw not found, installing..."',
-    "  npm install -g openclaw",
+    "  bun install -g openclaw", // npm stalls
     '  command -v openclaw || { echo "ERROR: openclaw install failed"; exit 1; }',
     "fi",
     'echo "==> Writing environment variables..."',
@@ -475,7 +475,8 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "full",
       modelPrompt: true,
       modelDefault: "openrouter/auto",
-      install: () => installAgent(runner, "openclaw", "source ~/.bashrc && npm install -g openclaw"),
+      // npm stalls
+      install: () => installAgent(runner, "openclaw", "source ~/.bashrc && bun install -g openclaw"),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,
