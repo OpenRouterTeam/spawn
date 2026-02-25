@@ -263,15 +263,28 @@ export function sanitizeTermValue(term: string): string {
 }
 
 /** Prepare stdin for clean handoff to an interactive child process.
- *  Removes listeners, resets raw mode, and pauses stdin
- *  so that child_process.spawn gets a pristine file descriptor. */
+ *  Removes listeners, unconditionally resets raw mode, resets the terminal
+ *  line discipline via `stty sane`, and resumes stdin so the child's fd 0
+ *  inheritance works correctly.
+ *
+ *  The unconditional setRawMode(false) is intentional: @clack/prompts may
+ *  toggle raw mode off (so isRaw === false) but leave the terminal line
+ *  discipline in a dirty state. Calling setRawMode(false) regardless
+ *  ensures the kernel-level tty state is reset. */
 export function prepareStdinForHandoff(): void {
   // Remove any leftover keypress/data listeners (from @clack/prompts, etc.)
   process.stdin.removeAllListeners();
-  // Reset raw mode if it was left on by @clack/prompts
-  if (process.stdin.isTTY && process.stdin.isRaw) {
+  // Unconditionally reset raw mode — even if isRaw is already false,
+  // the terminal line discipline may still be dirty after @clack
+  if (process.stdin.isTTY) {
     process.stdin.setRawMode(false);
   }
-  // Pause stdin so Node/Bun stops buffering input before the child takes over
-  process.stdin.pause();
+  // Reset terminal line discipline (handles edge cases setRawMode can't fix)
+  try {
+    Bun.spawnSync(["stty", "sane"], { stdin: "inherit" });
+  } catch {
+    // stty may not exist in non-Unix environments — safe to ignore
+  }
+  // Resume stdin so Bun.spawn inherits an active fd 0 (paused stdin blocks it)
+  process.stdin.resume();
 }
