@@ -792,6 +792,11 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
           ],
         },
       );
+      // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+      await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
       if ((await proc.exited) === 0) {
         logInfo("Startup script completed");
         return;
@@ -868,7 +873,11 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
       proc.kill();
     } catch {}
   }, timeout);
-  const stdout = await new Response(proc.stdout).text();
+  // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+  const [stdout] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   const exitCode = await proc.exited;
   clearTimeout(timer);
   if (exitCode !== 0) {
