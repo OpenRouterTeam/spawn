@@ -37,7 +37,7 @@ fly_ssh() {
   encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
 
   flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout 30 \
-    "eval \"\$(echo '${encoded_cmd}' | base64 -d)\""
+    "echo '${encoded_cmd}' | base64 -d | sh"
 }
 
 # ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ fly_ssh_long() {
   encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
 
   flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout "${timeout}" \
-    "eval \"\$(echo '${encoded_cmd}' | base64 -d)\""
+    "echo '${encoded_cmd}' | base64 -d | sh"
 }
 
 # ---------------------------------------------------------------------------
