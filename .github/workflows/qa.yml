@@ -1,20 +1,17 @@
-name: Daily QA
-# Disabled until QA VM is fixed
-# on:
-#   schedule:
-#     - cron: '0 6 * * *'
-#   workflow_dispatch:
+name: QA
 on:
+  schedule:
+    - cron: '0 */4 * * *'
   workflow_dispatch:
     inputs:
       reason:
         description: 'QA mode to trigger'
         required: false
-        default: 'e2e'
+        default: 'schedule'
         type: choice
         options:
-          - e2e
           - schedule
+          - e2e
           - fixtures
 jobs:
   trigger:
@@ -26,7 +23,7 @@ jobs:
           SPRITE_URL: ${{ secrets.QA_SPRITE_URL }}
           TRIGGER_SECRET: ${{ secrets.QA_TRIGGER_SECRET }}
         run: |
-          REASON="${{ github.event.inputs.reason || 'e2e' }}"
+          REASON="${{ github.event.inputs.reason || 'schedule' }}"
           curl -sS --fail-with-body -X POST \
             "${SPRITE_URL}/trigger?reason=${REASON}" \
             -H "Authorization: Bearer ${TRIGGER_SECRET}"

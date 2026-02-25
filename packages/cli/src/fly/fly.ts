@@ -1010,7 +1010,10 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
 
 export async function interactiveSession(cmd: string): Promise<number> {
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
-  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c ${JSON.stringify(cmd)}`;
+  // Single-quote escaping prevents premature shell expansion of $variables in cmd
+  // (JSON.stringify double-quoting lets the shell expand $vars before the script runs)
+  const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
+  const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
   // Shell-quote the command for -C
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const flyCmd = getCmd()!;
