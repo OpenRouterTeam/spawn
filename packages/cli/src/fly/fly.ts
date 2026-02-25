@@ -20,6 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import * as v from "valibot";
 import { parseJsonWith, parseJsonRaw, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
+import { killWithTimeout } from "../shared/ssh";
 import { saveVmConnection } from "../history.js";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
@@ -907,11 +908,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   });
   // Local safety timer — WireGuard has no HTTP deadline but we still want a ceiling.
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => {
-    try {
-      proc.kill();
-    } catch {}
-  }, timeout);
+  const timer = setTimeout(() => killWithTimeout(proc), timeout);
   const exitCode = await proc.exited;
   try {
     proc.stdin!.end();
@@ -949,11 +946,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
     env: process.env,
   });
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => {
-    try {
-      proc.kill();
-    } catch {}
-  }, timeout);
+  const timer = setTimeout(() => killWithTimeout(proc), timeout);
 
   // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
   const [stdout] = await Promise.all([
