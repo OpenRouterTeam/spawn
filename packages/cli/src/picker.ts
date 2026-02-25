@@ -309,7 +309,7 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
     outer: while (true) {
       let n: number;
       try {
-        n = fs.readSync(ttyFd, buf, 0, 8);
+        n = fs.readSync(ttyFd, buf, 0, 8, null);
       } catch {
         break;
       }
@@ -381,6 +381,234 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
   return result;
 }
 
+// ── TTY multi-select picker ──────────────────────────────────────────────────
+
+export interface MultiPickOption {
+  value: string;
+  label: string;
+  hint?: string;
+  selected?: boolean;
+}
+
+export interface MultiPickConfig {
+  message: string;
+  options: MultiPickOption[];
+  /** Minimum number of selections required. Default 1. */
+  minRequired?: number;
+}
+
+/**
+ * Multi-select picker that reads directly from /dev/tty.
+ * Bypasses process.stdin entirely — works even when stdin is shared
+ * with a parent process (e.g., child bun spawned from CLI bun).
+ *
+ * Returns an array of selected values, or null on cancel.
+ */
+export function multiPickToTTY(config: MultiPickConfig): string[] | null {
+  if (config.options.length === 0) {
+    return [];
+  }
+
+  // ── open /dev/tty ──────────────────────────────────────────────────────────
+  let ttyFd: number;
+  try {
+    ttyFd = fs.openSync("/dev/tty", "r+");
+  } catch {
+    // No TTY available — return all options as selected (non-interactive fallback)
+    return config.options.filter((o) => o.selected !== false).map((o) => o.value);
+  }
+
+  // ── save terminal settings ────────────────────────────────────────────────
+  const savedRes = spawnSync(
+    "stty",
+    [
+      "-g",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
+  if (savedRes.status !== 0 || !savedRes.stdout) {
+    fs.closeSync(ttyFd);
+    return config.options.filter((o) => o.selected !== false).map((o) => o.value);
+  }
+  const savedSettings = savedRes.stdout.toString().trim();
+
+  // ── enable raw / no-echo mode ─────────────────────────────────────────────
+  const rawRes = spawnSync(
+    "stty",
+    [
+      "raw",
+      "-echo",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
+  if (rawRes.status !== 0) {
+    fs.closeSync(ttyFd);
+    return config.options.filter((o) => o.selected !== false).map((o) => o.value);
+  }
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+  const w = (s: string) => {
+    try {
+      fs.writeSync(ttyFd, s);
+    } catch {}
+  };
+
+  const restore = () => {
+    try {
+      spawnSync(
+        "stty",
+        [
+          savedSettings,
+        ],
+        {
+          stdio: [
+            ttyFd,
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
+    } catch {}
+    w(A.showC);
+    try {
+      fs.closeSync(ttyFd);
+    } catch {}
+  };
+
+  // ── initial state ─────────────────────────────────────────────────────────
+  let cursor = 0;
+  const checked: boolean[] = config.options.map((o) => o.selected !== false);
+
+  const cols = getTTYCols(ttyFd);
+  const maxW = cols - 1;
+  const footerHint = "\u2191/\u2193 move  space toggle  \u23ce confirm  Ctrl-C cancel";
+  const pickerHeight = 1 + config.options.length + 1; // header + options + footer
+
+  const render = (first: boolean) => {
+    if (!first) {
+      w(A.up(pickerHeight) + A.col1 + A.clearBelow);
+    }
+    w(`${A.bold}${A.cyan}? ${trunc(config.message, maxW - 2)}${A.reset}\r\n`);
+    for (let i = 0; i < config.options.length; i++) {
+      const opt = config.options[i];
+      const box = checked[i] ? "\u25a0" : "\u25a1"; // ■ / □
+      if (i === cursor) {
+        const label = trunc(opt.label, maxW - 6);
+        w(`${A.green}${A.bold}> ${box} ${label}${A.reset}`);
+        if (opt.hint) {
+          const remaining = maxW - 6 - label.length - 2;
+          if (remaining > 3) {
+            w(`  ${A.dim}${trunc(opt.hint, remaining)}${A.reset}`);
+          }
+        }
+      } else {
+        w(`  ${A.dim}${box} ${trunc(opt.label, maxW - 4)}${A.reset}`);
+      }
+      w("\r\n");
+    }
+    w(`${A.dim}  ${trunc(footerHint, maxW - 2)}${A.reset}\r\n`);
+  };
+
+  // ── render & key loop ─────────────────────────────────────────────────────
+  w(A.hideC);
+  render(true);
+
+  const buf = Buffer.alloc(8);
+  let result: string[] | null = null;
+
+  try {
+    outer: while (true) {
+      let n: number;
+      try {
+        n = fs.readSync(ttyFd, buf, 0, 8, null);
+      } catch {
+        break;
+      }
+      if (n === 0) {
+        continue;
+      }
+
+      const key = buf.slice(0, n).toString("binary");
+
+      switch (key) {
+        // ── cancel ─────────────────────────────────────────────────────────
+        case "\x03": // Ctrl-C
+        case "\x1b": // standalone Escape
+          break outer;
+
+        // ── confirm ────────────────────────────────────────────────────────
+        case "\r":
+        case "\n": {
+          const selected = config.options.filter((_, i) => checked[i]).map((o) => o.value);
+          const minRequired = config.minRequired ?? 1;
+          if (selected.length < minRequired) {
+            // Flash: don't accept, keep looping
+            break;
+          }
+          result = selected;
+          // Replace picker with a one-line confirmation
+          w(A.up(pickerHeight) + A.col1 + A.clearBelow);
+          const summary = selected.length === config.options.length ? "all" : selected.join(", ");
+          w(
+            `${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${trunc(summary, maxW - config.message.length - 4)}${A.reset}\r\n`,
+          );
+          break outer;
+        }
+
+        // ── toggle ─────────────────────────────────────────────────────────
+        case " ":
+          checked[cursor] = !checked[cursor];
+          render(false);
+          break;
+
+        // ── select/deselect all ────────────────────────────────────────────
+        case "a": {
+          const allChecked = checked.every((c) => c);
+          for (let i = 0; i < checked.length; i++) {
+            checked[i] = !allChecked;
+          }
+          render(false);
+          break;
+        }
+
+        // ── navigation ─────────────────────────────────────────────────────
+        case "\x1b[A": // Up (CSI)
+        case "\x1bOA": // Up (SS3)
+        case "k": // vim-style
+          cursor = (cursor - 1 + config.options.length) % config.options.length;
+          render(false);
+          break;
+
+        case "\x1b[B": // Down (CSI)
+        case "\x1bOB": // Down (SS3)
+        case "j": // vim-style
+          cursor = (cursor + 1) % config.options.length;
+          render(false);
+          break;
+
+        default:
+          break;
+      }
+    }
+  } finally {
+    restore();
+  }
+
+  return result;
+}
+
 // ── fallback picker ───────────────────────────────────────────────────────────
 
 /**
@@ -420,7 +648,7 @@ export function pickFallback(config: PickConfig): string | null {
   let line = "";
   try {
     const lb = Buffer.alloc(256);
-    const n = fs.readSync(inputFd, lb, 0, 255);
+    const n = fs.readSync(inputFd, lb, 0, 255, null);
     line = lb
       .slice(0, n)
       .toString()
