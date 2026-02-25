@@ -2766,6 +2766,9 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
     if (connection.server_name) {
       validateServerIdentifier(connection.server_name);
     }
+    if (connection.server_id) {
+      validateServerIdentifier(connection.server_id);
+    }
   } catch (err) {
     p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
     p.log.info("Your spawn history file may be corrupted or tampered with.");
@@ -2829,6 +2832,9 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
     validateUsername(connection.user);
     if (connection.server_name) {
       validateServerIdentifier(connection.server_name);
+    }
+    if (connection.server_id) {
+      validateServerIdentifier(connection.server_id);
     }
   } catch (err) {
     p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
