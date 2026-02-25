@@ -9,6 +9,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mock-tests:
+    name: Mock Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run mock tests
+        run: bun test
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -22,9 +39,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install
-
-      - name: Run bun tests
-        run: bun test
 
       - name: Verify cloud bundles build
         run: bun run packages/cli/build-clouds.ts
