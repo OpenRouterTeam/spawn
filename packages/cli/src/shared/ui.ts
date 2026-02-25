@@ -285,11 +285,17 @@ export function prepareStdinForHandoff(): void {
   // nuclear option that guarantees the terminal is in cooked mode with
   // proper echo and line editing before SSH takes over.
   try {
-    Bun.spawnSync(["stty", "sane"], {
-      stdin: "inherit",
-      stdout: "ignore",
-      stderr: "ignore",
-    });
+    Bun.spawnSync(
+      [
+        "stty",
+        "sane",
+      ],
+      {
+        stdin: "inherit",
+        stdout: "ignore",
+        stderr: "ignore",
+      },
+    );
   } catch {
     // ignore — stty may not be available
   }
