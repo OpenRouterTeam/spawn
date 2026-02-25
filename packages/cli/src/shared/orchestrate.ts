@@ -138,8 +138,9 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
   logStep("Starting agent...");
 
   // Clean up stdin state accumulated during provisioning (readline, @clack/prompts
-  // raw mode, keypress listeners) so Bun.spawn gets a pristine FD handoff
+  // raw mode, keypress listeners) so child_process.spawn gets a pristine FD handoff
   prepareStdinForHandoff();
+  await new Promise((r) => setTimeout(r, 500));
 
   const launchCmd = agent.launchCmd();
   cloud.saveLaunchCmd(launchCmd);

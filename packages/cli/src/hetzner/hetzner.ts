@@ -1,7 +1,7 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
 import { readFileSync } from "node:fs";
-
+import { spawn } from "node:child_process";
 import {
   logInfo,
   logWarn,
@@ -631,22 +631,22 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
 
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
-  const exitCode = await Bun.spawn(
-    [
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    const child = spawn(
       "ssh",
-      ...SSH_INTERACTIVE_OPTS,
-      ...keyOpts,
-      `root@${serverIp}`,
-      fullCmd,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
+      [
+        ...SSH_INTERACTIVE_OPTS,
+        ...keyOpts,
+        `root@${serverIp}`,
+        fullCmd,
       ],
-    },
-  ).exited;
+      {
+        stdio: "inherit",
+      },
+    );
+    child.on("close", (code) => resolve(code ?? 0));
+    child.on("error", reject);
+  });
 
   // Post-session summary
   process.stderr.write("\n");

@@ -30,8 +30,8 @@ assert_agent_install() {
             # (mock claude binary is pre-installed, so curl installer is skipped)
             _assert_install_pattern "claude.*install" "installs claude code" ;;
         openclaw)
-            # npm install -g openclaw (Node runtime needs standard node_modules layout)
-            _assert_install_pattern "npm.*install.*openclaw" "installs openclaw via npm" ;;
+            # bun install -g openclaw (npm works but bun is preferred due to issues on VPSs with npm)
+            _assert_install_pattern "bun.*install.*openclaw" "installs openclaw via bun" ;;
         codex)
             # npm install -g @openai/codex
             _assert_install_pattern "npm.*install.*codex" "installs codex via npm" ;;

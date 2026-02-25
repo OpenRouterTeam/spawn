@@ -1,7 +1,7 @@
 // sprite/sprite.ts — Core Sprite provider: CLI installation, auth, provisioning, execution
 
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
-
+import { spawn } from "node:child_process";
 import {
   logInfo,
   logWarn,
@@ -584,13 +584,13 @@ export async function interactiveSession(cmd: string): Promise<number> {
         cmd,
       ];
 
-  const exitCode = await Bun.spawn(args, {
-    stdio: [
-      "inherit",
-      "inherit",
-      "inherit",
-    ],
-  }).exited;
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    const child = spawn(args[0], args.slice(1), {
+      stdio: "inherit",
+    });
+    child.on("close", (code) => resolve(code ?? 0));
+    child.on("error", reject);
+  });
 
   // Post-session summary
   process.stderr.write("\n");

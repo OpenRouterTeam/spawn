@@ -1,7 +1,7 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
 import { existsSync, readFileSync } from "node:fs";
-
+import { spawn } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
 import {
   logInfo,
@@ -1099,22 +1099,22 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
-  const exitCode = await Bun.spawn(
-    [
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    const child = spawn(
       "ssh",
-      ...SSH_INTERACTIVE_OPTS,
-      ...keyOpts,
-      `${SSH_USER}@${instanceIp}`,
-      `bash -c '${escapedCmd}'`,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
+      [
+        ...SSH_INTERACTIVE_OPTS,
+        ...keyOpts,
+        `${SSH_USER}@${instanceIp}`,
+        `bash -c '${escapedCmd}'`,
       ],
-    },
-  ).exited;
+      {
+        stdio: "inherit",
+      },
+    );
+    child.on("close", (code) => resolve(code ?? 0));
+    child.on("error", reject);
+  });
 
   // Post-session summary
   process.stderr.write("\n");
