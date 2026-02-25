@@ -149,7 +149,7 @@ function stripDangerousKeys(obj: unknown): unknown {
   return clean;
 }
 
-function isValidManifest(data: unknown): data is Manifest {
+export function isValidManifest(data: unknown): data is Manifest {
   return (
     data !== null &&
     typeof data === "object" &&
