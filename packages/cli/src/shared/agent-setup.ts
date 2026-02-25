@@ -99,7 +99,7 @@ export async function uploadConfigFile(runner: CloudRunner, content: string, rem
 export async function installClaudeCode(runner: CloudRunner): Promise<void> {
   logStep("Installing Claude Code...");
 
-  const claudePath = "$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin";
+  const claudePath = "$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.n/bin";
   const pathSetup = `for rc in ~/.bashrc ~/.zshrc; do grep -q '.claude/local/bin' "$rc" 2>/dev/null || printf '\\n# Claude Code PATH\\nexport PATH="$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH"\\n' >> "$rc"; done`;
   const finalize = `claude install --force 2>/dev/null || true; ${pathSetup}`;
 
@@ -111,7 +111,7 @@ export async function installClaudeCode(runner: CloudRunner): Promise<void> {
     "curl -fsSL https://claude.ai/install.sh | bash || true",
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
-    "if ! command -v node >/dev/null 2>&1; then curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; fi",
+    "if ! command -v node >/dev/null 2>&1; then export N_PREFIX=$HOME/.n; curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; export PATH=$N_PREFIX/bin:$PATH; fi",
     `echo "==> Installing Claude Code (method 2/2: npm)..."`,
     "npm install -g @anthropic-ai/claude-code || true",
     `export PATH="${claudePath}:$PATH"`,
