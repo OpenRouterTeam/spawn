@@ -263,15 +263,44 @@ export function sanitizeTermValue(term: string): string {
 }
 
 /** Prepare stdin for clean handoff to an interactive child process.
- *  Removes listeners, resets raw mode, and pauses stdin
- *  so that child_process.spawn gets a pristine file descriptor. */
+ *  Removes listeners, resets raw mode, and restores the terminal
+ *  so that Bun.spawn with stdio:"inherit" gets a clean fd 0. */
 export function prepareStdinForHandoff(): void {
-  // Remove any leftover keypress/data listeners (from @clack/prompts, etc.)
+  // Remove any leftover keypress/data listeners (from @clack/prompts, readline, etc.)
   process.stdin.removeAllListeners();
-  // Reset raw mode if it was left on by @clack/prompts
-  if (process.stdin.isTTY && process.stdin.isRaw) {
-    process.stdin.setRawMode(false);
+
+  // Unconditionally reset raw mode — @clack/core's close() may have already
+  // called setRawMode(false) making isRaw report false, but the terminal
+  // can still be in a dirty state after multiple readline instances
+  if (process.stdin.isTTY) {
+    try {
+      process.stdin.setRawMode(false);
+    } catch {
+      // ignore — not a TTY or already closed
+    }
   }
-  // Pause stdin so Node/Bun stops buffering input before the child takes over
-  process.stdin.pause();
+
+  // Reset terminal line discipline via stty to undo any damage from
+  // readline's emitKeypressEvents or leftover raw mode. This is the
+  // nuclear option that guarantees the terminal is in cooked mode with
+  // proper echo and line editing before SSH takes over.
+  try {
+    Bun.spawnSync(
+      [
+        "stty",
+        "sane",
+      ],
+      {
+        stdin: "inherit",
+        stdout: "ignore",
+        stderr: "ignore",
+      },
+    );
+  } catch {
+    // ignore — stty may not be available
+  }
+
+  // Resume stdin so Bun.spawn inherits an active fd 0. A paused stream
+  // can cause the child process to see a blocked/empty stdin on Bun.
+  process.stdin.resume();
 }
