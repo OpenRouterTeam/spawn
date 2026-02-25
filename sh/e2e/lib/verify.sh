@@ -11,8 +11,10 @@ _FLY_MACHINE_APP=""
 # ---------------------------------------------------------------------------
 # fly_ssh APP_NAME COMMAND
 #
-# Resolves machine ID, escapes single quotes, and runs the command via
-# flyctl machine exec. Returns the exit code of the remote command.
+# Resolves machine ID, base64-encodes the command, and runs it via
+# flyctl machine exec. Base64 encoding eliminates all shell metacharacter
+# injection risks (no quoting issues with $, `, ', ", ;, |, etc.).
+# Returns the exit code of the remote command.
 # ---------------------------------------------------------------------------
 fly_ssh() {
   local app="$1"
@@ -28,11 +30,14 @@ fly_ssh() {
     fi
   fi
 
-  # Escape single quotes in command: each ' becomes '\''
-  local escaped_cmd
-  escaped_cmd=$(printf '%s' "${cmd}" | sed "s/'/'\\\\''/g")
+  # Base64-encode command to avoid all shell metacharacter injection.
+  # base64 output contains only [A-Za-z0-9+/=], safe to embed in any quoting.
+  # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
 
-  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout 30 "bash -c '${escaped_cmd}'"
+  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout 30 \
+    "eval \"\$(echo '${encoded_cmd}' | base64 -d)\""
 }
 
 # ---------------------------------------------------------------------------
@@ -56,11 +61,14 @@ fly_ssh_long() {
     fi
   fi
 
-  # Escape single quotes in command: each ' becomes '\''
-  local escaped_cmd
-  escaped_cmd=$(printf '%s' "${cmd}" | sed "s/'/'\\\\''/g")
+  # Base64-encode command to avoid all shell metacharacter injection.
+  # base64 output contains only [A-Za-z0-9+/=], safe to embed in any quoting.
+  # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
 
-  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout "${timeout}" "bash -c '${escaped_cmd}'"
+  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout "${timeout}" \
+    "eval \"\$(echo '${encoded_cmd}' | base64 -d)\""
 }
 
 # ---------------------------------------------------------------------------
