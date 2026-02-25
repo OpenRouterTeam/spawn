@@ -456,7 +456,11 @@ export async function runServerCapture(cmd: string): Promise<string> {
   } catch {
     /* already closed */
   }
-  const stdout = await new Response(proc.stdout).text();
+  // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+  const [stdout] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   const exitCode = await proc.exited;
 
   await sleep(1000);
