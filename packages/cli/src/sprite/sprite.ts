@@ -585,7 +585,9 @@ export async function interactiveSession(cmd: string): Promise<number> {
       ];
 
   const exitCode = await new Promise<number>((resolve, reject) => {
-    const child = spawn(args[0], args.slice(1), { stdio: "inherit" });
+    const child = spawn(args[0], args.slice(1), {
+      stdio: "inherit",
+    });
     child.on("close", (code) => resolve(code ?? 0));
     child.on("error", reject);
   });

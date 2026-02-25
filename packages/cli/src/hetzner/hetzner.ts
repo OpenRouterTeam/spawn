@@ -634,8 +634,15 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const exitCode = await new Promise<number>((resolve, reject) => {
     const child = spawn(
       "ssh",
-      [...SSH_INTERACTIVE_OPTS, ...keyOpts, `root@${serverIp}`, fullCmd],
-      { stdio: "inherit" },
+      [
+        ...SSH_INTERACTIVE_OPTS,
+        ...keyOpts,
+        `root@${serverIp}`,
+        fullCmd,
+      ],
+      {
+        stdio: "inherit",
+      },
     );
     child.on("close", (code) => resolve(code ?? 0));
     child.on("error", reject);

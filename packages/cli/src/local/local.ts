@@ -71,10 +71,17 @@ export function uploadFile(localPath: string, remotePath: string): void {
 /** Launch an interactive shell session locally. */
 export async function interactiveSession(cmd: string): Promise<number> {
   return new Promise<number>((resolve, reject) => {
-    const child = spawn("bash", ["-c", cmd], {
-      stdio: "inherit",
-      env: process.env,
-    });
+    const child = spawn(
+      "bash",
+      [
+        "-c",
+        cmd,
+      ],
+      {
+        stdio: "inherit",
+        env: process.env,
+      },
+    );
     child.on("close", (code) => resolve(code ?? 0));
     child.on("error", reject);
   });

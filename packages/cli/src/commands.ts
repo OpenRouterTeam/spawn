@@ -2726,7 +2726,9 @@ export async function cmdLast(): Promise<void> {
 /** Execute a shell command and resolve/reject on process close/error */
 function runInteractiveCommand(cmd: string, args: string[], failureMsg: string, manualCmd: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: "inherit" });
+    const child = spawn(cmd, args, {
+      stdio: "inherit",
+    });
 
     child.on("close", (code: number | null) => {
       if (code === 0 || code === null) {
