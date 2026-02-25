@@ -11,8 +11,10 @@ _FLY_MACHINE_APP=""
 # ---------------------------------------------------------------------------
 # fly_ssh APP_NAME COMMAND
 #
-# Resolves machine ID, escapes single quotes, and runs the command via
-# flyctl machine exec. Returns the exit code of the remote command.
+# Resolves machine ID, base64-encodes the command, and runs it via
+# flyctl machine exec. Base64 encoding eliminates all shell metacharacter
+# injection risks (no quoting issues with $, `, ', ", ;, |, etc.).
+# Returns the exit code of the remote command.
 # ---------------------------------------------------------------------------
 fly_ssh() {
   local app="$1"
@@ -28,11 +30,14 @@ fly_ssh() {
     fi
   fi
 
-  # Escape single quotes in command: each ' becomes '\''
-  local escaped_cmd
-  escaped_cmd=$(printf '%s' "${cmd}" | sed "s/'/'\\\\''/g")
+  # Base64-encode command to avoid all shell metacharacter injection.
+  # base64 output contains only [A-Za-z0-9+/=], safe to embed in any quoting.
+  # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
 
-  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout 30 "bash -c '${escaped_cmd}'"
+  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout 30 \
+    "echo '${encoded_cmd}' | base64 -d | sh"
 }
 
 # ---------------------------------------------------------------------------
@@ -56,11 +61,14 @@ fly_ssh_long() {
     fi
   fi
 
-  # Escape single quotes in command: each ' becomes '\''
-  local escaped_cmd
-  escaped_cmd=$(printf '%s' "${cmd}" | sed "s/'/'\\\\''/g")
+  # Base64-encode command to avoid all shell metacharacter injection.
+  # base64 output contains only [A-Za-z0-9+/=], safe to embed in any quoting.
+  # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
 
-  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout "${timeout}" "bash -c '${escaped_cmd}'"
+  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout "${timeout}" \
+    "echo '${encoded_cmd}' | base64 -d | sh"
 }
 
 # ---------------------------------------------------------------------------
@@ -83,11 +91,15 @@ input_test_claude() {
   local app="$1"
 
   log_step "Running input test for claude..."
+  # Base64-encode prompt to prevent shell injection from special characters.
+  # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
+  local encoded_prompt
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    claude -p '${INPUT_TEST_PROMPT}' 2>/dev/null"
+    PROMPT=\$(echo '${encoded_prompt}' | base64 -d); claude -p \"\$PROMPT\" 2>/dev/null"
 
   local output
   output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
@@ -107,11 +119,14 @@ input_test_codex() {
   local app="$1"
 
   log_step "Running input test for codex..."
+  # Base64-encode prompt to prevent shell injection from special characters.
+  local encoded_prompt
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; \
     export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    codex -q '${INPUT_TEST_PROMPT}' 2>/dev/null"
+    PROMPT=\$(echo '${encoded_prompt}' | base64 -d); codex -q \"\$PROMPT\" 2>/dev/null"
 
   local output
   output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
@@ -138,11 +153,14 @@ input_test_openclaw() {
     log_warn "openclaw gateway not detected on :18789 — attempting test anyway"
   fi
 
+  # Base64-encode prompt to prevent shell injection from special characters.
+  local encoded_prompt
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    openclaw -p '${INPUT_TEST_PROMPT}' 2>/dev/null"
+    PROMPT=\$(echo '${encoded_prompt}' | base64 -d); openclaw -p \"\$PROMPT\" 2>/dev/null"
 
   local output
   output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
@@ -162,10 +180,13 @@ input_test_zeroclaw() {
   local app="$1"
 
   log_step "Running input test for zeroclaw..."
+  # Base64-encode prompt to prevent shell injection from special characters.
+  local encoded_prompt
+  encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    zeroclaw agent -p '${INPUT_TEST_PROMPT}' 2>/dev/null"
+    PROMPT=\$(echo '${encoded_prompt}' | base64 -d); zeroclaw agent -p \"\$PROMPT\" 2>/dev/null"
 
   local output
   output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true

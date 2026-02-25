@@ -18,7 +18,13 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import {
+  SSH_BASE_OPTS,
+  SSH_INTERACTIVE_OPTS,
+  sleep,
+  waitForSsh as sharedWaitForSsh,
+  killWithTimeout,
+} from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
 import { parseJsonWith, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
@@ -489,7 +495,11 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
           ],
         },
       );
-      const stdout = await new Response(proc.stdout).text();
+      // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+      const [stdout] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
       const exitCode = await proc.exited;
       if (exitCode === 0 && stdout.includes("done")) {
         logInfo("Cloud-init complete");
@@ -530,11 +540,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
   );
 
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => {
-    try {
-      proc.kill();
-    } catch {}
-  }, timeout);
+  const timer = setTimeout(() => killWithTimeout(proc), timeout);
   const exitCode = await proc.exited;
   try {
     proc.stdin!.end();
@@ -571,12 +577,12 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
   );
 
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => {
-    try {
-      proc.kill();
-    } catch {}
-  }, timeout);
-  const stdout = await new Response(proc.stdout).text();
+  const timer = setTimeout(() => killWithTimeout(proc), timeout);
+  // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+  const [stdout] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   const exitCode = await proc.exited;
   try {
     proc.stdin!.end();
@@ -611,8 +617,8 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
     {
       stdio: [
         "ignore",
-        "ignore",
-        "pipe",
+        "inherit",
+        "inherit",
       ],
     },
   );
@@ -632,8 +638,20 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = await Bun.spawn(
-    ["ssh", ...SSH_INTERACTIVE_OPTS, ...keyOpts, `root@${serverIp}`, fullCmd],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_INTERACTIVE_OPTS,
+      ...keyOpts,
+      `root@${serverIp}`,
+      fullCmd,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+    },
   ).exited;
 
   // Post-session summary

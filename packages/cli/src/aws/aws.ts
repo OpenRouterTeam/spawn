@@ -19,7 +19,13 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, sleep, waitForSsh as sharedWaitForSsh } from "../shared/ssh";
+import {
+  SSH_BASE_OPTS,
+  SSH_INTERACTIVE_OPTS,
+  sleep,
+  waitForSsh as sharedWaitForSsh,
+  killWithTimeout,
+} from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
 import { parseJsonWith } from "@openrouter/spawn-shared";
@@ -241,10 +247,13 @@ async function awsCli(args: string[]): Promise<string> {
       env: process.env,
     },
   );
-  const stdout = await new Response(proc.stdout).text();
+  // Drain both pipes concurrently before awaiting exit to prevent pipe buffer deadlock
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text();
     throw new Error(`aws CLI failed: ${stderr.trim() || stdout.trim()}`);
   }
   return stdout.trim();
@@ -636,9 +645,6 @@ export async function promptBundle(): Promise<void> {
     selectedBundle = process.env.LIGHTSAIL_BUNDLE;
     return;
   }
-  if (process.env.SPAWN_CUSTOM !== "1") {
-    return;
-  }
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     return;
   }
@@ -761,6 +767,11 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   const lines = [
     "#!/bin/bash",
     "export DEBIAN_FRONTEND=noninteractive",
+    "# Set up swap early — nano instances (512 MB) OOM during large installs",
+    "if ! swapon --show 2>/dev/null | grep -q /swapfile; then",
+    "  fallocate -l 1G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none",
+    "  chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile",
+    "fi",
     "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
   ];
@@ -972,17 +983,23 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
           ...SSH_BASE_OPTS,
           ...keyOpts,
           `${SSH_USER}@${instanceIp}`,
-          "test -f /home/ubuntu/.cloud-init-complete",
+          "test -f /home/ubuntu/.cloud-init-complete && echo done",
         ],
         {
           stdio: [
             "ignore",
             "pipe",
-            "ignore",
+            "pipe",
           ],
         },
       );
-      if ((await proc.exited) === 0) {
+      // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+      const [stdout] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ]);
+      const exitCode = await proc.exited;
+      if (exitCode === 0 && stdout.includes("done")) {
         logInfo("Cloud-init complete");
         return;
       }
@@ -1016,13 +1033,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
     },
   );
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => {
-    try {
-      proc.kill();
-    } catch {
-      /* ignore */
-    }
-  }, timeout);
+  const timer = setTimeout(() => killWithTimeout(proc), timeout);
   const exitCode = await proc.exited;
   clearTimeout(timer);
   if (exitCode !== 0) {
@@ -1050,14 +1061,12 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
     },
   );
   const timeout = (timeoutSecs || 300) * 1000;
-  const timer = setTimeout(() => {
-    try {
-      proc.kill();
-    } catch {
-      /* ignore */
-    }
-  }, timeout);
-  const stdout = await new Response(proc.stdout).text();
+  const timer = setTimeout(() => killWithTimeout(proc), timeout);
+  // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+  const [stdout] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   const exitCode = await proc.exited;
   clearTimeout(timer);
   if (exitCode !== 0) {
@@ -1082,8 +1091,8 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     {
       stdio: [
         "ignore",
-        "ignore",
-        "pipe",
+        "inherit",
+        "inherit",
       ],
     },
   );
@@ -1100,8 +1109,20 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const exitCode = await Bun.spawn(
-    ["ssh", ...SSH_INTERACTIVE_OPTS, ...keyOpts, `${SSH_USER}@${instanceIp}`, `bash -c '${escapedCmd}'`],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_INTERACTIVE_OPTS,
+      ...keyOpts,
+      `${SSH_USER}@${instanceIp}`,
+      `bash -c '${escapedCmd}'`,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+    },
   ).exited;
 
   // Post-session summary

@@ -36,6 +36,8 @@ export const SSH_BASE_OPTS: string[] = [
  * - Compression=yes (reduces latency on slow/distant links)
  * - IPQoS=lowdelay (mark packets for low-latency QoS treatment)
  * - RequestTTY=yes (force TTY allocation for the session)
+ * - EscapeChar=none (disable per-byte ~ escape scanning for faster keystroke echo)
+ * - AddressFamily=inet (skip IPv6 resolution to avoid intermittent stalls)
  */
 export const SSH_INTERACTIVE_OPTS: string[] = [
   "-o",
@@ -55,9 +57,13 @@ export const SSH_INTERACTIVE_OPTS: string[] = [
   "-o",
   "TCPKeepAlive=no",
   "-o",
-  "Compression=yes",
+  "Compression=no",
   "-o",
   "IPQoS=lowdelay",
+  "-o",
+  "EscapeChar=none",
+  "-o",
+  "AddressFamily=inet",
   "-t",
 ];
 
@@ -66,6 +72,36 @@ export const SSH_INTERACTIVE_OPTS: string[] = [
 /** Async sleep — shared across all cloud providers. */
 export function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Kill a child process with SIGTERM, then escalate to SIGKILL after a grace period.
+ *
+ * SSH processes stuck in network I/O can ignore SIGTERM indefinitely,
+ * causing `await proc.exited` to hang forever. This helper ensures the
+ * process is forcefully killed if it doesn't respond to SIGTERM.
+ */
+export function killWithTimeout(
+  proc: {
+    kill(signal?: number): void;
+    readonly killed: boolean;
+  },
+  gracePeriodMs = 5000,
+): void {
+  try {
+    proc.kill();
+  } catch {
+    return;
+  }
+  setTimeout(() => {
+    try {
+      if (!proc.killed) {
+        proc.kill(9);
+      }
+    } catch {
+      /* already dead */
+    }
+  }, gracePeriodMs);
 }
 
 // ─── TCP Pre-Check ───────────────────────────────────────────────────────────

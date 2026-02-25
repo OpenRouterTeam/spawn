@@ -153,7 +153,7 @@ export async function ensureSpriteCli(): Promise<void> {
       stdio: [
         "ignore",
         "inherit",
-        "pipe",
+        "inherit",
       ],
     },
   );
@@ -333,10 +333,11 @@ export async function createSprite(name: string): Promise<void> {
         ],
       },
     );
+    // Drain stderr before awaiting exit to prevent pipe buffer deadlock
+    const stderrText = new Response(proc.stderr).text();
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text();
-      throw new Error(`Failed to create sprite '${name}': ${stderr}`);
+      throw new Error(`Failed to create sprite '${name}': ${await stderrText}`);
     }
   });
 
@@ -544,10 +545,11 @@ export async function uploadFileSprite(localPath: string, remotePath: string): P
         ],
       },
     );
+    // Drain stderr before awaiting exit to prevent pipe buffer deadlock
+    const stderrText = new Response(proc.stderr).text();
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text();
-      throw new Error(`upload failed for ${remotePath}: ${stderr}`);
+      throw new Error(`upload failed for ${remotePath}: ${await stderrText}`);
     }
   });
 }
@@ -584,7 +586,13 @@ export async function interactiveSession(cmd: string): Promise<number> {
         cmd,
       ];
 
-  const exitCode = await Bun.spawn(args, { stdio: ["inherit", "inherit", "inherit"] }).exited;
+  const exitCode = await Bun.spawn(args, {
+    stdio: [
+      "inherit",
+      "inherit",
+      "inherit",
+    ],
+  }).exited;
 
   // Post-session summary
   process.stderr.write("\n");
@@ -626,11 +634,13 @@ export async function destroyServer(name?: string): Promise<void> {
       ],
     },
   );
+  // Drain stderr before awaiting exit to prevent pipe buffer deadlock
+  const stderrText = new Response(proc.stderr).text();
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     logError(`Failed to destroy sprite '${target}'`);
     logError(`Delete it manually: sprite destroy ${target}`);
-    throw new Error("Sprite destruction failed");
+    throw new Error(`Sprite destruction failed: ${await stderrText}`);
   }
 
   logInfo(`Sprite '${target}' destroyed`);
