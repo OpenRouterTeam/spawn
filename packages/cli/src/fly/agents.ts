@@ -47,7 +47,7 @@ export const agents: Record<string, FlyAgentConfig> = (() => {
         await installAgent(
           runner,
           "openclaw",
-          // npm stalls
+          // npm works but bun is preferred due to issues on VPSs with npm
           'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH" && bun install -g openclaw && command -v openclaw',
         );
       }
