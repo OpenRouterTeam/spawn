@@ -242,7 +242,10 @@ async function awsCli(args: string[]): Promise<string> {
     },
   );
   // Drain both pipes concurrently before awaiting exit to prevent pipe buffer deadlock
-  const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     throw new Error(`aws CLI failed: ${stderr.trim() || stdout.trim()}`);
