@@ -2471,7 +2471,7 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
     } catch (err) {
       p.log.error(`Connection failed: ${getErrorMessage(err)}`);
       p.log.info(
-        `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`,
+        `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`,
       );
     }
     return;
@@ -2483,7 +2483,7 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
     } catch (err) {
       p.log.error(`Connection failed: ${getErrorMessage(err)}`);
       p.log.info(
-        `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent}/${selected.cloud}`)} to start a new one.`,
+        `VM may no longer be running. Use ${pc.cyan(`spawn ${selected.agent} ${selected.cloud}`)} to start a new one.`,
       );
     }
     return;
