@@ -777,12 +777,10 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   ];
   if (needsNode(tier)) {
     lines.push(
-      "# Install Node.js 22 via n",
-      `su - ubuntu -c '${NODE_INSTALL_CMD}'`,
+      "# Install Node.js 22 via n (run as root so it installs to /usr/local/bin/)",
+      `${NODE_INSTALL_CMD} || true`,
       "# Install Claude Code",
       "su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'",
-      "# Configure npm global prefix",
-      "su - ubuntu -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'",
     );
   }
   if (needsBun(tier)) {

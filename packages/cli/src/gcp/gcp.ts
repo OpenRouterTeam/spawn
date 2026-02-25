@@ -624,12 +624,10 @@ function getStartupScript(username: string, tier: CloudInitTier = "full"): strin
   ];
   if (needsNode(tier)) {
     lines.push(
-      "# Install Node.js 22 via n",
-      `su - "${username}" -c '${NODE_INSTALL_CMD}'`,
+      "# Install Node.js 22 via n (run as root so it installs to /usr/local/bin/)",
+      `${NODE_INSTALL_CMD} || true`,
       "# Install Claude Code as the login user",
       `su - "${username}" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true`,
-      "# Configure npm global prefix",
-      `su - "${username}" -c 'mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global'`,
     );
   }
   if (needsBun(tier)) {
