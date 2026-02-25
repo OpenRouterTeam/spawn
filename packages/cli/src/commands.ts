@@ -2724,10 +2724,27 @@ export async function cmdLast(): Promise<void> {
 // ── Connect ────────────────────────────────────────────────────────────────────
 
 /** Execute a shell command and resolve/reject on process close/error */
-async function runInteractiveCommand(cmd: string, args: string[], failureMsg: string, manualCmd: string): Promise<void> {
+async function runInteractiveCommand(
+  cmd: string,
+  args: string[],
+  failureMsg: string,
+  manualCmd: string,
+): Promise<void> {
   let proc: ReturnType<typeof Bun.spawn> | undefined;
   try {
-    proc = Bun.spawn([cmd, ...args], { stdio: ["inherit", "inherit", "inherit"] });
+    proc = Bun.spawn(
+      [
+        cmd,
+        ...args,
+      ],
+      {
+        stdio: [
+          "inherit",
+          "inherit",
+          "inherit",
+        ],
+      },
+    );
   } catch (err) {
     p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
     p.log.info(`Try manually: ${pc.cyan(manualCmd)}`);
