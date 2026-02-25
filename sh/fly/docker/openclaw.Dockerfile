@@ -21,7 +21,7 @@ RUN apt-get update -y && \
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:/root/.local/bin:${PATH}"
 
-# OpenClaw via bun — npm stalls
+# OpenClaw via bun — npm works but bun is preferred due to issues on VPSs with npm
 RUN bun install -g openclaw
 # Ensure tools are on PATH for all shells
 RUN for rc in /root/.bashrc /root/.zshrc; do \
