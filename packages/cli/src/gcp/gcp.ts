@@ -16,7 +16,13 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, sleep, waitForSsh as sharedWaitForSsh, killWithTimeout } from "../shared/ssh";
+import {
+  SSH_BASE_OPTS,
+  SSH_INTERACTIVE_OPTS,
+  sleep,
+  waitForSsh as sharedWaitForSsh,
+  killWithTimeout,
+} from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import { saveVmConnection } from "../history.js";
 

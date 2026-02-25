@@ -18,7 +18,13 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { SSH_BASE_OPTS, SSH_INTERACTIVE_OPTS, sleep, waitForSsh as sharedWaitForSsh, killWithTimeout } from "../shared/ssh";
+import {
+  SSH_BASE_OPTS,
+  SSH_INTERACTIVE_OPTS,
+  sleep,
+  waitForSsh as sharedWaitForSsh,
+  killWithTimeout,
+} from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
 import { parseJsonWith, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";

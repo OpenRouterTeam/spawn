@@ -82,7 +82,10 @@ export function sleep(ms: number): Promise<void> {
  * process is forcefully killed if it doesn't respond to SIGTERM.
  */
 export function killWithTimeout(
-  proc: { kill(signal?: number): void; readonly killed: boolean },
+  proc: {
+    kill(signal?: number): void;
+    readonly killed: boolean;
+  },
   gracePeriodMs = 5000,
 ): void {
   try {
