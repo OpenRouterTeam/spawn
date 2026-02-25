@@ -3253,7 +3253,7 @@ export async function cmdCloudInfo(cloud: string, preloadedManifest?: Manifest):
   printAgentList(manifest, implAgents, missingAgents, cloudKey);
 
   console.log();
-  console.log(pc.dim(`  Full setup guide: ${pc.cyan(`https://github.com/${REPO}/tree/main/${cloudKey}`)}`));
+  console.log(pc.dim(`  Full setup guide: ${pc.cyan(`https://github.com/${REPO}/tree/main/sh/${cloudKey}`)}`));
   console.log();
 }
 
