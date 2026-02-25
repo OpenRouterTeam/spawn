@@ -21,32 +21,6 @@ export interface CloudOrchestrator {
   saveLaunchCmd(launchCmd: string): void;
 }
 
-/**
- * Wrap a launch command in a restart loop for cloud VMs.
- * Restarts the agent on non-zero exit (crash, SIGTERM, OOM) up to MAX_RESTARTS times.
- * Clean exits (exit code 0) break out of the loop immediately.
- * Skipped for local execution where the user controls the process directly.
- */
-function wrapWithRestartLoop(cmd: string): string {
-  // Shell restart loop — bash 3.x compatible (no ((var++)), no set -u)
-  return [
-    "_spawn_restarts=0",
-    "_spawn_max=10",
-    'while [ "$_spawn_restarts" -lt "$_spawn_max" ]; do',
-    `  ${cmd}`,
-    "  _spawn_exit=$?",
-    '  if [ "$_spawn_exit" -eq 0 ]; then break; fi',
-    "  _spawn_restarts=$((_spawn_restarts + 1))",
-    '  printf "\\n[spawn] Agent exited with code %d. Restarting in 5s (%d/%d)...\\n" "$_spawn_exit" "$_spawn_restarts" "$_spawn_max" >&2',
-    "  sleep 5",
-    "done",
-    'if [ "$_spawn_restarts" -ge "$_spawn_max" ]; then',
-    '  printf "\\n[spawn] Agent crashed %d times. Giving up.\\n" "$_spawn_max" >&2',
-    "fi",
-    'exit "${_spawn_exit:-0}"',
-  ].join("\n");
-}
-
 export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentConfig, agentName: string): Promise<void> {
   logInfo(`${agent.name} on ${cloud.cloudLabel}`);
   process.stderr.write("\n");
@@ -145,8 +119,6 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
   const launchCmd = agent.launchCmd();
   cloud.saveLaunchCmd(launchCmd);
 
-  // Wrap in restart loop for cloud VMs — not for local execution
-  const sessionCmd = cloud.cloudName === "local" ? launchCmd : wrapWithRestartLoop(launchCmd);
-  const exitCode = await cloud.interactiveSession(sessionCmd);
+  const exitCode = await cloud.interactiveSession(launchCmd);
   process.exit(exitCode);
 }
