@@ -36,6 +36,14 @@ provision_agent() {
   # Environment for headless provisioning
   # FLY_API_TOKEN="" forces spawn to use flyctl stored credentials (see plan section 6)
   # MODEL_ID bypasses the interactive model selection prompt (required by openclaw)
+  #
+  # Validate flyctl is authenticated before proceeding with empty token fallback
+  if [ -z "${FLY_API_TOKEN:-}" ]; then
+    if ! flyctl auth whoami >/dev/null 2>&1; then
+      log_err "FLY_API_TOKEN is empty and flyctl is not authenticated. Run: flyctl auth login"
+      return 1
+    fi
+  fi
   (
     SPAWN_NON_INTERACTIVE=1 \
     SPAWN_SKIP_GITHUB_AUTH=1 \

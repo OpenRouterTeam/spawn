@@ -197,8 +197,9 @@ if [[ "${RUN_MODE}" == "quality" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+    rm -f "${PROMPT_FILE}.bak"
 
 elif [[ "${RUN_MODE}" == "fixtures" ]]; then
     PROMPT_TEMPLATE="${SCRIPT_DIR}/qa-fixtures-prompt.md"
@@ -208,8 +209,9 @@ elif [[ "${RUN_MODE}" == "fixtures" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+    rm -f "${PROMPT_FILE}.bak"
 
 elif [[ "${RUN_MODE}" == "issue" ]]; then
     PROMPT_TEMPLATE="${SCRIPT_DIR}/qa-issue-prompt.md"
@@ -219,9 +221,10 @@ elif [[ "${RUN_MODE}" == "issue" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    sed -i "s|ISSUE_NUM_PLACEHOLDER|${ISSUE_NUM}|g" "${PROMPT_FILE}"
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|ISSUE_NUM_PLACEHOLDER|${ISSUE_NUM}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+    rm -f "${PROMPT_FILE}.bak"
 
 elif [[ "${RUN_MODE}" == "e2e" ]]; then
     PROMPT_TEMPLATE="${SCRIPT_DIR}/qa-e2e-prompt.md"
@@ -231,8 +234,9 @@ elif [[ "${RUN_MODE}" == "e2e" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    sed -i.bak "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
+    rm -f "${PROMPT_FILE}.bak"
 
 fi
 

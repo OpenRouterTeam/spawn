@@ -83,7 +83,7 @@ require_env() {
   # Check / generate FLY_API_TOKEN
   if [ -z "${FLY_API_TOKEN:-}" ]; then
     log_info "FLY_API_TOKEN not set, generating via flyctl..."
-    FLY_API_TOKEN=$(flyctl tokens create org personal --expiry 2h 2>/dev/null || true)
+    FLY_API_TOKEN=$(flyctl tokens create org personal --expiry 8h 2>/dev/null || true)
     if [ -z "${FLY_API_TOKEN:-}" ]; then
       log_warn "Could not generate token. Falling back to flyctl stored credentials."
       # Validate flyctl is authenticated
@@ -93,7 +93,7 @@ require_env() {
       fi
     else
       export FLY_API_TOKEN
-      log_ok "Generated FLY_API_TOKEN (expires in 2h)"
+      log_ok "Generated FLY_API_TOKEN (expires in 8h)"
     fi
   fi
 
