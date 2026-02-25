@@ -1053,8 +1053,8 @@ export async function uploadFile(localPath: string, remotePath: string, ip?: str
     {
       stdio: [
         "ignore",
-        "ignore",
-        "pipe",
+        "inherit",
+        "inherit",
       ],
     },
   );
