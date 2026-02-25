@@ -639,9 +639,6 @@ export async function promptBundle(): Promise<void> {
     selectedBundle = process.env.LIGHTSAIL_BUNDLE;
     return;
   }
-  if (process.env.SPAWN_CUSTOM !== "1") {
-    return;
-  }
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     return;
   }
@@ -764,6 +761,11 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   const lines = [
     "#!/bin/bash",
     "export DEBIAN_FRONTEND=noninteractive",
+    "# Set up swap early — nano instances (512 MB) OOM during large installs",
+    "if ! swapon --show 2>/dev/null | grep -q /swapfile; then",
+    "  fallocate -l 1G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none",
+    "  chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile",
+    "fi",
     "apt-get update -y",
     `apt-get install -y --no-install-recommends ${packages.join(" ")}`,
   ];
