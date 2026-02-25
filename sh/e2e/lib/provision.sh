@@ -45,15 +45,16 @@ provision_agent() {
     fi
   fi
   (
-    SPAWN_NON_INTERACTIVE=1 \
-    SPAWN_SKIP_GITHUB_AUTH=1 \
-    SPAWN_SKIP_API_VALIDATION=1 \
-    MODEL_ID="${MODEL_ID:-openrouter/auto}" \
-    FLY_APP_NAME="${app_name}" \
-    FLY_REGION="${FLY_REGION}" \
-    FLY_VM_MEMORY="${FLY_VM_MEMORY}" \
-    FLY_API_TOKEN="" \
-    OPENROUTER_API_KEY="${OPENROUTER_API_KEY}" \
+    export SPAWN_NON_INTERACTIVE=1
+    export SPAWN_SKIP_GITHUB_AUTH=1
+    export SPAWN_SKIP_API_VALIDATION=1
+    export MODEL_ID="${MODEL_ID:-openrouter/auto}"
+    export FLY_APP_NAME="${app_name}"
+    export FLY_REGION="${FLY_REGION}"
+    export FLY_VM_MEMORY="${FLY_VM_MEMORY}"
+    export FLY_API_TOKEN=""
+    export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
+
     bun run "${cli_entry}" "${agent}" fly --headless --output json \
       > "${stdout_file}" 2> "${stderr_file}"
     printf '%s' "$?" > "${exit_file}"
