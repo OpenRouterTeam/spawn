@@ -2724,10 +2724,27 @@ export async function cmdLast(): Promise<void> {
 // ── Connect ────────────────────────────────────────────────────────────────────
 
 /** Execute a shell command and resolve/reject on process close/error */
-async function runInteractiveCommand(cmd: string, args: string[], failureMsg: string, manualCmd: string): Promise<void> {
+async function runInteractiveCommand(
+  cmd: string,
+  args: string[],
+  failureMsg: string,
+  manualCmd: string,
+): Promise<void> {
   let proc: ReturnType<typeof Bun.spawn> | undefined;
   try {
-    proc = Bun.spawn([cmd, ...args], { stdio: ["inherit", "inherit", "inherit"] });
+    proc = Bun.spawn(
+      [
+        cmd,
+        ...args,
+      ],
+      {
+        stdio: [
+          "inherit",
+          "inherit",
+          "inherit",
+        ],
+      },
+    );
   } catch (err) {
     p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
     p.log.info(`Try manually: ${pc.cyan(manualCmd)}`);
@@ -2908,16 +2925,17 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
 
   // Standard SSH connection with agent launch
   p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
+  const escapedRemoteCmd = remoteCmd.replace(/'/g, "'\\''");
   return runInteractiveCommand(
     "ssh",
     [
       ...SSH_INTERACTIVE_OPTS,
       `${connection.user}@${connection.ip}`,
       "--",
-      `bash -lc '${remoteCmd}'`,
+      `bash -lc '${escapedRemoteCmd}'`,
     ],
     `Failed to enter ${agentName}`,
-    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${remoteCmd}'`,
+    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${escapedRemoteCmd}'`,
   );
 }
 

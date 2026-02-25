@@ -241,10 +241,13 @@ async function awsCli(args: string[]): Promise<string> {
       env: process.env,
     },
   );
-  const stdout = await new Response(proc.stdout).text();
+  // Drain both pipes concurrently before awaiting exit to prevent pipe buffer deadlock
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text();
     throw new Error(`aws CLI failed: ${stderr.trim() || stdout.trim()}`);
   }
   return stdout.trim();
@@ -1100,8 +1103,20 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   const exitCode = await Bun.spawn(
-    ["ssh", ...SSH_INTERACTIVE_OPTS, ...keyOpts, `${SSH_USER}@${instanceIp}`, `bash -c '${escapedCmd}'`],
-    { stdio: ["inherit", "inherit", "inherit"] },
+    [
+      "ssh",
+      ...SSH_INTERACTIVE_OPTS,
+      ...keyOpts,
+      `${SSH_USER}@${instanceIp}`,
+      `bash -c '${escapedCmd}'`,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+    },
   ).exited;
 
   // Post-session summary

@@ -70,10 +70,21 @@ export function uploadFile(localPath: string, remotePath: string): void {
 
 /** Launch an interactive shell session locally. */
 export async function interactiveSession(cmd: string): Promise<number> {
-  return Bun.spawn(["bash", "-c", cmd], {
-    stdio: ["inherit", "inherit", "inherit"],
-    env: process.env,
-  }).exited;
+  return Bun.spawn(
+    [
+      "bash",
+      "-c",
+      cmd,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+      env: process.env,
+    },
+  ).exited;
 }
 
 // ─── Connection Tracking ─────────────────────────────────────────────────────

@@ -1019,8 +1019,24 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const flyCmd = getCmd()!;
 
   const exitCode = await Bun.spawn(
-    [flyCmd, "ssh", "console", "-a", flyAppName, "--pty", "-C", `bash -c '${escapedCmd}'`],
-    { stdio: ["inherit", "inherit", "inherit"], env: process.env },
+    [
+      flyCmd,
+      "ssh",
+      "console",
+      "-a",
+      flyAppName,
+      "--pty",
+      "-C",
+      `bash -c '${escapedCmd}'`,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+      env: process.env,
+    },
   ).exited;
 
   // Post-session summary

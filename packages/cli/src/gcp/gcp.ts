@@ -919,8 +919,21 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
   const exitCode = await Bun.spawn(
-    ["ssh", ...SSH_INTERACTIVE_OPTS, ...keyOpts, `${username}@${gcpServerIp}`, `bash -c ${shellQuote(fullCmd)}`],
-    { stdio: ["inherit", "inherit", "inherit"], env: process.env },
+    [
+      "ssh",
+      ...SSH_INTERACTIVE_OPTS,
+      ...keyOpts,
+      `${username}@${gcpServerIp}`,
+      `bash -c ${shellQuote(fullCmd)}`,
+    ],
+    {
+      stdio: [
+        "inherit",
+        "inherit",
+        "inherit",
+      ],
+      env: process.env,
+    },
   ).exited;
 
   // Post-session summary
