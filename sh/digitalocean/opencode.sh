@@ -51,7 +51,7 @@ _run_with_restart() {
         attempt=$((attempt + 1))
         _GOT_SIGTERM=0
 
-        "$@" &
+        "$@" < /dev/stdin &
         _CHILD_PID=$!
         wait "$_CHILD_PID" 2>/dev/null
         local exit_code=$?
