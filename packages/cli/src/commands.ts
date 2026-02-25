@@ -2915,16 +2915,17 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
 
   // Standard SSH connection with agent launch
   p.log.step(`Entering ${pc.bold(agentName)} on ${pc.bold(connection.ip)}...`);
+  const escapedRemoteCmd = remoteCmd.replace(/'/g, "'\\''");
   return runInteractiveCommand(
     "ssh",
     [
       ...SSH_INTERACTIVE_OPTS,
       `${connection.user}@${connection.ip}`,
       "--",
-      `bash -lc '${remoteCmd}'`,
+      `bash -lc '${escapedRemoteCmd}'`,
     ],
     `Failed to enter ${agentName}`,
-    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${remoteCmd}'`,
+    `ssh -t ${connection.user}@${connection.ip} -- bash -lc '${escapedRemoteCmd}'`,
   );
 }
 
