@@ -47,7 +47,7 @@ export const agents: Record<string, FlyAgentConfig> = (() => {
         await installAgent(
           runner,
           "openclaw",
-          'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH" && npm install -g openclaw && command -v openclaw',
+          'export PATH="$HOME/.bun/bin:$HOME/.local/bin:/usr/local/bin:$PATH" && npm install -g openclaw && command -v openclaw',
         );
       }
     },
