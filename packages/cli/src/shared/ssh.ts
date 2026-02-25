@@ -36,6 +36,8 @@ export const SSH_BASE_OPTS: string[] = [
  * - Compression=yes (reduces latency on slow/distant links)
  * - IPQoS=lowdelay (mark packets for low-latency QoS treatment)
  * - RequestTTY=yes (force TTY allocation for the session)
+ * - EscapeChar=none (disable per-byte ~ escape scanning for faster keystroke echo)
+ * - AddressFamily=inet (skip IPv6 resolution to avoid intermittent stalls)
  */
 export const SSH_INTERACTIVE_OPTS: string[] = [
   "-o",
@@ -58,6 +60,10 @@ export const SSH_INTERACTIVE_OPTS: string[] = [
   "Compression=no",
   "-o",
   "IPQoS=lowdelay",
+  "-o",
+  "EscapeChar=none",
+  "-o",
+  "AddressFamily=inet",
   "-t",
 ];
 
