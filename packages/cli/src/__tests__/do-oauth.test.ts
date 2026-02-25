@@ -126,39 +126,6 @@ describe("DO token format validation", () => {
   });
 });
 
-// ── CSRF State Generation ───────────────────────────────────────────────────
-
-describe("CSRF state generation", () => {
-  function generateCsrfState(): string {
-    const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  it("should generate 32 hex characters (128 bits)", () => {
-    const state = generateCsrfState();
-    expect(state).toHaveLength(32);
-    expect(state).toMatch(/^[0-9a-f]{32}$/);
-  });
-
-  it("should generate unique values", () => {
-    const states = new Set<string>();
-    for (let i = 0; i < 100; i++) {
-      states.add(generateCsrfState());
-    }
-    expect(states.size).toBe(100);
-  });
-
-  it("should be URL-safe", () => {
-    const state = generateCsrfState();
-    expect(state).not.toContain(" ");
-    expect(state).not.toContain("&");
-    expect(state).not.toContain("?");
-    expect(state).not.toContain("/");
-    expect(state).not.toContain("#");
-  });
-});
-
 // ── OAuth Code Validation ───────────────────────────────────────────────────
 
 describe("OAuth code validation", () => {

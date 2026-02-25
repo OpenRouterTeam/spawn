@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { existsSync, writeFileSync, mkdirSync, rmSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import type { Manifest } from "../manifest";
-import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented } from "../manifest";
+import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented, isValidManifest } from "../manifest";
 import type { TestEnvironment } from "./test-helpers";
 import { createMockManifest, setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
 
@@ -25,14 +25,6 @@ import { createMockManifest, setupTestEnvironment, teardownTestEnvironment } fro
  */
 
 const mockManifest = createMockManifest();
-
-// ── isValidManifest (exact replica from manifest.ts line 84-86) ──────────────
-// The actual function uses short-circuit && which returns the last truthy value
-// or first falsy value, NOT a boolean. Tests use toBeTruthy/toBeFalsy.
-
-function isValidManifest(data: any): data is Manifest {
-  return data?.agents && data.clouds && data.matrix;
-}
 
 describe("Manifest Cache Lifecycle", () => {
   describe("isValidManifest validation", () => {
