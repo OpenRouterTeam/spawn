@@ -57,7 +57,7 @@ export const SSH_INTERACTIVE_OPTS: string[] = [
   "-o",
   "TCPKeepAlive=no",
   "-o",
-  "Compression=yes",
+  "Compression=no",
   "-o",
   "IPQoS=lowdelay",
   "-o",
