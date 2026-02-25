@@ -634,11 +634,13 @@ export async function destroyServer(name?: string): Promise<void> {
       ],
     },
   );
+  // Drain stderr before awaiting exit to prevent pipe buffer deadlock
+  const stderrText = new Response(proc.stderr).text();
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
     logError(`Failed to destroy sprite '${target}'`);
     logError(`Delete it manually: sprite destroy ${target}`);
-    throw new Error("Sprite destruction failed");
+    throw new Error(`Sprite destruction failed: ${await stderrText}`);
   }
 
   logInfo(`Sprite '${target}' destroyed`);
