@@ -327,12 +327,13 @@ export async function setupOpenclawBatched(
 
   const script = [
     'echo "==> Checking openclaw..."',
-    'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
+    'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
     "if command -v openclaw >/dev/null 2>&1; then",
     '  echo "    openclaw found at $(command -v openclaw)"',
     "else",
     '  echo "    openclaw not found, installing..."',
-    "  npm install -g openclaw",
+    "  mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw",
+    '  export PATH="$HOME/.npm-global/bin:$PATH"',
     '  command -v openclaw || { echo "ERROR: openclaw install failed"; exit 1; }',
     "fi",
     'echo "==> Writing environment variables..."',
@@ -475,7 +476,12 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "full",
       modelPrompt: true,
       modelDefault: "openrouter/auto",
-      install: () => installAgent(runner, "openclaw", "source ~/.bashrc && npm install -g openclaw"),
+      install: () =>
+        installAgent(
+          runner,
+          "openclaw",
+          "source ~/.bashrc && mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw",
+        ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,
