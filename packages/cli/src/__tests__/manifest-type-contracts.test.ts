@@ -376,50 +376,34 @@ describe("Agent launch command consistency", () => {
 // ── Dotenv path validation ────────────────────────────────────────────────
 
 describe("Dotenv configuration", () => {
-  const agentsWithDotenv = allAgents.filter(([, a]) => a.dotenv !== undefined);
-
-  if (agentsWithDotenv.length > 0) {
-    it("at least one agent uses dotenv configuration", () => {
-      expect(agentsWithDotenv.length).toBeGreaterThan(0);
+  for (const [key, agent] of allAgents.filter(([, a]) => a.dotenv !== undefined)) {
+    it(`agent "${key}" dotenv path should look like a file path`, () => {
+      const path = agent.dotenv!.path;
+      // Should contain a / or ~ indicating a path
+      expect(path).toMatch(/[/~]/);
     });
 
-    for (const [key, agent] of agentsWithDotenv) {
-      it(`agent "${key}" dotenv path should look like a file path`, () => {
-        const path = agent.dotenv!.path;
-        // Should contain a / or ~ indicating a path
-        expect(path).toMatch(/[/~]/);
-      });
-
-      it(`agent "${key}" dotenv values should all be strings`, () => {
-        for (const [k, v] of Object.entries(agent.dotenv!.values)) {
-          expect(typeof v).toBe("string");
-        }
-      });
-    }
+    it(`agent "${key}" dotenv values should all be strings`, () => {
+      for (const [k, v] of Object.entries(agent.dotenv!.values)) {
+        expect(typeof v).toBe("string");
+      }
+    });
   }
 });
 
 // ── Interactive prompts structure ─────────────────────────────────────────
 
 describe("Interactive prompts structure", () => {
-  const agentsWithPrompts = allAgents.filter(([, a]) => a.interactive_prompts !== undefined);
+  for (const [key, agent] of allAgents.filter(([, a]) => a.interactive_prompts !== undefined)) {
+    for (const [promptKey, entry] of Object.entries(agent.interactive_prompts!)) {
+      it(`agent "${key}" prompt "${promptKey}" should have non-empty prompt text`, () => {
+        expect(entry.prompt.trim().length).toBeGreaterThan(0);
+      });
 
-  if (agentsWithPrompts.length > 0) {
-    it("at least one agent uses interactive prompts", () => {
-      expect(agentsWithPrompts.length).toBeGreaterThan(0);
-    });
-
-    for (const [key, agent] of agentsWithPrompts) {
-      for (const [promptKey, entry] of Object.entries(agent.interactive_prompts!)) {
-        it(`agent "${key}" prompt "${promptKey}" should have non-empty prompt text`, () => {
-          expect(entry.prompt.trim().length).toBeGreaterThan(0);
-        });
-
-        it(`agent "${key}" prompt "${promptKey}" default should be defined`, () => {
-          expect(entry.default).toBeDefined();
-          expect(typeof entry.default).toBe("string");
-        });
-      }
+      it(`agent "${key}" prompt "${promptKey}" default should be defined`, () => {
+        expect(entry.default).toBeDefined();
+        expect(typeof entry.default).toBe("string");
+      });
     }
   }
 });
@@ -525,27 +509,19 @@ describe("Agent metadata field types (when present)", () => {
 // ── Config files structure ────────────────────────────────────────────────
 
 describe("Config files structure", () => {
-  const agentsWithConfig = allAgents.filter(([, a]) => a.config_files !== undefined);
-
-  if (agentsWithConfig.length > 0) {
-    it("at least one agent uses config files", () => {
-      expect(agentsWithConfig.length).toBeGreaterThan(0);
+  for (const [key, agent] of allAgents.filter(([, a]) => a.config_files !== undefined)) {
+    it(`agent "${key}" config file paths should look like file paths`, () => {
+      for (const filePath of Object.keys(agent.config_files!)) {
+        // Should contain / or ~ or . indicating a path
+        expect(filePath).toMatch(/[/~.]/);
+      }
     });
 
-    for (const [key, agent] of agentsWithConfig) {
-      it(`agent "${key}" config file paths should look like file paths`, () => {
-        for (const filePath of Object.keys(agent.config_files!)) {
-          // Should contain / or ~ or . indicating a path
-          expect(filePath).toMatch(/[/~.]/);
-        }
-      });
-
-      it(`agent "${key}" config file values should be objects`, () => {
-        for (const [path, content] of Object.entries(agent.config_files!)) {
-          expect(typeof content).toBe("object");
-          expect(content).not.toBeNull();
-        }
-      });
-    }
+    it(`agent "${key}" config file values should be objects`, () => {
+      for (const [path, content] of Object.entries(agent.config_files!)) {
+        expect(typeof content).toBe("object");
+        expect(content).not.toBeNull();
+      }
+    });
   }
 });

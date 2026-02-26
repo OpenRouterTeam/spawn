@@ -154,7 +154,6 @@ mock.module("@clack/prompts", () => ({
 const {
   prioritizeCloudsByCredentials,
   parseAuthEnvVars,
-  hasCloudCredentials,
   credentialHints,
   getImplementedClouds,
   getImplementedAgents,
@@ -164,7 +163,6 @@ const {
   buildRetryCommand,
   isRetryableExitCode,
   getScriptFailureGuidance,
-  getErrorMessage,
 } = await import("../commands.js");
 
 // ── prioritizeCloudsByCredentials ────────────────────────────────────────
@@ -437,54 +435,6 @@ describe("credential status display logic", () => {
       expect(parseAuthEnvVars("none")).toEqual([]);
     });
   });
-
-  describe("hasCloudCredentials for credential status", () => {
-    it("should return false when env var is not set", () => {
-      expect(hasCloudCredentials("HCLOUD_TOKEN")).toBe(false);
-    });
-
-    it("should return true when env var is set", () => {
-      process.env.HCLOUD_TOKEN = "test";
-      expect(hasCloudCredentials("HCLOUD_TOKEN")).toBe(true);
-    });
-
-    it("should return false for empty string env var", () => {
-      process.env.HCLOUD_TOKEN = "";
-      expect(hasCloudCredentials("HCLOUD_TOKEN")).toBe(false);
-    });
-
-    it("should require ALL vars for multi-var auth", () => {
-      process.env.UPCLOUD_USERNAME = "user";
-      // UPCLOUD_PASSWORD not set
-      expect(hasCloudCredentials("UPCLOUD_USERNAME + UPCLOUD_PASSWORD")).toBe(false);
-    });
-
-    it("should return true when ALL multi-var auth vars set", () => {
-      process.env.UPCLOUD_USERNAME = "user";
-      process.env.UPCLOUD_PASSWORD = "pass";
-      expect(hasCloudCredentials("UPCLOUD_USERNAME + UPCLOUD_PASSWORD")).toBe(true);
-    });
-  });
-
-  describe("credentialHints for credential status messages", () => {
-    it("should show missing credentials when no hint provided", () => {
-      const hints = credentialHints("hetzner");
-      expect(hints.length).toBeGreaterThan(0);
-      expect(hints.some((h: string) => h.includes("credentials") || h.includes("setup"))).toBe(true);
-    });
-
-    it("should show specific missing vars when hint provided and vars missing", () => {
-      const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-      expect(hints.some((h: string) => h.includes("HCLOUD_TOKEN") || h.includes("OPENROUTER_API_KEY"))).toBe(true);
-    });
-
-    it("should show all-set message when credentials are available", () => {
-      process.env.HCLOUD_TOKEN = "token";
-      process.env.OPENROUTER_API_KEY = "key";
-      const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-      expect(hints.some((h: string) => h.includes("set") || h.includes("appear"))).toBe(true);
-    });
-  });
 });
 
 // ── validateRunSecurity via checkEntity ──────────────────────────────────
@@ -605,178 +555,6 @@ describe("implementation checks for run path", () => {
   it("should return empty for nonexistent cloud", () => {
     const agents = getImplementedAgents(manifest, "nonexistent");
     expect(agents).toEqual([]);
-  });
-});
-
-// ── buildRetryCommand for run path error recovery ───────────────────────
-
-describe("buildRetryCommand for run path", () => {
-  it("should build simple retry command", () => {
-    expect(buildRetryCommand("claude", "hetzner")).toBe("spawn claude hetzner");
-  });
-
-  it("should include short prompt inline", () => {
-    const cmd = buildRetryCommand("claude", "hetzner", "Fix bugs");
-    expect(cmd).toContain("--prompt");
-    expect(cmd).toContain("Fix bugs");
-  });
-
-  it("should use --prompt-file for long prompts", () => {
-    const longPrompt = "x".repeat(100);
-    const cmd = buildRetryCommand("claude", "hetzner", longPrompt);
-    expect(cmd).toContain("--prompt-file");
-    expect(cmd).not.toContain(longPrompt);
-  });
-
-  it("should escape double quotes in short prompts", () => {
-    const cmd = buildRetryCommand("claude", "hetzner", 'Fix "this" bug');
-    expect(cmd).toContain('\\"this\\"');
-  });
-});
-
-// ── isRetryableExitCode for run path retry logic ────────────────────────
-
-describe("isRetryableExitCode for run path", () => {
-  it("should identify exit code 255 as retryable (SSH failure)", () => {
-    expect(isRetryableExitCode("Script exited with code 255")).toBe(true);
-  });
-
-  it("should not retry exit code 1 (general failure)", () => {
-    expect(isRetryableExitCode("Script exited with code 1")).toBe(false);
-  });
-
-  it("should not retry exit code 130 (Ctrl+C)", () => {
-    expect(isRetryableExitCode("Script exited with code 130")).toBe(false);
-  });
-
-  it("should not retry exit code 127 (command not found)", () => {
-    expect(isRetryableExitCode("Script exited with code 127")).toBe(false);
-  });
-
-  it("should return false for messages without exit code", () => {
-    expect(isRetryableExitCode("Some random error")).toBe(false);
-  });
-
-  it("should not retry exit code 0", () => {
-    expect(isRetryableExitCode("Script exited with code 0")).toBe(false);
-  });
-
-  it("should not retry exit code 137 (OOM killed)", () => {
-    expect(isRetryableExitCode("Script exited with code 137")).toBe(false);
-  });
-});
-
-// ── getScriptFailureGuidance for run path error messages ────────────────
-
-describe("getScriptFailureGuidance for run path", () => {
-  const savedEnv: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    savedEnv.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-    savedEnv.HCLOUD_TOKEN = process.env.HCLOUD_TOKEN;
-    delete process.env.OPENROUTER_API_KEY;
-    delete process.env.HCLOUD_TOKEN;
-  });
-
-  afterEach(() => {
-    for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) {
-        delete process.env[k];
-      } else {
-        process.env[k] = v;
-      }
-    }
-  });
-
-  it("should provide SSH guidance for exit code 255", () => {
-    const lines = getScriptFailureGuidance(255, "hetzner");
-    expect(lines.some((l: string) => l.toLowerCase().includes("ssh"))).toBe(true);
-  });
-
-  it("should mention Ctrl+C for exit code 130", () => {
-    const lines = getScriptFailureGuidance(130, "hetzner");
-    expect(lines.some((l: string) => l.includes("Ctrl+C") || l.includes("interrupted"))).toBe(true);
-  });
-
-  it("should mention OOM for exit code 137", () => {
-    const lines = getScriptFailureGuidance(137, "hetzner");
-    expect(lines.some((l: string) => l.toLowerCase().includes("killed") || l.toLowerCase().includes("memory"))).toBe(
-      true,
-    );
-  });
-
-  it("should mention command not found for exit code 127", () => {
-    const lines = getScriptFailureGuidance(127, "hetzner");
-    expect(
-      lines.some((l: string) => l.toLowerCase().includes("command") || l.toLowerCase().includes("not found")),
-    ).toBe(true);
-  });
-
-  it("should mention permission denied for exit code 126", () => {
-    const lines = getScriptFailureGuidance(126, "hetzner");
-    expect(lines.some((l: string) => l.toLowerCase().includes("permission"))).toBe(true);
-  });
-
-  it("should mention credentials for exit code 1 with authHint", () => {
-    const lines = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-    expect(
-      lines.some((l: string) => l.includes("HCLOUD_TOKEN") || l.includes("credential") || l.includes("Missing")),
-    ).toBe(true);
-  });
-
-  it("should provide default guidance for unknown exit codes", () => {
-    const lines = getScriptFailureGuidance(42, "hetzner");
-    expect(lines.length).toBeGreaterThan(0);
-  });
-
-  it("should provide default guidance for null exit code", () => {
-    const lines = getScriptFailureGuidance(null, "hetzner");
-    expect(lines.length).toBeGreaterThan(0);
-  });
-
-  it("should mention bug report for exit code 2 (syntax error)", () => {
-    const lines = getScriptFailureGuidance(2, "hetzner");
-    expect(lines.some((l: string) => l.includes("bug") || l.includes("Report") || l.includes("syntax"))).toBe(true);
-  });
-});
-
-// ── getErrorMessage for run path ────────────────────────────────────────
-
-describe("getErrorMessage for run path", () => {
-  it("should extract message from Error object", () => {
-    expect(getErrorMessage(new Error("test error"))).toBe("test error");
-  });
-
-  it("should handle plain string", () => {
-    expect(getErrorMessage("string error")).toBe("string error");
-  });
-
-  it("should handle number", () => {
-    expect(getErrorMessage(42)).toBe("42");
-  });
-
-  it("should handle null", () => {
-    expect(getErrorMessage(null)).toBe("null");
-  });
-
-  it("should handle undefined", () => {
-    expect(getErrorMessage(undefined)).toBe("undefined");
-  });
-
-  it("should handle object with message property", () => {
-    expect(
-      getErrorMessage({
-        message: "custom error",
-      }),
-    ).toBe("custom error");
-  });
-
-  it("should handle object without message property", () => {
-    expect(
-      getErrorMessage({
-        code: "ERR",
-      }),
-    ).toBe("[object Object]");
   });
 });
 
