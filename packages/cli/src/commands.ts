@@ -3,7 +3,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import * as v from "valibot";
 import { parseJsonWith, isString } from "@openrouter/spawn-shared";
-import { spawn } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Manifest } from "./manifest.js";
@@ -1678,15 +1678,15 @@ function handleUserInterrupt(errMsg: string, dashboardUrl?: string): void {
  * and an interactive session, so retrying would create duplicate servers.
  * On SSH disconnect (exit 255), shows a reconnect hint instead.
  */
-async function runBashScript(
+function runBashScript(
   script: string,
   prompt?: string,
   dashboardUrl?: string,
   debug?: boolean,
   spawnName?: string,
-): Promise<string | undefined> {
+): string | undefined {
   try {
-    await runBash(script, prompt, debug, spawnName);
+    runBash(script, prompt, debug, spawnName);
     return undefined; // success
   } catch (err) {
     const errMsg = getErrorMessage(err);
@@ -1748,42 +1748,45 @@ async function execScript(
     }
   }
 
-  const lastErr = await runBashScript(scriptContent, prompt, dashboardUrl, debug, spawnName);
+  const lastErr = runBashScript(scriptContent, prompt, dashboardUrl, debug, spawnName);
   if (lastErr) {
     reportScriptFailure(lastErr, cloud, agent, authHint, prompt, dashboardUrl, spawnName);
   }
 }
 
-function spawnBash(script: string, env: Record<string, string | undefined>): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      "bash",
-      [
-        "-c",
-        script,
-      ],
-      {
-        stdio: "inherit",
-        env,
-      },
-    );
-    child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
-      if (code === 0) {
-        resolve();
-      } else if (code !== null) {
-        const msg = code === 130 ? "Script interrupted by user (Ctrl+C)" : `Script exited with code ${code}`;
-        reject(new Error(msg));
-      } else {
-        // code is null when killed by a signal (SIGKILL, SIGTERM, etc.)
-        const sig = signal ?? "unknown signal";
-        reject(new Error(`Script was killed by ${sig}`));
-      }
-    });
-    child.on("error", reject);
-  });
+function spawnBash(script: string, env: Record<string, string | undefined>): void {
+  const result = spawnSync(
+    "bash",
+    [
+      "-c",
+      script,
+    ],
+    {
+      stdio: "inherit",
+      env,
+    },
+  );
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  const code = result.status;
+  const signal = result.signal;
+
+  if (code === 0) {
+    return;
+  }
+  if (code !== null) {
+    const msg = code === 130 ? "Script interrupted by user (Ctrl+C)" : `Script exited with code ${code}`;
+    throw new Error(msg);
+  }
+  // code is null when killed by a signal (SIGKILL, SIGTERM, etc.)
+  const sig = signal ?? "unknown signal";
+  throw new Error(`Script was killed by ${sig}`);
 }
 
-function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: string): Promise<void> {
+function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: string): void {
   // SECURITY: Validate script content before execution
   validateScriptContent(script);
 
@@ -1810,7 +1813,7 @@ function runBash(script: string, prompt?: string, debug?: boolean, spawnName?: s
   // gets a pristine file descriptor (prevents silent hangs / early exit)
   prepareStdinForHandoff();
 
-  return spawnBash(script, env);
+  spawnBash(script, env);
 }
 
 // ── List ───────────────────────────────────────────────────────────────────────
