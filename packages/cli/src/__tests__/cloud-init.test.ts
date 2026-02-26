@@ -1,13 +1,13 @@
 import { describe, it, expect } from "bun:test";
-import {
-  getPackagesForTier,
-  needsNode,
-  needsBun,
-  NODE_INSTALL_CMD,
-} from "../shared/cloud-init.js";
+import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init.js";
 
 describe("getPackagesForTier", () => {
-  const MINIMAL_PACKAGES = ["curl", "unzip", "git", "ca-certificates"];
+  const MINIMAL_PACKAGES = [
+    "curl",
+    "unzip",
+    "git",
+    "ca-certificates",
+  ];
 
   it("returns minimal packages for 'minimal' tier", () => {
     const pkgs = getPackagesForTier("minimal");
