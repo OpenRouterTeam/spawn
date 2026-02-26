@@ -20,6 +20,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { parseJsonWith, parseJsonRaw, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { saveVmConnection } from "../history.js";
+import { spawnInteractive } from "../shared/ssh";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -535,13 +536,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
     fullCmd,
   ];
 
-  const exitCode = await Bun.spawn(args, {
-    stdio: [
-      "inherit",
-      "inherit",
-      "inherit",
-    ],
-  }).exited;
+  const exitCode = spawnInteractive(args);
 
   // Post-session summary
   process.stderr.write("\n");

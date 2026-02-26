@@ -25,6 +25,7 @@ import {
   sleep,
   waitForSsh as sharedWaitForSsh,
   killWithTimeout,
+  spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
@@ -1103,25 +1104,17 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const term = sanitizeTermValue(process.env.TERM || "xterm-256color");
   // Single-quote escaping prevents premature shell expansion of $variables in cmd
   const shellEscapedCmd = cmd.replace(/'/g, "'\\''");
+  // Pass command directly to SSH (no outer bash -c wrapper) — matches Hetzner/DO behavior.
+  // The extra bash -c layer added latency and an unnecessary shell process.
   const fullCmd = `export TERM=${term} PATH="$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
-  const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
-  const exitCode = await Bun.spawn(
-    [
-      "ssh",
-      ...SSH_INTERACTIVE_OPTS,
-      ...keyOpts,
-      `${SSH_USER}@${instanceIp}`,
-      `bash -c '${escapedCmd}'`,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
-      ],
-    },
-  ).exited;
+  const exitCode = spawnInteractive([
+    "ssh",
+    ...SSH_INTERACTIVE_OPTS,
+    ...keyOpts,
+    `${SSH_USER}@${instanceIp}`,
+    fullCmd,
+  ]);
 
   // Post-session summary
   process.stderr.write("\n");

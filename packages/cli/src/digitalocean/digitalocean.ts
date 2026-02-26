@@ -26,6 +26,7 @@ import {
   sleep,
   waitForSsh as sharedWaitForSsh,
   killWithTimeout,
+  spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
 import { saveVmConnection } from "../history.js";
@@ -1070,22 +1071,13 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
 
-  const exitCode = await Bun.spawn(
-    [
-      "ssh",
-      ...SSH_INTERACTIVE_OPTS,
-      ...keyOpts,
-      `root@${serverIp}`,
-      fullCmd,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
-      ],
-    },
-  ).exited;
+  const exitCode = spawnInteractive([
+    "ssh",
+    ...SSH_INTERACTIVE_OPTS,
+    ...keyOpts,
+    `root@${serverIp}`,
+    fullCmd,
+  ]);
 
   // Post-session summary
   process.stderr.write("\n");

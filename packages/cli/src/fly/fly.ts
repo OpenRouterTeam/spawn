@@ -20,7 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import * as v from "valibot";
 import { parseJsonWith, parseJsonRaw, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
-import { killWithTimeout } from "../shared/ssh";
+import { killWithTimeout, spawnInteractive } from "../shared/ssh";
 import { saveVmConnection } from "../history.js";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
@@ -1015,26 +1015,16 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const flyCmd = getCmd()!;
 
-  const exitCode = await Bun.spawn(
-    [
-      flyCmd,
-      "ssh",
-      "console",
-      "-a",
-      flyAppName,
-      "--pty",
-      "-C",
-      `bash -c '${escapedCmd}'`,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
-      ],
-      env: process.env,
-    },
-  ).exited;
+  const exitCode = spawnInteractive([
+    flyCmd,
+    "ssh",
+    "console",
+    "-a",
+    flyAppName,
+    "--pty",
+    "-C",
+    `bash -c '${escapedCmd}'`,
+  ]);
 
   // Post-session summary
   process.stderr.write("\n");
