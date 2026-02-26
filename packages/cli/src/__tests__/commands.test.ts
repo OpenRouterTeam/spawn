@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { cmdHelp } from "../commands";
-import { createConsoleMocks, createProcessExitMock, restoreMocks, createMockManifest } from "./test-helpers";
-
-const mockManifest = createMockManifest();
+import { createConsoleMocks, createProcessExitMock, restoreMocks } from "./test-helpers";
 
 // Note: Bun test doesn't support module mocking the same way as vitest
 // These tests require refactoring commands.ts to use dependency injection
@@ -33,8 +31,8 @@ describe("commands", () => {
 
   // These functions are tested in dedicated files using mock.module():
   // - cmdList: commands-list-grid.test.ts, commands-compact-list.test.ts
-  // - cmdAgents/cmdClouds: commands-display.test.ts, commands-output.test.ts, commands-list-grid.test.ts
-  // - cmdAgentInfo/cmdCloudInfo: commands-info-details.test.ts, commands-display.test.ts, cloud-info.test.ts
+  // - cmdAgents/cmdClouds: commands-display.test.ts, commands-list-grid.test.ts
+  // - cmdAgentInfo/cmdCloudInfo: commands-info-details.test.ts, commands-display.test.ts, commands-cloud-info.test.ts
   // - cmdRun: commands-resolve-run.test.ts, commands-swap-resolve.test.ts, cmdrun-resolution.test.ts
   // - Download/failure: download-and-failure.test.ts, commands-update-download.test.ts
 });
