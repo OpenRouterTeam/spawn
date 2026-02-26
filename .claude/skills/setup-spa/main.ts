@@ -282,7 +282,6 @@ async function runClaudeAndStream(
     "--output-format",
     "stream-json",
     "--dangerously-skip-permissions",
-    "--no-session-persistence",
     "--system-prompt",
     SYSTEM_PROMPT,
   ];
