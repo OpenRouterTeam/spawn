@@ -16,7 +16,7 @@ Spawn is a matrix of **agents x clouds**. Every script provisions a cloud server
 ## The Matrix
 
 `manifest.json` is the source of truth. It tracks:
-- **agents** — AI agents and self-hosted AI tools (Claude Code, OpenClaw, NanoClaw, ...)
+- **agents** — AI agents and self-hosted AI tools (Claude Code, OpenClaw, ZeroClaw, ...)
 - **clouds** — cloud providers to run them on (Sprite, Hetzner, ...)
 - **matrix** — which `cloud/agent` combinations are `"implemented"` vs `"missing"`
 
@@ -39,16 +39,15 @@ Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
 
 ### 2. Add a new cloud provider (HIGH BAR)
 
-We are currently shipping with **9 curated clouds** (sorted by price):
+We are currently shipping with **8 curated clouds** (sorted by price):
 1. **local** — free (no provisioning)
 2. **hetzner** — ~€3.29/mo (CX22)
-3. **ovh** — ~€3.50/mo (d2-2)
-4. **fly** — free tier (3 shared-cpu VMs)
-5. **aws** — $3.50/mo (nano)
-6. **daytona** — pay-per-second sandboxes
-7. **digitalocean** — $4/mo (Basic droplet)
-8. **gcp** — $7.11/mo (e2-micro)
-9. **sprite** — Fly.io managed VMs
+3. **fly** — free tier (3 shared-cpu VMs)
+4. **aws** — $3.50/mo (nano)
+5. **daytona** — pay-per-second sandboxes
+6. **digitalocean** — $4/mo (Basic droplet)
+7. **gcp** — $7.11/mo (e2-micro)
+8. **sprite** — Fly.io managed VMs
 
 **Do NOT add clouds speculatively.** Every cloud must be manually tested and verified end-to-end before shipping. Adding a cloud that can't be tested is worse than not having it.
 
@@ -92,7 +91,7 @@ Check `gh issue list --repo OpenRouterTeam/spawn --state open` for user requests
 - If something is already implemented, close the issue with a note
 - If a bug is reported, fix it
 
-### 4. Extend tests
+### 5. Extend tests
 
 Tests use Bun's built-in test runner (`bun:test`). When adding a new cloud or agent:
 - Add unit tests in `packages/cli/src/__tests__/` with mocked fetch/prompts
@@ -107,7 +106,6 @@ spawn/
       src/index.ts               # CLI entry point (bun/TypeScript)
       src/manifest.ts            # Manifest fetch + cache logic
       src/commands.ts            # All subcommands (interactive, list, run, etc.)
-      src/version.ts             # Version constant
       package.json               # npm package (@openrouter/spawn)
     shared/
       src/parse.ts               # parseJsonWith(text, schema) and parseJsonRaw(text)
