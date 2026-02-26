@@ -662,29 +662,6 @@ export async function interactiveSession(cmd: string, ip?: string): Promise<numb
   return exitCode;
 }
 
-// ─── Retry Helper ────────────────────────────────────────────────────────────
-
-export async function runWithRetry(
-  maxAttempts: number,
-  sleepSec: number,
-  timeoutSecs: number,
-  cmd: string,
-): Promise<void> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      await runServer(cmd, timeoutSecs);
-      return;
-    } catch {
-      logWarn(`Command failed (attempt ${attempt}/${maxAttempts}): ${cmd}`);
-      if (attempt < maxAttempts) {
-        await sleep(sleepSec * 1000);
-      }
-    }
-  }
-  logError(`Command failed after ${maxAttempts} attempts: ${cmd}`);
-  throw new Error(`runWithRetry exhausted: ${cmd}`);
-}
-
 // ─── Server Name ─────────────────────────────────────────────────────────────
 
 export async function getServerName(): Promise<string> {
