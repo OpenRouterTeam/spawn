@@ -20,7 +20,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { parseJsonWith, parseJsonRaw, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { saveVmConnection } from "../history.js";
-import { spawnInteractive } from "../shared/ssh";
+import { sleep, spawnInteractive } from "../shared/ssh";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -44,10 +44,6 @@ export function getState() {
 }
 
 // ─── API Client ──────────────────────────────────────────────────────────────
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 const LooseObject = v.record(v.string(), v.unknown());
 

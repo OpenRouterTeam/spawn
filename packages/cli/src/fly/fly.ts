@@ -20,7 +20,7 @@ import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
 import * as v from "valibot";
 import { parseJsonWith, parseJsonRaw, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
-import { killWithTimeout, spawnInteractive } from "../shared/ssh";
+import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
 import { saveVmConnection } from "../history.js";
 
 const FLY_API_BASE = "https://api.machines.dev/v1";
@@ -158,10 +158,6 @@ async function flyApi(method: string, endpoint: string, body?: string, maxRetrie
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 const LooseObject = v.record(v.string(), v.unknown());
 
