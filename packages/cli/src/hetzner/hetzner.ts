@@ -27,8 +27,7 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import * as v from "valibot";
-import { parseJsonWith, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
+import { parseJsonObj, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
 import { saveVmConnection } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
@@ -90,12 +89,6 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const LooseObject = v.record(v.string(), v.unknown());
-
-function parseJson(text: string): Record<string, unknown> | null {
-  return parseJsonWith(text, LooseObject);
-}
-
 /** Narrow an unknown value to a Record if it is a non-array object */
 function rec(val: unknown): Record<string, unknown> | undefined {
   if (val && typeof val === "object" && !Array.isArray(val)) {
@@ -146,7 +139,7 @@ async function testHcloudToken(): Promise<boolean> {
   }
   try {
     const resp = await hetznerApi("GET", "/servers?per_page=1", undefined, 1);
-    const data = parseJson(resp);
+    const data = parseJsonObj(resp);
     // Hetzner returns { "error": { ... } } on auth failure.
     // Success responses may contain "error": null inside action objects,
     // so check for a real error object with a message.
@@ -221,7 +214,7 @@ export async function ensureSshKey(): Promise<void> {
 
     // Check if key is already registered
     const resp = await hetznerApi("GET", "/ssh_keys");
-    const data = parseJson(resp);
+    const data = parseJsonObj(resp);
     const sshKeys = toObjectArray(data?.ssh_keys);
 
     const alreadyRegistered = sshKeys.some((k) => fingerprint && k.fingerprint === fingerprint);
@@ -239,7 +232,7 @@ export async function ensureSshKey(): Promise<void> {
       public_key: pubKey,
     });
     const regResp = await hetznerApi("POST", "/ssh_keys", body);
-    const regData = parseJson(regResp);
+    const regData = parseJsonObj(regResp);
     const regError = rec(regData?.error);
     const regErrMsg = isString(regError?.message) ? regError.message : "";
     if (regErrMsg) {
@@ -413,7 +406,7 @@ export async function createServer(
 
   // Get all SSH key IDs
   const keysResp = await hetznerApi("GET", "/ssh_keys");
-  const keysData = parseJson(keysResp);
+  const keysData = parseJsonObj(keysResp);
   const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
     .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter(Boolean);
@@ -430,7 +423,7 @@ export async function createServer(
   });
 
   const resp = await hetznerApi("POST", "/servers", body);
-  const data = parseJson(resp);
+  const data = parseJsonObj(resp);
 
   // Hetzner success responses contain "error": null in action objects,
   // so check for presence of .server object, not absence of "error" string.
@@ -711,7 +704,7 @@ export async function destroyServer(serverId?: string): Promise<void> {
 
   logStep(`Destroying Hetzner server ${id}...`);
   const resp = await hetznerApi("DELETE", `/servers/${id}`);
-  const data = parseJson(resp);
+  const data = parseJsonObj(resp);
 
   // Hetzner returns { action: {...} } on success. "error": null in action is normal.
   if (!data?.action) {
@@ -726,7 +719,7 @@ export async function destroyServer(serverId?: string): Promise<void> {
 
 export async function listServers(): Promise<void> {
   const resp = await hetznerApi("GET", "/servers");
-  const data = parseJson(resp);
+  const data = parseJsonObj(resp);
   const servers = toObjectArray(data?.servers);
 
   if (servers.length === 0) {

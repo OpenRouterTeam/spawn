@@ -73,8 +73,6 @@ function getCacheDir(): string {
 function getCacheFile(): string {
   return join(getCacheDir(), "manifest.json");
 }
-// Backward-compatible export (evaluated at import time)
-const CACHE_DIR = getCacheDir();
 const CACHE_TTL = 3600; // 1 hour in seconds
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 
@@ -310,4 +308,4 @@ export function _resetCacheForTesting(): void {
   _staleCache = false;
 }
 
-export { RAW_BASE, REPO, CACHE_DIR, stripDangerousKeys };
+export { RAW_BASE, REPO, stripDangerousKeys };
