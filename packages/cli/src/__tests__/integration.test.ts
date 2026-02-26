@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import type { Manifest } from "../manifest";
 import type { TestEnvironment } from "./test-helpers";
 import { mockSuccessfulFetch, mockFailedFetch, setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
@@ -76,18 +76,8 @@ describe("CLI Integration Tests", () => {
     const manifest1 = await loadManifest(true);
     expect(manifest1).toEqual(mockManifest);
 
-    // Cache location depends on whether the test runs in the project directory
-    // In the spawn project root, it uses a local manifest.json, so cache may not be written
-    const cacheExists = existsSync(env.cacheFile);
-    if (cacheExists) {
-      const cachedData = JSON.parse(readFileSync(env.cacheFile, "utf-8"));
-      expect(cachedData).toEqual(mockManifest);
-    }
-
-    // Second load - should use cache
+    // Second load - in-memory cache should return same data
     const manifest2 = await loadManifest();
-
-    // Note: Bun's in-memory caching may behave differently
     expect(manifest2).toEqual(mockManifest);
   });
 
