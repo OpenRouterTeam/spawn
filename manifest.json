@@ -176,7 +176,7 @@
     "opencode": {
       "name": "OpenCode",
       "description": "AI coding agent built for the terminal with TUI",
-      "url": "https://github.com/anomalyco/opencode",
+      "url": "https://github.com/sst/opencode",
       "install": "curl -fsSL https://opencode.ai/install | bash",
       "launch": "opencode",
       "env": {
@@ -189,8 +189,8 @@
         "gcp",
         "aws"
       ],
-      "creator": "Anomaly",
-      "repo": "anomalyco/opencode",
+      "creator": "SST",
+      "repo": "sst/opencode",
       "license": "MIT",
       "created": "2025-04",
       "added": "2025-08",
