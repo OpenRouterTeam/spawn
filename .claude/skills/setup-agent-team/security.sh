@@ -99,7 +99,8 @@ safe_substitute() {
     local file="$3"
     local escaped
     escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
-    sed -i "s|${placeholder}|${escaped}|g" "$file"
+    sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
+    rm -f "${file}.bak"
 }
 
 # --- Safe rm -rf for worktree paths (defense-in-depth) ---
