@@ -83,10 +83,7 @@ export const SSH_INTERACTIVE_OPTS: string[] = [
  * sole reader of stdin. This matches the behavior of running SSH directly
  * from a shell.
  */
-export function spawnInteractive(
-  args: string[],
-  env?: Record<string, string | undefined>,
-): number {
+export function spawnInteractive(args: string[], env?: Record<string, string | undefined>): number {
   // Use Node's spawnSync (not Bun.spawnSync) — it's more battle-tested
   // with interactive TTY programs and properly handles SIGWINCH, job
   // control, and terminal I/O forwarding.

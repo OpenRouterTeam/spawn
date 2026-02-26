@@ -2731,7 +2731,10 @@ async function runInteractiveCommand(
 ): Promise<void> {
   let code: number;
   try {
-    code = spawnInteractive([cmd, ...args]);
+    code = spawnInteractive([
+      cmd,
+      ...args,
+    ]);
   } catch (err) {
     p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
     p.log.info(`Try manually: ${pc.cyan(manualCmd)}`);

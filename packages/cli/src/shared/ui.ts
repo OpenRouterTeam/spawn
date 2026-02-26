@@ -287,6 +287,8 @@ export function prepareStdinForHandoff(): void {
   }
 
   // Stop the stream from reading, but do NOT destroy it (that can close fd 0).
+  // Do NOT call unref() here — it allows the event loop to exit before an
+  // async child process (spawnBash) finishes. The spawnInteractive path uses
+  // spawnSync so the event loop is already blocked.
   process.stdin.pause();
-  process.stdin.unref();
 }
