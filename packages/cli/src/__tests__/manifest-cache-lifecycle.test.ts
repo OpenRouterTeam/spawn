@@ -390,12 +390,9 @@ describe("Manifest Cache Lifecycle", () => {
 
       global.fetch = mock(() => Promise.reject(new Error("DNS resolution failed")));
 
-      try {
-        await loadManifest(true);
-        // If we get here, local manifest in project dir was used (valid)
-      } catch (err: any) {
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      // tryLoadLocalManifest() returns null in test environments (NODE_ENV=test),
+      // so with no cache and no network, loadManifest must throw.
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
   });
 
