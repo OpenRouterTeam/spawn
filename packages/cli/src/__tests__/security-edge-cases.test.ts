@@ -50,19 +50,8 @@ describe("Security Edge Cases", () => {
     });
 
     it("should use custom field name in error messages", () => {
-      try {
-        validateIdentifier("", "Cloud provider");
-        throw new Error("Should have thrown");
-      } catch (e: any) {
-        expect(e.message).toContain("Cloud provider");
-      }
-
-      try {
-        validateIdentifier("UPPER", "Agent name");
-        throw new Error("Should have thrown");
-      } catch (e: any) {
-        expect(e.message).toContain("Agent name");
-      }
+      expect(() => validateIdentifier("", "Cloud provider")).toThrow("Cloud provider");
+      expect(() => validateIdentifier("UPPER", "Agent name")).toThrow("Agent name");
     });
 
     it("should reject URL-like identifiers", () => {
