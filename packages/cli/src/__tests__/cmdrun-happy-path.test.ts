@@ -68,13 +68,6 @@ const { cmdRun } = await import("../commands.js");
 
 const VALID_SCRIPT = "#!/bin/bash\nset -eo pipefail\nexit 0";
 
-/** Track child_process.spawn calls to verify env vars passed to bash */
-let spawnCalls: Array<{
-  command: string;
-  args: string[];
-  options: any;
-}> = [];
-
 /** Track all fetch calls to verify download behavior */
 let fetchCalls: Array<{
   url: string;
@@ -156,7 +149,6 @@ describe("cmdRun happy-path pipeline", () => {
     mockSpinnerStop.mockClear();
     mockSpinnerMessage.mockClear();
     fetchCalls = [];
-    spawnCalls = [];
 
     processExitSpy = spyOn(process, "exit").mockImplementation((_code?: number): never => {
       throw new Error("process.exit");
