@@ -18,8 +18,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import * as v from "valibot";
-import { parseJsonWith, parseJsonRaw, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
+import { parseJsonObj, parseJsonRaw, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
 import { killWithTimeout, sleep, spawnInteractive } from "../shared/ssh";
 import { saveVmConnection } from "../history.js";
 
@@ -158,12 +157,6 @@ async function flyApi(method: string, endpoint: string, body?: string, maxRetrie
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const LooseObject = v.record(v.string(), v.unknown());
-
-function parseJson(text: string): Record<string, unknown> | null {
-  return parseJsonWith(text, LooseObject);
-}
 
 function hasError(text: string): boolean {
   return text.includes('"error"') || text.includes('"errors"');
@@ -550,7 +543,7 @@ function parseOrgsJson(json: string): OrgEntry[] {
     orgs = toObjectArray(raw);
   } else {
     // Re-parse as Record<string, unknown> via valibot schema
-    const data = parseJson(json);
+    const data = parseJsonObj(json);
     if (!data) {
       return [];
     }
@@ -560,9 +553,9 @@ function parseOrgsJson(json: string): OrgEntry[] {
     } else if (data.organizations) {
       orgs = toObjectArray(data.organizations);
     } else if (data.data && typeof data.data === "object") {
-      const inner = parseJson(JSON.stringify(data.data));
+      const inner = parseJsonObj(JSON.stringify(data.data));
       if (inner?.organizations) {
-        const orgData = parseJson(JSON.stringify(inner.organizations));
+        const orgData = parseJsonObj(JSON.stringify(inner.organizations));
         if (orgData) {
           orgs = toObjectArray(orgData.nodes);
         }
@@ -688,7 +681,7 @@ async function createApp(name: string): Promise<void> {
   });
   const resp = await flyApi("POST", "/apps", body);
   if (resp.includes('"error"')) {
-    const data = parseJson(resp);
+    const data = parseJsonObj(resp);
     const errMsg = data?.error || "Unknown error";
     if (/already exists/i.test(String(errMsg))) {
       logInfo(`App '${name}' already exists, reusing it`);
@@ -745,13 +738,13 @@ async function createMachine(
 
   const resp = await flyApi("POST", `/apps/${name}/machines`, body);
   if (resp.includes('"error"')) {
-    const data = parseJson(resp);
+    const data = parseJsonObj(resp);
     logError(`Failed to create Fly.io machine: ${data?.error || "Unknown error"}`);
     logWarn("Check your dashboard: https://fly.io/dashboard");
     throw new Error("Machine creation failed");
   }
 
-  const data = parseJson(resp);
+  const data = parseJsonObj(resp);
   const machineId = isString(data?.id) ? data.id : undefined;
   if (!machineId) {
     logError("Failed to extract machine ID from API response");
@@ -773,7 +766,7 @@ async function waitForMachineStart(name: string, machineId: string, timeout = 60
       logWarn("Machine not ready yet, retrying...");
       continue;
     }
-    const data = parseJson(resp);
+    const data = parseJsonObj(resp);
     logError(`Machine did not reach 'started' state: ${data?.error || "timeout"}`);
     logError("Try a new region: FLY_REGION=ord spawn fly <agent>");
     throw new Error("Machine start timeout");
@@ -797,7 +790,7 @@ async function createVolume(name: string, region: string, sizeGb: number): Promi
     size_gb: sizeGb,
   });
   const resp = await flyApi("POST", `/apps/${name}/volumes`, body);
-  const data = parseJson(resp);
+  const data = parseJsonObj(resp);
   if (!data?.id) {
     logError("Failed to create volume");
     throw new Error("Volume creation failed");
@@ -1200,7 +1193,7 @@ export async function destroyServer(appName?: string): Promise<void> {
 
   const delResp = await flyApi("DELETE", `/apps/${name}`);
   if (delResp.includes('"error"')) {
-    const data = parseJson(delResp);
+    const data = parseJsonObj(delResp);
     logError(`Failed to delete app '${name}': ${data?.error || "Unknown error"}`);
     throw new Error("App deletion failed");
   }
@@ -1215,7 +1208,7 @@ export async function listServers(): Promise<void> {
   if (Array.isArray(raw)) {
     apps = toObjectArray(raw);
   } else {
-    const record = parseJson(resp);
+    const record = parseJsonObj(resp);
     apps = record ? toObjectArray(record.apps) : [];
   }
   if (apps.length === 0) {

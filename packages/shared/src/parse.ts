@@ -29,3 +29,20 @@ export function parseJsonRaw(text: string): unknown {
     return null;
   }
 }
+
+/**
+ * Parse a JSON string and return it as a Record<string, unknown> or null.
+ * Rejects non-object results (arrays, primitives).
+ * Use for API responses that are always a JSON object.
+ */
+export function parseJsonObj(text: string): Record<string, unknown> | null {
+  try {
+    const val = JSON.parse(text);
+    if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+      return val;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

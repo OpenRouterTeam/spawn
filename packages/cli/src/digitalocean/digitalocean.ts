@@ -2,7 +2,6 @@
 
 import { readFileSync } from "node:fs";
 
-import * as v from "valibot";
 import {
   logInfo,
   logWarn,
@@ -19,7 +18,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { parseJsonWith, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
+import { parseJsonObj, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
 import {
   SSH_BASE_OPTS,
   SSH_INTERACTIVE_OPTS,
@@ -124,14 +123,6 @@ async function doApi(
     }
   }
   throw new Error("doApi: unreachable");
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const LooseObject = v.record(v.string(), v.unknown());
-
-function parseJson(text: string): Record<string, unknown> | null {
-  return parseJsonWith(text, LooseObject);
 }
 
 // ─── Token Persistence ───────────────────────────────────────────────────────
@@ -283,7 +274,7 @@ async function tryRefreshDoToken(): Promise<string | null> {
       return null;
     }
 
-    const data = parseJson(await resp.text());
+    const data = parseJsonObj(await resp.text());
     if (!data?.access_token) {
       logWarn("Token refresh returned no access token");
       return null;
@@ -465,7 +456,7 @@ async function tryDoOAuth(): Promise<string | null> {
       return null;
     }
 
-    const data = parseJson(await resp.text());
+    const data = parseJsonObj(await resp.text());
     if (!data?.access_token) {
       logError("Token exchange returned no access token");
       return null;
@@ -582,7 +573,7 @@ export async function ensureSshKey(): Promise<void> {
 
     // Check if key is registered with DigitalOcean
     const { text } = await doApi("GET", "/account/keys");
-    const data = parseJson(text);
+    const data = parseJsonObj(text);
     const keys = toObjectArray(data?.ssh_keys);
 
     const found = keys.some((k: Record<string, unknown>) => {
@@ -794,7 +785,7 @@ export async function createServer(
 
   // Get all SSH key IDs
   const { text: keysText } = await doApi("GET", "/account/keys");
-  const keysData = parseJson(keysText);
+  const keysData = parseJsonObj(keysText);
   const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
     .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter((n) => n > 0);
@@ -812,7 +803,7 @@ export async function createServer(
   });
 
   const { text: createText } = await doApi("POST", "/droplets", body);
-  const createData = parseJson(createText);
+  const createData = parseJsonObj(createText);
 
   if (!createData?.droplet?.id) {
     const errMsg = createData?.message || "Unknown error";
@@ -839,7 +830,7 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const { text } = await doApi("GET", `/droplets/${dropletId}`);
-    const data = parseJson(text);
+    const data = parseJsonObj(text);
     const status = data?.droplet?.status;
 
     if (status === "active") {
@@ -1151,7 +1142,7 @@ export async function destroyServer(dropletId?: string): Promise<void> {
     return;
   }
 
-  const data = parseJson(text);
+  const data = parseJsonObj(text);
   if (data?.message) {
     logError(`Failed to destroy droplet ${id}: ${data.message}`);
     logWarn("The droplet may still be running and incurring charges.");
@@ -1164,7 +1155,7 @@ export async function destroyServer(dropletId?: string): Promise<void> {
 
 export async function listServers(): Promise<void> {
   const { text } = await doApi("GET", "/droplets");
-  const data = parseJson(text);
+  const data = parseJsonObj(text);
   const droplets = toObjectArray(data?.droplets);
 
   if (droplets.length === 0) {

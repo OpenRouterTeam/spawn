@@ -17,8 +17,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { parseJsonWith, parseJsonRaw, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
-import * as v from "valibot";
+import { parseJsonObj, parseJsonRaw, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { saveVmConnection } from "../history.js";
 import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
 
@@ -44,13 +43,6 @@ export function getState() {
 }
 
 // ─── API Client ──────────────────────────────────────────────────────────────
-
-const LooseObject = v.record(v.string(), v.unknown());
-
-/** Parse a JSON string into a Record<string, unknown> via valibot, or null. */
-function parseJson(text: string): Record<string, unknown> | null {
-  return parseJsonWith(text, LooseObject);
-}
 
 async function daytonaApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
   const url = `${DAYTONA_API_BASE}${endpoint}`;
@@ -96,7 +88,7 @@ function hasApiError(text: string): boolean {
 }
 
 function extractApiError(text: string, fallback = "Unknown error"): string {
-  const data = parseJson(text);
+  const data = parseJsonObj(text);
   if (!data) {
     return fallback;
   }
@@ -293,7 +285,7 @@ async function setupSshAccess(): Promise<void> {
   logStep("Setting up SSH access...");
 
   const sshResp = await daytonaApi("POST", `/sandbox/${sandboxId}/ssh-access?expiresInMinutes=480`);
-  const data = parseJson(sshResp);
+  const data = parseJsonObj(sshResp);
   if (!data) {
     logError("Failed to parse SSH access response");
     throw new Error("SSH access parse failure");
@@ -345,7 +337,7 @@ export async function createServer(name: string, sandboxSize?: SandboxSize): Pro
   });
 
   const response = await daytonaApi("POST", "/sandbox", body);
-  const data = parseJson(response);
+  const data = parseJsonObj(response);
 
   sandboxId = isString(data?.id) ? data.id : "";
   if (!sandboxId) {
@@ -361,7 +353,7 @@ export async function createServer(name: string, sandboxSize?: SandboxSize): Pro
   let waited = 0;
   while (waited < maxWait) {
     const statusResp = await daytonaApi("GET", `/sandbox/${sandboxId}`);
-    const statusData = parseJson(statusResp);
+    const statusData = parseJsonObj(statusResp);
     const state = isString(statusData?.state) ? statusData.state : "";
 
     if (state === "started" || state === "running") {
