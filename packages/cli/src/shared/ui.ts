@@ -300,7 +300,14 @@ export function prepareStdinForHandoff(): void {
     // ignore — stty may not be available
   }
 
-  // Resume stdin so Bun.spawn inherits an active fd 0. A paused stream
-  // can cause the child process to see a blocked/empty stdin on Bun.
-  process.stdin.resume();
+  // PAUSE stdin so the parent process stops reading from fd 0.
+  // Previously we called resume() here, which put the parent's stdin
+  // stream into flowing mode — actively reading bytes from fd 0 and
+  // silently discarding them (no listeners). This made the parent
+  // compete with the child (SSH) for stdin bytes, causing keystrokes
+  // to be randomly dropped during the interactive session.
+  // With pause(), the parent stops calling read() on fd 0, and
+  // Bun.spawn(...stdio: "inherit"...) gives the child the raw fd
+  // via dup2() — making the child the sole reader.
+  process.stdin.pause();
 }
