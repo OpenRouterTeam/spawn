@@ -306,7 +306,6 @@ describe("Script download and execution", () => {
   });
 
   it("should show troubleshooting info when download throws network error", async () => {
-    const callCount = 0;
     global.fetch = mock(async (url: string) => {
       if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));

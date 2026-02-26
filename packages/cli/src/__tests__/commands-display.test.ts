@@ -4,22 +4,13 @@ import { loadManifest } from "../manifest";
 
 /**
  * Tests for display/output commands: cmdAgentInfo (happy path), cmdList,
- * cmdAgents, cmdClouds, cmdHelp, and cmdUpdate error paths.
+ * cmdAgents, cmdClouds, cmdHelp.
  *
  * Existing tests cover:
  * - cmdAgentInfo error paths (commands-error-paths.test.ts)
  * - cmdCloudInfo full coverage (commands-cloud-info.test.ts)
  * - cmdRun validation and error paths (commands-error-paths.test.ts)
- *
- * This file covers the UNTESTED happy paths and output formatting of:
- * - cmdAgentInfo: displaying agent details and available clouds
- * - cmdList: rendering the full matrix table
- * - cmdAgents: listing all agents with cloud counts
- * - cmdClouds: listing all clouds with agent counts
- * - cmdHelp: verifying help output content
- * - cmdUpdate: version check and error handling paths
- *
- * Agent: test-engineer
+ * - cmdUpdate: commands-update-download.test.ts
  */
 
 const mockManifest = createMockManifest();
@@ -125,7 +116,7 @@ mock.module("@clack/prompts", () => ({
 }));
 
 // Import commands after mock setup
-const { cmdAgentInfo, cmdMatrix, cmdAgents, cmdClouds, cmdHelp, cmdUpdate } = await import("../commands.js");
+const { cmdAgentInfo, cmdMatrix, cmdAgents, cmdClouds, cmdHelp } = await import("../commands.js");
 
 describe("Commands Display Output", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
@@ -429,59 +420,6 @@ describe("Commands Display Output", () => {
       cmdHelp();
       const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(output).toContain("OpenRouterTeam/spawn");
-    });
-  });
-
-  // ── cmdUpdate ──────────────────────────────────────────────────────
-
-  describe("cmdUpdate", () => {
-    it("should show already up to date when versions match", async () => {
-      const pkg = await import("../../package.json");
-      global.fetch = mock(
-        async () =>
-          new Response(
-            JSON.stringify({
-              version: pkg.default.version,
-            }),
-          ),
-      );
-
-      await cmdUpdate();
-
-      // Spinner should have been used
-      expect(mockSpinnerStart).toHaveBeenCalled();
-      expect(mockSpinnerStop).toHaveBeenCalled();
-      // Stop message should mention "up to date"
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
-      expect(stopCalls.some((msg: string) => msg.includes("up to date"))).toBe(true);
-    });
-
-    it("should handle fetch failure gracefully", async () => {
-      global.fetch = mock(async (): Promise<Response> => {
-        throw new Error("Network timeout");
-      });
-
-      await cmdUpdate();
-
-      // Should stop spinner with failure message
-      expect(mockSpinnerStop).toHaveBeenCalled();
-      // Should print error details
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("Network timeout");
-    });
-
-    it("should handle non-ok fetch response", async () => {
-      global.fetch = mock(
-        async () =>
-          new Response("error", {
-            status: 500,
-          }),
-      );
-
-      await cmdUpdate();
-
-      // Should stop spinner with failure message
-      expect(mockSpinnerStop).toHaveBeenCalled();
     });
   });
 
