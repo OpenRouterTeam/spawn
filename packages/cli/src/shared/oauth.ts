@@ -83,7 +83,8 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
         hostname: "127.0.0.1",
         fetch(req) {
           const url = new URL(req.url);
-          if (url.pathname === "/callback" && url.searchParams.get("code")) {
+          const code = url.searchParams.get("code");
+          if (url.pathname === "/callback" && code) {
             // CSRF check
             if (url.searchParams.get("state") !== csrfState) {
               return new Response(ERROR_HTML, {
@@ -94,7 +95,6 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
                 },
               });
             }
-            const code = url.searchParams.get("code")!;
             // Validate code format
             if (!/^[a-zA-Z0-9_-]{16,128}$/.test(code)) {
               return new Response("<html><body><h1>Invalid OAuth Code</h1></body></html>", {
