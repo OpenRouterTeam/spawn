@@ -214,7 +214,7 @@ export function sanitizeFlyToken(raw: string): string {
   let t = raw.replace(/[\n\r]/g, "").trim();
   if (t.includes("FlyV1 ")) {
     // Already prefixed — extract everything after "FlyV1 "
-    t = "FlyV1 " + t.split("FlyV1 ").pop()!;
+    t = "FlyV1 " + (t.split("FlyV1 ").pop() || "");
   } else if (t.includes("fm2_")) {
     // Macaroon token — may have comma-separated discharge tokens (fm2_xxx,fm2_yyy,fo1_zzz).
     // Extract from the first fm2_ to end-of-string, preserving all segments.
@@ -870,7 +870,10 @@ export async function createServer(name: string, opts: ServerOptions, image?: st
 
 export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
-  const flyCmd = getCmd()!;
+  const flyCmd = getCmd();
+  if (!flyCmd) {
+    throw new Error("flyctl not found in PATH — run `spawn fly` to reinstall");
+  }
 
   // Wrap command with a background keepalive that sends a space to stderr every
   // 10s. Without this, flyctl tears down silent SSH sessions ("session forcibly
@@ -920,7 +923,10 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
 /** Run a command and capture stdout. */
 export async function runServerCapture(cmd: string, timeoutSecs?: number): Promise<string> {
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
-  const flyCmd = getCmd()!;
+  const flyCmd = getCmd();
+  if (!flyCmd) {
+    throw new Error("flyctl not found in PATH — run `spawn fly` to reinstall");
+  }
 
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
   const args = [
@@ -968,7 +974,10 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
-  const flyCmd = getCmd()!;
+  const flyCmd = getCmd();
+  if (!flyCmd) {
+    throw new Error("flyctl not found in PATH — run `spawn fly` to reinstall");
+  }
   const content: Buffer = readFileSync(localPath);
   const b64 = content.toString("base64");
   const proc = Bun.spawn(
@@ -1009,7 +1018,10 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const fullCmd = `export TERM=${term} PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && exec bash -l -c '${shellEscapedCmd}'`;
   // Shell-quote the command for -C
   const escapedCmd = fullCmd.replace(/'/g, "'\\''");
-  const flyCmd = getCmd()!;
+  const flyCmd = getCmd();
+  if (!flyCmd) {
+    throw new Error("flyctl not found in PATH — run `spawn fly` to reinstall");
+  }
 
   const exitCode = spawnInteractive([
     flyCmd,
