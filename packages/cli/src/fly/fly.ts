@@ -973,6 +973,15 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
   }
   const content: Buffer = readFileSync(localPath);
   const b64 = content.toString("base64");
+
+  // Validate base64 only contains safe characters (defense-in-depth)
+  if (/[^A-Za-z0-9+/=]/.test(b64)) {
+    logError("upload_file: base64 output contains unexpected characters");
+    throw new Error("Invalid base64");
+  }
+
+  // Pipe base64 data through stdin to avoid shell interpolation of file content.
+  // The remote command reads from stdin, so no data is embedded in the command string.
   const proc = Bun.spawn(
     [
       flyCmd,
@@ -981,7 +990,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
       "-a",
       flyAppName,
       "-C",
-      `bash -c 'printf "%s" ${b64} | base64 -d > ${remotePath}'`,
+      `base64 -d > '${remotePath}'`,
     ],
     {
       stdio: [
@@ -992,12 +1001,13 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
       env: process.env,
     },
   );
-  const exitCode = await proc.exited;
   try {
+    proc.stdin!.write(b64);
     proc.stdin!.end();
   } catch {
     /* already closed */
   }
+  const exitCode = await proc.exited;
   if (exitCode !== 0) {
     throw new Error(`upload_file failed for ${remotePath}`);
   }
