@@ -44,6 +44,18 @@ log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] [${RUN_MODE}] $*" | tee -a "${LOG_FILE}"
 }
 
+# --- Safe sed substitution (escapes sed metacharacters in replacement) ---
+# Usage: safe_substitute PLACEHOLDER VALUE FILE
+safe_substitute() {
+    local placeholder="$1"
+    local value="$2"
+    local file="$3"
+    local escaped
+    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
+    rm -f "${file}.bak"
+}
+
 # --- Safe rm -rf for worktree paths (defense-in-depth) ---
 safe_rm_worktree() {
     local target="${1:-}"
@@ -150,9 +162,9 @@ if [[ "${RUN_MODE}" == "issue" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    # Substitute placeholders with validated values (safe — no shell expansion)
-    sed -i "s|SPAWN_ISSUE_PLACEHOLDER|${SPAWN_ISSUE}|g" "${PROMPT_FILE}"
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    # Substitute placeholders with validated values
+    safe_substitute "SPAWN_ISSUE_PLACEHOLDER" "${SPAWN_ISSUE}" "${PROMPT_FILE}"
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
 
 else
     # --- Refactor mode: full 6-teammate team ---
@@ -164,7 +176,7 @@ else
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
     # Substitute WORKTREE_BASE_PLACEHOLDER with actual worktree path
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
 fi
 
 # Add grace period: issue=5min, refactor=10min beyond the prompt timeout
