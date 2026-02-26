@@ -178,13 +178,16 @@ wget http://example.com/install.sh | sh
     });
 
     it("should provide helpful error message for command substitution", () => {
+      let caught: unknown;
       try {
         validatePrompt("Run $(echo test)");
-        throw new Error("Expected validatePrompt to throw");
-      } catch (e: any) {
-        expect(e.message).toContain("shell syntax");
-        expect(e.message).toContain("plain English");
+      } catch (e) {
+        caught = e;
       }
+      expect(caught).toBeInstanceOf(Error);
+      const err = caught instanceof Error ? caught : null;
+      expect(err?.message).toContain("shell syntax");
+      expect(err?.message).toContain("plain English");
     });
 
     it("should detect multiple dangerous patterns", () => {

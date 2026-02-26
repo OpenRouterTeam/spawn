@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import type { Manifest } from "../manifest";
-import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented } from "../manifest";
+import { loadManifest, _resetCacheForTesting, agentKeys, cloudKeys, matrixStatus, countImplemented } from "../manifest";
 import { mkdirSync, writeFileSync } from "node:fs";
 import type { TestEnvironment } from "./test-helpers";
 import { setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
@@ -21,12 +21,18 @@ import { setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
 describe("Manifest Helper Edge Cases", () => {
   describe("isValidManifest with unusual data shapes", () => {
     let env: TestEnvironment;
+    let savedNodeEnv: string | undefined;
 
     beforeEach(() => {
       env = setupTestEnvironment();
+      _resetCacheForTesting();
+      // Prevent local manifest.json fallback so fetch mock governs behavior
+      savedNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "test";
     });
 
     afterEach(() => {
+      process.env.NODE_ENV = savedNodeEnv;
       teardownTestEnvironment(env);
     });
 
@@ -43,62 +49,47 @@ describe("Manifest Helper Edge Cases", () => {
         ),
       );
 
-      try {
-        await loadManifest(true);
-      } catch (err: any) {
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
 
     it("should reject string as manifest data", async () => {
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify("not a manifest"))));
 
-      try {
-        await loadManifest(true);
-      } catch (err: any) {
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
 
     it("should reject number as manifest data", async () => {
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(42))));
 
-      try {
-        await loadManifest(true);
-      } catch (err: any) {
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
 
     it("should reject boolean false as manifest data", async () => {
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(false))));
 
-      try {
-        await loadManifest(true);
-      } catch (err: any) {
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
 
     it("should reject undefined as manifest data", async () => {
       global.fetch = mock(() => Promise.resolve(new Response("undefined")));
 
-      try {
-        await loadManifest(true);
-      } catch (err: any) {
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
   });
 
   describe("readCache with corrupted data", () => {
     let env: TestEnvironment;
+    let savedNodeEnv: string | undefined;
 
     beforeEach(() => {
       env = setupTestEnvironment();
+      _resetCacheForTesting();
+      savedNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "test";
     });
 
     afterEach(() => {
+      process.env.NODE_ENV = savedNodeEnv;
       teardownTestEnvironment(env);
     });
 
@@ -110,11 +101,7 @@ describe("Manifest Helper Edge Cases", () => {
 
       global.fetch = mock(() => Promise.reject(new Error("Network error")));
 
-      try {
-        await loadManifest(true);
-      } catch (err: any) {
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
 
     it("should handle empty cache file gracefully", async () => {
@@ -125,11 +112,7 @@ describe("Manifest Helper Edge Cases", () => {
 
       global.fetch = mock(() => Promise.reject(new Error("Network error")));
 
-      try {
-        await loadManifest(true);
-      } catch (err: any) {
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
   });
 
@@ -230,7 +213,7 @@ describe("Manifest Helper Edge Cases", () => {
 
   describe("agentKeys and cloudKeys with many entries", () => {
     it("should return keys for manifest with many agents", () => {
-      const agents: Record<string, any> = {};
+      const agents: Record<string, Manifest["agents"][string]> = {};
       for (let i = 0; i < 20; i++) {
         agents[`agent-${i}`] = {
           name: `Agent ${i}`,
@@ -250,7 +233,7 @@ describe("Manifest Helper Edge Cases", () => {
     });
 
     it("should return keys for manifest with many clouds", () => {
-      const clouds: Record<string, any> = {};
+      const clouds: Record<string, Manifest["clouds"][string]> = {};
       for (let i = 0; i < 20; i++) {
         clouds[`cloud-${i}`] = {
           name: `Cloud ${i}`,
