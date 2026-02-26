@@ -263,15 +263,21 @@ export function sanitizeTermValue(term: string): string {
 }
 
 /** Prepare stdin for clean handoff to an interactive child process.
- *  Removes listeners, resets raw mode, and restores the terminal
- *  so that Bun.spawn with stdio:"inherit" gets a clean fd 0. */
+ *  Removes listeners and resets raw mode so fd 0 is clean.
+ *
+ *  NOTE: Do NOT call process.stdin.destroy() here — it can corrupt fd 0
+ *  so the child process (SSH) inherits a broken file descriptor.
+ *  Do NOT call stty sane — it enables ixon (XON/XOFF flow control) which
+ *  SSH may not fully override, causing periodic input pauses.
+ *
+ *  The interactive session uses spawnSync which blocks the event loop,
+ *  so there's no fd 0 competition regardless of stream state. */
 export function prepareStdinForHandoff(): void {
   // Remove any leftover keypress/data listeners (from @clack/prompts, readline, etc.)
   process.stdin.removeAllListeners();
 
-  // Unconditionally reset raw mode — @clack/core's close() may have already
-  // called setRawMode(false) making isRaw report false, but the terminal
-  // can still be in a dirty state after multiple readline instances
+  // Reset raw mode so the terminal is in cooked mode before SSH takes over.
+  // SSH will set its own terminal mode when it starts.
   if (process.stdin.isTTY) {
     try {
       process.stdin.setRawMode(false);
@@ -280,34 +286,7 @@ export function prepareStdinForHandoff(): void {
     }
   }
 
-  // Reset terminal line discipline via stty to undo any damage from
-  // readline's emitKeypressEvents or leftover raw mode. This is the
-  // nuclear option that guarantees the terminal is in cooked mode with
-  // proper echo and line editing before SSH takes over.
-  try {
-    Bun.spawnSync(
-      [
-        "stty",
-        "sane",
-      ],
-      {
-        stdin: "inherit",
-        stdout: "ignore",
-        stderr: "ignore",
-      },
-    );
-  } catch {
-    // ignore — stty may not be available
-  }
-
-  // PAUSE stdin so the parent process stops reading from fd 0.
-  // Previously we called resume() here, which put the parent's stdin
-  // stream into flowing mode — actively reading bytes from fd 0 and
-  // silently discarding them (no listeners). This made the parent
-  // compete with the child (SSH) for stdin bytes, causing keystrokes
-  // to be randomly dropped during the interactive session.
-  // With pause(), the parent stops calling read() on fd 0, and
-  // Bun.spawn(...stdio: "inherit"...) gives the child the raw fd
-  // via dup2() — making the child the sole reader.
+  // Stop the stream from reading, but do NOT destroy it (that can close fd 0).
   process.stdin.pause();
+  process.stdin.unref();
 }

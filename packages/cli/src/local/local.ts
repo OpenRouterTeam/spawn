@@ -4,6 +4,7 @@ import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { getSpawnDir } from "../history.js";
+import { spawnInteractive } from "../shared/ssh";
 
 // ─── Execution ───────────────────────────────────────────────────────────────
 
@@ -70,21 +71,11 @@ export function uploadFile(localPath: string, remotePath: string): void {
 
 /** Launch an interactive shell session locally. */
 export async function interactiveSession(cmd: string): Promise<number> {
-  return Bun.spawn(
-    [
-      "bash",
-      "-c",
-      cmd,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "inherit",
-        "inherit",
-      ],
-      env: process.env,
-    },
-  ).exited;
+  return spawnInteractive([
+    "bash",
+    "-c",
+    cmd,
+  ]);
 }
 
 // ─── Connection Tracking ─────────────────────────────────────────────────────

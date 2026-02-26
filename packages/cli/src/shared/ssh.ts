@@ -2,6 +2,7 @@
 
 import { logInfo, logStep, logError } from "./ui";
 import { connect } from "node:net";
+import { spawnSync as nodeSpawnSync } from "node:child_process";
 
 // ─── Shared SSH Options ──────────────────────────────────────────────────────
 
@@ -66,6 +67,35 @@ export const SSH_INTERACTIVE_OPTS: string[] = [
   "AddressFamily=inet",
   "-t",
 ];
+
+// ─── Interactive Spawn ───────────────────────────────────────────────────────
+
+/**
+ * Spawn a child process for an interactive terminal session using spawnSync.
+ *
+ * Why spawnSync instead of Bun.spawn?
+ * Bun's async event loop keeps polling fd 0 (stdin) even after
+ * process.stdin.pause()/destroy(). With Bun.spawn + stdio:"inherit",
+ * both the parent's event loop and the child (SSH) race for bytes on
+ * the same fd, causing random keystroke drops.
+ *
+ * spawnSync blocks the event loop entirely, so the child process is the
+ * sole reader of stdin. This matches the behavior of running SSH directly
+ * from a shell.
+ */
+export function spawnInteractive(
+  args: string[],
+  env?: Record<string, string | undefined>,
+): number {
+  // Use Node's spawnSync (not Bun.spawnSync) — it's more battle-tested
+  // with interactive TTY programs and properly handles SIGWINCH, job
+  // control, and terminal I/O forwarding.
+  const result = nodeSpawnSync(args[0], args.slice(1), {
+    stdio: "inherit",
+    env: env ?? process.env,
+  });
+  return result.status ?? 1;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

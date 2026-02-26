@@ -12,7 +12,7 @@ import {
   toKebabCase,
   defaultSpawnName,
 } from "../shared/ui";
-import { sleep } from "../shared/ssh";
+import { sleep, spawnInteractive } from "../shared/ssh";
 import { hasMessage } from "@openrouter/spawn-shared";
 import { getSpawnDir } from "../history.js";
 
@@ -586,13 +586,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
         cmd,
       ];
 
-  const exitCode = await Bun.spawn(args, {
-    stdio: [
-      "inherit",
-      "inherit",
-      "inherit",
-    ],
-  }).exited;
+  const exitCode = spawnInteractive(args);
 
   // Post-session summary
   process.stderr.write("\n");

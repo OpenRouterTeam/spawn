@@ -51,7 +51,7 @@ import {
 import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAuthenticate } from "./aws/aws.js";
 import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "./daytona/daytona.js";
 import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "./sprite/sprite.js";
-import { SSH_INTERACTIVE_OPTS } from "./shared/ssh.js";
+import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "./shared/ssh.js";
 import { toKebabCase, prepareStdinForHandoff } from "./shared/ui.js";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -2729,27 +2729,14 @@ async function runInteractiveCommand(
   failureMsg: string,
   manualCmd: string,
 ): Promise<void> {
-  let proc: ReturnType<typeof Bun.spawn> | undefined;
+  let code: number;
   try {
-    proc = Bun.spawn(
-      [
-        cmd,
-        ...args,
-      ],
-      {
-        stdio: [
-          "inherit",
-          "inherit",
-          "inherit",
-        ],
-      },
-    );
+    code = spawnInteractive([cmd, ...args]);
   } catch (err) {
     p.log.error(`Failed to connect: ${getErrorMessage(err)}`);
     p.log.info(`Try manually: ${pc.cyan(manualCmd)}`);
     throw err;
   }
-  const code = await proc.exited;
   if (code !== 0) {
     throw new Error(`${failureMsg} with exit code ${code}`);
   }
