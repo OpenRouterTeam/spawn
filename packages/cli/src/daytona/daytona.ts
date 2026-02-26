@@ -20,7 +20,7 @@ import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../sh
 import { parseJsonWith, parseJsonRaw, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import * as v from "valibot";
 import { saveVmConnection } from "../history.js";
-import { sleep, spawnInteractive } from "../shared/ssh";
+import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
 
 const DAYTONA_API_BASE = "https://app.daytona.io/api";
 const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
@@ -395,7 +395,7 @@ export async function createServer(name: string, sandboxSize?: SandboxSize): Pro
  * Run a command on the remote sandbox via SSH.
  * Adds a brief sleep after each call to let Daytona's gateway release the connection slot.
  */
-export async function runServer(cmd: string): Promise<void> {
+export async function runServer(cmd: string, timeoutSecs?: number): Promise<void> {
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const args = [
     ...sshBaseArgs(),
@@ -419,7 +419,10 @@ export async function runServer(cmd: string): Promise<void> {
   } catch {
     /* already closed */
   }
+  const timeout = (timeoutSecs || 300) * 1000;
+  const timer = setTimeout(() => killWithTimeout(proc), timeout);
   const exitCode = await proc.exited;
+  clearTimeout(timer);
 
   // Brief sleep to let gateway release connection slot
   await sleep(1000);
@@ -430,7 +433,7 @@ export async function runServer(cmd: string): Promise<void> {
 }
 
 /** Run a command and capture stdout. */
-export async function runServerCapture(cmd: string): Promise<string> {
+export async function runServerCapture(cmd: string, timeoutSecs?: number): Promise<string> {
   const fullCmd = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH" && ${cmd}`;
   const args = [
     ...sshBaseArgs(),
@@ -453,12 +456,15 @@ export async function runServerCapture(cmd: string): Promise<string> {
   } catch {
     /* already closed */
   }
+  const timeout = (timeoutSecs || 300) * 1000;
+  const timer = setTimeout(() => killWithTimeout(proc), timeout);
   // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
   const [stdout] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
   ]);
   const exitCode = await proc.exited;
+  clearTimeout(timer);
 
   await sleep(1000);
 
