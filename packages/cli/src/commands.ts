@@ -2635,7 +2635,20 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
     }
 
     if (filtered.length === 0) {
-      await showEmptyListMessage(agentFilter, cloudFilter);
+      const historyRecords = filterHistory(agentFilter, cloudFilter);
+      if (historyRecords.length > 0) {
+        p.log.info("No active servers found.");
+        p.log.info(
+          pc.dim(
+            `${historyRecords.length} spawn${historyRecords.length !== 1 ? "s" : ""} in history but without active connections.`,
+          ),
+        );
+        p.log.info(
+          `Re-launch with ${pc.cyan("spawn <agent> <cloud>")} or view history with ${pc.cyan("spawn list --non-interactive")}`,
+        );
+      } else {
+        await showEmptyListMessage(agentFilter, cloudFilter);
+      }
       return;
     }
 
