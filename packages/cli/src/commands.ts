@@ -2644,7 +2644,7 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
           ),
         );
         p.log.info(
-          `Re-launch with ${pc.cyan("spawn <agent> <cloud>")} or view history with ${pc.cyan("spawn list --non-interactive")}`,
+          `Re-launch with ${pc.cyan("spawn <agent> <cloud>")} or view full history with ${pc.cyan("spawn list | cat")}`,
         );
       } else {
         await showEmptyListMessage(agentFilter, cloudFilter);
