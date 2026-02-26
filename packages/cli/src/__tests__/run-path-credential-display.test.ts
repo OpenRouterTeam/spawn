@@ -435,7 +435,6 @@ describe("credential status display logic", () => {
       expect(parseAuthEnvVars("none")).toEqual([]);
     });
   });
-
 });
 
 // ── validateRunSecurity via checkEntity ──────────────────────────────────
