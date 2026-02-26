@@ -91,6 +91,17 @@ log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] [${RUN_MODE}] $*" | tee -a "${LOG_FILE}"
 }
 
+# --- Safe sed substitution (escapes sed metacharacters in replacement) ---
+# Usage: safe_substitute PLACEHOLDER VALUE FILE
+safe_substitute() {
+    local placeholder="$1"
+    local value="$2"
+    local file="$3"
+    local escaped
+    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    sed -i "s|${placeholder}|${escaped}|g" "$file"
+}
+
 # --- Safe rm -rf for worktree paths (defense-in-depth) ---
 safe_rm_worktree() {
     local target="${1:-}"
@@ -205,9 +216,9 @@ if [[ "${RUN_MODE}" == "team_building" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    # Substitute placeholders with validated values (safe — no shell expansion)
-    sed -i "s|ISSUE_NUM_PLACEHOLDER|${ISSUE_NUM}|g" "${PROMPT_FILE}"
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
+    # Substitute placeholders with validated values
+    safe_substitute "ISSUE_NUM_PLACEHOLDER" "${ISSUE_NUM}" "${PROMPT_FILE}"
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
 
 elif [[ "${RUN_MODE}" == "triage" ]]; then
     # --- Triage mode: single-agent issue safety check ---
@@ -218,9 +229,9 @@ elif [[ "${RUN_MODE}" == "triage" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    # Substitute placeholders with validated values (safe — no shell expansion)
-    sed -i "s|ISSUE_NUM_PLACEHOLDER|${ISSUE_NUM}|g" "${PROMPT_FILE}"
-    sed -i "s|SLACK_WEBHOOK_PLACEHOLDER|${SLACK_WEBHOOK:-NOT_SET}|g" "${PROMPT_FILE}"
+    # Substitute placeholders with validated values
+    safe_substitute "ISSUE_NUM_PLACEHOLDER" "${ISSUE_NUM}" "${PROMPT_FILE}"
+    safe_substitute "SLACK_WEBHOOK_PLACEHOLDER" "${SLACK_WEBHOOK:-NOT_SET}" "${PROMPT_FILE}"
 
 elif [[ "${RUN_MODE}" == "review_all" ]]; then
     # --- Review-all mode: batch security review + hygiene for ALL open PRs ---
@@ -231,16 +242,16 @@ elif [[ "${RUN_MODE}" == "review_all" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    # Substitute placeholders with validated values (safe — no shell expansion)
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
-    sed -i "s|SLACK_WEBHOOK_PLACEHOLDER|${SLACK_WEBHOOK:-NOT_SET}|g" "${PROMPT_FILE}"
+    # Substitute placeholders with validated values
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
+    safe_substitute "REPO_ROOT_PLACEHOLDER" "${REPO_ROOT}" "${PROMPT_FILE}"
+    safe_substitute "SLACK_WEBHOOK_PLACEHOLDER" "${SLACK_WEBHOOK:-NOT_SET}" "${PROMPT_FILE}"
     if [ -n "${SLACK_WEBHOOK:-}" ]; then
         SLACK_STATUS="yes"
     else
         SLACK_STATUS="no"
     fi
-    sed -i "s|SLACK_WEBHOOK_STATUS_PLACEHOLDER|${SLACK_STATUS}|g" "${PROMPT_FILE}"
+    safe_substitute "SLACK_WEBHOOK_STATUS_PLACEHOLDER" "${SLACK_STATUS}" "${PROMPT_FILE}"
 
 else
     # --- Scan mode: full repo security audit + issue filing ---
@@ -251,10 +262,10 @@ else
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    # Substitute placeholders with validated values (safe — no shell expansion)
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
-    sed -i "s|SLACK_WEBHOOK_PLACEHOLDER|${SLACK_WEBHOOK:-NOT_SET}|g" "${PROMPT_FILE}"
+    # Substitute placeholders with validated values
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
+    safe_substitute "REPO_ROOT_PLACEHOLDER" "${REPO_ROOT}" "${PROMPT_FILE}"
+    safe_substitute "SLACK_WEBHOOK_PLACEHOLDER" "${SLACK_WEBHOOK:-NOT_SET}" "${PROMPT_FILE}"
 
 fi
 

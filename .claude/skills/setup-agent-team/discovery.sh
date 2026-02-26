@@ -34,6 +34,17 @@ log_info()  { printf "${GREEN}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m
 log_warn()  { printf "${YELLOW}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] WARN: $1" >> "${LOG_FILE}"; }
 log_error() { printf "${RED}[discovery]${NC} %s\n" "$1"; echo "[$(date +'%Y-%m-%d %H:%M:%S')] [discovery] ERROR: $1" >> "${LOG_FILE}"; }
 
+# --- Safe sed substitution (escapes sed metacharacters in replacement) ---
+# Usage: safe_substitute PLACEHOLDER VALUE FILE
+safe_substitute() {
+    local placeholder="$1"
+    local value="$2"
+    local file="$3"
+    local escaped
+    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    sed -i "s|${placeholder}|${escaped}|g" "$file"
+}
+
 # --- Safe rm -rf for worktree paths (defense-in-depth) ---
 safe_rm_worktree() {
     local target="${1:-}"
@@ -142,7 +153,7 @@ _prepare_prompt_file() {
       gsub("MATRIX_SUMMARY_PLACEHOLDER"; env._SUMMARY)
     ' "${output_file}" > "${output_file}.tmp" && mv "${output_file}.tmp" "${output_file}"
 
-    sed -i "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${output_file}"
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${output_file}"
 }
 
 # Kill claude process and its full process tree

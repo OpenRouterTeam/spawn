@@ -61,6 +61,21 @@ log() {
     printf '[%s] [qa/%s] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "${RUN_MODE}" "$*" | tee -a "${LOG_FILE}"
 }
 
+# --- Safe sed substitution (escapes sed metacharacters in replacement) ---
+# Usage: safe_substitute PLACEHOLDER VALUE FILE
+# Replaces all occurrences of PLACEHOLDER with VALUE in FILE, escaping
+# sed-special characters (\, &, |, newline) in VALUE to prevent misinterpretation.
+safe_substitute() {
+    local placeholder="$1"
+    local value="$2"
+    local file="$3"
+    # Escape backslashes first, then &, then the delimiter |
+    local escaped
+    escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
+    sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
+    rm -f "${file}.bak"
+}
+
 # --- Safe rm -rf for worktree paths (defense-in-depth) ---
 safe_rm_worktree() {
     local target="${1:-}"
@@ -197,9 +212,8 @@ if [[ "${RUN_MODE}" == "quality" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    sed -i.bak "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i.bak "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
-    rm -f "${PROMPT_FILE}.bak"
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
+    safe_substitute "REPO_ROOT_PLACEHOLDER" "${REPO_ROOT}" "${PROMPT_FILE}"
 
 elif [[ "${RUN_MODE}" == "fixtures" ]]; then
     PROMPT_TEMPLATE="${SCRIPT_DIR}/qa-fixtures-prompt.md"
@@ -209,9 +223,8 @@ elif [[ "${RUN_MODE}" == "fixtures" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    sed -i.bak "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i.bak "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
-    rm -f "${PROMPT_FILE}.bak"
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
+    safe_substitute "REPO_ROOT_PLACEHOLDER" "${REPO_ROOT}" "${PROMPT_FILE}"
 
 elif [[ "${RUN_MODE}" == "issue" ]]; then
     PROMPT_TEMPLATE="${SCRIPT_DIR}/qa-issue-prompt.md"
@@ -221,10 +234,9 @@ elif [[ "${RUN_MODE}" == "issue" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    sed -i.bak "s|ISSUE_NUM_PLACEHOLDER|${ISSUE_NUM}|g" "${PROMPT_FILE}"
-    sed -i.bak "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i.bak "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
-    rm -f "${PROMPT_FILE}.bak"
+    safe_substitute "ISSUE_NUM_PLACEHOLDER" "${ISSUE_NUM}" "${PROMPT_FILE}"
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
+    safe_substitute "REPO_ROOT_PLACEHOLDER" "${REPO_ROOT}" "${PROMPT_FILE}"
 
 elif [[ "${RUN_MODE}" == "e2e" ]]; then
     PROMPT_TEMPLATE="${SCRIPT_DIR}/qa-e2e-prompt.md"
@@ -234,9 +246,8 @@ elif [[ "${RUN_MODE}" == "e2e" ]]; then
     fi
     cat "$PROMPT_TEMPLATE" > "${PROMPT_FILE}"
 
-    sed -i.bak "s|WORKTREE_BASE_PLACEHOLDER|${WORKTREE_BASE}|g" "${PROMPT_FILE}"
-    sed -i.bak "s|REPO_ROOT_PLACEHOLDER|${REPO_ROOT}|g" "${PROMPT_FILE}"
-    rm -f "${PROMPT_FILE}.bak"
+    safe_substitute "WORKTREE_BASE_PLACEHOLDER" "${WORKTREE_BASE}" "${PROMPT_FILE}"
+    safe_substitute "REPO_ROOT_PLACEHOLDER" "${REPO_ROOT}" "${PROMPT_FILE}"
 
 fi
 
