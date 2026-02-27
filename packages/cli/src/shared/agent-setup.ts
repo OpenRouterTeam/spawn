@@ -482,7 +482,9 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "openclaw",
-          "source ~/.bashrc && mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw",
+          "source ~/.bashrc && mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw && " +
+            "grep -q '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; " +
+            "grep -q '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc",
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
