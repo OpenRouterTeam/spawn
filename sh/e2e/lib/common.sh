@@ -84,6 +84,14 @@ load_cloud_driver() {
   eval "cloud_exec_long() { _${cloud}_exec_long \"\$@\"; }"
   eval "cloud_teardown() { _${cloud}_teardown \"\$@\"; }"
   eval "cloud_cleanup_stale() { _${cloud}_cleanup_stale \"\$@\"; }"
+
+  # Optional: per-cloud parallelism cap (returns max agents to run concurrently)
+  if type "_${cloud}_max_parallel" >/dev/null 2>&1; then
+    eval "cloud_max_parallel() { _${cloud}_max_parallel \"\$@\"; }"
+  else
+    # Default: no cap (return a large number)
+    eval "cloud_max_parallel() { printf '99'; }"
+  fi
 }
 
 # ---------------------------------------------------------------------------

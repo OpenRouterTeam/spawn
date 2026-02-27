@@ -237,9 +237,19 @@ run_agents_for_cloud() {
   local cloud_passed=""
   local cloud_failed=""
 
-  if [ "${PARALLEL_COUNT}" -gt 0 ] && [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
+  # Resolve effective parallelism (respect per-cloud cap)
+  local effective_parallel="${PARALLEL_COUNT}"
+  if [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
+    local cloud_max
+    cloud_max=$(cloud_max_parallel)
+    if [ "${effective_parallel}" -gt "${cloud_max}" ]; then
+      effective_parallel="${cloud_max}"
+    fi
+  fi
+
+  if [ "${effective_parallel}" -gt 0 ] && [ "${SEQUENTIAL_MODE}" -eq 0 ]; then
     # Parallel mode: batch agents
-    log_info "Running agents in parallel (batch size: ${PARALLEL_COUNT})"
+    log_info "Running agents in parallel (batch size: ${effective_parallel})"
 
     local batch_agents=""
     local batch_count=0
@@ -249,7 +259,7 @@ run_agents_for_cloud() {
       batch_agents="${batch_agents} ${agent}"
       batch_count=$((batch_count + 1))
 
-      if [ "${batch_count}" -ge "${PARALLEL_COUNT}" ]; then
+      if [ "${batch_count}" -ge "${effective_parallel}" ]; then
         batch_num=$((batch_num + 1))
         log_header "Batch ${batch_num} (${cloud})"
 
@@ -372,7 +382,7 @@ log_info "Agents: ${AGENTS_TO_TEST}"
 if [ "${SEQUENTIAL_MODE}" -eq 1 ]; then
   log_info "Agent parallelism: sequential"
 elif [ "${PARALLEL_COUNT}" -ge 99 ]; then
-  log_info "Agent parallelism: all at once"
+  log_info "Agent parallelism: all at once (per-cloud caps may apply)"
 else
   log_info "Agent parallelism: ${PARALLEL_COUNT} per cloud"
 fi

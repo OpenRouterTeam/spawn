@@ -49,11 +49,17 @@ _aws_validate_env() {
 # ---------------------------------------------------------------------------
 _aws_headless_env() {
   local app="$1"
-  # local agent="$2"  # unused but part of the interface
+  local agent="${2:-}"
+
+  # openclaw needs 4GB RAM — use medium_3_0 instead of nano
+  local bundle="${AWS_BUNDLE:-nano_3_0}"
+  if [ "${agent}" = "openclaw" ] && [ -z "${AWS_BUNDLE:-}" ]; then
+    bundle="medium_3_0"
+  fi
 
   printf 'export LIGHTSAIL_SERVER_NAME="%s"\n' "${app}"
   printf 'export AWS_DEFAULT_REGION="%s"\n' "${AWS_REGION:-us-east-1}"
-  printf 'export LIGHTSAIL_BUNDLE="%s"\n' "${AWS_BUNDLE:-nano_3_0}"
+  printf 'export LIGHTSAIL_BUNDLE="%s"\n' "${bundle}"
 }
 
 # ---------------------------------------------------------------------------

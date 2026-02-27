@@ -12,6 +12,16 @@
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
+# _sprite_max_parallel
+#
+# Sprite CLI gets rate-limited with too many concurrent calls.
+# Cap to 2 agents at a time.
+# ---------------------------------------------------------------------------
+_sprite_max_parallel() {
+  printf '2'
+}
+
+# ---------------------------------------------------------------------------
 # _sprite_validate_env
 #
 # Check that the sprite CLI is installed and credentials are valid.

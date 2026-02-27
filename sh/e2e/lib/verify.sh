@@ -32,7 +32,7 @@ input_test_claude() {
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); claude -p \"\$PROMPT\" 2>/dev/null"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); claude -p \"\$PROMPT\""
 
   local output
   output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
@@ -58,7 +58,7 @@ input_test_codex() {
   remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; \
     export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex -q \"\$PROMPT\" 2>/dev/null"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex -q \"\$PROMPT\""
 
   local output
   output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
@@ -91,7 +91,7 @@ input_test_openclaw() {
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw -p \"\$PROMPT\" 2>/dev/null"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw -p \"\$PROMPT\""
 
   local output
   output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
@@ -116,7 +116,7 @@ input_test_zeroclaw() {
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); zeroclaw agent -p \"\$PROMPT\" 2>/dev/null"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); zeroclaw agent -p \"\$PROMPT\""
 
   local output
   output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
