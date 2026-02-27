@@ -40,9 +40,12 @@ provision_agent() {
     export SPAWN_SKIP_GITHUB_AUTH=1
     export SPAWN_SKIP_API_VALIDATION=1
     export MODEL_ID="${MODEL_ID:-openrouter/auto}"
-    export AWS_LIGHTSAIL_INSTANCE_NAME="${app_name}"
-    export AWS_REGION="${AWS_REGION}"
-    export AWS_BUNDLE="${AWS_BUNDLE}"
+    # LIGHTSAIL_SERVER_NAME is the env var read by aws.ts:getServerName()
+    export LIGHTSAIL_SERVER_NAME="${app_name}"
+    # AWS_DEFAULT_REGION is the env var read by aws.ts:authenticate() and promptRegion()
+    export AWS_DEFAULT_REGION="${AWS_REGION}"
+    # LIGHTSAIL_BUNDLE is the env var read by aws.ts:promptBundle()
+    export LIGHTSAIL_BUNDLE="${AWS_BUNDLE:-nano_3_0}"
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
     bun run "${cli_entry}" "${agent}" aws --headless --output json \
