@@ -208,17 +208,9 @@ describe("manifest", () => {
       // Mock network failure
       global.fetch = mockFailedFetch("Network error");
 
-      // Note: In the spawn project directory, there's a local manifest.json that serves as fallback
-      // So this test will pass in isolation but may use local fallback when run in project
-      try {
-        const manifest = await loadManifest(true);
-        // If we get here, it used a local fallback (which is valid behavior)
-        expect(manifest).toHaveProperty("agents");
-        expect(manifest).toHaveProperty("clouds");
-      } catch (err: any) {
-        // Or it threw the expected error
-        expect(err.message).toContain("Cannot load manifest");
-      }
+      // tryLoadLocalManifest() returns null in test environments (NODE_ENV=test),
+      // so with no cache and no network, loadManifest must throw.
+      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
     });
 
     it("should validate manifest structure", async () => {
