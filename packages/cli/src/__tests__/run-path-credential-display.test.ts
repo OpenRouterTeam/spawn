@@ -638,4 +638,3 @@ describe("prioritizeCloudsByCredentials with real-world patterns", () => {
     expect(result.hintOverrides["digitalocean"]).toBeUndefined();
   });
 });
-

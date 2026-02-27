@@ -25,7 +25,12 @@ describe("Result constructors", () => {
 
   it("Err creates a failure result", () => {
     const r = Err(new Error("boom"));
-    expect(r).toMatchObject({ ok: false, error: { message: "boom" } });
+    expect(r).toMatchObject({
+      ok: false,
+      error: {
+        message: "boom",
+      },
+    });
   });
 });
 
@@ -121,7 +126,12 @@ describe("wrapSshCall", () => {
 
   it("returns Err for transient SSH error (retryable)", async () => {
     const result = await wrapSshCall(Promise.reject(new Error("connection reset")));
-    expect(result).toMatchObject({ ok: false, error: { message: "connection reset" } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        message: "connection reset",
+      },
+    });
   });
 
   it("returns Err for connection refused (retryable)", async () => {
@@ -139,7 +149,12 @@ describe("wrapSshCall", () => {
 
   it("wraps non-Error rejects into Error for Err", async () => {
     const result = await wrapSshCall(Promise.reject("string error"));
-    expect(result).toMatchObject({ ok: false, error: { message: "string error" } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        message: "string error",
+      },
+    });
     if (!result.ok) {
       expect(result.error).toBeInstanceOf(Error);
     }
