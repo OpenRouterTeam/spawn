@@ -461,6 +461,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     codex: {
       name: "Codex CLI",
       cloudInitTier: "node",
+      preProvision: promptGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -479,6 +480,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     openclaw: {
       name: "OpenClaw",
       cloudInitTier: "full",
+      preProvision: promptGithubAuth,
       modelPrompt: true,
       modelDefault: "openrouter/auto",
       install: () =>
@@ -503,6 +505,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     opencode: {
       name: "OpenCode",
       cloudInitTier: "minimal",
+      preProvision: promptGithubAuth,
       install: () => installAgent(runner, "OpenCode", openCodeInstallCmd()),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -513,6 +516,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     kilocode: {
       name: "Kilo Code",
       cloudInitTier: "node",
+      preProvision: promptGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -532,6 +536,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     zeroclaw: {
       name: "ZeroClaw",
       cloudInitTier: "minimal",
+      preProvision: promptGithubAuth,
       install: async () => {
         // Add swap before building — low-memory instances (e.g., AWS nano 512 MB)
         // OOM during Rust compilation if --prefer-prebuilt falls back to source.
