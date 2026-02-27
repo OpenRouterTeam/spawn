@@ -27,7 +27,7 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import { parseJsonObj, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
+import { parseJsonObj, isString, isNumber, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { saveVmConnection } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
@@ -87,16 +87,6 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
   throw new Error("hetznerApi: unreachable");
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Narrow an unknown value to a Record if it is a non-array object */
-function rec(val: unknown): Record<string, unknown> | undefined {
-  if (val && typeof val === "object" && !Array.isArray(val)) {
-    return Object.fromEntries(Object.entries(val));
-  }
-  return undefined;
-}
-
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
 const HETZNER_CONFIG_PATH = `${process.env.HOME}/.config/spawn/hetzner.json`;
@@ -143,7 +133,7 @@ async function testHcloudToken(): Promise<boolean> {
     // Hetzner returns { "error": { ... } } on auth failure.
     // Success responses may contain "error": null inside action objects,
     // so check for a real error object with a message.
-    if (rec(data?.error)?.message) {
+    if (toRecord(data?.error)?.message) {
       return false;
     }
     return true;
@@ -233,7 +223,7 @@ export async function ensureSshKey(): Promise<void> {
     });
     const regResp = await hetznerApi("POST", "/ssh_keys", body);
     const regData = parseJsonObj(regResp);
-    const regError = rec(regData?.error);
+    const regError = toRecord(regData?.error);
     const regErrMsg = isString(regError?.message) ? regError.message : "";
     if (regErrMsg) {
       // Key may already exist under a different name — non-fatal
@@ -427,9 +417,9 @@ export async function createServer(
 
   // Hetzner success responses contain "error": null in action objects,
   // so check for presence of .server object, not absence of "error" string.
-  const server = rec(data?.server);
+  const server = toRecord(data?.server);
   if (!server) {
-    const errMsg = rec(data?.error)?.message || "Unknown error";
+    const errMsg = toRecord(data?.error)?.message || "Unknown error";
     logError(`Failed to create Hetzner server: ${errMsg}`);
     logWarn("Common issues:");
     logWarn("  - Insufficient account balance or payment method required");
@@ -440,8 +430,8 @@ export async function createServer(
   }
 
   hetznerServerId = String(server.id);
-  const publicNet = rec(server.public_net);
-  const ipv4 = rec(publicNet?.ipv4);
+  const publicNet = toRecord(server.public_net);
+  const ipv4 = toRecord(publicNet?.ipv4);
   hetznerServerIp = isString(ipv4?.ip) ? ipv4.ip : "";
 
   if (!hetznerServerId || hetznerServerId === "null") {
@@ -708,7 +698,7 @@ export async function destroyServer(serverId?: string): Promise<void> {
 
   // Hetzner returns { action: {...} } on success. "error": null in action is normal.
   if (!data?.action) {
-    const errMsg = rec(data?.error)?.message || "Unknown error";
+    const errMsg = toRecord(data?.error)?.message || "Unknown error";
     logError(`Failed to destroy server ${id}: ${errMsg}`);
     logWarn("The server may still be running and incurring charges.");
     logWarn(`Delete it manually at: ${HETZNER_DASHBOARD_URL}`);
@@ -732,9 +722,9 @@ export async function listServers(): Promise<void> {
   console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10));
   console.log("-".repeat(75));
   for (const s of servers) {
-    const publicNet = rec(s.public_net);
-    const ipv4 = rec(publicNet?.ipv4);
-    const serverType = rec(s.server_type);
+    const publicNet = toRecord(s.public_net);
+    const ipv4 = toRecord(publicNet?.ipv4);
+    const serverType = toRecord(s.server_type);
     console.log(
       pad(str(s.name).slice(0, 24), 25) +
         pad(str(s.id).slice(0, 11), 12) +
