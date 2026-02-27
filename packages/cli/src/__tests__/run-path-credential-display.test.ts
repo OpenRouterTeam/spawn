@@ -583,9 +583,7 @@ describe("run-path validation sequence integration", () => {
   it("should resolve display name before validation", () => {
     const resolved = resolveAgentKey(manifest, "Claude Code");
     expect(resolved).toBe("claude");
-    if (resolved) {
-      expect(checkEntity(manifest, resolved, "agent")).toBe(true);
-    }
+    expect(checkEntity(manifest, resolved ?? "", "agent")).toBe(true);
   });
 
   it("should build correct retry command after failure", () => {
