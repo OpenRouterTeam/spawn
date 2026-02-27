@@ -705,31 +705,3 @@ export async function destroyServer(serverId?: string): Promise<void> {
   }
   logInfo(`Server ${id} destroyed`);
 }
-
-export async function listServers(): Promise<void> {
-  const resp = await hetznerApi("GET", "/servers");
-  const data = parseJsonObj(resp);
-  const servers = toObjectArray(data?.servers);
-
-  if (servers.length === 0) {
-    console.log("No servers found");
-    return;
-  }
-
-  const pad = (str: string, n: number) => (str + " ".repeat(n)).slice(0, n);
-  const str = (val: unknown, fallback = "N/A"): string => (isString(val) ? val : val != null ? String(val) : fallback);
-  console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10));
-  console.log("-".repeat(75));
-  for (const s of servers) {
-    const publicNet = toRecord(s.public_net);
-    const ipv4 = toRecord(publicNet?.ipv4);
-    const serverType = toRecord(s.server_type);
-    console.log(
-      pad(str(s.name).slice(0, 24), 25) +
-        pad(str(s.id).slice(0, 11), 12) +
-        pad(str(s.status).slice(0, 11), 12) +
-        pad(str(ipv4?.ip).slice(0, 15), 16) +
-        pad(str(serverType?.name).slice(0, 9), 10),
-    );
-  }
-}

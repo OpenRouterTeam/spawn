@@ -1169,32 +1169,3 @@ export async function destroyServer(dropletId?: string): Promise<void> {
 
   logInfo(`Droplet ${id} destroyed`);
 }
-
-export async function listServers(): Promise<void> {
-  const { text } = await doApi("GET", "/droplets");
-  const data = parseJsonObj(text);
-  const droplets = toObjectArray(data?.droplets);
-
-  if (droplets.length === 0) {
-    console.log("No droplets found");
-    return;
-  }
-
-  const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-  console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("SIZE", 15));
-  console.log("-".repeat(80));
-  for (const d of droplets) {
-    const networks = d.networks;
-    const v4 = networks && typeof networks === "object" && "v4" in networks ? networks.v4 : undefined;
-    const v4Arr = toObjectArray(v4);
-    const publicNet = v4Arr.find((n) => n.type === "public");
-    const ip = String(publicNet?.ip_address ?? "N/A");
-    console.log(
-      pad(String(d.name ?? "N/A").slice(0, 24), 25) +
-        pad(String(d.id ?? "N/A").slice(0, 11), 12) +
-        pad(String(d.status ?? "N/A").slice(0, 11), 12) +
-        pad(ip.slice(0, 15), 16) +
-        pad(String(d.size_slug ?? "N/A").slice(0, 14), 15),
-    );
-  }
-}

@@ -17,7 +17,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { parseJsonObj, parseJsonRaw, isString, toObjectArray, toRecord } from "@openrouter/spawn-shared";
+import { parseJsonObj, isString } from "@openrouter/spawn-shared";
 import { saveVmConnection } from "../history.js";
 import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
 
@@ -658,27 +658,4 @@ export async function destroyServer(id?: string): Promise<void> {
   }
 
   logInfo("Sandbox destroyed");
-}
-
-export async function listServers(): Promise<void> {
-  const response = await daytonaApi("GET", "/sandbox");
-  const raw = parseJsonRaw(response);
-  const parsed = toRecord(raw);
-  const rawItems = Array.isArray(raw) ? raw : (parsed?.items ?? parsed?.sandboxes ?? []);
-  const items = toObjectArray(rawItems);
-
-  if (items.length === 0) {
-    console.log("No sandboxes found");
-    return;
-  }
-
-  const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-  console.log(pad("NAME", 25) + pad("ID", 40) + pad("STATE", 12));
-  console.log("-".repeat(77));
-  for (const s of items) {
-    const name = isString(s.name) ? s.name : "N/A";
-    const id = isString(s.id) ? s.id : "N/A";
-    const state = isString(s.state) ? s.state : "N/A";
-    console.log(pad(name.slice(0, 24), 25) + pad(id.slice(0, 39), 40) + pad(state.slice(0, 11), 12));
-  }
 }
