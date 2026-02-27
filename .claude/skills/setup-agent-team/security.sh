@@ -103,6 +103,13 @@ safe_substitute() {
     rm -f "${file}.bak"
 }
 
+# --- Validate branch name against safe pattern (defense-in-depth) ---
+# Prevents command injection via shell metacharacters in branch names
+is_safe_branch_name() {
+    local name="${1:-}"
+    [[ -n "${name}" ]] && [[ "${name}" =~ ^[a-zA-Z0-9._/-]+$ ]]
+}
+
 # --- Safe rm -rf for worktree paths (defense-in-depth) ---
 safe_rm_worktree() {
     local target="${1:-}"
@@ -180,16 +187,20 @@ fi
 # Delete merged security-related remote branches (team-building/*, review-pr-*)
 MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -E 'origin/(team-building/|review-pr-)' | sed 's|origin/||' | tr -d ' ') || true
 for branch in $MERGED_BRANCHES; do
-    if [[ -n "$branch" ]]; then
-        git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
+    if is_safe_branch_name "$branch"; then
+        git push origin --delete -- "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
+    else
+        log "WARNING: Skipping branch with unsafe name: ${branch}"
     fi
 done
 
 # Delete stale local security-related branches
 LOCAL_BRANCHES=$(git branch --list 'team-building/*' --list 'review-pr-*' | tr -d ' *') || true
 for branch in $LOCAL_BRANCHES; do
-    if [[ -n "$branch" ]]; then
-        git branch -D "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
+    if is_safe_branch_name "$branch"; then
+        git branch -D -- "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
+    else
+        log "WARNING: Skipping local branch with unsafe name: ${branch}"
     fi
 done
 
