@@ -1,13 +1,7 @@
 // fly/agents.ts — Fly.io agent configs (thin wrapper over shared)
 
 import { runServer, uploadFile } from "./fly";
-import {
-  createAgents,
-  installAgent,
-  setupOpenclawBatched,
-  resolveAgent as _resolveAgent,
-  offerGithubAuth as _offerGithubAuth,
-} from "../shared/agent-setup";
+import { createAgents, installAgent, setupOpenclawBatched, resolveAgent as _resolveAgent } from "../shared/agent-setup";
 import type { CloudRunner } from "../shared/agent-setup";
 import type { AgentConfig } from "../shared/agents";
 import { generateEnvConfig } from "../shared/agents";
@@ -66,8 +60,4 @@ export function resolveAgent(name: string): FlyAgentConfig {
     throw new Error(`Unknown agent: ${name}`);
   }
   return agent;
-}
-
-export function offerGithubAuth(): Promise<void> {
-  return _offerGithubAuth(runner);
 }
