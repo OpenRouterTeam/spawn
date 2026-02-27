@@ -120,6 +120,11 @@ export const BUNDLES: Bundle[] = [
 
 export const DEFAULT_BUNDLE = BUNDLES[0]; // nano_3_0
 
+/** Per-agent default bundles — heavier agents need more RAM. */
+export const AGENT_BUNDLE_DEFAULTS: Record<string, string> = {
+  openclaw: "medium_3_0", // OpenClaw gateway + 713 npm packages needs >=4 GB
+};
+
 // ─── Lightsail Regions ────────────────────────────────────────────────────────
 
 export interface Region {
@@ -641,18 +646,24 @@ export async function promptRegion(): Promise<void> {
 
 let selectedBundle = DEFAULT_BUNDLE.id;
 
-export async function promptBundle(): Promise<void> {
+export async function promptBundle(agentName?: string): Promise<void> {
   if (process.env.LIGHTSAIL_BUNDLE) {
     selectedBundle = process.env.LIGHTSAIL_BUNDLE;
     return;
   }
+
+  // Use per-agent default if available (e.g. openclaw → medium)
+  const agentDefault = agentName ? AGENT_BUNDLE_DEFAULTS[agentName] : undefined;
+  const defaultId = agentDefault ?? DEFAULT_BUNDLE.id;
+
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    selectedBundle = defaultId;
     return;
   }
 
   process.stderr.write("\n");
   const items = BUNDLES.map((b) => `${b.id}|${b.label}`);
-  const selected = await selectFromList(items, "instance size", DEFAULT_BUNDLE.id);
+  const selected = await selectFromList(items, "instance size", defaultId);
   selectedBundle = selected;
   logInfo(`Using bundle: ${selected}`);
 }

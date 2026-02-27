@@ -257,7 +257,7 @@ model_provider = "openrouter"
 name = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
 env_key = "OPENROUTER_API_KEY"
-wire_api = "chat"
+wire_api = "responses"
 `;
   await uploadConfigFile(runner, config, "$HOME/.codex/config.toml");
 }
@@ -354,16 +354,19 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   // Start the daemon AND wait for port 18789 in a single SSH session.
   // The polling loop doubles as a keepalive for the SSH session.
+  // We resolve the full path to openclaw first because setsid replaces
+  // the process image and doesn't inherit the parent shell's PATH.
   const script =
     "source ~/.spawnrc 2>/dev/null; " +
     "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-    "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
-    "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; " +
-    "elapsed=0; while [ $elapsed -lt 60 ]; do " +
+    '_oc_bin=$(command -v openclaw) || { echo "openclaw not found in PATH"; exit 1; }; ' +
+    'if command -v setsid >/dev/null 2>&1; then setsid "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & ' +
+    'else nohup "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; ' +
+    "elapsed=0; while [ $elapsed -lt 120 ]; do " +
     'if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo "Gateway ready after ${elapsed}s"; exit 0; fi; ' +
     "printf '.'; sleep 1; elapsed=$((elapsed + 1)); " +
     "done; " +
-    'echo "Gateway failed to start after 60s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1';
+    'echo "Gateway failed to start after 120s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1';
   await runner.runServer(script);
   logInfo("OpenClaw gateway started");
 }
@@ -458,6 +461,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     codex: {
       name: "Codex CLI",
       cloudInitTier: "node",
+      preProvision: promptGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -476,6 +480,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     openclaw: {
       name: "OpenClaw",
       cloudInitTier: "full",
+      preProvision: promptGithubAuth,
       modelPrompt: true,
       modelDefault: "openrouter/auto",
       install: () =>
@@ -500,6 +505,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     opencode: {
       name: "OpenCode",
       cloudInitTier: "minimal",
+      preProvision: promptGithubAuth,
       install: () => installAgent(runner, "OpenCode", openCodeInstallCmd()),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -510,6 +516,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     kilocode: {
       name: "Kilo Code",
       cloudInitTier: "node",
+      preProvision: promptGithubAuth,
       install: () =>
         installAgent(
           runner,
@@ -529,6 +536,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     zeroclaw: {
       name: "ZeroClaw",
       cloudInitTier: "minimal",
+      preProvision: promptGithubAuth,
       install: async () => {
         // Add swap before building — low-memory instances (e.g., AWS nano 512 MB)
         // OOM during Rust compilation if --prefer-prebuilt falls back to source.
