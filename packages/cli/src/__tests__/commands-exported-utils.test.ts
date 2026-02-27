@@ -168,6 +168,19 @@ describe("parseAuthEnvVars", () => {
     it("should handle string with multiple + and no valid vars", () => {
       expect(parseAuthEnvVars("a + b + c")).toEqual([]);
     });
+
+    it("should handle extra whitespace around a single var", () => {
+      expect(parseAuthEnvVars("  HCLOUD_TOKEN  ")).toEqual([
+        "HCLOUD_TOKEN",
+      ]);
+    });
+
+    it("should handle empty token between + separators", () => {
+      expect(parseAuthEnvVars("VAR_A + + VAR_B")).toEqual([
+        "VAR_A",
+        "VAR_B",
+      ]);
+    });
   });
 });
 
