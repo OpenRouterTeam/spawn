@@ -276,32 +276,32 @@ export interface ServerTypeTier {
 
 export const SERVER_TYPES: ServerTypeTier[] = [
   {
-    id: "cx22",
-    label: "2 vCPU \u00b7 4 GB RAM \u00b7 40 GB (~\u20AC3.29/mo)",
+    id: "cx23",
+    label: "cx23 \u00b7 2 vCPU \u00b7 4 GB \u00b7 40 GB (~\u20AC3.49/mo, EU only)",
   },
   {
-    id: "cx32",
-    label: "4 vCPU \u00b7 8 GB RAM \u00b7 80 GB (~\u20AC5.39/mo)",
+    id: "cx33",
+    label: "cx33 \u00b7 4 vCPU \u00b7 8 GB \u00b7 80 GB (~\u20AC6.49/mo, EU only)",
   },
   {
-    id: "cx42",
-    label: "8 vCPU \u00b7 16 GB RAM \u00b7 160 GB (~\u20AC14.49/mo)",
+    id: "cx43",
+    label: "cx43 \u00b7 8 vCPU \u00b7 16 GB \u00b7 160 GB (~\u20AC14.49/mo, EU only)",
   },
   {
-    id: "cx52",
-    label: "16 vCPU \u00b7 32 GB RAM \u00b7 320 GB (~\u20AC28.49/mo)",
+    id: "cx53",
+    label: "cx53 \u00b7 16 vCPU \u00b7 32 GB \u00b7 320 GB (~\u20AC28.49/mo, EU only)",
   },
   {
-    id: "cpx21",
-    label: "3 AMD vCPU \u00b7 4 GB RAM \u00b7 80 GB (~\u20AC4.35/mo)",
+    id: "cpx22",
+    label: "cpx22 \u00b7 3 AMD vCPU \u00b7 4 GB \u00b7 80 GB (~\u20AC5.49/mo)",
   },
   {
-    id: "cpx31",
-    label: "4 AMD vCPU \u00b7 8 GB RAM \u00b7 160 GB (~\u20AC7.59/mo)",
+    id: "cpx32",
+    label: "cpx32 \u00b7 4 AMD vCPU \u00b7 8 GB \u00b7 160 GB (~\u20AC9.49/mo)",
   },
 ];
 
-export const DEFAULT_SERVER_TYPE = "cx22";
+export const DEFAULT_SERVER_TYPE = "cx23";
 
 // ─── Location Options ────────────────────────────────────────────────────────
 
@@ -341,10 +341,6 @@ export async function promptServerType(): Promise<string> {
   if (process.env.HETZNER_SERVER_TYPE) {
     logInfo(`Using server type from environment: ${process.env.HETZNER_SERVER_TYPE}`);
     return process.env.HETZNER_SERVER_TYPE;
-  }
-
-  if (process.env.SPAWN_CUSTOM !== "1") {
-    return DEFAULT_SERVER_TYPE;
   }
 
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
