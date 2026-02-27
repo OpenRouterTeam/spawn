@@ -27,7 +27,6 @@ const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]*\$?$/;
 // Special connection sentinel values (not actual IPs)
 const CONNECTION_SENTINELS = [
   "sprite-console",
-  "fly-ssh",
   "daytona-sandbox",
   "localhost",
 ];
@@ -173,7 +172,7 @@ export function validateScriptContent(script: string): void {
  * - Valid IPv4 addresses (e.g., "192.168.1.1")
  * - Valid IPv6 addresses (e.g., "::1", "2001:db8::1")
  * - Valid hostnames (e.g., "ssh.app.daytona.io")
- * - Special sentinel values ("sprite-console", "fly-ssh", "daytona-sandbox", "localhost")
+ * - Special sentinel values ("sprite-console", "daytona-sandbox", "localhost")
  *
  * @param ip - The IP address or sentinel to validate
  * @throws Error if validation fails

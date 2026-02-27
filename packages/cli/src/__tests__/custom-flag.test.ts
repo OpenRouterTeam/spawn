@@ -135,27 +135,6 @@ describe("GCP --custom prompts", () => {
   });
 });
 
-describe("Fly --custom prompts", () => {
-  const savedCustom = process.env.SPAWN_CUSTOM;
-  const savedMemory = process.env.FLY_VM_MEMORY;
-
-  afterEach(() => {
-    restoreEnv("SPAWN_CUSTOM", savedCustom);
-    restoreEnv("FLY_VM_MEMORY", savedMemory);
-  });
-
-  it("should return defaults without --custom", async () => {
-    delete process.env.FLY_VM_MEMORY;
-    delete process.env.SPAWN_CUSTOM;
-    const { DEFAULT_VM_TIER } = await import("../fly/fly");
-    // The promptVmOptions is local to main.ts, so we test the behavior
-    // via the exported DEFAULT_VM_TIER and the env-var pattern
-    expect(DEFAULT_VM_TIER.cpuKind).toBeDefined();
-    expect(DEFAULT_VM_TIER.cpus).toBeGreaterThan(0);
-    expect(DEFAULT_VM_TIER.memoryMb).toBeGreaterThan(0);
-  });
-});
-
 describe("Hetzner --custom prompts", () => {
   const savedCustom = process.env.SPAWN_CUSTOM;
   const savedServerType = process.env.HETZNER_SERVER_TYPE;

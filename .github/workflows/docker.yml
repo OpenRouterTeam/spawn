@@ -1,10 +1,10 @@
-name: Build Fly Docker Images
+name: Build Docker Images
 
 on:
   push:
     branches: [main]
     paths:
-      - "fly/docker/openclaw.Dockerfile"
+      - "sh/docker/**"
   schedule:
     # Daily: pick up new openclaw releases
     - cron: "0 6 * * *"
@@ -29,6 +29,6 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: fly/docker/openclaw.Dockerfile
+          file: sh/docker/openclaw.Dockerfile
           push: true
           tags: ghcr.io/openrouterteam/spawn-openclaw:latest

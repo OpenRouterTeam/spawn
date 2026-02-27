@@ -122,29 +122,28 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 
 ### Teammate 4: e2e-tester (model=sonnet)
 
-**Task**: Run the Fly.io E2E test suite, investigate failures, and fix broken test infrastructure.
+**Task**: Run the AWS E2E test suite, investigate failures, and fix broken test infrastructure.
 
 **Protocol**:
 1. Run the E2E suite from the main repo checkout (E2E tests provision live VMs — no worktree needed for the test runner itself):
    ```bash
    cd REPO_ROOT_PLACEHOLDER
-   chmod +x sh/e2e/fly-e2e.sh
-   ./sh/e2e/fly-e2e.sh --parallel 6
+   chmod +x sh/e2e/aws-e2e.sh
+   ./sh/e2e/aws-e2e.sh --parallel 6
    ```
 2. Capture the full output. Note which agents passed and which failed.
 3. If all agents pass: report results and you're done. No PR needed.
 4. If any agent fails, investigate the root cause. Failure categories:
 
-   **a) Provision failure** (app does not exist after provisioning):
+   **a) Provision failure** (instance does not exist after provisioning):
    - Check the stderr log in the temp directory printed at the start of the run
-   - Common causes: missing env var for headless mode, Fly.io API auth issues, agent install script changed upstream
-   - Read: `packages/cli/src/fly/agents.ts`, `packages/cli/src/shared/agent-setup.ts`, `sh/e2e/lib/provision.sh`
+   - Common causes: missing env var for headless mode, AWS API auth issues, agent install script changed upstream
+   - Read: `packages/cli/src/aws/aws.ts`, `packages/cli/src/shared/agent-setup.ts`, `sh/e2e/lib/provision.sh`
 
-   **b) Verification failure** (app exists but checks fail):
+   **b) Verification failure** (instance exists but checks fail):
    - SSH into the VM to investigate:
      ```bash
-     flyctl machines list -a APP_NAME --json | jq -r '.[0].id'
-     flyctl machine exec MACHINE_ID -a APP_NAME --timeout 30 "bash -c 'ls -la ~; cat ~/.spawnrc; echo ---; env'"
+     ssh -o StrictHostKeyChecking=no root@INSTANCE_IP "ls -la ~; cat ~/.spawnrc; echo ---; env"
      ```
    - Check if binary paths or env var names changed in `manifest.json` or `packages/cli/src/shared/agent-setup.ts`
    - Update verification checks in `sh/e2e/lib/verify.sh` if stale
@@ -161,9 +160,9 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    - `sh/e2e/lib/verify.sh` — binary paths, config file locations, env var checks
    - `sh/e2e/lib/common.sh` — API helpers, constants
    - `sh/e2e/lib/teardown.sh` — cleanup logic
-   - `sh/e2e/lib/cleanup.sh` — stale app detection
+   - `sh/e2e/lib/cleanup.sh` — stale instance detection
 7. Run `bash -n` on every modified `.sh` file
-8. Re-run the E2E suite for the failed agent(s) only: `./sh/e2e/fly-e2e.sh AGENT_NAME`
+8. Re-run the E2E suite for the failed agent(s) only: `./sh/e2e/aws-e2e.sh AGENT_NAME`
 9. If changes were made: commit, push, open draft PR with title "fix(e2e): [description]"
 10. Clean up worktree when done
 11. Report: agents tested, passed, failed, fixed

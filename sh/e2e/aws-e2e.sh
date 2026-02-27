@@ -1,13 +1,13 @@
 #!/bin/bash
-# sh/e2e/fly-e2e.sh — Main E2E test orchestrator for Spawn on Fly.io
+# sh/e2e/aws-e2e.sh — Main E2E test orchestrator for Spawn on AWS Lightsail
 #
 # Usage:
-#   ./sh/e2e/fly-e2e.sh                       # All agents, sequential
-#   ./sh/e2e/fly-e2e.sh claude                # Single agent
-#   ./sh/e2e/fly-e2e.sh claude codex opencode # Specific agents
-#   ./sh/e2e/fly-e2e.sh --parallel 2          # Parallel (2 at a time)
-#   ./sh/e2e/fly-e2e.sh --skip-cleanup        # Skip stale app cleanup
-#   ./sh/e2e/fly-e2e.sh --skip-input-test     # Skip live input tests
+#   ./sh/e2e/aws-e2e.sh                       # All agents, sequential
+#   ./sh/e2e/aws-e2e.sh claude                # Single agent
+#   ./sh/e2e/aws-e2e.sh claude codex opencode # Specific agents
+#   ./sh/e2e/aws-e2e.sh --parallel 2          # Parallel (2 at a time)
+#   ./sh/e2e/aws-e2e.sh --skip-cleanup        # Skip stale instance cleanup
+#   ./sh/e2e/aws-e2e.sh --skip-input-test     # Skip live input tests
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ while [ $# -gt 0 ]; do
       printf "\nAgents: %s\n" "${ALL_AGENTS}"
       printf "\nOptions:\n"
       printf "  --parallel N       Run N agents in parallel (default: sequential)\n"
-      printf "  --skip-cleanup     Skip stale e2e-* app cleanup\n"
+      printf "  --skip-cleanup     Skip stale e2e-* instance cleanup\n"
       printf "  --skip-input-test  Skip live input tests (send prompt, check response)\n"
       printf "  --help             Show this help\n"
       exit 0
@@ -90,12 +90,12 @@ if [ -z "${AGENTS_TO_TEST}" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Final cleanup trap — tear down any tracked apps on exit
+# Final cleanup trap — tear down any tracked instances on exit
 # ---------------------------------------------------------------------------
 final_cleanup() {
   if [ -n "${_TRACKED_APPS}" ]; then
     printf "\n"
-    log_warn "Cleaning up tracked apps on exit..."
+    log_warn "Cleaning up tracked instances on exit..."
     for app in ${_TRACKED_APPS}; do
       log_step "Tearing down ${app}..."
       teardown_agent "${app}" 2>/dev/null || log_warn "Failed to tear down ${app}"
@@ -111,7 +111,7 @@ trap final_cleanup EXIT
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-log_header "Spawn E2E Test Suite (Fly.io)"
+log_header "Spawn E2E Test Suite (AWS Lightsail)"
 log_info "Agents: ${AGENTS_TO_TEST}"
 log_info "Parallel: ${PARALLEL_COUNT:-sequential}"
 if [ "${SKIP_INPUT_TEST}" -eq 1 ]; then

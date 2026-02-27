@@ -1,5 +1,5 @@
 #!/bin/bash
-# e2e/lib/provision.sh — Provision an agent VM via spawn CLI (headless)
+# e2e/lib/provision.sh — Provision an agent VM via spawn CLI on AWS Lightsail (headless)
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
@@ -8,7 +8,7 @@ set -eo pipefail
 # Runs spawn in headless mode with a timeout. The provision process hangs on
 # the interactive SSH session (step 12 of the orchestration), so we kill it
 # after PROVISION_TIMEOUT seconds. The install itself usually succeeds; we
-# verify via app existence and .spawnrc presence afterward.
+# verify via instance existence and .spawnrc presence afterward.
 # ---------------------------------------------------------------------------
 provision_agent() {
   local agent="$1"
@@ -34,28 +34,18 @@ provision_agent() {
   rm -f "${exit_file}"
 
   # Environment for headless provisioning
-  # FLY_API_TOKEN="" forces spawn to use flyctl stored credentials (see plan section 6)
   # MODEL_ID bypasses the interactive model selection prompt (required by openclaw)
-  #
-  # Validate flyctl is authenticated before proceeding with empty token fallback
-  if [ -z "${FLY_API_TOKEN:-}" ]; then
-    if ! flyctl auth whoami >/dev/null 2>&1; then
-      log_err "FLY_API_TOKEN is empty and flyctl is not authenticated. Run: flyctl auth login"
-      return 1
-    fi
-  fi
   (
     export SPAWN_NON_INTERACTIVE=1
     export SPAWN_SKIP_GITHUB_AUTH=1
     export SPAWN_SKIP_API_VALIDATION=1
     export MODEL_ID="${MODEL_ID:-openrouter/auto}"
-    export FLY_APP_NAME="${app_name}"
-    export FLY_REGION="${FLY_REGION}"
-    export FLY_VM_MEMORY="${FLY_VM_MEMORY}"
-    export FLY_API_TOKEN=""
+    export AWS_LIGHTSAIL_INSTANCE_NAME="${app_name}"
+    export AWS_REGION="${AWS_REGION}"
+    export AWS_BUNDLE="${AWS_BUNDLE}"
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
-    bun run "${cli_entry}" "${agent}" fly --headless --output json \
+    bun run "${cli_entry}" "${agent}" aws --headless --output json \
       > "${stdout_file}" 2> "${stderr_file}"
     printf '%s' "$?" > "${exit_file}"
   ) &
@@ -84,22 +74,15 @@ provision_agent() {
     exit_code=$(cat "${exit_file}")
   fi
 
-  # Even if provision "failed" (timeout), the app may exist and install may have completed.
-  # Verify app existence via flyctl + REST API fallback.
+  # Even if provision "failed" (timeout), the instance may exist and install may have completed.
+  # Verify instance existence via AWS CLI.
   local app_exists=0
-  if flyctl status -a "${app_name}" >/dev/null 2>&1; then
+  if aws lightsail get-instance --instance-name "${app_name}" --region "${AWS_REGION}" >/dev/null 2>&1; then
     app_exists=1
-  else
-    # REST API fallback
-    local api_result
-    api_result=$(fly_api GET "/apps/${app_name}/machines" 2>/dev/null || true)
-    if printf '%s' "${api_result}" | jq -e '.[0].id' >/dev/null 2>&1; then
-      app_exists=1
-    fi
   fi
 
   if [ "${app_exists}" -eq 0 ]; then
-    log_err "App ${app_name} does not exist after provisioning"
+    log_err "Instance ${app_name} does not exist after provisioning"
     if [ -f "${stderr_file}" ]; then
       log_err "Stderr tail:"
       tail -20 "${stderr_file}" >&2 || true
@@ -107,14 +90,34 @@ provision_agent() {
     return 1
   fi
 
-  log_ok "App ${app_name} exists"
+  log_ok "Instance ${app_name} exists"
+
+  # Resolve instance public IP
+  local instance_ip
+  instance_ip=$(aws lightsail get-instance \
+    --instance-name "${app_name}" \
+    --region "${AWS_REGION}" \
+    --query 'instance.publicIpAddress' \
+    --output text 2>/dev/null || true)
+
+  if [ -z "${instance_ip}" ] || [ "${instance_ip}" = "None" ]; then
+    log_err "Could not resolve public IP for ${app_name}"
+    return 1
+  fi
+
+  log_ok "Instance IP: ${instance_ip}"
+
+  # Store IP in a file for verify/teardown to read
+  printf '%s' "${instance_ip}" > "${log_dir}/${app_name}.ip"
 
   # Wait for install to complete (.spawnrc is written near the end)
   log_step "Waiting for install to complete (polling .spawnrc, up to ${INSTALL_WAIT}s)..."
   local install_waited=0
   local install_ok=0
   while [ "${install_waited}" -lt "${INSTALL_WAIT}" ]; do
-    if fly_ssh "${app_name}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
+    if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+         -o LogLevel=ERROR -o BatchMode=yes \
+         "ubuntu@${instance_ip}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
       install_ok=1
       break
     fi

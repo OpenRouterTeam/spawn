@@ -2,13 +2,13 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Base packages (matches waitForCloudInit in fly.ts)
+# Base packages
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
       curl git ca-certificates build-essential unzip xz-utils zsh && \
     rm -rf /var/lib/apt/lists/*
 
-# Node.js 22 via apt + n (matches fly.ts cloud-init strategy)
+# Node.js 22 via apt + n
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends nodejs npm && \
     npm install -g n && n 22 && \
