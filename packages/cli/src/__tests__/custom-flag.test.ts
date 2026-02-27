@@ -18,27 +18,6 @@ describe("--custom flag", () => {
     });
   });
 
-  describe("SPAWN_CUSTOM env var propagation", () => {
-    const savedCustom = process.env.SPAWN_CUSTOM;
-
-    afterEach(() => {
-      if (savedCustom !== undefined) {
-        process.env.SPAWN_CUSTOM = savedCustom;
-      } else {
-        delete process.env.SPAWN_CUSTOM;
-      }
-    });
-
-    it("should be readable from process.env", () => {
-      process.env.SPAWN_CUSTOM = "1";
-      expect(process.env.SPAWN_CUSTOM).toBe("1");
-    });
-
-    it("should be unset by default", () => {
-      delete process.env.SPAWN_CUSTOM;
-      expect(process.env.SPAWN_CUSTOM).toBeUndefined();
-    });
-  });
 });
 
 describe("AWS --custom prompts", () => {
