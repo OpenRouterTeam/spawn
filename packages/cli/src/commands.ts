@@ -2786,7 +2786,6 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
     );
   }
 
-
   // Handle SSH connections
   p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
   const sshCmd = `ssh ${connection.user}@${connection.ip}`;
@@ -2870,7 +2869,6 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
       `sprite console -s ${connection.server_name} -- bash -lc '${remoteCmd}'`,
     );
   }
-
 
   // Handle Daytona sandbox connections
   if (connection.ip === "daytona-sandbox" && connection.server_id) {
