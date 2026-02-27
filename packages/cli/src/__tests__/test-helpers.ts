@@ -74,13 +74,6 @@ export function createConsoleMocks() {
   };
 }
 
-export function createProcessExitMock() {
-  const impl: () => never = () => {
-    throw new Error("process.exit");
-  };
-  return spyOn(process, "exit").mockImplementation(impl);
-}
-
 export function restoreMocks(
   ...mocks: Array<
     | {
@@ -102,17 +95,6 @@ export function mockSuccessfulFetch(data: any) {
 
 export function mockFailedFetch(error = "Network error") {
   return mock(() => Promise.reject(new Error(error)));
-}
-
-export function mockFetchWithStatus(status: number, data?: any) {
-  return mock(() =>
-    Promise.resolve(
-      new Response(JSON.stringify(data || {}), {
-        status,
-        statusText: status === 404 ? "Not Found" : "Error",
-      }),
-    ),
-  );
 }
 
 // ── Test Environment Setup ─────────────────────────────────────────────────────
