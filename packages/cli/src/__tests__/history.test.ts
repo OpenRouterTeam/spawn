@@ -75,7 +75,9 @@ describe("history", () => {
     it("throws for SPAWN_HOME pointing to /root when user home is different", () => {
       // This test only makes sense when $HOME is not /root — skip on root-owned CI
       const home = homedir();
-      if (home === "/root") { return; }
+      if (home === "/root") {
+        return;
+      }
       process.env.SPAWN_HOME = "/root/.spawn";
       expect(() => getSpawnDir()).toThrow("must be within your home directory");
     });
