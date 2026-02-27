@@ -2868,7 +2868,13 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
       parts.push(preLaunch);
     }
     parts.push(launchCmd);
-    remoteCmd = parts.join("; ");
+    remoteCmd = parts.reduce((acc, part) => {
+      if (!acc) {
+        return part;
+      }
+      const sep = acc.trimEnd().endsWith("&") ? " " : "; ";
+      return acc + sep + part;
+    }, "");
   }
 
   const agentName = agentDef?.name || agentKey;
