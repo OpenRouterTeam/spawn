@@ -318,5 +318,4 @@ describe("Commands Display Output", () => {
       expect(output).toContain("spawn claude digitalocean");
     });
   });
-
 });
