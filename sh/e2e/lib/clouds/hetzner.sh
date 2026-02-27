@@ -155,7 +155,7 @@ _hetzner_exec_long() {
       -o BatchMode=yes \
       -o ConnectTimeout=10 \
       -o ServerAliveInterval=15 \
-      "root@${ip}" "timeout ${timeout_secs} sh -c '${cmd}'"
+      "root@${ip}" "timeout ${timeout_secs} bash -c '${cmd}'"
 }
 
 # ---------------------------------------------------------------------------

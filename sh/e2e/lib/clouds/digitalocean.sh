@@ -182,7 +182,7 @@ _digitalocean_exec_long() {
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
       -o "ServerAliveInterval=15" -o "ServerAliveCountMax=$((timeout_secs / 15 + 1))" \
-      "root@${ip}" "timeout ${timeout_secs} sh -c '${cmd}'"
+      "root@${ip}" "timeout ${timeout_secs} bash -c '${cmd}'"
 }
 
 # ---------------------------------------------------------------------------

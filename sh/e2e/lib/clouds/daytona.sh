@@ -229,7 +229,7 @@ _daytona_exec_long() {
   fi
 
   # shellcheck disable=SC2086
-  ssh ${ssh_args} "${_DT_TOKEN}@${_DT_HOST}" "timeout ${timeout} sh -c '${cmd}'"
+  ssh ${ssh_args} "${_DT_TOKEN}@${_DT_HOST}" "timeout ${timeout} bash -c '${cmd}'"
 }
 
 # ---------------------------------------------------------------------------

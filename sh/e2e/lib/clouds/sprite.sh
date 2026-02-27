@@ -118,7 +118,7 @@ _sprite_exec_long() {
   local cmd="$2"
   local timeout="${3:-120}"
 
-  sprite exec -s "${app}" -- bash -c "timeout ${timeout} sh -c '${cmd}'"
+  sprite exec -s "${app}" -- bash -c "timeout ${timeout} bash -c '${cmd}'"
 }
 
 # ---------------------------------------------------------------------------

@@ -181,7 +181,7 @@ _aws_exec_long() {
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
       -o "ServerAliveInterval=15" -o "ServerAliveCountMax=${alive_count}" \
-      "ubuntu@${_AWS_INSTANCE_IP}" "timeout ${timeout} sh -c '${cmd}'"
+      "ubuntu@${_AWS_INSTANCE_IP}" "timeout ${timeout} bash -c '${cmd}'"
 }
 
 # ---------------------------------------------------------------------------
