@@ -39,7 +39,6 @@ import {
   getHistoryPath,
 } from "./history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "./guidance-data.js";
-import { destroyServer as flyDestroyServer, ensureFlyCli, ensureFlyToken } from "./fly/fly.js";
 import { destroyServer as hetznerDestroyServer, ensureHcloudToken } from "./hetzner/hetzner.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "./digitalocean/digitalocean.js";
 import {
@@ -424,7 +423,6 @@ const CLOUD_CLI_MAP: Record<string, string> = {
   gcp: "gcloud",
   aws: "aws",
 
-  fly: "flyctl",
   sprite: "sprite",
   hetzner: "hcloud",
   digitalocean: "doctl",
@@ -2290,13 +2288,6 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
   };
 
   switch (conn.cloud) {
-    case "fly":
-      return tryDelete(async () => {
-        await ensureFlyCli();
-        await ensureFlyToken();
-        await flyDestroyServer(id);
-      });
-
     case "hetzner":
       return tryDelete(async () => {
         await ensureHcloudToken();
@@ -2436,11 +2427,9 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
       hint:
         conn.ip === "sprite-console"
           ? `sprite console -s ${conn.server_name}`
-          : conn.ip === "fly-ssh"
-            ? `fly ssh console -a ${conn.server_name}`
-            : conn.ip === "daytona-sandbox"
-              ? `daytona ssh ${conn.server_id}`
-              : `ssh ${conn.user}@${conn.ip}`,
+          : conn.ip === "daytona-sandbox"
+            ? `daytona ssh ${conn.server_id}`
+            : `ssh ${conn.user}@${conn.ip}`,
     });
   }
 
@@ -2797,22 +2786,6 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
     );
   }
 
-  // Handle Fly.io SSH connections (uses flyctl, not direct SSH)
-  if (connection.ip === "fly-ssh" && connection.server_name) {
-    p.log.step(`Connecting to Fly.io app ${pc.bold(connection.server_name)}...`);
-    return runInteractiveCommand(
-      "fly",
-      [
-        "ssh",
-        "console",
-        "-a",
-        connection.server_name,
-        "--pty",
-      ],
-      "Fly.io SSH connection failed",
-      `fly ssh console -a ${connection.server_name}`,
-    );
-  }
 
   // Handle SSH connections
   p.log.step(`Connecting to ${pc.bold(connection.ip)}...`);
@@ -2898,29 +2871,6 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
     );
   }
 
-  // Handle Fly.io SSH connections
-  if (connection.ip === "fly-ssh" && connection.server_name) {
-    p.log.step(`Entering ${pc.bold(agentName)} on Fly.io app ${pc.bold(connection.server_name)}...`);
-    // Wrap in bash -c to ensure shell builtins (source, export) and operators (;) are
-    // interpreted correctly — fly ssh console -C exec's the command directly without a
-    // shell, so semicolons and builtins would fail without this wrapper.
-    // This matches how interactiveSession() and runServer() handle fly commands.
-    const escapedCmd = remoteCmd.replace(/'/g, "'\\''");
-    return runInteractiveCommand(
-      "fly",
-      [
-        "ssh",
-        "console",
-        "-a",
-        connection.server_name,
-        "--pty",
-        "-C",
-        `bash -c '${escapedCmd}'`,
-      ],
-      `Failed to enter ${agentName}`,
-      `fly ssh console -a ${connection.server_name} --pty -C 'bash -c ${escapedCmd}'`,
-    );
-  }
 
   // Handle Daytona sandbox connections
   if (connection.ip === "daytona-sandbox" && connection.server_id) {
@@ -3377,7 +3327,7 @@ function getHelpExamplesSection(): string {
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
   spawn codex sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
-  spawn openclaw fly -f instructions.txt
+  spawn openclaw aws -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
   spawn opencode gcp --dry-run       ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}

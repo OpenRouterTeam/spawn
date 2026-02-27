@@ -7,7 +7,7 @@ set -eo pipefail
 # RUN_MODE=quality  — agent team: test-runner + dedup-scanner + code-quality-reviewer + e2e-tester (reason=schedule/workflow_dispatch, 40 min)
 # RUN_MODE=fixtures — single agent: collect API fixtures from cloud providers (reason=fixtures, 20 min)
 # RUN_MODE=issue    — single agent: investigate and fix a specific issue (reason=issues, 15 min)
-# RUN_MODE=e2e      — single agent: run Fly.io E2E tests, investigate failures (reason=e2e, 20 min)
+# RUN_MODE=e2e      — single agent: run AWS E2E tests, investigate failures (reason=e2e, 20 min)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"

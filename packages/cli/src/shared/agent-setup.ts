@@ -353,7 +353,7 @@ export async function setupOpenclawBatched(
 export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   // Start the daemon AND wait for port 18789 in a single SSH session.
-  // The polling loop doubles as a keepalive for flyctl.
+  // The polling loop doubles as a keepalive for the SSH session.
   const script =
     "source ~/.spawnrc 2>/dev/null; " +
     "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +

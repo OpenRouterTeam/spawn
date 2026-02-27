@@ -271,24 +271,6 @@
       },
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/hetzner.png"
     },
-    "fly": {
-      "name": "Fly.io",
-      "description": "Deploy globally on Fly.io with free-tier VMs",
-      "url": "https://fly.io",
-      "type": "api+cli",
-      "auth": "FLY_API_TOKEN",
-      "provision_method": "POST /v1/apps + POST /v1/apps/{app}/machines",
-      "exec_method": "fly ssh console -C",
-      "interactive_method": "fly ssh console",
-      "defaults": {
-        "region": "iad",
-        "vm_size": "shared-cpu-1x",
-        "vm_memory": 1024,
-        "image": "ubuntu:24.04"
-      },
-      "notes": "Uses Machines API for provisioning and flyctl SSH for exec. Docker-based, pay-per-second pricing. Requires flyctl CLI.",
-      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/fly.png"
-    },
     "aws": {
       "name": "AWS Lightsail",
       "description": "Simple AWS instances starting at $3.50/mo",
@@ -381,12 +363,6 @@
     "hetzner/codex": "implemented",
     "hetzner/opencode": "implemented",
     "hetzner/kilocode": "implemented",
-    "fly/claude": "implemented",
-    "fly/openclaw": "implemented",
-    "fly/zeroclaw": "implemented",
-    "fly/codex": "implemented",
-    "fly/opencode": "implemented",
-    "fly/kilocode": "implemented",
     "aws/claude": "implemented",
     "aws/openclaw": "implemented",
     "aws/zeroclaw": "implemented",

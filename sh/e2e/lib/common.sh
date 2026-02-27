@@ -1,17 +1,16 @@
 #!/bin/bash
-# e2e/lib/common.sh — Constants, logging, env validation, Fly API helpers
+# e2e/lib/common.sh — Constants, logging, env validation for AWS Lightsail E2E
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 ALL_AGENTS="claude openclaw zeroclaw codex opencode kilocode"
-FLY_API_BASE="https://api.machines.dev/v1"
 PROVISION_TIMEOUT="${PROVISION_TIMEOUT:-480}"
 INSTALL_WAIT="${INSTALL_WAIT:-120}"
 INPUT_TEST_TIMEOUT="${INPUT_TEST_TIMEOUT:-120}"
-FLY_REGION="${FLY_REGION:-iad}"
-FLY_VM_MEMORY="${FLY_VM_MEMORY:-2048}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_BUNDLE="${AWS_BUNDLE:-nano_3_0}"
 
 # Colors
 RED='\033[0;31m'
@@ -22,7 +21,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-# Tracked apps for cleanup on exit
+# Tracked instances for cleanup on exit
 _TRACKED_APPS=""
 
 # ---------------------------------------------------------------------------
@@ -59,8 +58,8 @@ require_env() {
   local missing=0
 
   # Check required tools
-  if ! command -v flyctl >/dev/null 2>&1; then
-    log_err "flyctl not found. Install from https://fly.io/docs/flyctl/install/"
+  if ! command -v aws >/dev/null 2>&1; then
+    log_err "aws CLI not found. Install from https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
     missing=1
   fi
 
@@ -80,21 +79,12 @@ require_env() {
     missing=1
   fi
 
-  # Check / generate FLY_API_TOKEN
-  if [ -z "${FLY_API_TOKEN:-}" ]; then
-    log_info "FLY_API_TOKEN not set, generating via flyctl..."
-    FLY_API_TOKEN=$(flyctl tokens create org personal --expiry 8h 2>/dev/null || true)
-    if [ -z "${FLY_API_TOKEN:-}" ]; then
-      log_warn "Could not generate token. Falling back to flyctl stored credentials."
-      # Validate flyctl is authenticated
-      if ! flyctl auth whoami >/dev/null 2>&1; then
-        log_err "flyctl is not authenticated. Run: flyctl auth login"
-        missing=1
-      fi
-    else
-      export FLY_API_TOKEN
-      log_ok "Generated FLY_API_TOKEN (expires in 8h)"
-    fi
+  # Validate AWS credentials
+  if ! aws sts get-caller-identity --region "${AWS_REGION}" >/dev/null 2>&1; then
+    log_err "AWS credentials are not valid. Run: aws configure"
+    missing=1
+  else
+    log_ok "AWS credentials validated"
   fi
 
   if [ "${missing}" -eq 1 ]; then
@@ -103,44 +93,6 @@ require_env() {
 
   log_ok "Environment validated"
   return 0
-}
-
-# ---------------------------------------------------------------------------
-# Fly API helper
-# ---------------------------------------------------------------------------
-# fly_api METHOD ENDPOINT [BODY]
-# Calls the Fly Machines REST API.
-fly_api() {
-  local method="$1"
-  local endpoint="$2"
-  local body="${3:-}"
-  local url="${FLY_API_BASE}${endpoint}"
-  local auth_header
-
-  # Detect token format for auth header
-  local token="${FLY_API_TOKEN:-}"
-  if [ -z "${token}" ]; then
-    # If no token, try to get one from flyctl
-    token=$(flyctl auth token 2>/dev/null || true)
-  fi
-
-  if [ -z "${token}" ]; then
-    log_err "No Fly API token available"
-    return 1
-  fi
-
-  # FlyV1 tokens start with FlyV1, otherwise use Bearer
-  case "${token}" in
-    FlyV1\ *) auth_header="Authorization: ${token}" ;;
-    *)        auth_header="Authorization: Bearer ${token}" ;;
-  esac
-
-  local curl_args=("-s" "-X" "${method}" "-H" "${auth_header}" "-H" "Content-Type: application/json")
-  if [ -n "${body}" ]; then
-    curl_args+=("-d" "${body}")
-  fi
-
-  curl "${curl_args[@]}" "${url}"
 }
 
 # ---------------------------------------------------------------------------

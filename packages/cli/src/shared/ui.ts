@@ -1,5 +1,5 @@
 // shared/ui.ts — Logging, prompts, and browser opening
-// @clack/prompts is bundled into fly.js at build time.
+// @clack/prompts is bundled into cli.js at build time.
 
 import * as p from "@clack/prompts";
 import { isString } from "@openrouter/spawn-shared";
