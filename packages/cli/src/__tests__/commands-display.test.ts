@@ -514,14 +514,11 @@ describe("Commands Display Output", () => {
       await loadManifest(true);
 
       await cmdAgents();
-      const calls = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
-      // Both agents should show 0 clouds
-      const agentLines = calls.filter((line: string) => line.includes("claude") || line.includes("codex"));
-      for (const line of agentLines) {
-        if (line.includes("cloud")) {
-          expect(line).toContain("0 clouds");
-        }
-      }
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+      // Every agent line always contains the cloud count — assert directly
+      expect(output).toContain("claude");
+      expect(output).toContain("codex");
+      expect(output).toContain("0 clouds");
     });
   });
 
@@ -533,13 +530,11 @@ describe("Commands Display Output", () => {
       await loadManifest(true);
 
       await cmdClouds();
-      const calls = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" "));
-      const cloudLines = calls.filter((line: string) => line.includes("sprite") || line.includes("hetzner"));
-      for (const line of cloudLines) {
-        if (line.includes("agent")) {
-          expect(line).toContain("0 agents");
-        }
-      }
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
+      // Every cloud line always contains the agent count — assert directly
+      expect(output).toContain("sprite");
+      expect(output).toContain("hetzner");
+      expect(output).toContain("0/2");
     });
   });
 });

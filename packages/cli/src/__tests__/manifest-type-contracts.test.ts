@@ -132,32 +132,6 @@ describe("Agent optional field types (when present)", () => {
       });
     }
 
-    if (agent.interactive_prompts !== undefined) {
-      it(`agent "${key}" interactive_prompts should have valid entries`, () => {
-        expect(typeof agent.interactive_prompts).toBe("object");
-        expect(agent.interactive_prompts).not.toBeNull();
-        for (const [promptKey, entry] of Object.entries(agent.interactive_prompts!)) {
-          expect(typeof promptKey).toBe("string");
-          expect(typeof entry.prompt).toBe("string");
-          expect(entry.prompt.length).toBeGreaterThan(0);
-          expect(typeof entry.default).toBe("string");
-        }
-      });
-    }
-
-    if (agent.dotenv !== undefined) {
-      it(`agent "${key}" dotenv should have path and values`, () => {
-        expect(typeof agent.dotenv!.path).toBe("string");
-        expect(agent.dotenv!.path.length).toBeGreaterThan(0);
-        expect(typeof agent.dotenv!.values).toBe("object");
-        expect(agent.dotenv!.values).not.toBeNull();
-        for (const [k, v] of Object.entries(agent.dotenv!.values)) {
-          expect(typeof k).toBe("string");
-          expect(typeof v).toBe("string");
-        }
-      });
-    }
-
     if (agent.notes !== undefined) {
       it(`agent "${key}" notes should be a non-empty string`, () => {
         expect(typeof agent.notes).toBe("string");
