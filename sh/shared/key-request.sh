@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shell helpers for API key provisioning
-# Sourced by qa.sh (fixtures mode) for key loading and stale key handling
+# Sourced by QA/CI harnesses for key loading and stale key handling
 #
 # Requires: jq or bun, curl, REPO_ROOT set, log() function defined by caller
 #
