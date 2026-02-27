@@ -463,8 +463,8 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           runner,
           "Codex CLI",
           "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @openai/codex && " +
-            "grep -q '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; " +
-            "grep -q '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc",
+            "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
+            "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -482,7 +482,9 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "openclaw",
-          "source ~/.bashrc && mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw",
+          "source ~/.bashrc && mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw && " +
+            "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
+            "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
@@ -513,8 +515,8 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           runner,
           "Kilo Code",
           "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @kilocode/cli && " +
-            "grep -q '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; " +
-            "grep -q '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc",
+            "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
+            "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
