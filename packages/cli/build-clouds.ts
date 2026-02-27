@@ -5,7 +5,7 @@
 //
 // Usage:
 //   bun run cli/build-clouds.ts          # build all clouds
-//   bun run cli/build-clouds.ts fly      # build specific cloud
+//   bun run cli/build-clouds.ts aws      # build specific cloud
 
 import { readdirSync, existsSync } from "fs";
 import path from "path";

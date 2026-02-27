@@ -24,7 +24,6 @@ describe("validateConnectionIP", () => {
 
     it("should accept special sentinel values", () => {
       expect(() => validateConnectionIP("sprite-console")).not.toThrow();
-      expect(() => validateConnectionIP("fly-ssh")).not.toThrow();
       expect(() => validateConnectionIP("daytona-sandbox")).not.toThrow();
       expect(() => validateConnectionIP("localhost")).not.toThrow();
     });
