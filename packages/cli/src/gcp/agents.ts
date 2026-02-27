@@ -1,10 +1,7 @@
 // gcp/agents.ts — GCP Compute Engine agent configs (thin wrapper over shared)
 
 import { runServer, uploadFile } from "./gcp";
-import {
-  createAgents,
-  resolveAgent as _resolveAgent,
-} from "../shared/agent-setup";
+import { createAgents, resolveAgent as _resolveAgent } from "../shared/agent-setup";
 import type { AgentConfig } from "../shared/agents";
 import { generateEnvConfig } from "../shared/agents";
 

@@ -1,10 +1,7 @@
 // hetzner/agents.ts — Hetzner Cloud agent configs (thin wrapper over shared)
 
 import { runServer, uploadFile } from "./hetzner";
-import {
-  createAgents,
-  resolveAgent as _resolveAgent,
-} from "../shared/agent-setup";
+import { createAgents, resolveAgent as _resolveAgent } from "../shared/agent-setup";
 import type { AgentConfig } from "../shared/agents";
 import { generateEnvConfig } from "../shared/agents";
 

@@ -1,10 +1,7 @@
 // local/agents.ts — Local machine agent configs (thin wrapper over shared)
 
 import { runLocal, uploadFile } from "./local";
-import {
-  createAgents,
-  resolveAgent as _resolveAgent,
-} from "../shared/agent-setup";
+import { createAgents, resolveAgent as _resolveAgent } from "../shared/agent-setup";
 import type { AgentConfig } from "../shared/agents";
 import { generateEnvConfig } from "../shared/agents";
 

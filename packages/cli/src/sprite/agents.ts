@@ -1,10 +1,7 @@
 // sprite/agents.ts — Sprite agent configs (thin wrapper over shared)
 
 import { runSprite, uploadFileSprite } from "./sprite";
-import {
-  createAgents,
-  resolveAgent as _resolveAgent,
-} from "../shared/agent-setup";
+import { createAgents, resolveAgent as _resolveAgent } from "../shared/agent-setup";
 import type { AgentConfig } from "../shared/agents";
 import { generateEnvConfig } from "../shared/agents";
 
