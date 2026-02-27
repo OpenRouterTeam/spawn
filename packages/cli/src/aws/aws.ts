@@ -46,7 +46,10 @@ const AwsCredsSchema = v.object({
 
 export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
   const dir = AWS_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   const payload = `{\n  "accessKeyId": ${jsonEscape(accessKeyId)},\n  "secretAccessKey": ${jsonEscape(secretAccessKey)},\n  "region": ${jsonEscape(region)}\n}\n`;
   await Bun.write(AWS_CONFIG_PATH, payload, {
     mode: 0o600,

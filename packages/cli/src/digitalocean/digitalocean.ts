@@ -161,7 +161,10 @@ function loadConfig(): DoConfig | null {
 
 async function saveConfig(config: DoConfig): Promise<void> {
   const dir = DO_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   await Bun.write(DO_CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", {
     mode: 0o600,
   });
