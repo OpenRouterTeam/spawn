@@ -419,11 +419,8 @@ describe("history", () => {
     });
   });
 
-  // ── formatTimestamp (imported via commands.ts, tested inline) ──────────
-
-  describe("formatTimestamp edge cases (via cmdList integration)", () => {
-    // formatTimestamp is not exported from history.ts, but we test the
-    // timestamp handling indirectly through loadHistory round-trip
+  describe("timestamp round-trip", () => {
+    // timestamp handling tested indirectly through loadHistory round-trip
     it("preserves ISO timestamp strings through save/load cycle", () => {
       const ts = "2026-02-11T14:30:00.000Z";
       saveSpawnRecord({
