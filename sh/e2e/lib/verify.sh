@@ -125,7 +125,7 @@ input_test_codex() {
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; \
-    export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(echo '${encoded_prompt}' | base64 -d); codex -q \"\$PROMPT\" 2>/dev/null"
 
@@ -159,7 +159,7 @@ input_test_openclaw() {
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(echo '${encoded_prompt}' | base64 -d); openclaw -p \"\$PROMPT\" 2>/dev/null"
 
@@ -331,9 +331,9 @@ verify_openclaw() {
   local app="$1"
   local failures=0
 
-  # Binary check
+  # Binary check (openclaw installed in $HOME/.npm-global/bin via npm install -g)
   log_step "Checking openclaw binary..."
-  if fly_ssh "${app}" "PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
+  if fly_ssh "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
     log_ok "openclaw binary found"
   else
     log_err "openclaw binary not found"
