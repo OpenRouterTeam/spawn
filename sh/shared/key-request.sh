@@ -121,8 +121,8 @@ process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
             # downstream in unquoted expansions, eval contexts, or logging
             # Allow alphanumeric plus safe chars needed by real tokens:
             #   - _ . / @  (standard API key chars)
-            #   : + =      (base64 segments, URL-style formats)
-            #   space       (Fly.io "FlyV1 <macaroon>" prefixed tokens)
+            #   : + =      (base64 segments, URL-safe and base64 formats)
+            #   space       (prefixed token formats, e.g., "Bearer <token>")
             # Must match CLI's loadTokenFromConfig regex in cli/src/digitalocean/digitalocean.ts
             if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
                 log "SECURITY: Invalid characters in config value for ${var_name}"
