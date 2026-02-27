@@ -2634,6 +2634,10 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
 }
 
 export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Promise<void> {
+  const resolved = await resolveListFilters(agentFilter, cloudFilter);
+  agentFilter = resolved.agentFilter;
+  cloudFilter = resolved.cloudFilter;
+
   const servers = getActiveServers();
 
   let filtered = servers;
