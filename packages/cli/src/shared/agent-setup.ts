@@ -394,9 +394,7 @@ allow_destructive = true
 policy = "allow_all"
 `;
   const patchB64 = Buffer.from(patch).toString("base64");
-  await runner.runServer(
-    `printf '%s' '${patchB64}' | base64 -d >> ~/.zeroclaw/config.toml`,
-  );
+  await runner.runServer(`printf '%s' '${patchB64}' | base64 -d >> ~/.zeroclaw/config.toml`);
   logInfo("ZeroClaw configured for autonomous operation");
 }
 
