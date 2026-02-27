@@ -45,7 +45,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    - If tests still fail after 2 fix attempts, report the failures without further attempts
 5. Run `bash -n` on all `.sh` files that were recently modified (use `git log --since="7 days ago" --name-only -- '*.sh'`)
 6. Report: total tests, passed, failed, fixed count
-7. If changes were made: commit, push, open draft PR with title "fix: Fix failing tests" and body explaining what was fixed
+7. If changes were made: commit, push, open a PR (NOT draft) with title "fix: Fix failing tests" and body explaining what was fixed
 8. Clean up worktree when done
 9. **SIGN-OFF**: `-- qa/test-runner`
 
@@ -80,7 +80,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 
 4. For each finding: fix it (consolidate, rewrite, or remove)
 5. Run `bun test` to verify no regressions
-6. If changes were made: commit, push, open draft PR with title "test: Remove duplicate and theatrical tests"
+6. If changes were made: commit, push, open a PR (NOT draft) with title "test: Remove duplicate and theatrical tests"
 7. Clean up worktree when done
 8. Report: duplicates found, tests removed, tests rewritten
 9. **SIGN-OFF**: `-- qa/dedup-scanner`
@@ -115,7 +115,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
 4. For each finding: fix it
 5. Run `bash -n` on every modified `.sh` file
 6. Run `bun test` to verify no regressions
-7. If changes were made: commit, push, open draft PR with title "refactor: Remove dead code and stale references"
+7. If changes were made: commit, push, open a PR (NOT draft) with title "refactor: Remove dead code and stale references"
 8. Clean up worktree when done
 9. Report: issues found by category, files modified
 10. **SIGN-OFF**: `-- qa/code-quality`
@@ -163,7 +163,7 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/TASK_N
    - `sh/e2e/lib/cleanup.sh` — stale instance detection
 7. Run `bash -n` on every modified `.sh` file
 8. Re-run the E2E suite for the failed agent(s) only: `./sh/e2e/aws-e2e.sh AGENT_NAME`
-9. If changes were made: commit, push, open draft PR with title "fix(e2e): [description]"
+9. If changes were made: commit, push, open a PR (NOT draft) with title "fix(e2e): [description]"
 10. Clean up worktree when done
 11. Report: agents tested, passed, failed, fixed
 12. **SIGN-OFF**: `-- qa/e2e-tester`
@@ -225,7 +225,7 @@ You use **spawn teams**. Messages arrive AUTOMATICALLY. Do NOT poll for messages
 ## Safety
 
 - Always use worktrees for all work
-- NEVER commit directly to main — always open draft PRs
+- NEVER commit directly to main — always open PRs (do NOT use `--draft` — the security bot reviews and merges non-draft PRs; draft PRs get closed as stale)
 - Run `bash -n` on every modified `.sh` file before committing
 - Run `bun test` before opening any PR
 - Limit to at most 4 concurrent teammates
