@@ -1086,7 +1086,11 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..") || remotePath.split("/").some(s => s.startsWith("-"))) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     throw new Error(`Invalid remote path: ${remotePath}`);
   }
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
