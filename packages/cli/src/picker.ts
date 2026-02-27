@@ -121,7 +121,13 @@ type WriteFn = (s: string) => void;
 interface KeyLoopCallbacks<T> {
   fallback: () => T;
   init: (w: WriteFn, cols: number) => void;
-  handleKey: (key: string, w: WriteFn) => { done: boolean; result?: T };
+  handleKey: (
+    key: string,
+    w: WriteFn,
+  ) => {
+    done: boolean;
+    result?: T;
+  };
 }
 
 /**
@@ -141,9 +147,19 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
   }
 
   // ── save terminal settings ──────────────────────────────────────────────
-  const savedRes = spawnSync("stty", ["-g"], {
-    stdio: [ttyFd, "pipe", "pipe"],
-  });
+  const savedRes = spawnSync(
+    "stty",
+    [
+      "-g",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
   if (savedRes.status !== 0 || !savedRes.stdout) {
     fs.closeSync(ttyFd);
     return callbacks.fallback();
@@ -151,9 +167,20 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
   const savedSettings = savedRes.stdout.toString().trim();
 
   // ── enable raw / no-echo mode ───────────────────────────────────────────
-  const rawRes = spawnSync("stty", ["raw", "-echo"], {
-    stdio: [ttyFd, "pipe", "pipe"],
-  });
+  const rawRes = spawnSync(
+    "stty",
+    [
+      "raw",
+      "-echo",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
   if (rawRes.status !== 0) {
     fs.closeSync(ttyFd);
     return callbacks.fallback();
@@ -168,9 +195,19 @@ function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
 
   const restore = () => {
     try {
-      spawnSync("stty", [savedSettings], {
-        stdio: [ttyFd, "pipe", "pipe"],
-      });
+      spawnSync(
+        "stty",
+        [
+          savedSettings,
+        ],
+        {
+          stdio: [
+            ttyFd,
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
     } catch {}
     w(A.showC);
     try {
@@ -336,7 +373,10 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
           w(
             `${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${trunc(opt.label, maxW - config.message.length - 4)}${A.reset}\r\n`,
           );
-          return { done: true, result };
+          return {
+            done: true,
+            result,
+          };
         }
 
         case "d":
@@ -347,26 +387,37 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
               index: selected,
             };
             w(A.up(pickerHeight) + A.col1 + A.clearBelow);
-            return { done: true, result };
+            return {
+              done: true,
+              result,
+            };
           }
-          return { done: false };
+          return {
+            done: false,
+          };
 
         case "\x1b[A":
         case "\x1bOA":
         case "k":
           selected = (selected - 1 + config.options.length) % config.options.length;
           render(w, false);
-          return { done: false };
+          return {
+            done: false,
+          };
 
         case "\x1b[B":
         case "\x1bOB":
         case "j":
           selected = (selected + 1) % config.options.length;
           render(w, false);
-          return { done: false };
+          return {
+            done: false,
+          };
 
         default:
-          return { done: false };
+          return {
+            done: false,
+          };
       }
     },
   });
@@ -400,8 +451,7 @@ export function multiPickToTTY(config: MultiPickConfig): string[] | null {
     return [];
   }
 
-  const multiFallback = (): string[] | null =>
-    config.options.filter((o) => o.selected !== false).map((o) => o.value);
+  const multiFallback = (): string[] | null => config.options.filter((o) => o.selected !== false).map((o) => o.value);
 
   let cursor = 0;
   const checked: boolean[] = config.options.map((o) => o.selected !== false);
@@ -453,20 +503,27 @@ export function multiPickToTTY(config: MultiPickConfig): string[] | null {
           const selected = config.options.filter((_, i) => checked[i]).map((o) => o.value);
           const minRequired = config.minRequired ?? 1;
           if (selected.length < minRequired) {
-            return { done: false };
+            return {
+              done: false,
+            };
           }
           w(A.up(pickerHeight) + A.col1 + A.clearBelow);
           const summary = selected.length === config.options.length ? "all" : selected.join(", ");
           w(
             `${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${trunc(summary, maxW - config.message.length - 4)}${A.reset}\r\n`,
           );
-          return { done: true, result: selected };
+          return {
+            done: true,
+            result: selected,
+          };
         }
 
         case " ":
           checked[cursor] = !checked[cursor];
           render(w, false);
-          return { done: false };
+          return {
+            done: false,
+          };
 
         case "a": {
           const allChecked = checked.every((c) => c);
@@ -474,7 +531,9 @@ export function multiPickToTTY(config: MultiPickConfig): string[] | null {
             checked[i] = !allChecked;
           }
           render(w, false);
-          return { done: false };
+          return {
+            done: false,
+          };
         }
 
         case "\x1b[A":
@@ -482,17 +541,23 @@ export function multiPickToTTY(config: MultiPickConfig): string[] | null {
         case "k":
           cursor = (cursor - 1 + config.options.length) % config.options.length;
           render(w, false);
-          return { done: false };
+          return {
+            done: false,
+          };
 
         case "\x1b[B":
         case "\x1bOB":
         case "j":
           cursor = (cursor + 1) % config.options.length;
           render(w, false);
-          return { done: false };
+          return {
+            done: false,
+          };
 
         default:
-          return { done: false };
+          return {
+            done: false,
+          };
       }
     },
   });
