@@ -1,81 +1,8 @@
 #!/bin/bash
-# e2e/lib/verify.sh — SSH helpers and per-agent verification for AWS Lightsail
+# e2e/lib/verify.sh — Per-agent verification (cloud-agnostic)
+#
+# All remote execution uses cloud_exec/cloud_exec_long from the active driver.
 set -eo pipefail
-
-# ---------------------------------------------------------------------------
-# Instance IP cache (avoid repeated API calls)
-# ---------------------------------------------------------------------------
-_AWS_INSTANCE_IP=""
-_AWS_INSTANCE_APP=""
-
-# ---------------------------------------------------------------------------
-# aws_ssh APP_NAME COMMAND
-#
-# Resolves instance IP, then runs a command via SSH.
-# Returns the exit code of the remote command.
-# ---------------------------------------------------------------------------
-aws_ssh() {
-  local app="$1"
-  local cmd="$2"
-
-  # Resolve instance IP (cached per app)
-  if [ "${_AWS_INSTANCE_APP}" != "${app}" ] || [ -z "${_AWS_INSTANCE_IP}" ]; then
-    # Try reading from the IP file first (written by provision.sh)
-    if [ -n "${LOG_DIR:-}" ] && [ -f "${LOG_DIR}/${app}.ip" ]; then
-      _AWS_INSTANCE_IP=$(cat "${LOG_DIR}/${app}.ip")
-    else
-      _AWS_INSTANCE_IP=$(aws lightsail get-instance \
-        --instance-name "${app}" \
-        --region "${AWS_REGION}" \
-        --query 'instance.publicIpAddress' \
-        --output text 2>/dev/null || true)
-    fi
-    _AWS_INSTANCE_APP="${app}"
-    if [ -z "${_AWS_INSTANCE_IP}" ] || [ "${_AWS_INSTANCE_IP}" = "None" ]; then
-      log_err "Could not resolve IP for instance ${app}"
-      return 1
-    fi
-  fi
-
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-      -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      "ubuntu@${_AWS_INSTANCE_IP}" "${cmd}"
-}
-
-# ---------------------------------------------------------------------------
-# aws_ssh_long APP_NAME COMMAND TIMEOUT
-#
-# Same as aws_ssh() but with a configurable timeout for long-running commands
-# like input tests that send prompts to agents.
-# ---------------------------------------------------------------------------
-aws_ssh_long() {
-  local app="$1"
-  local cmd="$2"
-  local timeout="${3:-120}"
-
-  # Resolve instance IP (cached per app)
-  if [ "${_AWS_INSTANCE_APP}" != "${app}" ] || [ -z "${_AWS_INSTANCE_IP}" ]; then
-    if [ -n "${LOG_DIR:-}" ] && [ -f "${LOG_DIR}/${app}.ip" ]; then
-      _AWS_INSTANCE_IP=$(cat "${LOG_DIR}/${app}.ip")
-    else
-      _AWS_INSTANCE_IP=$(aws lightsail get-instance \
-        --instance-name "${app}" \
-        --region "${AWS_REGION}" \
-        --query 'instance.publicIpAddress' \
-        --output text 2>/dev/null || true)
-    fi
-    _AWS_INSTANCE_APP="${app}"
-    if [ -z "${_AWS_INSTANCE_IP}" ] || [ "${_AWS_INSTANCE_IP}" = "None" ]; then
-      log_err "Could not resolve IP for instance ${app}"
-      return 1
-    fi
-  fi
-
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-      -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
-      -o "ServerAliveInterval=15" -o "ServerAliveCountMax=$((timeout / 15 + 1))" \
-      "ubuntu@${_AWS_INSTANCE_IP}" "timeout ${timeout} sh -c '${cmd}'"
-}
 
 # ---------------------------------------------------------------------------
 # Input test constants
@@ -108,7 +35,7 @@ input_test_claude() {
     PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); claude -p \"\$PROMPT\" 2>/dev/null"
 
   local output
-  output=$(aws_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "claude input test — marker found in response"
@@ -134,7 +61,7 @@ input_test_codex() {
     PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex -q \"\$PROMPT\" 2>/dev/null"
 
   local output
-  output=$(aws_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "codex input test — marker found in response"
@@ -154,7 +81,7 @@ input_test_openclaw() {
 
   # Pre-check: verify the gateway is running on :18789
   log_step "Checking openclaw gateway on :18789..."
-  if ! aws_ssh "${app}" "curl -sf http://localhost:18789/health >/dev/null 2>&1 || ss -tlnp | grep -q 18789" >/dev/null 2>&1; then
+  if ! cloud_exec "${app}" "curl -sf http://localhost:18789/health >/dev/null 2>&1 || ss -tlnp | grep -q 18789" >/dev/null 2>&1; then
     log_warn "openclaw gateway not detected on :18789 — attempting test anyway"
   fi
 
@@ -167,7 +94,7 @@ input_test_openclaw() {
     PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw -p \"\$PROMPT\" 2>/dev/null"
 
   local output
-  output=$(aws_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "openclaw input test — marker found in response"
@@ -192,7 +119,7 @@ input_test_zeroclaw() {
     PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); zeroclaw agent -p \"\$PROMPT\" 2>/dev/null"
 
   local output
-  output=$(aws_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "zeroclaw input test — marker found in response"
@@ -251,7 +178,7 @@ run_input_test() {
 # verify_common APP_NAME AGENT
 #
 # Checks that apply to ALL agents:
-#   1. SSH connectivity
+#   1. Remote connectivity (SSH or CLI exec)
 #   2. .spawnrc exists
 #   3. .spawnrc contains OPENROUTER_API_KEY
 # ---------------------------------------------------------------------------
@@ -260,18 +187,18 @@ verify_common() {
   local agent="$2"
   local failures=0
 
-  # 1. SSH connectivity
-  log_step "Checking SSH connectivity..."
-  if aws_ssh "${app}" "echo e2e-ssh-ok" 2>/dev/null | grep -q "e2e-ssh-ok"; then
-    log_ok "SSH connectivity"
+  # 1. Remote connectivity
+  log_step "Checking remote connectivity..."
+  if cloud_exec "${app}" "echo e2e-ssh-ok" 2>/dev/null | grep -q "e2e-ssh-ok"; then
+    log_ok "Remote connectivity"
   else
-    log_err "SSH connectivity failed"
+    log_err "Remote connectivity failed"
     failures=$((failures + 1))
   fi
 
   # 2. .spawnrc exists
   log_step "Checking .spawnrc exists..."
-  if aws_ssh "${app}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
     log_ok ".spawnrc exists"
   else
     log_err ".spawnrc not found"
@@ -280,7 +207,7 @@ verify_common() {
 
   # 3. .spawnrc has OPENROUTER_API_KEY
   log_step "Checking OPENROUTER_API_KEY in .spawnrc..."
-  if aws_ssh "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "OPENROUTER_API_KEY present in .spawnrc"
   else
     log_err "OPENROUTER_API_KEY not found in .spawnrc"
@@ -301,7 +228,7 @@ verify_claude() {
 
   # Binary check
   log_step "Checking claude binary..."
-  if aws_ssh "${app}" "PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v claude" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v claude" >/dev/null 2>&1; then
     log_ok "claude binary found"
   else
     log_err "claude binary not found"
@@ -310,7 +237,7 @@ verify_claude() {
 
   # Config check
   log_step "Checking claude config..."
-  if aws_ssh "${app}" "test -f ~/.claude/settings.json" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "test -f ~/.claude/settings.json" >/dev/null 2>&1; then
     log_ok "~/.claude/settings.json exists"
   else
     log_err "~/.claude/settings.json not found"
@@ -319,7 +246,7 @@ verify_claude() {
 
   # Env check
   log_step "Checking claude env (openrouter base url)..."
-  if aws_ssh "${app}" "grep -q openrouter.ai ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q openrouter.ai ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "openrouter.ai configured in .spawnrc"
   else
     log_err "openrouter.ai not found in .spawnrc"
@@ -335,7 +262,7 @@ verify_openclaw() {
 
   # Binary check
   log_step "Checking openclaw binary..."
-  if aws_ssh "${app}" "PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
     log_ok "openclaw binary found"
   else
     log_err "openclaw binary not found"
@@ -344,7 +271,7 @@ verify_openclaw() {
 
   # Env check
   log_step "Checking openclaw env (ANTHROPIC_API_KEY)..."
-  if aws_ssh "${app}" "grep -q ANTHROPIC_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q ANTHROPIC_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "ANTHROPIC_API_KEY present in .spawnrc"
   else
     log_err "ANTHROPIC_API_KEY not found in .spawnrc"
@@ -360,7 +287,7 @@ verify_zeroclaw() {
 
   # Binary check (requires cargo env)
   log_step "Checking zeroclaw binary..."
-  if aws_ssh "${app}" "source ~/.cargo/env 2>/dev/null; command -v zeroclaw" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "source ~/.cargo/env 2>/dev/null; command -v zeroclaw" >/dev/null 2>&1; then
     log_ok "zeroclaw binary found"
   else
     log_err "zeroclaw binary not found"
@@ -369,7 +296,7 @@ verify_zeroclaw() {
 
   # Env check: ZEROCLAW_PROVIDER
   log_step "Checking zeroclaw env (ZEROCLAW_PROVIDER)..."
-  if aws_ssh "${app}" "grep -q ZEROCLAW_PROVIDER ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q ZEROCLAW_PROVIDER ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "ZEROCLAW_PROVIDER present in .spawnrc"
   else
     log_err "ZEROCLAW_PROVIDER not found in .spawnrc"
@@ -378,7 +305,7 @@ verify_zeroclaw() {
 
   # Env check: provider is openrouter
   log_step "Checking zeroclaw uses openrouter..."
-  if aws_ssh "${app}" "grep ZEROCLAW_PROVIDER ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep ZEROCLAW_PROVIDER ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
     log_ok "ZEROCLAW_PROVIDER set to openrouter"
   else
     log_err "ZEROCLAW_PROVIDER not set to openrouter"
@@ -394,7 +321,7 @@ verify_codex() {
 
   # Binary check
   log_step "Checking codex binary..."
-  if aws_ssh "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v codex" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v codex" >/dev/null 2>&1; then
     log_ok "codex binary found"
   else
     log_err "codex binary not found"
@@ -403,7 +330,7 @@ verify_codex() {
 
   # Config check
   log_step "Checking codex config..."
-  if aws_ssh "${app}" "test -f ~/.codex/config.toml" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "test -f ~/.codex/config.toml" >/dev/null 2>&1; then
     log_ok "~/.codex/config.toml exists"
   else
     log_err "~/.codex/config.toml not found"
@@ -412,7 +339,7 @@ verify_codex() {
 
   # Env check
   log_step "Checking codex env (OPENROUTER_API_KEY)..."
-  if aws_ssh "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "OPENROUTER_API_KEY present in .spawnrc"
   else
     log_err "OPENROUTER_API_KEY not found in .spawnrc"
@@ -428,7 +355,7 @@ verify_opencode() {
 
   # Binary check
   log_step "Checking opencode binary..."
-  if aws_ssh "${app}" "PATH=\$HOME/.opencode/bin:\$PATH command -v opencode" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.opencode/bin:\$PATH command -v opencode" >/dev/null 2>&1; then
     log_ok "opencode binary found"
   else
     log_err "opencode binary not found"
@@ -437,7 +364,7 @@ verify_opencode() {
 
   # Env check
   log_step "Checking opencode env (OPENROUTER_API_KEY)..."
-  if aws_ssh "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "OPENROUTER_API_KEY present in .spawnrc"
   else
     log_err "OPENROUTER_API_KEY not found in .spawnrc"
@@ -453,7 +380,7 @@ verify_kilocode() {
 
   # Binary check
   log_step "Checking kilocode binary..."
-  if aws_ssh "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v kilocode" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v kilocode" >/dev/null 2>&1; then
     log_ok "kilocode binary found"
   else
     log_err "kilocode binary not found"
@@ -462,7 +389,7 @@ verify_kilocode() {
 
   # Env check: KILO_PROVIDER_TYPE
   log_step "Checking kilocode env (KILO_PROVIDER_TYPE)..."
-  if aws_ssh "${app}" "grep -q KILO_PROVIDER_TYPE ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q KILO_PROVIDER_TYPE ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "KILO_PROVIDER_TYPE present in .spawnrc"
   else
     log_err "KILO_PROVIDER_TYPE not found in .spawnrc"
@@ -471,7 +398,7 @@ verify_kilocode() {
 
   # Env check: provider is openrouter
   log_step "Checking kilocode uses openrouter..."
-  if aws_ssh "${app}" "grep KILO_PROVIDER_TYPE ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep KILO_PROVIDER_TYPE ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
     log_ok "KILO_PROVIDER_TYPE set to openrouter"
   else
     log_err "KILO_PROVIDER_TYPE not set to openrouter"
@@ -491,10 +418,6 @@ verify_agent() {
   local agent="$1"
   local app="$2"
   local total_failures=0
-
-  # Reset instance IP cache for each agent
-  _AWS_INSTANCE_IP=""
-  _AWS_INSTANCE_APP=""
 
   log_header "Verifying ${agent} (${app})"
 

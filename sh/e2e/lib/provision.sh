@@ -1,5 +1,5 @@
 #!/bin/bash
-# e2e/lib/provision.sh — Provision an agent VM via spawn CLI on AWS Lightsail (headless)
+# e2e/lib/provision.sh — Provision an agent VM via spawn CLI (cloud-agnostic)
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
@@ -9,6 +9,11 @@ set -eo pipefail
 # the interactive SSH session (step 12 of the orchestration), so we kill it
 # after PROVISION_TIMEOUT seconds. The install itself usually succeeds; we
 # verify via instance existence and .spawnrc presence afterward.
+#
+# Uses cloud driver functions:
+#   cloud_headless_env  — cloud-specific env var exports
+#   cloud_provision_verify — check instance exists, write IP + metadata
+#   cloud_exec          — remote command execution
 # ---------------------------------------------------------------------------
 provision_agent() {
   local agent="$1"
@@ -28,10 +33,14 @@ provision_agent() {
     return 1
   fi
 
-  log_step "Provisioning ${agent} as ${app_name} (timeout: ${PROVISION_TIMEOUT}s)"
+  log_step "Provisioning ${agent} as ${app_name} on ${ACTIVE_CLOUD} (timeout: ${PROVISION_TIMEOUT}s)"
 
   # Remove stale exit file
   rm -f "${exit_file}"
+
+  # Get cloud-specific env var exports
+  local cloud_env
+  cloud_env=$(cloud_headless_env "${app_name}" "${agent}")
 
   # Environment for headless provisioning
   # MODEL_ID bypasses the interactive model selection prompt (required by openclaw)
@@ -40,15 +49,12 @@ provision_agent() {
     export SPAWN_SKIP_GITHUB_AUTH=1
     export SPAWN_SKIP_API_VALIDATION=1
     export MODEL_ID="${MODEL_ID:-openrouter/auto}"
-    # LIGHTSAIL_SERVER_NAME is the env var read by aws.ts:getServerName()
-    export LIGHTSAIL_SERVER_NAME="${app_name}"
-    # AWS_DEFAULT_REGION is the env var read by aws.ts:authenticate() and promptRegion()
-    export AWS_DEFAULT_REGION="${AWS_REGION}"
-    # LIGHTSAIL_BUNDLE is the env var read by aws.ts:promptBundle()
-    export LIGHTSAIL_BUNDLE="${AWS_BUNDLE:-nano_3_0}"
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
-    bun run "${cli_entry}" "${agent}" aws --headless --output json \
+    # Apply cloud-specific env vars
+    eval "${cloud_env}"
+
+    bun run "${cli_entry}" "${agent}" "${ACTIVE_CLOUD}" --headless --output json \
       > "${stdout_file}" 2> "${stderr_file}"
     printf '%s' "$?" > "${exit_file}"
   ) &
@@ -71,20 +77,9 @@ provision_agent() {
     wait "${pid}" 2>/dev/null || true
   fi
 
-  # Check if the provision process exited cleanly
-  local exit_code=""
-  if [ -f "${exit_file}" ]; then
-    exit_code=$(cat "${exit_file}")
-  fi
-
   # Even if provision "failed" (timeout), the instance may exist and install may have completed.
-  # Verify instance existence via AWS CLI.
-  local app_exists=0
-  if aws lightsail get-instance --instance-name "${app_name}" --region "${AWS_REGION}" >/dev/null 2>&1; then
-    app_exists=1
-  fi
-
-  if [ "${app_exists}" -eq 0 ]; then
+  # Verify instance existence via cloud driver.
+  if ! cloud_provision_verify "${app_name}" "${log_dir}"; then
     log_err "Instance ${app_name} does not exist after provisioning"
     if [ -f "${stderr_file}" ]; then
       log_err "Stderr tail:"
@@ -93,34 +88,14 @@ provision_agent() {
     return 1
   fi
 
-  log_ok "Instance ${app_name} exists"
-
-  # Resolve instance public IP
-  local instance_ip
-  instance_ip=$(aws lightsail get-instance \
-    --instance-name "${app_name}" \
-    --region "${AWS_REGION}" \
-    --query 'instance.publicIpAddress' \
-    --output text 2>/dev/null || true)
-
-  if [ -z "${instance_ip}" ] || [ "${instance_ip}" = "None" ]; then
-    log_err "Could not resolve public IP for ${app_name}"
-    return 1
-  fi
-
-  log_ok "Instance IP: ${instance_ip}"
-
-  # Store IP in a file for verify/teardown to read
-  printf '%s' "${instance_ip}" > "${log_dir}/${app_name}.ip"
+  log_ok "Instance ${app_name} verified"
 
   # Wait for install to complete (.spawnrc is written near the end)
   log_step "Waiting for install to complete (polling .spawnrc, up to ${INSTALL_WAIT}s)..."
   local install_waited=0
   local install_ok=0
   while [ "${install_waited}" -lt "${INSTALL_WAIT}" ]; do
-    if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
-         -o LogLevel=ERROR -o BatchMode=yes \
-         "ubuntu@${instance_ip}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
+    if cloud_exec "${app_name}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
       install_ok=1
       break
     fi
