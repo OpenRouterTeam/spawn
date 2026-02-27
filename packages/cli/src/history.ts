@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { join, resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
-import { validateConnectionIP, validateUsername, validateServerIdentifier } from "./security.js";
+import { validateConnectionIP, validateUsername, validateServerIdentifier, validateLaunchCmd } from "./security.js";
 import { isString } from "@openrouter/spawn-shared";
 
 export interface VMConnection {
@@ -212,6 +212,9 @@ export function mergeLastConnection(): void {
       }
       if (connData.server_name) {
         validateServerIdentifier(connData.server_name);
+      }
+      if (connData.launch_cmd) {
+        validateLaunchCmd(connData.launch_cmd);
       }
     } catch (err) {
       // Log validation failure and skip merging

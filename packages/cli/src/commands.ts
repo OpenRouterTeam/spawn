@@ -27,6 +27,7 @@ import {
   validateUsername,
   validateServerIdentifier,
   validateMetadataValue,
+  validateLaunchCmd,
 } from "./security.js";
 import type { SpawnRecord, VMConnection } from "./history.js";
 import {
@@ -2793,6 +2794,9 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
     }
     if (connection.server_id) {
       validateServerIdentifier(connection.server_id);
+    }
+    if (connection.launch_cmd) {
+      validateLaunchCmd(connection.launch_cmd);
     }
   } catch (err) {
     p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
