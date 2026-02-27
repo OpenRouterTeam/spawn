@@ -27,7 +27,9 @@ cd REPO_ROOT_PLACEHOLDER && git worktree remove WORKTREE_BASE_PLACEHOLDER/pr-NUM
 
 `gh pr list --repo OpenRouterTeam/spawn --state open --json number,title,headRefName,updatedAt,mergeable,isDraft`
 
-**Skip draft PRs** — draft PRs are work-in-progress and not ready for security review. Only review PRs where `isDraft` is `false`.
+Save the **full list** (including drafts) — Step 3.5 needs draft PRs for stale-draft cleanup.
+
+For **security review** (Steps 2-3), skip draft PRs — they are work-in-progress and not ready for review. Only review PRs where `isDraft` is `false`.
 
 If zero non-draft PRs, skip to Step 3.
 
@@ -105,10 +107,30 @@ Spawn **branch-cleaner** (model=sonnet):
 
 ## Step 3.5 — Close Stale Draft PRs
 
-From the PR list in Step 1, for each draft PR (`isDraft`=true) with `updatedAt` older than 7 days:
-```bash
-gh pr close NUMBER --repo OpenRouterTeam/spawn --delete-branch --comment "Closing stale draft PR (no updates for 7+ days). Re-open or create a new PR when ready to continue.\n\n-- security/pr-reviewer"
-```
+From the **full** PR list saved in Step 1 (including drafts), filter to draft PRs (`isDraft`=true).
+
+**Age verification is MANDATORY.** For each draft PR, you MUST:
+
+1. **Compute the age** — compare `updatedAt` to the current time. The PR is stale ONLY if `updatedAt` is more than 7 days (168 hours) ago. Use this check:
+   ```bash
+   UPDATED_AT="<updatedAt from PR>"
+   UPDATED_EPOCH=$(date -d "$UPDATED_AT" +%s 2>/dev/null || date -jf "%Y-%m-%dT%H:%M:%SZ" "$UPDATED_AT" +%s)
+   NOW_EPOCH=$(date +%s)
+   AGE_DAYS=$(( (NOW_EPOCH - UPDATED_EPOCH) / 86400 ))
+   # Only close if AGE_DAYS >= 7
+   ```
+2. **Check draft/non-draft timeline** — a PR may have been recently converted to draft. Fetch the timeline:
+   ```bash
+   gh api repos/OpenRouterTeam/spawn/issues/NUMBER/timeline --jq '[.[] | select(.event == "convert_to_draft")] | last | .created_at'
+   ```
+   If the PR was converted to draft less than 7 days ago, treat it as fresh — do NOT close it.
+3. **If and ONLY if both checks confirm the PR is stale (>7 days)**, close it:
+   ```bash
+   gh pr close NUMBER --repo OpenRouterTeam/spawn --delete-branch --comment "Closing stale draft PR (no updates for 7+ days). Re-open or create a new PR when ready to continue.\n\n-- security/pr-reviewer"
+   ```
+4. **If the PR is less than 7 days old, SKIP it.** Do not close, do not comment.
+
+**NEVER close a draft PR that is less than 7 days old.** This is a hard requirement — see Safety rules below.
 
 ## Step 4 — Stale Issue Re-triage
 
@@ -170,7 +192,7 @@ You use **spawn teams**. Messages arrive AUTOMATICALLY.
 
 - Always use worktrees for testing
 - NEVER approve PRs with CRITICAL/HIGH findings; auto-merge clean PRs
-- NEVER close a PR without a comment; never close fresh PRs (<24h) for staleness
+- NEVER close a PR without a comment; never close fresh PRs (<24h) for staleness; never close draft PRs unless `updatedAt` is >7 days ago (verify with date arithmetic, not guessing)
 - Limit to at most 10 concurrent reviewer teammates
 - **SIGN-OFF**: Every comment/review MUST end with `-- security/AGENT-NAME`
 
