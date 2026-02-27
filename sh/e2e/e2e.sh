@@ -390,15 +390,15 @@ START_TIME=$(date +%s)
 # ---------------------------------------------------------------------------
 if [ "${cloud_count}" -eq 1 ]; then
   # Single cloud — run directly in this process
-  run_agents_for_cloud "${CLOUDS}" "${LOG_DIR}"
-  single_cloud_exit=$?
+  run_agents_for_cloud "${CLOUDS}" "${LOG_DIR}" || true
 
 else
   # Multi-cloud — each cloud runs as a separate background process
   cloud_pids=""
   for cloud in ${CLOUDS}; do
     (
-      # Each cloud subshell gets its own tracked apps and cleanup
+      # Reset parent's EXIT trap — the main process handles LOG_DIR cleanup
+      trap - EXIT
       _TRACKED_APPS=""
       run_agents_for_cloud "${cloud}" "${LOG_DIR}"
     ) > "${LOG_DIR}/${cloud}.log" 2>&1 &
