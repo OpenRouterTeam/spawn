@@ -1040,7 +1040,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || doServerIp;
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
+  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
