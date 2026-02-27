@@ -192,23 +192,6 @@ const InstanceStateSchema = v.object({
   }),
 });
 
-const InstanceListSchema = v.object({
-  instances: v.optional(
-    v.array(
-      v.object({
-        name: v.optional(v.string()),
-        state: v.optional(
-          v.object({
-            name: v.optional(v.string()),
-          }),
-        ),
-        publicIpAddress: v.optional(v.string()),
-        bundleId: v.optional(v.string()),
-      }),
-    ),
-  ),
-});
-
 // ─── AWS CLI Wrapper ────────────────────────────────────────────────────────
 
 function awsCliSync(args: string[]): {
@@ -1223,41 +1206,4 @@ export async function destroyServer(name?: string): Promise<void> {
     }
   }
   logInfo(`Instance '${target}' destroyed`);
-}
-
-export async function listServers(): Promise<void> {
-  if (lightsailMode === "cli") {
-    const proc = Bun.spawn(
-      [
-        "aws",
-        "lightsail",
-        "get-instances",
-        "--query",
-        "instances[].{Name:name,State:state.name,IP:publicIpAddress,Bundle:bundleId}",
-        "--output",
-        "table",
-      ],
-      {
-        stdio: [
-          "ignore",
-          "inherit",
-          "inherit",
-        ],
-        env: process.env,
-      },
-    );
-    await proc.exited;
-  } else {
-    const resp = await lightsailRest("Lightsail_20161128.GetInstances", "{}");
-    const data = parseJsonWith(resp, InstanceListSchema);
-    const instances = data?.instances ?? [];
-    const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-    console.log(pad("Name", 30) + pad("State", 12) + pad("IP", 16) + "Bundle");
-    console.log("-".repeat(72));
-    for (const i of instances) {
-      console.log(
-        pad(i.name || "", 30) + pad(i.state?.name || "", 12) + pad(i.publicIpAddress || "N/A", 16) + (i.bundleId || ""),
-      );
-    }
-  }
 }

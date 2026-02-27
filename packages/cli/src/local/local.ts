@@ -31,31 +31,6 @@ export async function runLocal(cmd: string): Promise<void> {
   }
 }
 
-/** Run a shell command locally and capture stdout. */
-export async function runLocalCapture(cmd: string): Promise<string> {
-  const proc = Bun.spawn(
-    [
-      "bash",
-      "-c",
-      cmd,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "pipe",
-        "inherit",
-      ],
-      env: process.env,
-    },
-  );
-  const stdout = await new Response(proc.stdout).text();
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`Command failed (exit ${exitCode}): ${cmd}`);
-  }
-  return stdout.trim();
-}
-
 // ─── File Operations ─────────────────────────────────────────────────────────
 
 /** Copy a file locally, expanding ~ in the destination path. */
