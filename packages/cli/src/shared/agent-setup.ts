@@ -354,11 +354,14 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   // Start the daemon AND wait for port 18789 in a single SSH session.
   // The polling loop doubles as a keepalive for the SSH session.
+  // We resolve the full path to openclaw first because setsid replaces
+  // the process image and doesn't inherit the parent shell's PATH.
   const script =
     "source ~/.spawnrc 2>/dev/null; " +
     "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-    "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
-    "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; " +
+    '_oc_bin=$(command -v openclaw) || { echo "openclaw not found in PATH"; exit 1; }; ' +
+    'if command -v setsid >/dev/null 2>&1; then setsid "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & ' +
+    'else nohup "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; ' +
     "elapsed=0; while [ $elapsed -lt 120 ]; do " +
     'if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo "Gateway ready after ${elapsed}s"; exit 0; fi; ' +
     "printf '.'; sleep 1; elapsed=$((elapsed + 1)); " +

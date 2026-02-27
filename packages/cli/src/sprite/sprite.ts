@@ -407,7 +407,7 @@ export async function setupShellEnvironment(): Promise<void> {
   await runSpriteSilent(`sed -i '/exec \\/usr\\/bin\\/zsh/d' ~/.bashrc ~/.bash_profile 2>/dev/null; true`);
 
   // Upload and append PATH config to .bashrc and .zshrc
-  const pathConfig = `\n# [spawn:path]\nexport PATH="\${HOME}/.bun/bin:/.sprite/languages/bun/bin:\${PATH}"\n`;
+  const pathConfig = `\n# [spawn:path]\nexport PATH="\${HOME}/.npm-global/bin:\${HOME}/.bun/bin:/.sprite/languages/bun/bin:\${PATH}"\n`;
   const pathB64 = Buffer.from(pathConfig).toString("base64");
   await runSprite(
     `printf '%s' '${pathB64}' | base64 -d >> ~/.bashrc && printf '%s' '${pathB64}' | base64 -d >> ~/.zshrc`,
