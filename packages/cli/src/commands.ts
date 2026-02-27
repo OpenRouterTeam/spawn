@@ -2029,29 +2029,6 @@ export function formatRelativeTime(iso: string): string {
   }
 }
 
-export function formatTimestamp(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      return iso;
-    }
-    const date = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    const time = d.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    return `${date} ${time}`;
-  } catch (_err) {
-    // Invalid date format - return as-is
-    return iso;
-  }
-}
-
 async function suggestFilterCorrection(
   filter: string,
   flag: string,
