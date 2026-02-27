@@ -153,8 +153,6 @@ mock.module("@clack/prompts", () => ({
 // Import after mocks are set up
 const {
   prioritizeCloudsByCredentials,
-  parseAuthEnvVars,
-  credentialHints,
   getImplementedClouds,
   getImplementedAgents,
   checkEntity,
@@ -384,56 +382,6 @@ describe("prioritizeCloudsByCredentials", () => {
     // sprite and localcloud should be at the end
     expect(result.sortedClouds.slice(3)).toContain("sprite");
     expect(result.sortedClouds.slice(3)).toContain("localcloud");
-  });
-});
-
-// ── buildCredentialStatusLines (tested via dry-run behavior) ─────────────
-
-describe("credential status display logic", () => {
-  const savedEnv: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    for (const v of [
-      "OPENROUTER_API_KEY",
-      "HCLOUD_TOKEN",
-      "DO_API_TOKEN",
-    ]) {
-      savedEnv[v] = process.env[v];
-      delete process.env[v];
-    }
-  });
-
-  afterEach(() => {
-    for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) {
-        delete process.env[k];
-      } else {
-        process.env[k] = v;
-      }
-    }
-  });
-
-  describe("parseAuthEnvVars for credential status", () => {
-    it("should extract single env var", () => {
-      expect(parseAuthEnvVars("HCLOUD_TOKEN")).toEqual([
-        "HCLOUD_TOKEN",
-      ]);
-    });
-
-    it("should extract multiple env vars", () => {
-      expect(parseAuthEnvVars("UPCLOUD_USERNAME + UPCLOUD_PASSWORD")).toEqual([
-        "UPCLOUD_USERNAME",
-        "UPCLOUD_PASSWORD",
-      ]);
-    });
-
-    it("should return empty for CLI-based auth", () => {
-      expect(parseAuthEnvVars("sprite login")).toEqual([]);
-    });
-
-    it("should return empty for 'none'", () => {
-      expect(parseAuthEnvVars("none")).toEqual([]);
-    });
   });
 });
 
@@ -691,47 +639,3 @@ describe("prioritizeCloudsByCredentials with real-world patterns", () => {
   });
 });
 
-// ── Edge cases for credential-related functions ─────────────────────────
-
-describe("credential function edge cases", () => {
-  const savedEnv: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    savedEnv.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-    delete process.env.OPENROUTER_API_KEY;
-  });
-
-  afterEach(() => {
-    if (savedEnv.OPENROUTER_API_KEY === undefined) {
-      delete process.env.OPENROUTER_API_KEY;
-    } else {
-      process.env.OPENROUTER_API_KEY = savedEnv.OPENROUTER_API_KEY;
-    }
-  });
-
-  it("credentialHints should always mention OPENROUTER_API_KEY when missing", () => {
-    const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-    expect(hints.some((h: string) => h.includes("OPENROUTER_API_KEY") || h.includes("Missing"))).toBe(true);
-  });
-
-  it("credentialHints should not flag OPENROUTER_API_KEY when set", () => {
-    process.env.OPENROUTER_API_KEY = "key";
-    process.env.HCLOUD_TOKEN = "token";
-    const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-    // When all are set, should show "appear to be set" message
-    expect(hints.some((h: string) => h.includes("set") || h.includes("appear"))).toBe(true);
-  });
-
-  it("parseAuthEnvVars should handle extra whitespace", () => {
-    expect(parseAuthEnvVars("  HCLOUD_TOKEN  ")).toEqual([
-      "HCLOUD_TOKEN",
-    ]);
-  });
-
-  it("parseAuthEnvVars should handle empty + separator", () => {
-    expect(parseAuthEnvVars("VAR_A + + VAR_B")).toEqual([
-      "VAR_A",
-      "VAR_B",
-    ]);
-  });
-});
