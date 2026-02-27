@@ -257,7 +257,7 @@ model_provider = "openrouter"
 name = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
 env_key = "OPENROUTER_API_KEY"
-wire_api = "chat"
+wire_api = "responses"
 `;
   await uploadConfigFile(runner, config, "$HOME/.codex/config.toml");
 }
