@@ -359,11 +359,11 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
     "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
     "if command -v setsid >/dev/null 2>&1; then setsid openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & " +
     "else nohup openclaw gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; " +
-    "elapsed=0; while [ $elapsed -lt 60 ]; do " +
+    "elapsed=0; while [ $elapsed -lt 120 ]; do " +
     'if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo "Gateway ready after ${elapsed}s"; exit 0; fi; ' +
     "printf '.'; sleep 1; elapsed=$((elapsed + 1)); " +
     "done; " +
-    'echo "Gateway failed to start after 60s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1';
+    'echo "Gateway failed to start after 120s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1';
   await runner.runServer(script);
   logInfo("OpenClaw gateway started");
 }
