@@ -17,7 +17,6 @@ describe("--custom flag", () => {
       ).toBeNull();
     });
   });
-
 });
 
 describe("AWS --custom prompts", () => {
