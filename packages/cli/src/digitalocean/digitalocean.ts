@@ -38,9 +38,23 @@ const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
 const DO_OAUTH_AUTHORIZE = "https://cloud.digitalocean.com/v1/oauth/authorize";
 const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 
-// OAuth application credentials (embedded, same pattern as gh CLI / doctl).
-// Public clients cannot keep secrets confidential — security comes from the
-// authorization code flow itself (user consent, localhost redirect, CSRF state).
+// OAuth application credentials — embedded in the binary, same pattern as gh CLI and doctl.
+//
+// Why the client_secret is here and why that's acceptable:
+//   1. DigitalOcean's token exchange endpoint REQUIRES client_secret — their OAuth
+//      implementation does not support PKCE-only public client flows (as of 2026).
+//   2. Open-source CLI tools are "public clients" (RFC 6749 §2.1) — any secret
+//      shipped in source code or a binary is extractable and provides zero
+//      confidentiality. This is a well-understood OAuth limitation.
+//   3. Security relies on the authorization code flow itself: user consent in the
+//      browser, localhost-only redirect URI, and CSRF state parameter validation.
+//   4. The secret alone cannot access user resources — it only allows exchanging a
+//      one-time authorization code (which requires user approval) for a token.
+//   5. This is the same pattern used by: gh CLI (GitHub), doctl (DigitalOcean),
+//      gcloud (Google), and az (Azure).
+//
+// If DigitalOcean adds PKCE support in the future, the client_secret should be
+// removed and replaced with code_challenge/code_verifier parameters.
 const DO_CLIENT_ID = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
 const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
 
