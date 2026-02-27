@@ -1,6 +1,6 @@
 // daytona/daytona.ts — Core Daytona provider: API, SSH, provisioning, execution
 
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 import {
   logInfo,
@@ -102,11 +102,7 @@ const DAYTONA_CONFIG_PATH = `${process.env.HOME}/.config/spawn/daytona.json`;
 
 async function saveTokenToConfig(token: string): Promise<void> {
   const dir = DAYTONA_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
   const escaped = jsonEscape(token);
   await Bun.write(DAYTONA_CONFIG_PATH, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
     mode: 0o600,
