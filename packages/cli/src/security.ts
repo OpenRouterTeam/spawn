@@ -320,15 +320,42 @@ const LAUNCH_CMD_DANGEROUS_PATTERNS: ReadonlyArray<{
   pattern: RegExp;
   description: string;
 }> = [
-  { pattern: /\$\(/, description: "command substitution $()" },
-  { pattern: /`/, description: "backtick command substitution" },
-  { pattern: /\|/, description: "pipe operator" },
-  { pattern: /;\s*rm\b/, description: "destructive command sequence (rm)" },
-  { pattern: /&&/, description: "command chaining (&&)" },
-  { pattern: /\|\|/, description: "command chaining (||)" },
-  { pattern: />\s*\//, description: "redirection to absolute path" },
-  { pattern: /<\s*\//, description: "input redirection from absolute path" },
-  { pattern: /\$\{/, description: "variable expansion" },
+  {
+    pattern: /\$\(/,
+    description: "command substitution $()",
+  },
+  {
+    pattern: /`/,
+    description: "backtick command substitution",
+  },
+  {
+    pattern: /\|/,
+    description: "pipe operator",
+  },
+  {
+    pattern: /;\s*rm\b/,
+    description: "destructive command sequence (rm)",
+  },
+  {
+    pattern: /&&/,
+    description: "command chaining (&&)",
+  },
+  {
+    pattern: /\|\|/,
+    description: "command chaining (||)",
+  },
+  {
+    pattern: />\s*\//,
+    description: "redirection to absolute path",
+  },
+  {
+    pattern: /<\s*\//,
+    description: "input redirection from absolute path",
+  },
+  {
+    pattern: /\$\{/,
+    description: "variable expansion",
+  },
 ];
 
 /**
