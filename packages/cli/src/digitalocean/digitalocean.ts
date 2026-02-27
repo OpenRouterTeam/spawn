@@ -1,6 +1,6 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 import {
   logInfo,
@@ -161,11 +161,10 @@ function loadConfig(): DoConfig | null {
 
 async function saveConfig(config: DoConfig): Promise<void> {
   const dir = DO_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   await Bun.write(DO_CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", {
     mode: 0o600,
   });

@@ -1,6 +1,6 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 
 import { createHash, createHmac } from "node:crypto";
 import {
@@ -46,11 +46,10 @@ const AwsCredsSchema = v.object({
 
 export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
   const dir = AWS_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   const payload = `{\n  "accessKeyId": ${jsonEscape(accessKeyId)},\n  "secretAccessKey": ${jsonEscape(secretAccessKey)},\n  "region": ${jsonEscape(region)}\n}\n`;
   await Bun.write(AWS_CONFIG_PATH, payload, {
     mode: 0o600,

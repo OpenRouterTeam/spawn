@@ -75,6 +75,7 @@ export function saveVmConnection(
   const dir = getSpawnDir();
   mkdirSync(dir, {
     recursive: true,
+    mode: 0o700,
   });
   const json: Record<string, unknown> = {
     ip,
@@ -95,7 +96,9 @@ export function saveVmConnection(
   if (metadata && Object.keys(metadata).length > 0) {
     json.metadata = metadata;
   }
-  writeFileSync(join(dir, "last-connection.json"), JSON.stringify(json) + "\n");
+  writeFileSync(join(dir, "last-connection.json"), JSON.stringify(json) + "\n", {
+    mode: 0o600,
+  });
 }
 
 /** Save launch command to the last-connection.json file. */
@@ -104,7 +107,9 @@ export function saveLaunchCmd(launchCmd: string): void {
   try {
     const data = JSON.parse(readFileSync(connFile, "utf-8"));
     data.launch_cmd = launchCmd;
-    writeFileSync(connFile, JSON.stringify(data) + "\n");
+    writeFileSync(connFile, JSON.stringify(data) + "\n", {
+      mode: 0o600,
+    });
   } catch {
     // non-fatal
   }
@@ -130,6 +135,7 @@ export function saveSpawnRecord(record: SpawnRecord): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, {
       recursive: true,
+      mode: 0o700,
     });
   }
   let history = loadHistory();
@@ -138,7 +144,9 @@ export function saveSpawnRecord(record: SpawnRecord): void {
   if (history.length > MAX_HISTORY_ENTRIES) {
     history = history.slice(history.length - MAX_HISTORY_ENTRIES);
   }
-  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
+  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
+    mode: 0o600,
+  });
 }
 
 export function clearHistory(): number {
@@ -223,7 +231,9 @@ export function mergeLastConnection(): void {
       if (!latest.connection) {
         latest.connection = connData;
         // Save updated history
-        writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
+        writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
+          mode: 0o600,
+        });
       }
     }
 
@@ -244,7 +254,9 @@ export function removeRecord(record: SpawnRecord): boolean {
     return false;
   }
   history.splice(index, 1);
-  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
+  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
+    mode: 0o600,
+  });
   return true;
 }
 
@@ -262,7 +274,9 @@ export function markRecordDeleted(record: SpawnRecord): boolean {
   }
   found.connection.deleted = true;
   found.connection.deleted_at = new Date().toISOString();
-  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n");
+  writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
+    mode: 0o600,
+  });
   return true;
 }
 
