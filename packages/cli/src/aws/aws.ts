@@ -1,6 +1,6 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 
 import { createHash, createHmac } from "node:crypto";
 import {
@@ -46,11 +46,10 @@ const AwsCredsSchema = v.object({
 
 export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
   const dir = AWS_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   const payload = `{\n  "accessKeyId": ${jsonEscape(accessKeyId)},\n  "secretAccessKey": ${jsonEscape(secretAccessKey)},\n  "region": ${jsonEscape(region)}\n}\n`;
   await Bun.write(AWS_CONFIG_PATH, payload, {
     mode: 0o600,
@@ -191,23 +190,6 @@ const InstanceStateSchema = v.object({
     }),
     publicIpAddress: v.optional(v.string()),
   }),
-});
-
-const InstanceListSchema = v.object({
-  instances: v.optional(
-    v.array(
-      v.object({
-        name: v.optional(v.string()),
-        state: v.optional(
-          v.object({
-            name: v.optional(v.string()),
-          }),
-        ),
-        publicIpAddress: v.optional(v.string()),
-        bundleId: v.optional(v.string()),
-      }),
-    ),
-  ),
 });
 
 // ─── AWS CLI Wrapper ────────────────────────────────────────────────────────
@@ -1086,7 +1068,11 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     throw new Error(`Invalid remote path: ${remotePath}`);
   }
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
@@ -1220,41 +1206,4 @@ export async function destroyServer(name?: string): Promise<void> {
     }
   }
   logInfo(`Instance '${target}' destroyed`);
-}
-
-export async function listServers(): Promise<void> {
-  if (lightsailMode === "cli") {
-    const proc = Bun.spawn(
-      [
-        "aws",
-        "lightsail",
-        "get-instances",
-        "--query",
-        "instances[].{Name:name,State:state.name,IP:publicIpAddress,Bundle:bundleId}",
-        "--output",
-        "table",
-      ],
-      {
-        stdio: [
-          "ignore",
-          "inherit",
-          "inherit",
-        ],
-        env: process.env,
-      },
-    );
-    await proc.exited;
-  } else {
-    const resp = await lightsailRest("Lightsail_20161128.GetInstances", "{}");
-    const data = parseJsonWith(resp, InstanceListSchema);
-    const instances = data?.instances ?? [];
-    const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-    console.log(pad("Name", 30) + pad("State", 12) + pad("IP", 16) + "Bundle");
-    console.log("-".repeat(72));
-    for (const i of instances) {
-      console.log(
-        pad(i.name || "", 30) + pad(i.state?.name || "", 12) + pad(i.publicIpAddress || "N/A", 16) + (i.bundleId || ""),
-      );
-    }
-  }
 }

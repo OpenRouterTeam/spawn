@@ -95,10 +95,10 @@ done
 
 1. `git add fixtures/`
 2. Commit with message: `test: Update API fixtures for {clouds}`
-3. Push and open draft PR:
+3. Push and open a PR (NOT draft — the security bot reviews and merges non-draft PRs):
    ```bash
    git push -u origin qa/fixtures
-   gh pr create --draft --title "test: Update API fixtures" --body "$(cat <<'EOF'
+   gh pr create --title "test: Update API fixtures" --body "$(cat <<'EOF'
    ## Summary
    - Updated API fixtures for: {cloud list}
    - Skipped (no credentials): {skipped list}
