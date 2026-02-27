@@ -6,7 +6,6 @@ import {
   installAgent,
   setupOpenclawBatched,
   resolveAgent as _resolveAgent,
-  offerGithubAuth as _offerGithubAuth,
 } from "../shared/agent-setup";
 import type { CloudRunner } from "../shared/agent-setup";
 import type { AgentConfig } from "../shared/agents";
@@ -68,6 +67,3 @@ export function resolveAgent(name: string): FlyAgentConfig {
   return agent;
 }
 
-export function offerGithubAuth(): Promise<void> {
-  return _offerGithubAuth(runner);
-}

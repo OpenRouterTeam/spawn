@@ -2,7 +2,7 @@
 # Shared per-agent install assertions
 # Verifies each agent script uses the correct install method
 #
-# Sourced by mock.sh _run_agent_assertions(). Expects:
+# Source this file and call assert_agent_install CLOUD AGENT. Expects:
 #   MOCK_LOG  — path to the mock call log
 #   PASSED / FAILED — counters (updated in-place)
 #   GREEN / RED / NC — color codes
