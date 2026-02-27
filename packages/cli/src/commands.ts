@@ -3,7 +3,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import * as v from "valibot";
 import { parseJsonWith, isString } from "@openrouter/spawn-shared";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Manifest } from "./manifest.js";
