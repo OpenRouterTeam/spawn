@@ -31,7 +31,7 @@ ALL_CLOUDS="aws hetzner digitalocean gcp daytona sprite"
 # ---------------------------------------------------------------------------
 CLOUDS=""
 AGENTS_TO_TEST=""
-PARALLEL_COUNT=0
+PARALLEL_COUNT=99
 SKIP_CLEANUP=0
 SKIP_INPUT_TEST="${SKIP_INPUT_TEST:-0}"
 SEQUENTIAL_MODE=0
@@ -95,7 +95,7 @@ while [ $# -gt 0 ]; do
       printf "Agents: %s\n\n" "${ALL_AGENTS}"
       printf "Options:\n"
       printf "  --cloud CLOUD       Cloud to test (repeatable, or 'all')\n"
-      printf "  --parallel N        Run N agents in parallel per cloud (default: sequential)\n"
+      printf "  --parallel N        Run N agents in parallel per cloud (default: all at once)\n"
       printf "  --sequential        Force sequential agent execution\n"
       printf "  --skip-cleanup      Skip stale e2e-* instance cleanup\n"
       printf "  --skip-input-test   Skip live input tests\n"
@@ -369,10 +369,12 @@ trap final_cleanup EXIT
 log_header "Spawn E2E Test Suite (Multi-Cloud)"
 log_info "Clouds: ${CLOUDS}"
 log_info "Agents: ${AGENTS_TO_TEST}"
-if [ "${PARALLEL_COUNT}" -gt 0 ]; then
-  log_info "Agent parallelism: ${PARALLEL_COUNT} per cloud"
-else
+if [ "${SEQUENTIAL_MODE}" -eq 1 ]; then
   log_info "Agent parallelism: sequential"
+elif [ "${PARALLEL_COUNT}" -ge 99 ]; then
+  log_info "Agent parallelism: all at once"
+else
+  log_info "Agent parallelism: ${PARALLEL_COUNT} per cloud"
 fi
 if [ "${SKIP_INPUT_TEST}" -eq 1 ]; then
   log_info "Input tests: SKIPPED"
