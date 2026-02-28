@@ -40,7 +40,7 @@ _hetzner_headless_env() {
   # $2 = agent (unused but part of the interface)
 
   printf 'export HETZNER_SERVER_NAME="%s"\n' "${app}"
-  printf 'export HETZNER_SERVER_TYPE="%s"\n' "${HETZNER_SERVER_TYPE:-cx22}"
+  printf 'export HETZNER_SERVER_TYPE="%s"\n' "${HETZNER_SERVER_TYPE:-cx23}"
   printf 'export HETZNER_LOCATION="%s"\n' "${HETZNER_LOCATION:-fsn1}"
 }
 
