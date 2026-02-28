@@ -5,7 +5,7 @@
 # Sourced by common.sh's load_cloud_driver() which wires these to generic names.
 #
 # Sprite uses its own CLI for execution — NO SSH is used.
-# All remote commands run via: sprite exec -s NAME -- bash -c "CMD"
+# All remote commands run via: sprite exec -s NAME -- bash -c '$1' _ "CMD"
 #
 # Depends on: log_step, log_ok, log_err, log_warn, log_info, format_duration,
 #             untrack_app (provided by common.sh)
@@ -113,7 +113,7 @@ _sprite_exec() {
   local app="$1"
   local cmd="$2"
 
-  sprite exec -s "${app}" -- bash -c "${cmd}"
+  sprite exec -s "${app}" -- bash -c '$1' _ "${cmd}"
 }
 
 # ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ _sprite_exec_long() {
   local cmd="$2"
   local timeout="${3:-120}"
 
-  sprite exec -s "${app}" -- bash -c "timeout ${timeout} bash -c '${cmd}'"
+  sprite exec -s "${app}" -- bash -c 'timeout "$1" bash -c "$2"' _ "${timeout}" "${cmd}"
 }
 
 # ---------------------------------------------------------------------------
