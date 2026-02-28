@@ -142,6 +142,11 @@ input_test_kilocode() {
   return 0
 }
 
+input_test_hermes() {
+  log_warn "hermes is TUI-only — skipping input test"
+  return 0
+}
+
 # ---------------------------------------------------------------------------
 # run_input_test AGENT APP_NAME
 #
@@ -167,6 +172,7 @@ run_input_test() {
     zeroclaw)  input_test_zeroclaw "${app}"  ;;
     opencode)  input_test_opencode          ;;
     kilocode)  input_test_kilocode          ;;
+    hermes)    input_test_hermes            ;;
     *)
       log_err "Unknown agent for input test: ${agent}"
       return 1
@@ -408,6 +414,40 @@ verify_kilocode() {
   return "${failures}"
 }
 
+verify_hermes() {
+  local app="$1"
+  local failures=0
+
+  # Binary check
+  log_step "Checking hermes binary..."
+  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; command -v hermes" >/dev/null 2>&1; then
+    log_ok "hermes binary found"
+  else
+    log_err "hermes binary not found"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: OPENROUTER_API_KEY
+  log_step "Checking hermes env (OPENROUTER_API_KEY)..."
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+    log_ok "OPENROUTER_API_KEY present in .spawnrc"
+  else
+    log_err "OPENROUTER_API_KEY not found in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: OPENAI_BASE_URL points to openrouter
+  log_step "Checking hermes env (OPENAI_BASE_URL)..."
+  if cloud_exec "${app}" "grep OPENAI_BASE_URL ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
+    log_ok "OPENAI_BASE_URL set to openrouter"
+  else
+    log_err "OPENAI_BASE_URL not set to openrouter in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  return "${failures}"
+}
+
 # ---------------------------------------------------------------------------
 # verify_agent AGENT APP_NAME
 #
@@ -435,6 +475,7 @@ verify_agent() {
     codex)     verify_codex "${app}"     || agent_failures=$? ;;
     opencode)  verify_opencode "${app}"  || agent_failures=$? ;;
     kilocode)  verify_kilocode "${app}"  || agent_failures=$? ;;
+    hermes)    verify_hermes "${app}"    || agent_failures=$? ;;
     *)
       log_err "Unknown agent: ${agent}"
       return 1
