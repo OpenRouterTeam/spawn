@@ -20,9 +20,9 @@ provision_agent() {
   local app_name="$2"
   local log_dir="$3"
 
-  local exit_file="${log_dir}/${agent}.exit"
-  local stdout_file="${log_dir}/${agent}.stdout"
-  local stderr_file="${log_dir}/${agent}.stderr"
+  local exit_file="${log_dir}/${app_name}.exit"
+  local stdout_file="${log_dir}/${app_name}.stdout"
+  local stderr_file="${log_dir}/${app_name}.stderr"
 
   # Resolve CLI entry point
   # SPAWN_CLI_DIR overrides auto-resolution — use this to force local source code
@@ -99,10 +99,12 @@ provision_agent() {
   log_ok "Instance ${app_name} verified"
 
   # Wait for install to complete (.spawnrc is written near the end)
-  log_step "Waiting for install to complete (polling .spawnrc, up to ${INSTALL_WAIT}s)..."
+  local effective_install_wait
+  effective_install_wait=$(cloud_install_wait)
+  log_step "Waiting for install to complete (polling .spawnrc, up to ${effective_install_wait}s)..."
   local install_waited=0
   local install_ok=0
-  while [ "${install_waited}" -lt "${INSTALL_WAIT}" ]; do
+  while [ "${install_waited}" -lt "${effective_install_wait}" ]; do
     if cloud_exec "${app_name}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
       install_ok=1
       break
@@ -117,7 +119,7 @@ provision_agent() {
     log_ok "Install completed (.spawnrc found)"
     return 0
   else
-    log_warn ".spawnrc not found after ${INSTALL_WAIT}s — install may still be running"
+    log_warn ".spawnrc not found after ${effective_install_wait}s — install may still be running"
     return 0  # Continue to verification; it will catch real failures
   fi
 }

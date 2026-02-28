@@ -7,7 +7,7 @@ set -eo pipefail
 # ---------------------------------------------------------------------------
 ALL_AGENTS="claude openclaw zeroclaw codex opencode kilocode"
 PROVISION_TIMEOUT="${PROVISION_TIMEOUT:-480}"
-INSTALL_WAIT="${INSTALL_WAIT:-120}"
+INSTALL_WAIT="${INSTALL_WAIT:-300}"
 INPUT_TEST_TIMEOUT="${INPUT_TEST_TIMEOUT:-120}"
 
 # Active cloud (set by load_cloud_driver)
@@ -92,6 +92,13 @@ load_cloud_driver() {
     # Default: no cap (return a large number)
     eval "cloud_max_parallel() { printf '99'; }"
   fi
+
+  # Optional: per-cloud install wait override (seconds to poll for .spawnrc)
+  if type "_${cloud}_install_wait" >/dev/null 2>&1; then
+    eval "cloud_install_wait() { _${cloud}_install_wait \"\$@\"; }"
+  else
+    eval "cloud_install_wait() { printf '%s' \"\${INSTALL_WAIT}\"; }"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -150,7 +157,12 @@ make_app_name() {
   local agent="$1"
   local ts
   ts=$(date +%s)
-  printf "e2e-%s-%s" "${agent}" "${ts}"
+  # Include ACTIVE_CLOUD to avoid name collisions in multi-cloud parallel runs
+  if [ -n "${ACTIVE_CLOUD:-}" ]; then
+    printf "e2e-%s-%s-%s" "${ACTIVE_CLOUD}" "${agent}" "${ts}"
+  else
+    printf "e2e-%s-%s" "${agent}" "${ts}"
+  fi
 }
 
 format_duration() {

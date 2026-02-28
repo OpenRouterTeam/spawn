@@ -294,3 +294,12 @@ _hetzner_cleanup_stale() {
     log_info "Skipped ${skipped} recent Hetzner instance(s)"
   fi
 }
+
+# ---------------------------------------------------------------------------
+# _hetzner_max_parallel
+#
+# Hetzner accounts have a primary IP limit (~5 for most accounts).
+# ---------------------------------------------------------------------------
+_hetzner_max_parallel() {
+  printf '5'
+}
