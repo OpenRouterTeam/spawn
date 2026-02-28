@@ -1,6 +1,8 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
 import { mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import {
   logInfo,
@@ -141,7 +143,9 @@ async function doApi(
 
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
-const DO_CONFIG_PATH = `${process.env.HOME}/.config/spawn/digitalocean.json`;
+function getConfigPath(): string {
+  return join(process.env.HOME || homedir(), ".config", "spawn", "digitalocean.json");
+}
 
 interface DoConfig {
   api_key?: string;
@@ -153,19 +157,20 @@ interface DoConfig {
 
 function loadConfig(): DoConfig | null {
   try {
-    return JSON.parse(readFileSync(DO_CONFIG_PATH, "utf-8"));
+    return JSON.parse(readFileSync(getConfigPath(), "utf-8"));
   } catch {
     return null;
   }
 }
 
 async function saveConfig(config: DoConfig): Promise<void> {
-  const dir = DO_CONFIG_PATH.replace(/\/[^/]+$/, "");
+  const configPath = getConfigPath();
+  const dir = configPath.replace(/\/[^/]+$/, "");
   mkdirSync(dir, {
     recursive: true,
     mode: 0o700,
   });
-  await Bun.write(DO_CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", {
+  await Bun.write(configPath, JSON.stringify(config, null, 2) + "\n", {
     mode: 0o600,
   });
 }

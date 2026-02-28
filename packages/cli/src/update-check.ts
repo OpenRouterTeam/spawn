@@ -2,6 +2,7 @@ import "./unicode-detect.js"; // Ensure TERM is set before using symbols
 import type { ExecSyncOptions, ExecFileSyncOptions } from "node:child_process";
 import { execSync as nodeExecSync, execFileSync as nodeExecFileSync } from "node:child_process";
 import fs from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import pc from "picocolors";
 import * as v from "valibot";
@@ -80,7 +81,7 @@ function compareVersions(current: string, latest: string): boolean {
 // ── Failure Backoff ──────────────────────────────────────────────────────────
 
 function getUpdateFailedPath(): string {
-  return path.join(process.env.HOME || "/tmp", ".config", "spawn", ".update-failed");
+  return path.join(process.env.HOME || homedir(), ".config", "spawn", ".update-failed");
 }
 
 export function isUpdateBackedOff(): boolean {

@@ -1,6 +1,8 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
 import { mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import {
   logInfo,
@@ -89,23 +91,26 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
 
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
-const HETZNER_CONFIG_PATH = `${process.env.HOME}/.config/spawn/hetzner.json`;
+function getConfigPath(): string {
+  return join(process.env.HOME || homedir(), ".config", "spawn", "hetzner.json");
+}
 
 async function saveTokenToConfig(token: string): Promise<void> {
-  const dir = HETZNER_CONFIG_PATH.replace(/\/[^/]+$/, "");
+  const configPath = getConfigPath();
+  const dir = configPath.replace(/\/[^/]+$/, "");
   mkdirSync(dir, {
     recursive: true,
     mode: 0o700,
   });
   const escaped = jsonEscape(token);
-  await Bun.write(HETZNER_CONFIG_PATH, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
+  await Bun.write(configPath, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
     mode: 0o600,
   });
 }
 
 function loadTokenFromConfig(): string | null {
   try {
-    const data = JSON.parse(readFileSync(HETZNER_CONFIG_PATH, "utf-8"));
+    const data = JSON.parse(readFileSync(getConfigPath(), "utf-8"));
     const token = data.api_key || data.token || "";
     if (!token) {
       return null;
