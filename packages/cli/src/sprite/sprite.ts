@@ -1,6 +1,8 @@
 // sprite/sprite.ts — Core Sprite provider: CLI installation, auth, provisioning, execution
 
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import {
   logInfo,
@@ -110,7 +112,7 @@ function getSpriteCmd(): string | null {
     return "sprite";
   }
   const commonPaths = [
-    `${process.env.HOME}/.local/bin/sprite`,
+    join(process.env.HOME || homedir(), ".local/bin/sprite"),
     "/data/data/com.termux/files/usr/bin/sprite",
     "/usr/local/bin/sprite",
     "/usr/bin/sprite",
@@ -166,7 +168,7 @@ export async function ensureSpriteCli(): Promise<void> {
   }
 
   // Add to PATH
-  const localBin = `${process.env.HOME}/.local/bin`;
+  const localBin = join(process.env.HOME || homedir(), ".local/bin");
   if (!process.env.PATH?.includes(localBin)) {
     process.env.PATH = `${localBin}:${process.env.PATH}`;
   }

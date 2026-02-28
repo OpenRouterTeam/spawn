@@ -1,6 +1,8 @@
 // gcp/gcp.ts — Core GCP Compute Engine provider: gcloud CLI wrapper, auth, provisioning, SSH
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import {
   logInfo,
@@ -173,7 +175,7 @@ function getGcloudCmd(): string | null {
   }
   // Check common install locations
   const paths = [
-    `${process.env.HOME}/google-cloud-sdk/bin/gcloud`,
+    join(process.env.HOME || homedir(), "google-cloud-sdk/bin/gcloud"),
     "/usr/lib/google-cloud-sdk/bin/gcloud",
     "/snap/bin/gcloud",
   ];
@@ -371,7 +373,7 @@ export async function ensureGcloudCli(): Promise<void> {
   }
 
   // Add to PATH
-  const sdkBin = `${process.env.HOME}/google-cloud-sdk/bin`;
+  const sdkBin = join(process.env.HOME || homedir(), "google-cloud-sdk/bin");
   if (!process.env.PATH?.includes(sdkBin)) {
     process.env.PATH = `${sdkBin}:${process.env.PATH}`;
   }
