@@ -1205,16 +1205,24 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
   let localScriptResolved = "";
 
   if (cliDir) {
-    const resolvedCliDir = path.resolve(cliDir);
-    const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
-    try {
-      const canonicalPath = fs.realpathSync(candidatePath);
-      // Ensure the resolved path stays inside the CLI dir (no path traversal)
-      if (canonicalPath.startsWith(resolvedCliDir + path.sep)) {
-        localScriptResolved = canonicalPath;
+    // Reject cloud/agent names containing path traversal characters
+    const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
+    const safeCloud = !hasBadChars(resolvedCloud);
+    const safeAgent = !hasBadChars(resolvedAgent);
+
+    if (safeCloud && safeAgent) {
+      const resolvedCliDir = path.resolve(cliDir);
+      const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
+      try {
+        const canonicalPath = fs.realpathSync(candidatePath);
+        // Ensure the resolved path stays inside the CLI dir (no path traversal)
+        const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
+        if (canonicalPath.startsWith(prefix)) {
+          localScriptResolved = canonicalPath;
+        }
+      } catch {
+        // File doesn't exist — fall through to remote fetch
       }
-    } catch {
-      // File doesn't exist — fall through to remote fetch
     }
   }
 
