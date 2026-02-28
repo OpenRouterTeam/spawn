@@ -294,62 +294,6 @@ export async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, m
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 }
 
-export async function setupOpenclawBatched(
-  runner: CloudRunner,
-  envContent: string,
-  apiKey: string,
-  modelId: string,
-): Promise<void> {
-  logStep("Setting up OpenClaw (install check + env + config)...");
-
-  const envB64 = Buffer.from(envContent).toString("base64");
-
-  const gatewayToken = crypto.randomUUID().replace(/-/g, "");
-  const configJson = JSON.stringify({
-    env: {
-      OPENROUTER_API_KEY: apiKey,
-    },
-    gateway: {
-      mode: "local",
-      auth: {
-        token: gatewayToken,
-      },
-    },
-    agents: {
-      defaults: {
-        model: {
-          primary: modelId,
-        },
-      },
-    },
-  });
-  const configB64 = Buffer.from(configJson).toString("base64");
-
-  const script = [
-    'echo "==> Checking openclaw..."',
-    'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
-    "if command -v openclaw >/dev/null 2>&1; then",
-    '  echo "    openclaw found at $(command -v openclaw)"',
-    "else",
-    '  echo "    openclaw not found, installing..."',
-    "  mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw",
-    '  export PATH="$HOME/.npm-global/bin:$PATH"',
-    '  command -v openclaw || { echo "ERROR: openclaw install failed"; exit 1; }',
-    "fi",
-    'echo "==> Writing environment variables..."',
-    `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc`,
-    "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc",
-    "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc",
-    'echo "==> Writing openclaw config..."',
-    "mkdir -p ~/.openclaw",
-    `printf '%s' '${configB64}' | base64 -d > ~/.openclaw/openclaw.json && chmod 600 ~/.openclaw/openclaw.json`,
-    'echo "==> Setup complete"',
-  ].join("\n");
-
-  await runner.runServer(script);
-  logInfo("OpenClaw setup complete (install + env + config)");
-}
-
 export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   // Start the daemon AND wait for port 18789 in a single SSH session.
