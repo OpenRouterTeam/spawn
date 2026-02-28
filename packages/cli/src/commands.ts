@@ -1202,12 +1202,26 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
   // Phase 2: Load script — prefer local source when SPAWN_CLI_DIR is set (exit code 2)
   let scriptContent: string;
   const cliDir = process.env.SPAWN_CLI_DIR;
-  const localScript = cliDir ? `${cliDir}/sh/${resolvedCloud}/${resolvedAgent}.sh` : "";
+  let localScriptResolved = "";
 
-  if (localScript && fs.existsSync(localScript)) {
-    scriptContent = fs.readFileSync(localScript, "utf-8");
+  if (cliDir) {
+    const resolvedCliDir = path.resolve(cliDir);
+    const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
+    try {
+      const canonicalPath = fs.realpathSync(candidatePath);
+      // Ensure the resolved path stays inside the CLI dir (no path traversal)
+      if (canonicalPath.startsWith(resolvedCliDir + path.sep)) {
+        localScriptResolved = canonicalPath;
+      }
+    } catch {
+      // File doesn't exist — fall through to remote fetch
+    }
+  }
+
+  if (localScriptResolved) {
+    scriptContent = fs.readFileSync(localScriptResolved, "utf-8");
     if (debug) {
-      console.error(`[headless] Using local script: ${localScript}`);
+      console.error(`[headless] Using local script: ${localScriptResolved}`);
     }
   } else {
     const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
