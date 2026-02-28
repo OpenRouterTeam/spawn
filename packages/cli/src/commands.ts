@@ -27,6 +27,7 @@ import {
   validateUsername,
   validateServerIdentifier,
   validateMetadataValue,
+  validateLaunchCmd,
 } from "./security.js";
 import type { SpawnRecord, VMConnection } from "./history.js";
 import {
@@ -2634,6 +2635,10 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
 }
 
 export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Promise<void> {
+  const resolved = await resolveListFilters(agentFilter, cloudFilter);
+  agentFilter = resolved.agentFilter;
+  cloudFilter = resolved.cloudFilter;
+
   const servers = getActiveServers();
 
   let filtered = servers;
@@ -2789,6 +2794,9 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
     }
     if (connection.server_id) {
       validateServerIdentifier(connection.server_id);
+    }
+    if (connection.launch_cmd) {
+      validateLaunchCmd(connection.launch_cmd);
     }
   } catch (err) {
     p.log.error(`Security validation failed: ${getErrorMessage(err)}`);

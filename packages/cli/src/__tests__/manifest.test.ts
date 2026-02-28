@@ -125,10 +125,8 @@ describe("manifest", () => {
         }),
       );
 
-      // Cache location depends on whether the test runs in the project directory
-      // In the spawn project root, it uses a local manifest.json, so cache may not be written
-      const cacheExists = existsSync(env.cacheFile);
-      expect(typeof cacheExists).toBe("boolean");
+      // The manifest was fetched and returned successfully
+      expect(manifest.agents).toBeDefined();
     });
 
     it("should use disk cache when fresh", async () => {

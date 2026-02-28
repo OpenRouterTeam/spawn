@@ -1,6 +1,6 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 import {
   logInfo,
@@ -161,11 +161,10 @@ function loadConfig(): DoConfig | null {
 
 async function saveConfig(config: DoConfig): Promise<void> {
   const dir = DO_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   await Bun.write(DO_CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", {
     mode: 0o600,
   });
@@ -1040,7 +1039,11 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || doServerIp;
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
@@ -1165,33 +1168,4 @@ export async function destroyServer(dropletId?: string): Promise<void> {
   }
 
   logInfo(`Droplet ${id} destroyed`);
-}
-
-export async function listServers(): Promise<void> {
-  const { text } = await doApi("GET", "/droplets");
-  const data = parseJsonObj(text);
-  const droplets = toObjectArray(data?.droplets);
-
-  if (droplets.length === 0) {
-    console.log("No droplets found");
-    return;
-  }
-
-  const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-  console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("SIZE", 15));
-  console.log("-".repeat(80));
-  for (const d of droplets) {
-    const networks = d.networks;
-    const v4 = networks && typeof networks === "object" && "v4" in networks ? networks.v4 : undefined;
-    const v4Arr = toObjectArray(v4);
-    const publicNet = v4Arr.find((n) => n.type === "public");
-    const ip = String(publicNet?.ip_address ?? "N/A");
-    console.log(
-      pad(String(d.name ?? "N/A").slice(0, 24), 25) +
-        pad(String(d.id ?? "N/A").slice(0, 11), 12) +
-        pad(String(d.status ?? "N/A").slice(0, 11), 12) +
-        pad(ip.slice(0, 15), 16) +
-        pad(String(d.size_slug ?? "N/A").slice(0, 14), 15),
-    );
-  }
 }

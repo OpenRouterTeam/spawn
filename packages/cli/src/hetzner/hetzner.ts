@@ -1,6 +1,6 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 import {
   logInfo,
@@ -93,11 +93,10 @@ const HETZNER_CONFIG_PATH = `${process.env.HOME}/.config/spawn/hetzner.json`;
 
 async function saveTokenToConfig(token: string): Promise<void> {
   const dir = HETZNER_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   const escaped = jsonEscape(token);
   await Bun.write(HETZNER_CONFIG_PATH, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
     mode: 0o600,
@@ -579,7 +578,11 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || hetznerServerIp;
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
@@ -701,32 +704,4 @@ export async function destroyServer(serverId?: string): Promise<void> {
     throw new Error("Server deletion failed");
   }
   logInfo(`Server ${id} destroyed`);
-}
-
-export async function listServers(): Promise<void> {
-  const resp = await hetznerApi("GET", "/servers");
-  const data = parseJsonObj(resp);
-  const servers = toObjectArray(data?.servers);
-
-  if (servers.length === 0) {
-    console.log("No servers found");
-    return;
-  }
-
-  const pad = (str: string, n: number) => (str + " ".repeat(n)).slice(0, n);
-  const str = (val: unknown, fallback = "N/A"): string => (isString(val) ? val : val != null ? String(val) : fallback);
-  console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10));
-  console.log("-".repeat(75));
-  for (const s of servers) {
-    const publicNet = toRecord(s.public_net);
-    const ipv4 = toRecord(publicNet?.ipv4);
-    const serverType = toRecord(s.server_type);
-    console.log(
-      pad(str(s.name).slice(0, 24), 25) +
-        pad(str(s.id).slice(0, 11), 12) +
-        pad(str(s.status).slice(0, 11), 12) +
-        pad(str(ipv4?.ip).slice(0, 15), 16) +
-        pad(str(serverType?.name).slice(0, 9), 10),
-    );
-  }
 }

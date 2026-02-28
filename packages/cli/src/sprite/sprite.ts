@@ -511,7 +511,11 @@ async function runSpriteSilent(cmd: string): Promise<void> {
  * The -file flag format is "localpath:remotepath".
  */
 export async function uploadFileSprite(localPath: string, remotePath: string): Promise<void> {
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
