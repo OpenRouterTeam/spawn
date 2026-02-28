@@ -15,6 +15,17 @@ set -eo pipefail
 # Resolve script directory and source libraries
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Auto-set SPAWN_CLI_DIR to repo root so shell scripts use local source instead
+# of downloading pre-bundled .js from GitHub releases. Can be overridden by env.
+if [ -z "${SPAWN_CLI_DIR:-}" ]; then
+  _repo_root="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+  if [ -f "${_repo_root}/packages/cli/src/index.ts" ]; then
+    export SPAWN_CLI_DIR="${_repo_root}"
+  fi
+  unset _repo_root
+fi
+
 source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/provision.sh"
 source "${SCRIPT_DIR}/lib/verify.sh"
