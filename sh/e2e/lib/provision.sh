@@ -43,10 +43,6 @@ provision_agent() {
   # Remove stale exit file
   rm -f "${exit_file}"
 
-  # Get cloud-specific env var exports
-  local cloud_env
-  cloud_env=$(cloud_headless_env "${app_name}" "${agent}")
-
   # Environment for headless provisioning
   # MODEL_ID bypasses the interactive model selection prompt (required by openclaw)
   (
@@ -59,8 +55,14 @@ provision_agent() {
     export MODEL_ID="${MODEL_ID:-openrouter/auto}"
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
-    # Apply cloud-specific env vars
-    eval "${cloud_env}"
+    # Apply cloud-specific env vars (safe: only processes export VAR="VALUE" lines)
+    while IFS= read -r _env_line; do
+      if [[ "${_env_line}" =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=\"(.*)\"$ ]]; then
+        export "${BASH_REMATCH[1]}"="${BASH_REMATCH[2]}"
+      fi
+    done <<CLOUD_ENV
+$(cloud_headless_env "${app_name}" "${agent}")
+CLOUD_ENV
 
     bun run "${cli_entry}" "${agent}" "${ACTIVE_CLOUD}" --headless --output json \
       > "${stdout_file}" 2> "${stderr_file}"
