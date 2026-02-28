@@ -78,11 +78,19 @@ export interface SlackSegment {
   kind: "text" | "tool_use" | "tool_result";
   text: string;
   toolName?: string; // set for tool_use
+  toolHint?: string; // set for tool_use — truncated command/pattern/path
   isError?: boolean; // set for tool_result
 }
 
-/** Format a tool_use input block into a truncated backtick hint string. */
-function formatToolHint(block: Record<string, unknown>): string {
+/** Tracked tool call for history and stats. */
+export interface ToolCall {
+  name: string;
+  hint: string;
+  errored?: boolean;
+}
+
+/** Extract a truncated hint from a tool_use input block. */
+export function extractToolHint(block: Record<string, unknown>): string {
   const input = toRecord(block.input);
   if (!input) {
     return "";
@@ -94,8 +102,34 @@ function formatToolHint(block: Record<string, unknown>): string {
   if (!hint) {
     return "";
   }
-  const short = hint.length > 80 ? `${hint.slice(0, 80)}...` : hint;
-  return ` \`${short}\``;
+  return hint.length > 80 ? `${hint.slice(0, 80)}...` : hint;
+}
+
+/** Format a tool_use input block into a truncated backtick hint string. */
+function formatToolHint(block: Record<string, unknown>): string {
+  const hint = extractToolHint(block);
+  if (!hint) {
+    return "";
+  }
+  return ` \`${hint}\``;
+}
+
+/** Format tool counts into a compact stats string: "1× Bash, 4× Read, 5× Grep". */
+export function formatToolStats(counts: ReadonlyMap<string, number>): string {
+  return Array.from(counts.entries())
+    .map(([name, count]) => `${count}× ${name}`)
+    .join(", ");
+}
+
+/** Format the full ordered tool history into a numbered list for the expandable attachment. */
+export function formatToolHistory(history: readonly ToolCall[]): string {
+  return history
+    .map((t, i) => {
+      const icon = t.errored ? "✗" : "✓";
+      const hint = t.hint ? ` — ${t.hint}` : "";
+      return `${i + 1}. ${icon} ${t.name}${hint}`;
+    })
+    .join("\n");
 }
 
 /** Parse an assistant-type event into a SlackSegment. */
@@ -109,6 +143,7 @@ function parseAssistantEvent(event: Record<string, unknown>): SlackSegment | nul
   const textParts: string[] = [];
   const toolParts: string[] = [];
   let firstToolName: string | undefined;
+  let firstToolHint: string | undefined;
 
   for (const rawBlock of content) {
     const block = toRecord(rawBlock);
@@ -123,6 +158,7 @@ function parseAssistantEvent(event: Record<string, unknown>): SlackSegment | nul
     if (block.type === "tool_use" && isString(block.name)) {
       if (!firstToolName) {
         firstToolName = block.name;
+        firstToolHint = extractToolHint(block);
       }
       toolParts.push(`:hammer_and_wrench: *${block.name}*${formatToolHint(block)}`);
     }
@@ -134,6 +170,7 @@ function parseAssistantEvent(event: Record<string, unknown>): SlackSegment | nul
       kind: "tool_use",
       text: toolParts.join("\n"),
       toolName: firstToolName,
+      toolHint: firstToolHint,
     };
   }
   if (textParts.length > 0) {
