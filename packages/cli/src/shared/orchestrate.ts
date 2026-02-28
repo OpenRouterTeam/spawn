@@ -130,6 +130,12 @@ export async function runOrchestration(cloud: CloudOrchestrator, agent: AgentCon
     await agent.preLaunch();
   }
 
+  // 11b. Agent-specific pre-launch tip (e.g. channel setup ordering hint)
+  if (agent.preLaunchMsg) {
+    process.stderr.write("\n");
+    logInfo(`Tip: ${agent.preLaunchMsg}`);
+  }
+
   // 12. Launch interactive session
   logInfo(`${agent.name} is ready`);
   process.stderr.write("\n");
