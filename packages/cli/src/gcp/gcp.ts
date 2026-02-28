@@ -680,7 +680,6 @@ export async function createInstance(
     "--image-project=ubuntu-os-cloud",
     `--network=${process.env.GCP_NETWORK ?? "default"}`,
     `--subnet=${process.env.GCP_SUBNET ?? "default"}`,
-    `--subnet-region=${zone.replace(/-[a-z]$/, "")}`,
     `--metadata-from-file=startup-script=${tmpFile}`,
     `--metadata=ssh-keys=${sshKeysMetadata}`,
     `--project=${gcpProject}`,
