@@ -13,7 +13,7 @@ set -eo pipefail
 # Constants
 # ---------------------------------------------------------------------------
 _DO_API="https://api.digitalocean.com/v2"
-_DO_DEFAULT_SIZE="s-1vcpu-512mb-10gb"
+_DO_DEFAULT_SIZE="s-2vcpu-2gb"
 _DO_DEFAULT_REGION="nyc3"
 
 # ---------------------------------------------------------------------------
@@ -309,4 +309,13 @@ EOF
   if [ "${skipped}" -gt 0 ]; then
     log_info "Skipped ${skipped} recent droplet(s)"
   fi
+}
+
+# ---------------------------------------------------------------------------
+# _digitalocean_max_parallel
+#
+# DigitalOcean accounts often have a 3-droplet limit.
+# ---------------------------------------------------------------------------
+_digitalocean_max_parallel() {
+  printf '3'
 }
