@@ -16,7 +16,6 @@
 
 log_info()  { printf '[github-auth] %s\n' "$*" >&2; }
 log_step()  { printf '[github-auth] %s\n' "$*" >&2; }
-log_warn()  { printf '[github-auth] WARNING: %s\n' "$*" >&2; }
 log_error() { printf '[github-auth] ERROR: %s\n' "$*" >&2; }
 
 # ============================================================
