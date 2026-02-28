@@ -19,8 +19,6 @@ import { loadManifest } from "../manifest";
  * - validateCloud: display name suggestion when key suggestion fails
  * - Both key AND display name suggestions returning null (very different input)
  * - findClosestMatch with display names via the full cmdRun / cmdAgentInfo paths
- *
- * Agent: test-engineer
  */
 
 // Manifest with names very different from keys so key-based suggestion fails

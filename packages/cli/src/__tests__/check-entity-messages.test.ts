@@ -12,8 +12,6 @@ import type { Manifest } from "../manifest";
  * 2. Cross-kind fuzzy match: "looks like {kind} X" + swap warning (PR #510)
  * 3. Exact wrong-type detection: "X is a cloud, not an agent" (existing)
  * 4. No match at all: just the listCmd hint (existing)
- *
- * Agent: test-engineer
  */
 
 // ── Mock @clack/prompts ─────────────────────────────────────────────────────

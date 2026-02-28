@@ -16,8 +16,6 @@ import type { SpawnRecord } from "../history";
  * - Manifest unavailable (falls back to raw keys)
  * - Records with/without prompts
  * - Integration with cmdRun (mocked)
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

@@ -20,8 +20,6 @@ import { createMockManifest, setupTestEnvironment, teardownTestEnvironment } fro
  * - agentKeys/cloudKeys insertion order preservation
  * - In-memory cache forceRefresh bypass
  * - Fallback chain: invalid fetch data + stale cache
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

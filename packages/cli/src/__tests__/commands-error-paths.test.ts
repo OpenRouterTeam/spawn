@@ -6,10 +6,6 @@ import { isString } from "@openrouter/spawn-shared";
 /**
  * Tests for commands.ts error/validation paths that call process.exit(1).
  *
- * These test the ACTUAL exported functions from commands.ts (not inline replicas).
- * Previous tests in commands-helpers.test.ts and commands-untested.test.ts used
- * re-implemented copies of the logic. This file tests the real code paths:
- *
  * - cmdRun with invalid identifiers (injection characters, path traversal)
  * - cmdRun with unknown agent or cloud names
  * - cmdRun with unimplemented agent/cloud combinations
@@ -18,8 +14,6 @@ import { isString } from "@openrouter/spawn-shared";
  * - cmdAgentInfo with invalid identifier
  * - validateNonEmptyString triggering process.exit for empty inputs
  * - validateImplementation showing available clouds when combination is missing
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

@@ -23,8 +23,6 @@ import { createMockManifest } from "./test-helpers";
  * 3. Return the key with the smallest distance (key or name), if <= 3
  *
  * This is distinct from findClosestMatch which only checks one list.
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

@@ -6,8 +6,6 @@ import { credentialHints } from "../commands";
  *
  * credentialHints now checks which required env vars are actually set
  * and gives specific feedback about which are missing vs present.
- *
- * Agent: ux-engineer
  */
 
 describe("credentialHints", () => {
