@@ -13,8 +13,6 @@ import { loadManifest } from "../manifest";
  * - Invalid/unknown cloud error paths
  * - Typo suggestion via findClosestMatch integration
  * - validateAndGetCloud identifier + empty string rejection
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

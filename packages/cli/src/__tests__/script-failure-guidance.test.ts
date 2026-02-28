@@ -26,8 +26,6 @@ function getSignalGuidance(...args: Parameters<typeof _getSignalGuidance>): stri
  * This function maps exit codes from failed spawn scripts to user-facing
  * guidance strings. It was recently modified (PRs #450, #449) but has
  * zero direct test coverage.
- *
- * Agent: test-engineer
  */
 
 describe("getScriptFailureGuidance", () => {

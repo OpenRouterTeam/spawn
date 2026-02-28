@@ -7,14 +7,6 @@ import { isString } from "@openrouter/spawn-shared";
  * Tests for the download fallback pipeline and script failure reporting
  * through real exported code paths in commands.ts.
  *
- * Existing tests cover:
- * - getScriptFailureGuidance in isolation (script-failure-guidance.test.ts)
- * - getStatusDescription as a reimplemented copy (commands-untested.test.ts)
- * - downloadScriptWithFallback logic as a reimplemented copy (commands-untested.test.ts)
- * - cmdRun validation paths (commands-error-paths.test.ts)
- * - cmdRun resolution and swap (commands-resolve-run.test.ts, commands-swap-resolve.test.ts)
- *
- * This file covers the UNTESTED real code paths:
  * - downloadScriptWithFallback: primary URL succeeds (real code path through cmdRun)
  * - downloadScriptWithFallback: primary fails, fallback succeeds (real cmdRun)
  * - downloadScriptWithFallback: both fail with 404 (reportDownloadFailure 404+404 path)
@@ -26,8 +18,6 @@ import { isString } from "@openrouter/spawn-shared";
  * - reportScriptFailure: unknown exit code (default guidance)
  * - execScript: validateScriptContent rejection of bad scripts
  * - execScript: interrupted script (code 130) handling
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

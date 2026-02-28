@@ -25,8 +25,6 @@ import { isString } from "@openrouter/spawn-shared";
  * - SPAWN_PROMPT and SPAWN_MODE are NOT set when no prompt is provided
  * - saveSpawnRecord failure is non-fatal (script still runs)
  * - Dry-run mode skips script download entirely
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

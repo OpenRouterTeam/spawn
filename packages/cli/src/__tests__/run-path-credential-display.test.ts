@@ -14,8 +14,6 @@ import type { Manifest } from "../manifest";
  *
  * These functions are all in the hot path of cmdRun (the primary CLI flow).
  * A bug in any of them breaks the user experience for every spawn invocation.
- *
- * Agent: test-engineer
  */
 
 // ── Test manifest ───────────────────────────────────────────────────────

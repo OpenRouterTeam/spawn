@@ -19,8 +19,6 @@ import { isString } from "@openrouter/spawn-shared";
  * - resolveAndLog: no resolution needed, agent resolved, cloud resolved, both resolved
  * - Edge case: swapped args after display name resolution
  * - Edge case: resolution to a key that then fails validation
- *
- * Agent: test-engineer
  */
 
 // Mock @clack/prompts

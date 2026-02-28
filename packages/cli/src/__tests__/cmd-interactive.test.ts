@@ -14,8 +14,6 @@ import { isString } from "@openrouter/spawn-shared";
  * - Happy path: agent selected, cloud selected, execScript called
  * - Intro banner and outro messaging
  * - "Next time, run directly" hint after selection
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

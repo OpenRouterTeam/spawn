@@ -30,8 +30,6 @@ import { createMockManifest, createEmptyManifest } from "./test-helpers";
  * - getStatusDescription: HTTP status to human-readable string
  * - calculateColumnWidth: matrix display column sizing
  * - getTerminalWidth: terminal width with fallback
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

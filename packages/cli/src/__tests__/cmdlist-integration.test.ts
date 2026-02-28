@@ -23,8 +23,6 @@ import type { SpawnRecord } from "../history";
  * - cmdList with filters that match nothing (empty + suggestion flow)
  * - cmdList when manifest is unavailable (falls back to raw keys)
  * - cmdList footer: rerun hint with/without prompt, filter count text
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

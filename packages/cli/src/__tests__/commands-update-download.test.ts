@@ -17,8 +17,6 @@ const VERSION = pkg.version;
  *
  * The tests mock @clack/prompts, global.fetch, and process.exit to
  * exercise the actual exported functions without side effects.
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

@@ -23,8 +23,6 @@ import type { Manifest } from "../manifest";
  *
  * Unlike manifest-integrity.test.ts which checks truthiness, these tests
  * verify exact types to prevent subtle runtime bugs from type mismatches.
- *
- * Agent: test-engineer
  */
 
 const REPO_ROOT = resolve(import.meta.dir, "../../../..");

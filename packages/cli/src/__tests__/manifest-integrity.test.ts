@@ -14,8 +14,6 @@ import type { Manifest } from "../manifest";
  * These tests catch configuration drift — when someone adds a script
  * without updating the manifest, or marks an entry "implemented" without
  * creating the script.
- *
- * Agent: test-engineer
  */
 
 const REPO_ROOT = resolve(import.meta.dir, "../../../..");

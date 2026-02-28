@@ -25,8 +25,6 @@ import { createConsoleMocks, restoreMocks } from "./test-helpers";
  * - cmdAgents: agent keys, display names, implementation counts, footer hint
  * - cmdClouds: cloud keys, display names, type grouping, auth hints, footer
  * - Edge cases: empty manifest, single entry, all implemented, none implemented
- *
- * Agent: test-engineer
  */
 
 // ── Mock manifests ──────────────────────────────────────────────────────────
