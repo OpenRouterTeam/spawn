@@ -165,6 +165,5 @@ describe("manifest", () => {
       expect(manifest).toHaveProperty("matrix");
       expect(global.fetch).toHaveBeenCalled();
     });
-
   });
 });
