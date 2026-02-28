@@ -149,15 +149,10 @@ describe("wrapSshCall", () => {
 
   it("wraps non-Error rejects into Error for Err", async () => {
     const result = await wrapSshCall(Promise.reject("string error"));
-    expect(result).toMatchObject({
-      ok: false,
-      error: {
-        message: "string error",
-      },
-    });
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(Error);
-    }
+    expect(result.ok).toBe(false);
+    if (result.ok) { return; }
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error.message).toBe("string error");
   });
 });
 

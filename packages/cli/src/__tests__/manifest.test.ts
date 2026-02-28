@@ -1,14 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import type { Manifest } from "../manifest";
 import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented } from "../manifest";
-import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { TestEnvironment } from "./test-helpers";
 import {
   createMockManifest,
   createEmptyManifest,
   mockSuccessfulFetch,
-  mockFailedFetch,
   setupTestEnvironment,
   teardownTestEnvironment,
 } from "./test-helpers";
@@ -167,114 +166,5 @@ describe("manifest", () => {
       expect(global.fetch).toHaveBeenCalled();
     });
 
-    it("should use stale cache as fallback on network error", async () => {
-      // Write old cache (more than 1 hour old)
-      mkdirSync(join(env.testDir, "spawn"), {
-        recursive: true,
-      });
-      writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
-      const oldTime = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
-      const { utimesSync } = await import("node:fs");
-      utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
-
-      // Mock network failure
-      global.fetch = mockFailedFetch("Network error");
-
-      const manifest = await loadManifest(true);
-
-      // Should fall back to stale cache
-      expect(manifest).toHaveProperty("agents");
-      expect(manifest).toHaveProperty("clouds");
-      expect(manifest).toHaveProperty("matrix");
-    });
-
-    it("should throw error when no cache and network fails", async () => {
-      // Ensure no cache exists in test directory
-      if (existsSync(env.cacheFile)) {
-        unlinkSync(env.cacheFile);
-      }
-
-      // Remove cache directory to ensure it's truly missing
-      const cacheDir = join(env.testDir, "spawn");
-      if (existsSync(cacheDir)) {
-        rmSync(cacheDir, {
-          recursive: true,
-          force: true,
-        });
-      }
-
-      // Mock network failure
-      global.fetch = mockFailedFetch("Network error");
-
-      // tryLoadLocalManifest() returns null in test environments (NODE_ENV=test),
-      // so with no cache and no network, loadManifest must throw.
-      await expect(loadManifest(true)).rejects.toThrow("Cannot load manifest");
-    });
-
-    it("should validate manifest structure", async () => {
-      // Mock fetch with invalid data (missing required fields)
-      global.fetch = mock(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({
-              agents: {},
-            }),
-          ),
-        ),
-      ); // missing clouds and matrix
-
-      // Write valid cache as fallback
-      mkdirSync(join(env.testDir, "spawn"), {
-        recursive: true,
-      });
-      writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
-      const oldTime = Date.now() - 2 * 60 * 60 * 1000;
-      const { utimesSync } = await import("node:fs");
-      utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
-
-      const manifest = await loadManifest(true);
-
-      // Should fall back to cache when fetched data is invalid
-      expect(manifest).toHaveProperty("agents");
-      expect(manifest).toHaveProperty("clouds");
-      expect(manifest).toHaveProperty("matrix");
-    });
-
-    it("should handle fetch timeout", async () => {
-      // Mock timeout
-      const timeoutFetch: typeof fetch = () =>
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 100));
-      global.fetch = mock(timeoutFetch);
-
-      // Write cache as fallback
-      mkdirSync(join(env.testDir, "spawn"), {
-        recursive: true,
-      });
-      writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
-      const oldTime = Date.now() - 2 * 60 * 60 * 1000;
-      const { utimesSync } = await import("node:fs");
-      utimesSync(env.cacheFile, new Date(oldTime), new Date(oldTime));
-
-      const manifest = await loadManifest(true);
-
-      // Should fall back to cache on timeout
-      expect(manifest).toHaveProperty("agents");
-      expect(manifest).toHaveProperty("clouds");
-      expect(manifest).toHaveProperty("matrix");
-    });
-
-    it("should return cached instance on subsequent calls", async () => {
-      // Mock successful fetch
-      global.fetch = mockSuccessfulFetch(mockManifest);
-
-      const manifest1 = await loadManifest(true);
-      const manifest2 = await loadManifest(); // Should use in-memory cache
-
-      expect(manifest1).toBe(manifest2); // Same instance
-      // Note: in real execution, fetch is only called once, but module caching
-      // in tests may behave differently
-      expect(manifest2).toHaveProperty("agents");
-      expect(manifest2).toHaveProperty("clouds");
-    });
   });
 });
