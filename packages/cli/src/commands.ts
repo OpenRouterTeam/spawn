@@ -1199,42 +1199,52 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     }
   }
 
-  // Phase 2: Download script (exit code 2)
-  const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
-  const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
-
+  // Phase 2: Load script — prefer local source when SPAWN_CLI_DIR is set (exit code 2)
   let scriptContent: string;
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT),
-    });
-    if (res.ok) {
-      scriptContent = await res.text();
-    } else {
-      const ghRes = await fetch(ghUrl, {
+  const cliDir = process.env.SPAWN_CLI_DIR;
+  const localScript = cliDir ? `${cliDir}/sh/${resolvedCloud}/${resolvedAgent}.sh` : "";
+
+  if (localScript && fs.existsSync(localScript)) {
+    scriptContent = fs.readFileSync(localScript, "utf-8");
+    if (debug) {
+      console.error(`[headless] Using local script: ${localScript}`);
+    }
+  } else {
+    const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
+    const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
+
+    try {
+      const res = await fetch(url, {
         signal: AbortSignal.timeout(FETCH_TIMEOUT),
       });
-      if (!ghRes.ok) {
-        headlessError(
-          resolvedAgent,
-          resolvedCloud,
-          "DOWNLOAD_ERROR",
-          `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
-          outputFormat,
-          2,
-        );
+      if (res.ok) {
+        scriptContent = await res.text();
+      } else {
+        const ghRes = await fetch(ghUrl, {
+          signal: AbortSignal.timeout(FETCH_TIMEOUT),
+        });
+        if (!ghRes.ok) {
+          headlessError(
+            resolvedAgent,
+            resolvedCloud,
+            "DOWNLOAD_ERROR",
+            `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
+            outputFormat,
+            2,
+          );
+        }
+        scriptContent = await ghRes.text();
       }
-      scriptContent = await ghRes.text();
+    } catch (err) {
+      headlessError(
+        resolvedAgent,
+        resolvedCloud,
+        "DOWNLOAD_ERROR",
+        `Failed to download script: ${getErrorMessage(err)}`,
+        outputFormat,
+        2,
+      );
     }
-  } catch (err) {
-    headlessError(
-      resolvedAgent,
-      resolvedCloud,
-      "DOWNLOAD_ERROR",
-      `Failed to download script: ${getErrorMessage(err)}`,
-      outputFormat,
-      2,
-    );
   }
 
   // Phase 3: Execute script (exit code 1)

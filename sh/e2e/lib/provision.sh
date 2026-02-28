@@ -24,9 +24,14 @@ provision_agent() {
   local stdout_file="${log_dir}/${agent}.stdout"
   local stderr_file="${log_dir}/${agent}.stderr"
 
-  # Resolve CLI entry point (relative to this script's location in sh/e2e/lib/)
+  # Resolve CLI entry point
+  # SPAWN_CLI_DIR overrides auto-resolution — use this to force local source code
   local cli_entry
-  cli_entry="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/packages/cli/src/index.ts"
+  if [ -n "${SPAWN_CLI_DIR:-}" ]; then
+    cli_entry="${SPAWN_CLI_DIR}/packages/cli/src/index.ts"
+  else
+    cli_entry="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/packages/cli/src/index.ts"
+  fi
 
   if [ ! -f "${cli_entry}" ]; then
     log_err "CLI entry point not found: ${cli_entry}"
@@ -48,6 +53,9 @@ provision_agent() {
     export SPAWN_NON_INTERACTIVE=1
     export SPAWN_SKIP_GITHUB_AUTH=1
     export SPAWN_SKIP_API_VALIDATION=1
+    export SPAWN_NO_UPDATE_CHECK=1
+    export BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
+    export SPAWN_CLI_DIR="${SPAWN_CLI_DIR:-}"
     export MODEL_ID="${MODEL_ID:-openrouter/auto}"
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
