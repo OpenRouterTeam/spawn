@@ -8,12 +8,12 @@ Launch any AI agent on any cloud with a single command. Coding agents, research 
 
 **macOS / Linux — and Windows users inside a WSL2 terminal (Ubuntu, Debian, etc.):**
 ```bash
-curl -fsSL https://openrouter.ai/labs/spawn/install.sh | bash
+curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash
 ```
 
 **Windows PowerShell (outside WSL):**
 ```powershell
-irm https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/cli/install.ps1 | iex
+irm https://openrouter.ai/labs/spawn/cli/install.ps1 | iex
 ```
 
 ## Usage
@@ -116,7 +116,7 @@ If spawn fails to install, try these steps:
    ```bash
    curl -fsSL https://bun.sh/install | bash
    source ~/.bashrc  # or ~/.zshrc for zsh
-   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/cli/install.sh | bash
+   curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash
    ```
 
 3. **PATH issues**: If `spawn` command not found after install
