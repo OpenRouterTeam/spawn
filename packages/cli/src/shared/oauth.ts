@@ -56,6 +56,8 @@ const SUCCESS_HTML = `<html><head><meta name="viewport" content="width=device-wi
 
 const ERROR_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}h1{color:#dc2626}@media(prefers-color-scheme:dark){h1{color:#ef4444}}</style></head><body><div class="card"><div class="icon">&#10007;</div><h1>Authentication Failed</h1><p>Invalid or missing state parameter (CSRF protection). Please try again.</p></div></body></html>`;
 
+const DENIAL_HTML = `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${OAUTH_CSS}h1{color:#dc2626}@media(prefers-color-scheme:dark){h1{color:#ef4444}}</style></head><body><div class="card"><div class="icon">&#10007;</div><h1>Authorization Denied</h1><p>You denied access to OpenRouter. You can close this tab and return to your terminal.</p></div></body></html>`;
+
 async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?: string): Promise<string | null> {
   logStep("Attempting OAuth authentication...");
 
@@ -72,6 +74,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
 
   const csrfState = generateCsrfState();
   let oauthCode: string | null = null;
+  let oauthDenied = false;
   let server: ReturnType<typeof Bun.serve> | null = null;
 
   // Try ports in range
@@ -83,6 +86,22 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
         hostname: "127.0.0.1",
         fetch(req) {
           const url = new URL(req.url);
+          if (url.pathname === "/callback") {
+            // Check for OAuth denial / error
+            const error = url.searchParams.get("error");
+            if (error) {
+              const desc = url.searchParams.get("error_description") || error;
+              logError(`OpenRouter authorization denied: ${desc}`);
+              oauthDenied = true;
+              return new Response(DENIAL_HTML, {
+                status: 403,
+                headers: {
+                  "Content-Type": "text/html",
+                  Connection: "close",
+                },
+              });
+            }
+          }
           const code = url.searchParams.get("code");
           if (url.pathname === "/callback" && code) {
             // CSRF check
@@ -145,11 +164,18 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
   // Wait up to 120 seconds
   logStep("Waiting for authentication in browser (timeout: 120s)...");
   const deadline = Date.now() + 120_000;
-  while (!oauthCode && Date.now() < deadline) {
+  while (!oauthCode && !oauthDenied && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 500));
   }
 
   server.stop(true);
+
+  if (oauthDenied) {
+    logError("OAuth authorization was denied by the user");
+    logError("Alternative: Use a manual API key instead");
+    logError("  export OPENROUTER_API_KEY=sk-or-v1-...");
+    return null;
+  }
 
   if (!oauthCode) {
     logError("OAuth authentication timed out after 120 seconds");

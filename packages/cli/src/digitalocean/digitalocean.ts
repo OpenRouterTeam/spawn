@@ -330,6 +330,7 @@ async function tryDoOAuth(): Promise<string | null> {
 
   const csrfState = generateCsrfState();
   let oauthCode: string | null = null;
+  let oauthDenied = false;
   let server: ReturnType<typeof Bun.serve> | null = null;
 
   // Try ports in range
@@ -347,6 +348,7 @@ async function tryDoOAuth(): Promise<string | null> {
             if (error) {
               const desc = url.searchParams.get("error_description") || error;
               logError(`DigitalOcean authorization denied: ${desc}`);
+              oauthDenied = true;
               return new Response(OAUTH_ERROR_HTML, {
                 status: 403,
                 headers: {
@@ -434,11 +436,18 @@ async function tryDoOAuth(): Promise<string | null> {
   // Wait up to 120 seconds
   logStep("Waiting for authorization in browser (timeout: 120s)...");
   const deadline = Date.now() + 120_000;
-  while (!oauthCode && Date.now() < deadline) {
+  while (!oauthCode && !oauthDenied && Date.now() < deadline) {
     await sleep(500);
   }
 
   server.stop(true);
+
+  if (oauthDenied) {
+    logError("OAuth authorization was denied by the user");
+    logError("Alternative: Use a manual API token instead");
+    logError("  export DO_API_TOKEN=dop_v1_...");
+    return null;
+  }
 
   if (!oauthCode) {
     logError("OAuth authentication timed out after 120 seconds");
