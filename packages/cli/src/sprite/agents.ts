@@ -3,10 +3,6 @@
 import { runSprite, uploadFileSprite } from "./sprite";
 import { createAgents, resolveAgent as _resolveAgent } from "../shared/agent-setup";
 import type { AgentConfig } from "../shared/agents";
-import { generateEnvConfig } from "../shared/agents";
-
-export type { AgentConfig };
-export { generateEnvConfig };
 
 const runner = {
   runServer: runSprite,
