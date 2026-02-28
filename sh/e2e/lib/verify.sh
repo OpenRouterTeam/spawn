@@ -58,7 +58,7 @@ input_test_codex() {
   remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; \
     export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex -q \"\$PROMPT\""
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex \"\$PROMPT\""
 
   local output
   output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
