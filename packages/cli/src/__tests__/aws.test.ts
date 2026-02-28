@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { unlinkSync, existsSync, readFileSync } from "node:fs";
 
-import { BUNDLES, DEFAULT_BUNDLE, loadCredsFromConfig, saveCredsToConfig, AWS_CONFIG_PATH } from "../aws/aws";
+import { BUNDLES, DEFAULT_BUNDLE, loadCredsFromConfig, saveCredsToConfig, getAwsConfigPath } from "../aws/aws";
 
 // ─── Credential caching tests ────────────────────────────────────────────────
 
@@ -9,8 +9,8 @@ describe("aws/credential-cache", () => {
   let originalConfig: string | null = null;
 
   beforeEach(() => {
-    if (existsSync(AWS_CONFIG_PATH)) {
-      originalConfig = readFileSync(AWS_CONFIG_PATH, "utf-8");
+    if (existsSync(getAwsConfigPath())) {
+      originalConfig = readFileSync(getAwsConfigPath(), "utf-8");
     } else {
       originalConfig = null;
     }
@@ -18,22 +18,22 @@ describe("aws/credential-cache", () => {
 
   afterEach(() => {
     if (originalConfig !== null) {
-      Bun.write(AWS_CONFIG_PATH, originalConfig);
-    } else if (existsSync(AWS_CONFIG_PATH)) {
-      unlinkSync(AWS_CONFIG_PATH);
+      Bun.write(getAwsConfigPath(), originalConfig);
+    } else if (existsSync(getAwsConfigPath())) {
+      unlinkSync(getAwsConfigPath());
     }
   });
 
   describe("loadCredsFromConfig", () => {
     it("returns null when config file does not exist", () => {
-      if (existsSync(AWS_CONFIG_PATH)) {
-        unlinkSync(AWS_CONFIG_PATH);
+      if (existsSync(getAwsConfigPath())) {
+        unlinkSync(getAwsConfigPath());
       }
       expect(loadCredsFromConfig()).toBeNull();
     });
 
     it("returns null for malformed JSON", async () => {
-      await Bun.write(AWS_CONFIG_PATH, "not-json", {
+      await Bun.write(getAwsConfigPath(), "not-json", {
         mode: 0o600,
       });
       expect(loadCredsFromConfig()).toBeNull();
@@ -41,7 +41,7 @@ describe("aws/credential-cache", () => {
 
     it("returns null when accessKeyId is missing", async () => {
       await Bun.write(
-        AWS_CONFIG_PATH,
+        getAwsConfigPath(),
         JSON.stringify({
           secretAccessKey: "secretsecretkey1234",
         }),
@@ -54,7 +54,7 @@ describe("aws/credential-cache", () => {
 
     it("returns null when secretAccessKey is too short", async () => {
       await Bun.write(
-        AWS_CONFIG_PATH,
+        getAwsConfigPath(),
         JSON.stringify({
           accessKeyId: "AKIAIOSFODNN7EXAMPLE",
           secretAccessKey: "tooshort",
@@ -68,7 +68,7 @@ describe("aws/credential-cache", () => {
 
     it("returns null for invalid accessKeyId format", async () => {
       await Bun.write(
-        AWS_CONFIG_PATH,
+        getAwsConfigPath(),
         JSON.stringify({
           accessKeyId: "invalid key!",
           secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
@@ -82,7 +82,7 @@ describe("aws/credential-cache", () => {
 
     it("returns credentials for valid data", async () => {
       await Bun.write(
-        AWS_CONFIG_PATH,
+        getAwsConfigPath(),
         JSON.stringify({
           accessKeyId: "AKIAIOSFODNN7EXAMPLE",
           secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
@@ -101,7 +101,7 @@ describe("aws/credential-cache", () => {
 
     it("defaults region to us-east-1 when not stored", async () => {
       await Bun.write(
-        AWS_CONFIG_PATH,
+        getAwsConfigPath(),
         JSON.stringify({
           accessKeyId: "AKIAIOSFODNN7EXAMPLE",
           secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
@@ -117,8 +117,8 @@ describe("aws/credential-cache", () => {
 
   describe("saveCredsToConfig", () => {
     it("writes credentials to config file", async () => {
-      if (existsSync(AWS_CONFIG_PATH)) {
-        unlinkSync(AWS_CONFIG_PATH);
+      if (existsSync(getAwsConfigPath())) {
+        unlinkSync(getAwsConfigPath());
       }
       await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCY", "us-west-2");
       const result = loadCredsFromConfig();
@@ -128,8 +128,8 @@ describe("aws/credential-cache", () => {
     });
 
     it("round-trips credentials with special characters in secret key", async () => {
-      if (existsSync(AWS_CONFIG_PATH)) {
-        unlinkSync(AWS_CONFIG_PATH);
+      if (existsSync(getAwsConfigPath())) {
+        unlinkSync(getAwsConfigPath());
       }
       const secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCY==";
       await saveCredsToConfig("AKIAIOSFODNN7EXAMPLE", secret, "ap-northeast-1");
