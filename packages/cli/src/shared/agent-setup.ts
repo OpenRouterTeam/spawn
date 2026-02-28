@@ -446,6 +446,8 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: (apiKey, modelId) => setupOpenclawConfig(runner, apiKey, modelId || "openrouter/auto"),
       preLaunch: () => startGateway(runner),
+      preLaunchMsg:
+        "Set up one channel at a time in the OpenClaw TUI. Wait for each channel to fully complete before pasting the next token — concurrent token pastes can cause setup to hang.",
       launchCmd: () =>
         "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
     },
