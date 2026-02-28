@@ -22,6 +22,15 @@ _sprite_max_parallel() {
 }
 
 # ---------------------------------------------------------------------------
+# _sprite_install_wait
+#
+# Sprite exec is slower per-call than SSH — give installs more time to complete.
+# ---------------------------------------------------------------------------
+_sprite_install_wait() {
+  printf '300'
+}
+
+# ---------------------------------------------------------------------------
 # _sprite_validate_env
 #
 # Check that the sprite CLI is installed and credentials are valid.
