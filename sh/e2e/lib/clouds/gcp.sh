@@ -60,7 +60,7 @@ _gcp_headless_env() {
   printf 'export GCP_INSTANCE_NAME="%s"\n' "${app}"
   printf 'export GCP_PROJECT="%s"\n' "${GCP_PROJECT:-}"
   printf 'export GCP_ZONE="%s"\n' "${GCP_ZONE:-us-central1-a}"
-  printf 'export GCP_MACHINE_TYPE="%s"\n' "${GCP_MACHINE_TYPE:-e2-medium}"
+  printf 'export GCP_MACHINE_TYPE="%s"\n' "${GCP_MACHINE_TYPE:-e2-standard-2}"
 }
 
 # ---------------------------------------------------------------------------

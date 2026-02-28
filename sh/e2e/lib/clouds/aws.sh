@@ -51,11 +51,7 @@ _aws_headless_env() {
   local app="$1"
   local agent="${2:-}"
 
-  # openclaw needs 4GB RAM — use medium_3_0 instead of nano
-  local bundle="${AWS_BUNDLE:-nano_3_0}"
-  if [ "${agent}" = "openclaw" ] && [ -z "${AWS_BUNDLE:-}" ]; then
-    bundle="medium_3_0"
-  fi
+  local bundle="${AWS_BUNDLE:-medium_3_0}"
 
   printf 'export LIGHTSAIL_SERVER_NAME="%s"\n' "${app}"
   printf 'export AWS_DEFAULT_REGION="%s"\n' "${AWS_REGION:-us-east-1}"
