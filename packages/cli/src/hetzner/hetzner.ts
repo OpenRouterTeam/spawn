@@ -1,6 +1,8 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import {
   logInfo,
@@ -27,8 +29,7 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import * as v from "valibot";
-import { parseJsonWith, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
+import { parseJsonObj, isString, isNumber, toObjectArray, toRecord } from "@openrouter/spawn-shared";
 import { saveVmConnection } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
@@ -88,42 +89,28 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
   throw new Error("hetznerApi: unreachable");
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const LooseObject = v.record(v.string(), v.unknown());
-
-function parseJson(text: string): Record<string, unknown> | null {
-  return parseJsonWith(text, LooseObject);
-}
-
-/** Narrow an unknown value to a Record if it is a non-array object */
-function rec(val: unknown): Record<string, unknown> | undefined {
-  if (val && typeof val === "object" && !Array.isArray(val)) {
-    return Object.fromEntries(Object.entries(val));
-  }
-  return undefined;
-}
-
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
-const HETZNER_CONFIG_PATH = `${process.env.HOME}/.config/spawn/hetzner.json`;
+function getConfigPath(): string {
+  return join(process.env.HOME || homedir(), ".config", "spawn", "hetzner.json");
+}
 
 async function saveTokenToConfig(token: string): Promise<void> {
-  const dir = HETZNER_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
+  const configPath = getConfigPath();
+  const dir = configPath.replace(/\/[^/]+$/, "");
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   const escaped = jsonEscape(token);
-  await Bun.write(HETZNER_CONFIG_PATH, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
+  await Bun.write(configPath, `{\n  "api_key": ${escaped},\n  "token": ${escaped}\n}\n`, {
     mode: 0o600,
   });
 }
 
 function loadTokenFromConfig(): string | null {
   try {
-    const data = JSON.parse(readFileSync(HETZNER_CONFIG_PATH, "utf-8"));
+    const data = JSON.parse(readFileSync(getConfigPath(), "utf-8"));
     const token = data.api_key || data.token || "";
     if (!token) {
       return null;
@@ -146,11 +133,11 @@ async function testHcloudToken(): Promise<boolean> {
   }
   try {
     const resp = await hetznerApi("GET", "/servers?per_page=1", undefined, 1);
-    const data = parseJson(resp);
+    const data = parseJsonObj(resp);
     // Hetzner returns { "error": { ... } } on auth failure.
     // Success responses may contain "error": null inside action objects,
     // so check for a real error object with a message.
-    if (rec(data?.error)?.message) {
+    if (toRecord(data?.error)?.message) {
       return false;
     }
     return true;
@@ -221,7 +208,7 @@ export async function ensureSshKey(): Promise<void> {
 
     // Check if key is already registered
     const resp = await hetznerApi("GET", "/ssh_keys");
-    const data = parseJson(resp);
+    const data = parseJsonObj(resp);
     const sshKeys = toObjectArray(data?.ssh_keys);
 
     const alreadyRegistered = sshKeys.some((k) => fingerprint && k.fingerprint === fingerprint);
@@ -239,8 +226,8 @@ export async function ensureSshKey(): Promise<void> {
       public_key: pubKey,
     });
     const regResp = await hetznerApi("POST", "/ssh_keys", body);
-    const regData = parseJson(regResp);
-    const regError = rec(regData?.error);
+    const regData = parseJsonObj(regResp);
+    const regError = toRecord(regData?.error);
     const regErrMsg = isString(regError?.message) ? regError.message : "";
     if (regErrMsg) {
       // Key may already exist under a different name — non-fatal
@@ -293,32 +280,32 @@ export interface ServerTypeTier {
 
 export const SERVER_TYPES: ServerTypeTier[] = [
   {
-    id: "cx22",
-    label: "2 vCPU \u00b7 4 GB RAM \u00b7 40 GB (~\u20AC3.29/mo)",
+    id: "cx23",
+    label: "cx23 \u00b7 2 vCPU \u00b7 4 GB \u00b7 40 GB (~\u20AC3.49/mo, EU only)",
   },
   {
-    id: "cx32",
-    label: "4 vCPU \u00b7 8 GB RAM \u00b7 80 GB (~\u20AC5.39/mo)",
+    id: "cx33",
+    label: "cx33 \u00b7 4 vCPU \u00b7 8 GB \u00b7 80 GB (~\u20AC6.49/mo, EU only)",
   },
   {
-    id: "cx42",
-    label: "8 vCPU \u00b7 16 GB RAM \u00b7 160 GB (~\u20AC14.49/mo)",
+    id: "cx43",
+    label: "cx43 \u00b7 8 vCPU \u00b7 16 GB \u00b7 160 GB (~\u20AC14.49/mo, EU only)",
   },
   {
-    id: "cx52",
-    label: "16 vCPU \u00b7 32 GB RAM \u00b7 320 GB (~\u20AC28.49/mo)",
+    id: "cx53",
+    label: "cx53 \u00b7 16 vCPU \u00b7 32 GB \u00b7 320 GB (~\u20AC28.49/mo, EU only)",
   },
   {
-    id: "cpx21",
-    label: "3 AMD vCPU \u00b7 4 GB RAM \u00b7 80 GB (~\u20AC4.35/mo)",
+    id: "cpx22",
+    label: "cpx22 \u00b7 3 AMD vCPU \u00b7 4 GB \u00b7 80 GB (~\u20AC5.49/mo)",
   },
   {
-    id: "cpx31",
-    label: "4 AMD vCPU \u00b7 8 GB RAM \u00b7 160 GB (~\u20AC7.59/mo)",
+    id: "cpx32",
+    label: "cpx32 \u00b7 4 AMD vCPU \u00b7 8 GB \u00b7 160 GB (~\u20AC9.49/mo)",
   },
 ];
 
-export const DEFAULT_SERVER_TYPE = "cx22";
+export const DEFAULT_SERVER_TYPE = "cx23";
 
 // ─── Location Options ────────────────────────────────────────────────────────
 
@@ -358,10 +345,6 @@ export async function promptServerType(): Promise<string> {
   if (process.env.HETZNER_SERVER_TYPE) {
     logInfo(`Using server type from environment: ${process.env.HETZNER_SERVER_TYPE}`);
     return process.env.HETZNER_SERVER_TYPE;
-  }
-
-  if (process.env.SPAWN_CUSTOM !== "1") {
-    return DEFAULT_SERVER_TYPE;
   }
 
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
@@ -413,7 +396,7 @@ export async function createServer(
 
   // Get all SSH key IDs
   const keysResp = await hetznerApi("GET", "/ssh_keys");
-  const keysData = parseJson(keysResp);
+  const keysData = parseJsonObj(keysResp);
   const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
     .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter(Boolean);
@@ -430,13 +413,13 @@ export async function createServer(
   });
 
   const resp = await hetznerApi("POST", "/servers", body);
-  const data = parseJson(resp);
+  const data = parseJsonObj(resp);
 
   // Hetzner success responses contain "error": null in action objects,
   // so check for presence of .server object, not absence of "error" string.
-  const server = rec(data?.server);
+  const server = toRecord(data?.server);
   if (!server) {
-    const errMsg = rec(data?.error)?.message || "Unknown error";
+    const errMsg = toRecord(data?.error)?.message || "Unknown error";
     logError(`Failed to create Hetzner server: ${errMsg}`);
     logWarn("Common issues:");
     logWarn("  - Insufficient account balance or payment method required");
@@ -447,8 +430,8 @@ export async function createServer(
   }
 
   hetznerServerId = String(server.id);
-  const publicNet = rec(server.public_net);
-  const ipv4 = rec(publicNet?.ipv4);
+  const publicNet = toRecord(server.public_net);
+  const ipv4 = toRecord(publicNet?.ipv4);
   hetznerServerIp = isString(ipv4?.ip) ? ipv4.ip : "";
 
   if (!hetznerServerId || hetznerServerId === "null") {
@@ -600,7 +583,11 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || hetznerServerIp;
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
@@ -711,43 +698,15 @@ export async function destroyServer(serverId?: string): Promise<void> {
 
   logStep(`Destroying Hetzner server ${id}...`);
   const resp = await hetznerApi("DELETE", `/servers/${id}`);
-  const data = parseJson(resp);
+  const data = parseJsonObj(resp);
 
   // Hetzner returns { action: {...} } on success. "error": null in action is normal.
   if (!data?.action) {
-    const errMsg = rec(data?.error)?.message || "Unknown error";
+    const errMsg = toRecord(data?.error)?.message || "Unknown error";
     logError(`Failed to destroy server ${id}: ${errMsg}`);
     logWarn("The server may still be running and incurring charges.");
     logWarn(`Delete it manually at: ${HETZNER_DASHBOARD_URL}`);
     throw new Error("Server deletion failed");
   }
   logInfo(`Server ${id} destroyed`);
-}
-
-export async function listServers(): Promise<void> {
-  const resp = await hetznerApi("GET", "/servers");
-  const data = parseJson(resp);
-  const servers = toObjectArray(data?.servers);
-
-  if (servers.length === 0) {
-    console.log("No servers found");
-    return;
-  }
-
-  const pad = (str: string, n: number) => (str + " ".repeat(n)).slice(0, n);
-  const str = (val: unknown, fallback = "N/A"): string => (isString(val) ? val : val != null ? String(val) : fallback);
-  console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("TYPE", 10));
-  console.log("-".repeat(75));
-  for (const s of servers) {
-    const publicNet = rec(s.public_net);
-    const ipv4 = rec(publicNet?.ipv4);
-    const serverType = rec(s.server_type);
-    console.log(
-      pad(str(s.name).slice(0, 24), 25) +
-        pad(str(s.id).slice(0, 11), 12) +
-        pad(str(s.status).slice(0, 11), 12) +
-        pad(str(ipv4?.ip).slice(0, 15), 16) +
-        pad(str(serverType?.name).slice(0, 9), 10),
-    );
-  }
 }

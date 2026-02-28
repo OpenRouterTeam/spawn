@@ -241,6 +241,42 @@
         "agentic",
         "engineering"
       ]
+    },
+    "hermes": {
+      "name": "Hermes Agent",
+      "description": "Persistent AI agent with multi-platform messaging, memory across sessions, and tool use",
+      "url": "https://github.com/NousResearch/hermes-agent",
+      "install": "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
+      "launch": "hermes",
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}"
+      },
+      "notes": "Natively supports OpenRouter via OPENROUTER_API_KEY. Also works via OPENAI_BASE_URL + OPENAI_API_KEY for OpenAI-compatible mode. Installs Python 3.11 via uv.",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/hermes.png",
+      "featured_cloud": [
+        "sprite",
+        "hetzner",
+        "gcp"
+      ],
+      "creator": "Nous Research",
+      "repo": "NousResearch/hermes-agent",
+      "license": "MIT",
+      "created": "2025-06",
+      "added": "2026-02",
+      "github_stars": 1016,
+      "stars_updated": "2026-02-28",
+      "language": "Python",
+      "runtime": "python",
+      "category": "cli",
+      "tagline": "Persistent AI agent with memory, tools, and multi-platform messaging",
+      "tags": [
+        "agent",
+        "messaging",
+        "memory",
+        "tools"
+      ]
     }
   },
   "clouds": {
@@ -270,24 +306,6 @@
         "image": "ubuntu-24.04"
       },
       "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/hetzner.png"
-    },
-    "fly": {
-      "name": "Fly.io",
-      "description": "Deploy globally on Fly.io with free-tier VMs",
-      "url": "https://fly.io",
-      "type": "api+cli",
-      "auth": "FLY_API_TOKEN",
-      "provision_method": "POST /v1/apps + POST /v1/apps/{app}/machines",
-      "exec_method": "fly ssh console -C",
-      "interactive_method": "fly ssh console",
-      "defaults": {
-        "region": "iad",
-        "vm_size": "shared-cpu-1x",
-        "vm_memory": 1024,
-        "image": "ubuntu:24.04"
-      },
-      "notes": "Uses Machines API for provisioning and flyctl SSH for exec. Docker-based, pay-per-second pricing. Requires flyctl CLI.",
-      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/clouds/fly.png"
     },
     "aws": {
       "name": "AWS Lightsail",
@@ -381,12 +399,6 @@
     "hetzner/codex": "implemented",
     "hetzner/opencode": "implemented",
     "hetzner/kilocode": "implemented",
-    "fly/claude": "implemented",
-    "fly/openclaw": "implemented",
-    "fly/zeroclaw": "implemented",
-    "fly/codex": "implemented",
-    "fly/opencode": "implemented",
-    "fly/kilocode": "implemented",
     "aws/claude": "implemented",
     "aws/openclaw": "implemented",
     "aws/zeroclaw": "implemented",
@@ -416,6 +428,13 @@
     "sprite/zeroclaw": "implemented",
     "sprite/codex": "implemented",
     "sprite/opencode": "implemented",
-    "sprite/kilocode": "implemented"
+    "sprite/kilocode": "implemented",
+    "local/hermes": "missing",
+    "hetzner/hermes": "missing",
+    "aws/hermes": "missing",
+    "daytona/hermes": "missing",
+    "digitalocean/hermes": "missing",
+    "gcp/hermes": "missing",
+    "sprite/hermes": "implemented"
   }
 }

@@ -28,6 +28,8 @@ export interface AgentConfig {
   setup?: (envContent: string, apiKey: string, modelId?: string) => Promise<void>;
   /** Pre-launch hook (e.g., start gateway daemon). */
   preLaunch?: () => Promise<void>;
+  /** Optional tip or warning shown to the user just before the agent launches. */
+  preLaunchMsg?: string;
   /** Shell command to launch the agent interactively. */
   launchCmd: () => string;
   /** Cloud-init dependency tier. Defaults to "full" if unset. */

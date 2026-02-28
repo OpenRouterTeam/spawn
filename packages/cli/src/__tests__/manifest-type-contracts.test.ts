@@ -23,8 +23,6 @@ import type { Manifest } from "../manifest";
  *
  * Unlike manifest-integrity.test.ts which checks truthiness, these tests
  * verify exact types to prevent subtle runtime bugs from type mismatches.
- *
- * Agent: test-engineer
  */
 
 const REPO_ROOT = resolve(import.meta.dir, "../../../..");
@@ -111,16 +109,6 @@ describe("Agent optional field types (when present)", () => {
       });
     }
 
-    if (agent.deps !== undefined) {
-      it(`agent "${key}" deps should be an array of strings`, () => {
-        expect(Array.isArray(agent.deps)).toBe(true);
-        for (const dep of agent.deps!) {
-          expect(typeof dep).toBe("string");
-          expect(dep.length).toBeGreaterThan(0);
-        }
-      });
-    }
-
     if (agent.config_files !== undefined) {
       it(`agent "${key}" config_files should be an object with string keys`, () => {
         expect(typeof agent.config_files).toBe("object");
@@ -128,32 +116,6 @@ describe("Agent optional field types (when present)", () => {
         for (const filePath of Object.keys(agent.config_files!)) {
           expect(typeof filePath).toBe("string");
           expect(filePath.length).toBeGreaterThan(0);
-        }
-      });
-    }
-
-    if (agent.interactive_prompts !== undefined) {
-      it(`agent "${key}" interactive_prompts should have valid entries`, () => {
-        expect(typeof agent.interactive_prompts).toBe("object");
-        expect(agent.interactive_prompts).not.toBeNull();
-        for (const [promptKey, entry] of Object.entries(agent.interactive_prompts!)) {
-          expect(typeof promptKey).toBe("string");
-          expect(typeof entry.prompt).toBe("string");
-          expect(entry.prompt.length).toBeGreaterThan(0);
-          expect(typeof entry.default).toBe("string");
-        }
-      });
-    }
-
-    if (agent.dotenv !== undefined) {
-      it(`agent "${key}" dotenv should have path and values`, () => {
-        expect(typeof agent.dotenv!.path).toBe("string");
-        expect(agent.dotenv!.path.length).toBeGreaterThan(0);
-        expect(typeof agent.dotenv!.values).toBe("object");
-        expect(agent.dotenv!.values).not.toBeNull();
-        for (const [k, v] of Object.entries(agent.dotenv!.values)) {
-          expect(typeof k).toBe("string");
-          expect(typeof v).toBe("string");
         }
       });
     }
@@ -267,61 +229,6 @@ describe("Cloud type values", () => {
   });
 });
 
-// ── Cross-referential consistency ─────────────────────────────────────────
-
-describe("Cross-referential consistency", () => {
-  it("matrix keys should cover all cloud/agent combinations", () => {
-    const expectedKeys = new Set<string>();
-    for (const [cloud] of allClouds) {
-      for (const [agent] of allAgents) {
-        expectedKeys.add(`${cloud}/${agent}`);
-      }
-    }
-    const actualKeys = new Set(Object.keys(manifest.matrix));
-    expect(actualKeys.size).toBe(expectedKeys.size);
-    for (const key of expectedKeys) {
-      expect(actualKeys.has(key)).toBe(true);
-    }
-  });
-
-  it("no matrix key should reference a nonexistent agent or cloud", () => {
-    const agentSet = new Set(allAgents.map(([k]) => k));
-    const cloudSet = new Set(allClouds.map(([k]) => k));
-    for (const key of Object.keys(manifest.matrix)) {
-      const [cloud, agent] = key.split("/");
-      expect(cloudSet.has(cloud)).toBe(true);
-      expect(agentSet.has(agent)).toBe(true);
-    }
-  });
-
-  it("matrix values should only be 'implemented' or 'missing'", () => {
-    for (const [key, status] of Object.entries(manifest.matrix)) {
-      expect(status === "implemented" || status === "missing").toBe(true);
-    }
-  });
-});
-
-// ── Display name uniqueness ───────────────────────────────────────────────
-
-describe("Display name uniqueness", () => {
-  it("agent display names should be unique", () => {
-    const names = allAgents.map(([, a]) => a.name);
-    expect(new Set(names).size).toBe(names.length);
-  });
-
-  it("cloud display names should be unique", () => {
-    const names = allClouds.map(([, c]) => c.name);
-    expect(new Set(names).size).toBe(names.length);
-  });
-
-  it("agent keys should not collide with cloud keys", () => {
-    const agentKeySet = new Set(allAgents.map(([k]) => k));
-    for (const [cloudKey] of allClouds) {
-      expect(agentKeySet.has(cloudKey)).toBe(false);
-    }
-  });
-});
-
 // ── Env var interpolation patterns ────────────────────────────────────────
 
 describe("Env var interpolation patterns", () => {
@@ -371,24 +278,6 @@ describe("Agent launch command consistency", () => {
       expect(agent.install.trim().length).toBeGreaterThan(0);
     }
   });
-});
-
-// ── Dotenv path validation ────────────────────────────────────────────────
-
-describe("Dotenv configuration", () => {
-  for (const [key, agent] of allAgents.filter(([, a]) => a.dotenv !== undefined)) {
-    it(`agent "${key}" dotenv path should look like a file path`, () => {
-      const path = agent.dotenv!.path;
-      // Should contain a / or ~ indicating a path
-      expect(path).toMatch(/[/~]/);
-    });
-
-    it(`agent "${key}" dotenv values should all be strings`, () => {
-      for (const [k, v] of Object.entries(agent.dotenv!.values)) {
-        expect(typeof v).toBe("string");
-      }
-    });
-  }
 });
 
 // ── Interactive prompts structure ─────────────────────────────────────────

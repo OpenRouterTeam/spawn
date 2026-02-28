@@ -1,5 +1,5 @@
 #!/bin/bash
-# e2e/lib/provision.sh — Provision an agent VM via spawn CLI (headless)
+# e2e/lib/provision.sh — Provision an agent VM via spawn CLI (cloud-agnostic)
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
@@ -8,54 +8,63 @@ set -eo pipefail
 # Runs spawn in headless mode with a timeout. The provision process hangs on
 # the interactive SSH session (step 12 of the orchestration), so we kill it
 # after PROVISION_TIMEOUT seconds. The install itself usually succeeds; we
-# verify via app existence and .spawnrc presence afterward.
+# verify via instance existence and .spawnrc presence afterward.
+#
+# Uses cloud driver functions:
+#   cloud_headless_env  — cloud-specific env var exports
+#   cloud_provision_verify — check instance exists, write IP + metadata
+#   cloud_exec          — remote command execution
 # ---------------------------------------------------------------------------
 provision_agent() {
   local agent="$1"
   local app_name="$2"
   local log_dir="$3"
 
-  local exit_file="${log_dir}/${agent}.exit"
-  local stdout_file="${log_dir}/${agent}.stdout"
-  local stderr_file="${log_dir}/${agent}.stderr"
+  local exit_file="${log_dir}/${app_name}.exit"
+  local stdout_file="${log_dir}/${app_name}.stdout"
+  local stderr_file="${log_dir}/${app_name}.stderr"
 
-  # Resolve CLI entry point (relative to this script's location in sh/e2e/lib/)
+  # Resolve CLI entry point
+  # SPAWN_CLI_DIR overrides auto-resolution — use this to force local source code
   local cli_entry
-  cli_entry="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/packages/cli/src/index.ts"
+  if [ -n "${SPAWN_CLI_DIR:-}" ]; then
+    cli_entry="${SPAWN_CLI_DIR}/packages/cli/src/index.ts"
+  else
+    cli_entry="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/packages/cli/src/index.ts"
+  fi
 
   if [ ! -f "${cli_entry}" ]; then
     log_err "CLI entry point not found: ${cli_entry}"
     return 1
   fi
 
-  log_step "Provisioning ${agent} as ${app_name} (timeout: ${PROVISION_TIMEOUT}s)"
+  log_step "Provisioning ${agent} as ${app_name} on ${ACTIVE_CLOUD} (timeout: ${PROVISION_TIMEOUT}s)"
 
   # Remove stale exit file
   rm -f "${exit_file}"
 
   # Environment for headless provisioning
-  # FLY_API_TOKEN="" forces spawn to use flyctl stored credentials (see plan section 6)
   # MODEL_ID bypasses the interactive model selection prompt (required by openclaw)
-  #
-  # Validate flyctl is authenticated before proceeding with empty token fallback
-  if [ -z "${FLY_API_TOKEN:-}" ]; then
-    if ! flyctl auth whoami >/dev/null 2>&1; then
-      log_err "FLY_API_TOKEN is empty and flyctl is not authenticated. Run: flyctl auth login"
-      return 1
-    fi
-  fi
   (
     export SPAWN_NON_INTERACTIVE=1
     export SPAWN_SKIP_GITHUB_AUTH=1
     export SPAWN_SKIP_API_VALIDATION=1
+    export SPAWN_NO_UPDATE_CHECK=1
+    export BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
+    export SPAWN_CLI_DIR="${SPAWN_CLI_DIR:-}"
     export MODEL_ID="${MODEL_ID:-openrouter/auto}"
-    export FLY_APP_NAME="${app_name}"
-    export FLY_REGION="${FLY_REGION}"
-    export FLY_VM_MEMORY="${FLY_VM_MEMORY}"
-    export FLY_API_TOKEN=""
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
-    bun run "${cli_entry}" "${agent}" fly --headless --output json \
+    # Apply cloud-specific env vars (safe: only processes export VAR="VALUE" lines)
+    while IFS= read -r _env_line; do
+      if [[ "${_env_line}" =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=\"(.*)\"$ ]]; then
+        export "${BASH_REMATCH[1]}"="${BASH_REMATCH[2]}"
+      fi
+    done <<CLOUD_ENV
+$(cloud_headless_env "${app_name}" "${agent}")
+CLOUD_ENV
+
+    bun run "${cli_entry}" "${agent}" "${ACTIVE_CLOUD}" --headless --output json \
       > "${stdout_file}" 2> "${stderr_file}"
     printf '%s' "$?" > "${exit_file}"
   ) &
@@ -78,28 +87,10 @@ provision_agent() {
     wait "${pid}" 2>/dev/null || true
   fi
 
-  # Check if the provision process exited cleanly
-  local exit_code=""
-  if [ -f "${exit_file}" ]; then
-    exit_code=$(cat "${exit_file}")
-  fi
-
-  # Even if provision "failed" (timeout), the app may exist and install may have completed.
-  # Verify app existence via flyctl + REST API fallback.
-  local app_exists=0
-  if flyctl status -a "${app_name}" >/dev/null 2>&1; then
-    app_exists=1
-  else
-    # REST API fallback
-    local api_result
-    api_result=$(fly_api GET "/apps/${app_name}/machines" 2>/dev/null || true)
-    if printf '%s' "${api_result}" | jq -e '.[0].id' >/dev/null 2>&1; then
-      app_exists=1
-    fi
-  fi
-
-  if [ "${app_exists}" -eq 0 ]; then
-    log_err "App ${app_name} does not exist after provisioning"
+  # Even if provision "failed" (timeout), the instance may exist and install may have completed.
+  # Verify instance existence via cloud driver.
+  if ! cloud_provision_verify "${app_name}" "${log_dir}"; then
+    log_err "Instance ${app_name} does not exist after provisioning"
     if [ -f "${stderr_file}" ]; then
       log_err "Stderr tail:"
       tail -20 "${stderr_file}" >&2 || true
@@ -107,14 +98,16 @@ provision_agent() {
     return 1
   fi
 
-  log_ok "App ${app_name} exists"
+  log_ok "Instance ${app_name} verified"
 
   # Wait for install to complete (.spawnrc is written near the end)
-  log_step "Waiting for install to complete (polling .spawnrc, up to ${INSTALL_WAIT}s)..."
+  local effective_install_wait
+  effective_install_wait=$(cloud_install_wait)
+  log_step "Waiting for install to complete (polling .spawnrc, up to ${effective_install_wait}s)..."
   local install_waited=0
   local install_ok=0
-  while [ "${install_waited}" -lt "${INSTALL_WAIT}" ]; do
-    if fly_ssh "${app_name}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
+  while [ "${install_waited}" -lt "${effective_install_wait}" ]; do
+    if cloud_exec "${app_name}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
       install_ok=1
       break
     fi
@@ -128,7 +121,7 @@ provision_agent() {
     log_ok "Install completed (.spawnrc found)"
     return 0
   else
-    log_warn ".spawnrc not found after ${INSTALL_WAIT}s — install may still be running"
+    log_warn ".spawnrc not found after ${effective_install_wait}s — install may still be running"
     return 0  # Continue to verification; it will catch real failures
   fi
 }

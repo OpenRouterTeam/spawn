@@ -1,6 +1,7 @@
 // local/local.ts — Core local provider: runs commands on the user's machine
 
 import { copyFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname } from "node:path";
 
 import { getSpawnDir } from "../history.js";
@@ -31,36 +32,11 @@ export async function runLocal(cmd: string): Promise<void> {
   }
 }
 
-/** Run a shell command locally and capture stdout. */
-export async function runLocalCapture(cmd: string): Promise<string> {
-  const proc = Bun.spawn(
-    [
-      "bash",
-      "-c",
-      cmd,
-    ],
-    {
-      stdio: [
-        "inherit",
-        "pipe",
-        "inherit",
-      ],
-      env: process.env,
-    },
-  );
-  const stdout = await new Response(proc.stdout).text();
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`Command failed (exit ${exitCode}): ${cmd}`);
-  }
-  return stdout.trim();
-}
-
 // ─── File Operations ─────────────────────────────────────────────────────────
 
 /** Copy a file locally, expanding ~ in the destination path. */
 export function uploadFile(localPath: string, remotePath: string): void {
-  const expanded = remotePath.replace(/^~/, process.env.HOME || "");
+  const expanded = remotePath.replace(/^~/, process.env.HOME || homedir());
   mkdirSync(dirname(expanded), {
     recursive: true,
   });

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shell helpers for API key provisioning
-# Sourced by qa.sh (fixtures mode) for key loading and stale key handling
+# Sourced by QA/CI harnesses for key loading and stale key handling
 #
 # Requires: jq or bun, curl, REPO_ROOT set, log() function defined by caller
 #
@@ -10,44 +10,11 @@
 #     _try_load_env_var          — Load a single env var from config file
 #     _load_cloud_credentials    — Load all env vars for one cloud provider
 #   request_missing_cloud_keys   — POST to key server for missing providers (fire-and-forget)
-#   invalidate_cloud_key         — Delete a cloud's config file
-#   get_cloud_env_vars           — Get env var names for a cloud from manifest
 
 # Fallback log function if caller hasn't defined one
 if ! type log &>/dev/null 2>&1; then
     log() { printf '[%s] [keys] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$*"; }
 fi
-
-# Get env var names for a cloud provider from manifest.json
-# Usage: get_cloud_env_vars CLOUD_KEY
-# Outputs one env var name per line, empty if CLI-based auth
-get_cloud_env_vars() {
-    local cloud="${1}"
-    if command -v jq &>/dev/null; then
-        local auth
-        auth=$(jq -r --arg c "${cloud}" '.clouds[$c].auth // ""' "${REPO_ROOT}/manifest.json" 2>/dev/null) || return 0
-        # Skip CLI-based auth (login, configure, setup)
-        if printf '%s' "${auth}" | grep -qiE '\b(login|configure|setup)\b'; then
-            return 0
-        fi
-        # Empty auth means no env vars needed
-        if [[ -z "${auth}" ]]; then
-            return 0
-        fi
-        # Split on + or , and output each var name
-        printf '%s' "${auth}" | tr '+,' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' || true
-    else
-        _MANIFEST="${REPO_ROOT}/manifest.json" _CLOUD="${cloud}" bun -e "
-import fs from 'fs';
-const m = JSON.parse(fs.readFileSync(process.env._MANIFEST, 'utf8'));
-const auth = (m.clouds?.[process.env._CLOUD]?.auth) || '';
-if (/\b(login|configure|setup)\b/i.test(auth)) process.exit(0);
-for (const v of auth.split(/\s*[+,]\s*/)) {
-  if (v.trim()) process.stdout.write(v.trim() + '\n');
-}
-" 2>/dev/null
-    fi
-}
 
 # Parse manifest.json to extract cloud_key|auth_string lines for API-token clouds.
 # Skips CLI-based auth (sprite login, aws configure, etc.) and empty auth fields.
@@ -121,8 +88,8 @@ process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
             # downstream in unquoted expansions, eval contexts, or logging
             # Allow alphanumeric plus safe chars needed by real tokens:
             #   - _ . / @  (standard API key chars)
-            #   : + =      (base64 segments, URL-style formats)
-            #   space       (Fly.io "FlyV1 <macaroon>" prefixed tokens)
+            #   : + =      (base64 segments, URL-safe and base64 formats)
+            #   space       (prefixed token formats, e.g., "Bearer <token>")
             # Must match CLI's loadTokenFromConfig regex in cli/src/digitalocean/digitalocean.ts
             if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
                 log "SECURITY: Invalid characters in config value for ${var_name}"
@@ -284,22 +251,3 @@ CURL_BODY
     fi
 }
 
-# Invalidate a cloud provider's stored key by deleting its config file
-# Usage: invalidate_cloud_key CLOUD_KEY
-invalidate_cloud_key() {
-    local provider="${1}"
-
-    # Validate provider name to prevent path traversal
-    # Only allow lowercase letters, numbers, hyphens, and underscores (no dots to prevent ..)
-    if [[ ! "${provider}" =~ ^[a-z0-9][a-z0-9_-]{0,63}$ ]]; then
-        log "invalidate_cloud_key: invalid provider name: ${provider}"
-        return 1
-    fi
-
-    local config_file="${HOME}/.config/spawn/${provider}.json"
-
-    if [[ -f "${config_file}" ]]; then
-        rm -f "${config_file}"
-        log "Invalidated key config for ${provider}"
-    fi
-}

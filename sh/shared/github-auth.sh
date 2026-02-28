@@ -16,7 +16,6 @@
 
 log_info()  { printf '[github-auth] %s\n' "$*" >&2; }
 log_step()  { printf '[github-auth] %s\n' "$*" >&2; }
-log_warn()  { printf '[github-auth] WARNING: %s\n' "$*" >&2; }
 log_error() { printf '[github-auth] ERROR: %s\n' "$*" >&2; }
 
 # ============================================================
@@ -39,7 +38,7 @@ _install_gh_brew() {
 
 # Install gh via APT with GitHub's official repository (Debian/Ubuntu)
 _install_gh_apt() {
-    # Use sudo only when not already root (Fly.io containers run as root)
+    # Use sudo only when not already root (some cloud containers run as root)
     local SUDO=""
     if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
 

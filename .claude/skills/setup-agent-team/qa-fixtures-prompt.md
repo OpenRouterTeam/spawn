@@ -58,11 +58,6 @@ curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" "https://api.digitalocean.com
 curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" "https://api.digitalocean.com/v2/regions"
 ```
 
-### Fly.io (needs FLY_API_TOKEN)
-```bash
-curl -s -H "Authorization: Bearer ${FLY_API_TOKEN}" "https://api.machines.dev/v1/apps?org_slug=personal"
-```
-
 For any other cloud directories found, read their TypeScript module in `packages/cli/src/{cloud}/` to discover the API base URL and auth pattern, then call equivalent GET-only endpoints.
 
 ## Step 4 — Save Fixtures
@@ -100,10 +95,10 @@ done
 
 1. `git add fixtures/`
 2. Commit with message: `test: Update API fixtures for {clouds}`
-3. Push and open draft PR:
+3. Push and open a PR (NOT draft — the security bot reviews and merges non-draft PRs):
    ```bash
    git push -u origin qa/fixtures
-   gh pr create --draft --title "test: Update API fixtures" --body "$(cat <<'EOF'
+   gh pr create --title "test: Update API fixtures" --body "$(cat <<'EOF'
    ## Summary
    - Updated API fixtures for: {cloud list}
    - Skipped (no credentials): {skipped list}

@@ -1,76 +1,8 @@
 #!/bin/bash
-# e2e/lib/verify.sh — SSH helpers and per-agent verification
+# e2e/lib/verify.sh — Per-agent verification (cloud-agnostic)
+#
+# All remote execution uses cloud_exec/cloud_exec_long from the active driver.
 set -eo pipefail
-
-# ---------------------------------------------------------------------------
-# Machine ID cache (avoid repeated API calls)
-# ---------------------------------------------------------------------------
-_FLY_MACHINE_ID=""
-_FLY_MACHINE_APP=""
-
-# ---------------------------------------------------------------------------
-# fly_ssh APP_NAME COMMAND
-#
-# Resolves machine ID, base64-encodes the command, and runs it via
-# flyctl machine exec. Safety relies on two properties together:
-# 1. Base64 output alphabet [A-Za-z0-9+/=] cannot contain single quotes
-# 2. Single-quote wrapping in the exec command prevents shell expansion
-# Returns the exit code of the remote command.
-# ---------------------------------------------------------------------------
-fly_ssh() {
-  local app="$1"
-  local cmd="$2"
-
-  # Resolve machine ID (cached per app)
-  if [ "${_FLY_MACHINE_APP}" != "${app}" ] || [ -z "${_FLY_MACHINE_ID}" ]; then
-    _FLY_MACHINE_ID=$(flyctl machines list -a "${app}" --json 2>/dev/null | jq -r '.[0].id')
-    _FLY_MACHINE_APP="${app}"
-    if [ -z "${_FLY_MACHINE_ID}" ] || [ "${_FLY_MACHINE_ID}" = "null" ]; then
-      log_err "Could not resolve machine ID for app ${app}"
-      return 1
-    fi
-  fi
-
-  # Base64-encode command for safe embedding in single quotes.
-  # base64 output [A-Za-z0-9+/=] cannot break out of single-quote context.
-  # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
-  local encoded_cmd
-  encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
-
-  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout 30 \
-    "echo '${encoded_cmd}' | base64 -d | sh"
-}
-
-# ---------------------------------------------------------------------------
-# fly_ssh_long APP_NAME COMMAND TIMEOUT
-#
-# Same as fly_ssh() but with a configurable timeout for long-running commands
-# like input tests that send prompts to agents.
-# ---------------------------------------------------------------------------
-fly_ssh_long() {
-  local app="$1"
-  local cmd="$2"
-  local timeout="${3:-120}"
-
-  # Resolve machine ID (cached per app)
-  if [ "${_FLY_MACHINE_APP}" != "${app}" ] || [ -z "${_FLY_MACHINE_ID}" ]; then
-    _FLY_MACHINE_ID=$(flyctl machines list -a "${app}" --json 2>/dev/null | jq -r '.[0].id')
-    _FLY_MACHINE_APP="${app}"
-    if [ -z "${_FLY_MACHINE_ID}" ] || [ "${_FLY_MACHINE_ID}" = "null" ]; then
-      log_err "Could not resolve machine ID for app ${app}"
-      return 1
-    fi
-  fi
-
-  # Base64-encode command for safe embedding in single quotes.
-  # base64 output [A-Za-z0-9+/=] cannot break out of single-quote context.
-  # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
-  local encoded_cmd
-  encoded_cmd=$(printf '%s' "${cmd}" | base64 -w 0 2>/dev/null || printf '%s' "${cmd}" | base64)
-
-  flyctl machine exec "${_FLY_MACHINE_ID}" -a "${app}" --timeout "${timeout}" \
-    "echo '${encoded_cmd}' | base64 -d | sh"
-}
 
 # ---------------------------------------------------------------------------
 # Input test constants
@@ -92,7 +24,7 @@ input_test_claude() {
   local app="$1"
 
   log_step "Running input test for claude..."
-  # Base64-encode prompt for safe embedding in single quotes below.
+  # Base64-encode prompt for safe embedding.
   # -w 0 is GNU coreutils (Linux); falls back to plain base64 (macOS/BSD).
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
@@ -100,10 +32,10 @@ input_test_claude() {
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(echo '${encoded_prompt}' | base64 -d); claude -p \"\$PROMPT\" 2>/dev/null"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); claude -p \"\$PROMPT\""
 
   local output
-  output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "claude input test — marker found in response"
@@ -120,17 +52,16 @@ input_test_codex() {
   local app="$1"
 
   log_step "Running input test for codex..."
-  # Base64-encode prompt for safe embedding in single quotes below.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; \
     export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(echo '${encoded_prompt}' | base64 -d); codex -q \"\$PROMPT\" 2>/dev/null"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex exec \"\$PROMPT\""
 
   local output
-  output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "codex input test — marker found in response"
@@ -150,21 +81,20 @@ input_test_openclaw() {
 
   # Pre-check: verify the gateway is running on :18789
   log_step "Checking openclaw gateway on :18789..."
-  if ! fly_ssh "${app}" "curl -sf http://localhost:18789/health >/dev/null 2>&1 || ss -tlnp | grep -q 18789" >/dev/null 2>&1; then
+  if ! cloud_exec "${app}" "curl -sf http://localhost:18789/health >/dev/null 2>&1 || ss -tlnp | grep -q 18789" >/dev/null 2>&1; then
     log_warn "openclaw gateway not detected on :18789 — attempting test anyway"
   fi
 
-  # Base64-encode prompt for safe embedding in single quotes below.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(echo '${encoded_prompt}' | base64 -d); openclaw -p \"\$PROMPT\" 2>/dev/null"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw -p \"\$PROMPT\""
 
   local output
-  output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "openclaw input test — marker found in response"
@@ -181,16 +111,15 @@ input_test_zeroclaw() {
   local app="$1"
 
   log_step "Running input test for zeroclaw..."
-  # Base64-encode prompt for safe embedding in single quotes below.
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.cargo/env 2>/dev/null; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(echo '${encoded_prompt}' | base64 -d); zeroclaw agent -p \"\$PROMPT\" 2>/dev/null"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); zeroclaw agent -p \"\$PROMPT\""
 
   local output
-  output=$(fly_ssh_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
+  output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
 
   if printf '%s' "${output}" | grep -q "${INPUT_TEST_MARKER}"; then
     log_ok "zeroclaw input test — marker found in response"
@@ -210,6 +139,11 @@ input_test_opencode() {
 
 input_test_kilocode() {
   log_warn "kilocode is TUI-only — skipping input test"
+  return 0
+}
+
+input_test_hermes() {
+  log_warn "hermes is TUI-only — skipping input test"
   return 0
 }
 
@@ -238,6 +172,7 @@ run_input_test() {
     zeroclaw)  input_test_zeroclaw "${app}"  ;;
     opencode)  input_test_opencode          ;;
     kilocode)  input_test_kilocode          ;;
+    hermes)    input_test_hermes            ;;
     *)
       log_err "Unknown agent for input test: ${agent}"
       return 1
@@ -249,7 +184,7 @@ run_input_test() {
 # verify_common APP_NAME AGENT
 #
 # Checks that apply to ALL agents:
-#   1. SSH connectivity
+#   1. Remote connectivity (SSH or CLI exec)
 #   2. .spawnrc exists
 #   3. .spawnrc contains OPENROUTER_API_KEY
 # ---------------------------------------------------------------------------
@@ -258,18 +193,18 @@ verify_common() {
   local agent="$2"
   local failures=0
 
-  # 1. SSH connectivity
-  log_step "Checking SSH connectivity..."
-  if fly_ssh "${app}" "echo e2e-ssh-ok" 2>/dev/null | grep -q "e2e-ssh-ok"; then
-    log_ok "SSH connectivity"
+  # 1. Remote connectivity
+  log_step "Checking remote connectivity..."
+  if cloud_exec "${app}" "echo e2e-ssh-ok" 2>/dev/null | grep -q "e2e-ssh-ok"; then
+    log_ok "Remote connectivity"
   else
-    log_err "SSH connectivity failed"
+    log_err "Remote connectivity failed"
     failures=$((failures + 1))
   fi
 
   # 2. .spawnrc exists
   log_step "Checking .spawnrc exists..."
-  if fly_ssh "${app}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "test -f ~/.spawnrc" >/dev/null 2>&1; then
     log_ok ".spawnrc exists"
   else
     log_err ".spawnrc not found"
@@ -278,7 +213,7 @@ verify_common() {
 
   # 3. .spawnrc has OPENROUTER_API_KEY
   log_step "Checking OPENROUTER_API_KEY in .spawnrc..."
-  if fly_ssh "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "OPENROUTER_API_KEY present in .spawnrc"
   else
     log_err "OPENROUTER_API_KEY not found in .spawnrc"
@@ -299,7 +234,7 @@ verify_claude() {
 
   # Binary check
   log_step "Checking claude binary..."
-  if fly_ssh "${app}" "PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v claude" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.claude/local/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v claude" >/dev/null 2>&1; then
     log_ok "claude binary found"
   else
     log_err "claude binary not found"
@@ -308,7 +243,7 @@ verify_claude() {
 
   # Config check
   log_step "Checking claude config..."
-  if fly_ssh "${app}" "test -f ~/.claude/settings.json" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "test -f ~/.claude/settings.json" >/dev/null 2>&1; then
     log_ok "~/.claude/settings.json exists"
   else
     log_err "~/.claude/settings.json not found"
@@ -317,7 +252,7 @@ verify_claude() {
 
   # Env check
   log_step "Checking claude env (openrouter base url)..."
-  if fly_ssh "${app}" "grep -q openrouter.ai ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q openrouter.ai ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "openrouter.ai configured in .spawnrc"
   else
     log_err "openrouter.ai not found in .spawnrc"
@@ -333,7 +268,7 @@ verify_openclaw() {
 
   # Binary check
   log_step "Checking openclaw binary..."
-  if fly_ssh "${app}" "PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
     log_ok "openclaw binary found"
   else
     log_err "openclaw binary not found"
@@ -342,7 +277,7 @@ verify_openclaw() {
 
   # Env check
   log_step "Checking openclaw env (ANTHROPIC_API_KEY)..."
-  if fly_ssh "${app}" "grep -q ANTHROPIC_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q ANTHROPIC_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "ANTHROPIC_API_KEY present in .spawnrc"
   else
     log_err "ANTHROPIC_API_KEY not found in .spawnrc"
@@ -358,7 +293,7 @@ verify_zeroclaw() {
 
   # Binary check (requires cargo env)
   log_step "Checking zeroclaw binary..."
-  if fly_ssh "${app}" "source ~/.cargo/env 2>/dev/null; command -v zeroclaw" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "source ~/.cargo/env 2>/dev/null; command -v zeroclaw" >/dev/null 2>&1; then
     log_ok "zeroclaw binary found"
   else
     log_err "zeroclaw binary not found"
@@ -367,7 +302,7 @@ verify_zeroclaw() {
 
   # Env check: ZEROCLAW_PROVIDER
   log_step "Checking zeroclaw env (ZEROCLAW_PROVIDER)..."
-  if fly_ssh "${app}" "grep -q ZEROCLAW_PROVIDER ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q ZEROCLAW_PROVIDER ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "ZEROCLAW_PROVIDER present in .spawnrc"
   else
     log_err "ZEROCLAW_PROVIDER not found in .spawnrc"
@@ -376,7 +311,7 @@ verify_zeroclaw() {
 
   # Env check: provider is openrouter
   log_step "Checking zeroclaw uses openrouter..."
-  if fly_ssh "${app}" "grep ZEROCLAW_PROVIDER ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep ZEROCLAW_PROVIDER ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
     log_ok "ZEROCLAW_PROVIDER set to openrouter"
   else
     log_err "ZEROCLAW_PROVIDER not set to openrouter"
@@ -392,7 +327,7 @@ verify_codex() {
 
   # Binary check
   log_step "Checking codex binary..."
-  if fly_ssh "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v codex" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v codex" >/dev/null 2>&1; then
     log_ok "codex binary found"
   else
     log_err "codex binary not found"
@@ -401,7 +336,7 @@ verify_codex() {
 
   # Config check
   log_step "Checking codex config..."
-  if fly_ssh "${app}" "test -f ~/.codex/config.toml" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "test -f ~/.codex/config.toml" >/dev/null 2>&1; then
     log_ok "~/.codex/config.toml exists"
   else
     log_err "~/.codex/config.toml not found"
@@ -410,7 +345,7 @@ verify_codex() {
 
   # Env check
   log_step "Checking codex env (OPENROUTER_API_KEY)..."
-  if fly_ssh "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "OPENROUTER_API_KEY present in .spawnrc"
   else
     log_err "OPENROUTER_API_KEY not found in .spawnrc"
@@ -426,7 +361,7 @@ verify_opencode() {
 
   # Binary check
   log_step "Checking opencode binary..."
-  if fly_ssh "${app}" "PATH=\$HOME/.opencode/bin:\$PATH command -v opencode" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.opencode/bin:\$PATH command -v opencode" >/dev/null 2>&1; then
     log_ok "opencode binary found"
   else
     log_err "opencode binary not found"
@@ -435,7 +370,7 @@ verify_opencode() {
 
   # Env check
   log_step "Checking opencode env (OPENROUTER_API_KEY)..."
-  if fly_ssh "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "OPENROUTER_API_KEY present in .spawnrc"
   else
     log_err "OPENROUTER_API_KEY not found in .spawnrc"
@@ -451,7 +386,7 @@ verify_kilocode() {
 
   # Binary check
   log_step "Checking kilocode binary..."
-  if fly_ssh "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v kilocode" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v kilocode" >/dev/null 2>&1; then
     log_ok "kilocode binary found"
   else
     log_err "kilocode binary not found"
@@ -460,7 +395,7 @@ verify_kilocode() {
 
   # Env check: KILO_PROVIDER_TYPE
   log_step "Checking kilocode env (KILO_PROVIDER_TYPE)..."
-  if fly_ssh "${app}" "grep -q KILO_PROVIDER_TYPE ~/.spawnrc" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep -q KILO_PROVIDER_TYPE ~/.spawnrc" >/dev/null 2>&1; then
     log_ok "KILO_PROVIDER_TYPE present in .spawnrc"
   else
     log_err "KILO_PROVIDER_TYPE not found in .spawnrc"
@@ -469,10 +404,44 @@ verify_kilocode() {
 
   # Env check: provider is openrouter
   log_step "Checking kilocode uses openrouter..."
-  if fly_ssh "${app}" "grep KILO_PROVIDER_TYPE ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "grep KILO_PROVIDER_TYPE ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
     log_ok "KILO_PROVIDER_TYPE set to openrouter"
   else
     log_err "KILO_PROVIDER_TYPE not set to openrouter"
+    failures=$((failures + 1))
+  fi
+
+  return "${failures}"
+}
+
+verify_hermes() {
+  local app="$1"
+  local failures=0
+
+  # Binary check
+  log_step "Checking hermes binary..."
+  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; command -v hermes" >/dev/null 2>&1; then
+    log_ok "hermes binary found"
+  else
+    log_err "hermes binary not found"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: OPENROUTER_API_KEY
+  log_step "Checking hermes env (OPENROUTER_API_KEY)..."
+  if cloud_exec "${app}" "grep -q OPENROUTER_API_KEY ~/.spawnrc" >/dev/null 2>&1; then
+    log_ok "OPENROUTER_API_KEY present in .spawnrc"
+  else
+    log_err "OPENROUTER_API_KEY not found in .spawnrc"
+    failures=$((failures + 1))
+  fi
+
+  # Env check: OPENAI_BASE_URL points to openrouter
+  log_step "Checking hermes env (OPENAI_BASE_URL)..."
+  if cloud_exec "${app}" "grep OPENAI_BASE_URL ~/.spawnrc | grep -q openrouter" >/dev/null 2>&1; then
+    log_ok "OPENAI_BASE_URL set to openrouter"
+  else
+    log_err "OPENAI_BASE_URL not set to openrouter in .spawnrc"
     failures=$((failures + 1))
   fi
 
@@ -490,10 +459,6 @@ verify_agent() {
   local app="$2"
   local total_failures=0
 
-  # Reset machine ID cache for each agent
-  _FLY_MACHINE_ID=""
-  _FLY_MACHINE_APP=""
-
   log_header "Verifying ${agent} (${app})"
 
   # Common checks
@@ -510,6 +475,7 @@ verify_agent() {
     codex)     verify_codex "${app}"     || agent_failures=$? ;;
     opencode)  verify_opencode "${app}"  || agent_failures=$? ;;
     kilocode)  verify_kilocode "${app}"  || agent_failures=$? ;;
+    hermes)    verify_hermes "${app}"    || agent_failures=$? ;;
     *)
       log_err "Unknown agent: ${agent}"
       return 1

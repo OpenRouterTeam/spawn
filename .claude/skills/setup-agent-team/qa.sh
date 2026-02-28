@@ -7,7 +7,7 @@ set -eo pipefail
 # RUN_MODE=quality  — agent team: test-runner + dedup-scanner + code-quality-reviewer + e2e-tester (reason=schedule/workflow_dispatch, 40 min)
 # RUN_MODE=fixtures — single agent: collect API fixtures from cloud providers (reason=fixtures, 20 min)
 # RUN_MODE=issue    — single agent: investigate and fix a specific issue (reason=issues, 15 min)
-# RUN_MODE=e2e      — single agent: run Fly.io E2E tests, investigate failures (reason=e2e, 20 min)
+# RUN_MODE=e2e      — single agent: run AWS E2E tests, investigate failures (reason=e2e, 20 min)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -74,6 +74,13 @@ safe_substitute() {
     escaped=$(printf '%s' "$value" | sed -e 's/[\\]/\\&/g' -e 's/[&]/\\&/g' -e 's/[|]/\\|/g')
     sed -i.bak "s|${placeholder}|${escaped}|g" "$file"
     rm -f "${file}.bak"
+}
+
+# --- Validate branch name against safe pattern (defense-in-depth) ---
+# Prevents command injection via shell metacharacters in branch names
+is_safe_branch_name() {
+    local name="${1:-}"
+    [[ -n "${name}" ]] && [[ "${name}" =~ ^[a-zA-Z0-9._/-]+$ ]]
 }
 
 # --- Safe rm -rf for worktree paths (defense-in-depth) ---
@@ -157,16 +164,20 @@ fi
 # Delete merged qa-related remote branches
 MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -E 'origin/qa/' | sed 's|origin/||' | tr -d ' ') || true
 for branch in $MERGED_BRANCHES; do
-    if [[ -n "$branch" ]]; then
-        git push origin --delete "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
+    if is_safe_branch_name "$branch"; then
+        git push origin --delete -- "$branch" 2>&1 | tee -a "${LOG_FILE}" && log "Deleted merged branch: $branch" || true
+    else
+        log "WARNING: Skipping branch with unsafe name: ${branch}"
     fi
 done
 
 # Delete stale local qa branches
 LOCAL_BRANCHES=$(git branch --list 'qa/*' | tr -d ' *') || true
 for branch in $LOCAL_BRANCHES; do
-    if [[ -n "$branch" ]]; then
-        git branch -D "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
+    if is_safe_branch_name "$branch"; then
+        git branch -D -- "$branch" 2>&1 | tee -a "${LOG_FILE}" || true
+    else
+        log "WARNING: Skipping local branch with unsafe name: ${branch}"
     fi
 done
 

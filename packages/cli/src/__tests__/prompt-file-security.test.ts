@@ -81,13 +81,16 @@ describe("validatePromptFilePath", () => {
   });
 
   it("should include helpful error message about exfiltration risk", () => {
+    let caught: unknown;
     try {
       validatePromptFilePath("/home/user/.ssh/id_rsa");
-      throw new Error("Expected to throw");
-    } catch (e: any) {
-      expect(e.message).toContain("sent to the agent");
-      expect(e.message).toContain("plain text file");
+    } catch (e) {
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(Error);
+    const err = caught instanceof Error ? caught : null;
+    expect(err?.message).toContain("sent to the agent");
+    expect(err?.message).toContain("plain text file");
   });
 
   it("should reject SSH key files by filename pattern anywhere in path", () => {
@@ -144,12 +147,15 @@ describe("validatePromptFileStats", () => {
       isFile: () => true,
       size: 5 * 1024 * 1024,
     };
+    let caught: unknown;
     try {
       validatePromptFileStats("large.bin", stats);
-      throw new Error("Expected to throw");
-    } catch (e: any) {
-      expect(e.message).toContain("5.0MB");
-      expect(e.message).toContain("maximum is 1MB");
+    } catch (e) {
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(Error);
+    const err = caught instanceof Error ? caught : null;
+    expect(err?.message).toContain("5.0MB");
+    expect(err?.message).toContain("maximum is 1MB");
   });
 });

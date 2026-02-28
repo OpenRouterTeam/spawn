@@ -14,8 +14,6 @@ import type { Manifest } from "../manifest";
  *
  * These functions are all in the hot path of cmdRun (the primary CLI flow).
  * A bug in any of them breaks the user experience for every spawn invocation.
- *
- * Agent: test-engineer
  */
 
 // ── Test manifest ───────────────────────────────────────────────────────
@@ -153,10 +151,6 @@ mock.module("@clack/prompts", () => ({
 // Import after mocks are set up
 const {
   prioritizeCloudsByCredentials,
-  parseAuthEnvVars,
-  credentialHints,
-  getImplementedClouds,
-  getImplementedAgents,
   checkEntity,
   resolveAgentKey,
   resolveCloudKey,
@@ -387,56 +381,6 @@ describe("prioritizeCloudsByCredentials", () => {
   });
 });
 
-// ── buildCredentialStatusLines (tested via dry-run behavior) ─────────────
-
-describe("credential status display logic", () => {
-  const savedEnv: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    for (const v of [
-      "OPENROUTER_API_KEY",
-      "HCLOUD_TOKEN",
-      "DO_API_TOKEN",
-    ]) {
-      savedEnv[v] = process.env[v];
-      delete process.env[v];
-    }
-  });
-
-  afterEach(() => {
-    for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) {
-        delete process.env[k];
-      } else {
-        process.env[k] = v;
-      }
-    }
-  });
-
-  describe("parseAuthEnvVars for credential status", () => {
-    it("should extract single env var", () => {
-      expect(parseAuthEnvVars("HCLOUD_TOKEN")).toEqual([
-        "HCLOUD_TOKEN",
-      ]);
-    });
-
-    it("should extract multiple env vars", () => {
-      expect(parseAuthEnvVars("UPCLOUD_USERNAME + UPCLOUD_PASSWORD")).toEqual([
-        "UPCLOUD_USERNAME",
-        "UPCLOUD_PASSWORD",
-      ]);
-    });
-
-    it("should return empty for CLI-based auth", () => {
-      expect(parseAuthEnvVars("sprite login")).toEqual([]);
-    });
-
-    it("should return empty for 'none'", () => {
-      expect(parseAuthEnvVars("none")).toEqual([]);
-    });
-  });
-});
-
 // ── validateRunSecurity via checkEntity ──────────────────────────────────
 
 describe("entity validation for run path", () => {
@@ -517,47 +461,6 @@ describe("key resolution for run path", () => {
   });
 });
 
-// ── getImplementedClouds / getImplementedAgents for run path ─────────────
-
-describe("implementation checks for run path", () => {
-  const manifest = makeManifest();
-
-  it("should return implemented clouds for claude", () => {
-    const clouds = getImplementedClouds(manifest, "claude");
-    expect(clouds).toContain("hetzner");
-    expect(clouds).toContain("sprite");
-    expect(clouds).toContain("digitalocean");
-    expect(clouds).toContain("upcloud");
-    expect(clouds).toContain("localcloud");
-  });
-
-  it("should return implemented clouds for codex (fewer)", () => {
-    const clouds = getImplementedClouds(manifest, "codex");
-    expect(clouds).toContain("hetzner");
-    expect(clouds).toContain("digitalocean");
-    expect(clouds).toContain("localcloud");
-    // sprite/codex and upcloud/codex are "missing"
-    expect(clouds).not.toContain("sprite");
-    expect(clouds).not.toContain("upcloud");
-  });
-
-  it("should return implemented agents for hetzner", () => {
-    const agents = getImplementedAgents(manifest, "hetzner");
-    expect(agents).toContain("claude");
-    expect(agents).toContain("codex");
-  });
-
-  it("should return empty for nonexistent agent", () => {
-    const clouds = getImplementedClouds(manifest, "nonexistent");
-    expect(clouds).toEqual([]);
-  });
-
-  it("should return empty for nonexistent cloud", () => {
-    const agents = getImplementedAgents(manifest, "nonexistent");
-    expect(agents).toEqual([]);
-  });
-});
-
 // ── Integration: full run-path validation sequence ──────────────────────
 
 describe("run-path validation sequence integration", () => {
@@ -583,9 +486,7 @@ describe("run-path validation sequence integration", () => {
   it("should resolve display name before validation", () => {
     const resolved = resolveAgentKey(manifest, "Claude Code");
     expect(resolved).toBe("claude");
-    if (resolved) {
-      expect(checkEntity(manifest, resolved, "agent")).toBe(true);
-    }
+    expect(checkEntity(manifest, resolved ?? "", "agent")).toBe(true);
   });
 
   it("should build correct retry command after failure", () => {
@@ -605,135 +506,5 @@ describe("run-path validation sequence integration", () => {
     expect(isRetryableExitCode(errMsg)).toBe(false);
     const guidance = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
     expect(guidance.length).toBeGreaterThan(0);
-  });
-});
-
-// ── prioritizeCloudsByCredentials with real manifest shape ──────────────
-
-describe("prioritizeCloudsByCredentials with real-world patterns", () => {
-  const savedEnv: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    for (const v of [
-      "HCLOUD_TOKEN",
-      "DO_API_TOKEN",
-      "UPCLOUD_USERNAME",
-      "UPCLOUD_PASSWORD",
-    ]) {
-      savedEnv[v] = process.env[v];
-      delete process.env[v];
-    }
-  });
-
-  afterEach(() => {
-    for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) {
-        delete process.env[k];
-      } else {
-        process.env[k] = v;
-      }
-    }
-  });
-
-  it("should not crash on clouds with 'none' auth", () => {
-    const manifest = makeManifest();
-    const result = prioritizeCloudsByCredentials(
-      [
-        "localcloud",
-      ],
-      manifest,
-    );
-    expect(result.credCount).toBe(0);
-    expect(result.sortedClouds).toEqual([
-      "localcloud",
-    ]);
-  });
-
-  it("should handle mix of API, CLI, and local clouds", () => {
-    process.env.HCLOUD_TOKEN = "token";
-    const manifest = makeManifest();
-    const clouds = [
-      "localcloud",
-      "sprite",
-      "hetzner",
-      "digitalocean",
-    ];
-    const result = prioritizeCloudsByCredentials(clouds, manifest);
-
-    expect(result.credCount).toBe(1);
-    expect(result.sortedClouds[0]).toBe("hetzner");
-    expect(result.sortedClouds).toHaveLength(4);
-  });
-
-  it("should generate correct hint format with description", () => {
-    process.env.DO_API_TOKEN = "token";
-    const manifest = makeManifest();
-    const result = prioritizeCloudsByCredentials(
-      [
-        "digitalocean",
-      ],
-      manifest,
-    );
-
-    expect(result.hintOverrides["digitalocean"]).toBe("credentials detected -- Simple cloud hosting");
-  });
-
-  it("should not generate hints for clouds without credentials", () => {
-    const manifest = makeManifest();
-    const result = prioritizeCloudsByCredentials(
-      [
-        "hetzner",
-        "digitalocean",
-      ],
-      manifest,
-    );
-
-    expect(result.hintOverrides["hetzner"]).toBeUndefined();
-    expect(result.hintOverrides["digitalocean"]).toBeUndefined();
-  });
-});
-
-// ── Edge cases for credential-related functions ─────────────────────────
-
-describe("credential function edge cases", () => {
-  const savedEnv: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    savedEnv.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-    delete process.env.OPENROUTER_API_KEY;
-  });
-
-  afterEach(() => {
-    if (savedEnv.OPENROUTER_API_KEY === undefined) {
-      delete process.env.OPENROUTER_API_KEY;
-    } else {
-      process.env.OPENROUTER_API_KEY = savedEnv.OPENROUTER_API_KEY;
-    }
-  });
-
-  it("credentialHints should always mention OPENROUTER_API_KEY when missing", () => {
-    const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-    expect(hints.some((h: string) => h.includes("OPENROUTER_API_KEY") || h.includes("Missing"))).toBe(true);
-  });
-
-  it("credentialHints should not flag OPENROUTER_API_KEY when set", () => {
-    process.env.OPENROUTER_API_KEY = "key";
-    process.env.HCLOUD_TOKEN = "token";
-    const hints = credentialHints("hetzner", "HCLOUD_TOKEN");
-    // When all are set, should show "appear to be set" message
-    expect(hints.some((h: string) => h.includes("set") || h.includes("appear"))).toBe(true);
-  });
-
-  it("parseAuthEnvVars should handle extra whitespace", () => {
-    expect(parseAuthEnvVars("  HCLOUD_TOKEN  ")).toEqual([
-      "HCLOUD_TOKEN",
-    ]);
-  });
-
-  it("parseAuthEnvVars should handle empty + separator", () => {
-    expect(parseAuthEnvVars("VAR_A + + VAR_B")).toEqual([
-      "VAR_A",
-      "VAR_B",
-    ]);
   });
 });

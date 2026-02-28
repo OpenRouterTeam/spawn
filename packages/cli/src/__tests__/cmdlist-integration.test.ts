@@ -10,11 +10,6 @@ import type { SpawnRecord } from "../history";
  *
  * Existing tests cover:
  * - history.test.ts: data layer (loadHistory, saveSpawnRecord, filterHistory)
- * - list-display.test.ts: formatTimestamp and parseListFilters replicas
- * - list-table-rendering.test.ts: resolveDisplayName unit tests and table rendering
- * - list-empty-footer.test.ts: showEmptyListMessage and showListFooter replicas
- * - list-filter-suggestions.test.ts: suggestFilterCorrection replicas
- * - list-prompt-display.test.ts: prompt preview rendering
  *
  * This file covers the UNTESTED integration path: calling the real cmdList
  * exported function with mock.module for @clack/prompts and a controlled
@@ -28,8 +23,6 @@ import type { SpawnRecord } from "../history";
  * - cmdList with filters that match nothing (empty + suggestion flow)
  * - cmdList when manifest is unavailable (falls back to raw keys)
  * - cmdList footer: rerun hint with/without prompt, filter count text
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

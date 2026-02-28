@@ -1,6 +1,8 @@
 // sprite/sprite.ts — Core Sprite provider: CLI installation, auth, provisioning, execution
 
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import {
   logInfo,
@@ -110,7 +112,7 @@ function getSpriteCmd(): string | null {
     return "sprite";
   }
   const commonPaths = [
-    `${process.env.HOME}/.local/bin/sprite`,
+    join(process.env.HOME || homedir(), ".local/bin/sprite"),
     "/data/data/com.termux/files/usr/bin/sprite",
     "/usr/local/bin/sprite",
     "/usr/bin/sprite",
@@ -166,7 +168,7 @@ export async function ensureSpriteCli(): Promise<void> {
   }
 
   // Add to PATH
-  const localBin = `${process.env.HOME}/.local/bin`;
+  const localBin = join(process.env.HOME || homedir(), ".local/bin");
   if (!process.env.PATH?.includes(localBin)) {
     process.env.PATH = `${localBin}:${process.env.PATH}`;
   }
@@ -407,7 +409,7 @@ export async function setupShellEnvironment(): Promise<void> {
   await runSpriteSilent(`sed -i '/exec \\/usr\\/bin\\/zsh/d' ~/.bashrc ~/.bash_profile 2>/dev/null; true`);
 
   // Upload and append PATH config to .bashrc and .zshrc
-  const pathConfig = `\n# [spawn:path]\nexport PATH="\${HOME}/.bun/bin:/.sprite/languages/bun/bin:\${PATH}"\n`;
+  const pathConfig = `\n# [spawn:path]\nexport PATH="\${HOME}/.npm-global/bin:\${HOME}/.bun/bin:/.sprite/languages/bun/bin:\${PATH}"\n`;
   const pathB64 = Buffer.from(pathConfig).toString("base64");
   await runSprite(
     `printf '%s' '${pathB64}' | base64 -d >> ~/.bashrc && printf '%s' '${pathB64}' | base64 -d >> ~/.zshrc`,
@@ -511,7 +513,11 @@ async function runSpriteSilent(cmd: string): Promise<void> {
  * The -file flag format is "localpath:remotepath".
  */
 export async function uploadFileSprite(localPath: string, remotePath: string): Promise<void> {
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) || remotePath.includes("..")) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }

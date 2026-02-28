@@ -43,7 +43,7 @@ async function main() {
       await ensureAwsCli();
       await authenticate();
       await promptRegion();
-      await promptBundle();
+      await promptBundle(agentName);
       await ensureSshKey();
     },
     async promptSize() {

@@ -27,7 +27,6 @@ const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]*\$?$/;
 // Special connection sentinel values (not actual IPs)
 const CONNECTION_SENTINELS = [
   "sprite-console",
-  "fly-ssh",
   "daytona-sandbox",
   "localhost",
 ];
@@ -173,7 +172,7 @@ export function validateScriptContent(script: string): void {
  * - Valid IPv4 addresses (e.g., "192.168.1.1")
  * - Valid IPv6 addresses (e.g., "::1", "2001:db8::1")
  * - Valid hostnames (e.g., "ssh.app.daytona.io")
- * - Special sentinel values ("sprite-console", "fly-ssh", "daytona-sandbox", "localhost")
+ * - Special sentinel values ("sprite-console", "daytona-sandbox", "localhost")
  *
  * @param ip - The IP address or sentinel to validate
  * @throws Error if validation fails
@@ -310,6 +309,89 @@ export function validateServerIdentifier(id: string): void {
         "Your spawn history file may be corrupted or tampered with.\n" +
         `To fix: run 'spawn list --clear' to reset history`,
     );
+  }
+}
+
+/**
+ * Dangerous shell patterns blocked in launch commands.
+ * SECURITY-CRITICAL: These patterns enable command injection when passed to `bash -lc`.
+ */
+const LAUNCH_CMD_DANGEROUS_PATTERNS: ReadonlyArray<{
+  pattern: RegExp;
+  description: string;
+}> = [
+  {
+    pattern: /\$\(/,
+    description: "command substitution $()",
+  },
+  {
+    pattern: /`/,
+    description: "backtick command substitution",
+  },
+  {
+    pattern: /\|/,
+    description: "pipe operator",
+  },
+  {
+    pattern: /;\s*rm\b/,
+    description: "destructive command sequence (rm)",
+  },
+  {
+    pattern: /&&/,
+    description: "command chaining (&&)",
+  },
+  {
+    pattern: /\|\|/,
+    description: "command chaining (||)",
+  },
+  {
+    pattern: />\s*\//,
+    description: "redirection to absolute path",
+  },
+  {
+    pattern: /<\s*\//,
+    description: "input redirection from absolute path",
+  },
+  {
+    pattern: /\$\{/,
+    description: "variable expansion",
+  },
+];
+
+/**
+ * Validates a launch command from connection history before shell execution.
+ * SECURITY-CRITICAL: launch_cmd is passed directly to `bash -lc` via SSH.
+ * A tampered history file could inject arbitrary commands without this check.
+ *
+ * Blocks: $(...), backticks, pipes |, &&, ||, redirections to paths, ${...}
+ *
+ * @param cmd - The launch command to validate
+ * @throws Error if dangerous patterns are detected
+ */
+export function validateLaunchCmd(cmd: string): void {
+  if (!cmd || cmd.trim() === "") {
+    return; // Empty/missing launch_cmd is fine — caller falls back to manifest
+  }
+
+  if (cmd.length > 1024) {
+    throw new Error(
+      `Launch command is too long (${cmd.length} characters, maximum is 1024)\n\n` +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
+    );
+  }
+
+  for (const { pattern, description } of LAUNCH_CMD_DANGEROUS_PATTERNS) {
+    if (pattern.test(cmd)) {
+      throw new Error(
+        `Invalid launch command in history: contains ${description}\n\n` +
+          `Command: "${cmd}"\n\n` +
+          "Launch commands should be simple executable invocations (e.g., 'claude', 'aider').\n" +
+          "Shell operators like pipes, command substitution, and chaining are not allowed.\n\n" +
+          "Your spawn history file may be corrupted or tampered with.\n" +
+          `To fix: run 'spawn list --clear' to reset history`,
+      );
+    }
   }
 }
 

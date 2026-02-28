@@ -1,6 +1,8 @@
 // shared/ssh-keys.ts — SSH key discovery, selection, and generation
 
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { logInfo, logStep } from "./ui";
 import { multiPickToTTY } from "../picker";
 
@@ -28,7 +30,7 @@ export function _resetCache(): void {
 
 /** Scan ~/.ssh/ for valid key pairs and extract key types. */
 export function discoverSshKeys(): SshKeyPair[] {
-  const sshDir = `${process.env.HOME}/.ssh`;
+  const sshDir = join(process.env.HOME || homedir(), ".ssh");
   if (!existsSync(sshDir)) {
     return [];
   }
@@ -114,7 +116,7 @@ function getKeyType(pubPath: string): string {
 
 /** Generate a new ed25519 key at ~/.ssh/id_ed25519. Returns the pair. */
 export function generateSshKey(): SshKeyPair {
-  const sshDir = `${process.env.HOME}/.ssh`;
+  const sshDir = join(process.env.HOME || homedir(), ".ssh");
   const privPath = `${sshDir}/id_ed25519`;
   const pubPath = `${privPath}.pub`;
 

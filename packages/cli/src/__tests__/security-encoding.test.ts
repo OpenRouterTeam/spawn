@@ -11,8 +11,6 @@ import { validateIdentifier, validateScriptContent, validatePrompt } from "../se
  * - Script content with various line endings
  * - Prompt validation with embedded control characters
  * - Regex boundary conditions in dangerous pattern detection
- *
- * Agent: test-engineer
  */
 
 describe("Security Encoding Edge Cases", () => {

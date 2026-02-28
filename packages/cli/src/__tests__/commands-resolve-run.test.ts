@@ -7,19 +7,11 @@ import { isString } from "@openrouter/spawn-shared";
  * Tests for cmdRun display-name resolution and validateImplementation
  * suggestion paths in commands.ts.
  *
- * Existing tests cover:
- * - resolveAgentKey/resolveCloudKey as isolated functions (commands-helpers.test.ts)
- * - cmdRun error paths: invalid identifiers, unknown agents/clouds (commands-error-paths.test.ts)
- * - cmdRun swapped argument detection (commands-error-paths.test.ts)
- *
- * This file covers the UNTESTED integration paths:
  * - cmdRun resolving case-insensitive display names and logging "Resolved" messages
  * - cmdRun resolving case-insensitive keys (e.g. "Claude" -> "claude")
  * - validateImplementation showing "see all N options" hint when > 3 clouds available
  * - validateImplementation showing "no implemented cloud providers" message
  * - cmdRun proceeding correctly after resolution (step log with agent/cloud names)
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();

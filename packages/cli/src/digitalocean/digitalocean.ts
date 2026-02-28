@@ -1,8 +1,9 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-import * as v from "valibot";
 import {
   logInfo,
   logWarn,
@@ -19,7 +20,7 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { parseJsonWith, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
+import { parseJsonObj, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
 import {
   SSH_BASE_OPTS,
   SSH_INTERACTIVE_OPTS,
@@ -39,9 +40,23 @@ const DO_DASHBOARD_URL = "https://cloud.digitalocean.com/droplets";
 const DO_OAUTH_AUTHORIZE = "https://cloud.digitalocean.com/v1/oauth/authorize";
 const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 
-// OAuth application credentials (embedded, same pattern as gh CLI / doctl).
-// Public clients cannot keep secrets confidential — security comes from the
-// authorization code flow itself (user consent, localhost redirect, CSRF state).
+// OAuth application credentials — embedded in the binary, same pattern as gh CLI and doctl.
+//
+// Why the client_secret is here and why that's acceptable:
+//   1. DigitalOcean's token exchange endpoint REQUIRES client_secret — their OAuth
+//      implementation does not support PKCE-only public client flows (as of 2026).
+//   2. Open-source CLI tools are "public clients" (RFC 6749 §2.1) — any secret
+//      shipped in source code or a binary is extractable and provides zero
+//      confidentiality. This is a well-understood OAuth limitation.
+//   3. Security relies on the authorization code flow itself: user consent in the
+//      browser, localhost-only redirect URI, and CSRF state parameter validation.
+//   4. The secret alone cannot access user resources — it only allows exchanging a
+//      one-time authorization code (which requires user approval) for a token.
+//   5. This is the same pattern used by: gh CLI (GitHub), doctl (DigitalOcean),
+//      gcloud (Google), and az (Azure).
+//
+// If DigitalOcean adds PKCE support in the future, the client_secret should be
+// removed and replaced with code_challenge/code_verifier parameters.
 const DO_CLIENT_ID = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
 const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
 
@@ -126,17 +141,11 @@ async function doApi(
   throw new Error("doApi: unreachable");
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const LooseObject = v.record(v.string(), v.unknown());
-
-function parseJson(text: string): Record<string, unknown> | null {
-  return parseJsonWith(text, LooseObject);
-}
-
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
-const DO_CONFIG_PATH = `${process.env.HOME}/.config/spawn/digitalocean.json`;
+function getConfigPath(): string {
+  return join(process.env.HOME || homedir(), ".config", "spawn", "digitalocean.json");
+}
 
 interface DoConfig {
   api_key?: string;
@@ -148,20 +157,20 @@ interface DoConfig {
 
 function loadConfig(): DoConfig | null {
   try {
-    return JSON.parse(readFileSync(DO_CONFIG_PATH, "utf-8"));
+    return JSON.parse(readFileSync(getConfigPath(), "utf-8"));
   } catch {
     return null;
   }
 }
 
 async function saveConfig(config: DoConfig): Promise<void> {
-  const dir = DO_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
-  await Bun.write(DO_CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", {
+  const configPath = getConfigPath();
+  const dir = configPath.replace(/\/[^/]+$/, "");
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
+  await Bun.write(configPath, JSON.stringify(config, null, 2) + "\n", {
     mode: 0o600,
   });
 }
@@ -283,7 +292,7 @@ async function tryRefreshDoToken(): Promise<string | null> {
       return null;
     }
 
-    const data = parseJson(await resp.text());
+    const data = parseJsonObj(await resp.text());
     if (!data?.access_token) {
       logWarn("Token refresh returned no access token");
       return null;
@@ -321,6 +330,7 @@ async function tryDoOAuth(): Promise<string | null> {
 
   const csrfState = generateCsrfState();
   let oauthCode: string | null = null;
+  let oauthDenied = false;
   let server: ReturnType<typeof Bun.serve> | null = null;
 
   // Try ports in range
@@ -338,6 +348,7 @@ async function tryDoOAuth(): Promise<string | null> {
             if (error) {
               const desc = url.searchParams.get("error_description") || error;
               logError(`DigitalOcean authorization denied: ${desc}`);
+              oauthDenied = true;
               return new Response(OAUTH_ERROR_HTML, {
                 status: 403,
                 headers: {
@@ -425,11 +436,18 @@ async function tryDoOAuth(): Promise<string | null> {
   // Wait up to 120 seconds
   logStep("Waiting for authorization in browser (timeout: 120s)...");
   const deadline = Date.now() + 120_000;
-  while (!oauthCode && Date.now() < deadline) {
+  while (!oauthCode && !oauthDenied && Date.now() < deadline) {
     await sleep(500);
   }
 
   server.stop(true);
+
+  if (oauthDenied) {
+    logError("OAuth authorization was denied by the user");
+    logError("Alternative: Use a manual API token instead");
+    logError("  export DO_API_TOKEN=dop_v1_...");
+    return null;
+  }
 
   if (!oauthCode) {
     logError("OAuth authentication timed out after 120 seconds");
@@ -465,7 +483,7 @@ async function tryDoOAuth(): Promise<string | null> {
       return null;
     }
 
-    const data = parseJson(await resp.text());
+    const data = parseJsonObj(await resp.text());
     if (!data?.access_token) {
       logError("Token exchange returned no access token");
       return null;
@@ -582,7 +600,7 @@ export async function ensureSshKey(): Promise<void> {
 
     // Check if key is registered with DigitalOcean
     const { text } = await doApi("GET", "/account/keys");
-    const data = parseJson(text);
+    const data = parseJsonObj(text);
     const keys = toObjectArray(data?.ssh_keys);
 
     const found = keys.some((k: Record<string, unknown>) => {
@@ -794,7 +812,7 @@ export async function createServer(
 
   // Get all SSH key IDs
   const { text: keysText } = await doApi("GET", "/account/keys");
-  const keysData = parseJson(keysText);
+  const keysData = parseJsonObj(keysText);
   const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
     .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter((n) => n > 0);
@@ -812,7 +830,7 @@ export async function createServer(
   });
 
   const { text: createText } = await doApi("POST", "/droplets", body);
-  const createData = parseJson(createText);
+  const createData = parseJsonObj(createText);
 
   if (!createData?.droplet?.id) {
     const errMsg = createData?.message || "Unknown error";
@@ -839,7 +857,7 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const { text } = await doApi("GET", `/droplets/${dropletId}`);
-    const data = parseJson(text);
+    const data = parseJsonObj(text);
     const status = data?.droplet?.status;
 
     if (status === "active") {
@@ -1035,7 +1053,11 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
 
 export async function uploadFile(localPath: string, remotePath: string, ip?: string): Promise<void> {
   const serverIp = ip || doServerIp;
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     logError(`Invalid remote path: ${remotePath}`);
     throw new Error("Invalid remote path");
   }
@@ -1151,7 +1173,7 @@ export async function destroyServer(dropletId?: string): Promise<void> {
     return;
   }
 
-  const data = parseJson(text);
+  const data = parseJsonObj(text);
   if (data?.message) {
     logError(`Failed to destroy droplet ${id}: ${data.message}`);
     logWarn("The droplet may still be running and incurring charges.");
@@ -1160,33 +1182,4 @@ export async function destroyServer(dropletId?: string): Promise<void> {
   }
 
   logInfo(`Droplet ${id} destroyed`);
-}
-
-export async function listServers(): Promise<void> {
-  const { text } = await doApi("GET", "/droplets");
-  const data = parseJson(text);
-  const droplets = toObjectArray(data?.droplets);
-
-  if (droplets.length === 0) {
-    console.log("No droplets found");
-    return;
-  }
-
-  const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-  console.log(pad("NAME", 25) + pad("ID", 12) + pad("STATUS", 12) + pad("IP", 16) + pad("SIZE", 15));
-  console.log("-".repeat(80));
-  for (const d of droplets) {
-    const networks = d.networks;
-    const v4 = networks && typeof networks === "object" && "v4" in networks ? networks.v4 : undefined;
-    const v4Arr = toObjectArray(v4);
-    const publicNet = v4Arr.find((n) => n.type === "public");
-    const ip = String(publicNet?.ip_address ?? "N/A");
-    console.log(
-      pad(String(d.name ?? "N/A").slice(0, 24), 25) +
-        pad(String(d.id ?? "N/A").slice(0, 11), 12) +
-        pad(String(d.status ?? "N/A").slice(0, 11), 12) +
-        pad(ip.slice(0, 15), 16) +
-        pad(String(d.size_slug ?? "N/A").slice(0, 14), 15),
-    );
-  }
 }

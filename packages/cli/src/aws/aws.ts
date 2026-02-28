@@ -1,6 +1,8 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import { createHash, createHmac } from "node:crypto";
 import {
@@ -36,7 +38,9 @@ const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 
 // ─── Credential Cache ────────────────────────────────────────────────────────
 
-export const AWS_CONFIG_PATH = `${process.env.HOME}/.config/spawn/aws.json`;
+export function getAwsConfigPath(): string {
+  return join(process.env.HOME || homedir(), ".config", "spawn", "aws.json");
+}
 
 const AwsCredsSchema = v.object({
   accessKeyId: v.string(),
@@ -45,14 +49,14 @@ const AwsCredsSchema = v.object({
 });
 
 export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
-  const dir = AWS_CONFIG_PATH.replace(/\/[^/]+$/, "");
-  await Bun.spawn([
-    "mkdir",
-    "-p",
-    dir,
-  ]).exited;
+  const configPath = getAwsConfigPath();
+  const dir = configPath.replace(/\/[^/]+$/, "");
+  mkdirSync(dir, {
+    recursive: true,
+    mode: 0o700,
+  });
   const payload = `{\n  "accessKeyId": ${jsonEscape(accessKeyId)},\n  "secretAccessKey": ${jsonEscape(secretAccessKey)},\n  "region": ${jsonEscape(region)}\n}\n`;
-  await Bun.write(AWS_CONFIG_PATH, payload, {
+  await Bun.write(configPath, payload, {
     mode: 0o600,
   });
 }
@@ -63,7 +67,7 @@ export function loadCredsFromConfig(): {
   region: string;
 } | null {
   try {
-    const raw = readFileSync(AWS_CONFIG_PATH, "utf-8");
+    const raw = readFileSync(getAwsConfigPath(), "utf-8");
     const data = parseJsonWith(raw, AwsCredsSchema);
     if (!data?.accessKeyId || !data?.secretAccessKey) {
       return null;
@@ -119,6 +123,11 @@ export const BUNDLES: Bundle[] = [
 ];
 
 export const DEFAULT_BUNDLE = BUNDLES[0]; // nano_3_0
+
+/** Per-agent default bundles — heavier agents need more RAM. */
+export const AGENT_BUNDLE_DEFAULTS: Record<string, string> = {
+  openclaw: "medium_3_0", // OpenClaw gateway + 713 npm packages needs >=4 GB
+};
 
 // ─── Lightsail Regions ────────────────────────────────────────────────────────
 
@@ -186,23 +195,6 @@ const InstanceStateSchema = v.object({
     }),
     publicIpAddress: v.optional(v.string()),
   }),
-});
-
-const InstanceListSchema = v.object({
-  instances: v.optional(
-    v.array(
-      v.object({
-        name: v.optional(v.string()),
-        state: v.optional(
-          v.object({
-            name: v.optional(v.string()),
-          }),
-        ),
-        publicIpAddress: v.optional(v.string()),
-        bundleId: v.optional(v.string()),
-      }),
-    ),
-  ),
 });
 
 // ─── AWS CLI Wrapper ────────────────────────────────────────────────────────
@@ -641,18 +633,24 @@ export async function promptRegion(): Promise<void> {
 
 let selectedBundle = DEFAULT_BUNDLE.id;
 
-export async function promptBundle(): Promise<void> {
+export async function promptBundle(agentName?: string): Promise<void> {
   if (process.env.LIGHTSAIL_BUNDLE) {
     selectedBundle = process.env.LIGHTSAIL_BUNDLE;
     return;
   }
+
+  // Use per-agent default if available (e.g. openclaw → medium)
+  const agentDefault = agentName ? AGENT_BUNDLE_DEFAULTS[agentName] : undefined;
+  const defaultId = agentDefault ?? DEFAULT_BUNDLE.id;
+
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
+    selectedBundle = defaultId;
     return;
   }
 
   process.stderr.write("\n");
   const items = BUNDLES.map((b) => `${b.id}|${b.label}`);
-  const selected = await selectFromList(items, "instance size", DEFAULT_BUNDLE.id);
+  const selected = await selectFromList(items, "instance size", defaultId);
   selectedBundle = selected;
   logInfo(`Using bundle: ${selected}`);
 }
@@ -1075,7 +1073,11 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
 }
 
 export async function uploadFile(localPath: string, remotePath: string): Promise<void> {
-  if (!/^[a-zA-Z0-9/_.~-]+$/.test(remotePath)) {
+  if (
+    !/^[a-zA-Z0-9/_.~-]+$/.test(remotePath) ||
+    remotePath.includes("..") ||
+    remotePath.split("/").some((s) => s.startsWith("-"))
+  ) {
     throw new Error(`Invalid remote path: ${remotePath}`);
   }
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
@@ -1209,41 +1211,4 @@ export async function destroyServer(name?: string): Promise<void> {
     }
   }
   logInfo(`Instance '${target}' destroyed`);
-}
-
-export async function listServers(): Promise<void> {
-  if (lightsailMode === "cli") {
-    const proc = Bun.spawn(
-      [
-        "aws",
-        "lightsail",
-        "get-instances",
-        "--query",
-        "instances[].{Name:name,State:state.name,IP:publicIpAddress,Bundle:bundleId}",
-        "--output",
-        "table",
-      ],
-      {
-        stdio: [
-          "ignore",
-          "inherit",
-          "inherit",
-        ],
-        env: process.env,
-      },
-    );
-    await proc.exited;
-  } else {
-    const resp = await lightsailRest("Lightsail_20161128.GetInstances", "{}");
-    const data = parseJsonWith(resp, InstanceListSchema);
-    const instances = data?.instances ?? [];
-    const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
-    console.log(pad("Name", 30) + pad("State", 12) + pad("IP", 16) + "Bundle");
-    console.log("-".repeat(72));
-    for (const i of instances) {
-      console.log(
-        pad(i.name || "", 30) + pad(i.state?.name || "", 12) + pad(i.publicIpAddress || "N/A", 16) + (i.bundleId || ""),
-      );
-    }
-  }
 }

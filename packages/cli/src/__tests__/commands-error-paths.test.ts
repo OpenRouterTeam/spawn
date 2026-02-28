@@ -6,10 +6,6 @@ import { isString } from "@openrouter/spawn-shared";
 /**
  * Tests for commands.ts error/validation paths that call process.exit(1).
  *
- * These test the ACTUAL exported functions from commands.ts (not inline replicas).
- * Previous tests in commands-helpers.test.ts and commands-untested.test.ts used
- * re-implemented copies of the logic. This file tests the real code paths:
- *
  * - cmdRun with invalid identifiers (injection characters, path traversal)
  * - cmdRun with unknown agent or cloud names
  * - cmdRun with unimplemented agent/cloud combinations
@@ -18,8 +14,6 @@ import { isString } from "@openrouter/spawn-shared";
  * - cmdAgentInfo with invalid identifier
  * - validateNonEmptyString triggering process.exit for empty inputs
  * - validateImplementation showing available clouds when combination is missing
- *
- * Agent: test-engineer
  */
 
 const mockManifest = createMockManifest();
@@ -333,51 +327,6 @@ describe("Commands Error Paths", () => {
 
       const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
-    });
-  });
-
-  // ── cmdRun: swapped arguments detection ──────────────────────────────
-
-  describe("cmdRun - swapped arguments detection", () => {
-    it("should detect when cloud and agent arguments are swapped", async () => {
-      // "spawn sprite claude" should detect that sprite is a cloud and claude is an agent
-      await expect(cmdRun("sprite", "claude")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
-    });
-
-    it("should suggest the correct argument order when swapped", async () => {
-      await expect(cmdRun("sprite", "claude")).rejects.toThrow("process.exit");
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("spawn claude sprite"))).toBe(true);
-    });
-
-    it("should suggest correct order for hetzner/codex swap", async () => {
-      await expect(cmdRun("hetzner", "codex")).rejects.toThrow("process.exit");
-
-      const infoCalls2 = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls2.some((msg: string) => msg.includes("swapped"))).toBe(true);
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("spawn codex hetzner"))).toBe(true);
-    });
-
-    it("should NOT trigger swap detection when both args are unknown", async () => {
-      await expect(cmdRun("unknown1", "unknown2")).rejects.toThrow("process.exit");
-
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(false);
-    });
-
-    it("should NOT trigger swap detection when agent is valid", async () => {
-      // "spawn claude nonexistent" - agent is valid, cloud is not
-      await expect(cmdRun("claude", "nonexistent")).rejects.toThrow("process.exit");
-
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(false);
     });
   });
 

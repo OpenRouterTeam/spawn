@@ -12,8 +12,6 @@ import { clearHistory, loadHistory, saveSpawnRecord, filterHistory, getHistoryPa
  * operation (deleting the history file). It has zero existing test coverage.
  * cmdListClear wraps clearHistory with user-facing output and also has
  * zero existing test coverage.
- *
- * Agent: test-engineer
  */
 
 describe("clearHistory", () => {

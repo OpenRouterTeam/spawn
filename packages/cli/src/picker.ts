@@ -114,6 +114,148 @@ function getTTYCols(ttyFd: number): number {
   return 80;
 }
 
+// ── Shared TTY key-loop infrastructure ───────────────────────────────────────
+
+type WriteFn = (s: string) => void;
+
+interface KeyLoopCallbacks<T> {
+  fallback: () => T;
+  init: (w: WriteFn, cols: number) => void;
+  handleKey: (
+    key: string,
+    w: WriteFn,
+  ) => {
+    done: boolean;
+    result?: T;
+  };
+}
+
+/**
+ * Opens /dev/tty, saves/restores stty settings, enables raw mode,
+ * and runs a synchronous key-read loop. Delegates all rendering and
+ * key handling to the provided callbacks.
+ *
+ * Returns `fallback()` if /dev/tty or stty setup fails.
+ */
+function withTTYKeyLoop<T>(callbacks: KeyLoopCallbacks<T>): T {
+  // ── open /dev/tty ────────────────────────────────────────────────────────
+  let ttyFd: number;
+  try {
+    ttyFd = fs.openSync("/dev/tty", "r+");
+  } catch {
+    return callbacks.fallback();
+  }
+
+  // ── save terminal settings ──────────────────────────────────────────────
+  const savedRes = spawnSync(
+    "stty",
+    [
+      "-g",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
+  if (savedRes.status !== 0 || !savedRes.stdout) {
+    fs.closeSync(ttyFd);
+    return callbacks.fallback();
+  }
+  const savedSettings = savedRes.stdout.toString().trim();
+
+  // ── enable raw / no-echo mode ───────────────────────────────────────────
+  const rawRes = spawnSync(
+    "stty",
+    [
+      "raw",
+      "-echo",
+    ],
+    {
+      stdio: [
+        ttyFd,
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
+  if (rawRes.status !== 0) {
+    fs.closeSync(ttyFd);
+    return callbacks.fallback();
+  }
+
+  // ── helpers ─────────────────────────────────────────────────────────────
+  const w: WriteFn = (s) => {
+    try {
+      fs.writeSync(ttyFd, s);
+    } catch {}
+  };
+
+  const restore = () => {
+    try {
+      spawnSync(
+        "stty",
+        [
+          savedSettings,
+        ],
+        {
+          stdio: [
+            ttyFd,
+            "pipe",
+            "pipe",
+          ],
+        },
+      );
+    } catch {}
+    w(A.showC);
+    try {
+      fs.closeSync(ttyFd);
+    } catch {}
+  };
+
+  // ── init (first render) ─────────────────────────────────────────────────
+  const cols = getTTYCols(ttyFd);
+  w(A.hideC);
+  callbacks.init(w, cols);
+
+  // ── key loop ────────────────────────────────────────────────────────────
+  const buf = Buffer.alloc(8);
+  let finalResult: T | undefined;
+
+  try {
+    while (true) {
+      let n: number;
+      try {
+        n = fs.readSync(ttyFd, buf, 0, 8, null);
+      } catch {
+        break;
+      }
+      if (n === 0) {
+        continue;
+      }
+
+      const key = buf.slice(0, n).toString("binary");
+
+      // Ctrl-C / Escape — universal cancel
+      if (key === "\x03" || key === "\x1b") {
+        break;
+      }
+
+      const action = callbacks.handleKey(key, w);
+      if (action.done) {
+        finalResult = action.result;
+        break;
+      }
+    }
+  } finally {
+    restore();
+  }
+
+  return finalResult !== undefined ? finalResult : callbacks.fallback();
+}
+
 // ── TTY picker ────────────────────────────────────────────────────────────────
 
 /**
@@ -149,12 +291,7 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
       : cancel;
   }
 
-  // ── open /dev/tty ──────────────────────────────────────────────────────────
-  let ttyFd: number;
-  try {
-    ttyFd = fs.openSync("/dev/tty", "r+");
-  } catch {
-    // Fall back to basic pickFallback which returns a value
+  const fallback = (): PickResult => {
     const val = pickFallback(config);
     return val
       ? {
@@ -163,92 +300,8 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
           index: config.options.findIndex((o) => o.value === val),
         }
       : cancel;
-  }
-
-  // ── save terminal settings ────────────────────────────────────────────────
-  const savedRes = spawnSync(
-    "stty",
-    [
-      "-g",
-    ],
-    {
-      stdio: [
-        ttyFd,
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  if (savedRes.status !== 0 || !savedRes.stdout) {
-    fs.closeSync(ttyFd);
-    const val = pickFallback(config);
-    return val
-      ? {
-          action: "select",
-          value: val,
-          index: config.options.findIndex((o) => o.value === val),
-        }
-      : cancel;
-  }
-  const savedSettings = savedRes.stdout.toString().trim();
-
-  // ── enable raw / no-echo mode ─────────────────────────────────────────────
-  const rawRes = spawnSync(
-    "stty",
-    [
-      "raw",
-      "-echo",
-    ],
-    {
-      stdio: [
-        ttyFd,
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  if (rawRes.status !== 0) {
-    fs.closeSync(ttyFd);
-    const val = pickFallback(config);
-    return val
-      ? {
-          action: "select",
-          value: val,
-          index: config.options.findIndex((o) => o.value === val),
-        }
-      : cancel;
-  }
-
-  // ── helpers ───────────────────────────────────────────────────────────────
-  const w = (s: string) => {
-    try {
-      fs.writeSync(ttyFd, s);
-    } catch {}
   };
 
-  const restore = () => {
-    try {
-      spawnSync(
-        "stty",
-        [
-          savedSettings,
-        ],
-        {
-          stdio: [
-            ttyFd,
-            "pipe",
-            "pipe",
-          ],
-        },
-      );
-    } catch {}
-    w(A.showC);
-    try {
-      fs.closeSync(ttyFd);
-    } catch {}
-  };
-
-  // ── initial state ─────────────────────────────────────────────────────────
   let selected = 0;
   if (config.defaultValue) {
     const idx = config.options.findIndex((o) => o.value === config.defaultValue);
@@ -257,128 +310,117 @@ export function pickToTTYWithActions(config: PickConfig): PickResult {
     }
   }
 
-  const cols = getTTYCols(ttyFd);
-  const maxW = cols - 1; // leave 1 char margin to prevent terminal auto-wrap
+  let maxW = 80;
+  let pickerHeight = 0;
+  let render: (w: WriteFn, first: boolean) => void;
 
-  const footerHint = config.deleteKey
-    ? "\u2191/\u2193 move  \u23ce select  d delete  Ctrl-C cancel"
-    : "\u2191/\u2193 move  \u23ce select  Ctrl-C cancel";
+  return withTTYKeyLoop<PickResult>({
+    fallback,
 
-  // header line + lines per option (2 if subtitle, 1 otherwise) + footer line
-  const linesPerOption = config.options.map((o) => (o.subtitle ? 2 : 1));
-  const pickerHeight = 1 + linesPerOption.reduce((a, b) => a + b, 0) + 1;
+    init(w, cols) {
+      maxW = cols - 1;
+      const footerHint = config.deleteKey
+        ? "\u2191/\u2193 move  \u23ce select  d delete  Ctrl-C cancel"
+        : "\u2191/\u2193 move  \u23ce select  Ctrl-C cancel";
 
-  const render = (first: boolean) => {
-    if (!first) {
-      w(A.up(pickerHeight) + A.col1 + A.clearBelow);
-    }
-    w(`${A.bold}${A.cyan}? ${trunc(config.message, maxW - 2)}${A.reset}\r\n`);
-    for (let i = 0; i < config.options.length; i++) {
-      const opt = config.options[i];
-      if (i === selected) {
-        const label = trunc(opt.label, maxW - 2);
-        w(`${A.green}${A.bold}> ${label}${A.reset}`);
-        if (!opt.subtitle && opt.hint) {
-          const remaining = maxW - 2 - label.length - 2;
-          if (remaining > 3) {
-            w(`  ${A.dim}${trunc(opt.hint, remaining)}${A.reset}`);
+      const linesPerOption = config.options.map((o) => (o.subtitle ? 2 : 1));
+      pickerHeight = 1 + linesPerOption.reduce((a, b) => a + b, 0) + 1;
+
+      render = (wr: WriteFn, first: boolean) => {
+        if (!first) {
+          wr(A.up(pickerHeight) + A.col1 + A.clearBelow);
+        }
+        wr(`${A.bold}${A.cyan}? ${trunc(config.message, maxW - 2)}${A.reset}\r\n`);
+        for (let i = 0; i < config.options.length; i++) {
+          const opt = config.options[i];
+          if (i === selected) {
+            const label = trunc(opt.label, maxW - 2);
+            wr(`${A.green}${A.bold}> ${label}${A.reset}`);
+            if (!opt.subtitle && opt.hint) {
+              const remaining = maxW - 2 - label.length - 2;
+              if (remaining > 3) {
+                wr(`  ${A.dim}${trunc(opt.hint, remaining)}${A.reset}`);
+              }
+            }
+            wr("\r\n");
+            if (opt.subtitle) {
+              wr(`  ${A.dim}${trunc(opt.subtitle, maxW - 2)}${A.reset}\r\n`);
+            }
+          } else {
+            wr(`  ${A.dim}${trunc(opt.label, maxW - 2)}${A.reset}\r\n`);
+            if (opt.subtitle) {
+              wr(`  ${A.dim}${trunc(opt.subtitle, maxW - 2)}${A.reset}\r\n`);
+            }
           }
         }
-        w("\r\n");
-        if (opt.subtitle) {
-          w(`  ${A.dim}${trunc(opt.subtitle, maxW - 2)}${A.reset}\r\n`);
-        }
-      } else {
-        w(`  ${A.dim}${trunc(opt.label, maxW - 2)}${A.reset}\r\n`);
-        if (opt.subtitle) {
-          w(`  ${A.dim}${trunc(opt.subtitle, maxW - 2)}${A.reset}\r\n`);
-        }
-      }
-    }
-    w(`${A.dim}  ${trunc(footerHint, maxW - 2)}${A.reset}\r\n`);
-  };
+        wr(`${A.dim}  ${trunc(footerHint, maxW - 2)}${A.reset}\r\n`);
+      };
 
-  // ── render & key loop ─────────────────────────────────────────────────────
-  w(A.hideC);
-  render(true);
+      render(w, true);
+    },
 
-  const buf = Buffer.alloc(8);
-  let result: PickResult = cancel;
-
-  try {
-    outer: while (true) {
-      let n: number;
-      try {
-        n = fs.readSync(ttyFd, buf, 0, 8, null);
-      } catch {
-        break;
-      }
-      if (n === 0) {
-        continue;
-      }
-
-      const key = buf.slice(0, n).toString("binary");
-
+    handleKey(key, w) {
       switch (key) {
-        // ── cancel ─────────────────────────────────────────────────────────
-        case "\x03": // Ctrl-C
-        case "\x1b": // standalone Escape
-          break outer;
-
-        // ── confirm ────────────────────────────────────────────────────────
         case "\r":
         case "\n": {
-          result = {
+          const result: PickResult = {
             action: "select",
             value: config.options[selected].value,
             index: selected,
           };
-          // Replace picker with a one-line confirmation
           w(A.up(pickerHeight) + A.col1 + A.clearBelow);
           const opt = config.options[selected];
           w(
             `${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${trunc(opt.label, maxW - config.message.length - 4)}${A.reset}\r\n`,
           );
-          break outer;
+          return {
+            done: true,
+            result,
+          };
         }
 
-        // ── delete ───────────────────────────────────────────────────────
         case "d":
           if (config.deleteKey) {
-            result = {
+            const result: PickResult = {
               action: "delete",
               value: config.options[selected].value,
               index: selected,
             };
             w(A.up(pickerHeight) + A.col1 + A.clearBelow);
-            break outer;
+            return {
+              done: true,
+              result,
+            };
           }
-          break;
+          return {
+            done: false,
+          };
 
-        // ── navigation ─────────────────────────────────────────────────────
-        case "\x1b[A": // Up (CSI)
-        case "\x1bOA": // Up (SS3, some terminals)
-        case "k": // vim-style
+        case "\x1b[A":
+        case "\x1bOA":
+        case "k":
           selected = (selected - 1 + config.options.length) % config.options.length;
-          render(false);
-          break;
+          render(w, false);
+          return {
+            done: false,
+          };
 
-        case "\x1b[B": // Down (CSI)
-        case "\x1bOB": // Down (SS3)
-        case "j": // vim-style
+        case "\x1b[B":
+        case "\x1bOB":
+        case "j":
           selected = (selected + 1) % config.options.length;
-          render(false);
-          break;
+          render(w, false);
+          return {
+            done: false,
+          };
 
         default:
-          break;
+          return {
+            done: false,
+          };
       }
-    }
-  } finally {
-    restore();
-  }
-
-  return result;
+    },
+  });
 }
 
 // ── TTY multi-select picker ──────────────────────────────────────────────────
@@ -409,204 +451,116 @@ export function multiPickToTTY(config: MultiPickConfig): string[] | null {
     return [];
   }
 
-  // ── open /dev/tty ──────────────────────────────────────────────────────────
-  let ttyFd: number;
-  try {
-    ttyFd = fs.openSync("/dev/tty", "r+");
-  } catch {
-    // No TTY available — return all options as selected (non-interactive fallback)
-    return config.options.filter((o) => o.selected !== false).map((o) => o.value);
-  }
+  const multiFallback = (): string[] | null => config.options.filter((o) => o.selected !== false).map((o) => o.value);
 
-  // ── save terminal settings ────────────────────────────────────────────────
-  const savedRes = spawnSync(
-    "stty",
-    [
-      "-g",
-    ],
-    {
-      stdio: [
-        ttyFd,
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  if (savedRes.status !== 0 || !savedRes.stdout) {
-    fs.closeSync(ttyFd);
-    return config.options.filter((o) => o.selected !== false).map((o) => o.value);
-  }
-  const savedSettings = savedRes.stdout.toString().trim();
-
-  // ── enable raw / no-echo mode ─────────────────────────────────────────────
-  const rawRes = spawnSync(
-    "stty",
-    [
-      "raw",
-      "-echo",
-    ],
-    {
-      stdio: [
-        ttyFd,
-        "pipe",
-        "pipe",
-      ],
-    },
-  );
-  if (rawRes.status !== 0) {
-    fs.closeSync(ttyFd);
-    return config.options.filter((o) => o.selected !== false).map((o) => o.value);
-  }
-
-  // ── helpers ───────────────────────────────────────────────────────────────
-  const w = (s: string) => {
-    try {
-      fs.writeSync(ttyFd, s);
-    } catch {}
-  };
-
-  const restore = () => {
-    try {
-      spawnSync(
-        "stty",
-        [
-          savedSettings,
-        ],
-        {
-          stdio: [
-            ttyFd,
-            "pipe",
-            "pipe",
-          ],
-        },
-      );
-    } catch {}
-    w(A.showC);
-    try {
-      fs.closeSync(ttyFd);
-    } catch {}
-  };
-
-  // ── initial state ─────────────────────────────────────────────────────────
   let cursor = 0;
   const checked: boolean[] = config.options.map((o) => o.selected !== false);
 
-  const cols = getTTYCols(ttyFd);
-  const maxW = cols - 1;
-  const footerHint = "\u2191/\u2193 move  space toggle  \u23ce confirm  Ctrl-C cancel";
-  const pickerHeight = 1 + config.options.length + 1; // header + options + footer
+  let maxW = 80;
+  let pickerHeight = 0;
+  let render: (w: WriteFn, first: boolean) => void;
 
-  const render = (first: boolean) => {
-    if (!first) {
-      w(A.up(pickerHeight) + A.col1 + A.clearBelow);
-    }
-    w(`${A.bold}${A.cyan}? ${trunc(config.message, maxW - 2)}${A.reset}\r\n`);
-    for (let i = 0; i < config.options.length; i++) {
-      const opt = config.options[i];
-      const box = checked[i] ? "\u25a0" : "\u25a1"; // ■ / □
-      if (i === cursor) {
-        const label = trunc(opt.label, maxW - 6);
-        w(`${A.green}${A.bold}> ${box} ${label}${A.reset}`);
-        if (opt.hint) {
-          const remaining = maxW - 6 - label.length - 2;
-          if (remaining > 3) {
-            w(`  ${A.dim}${trunc(opt.hint, remaining)}${A.reset}`);
-          }
+  return withTTYKeyLoop<string[] | null>({
+    fallback: multiFallback,
+
+    init(w, cols) {
+      maxW = cols - 1;
+      const footerHint = "\u2191/\u2193 move  space toggle  \u23ce confirm  Ctrl-C cancel";
+      pickerHeight = 1 + config.options.length + 1;
+
+      render = (wr: WriteFn, first: boolean) => {
+        if (!first) {
+          wr(A.up(pickerHeight) + A.col1 + A.clearBelow);
         }
-      } else {
-        w(`  ${A.dim}${box} ${trunc(opt.label, maxW - 4)}${A.reset}`);
-      }
-      w("\r\n");
-    }
-    w(`${A.dim}  ${trunc(footerHint, maxW - 2)}${A.reset}\r\n`);
-  };
+        wr(`${A.bold}${A.cyan}? ${trunc(config.message, maxW - 2)}${A.reset}\r\n`);
+        for (let i = 0; i < config.options.length; i++) {
+          const opt = config.options[i];
+          const box = checked[i] ? "\u25a0" : "\u25a1";
+          if (i === cursor) {
+            const label = trunc(opt.label, maxW - 6);
+            wr(`${A.green}${A.bold}> ${box} ${label}${A.reset}`);
+            if (opt.hint) {
+              const remaining = maxW - 6 - label.length - 2;
+              if (remaining > 3) {
+                wr(`  ${A.dim}${trunc(opt.hint, remaining)}${A.reset}`);
+              }
+            }
+          } else {
+            wr(`  ${A.dim}${box} ${trunc(opt.label, maxW - 4)}${A.reset}`);
+          }
+          wr("\r\n");
+        }
+        wr(`${A.dim}  ${trunc(footerHint, maxW - 2)}${A.reset}\r\n`);
+      };
 
-  // ── render & key loop ─────────────────────────────────────────────────────
-  w(A.hideC);
-  render(true);
+      render(w, true);
+    },
 
-  const buf = Buffer.alloc(8);
-  let result: string[] | null = null;
-
-  try {
-    outer: while (true) {
-      let n: number;
-      try {
-        n = fs.readSync(ttyFd, buf, 0, 8, null);
-      } catch {
-        break;
-      }
-      if (n === 0) {
-        continue;
-      }
-
-      const key = buf.slice(0, n).toString("binary");
-
+    handleKey(key, w) {
       switch (key) {
-        // ── cancel ─────────────────────────────────────────────────────────
-        case "\x03": // Ctrl-C
-        case "\x1b": // standalone Escape
-          break outer;
-
-        // ── confirm ────────────────────────────────────────────────────────
         case "\r":
         case "\n": {
           const selected = config.options.filter((_, i) => checked[i]).map((o) => o.value);
           const minRequired = config.minRequired ?? 1;
           if (selected.length < minRequired) {
-            // Flash: don't accept, keep looping
-            break;
+            return {
+              done: false,
+            };
           }
-          result = selected;
-          // Replace picker with a one-line confirmation
           w(A.up(pickerHeight) + A.col1 + A.clearBelow);
           const summary = selected.length === config.options.length ? "all" : selected.join(", ");
           w(
             `${A.green}${A.bold}> ${config.message}:${A.reset} ${A.cyan}${trunc(summary, maxW - config.message.length - 4)}${A.reset}\r\n`,
           );
-          break outer;
+          return {
+            done: true,
+            result: selected,
+          };
         }
 
-        // ── toggle ─────────────────────────────────────────────────────────
         case " ":
           checked[cursor] = !checked[cursor];
-          render(false);
-          break;
+          render(w, false);
+          return {
+            done: false,
+          };
 
-        // ── select/deselect all ────────────────────────────────────────────
         case "a": {
           const allChecked = checked.every((c) => c);
           for (let i = 0; i < checked.length; i++) {
             checked[i] = !allChecked;
           }
-          render(false);
-          break;
+          render(w, false);
+          return {
+            done: false,
+          };
         }
 
-        // ── navigation ─────────────────────────────────────────────────────
-        case "\x1b[A": // Up (CSI)
-        case "\x1bOA": // Up (SS3)
-        case "k": // vim-style
+        case "\x1b[A":
+        case "\x1bOA":
+        case "k":
           cursor = (cursor - 1 + config.options.length) % config.options.length;
-          render(false);
-          break;
+          render(w, false);
+          return {
+            done: false,
+          };
 
-        case "\x1b[B": // Down (CSI)
-        case "\x1bOB": // Down (SS3)
-        case "j": // vim-style
+        case "\x1b[B":
+        case "\x1bOB":
+        case "j":
           cursor = (cursor + 1) % config.options.length;
-          render(false);
-          break;
+          render(w, false);
+          return {
+            done: false,
+          };
 
         default:
-          break;
+          return {
+            done: false,
+          };
       }
-    }
-  } finally {
-    restore();
-  }
-
-  return result;
+    },
+  });
 }
 
 // ── fallback picker ───────────────────────────────────────────────────────────

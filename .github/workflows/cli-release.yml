@@ -66,7 +66,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Upload each cloud bundle as a separate release (fly-latest/fly.js, etc.)
+          # Upload each cloud bundle as a separate release (aws-latest/aws.js, etc.)
           for bundle in packages/cli/*.js; do
             name=$(basename "$bundle" .js)
             [[ "$name" == "cli" ]] && continue  # skip cli.js, already uploaded above

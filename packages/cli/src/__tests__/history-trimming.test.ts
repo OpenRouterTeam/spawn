@@ -14,8 +14,6 @@ import { loadHistory, saveSpawnRecord, filterHistory } from "../history.js";
  * recent entries and not lose data prematurely.
  *
  * Also tests filterHistory ordering guarantees (reverse chronological).
- *
- * Agent: test-engineer
  */
 
 describe("History Trimming and Boundaries", () => {

@@ -25,8 +25,6 @@ import { createConsoleMocks, restoreMocks } from "./test-helpers";
  * - cmdAgents: agent keys, display names, implementation counts, footer hint
  * - cmdClouds: cloud keys, display names, type grouping, auth hints, footer
  * - Edge cases: empty manifest, single entry, all implemented, none implemented
- *
- * Agent: test-engineer
  */
 
 // ── Mock manifests ──────────────────────────────────────────────────────────
@@ -744,9 +742,8 @@ describe("cmdClouds output", () => {
       // Find lines containing "Local Machine" and check they don't have auth: none
       const lines = output.split("\n");
       const localLine = lines.find((l) => l.includes("Local Machine"));
-      if (localLine) {
-        expect(localLine).not.toContain("auth:");
-      }
+      expect(localLine).toBeDefined();
+      expect(localLine).not.toContain("auth:");
     });
   });
 

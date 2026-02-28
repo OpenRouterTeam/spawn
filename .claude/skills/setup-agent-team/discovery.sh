@@ -46,6 +46,13 @@ safe_substitute() {
     rm -f "${file}.bak"
 }
 
+# --- Validate branch name against safe pattern (defense-in-depth) ---
+# Prevents command injection via shell metacharacters in branch names
+is_safe_branch_name() {
+    local name="${1:-}"
+    [[ -n "${name}" ]] && [[ "${name}" =~ ^[a-zA-Z0-9._/-]+$ ]]
+}
+
 # --- Safe rm -rf for worktree paths (defense-in-depth) ---
 safe_rm_worktree() {
     local target="${1:-}"
@@ -129,8 +136,10 @@ _cleanup_stale_artifacts() {
     local MERGED_BRANCHES
     MERGED_BRANCHES=$(git branch -r --merged origin/main | grep -v 'origin/main\|origin/HEAD' | grep -E 'origin/(add-|impl-|gap-filler-)' | sed 's|origin/||' | tr -d ' ') || true
     for branch in $MERGED_BRANCHES; do
-        if [[ -n "$branch" ]]; then
-            git push origin --delete "$branch" 2>&1 && log_info "Deleted merged branch: $branch" || true
+        if is_safe_branch_name "$branch"; then
+            git push origin --delete -- "$branch" 2>&1 && log_info "Deleted merged branch: $branch" || true
+        else
+            log_warn "Skipping branch with unsafe name: ${branch}"
         fi
     done
 
@@ -248,7 +257,15 @@ cleanup_between_cycles() {
     git pull --rebase origin main 2>/dev/null || true
     git worktree prune 2>/dev/null || true
     safe_rm_worktree "${WORKTREE_BASE}"
-    git branch --merged main | grep -v 'main' | grep -v '^\*' | xargs -r git branch -d 2>/dev/null || true
+    local LOCAL_MERGED
+    LOCAL_MERGED=$(git branch --merged main | grep -v 'main' | grep -v '^\*' | tr -d ' ') || true
+    for branch in $LOCAL_MERGED; do
+        if is_safe_branch_name "$branch"; then
+            git branch -d -- "$branch" 2>/dev/null || true
+        else
+            log_warn "Skipping local branch with unsafe name: ${branch}"
+        fi
+    done
     log_info "Cleanup complete"
 }
 

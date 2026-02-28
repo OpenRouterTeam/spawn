@@ -18,8 +18,6 @@ import type { Manifest } from "../manifest";
  *
  * This function is called in cmdRun (commands.ts:396-397) for both agent
  * and cloud validation, making it critical for the run pipeline.
- *
- * Agent: test-engineer
  */
 
 // ── Test Fixtures ──────────────────────────────────────────────────────────

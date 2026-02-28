@@ -3,8 +3,9 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import * as v from "valibot";
 import { parseJsonWith, isString } from "@openrouter/spawn-shared";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
+import { homedir } from "node:os";
 import * as path from "node:path";
 import type { Manifest } from "./manifest.js";
 import {
@@ -27,6 +28,7 @@ import {
   validateUsername,
   validateServerIdentifier,
   validateMetadataValue,
+  validateLaunchCmd,
 } from "./security.js";
 import type { SpawnRecord, VMConnection } from "./history.js";
 import {
@@ -39,7 +41,6 @@ import {
   getHistoryPath,
 } from "./history.js";
 import { buildDashboardHint, EXIT_CODE_GUIDANCE, SIGNAL_GUIDANCE } from "./guidance-data.js";
-import { destroyServer as flyDestroyServer, ensureFlyCli, ensureFlyToken } from "./fly/fly.js";
 import { destroyServer as hetznerDestroyServer, ensureHcloudToken } from "./hetzner/hetzner.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "./digitalocean/digitalocean.js";
 import {
@@ -424,7 +425,6 @@ const CLOUD_CLI_MAP: Record<string, string> = {
   gcp: "gcloud",
   aws: "aws",
 
-  fly: "flyctl",
   sprite: "sprite",
   hetzner: "hcloud",
   digitalocean: "doctl",
@@ -896,7 +896,7 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
 /** Check if credentials are saved in ~/.config/spawn/{cloud}.json */
 function hasCloudConfigCredentials(cloud: string): boolean {
   try {
-    const configPath = path.join(process.env.HOME || "", ".config/spawn", `${cloud}.json`);
+    const configPath = path.join(process.env.HOME || homedir(), ".config/spawn", `${cloud}.json`);
     if (!fs.existsSync(configPath)) {
       return false;
     }
@@ -1200,42 +1200,74 @@ export async function cmdRunHeadless(agent: string, cloud: string, opts: Headles
     }
   }
 
-  // Phase 2: Download script (exit code 2)
-  const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
-  const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
-
+  // Phase 2: Load script — prefer local source when SPAWN_CLI_DIR is set (exit code 2)
   let scriptContent: string;
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT),
-    });
-    if (res.ok) {
-      scriptContent = await res.text();
-    } else {
-      const ghRes = await fetch(ghUrl, {
+  const cliDir = process.env.SPAWN_CLI_DIR;
+  let localScriptResolved = "";
+
+  if (cliDir) {
+    // Reject cloud/agent names containing path traversal characters
+    const hasBadChars = (s: string) => s.includes("..") || s.includes("/") || s.includes("\\");
+    const safeCloud = !hasBadChars(resolvedCloud);
+    const safeAgent = !hasBadChars(resolvedAgent);
+
+    if (safeCloud && safeAgent) {
+      const resolvedCliDir = path.resolve(cliDir);
+      const candidatePath = path.join(resolvedCliDir, "sh", resolvedCloud, `${resolvedAgent}.sh`);
+      try {
+        const canonicalPath = fs.realpathSync(candidatePath);
+        // Ensure the resolved path stays inside the CLI dir (no path traversal)
+        const prefix = resolvedCliDir.endsWith(path.sep) ? resolvedCliDir : resolvedCliDir + path.sep;
+        if (canonicalPath.startsWith(prefix)) {
+          localScriptResolved = canonicalPath;
+        }
+      } catch {
+        // File doesn't exist — fall through to remote fetch
+      }
+    }
+  }
+
+  if (localScriptResolved) {
+    scriptContent = fs.readFileSync(localScriptResolved, "utf-8");
+    if (debug) {
+      console.error(`[headless] Using local script: ${localScriptResolved}`);
+    }
+  } else {
+    const url = `https://openrouter.ai/labs/spawn/${resolvedCloud}/${resolvedAgent}.sh`;
+    const ghUrl = `${RAW_BASE}/sh/${resolvedCloud}/${resolvedAgent}.sh`;
+
+    try {
+      const res = await fetch(url, {
         signal: AbortSignal.timeout(FETCH_TIMEOUT),
       });
-      if (!ghRes.ok) {
-        headlessError(
-          resolvedAgent,
-          resolvedCloud,
-          "DOWNLOAD_ERROR",
-          `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
-          outputFormat,
-          2,
-        );
+      if (res.ok) {
+        scriptContent = await res.text();
+      } else {
+        const ghRes = await fetch(ghUrl, {
+          signal: AbortSignal.timeout(FETCH_TIMEOUT),
+        });
+        if (!ghRes.ok) {
+          headlessError(
+            resolvedAgent,
+            resolvedCloud,
+            "DOWNLOAD_ERROR",
+            `Script not found (HTTP ${res.status} primary, ${ghRes.status} fallback)`,
+            outputFormat,
+            2,
+          );
+        }
+        scriptContent = await ghRes.text();
       }
-      scriptContent = await ghRes.text();
+    } catch (err) {
+      headlessError(
+        resolvedAgent,
+        resolvedCloud,
+        "DOWNLOAD_ERROR",
+        `Failed to download script: ${getErrorMessage(err)}`,
+        outputFormat,
+        2,
+      );
     }
-  } catch (err) {
-    headlessError(
-      resolvedAgent,
-      resolvedCloud,
-      "DOWNLOAD_ERROR",
-      `Failed to download script: ${getErrorMessage(err)}`,
-      outputFormat,
-      2,
-    );
   }
 
   // Phase 3: Execute script (exit code 1)
@@ -2031,29 +2063,6 @@ export function formatRelativeTime(iso: string): string {
   }
 }
 
-export function formatTimestamp(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      return iso;
-    }
-    const date = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    const time = d.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    return `${date} ${time}`;
-  } catch (_err) {
-    // Invalid date format - return as-is
-    return iso;
-  }
-}
-
 async function suggestFilterCorrection(
   filter: string,
   flag: string,
@@ -2290,13 +2299,6 @@ async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
   };
 
   switch (conn.cloud) {
-    case "fly":
-      return tryDelete(async () => {
-        await ensureFlyCli();
-        await ensureFlyToken();
-        await flyDestroyServer(id);
-      });
-
     case "hetzner":
       return tryDelete(async () => {
         await ensureHcloudToken();
@@ -2436,11 +2438,9 @@ async function handleRecordAction(selected: SpawnRecord, manifest: Manifest | nu
       hint:
         conn.ip === "sprite-console"
           ? `sprite console -s ${conn.server_name}`
-          : conn.ip === "fly-ssh"
-            ? `fly ssh console -a ${conn.server_name}`
-            : conn.ip === "daytona-sandbox"
-              ? `daytona ssh ${conn.server_id}`
-              : `ssh ${conn.user}@${conn.ip}`,
+          : conn.ip === "daytona-sandbox"
+            ? `daytona ssh ${conn.server_id}`
+            : `ssh ${conn.user}@${conn.ip}`,
     });
   }
 
@@ -2644,7 +2644,7 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
           ),
         );
         p.log.info(
-          `Re-launch with ${pc.cyan("spawn <agent> <cloud>")} or view history with ${pc.cyan("spawn list --non-interactive")}`,
+          `Re-launch with ${pc.cyan("spawn <agent> <cloud>")} or view full history with ${pc.cyan("spawn list | cat")}`,
         );
       } else {
         await showEmptyListMessage(agentFilter, cloudFilter);
@@ -2668,6 +2668,10 @@ export async function cmdList(agentFilter?: string, cloudFilter?: string): Promi
 }
 
 export async function cmdDelete(agentFilter?: string, cloudFilter?: string): Promise<void> {
+  const resolved = await resolveListFilters(agentFilter, cloudFilter);
+  agentFilter = resolved.agentFilter;
+  cloudFilter = resolved.cloudFilter;
+
   const servers = getActiveServers();
 
   let filtered = servers;
@@ -2797,20 +2801,17 @@ async function cmdConnect(connection: VMConnection): Promise<void> {
     );
   }
 
-  // Handle Fly.io SSH connections (uses flyctl, not direct SSH)
-  if (connection.ip === "fly-ssh" && connection.server_name) {
-    p.log.step(`Connecting to Fly.io app ${pc.bold(connection.server_name)}...`);
+  // Handle Daytona sandbox connections
+  if (connection.ip === "daytona-sandbox" && connection.server_id) {
+    p.log.step(`Connecting to Daytona sandbox ${pc.bold(connection.server_id)}...`);
     return runInteractiveCommand(
-      "fly",
+      "daytona",
       [
         "ssh",
-        "console",
-        "-a",
-        connection.server_name,
-        "--pty",
+        connection.server_id,
       ],
-      "Fly.io SSH connection failed",
-      `fly ssh console -a ${connection.server_name}`,
+      "Daytona sandbox connection failed",
+      `daytona ssh ${connection.server_id}`,
     );
   }
 
@@ -2841,6 +2842,9 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
     if (connection.server_id) {
       validateServerIdentifier(connection.server_id);
     }
+    if (connection.launch_cmd) {
+      validateLaunchCmd(connection.launch_cmd);
+    }
   } catch (err) {
     p.log.error(`Security validation failed: ${getErrorMessage(err)}`);
     p.log.info("Your spawn history file may be corrupted or tampered with.");
@@ -2868,7 +2872,13 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
       parts.push(preLaunch);
     }
     parts.push(launchCmd);
-    remoteCmd = parts.join("; ");
+    remoteCmd = parts.reduce((acc, part) => {
+      if (!acc) {
+        return part;
+      }
+      const sep = acc.trimEnd().endsWith("&") ? " " : "; ";
+      return acc + sep + part;
+    }, "");
   }
 
   const agentName = agentDef?.name || agentKey;
@@ -2889,30 +2899,6 @@ async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifes
       ],
       `Failed to enter ${agentName}`,
       `sprite console -s ${connection.server_name} -- bash -lc '${remoteCmd}'`,
-    );
-  }
-
-  // Handle Fly.io SSH connections
-  if (connection.ip === "fly-ssh" && connection.server_name) {
-    p.log.step(`Entering ${pc.bold(agentName)} on Fly.io app ${pc.bold(connection.server_name)}...`);
-    // Wrap in bash -c to ensure shell builtins (source, export) and operators (;) are
-    // interpreted correctly — fly ssh console -C exec's the command directly without a
-    // shell, so semicolons and builtins would fail without this wrapper.
-    // This matches how interactiveSession() and runServer() handle fly commands.
-    const escapedCmd = remoteCmd.replace(/'/g, "'\\''");
-    return runInteractiveCommand(
-      "fly",
-      [
-        "ssh",
-        "console",
-        "-a",
-        connection.server_name,
-        "--pty",
-        "-C",
-        `bash -c '${escapedCmd}'`,
-      ],
-      `Failed to enter ${agentName}`,
-      `fly ssh console -a ${connection.server_name} --pty -C 'bash -c ${escapedCmd}'`,
     );
   }
 
@@ -3371,7 +3357,7 @@ function getHelpExamplesSection(): string {
   spawn claude sprite --prompt "Fix all linter errors"
                                      ${pc.dim("# Execute Claude with prompt and exit")}
   spawn codex sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
-  spawn openclaw fly -f instructions.txt
+  spawn openclaw aws -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
   spawn opencode gcp --dry-run       ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}

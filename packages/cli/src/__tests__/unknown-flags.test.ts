@@ -19,7 +19,7 @@ describe("Unknown Flag Detection", () => {
       ).toBe("--json");
     });
 
-    it("should detect --verbose as unknown", () => {
+    it("should detect --verbose as unknown (middle position)", () => {
       expect(
         findUnknownFlag([
           "claude",
@@ -47,16 +47,6 @@ describe("Unknown Flag Detection", () => {
       ).toBe("--force");
     });
 
-    it("should detect --verbose as unknown", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "sprite",
-          "--verbose",
-        ]),
-      ).toBe("--verbose");
-    });
-
     it("should detect unknown flag at the beginning", () => {
       expect(
         findUnknownFlag([
@@ -78,159 +68,34 @@ describe("Unknown Flag Detection", () => {
   });
 
   describe("allows known flags", () => {
-    it("should allow --help", () => {
-      expect(
-        findUnknownFlag([
-          "list",
-          "--help",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow -h", () => {
-      expect(
-        findUnknownFlag([
-          "agents",
-          "-h",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --version", () => {
-      expect(
-        findUnknownFlag([
-          "--version",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow -v", () => {
-      expect(
-        findUnknownFlag([
-          "-v",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow -V", () => {
-      expect(
-        findUnknownFlag([
-          "-V",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --prompt (already extracted, but still known)", () => {
-      expect(
-        findUnknownFlag([
-          "--prompt",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow -p", () => {
-      expect(
-        findUnknownFlag([
-          "-p",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --prompt-file", () => {
-      expect(
-        findUnknownFlag([
-          "--prompt-file",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow -f (short form of --prompt-file)", () => {
-      expect(
-        findUnknownFlag([
-          "-f",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --dry-run", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "sprite",
-          "--dry-run",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow -n (short form of --dry-run)", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "sprite",
-          "-n",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --default (used by spawn pick)", () => {
-      expect(
-        findUnknownFlag([
-          "--default",
-          "us-central1-a",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --output", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "sprite",
-          "--output",
-          "json",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --headless", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "sprite",
-          "--headless",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --debug", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "sprite",
-          "--debug",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --name", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "sprite",
-          "--name",
-          "my-box",
-        ]),
-      ).toBeNull();
-    });
-
-    it("should allow --reauth", () => {
-      expect(
-        findUnknownFlag([
-          "claude",
-          "aws",
-          "--reauth",
-        ]),
-      ).toBeNull();
+    it("should return null for all known flags", () => {
+      const knownFlagsToTest = [
+        "--help",
+        "-h",
+        "--version",
+        "-v",
+        "-V",
+        "--prompt",
+        "-p",
+        "--prompt-file",
+        "-f",
+        "--dry-run",
+        "-n",
+        "--default",
+        "--output",
+        "--headless",
+        "--debug",
+        "--name",
+        "--reauth",
+      ];
+      for (const flag of knownFlagsToTest) {
+        expect(
+          findUnknownFlag([
+            flag,
+          ]),
+          `expected ${flag} to be allowed`,
+        ).toBeNull();
+      }
     });
   });
 
@@ -321,10 +186,6 @@ describe("Unknown Flag Detection", () => {
 });
 
 describe("KNOWN_FLAGS completeness", () => {
-  it("should contain --name flag", () => {
-    expect(KNOWN_FLAGS.has("--name")).toBe(true);
-  });
-
   it("should contain all expected flags", () => {
     const expected = [
       "--help",

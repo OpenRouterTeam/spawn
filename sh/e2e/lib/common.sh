@@ -1,17 +1,20 @@
 #!/bin/bash
-# e2e/lib/common.sh — Constants, logging, env validation, Fly API helpers
+# e2e/lib/common.sh — Constants, logging, env validation for multi-cloud E2E
 set -eo pipefail
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-ALL_AGENTS="claude openclaw zeroclaw codex opencode kilocode"
-FLY_API_BASE="https://api.machines.dev/v1"
+ALL_AGENTS="claude openclaw zeroclaw codex opencode kilocode hermes"
 PROVISION_TIMEOUT="${PROVISION_TIMEOUT:-480}"
-INSTALL_WAIT="${INSTALL_WAIT:-120}"
+INSTALL_WAIT="${INSTALL_WAIT:-300}"
 INPUT_TEST_TIMEOUT="${INPUT_TEST_TIMEOUT:-120}"
-FLY_REGION="${FLY_REGION:-iad}"
-FLY_VM_MEMORY="${FLY_VM_MEMORY:-2048}"
+
+# Active cloud (set by load_cloud_driver)
+ACTIVE_CLOUD=""
+
+# Cloud log prefix for multi-cloud parallel output
+CLOUD_LOG_PREFIX=""
 
 # Colors
 RED='\033[0;31m'
@@ -22,47 +25,90 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-# Tracked apps for cleanup on exit
+# Tracked instances for cleanup on exit
 _TRACKED_APPS=""
 
 # ---------------------------------------------------------------------------
-# Logging
+# Logging (with optional cloud prefix for parallel output)
 # ---------------------------------------------------------------------------
 log_header() {
-  printf "\n${BOLD}${BLUE}=== %s ===${NC}\n" "$1"
+  printf "\n${BOLD}${BLUE}%s=== %s ===${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
 }
 
 log_step() {
-  printf "${CYAN}  -> %s${NC}\n" "$1"
+  printf "${CYAN}%s  -> %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
 }
 
 log_ok() {
-  printf "${GREEN}  [PASS] %s${NC}\n" "$1"
+  printf "${GREEN}%s  [PASS] %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
 }
 
 log_err() {
-  printf "${RED}  [FAIL] %s${NC}\n" "$1"
+  printf "${RED}%s  [FAIL] %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
 }
 
 log_warn() {
-  printf "${YELLOW}  [WARN] %s${NC}\n" "$1"
+  printf "${YELLOW}%s  [WARN] %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
 }
 
 log_info() {
-  printf "${BLUE}  [INFO] %s${NC}\n" "$1"
+  printf "${BLUE}%s  [INFO] %s${NC}\n" "${CLOUD_LOG_PREFIX}" "$1"
 }
 
 # ---------------------------------------------------------------------------
-# Environment validation
+# load_cloud_driver CLOUD
+#
+# Sources the cloud-specific driver and creates generic wrappers.
 # ---------------------------------------------------------------------------
-require_env() {
-  local missing=0
+load_cloud_driver() {
+  local cloud="$1"
+  ACTIVE_CLOUD="${cloud}"
 
-  # Check required tools
-  if ! command -v flyctl >/dev/null 2>&1; then
-    log_err "flyctl not found. Install from https://fly.io/docs/flyctl/install/"
-    missing=1
+  # Resolve driver file (relative to this script's location)
+  local driver_dir
+  driver_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/clouds"
+  local driver_file="${driver_dir}/${cloud}.sh"
+
+  if [ ! -f "${driver_file}" ]; then
+    log_err "Cloud driver not found: ${driver_file}"
+    return 1
   fi
+
+  source "${driver_file}"
+
+  # Create generic wrappers that delegate to cloud-specific functions
+  eval "cloud_validate_env() { _${cloud}_validate_env \"\$@\"; }"
+  eval "cloud_headless_env() { _${cloud}_headless_env \"\$@\"; }"
+  eval "cloud_provision_verify() { _${cloud}_provision_verify \"\$@\"; }"
+  eval "cloud_exec() { _${cloud}_exec \"\$@\"; }"
+  eval "cloud_exec_long() { _${cloud}_exec_long \"\$@\"; }"
+  eval "cloud_teardown() { _${cloud}_teardown \"\$@\"; }"
+  eval "cloud_cleanup_stale() { _${cloud}_cleanup_stale \"\$@\"; }"
+
+  # Optional: per-cloud parallelism cap (returns max agents to run concurrently)
+  if type "_${cloud}_max_parallel" >/dev/null 2>&1; then
+    eval "cloud_max_parallel() { _${cloud}_max_parallel \"\$@\"; }"
+  else
+    # Default: no cap (return a large number)
+    eval "cloud_max_parallel() { printf '99'; }"
+  fi
+
+  # Optional: per-cloud install wait override (seconds to poll for .spawnrc)
+  if type "_${cloud}_install_wait" >/dev/null 2>&1; then
+    eval "cloud_install_wait() { _${cloud}_install_wait \"\$@\"; }"
+  else
+    eval "cloud_install_wait() { printf '%s' \"\${INSTALL_WAIT}\"; }"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# require_common_env
+#
+# Validates tools and env vars common to ALL clouds (bun, jq, OPENROUTER_API_KEY).
+# Cloud-specific validation is handled by cloud_validate_env().
+# ---------------------------------------------------------------------------
+require_common_env() {
+  local missing=0
 
   if ! command -v jq >/dev/null 2>&1; then
     log_err "jq not found. Install via: brew install jq / apt install jq"
@@ -74,73 +120,34 @@ require_env() {
     missing=1
   fi
 
-  # Check OPENROUTER_API_KEY
   if [ -z "${OPENROUTER_API_KEY:-}" ]; then
     log_err "OPENROUTER_API_KEY is not set"
     missing=1
-  fi
-
-  # Check / generate FLY_API_TOKEN
-  if [ -z "${FLY_API_TOKEN:-}" ]; then
-    log_info "FLY_API_TOKEN not set, generating via flyctl..."
-    FLY_API_TOKEN=$(flyctl tokens create org personal --expiry 8h 2>/dev/null || true)
-    if [ -z "${FLY_API_TOKEN:-}" ]; then
-      log_warn "Could not generate token. Falling back to flyctl stored credentials."
-      # Validate flyctl is authenticated
-      if ! flyctl auth whoami >/dev/null 2>&1; then
-        log_err "flyctl is not authenticated. Run: flyctl auth login"
-        missing=1
-      fi
-    else
-      export FLY_API_TOKEN
-      log_ok "Generated FLY_API_TOKEN (expires in 8h)"
-    fi
   fi
 
   if [ "${missing}" -eq 1 ]; then
     return 1
   fi
 
-  log_ok "Environment validated"
   return 0
 }
 
 # ---------------------------------------------------------------------------
-# Fly API helper
+# require_env
+#
+# Validates common env + active cloud-specific env.
 # ---------------------------------------------------------------------------
-# fly_api METHOD ENDPOINT [BODY]
-# Calls the Fly Machines REST API.
-fly_api() {
-  local method="$1"
-  local endpoint="$2"
-  local body="${3:-}"
-  local url="${FLY_API_BASE}${endpoint}"
-  local auth_header
-
-  # Detect token format for auth header
-  local token="${FLY_API_TOKEN:-}"
-  if [ -z "${token}" ]; then
-    # If no token, try to get one from flyctl
-    token=$(flyctl auth token 2>/dev/null || true)
-  fi
-
-  if [ -z "${token}" ]; then
-    log_err "No Fly API token available"
+require_env() {
+  if ! require_common_env; then
     return 1
   fi
 
-  # FlyV1 tokens start with FlyV1, otherwise use Bearer
-  case "${token}" in
-    FlyV1\ *) auth_header="Authorization: ${token}" ;;
-    *)        auth_header="Authorization: Bearer ${token}" ;;
-  esac
-
-  local curl_args=("-s" "-X" "${method}" "-H" "${auth_header}" "-H" "Content-Type: application/json")
-  if [ -n "${body}" ]; then
-    curl_args+=("-d" "${body}")
+  if ! cloud_validate_env; then
+    return 1
   fi
 
-  curl "${curl_args[@]}" "${url}"
+  log_ok "Environment validated"
+  return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -150,7 +157,12 @@ make_app_name() {
   local agent="$1"
   local ts
   ts=$(date +%s)
-  printf "e2e-%s-%s" "${agent}" "${ts}"
+  # Include ACTIVE_CLOUD to avoid name collisions in multi-cloud parallel runs
+  if [ -n "${ACTIVE_CLOUD:-}" ]; then
+    printf "e2e-%s-%s-%s" "${ACTIVE_CLOUD}" "${agent}" "${ts}"
+  else
+    printf "e2e-%s-%s" "${agent}" "${ts}"
+  fi
 }
 
 format_duration() {
