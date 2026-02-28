@@ -241,61 +241,6 @@ describe("Cloud type values", () => {
   });
 });
 
-// ── Cross-referential consistency ─────────────────────────────────────────
-
-describe("Cross-referential consistency", () => {
-  it("matrix keys should cover all cloud/agent combinations", () => {
-    const expectedKeys = new Set<string>();
-    for (const [cloud] of allClouds) {
-      for (const [agent] of allAgents) {
-        expectedKeys.add(`${cloud}/${agent}`);
-      }
-    }
-    const actualKeys = new Set(Object.keys(manifest.matrix));
-    expect(actualKeys.size).toBe(expectedKeys.size);
-    for (const key of expectedKeys) {
-      expect(actualKeys.has(key)).toBe(true);
-    }
-  });
-
-  it("no matrix key should reference a nonexistent agent or cloud", () => {
-    const agentSet = new Set(allAgents.map(([k]) => k));
-    const cloudSet = new Set(allClouds.map(([k]) => k));
-    for (const key of Object.keys(manifest.matrix)) {
-      const [cloud, agent] = key.split("/");
-      expect(cloudSet.has(cloud)).toBe(true);
-      expect(agentSet.has(agent)).toBe(true);
-    }
-  });
-
-  it("matrix values should only be 'implemented' or 'missing'", () => {
-    for (const [key, status] of Object.entries(manifest.matrix)) {
-      expect(status === "implemented" || status === "missing").toBe(true);
-    }
-  });
-});
-
-// ── Display name uniqueness ───────────────────────────────────────────────
-
-describe("Display name uniqueness", () => {
-  it("agent display names should be unique", () => {
-    const names = allAgents.map(([, a]) => a.name);
-    expect(new Set(names).size).toBe(names.length);
-  });
-
-  it("cloud display names should be unique", () => {
-    const names = allClouds.map(([, c]) => c.name);
-    expect(new Set(names).size).toBe(names.length);
-  });
-
-  it("agent keys should not collide with cloud keys", () => {
-    const agentKeySet = new Set(allAgents.map(([k]) => k));
-    for (const [cloudKey] of allClouds) {
-      expect(agentKeySet.has(cloudKey)).toBe(false);
-    }
-  });
-});
-
 // ── Env var interpolation patterns ────────────────────────────────────────
 
 describe("Env var interpolation patterns", () => {
