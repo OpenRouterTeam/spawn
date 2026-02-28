@@ -5,7 +5,7 @@ import type { SectionBlock, ContextBlock, KnownBlock } from "@slack/bolt";
 import { App } from "@slack/bolt";
 import * as v from "valibot";
 import { toRecord, isString } from "@openrouter/spawn-shared";
-import type { State } from "./helpers";
+import type { State, ToolCall } from "./helpers";
 import {
   ResultSchema,
   loadState,
@@ -16,6 +16,8 @@ import {
   stripMention,
   downloadSlackFile,
   runCleanupIfDue,
+  formatToolStats,
+  formatToolHistory,
 } from "./helpers";
 
 type SlackClient = InstanceType<typeof App>["client"];
@@ -99,8 +101,16 @@ When creating issues, include a footer: "_Filed from Slack by SPA_"
 
 Below is the full Slack thread. The most recent message is the one you should respond to. Prior messages are context.`;
 
+/** Slack attachment shape (secondary content below blocks). */
+interface SlackAttachment {
+  color?: string;
+  text: string;
+  mrkdwn_in?: string[];
+}
+
 /**
  * Post a new message or update an existing one. Returns the message timestamp.
+ * Optional `attachments` adds expandable secondary content below blocks.
  */
 async function postOrUpdate(
   client: SlackClient,
@@ -109,6 +119,7 @@ async function postOrUpdate(
   existingTs: string | undefined,
   fallback: string,
   blocks: KnownBlock[],
+  attachments?: SlackAttachment[],
 ): Promise<string | undefined> {
   if (!existingTs) {
     const msg = await client.chat
@@ -117,6 +128,7 @@ async function postOrUpdate(
         thread_ts: threadTs,
         text: fallback,
         blocks,
+        attachments,
       })
       .catch(() => null);
     return msg?.ts;
@@ -127,6 +139,7 @@ async function postOrUpdate(
       ts: existingTs,
       text: fallback,
       blocks,
+      attachments: attachments ?? [],
     })
     .catch(() => {});
   return existingTs;
@@ -209,17 +222,34 @@ async function buildThreadPrompt(client: SlackClient, channel: string, threadTs:
 
 // ─── Block Kit message builder ─────────────────────────────────────────────
 
-interface ToolEntry {
-  name: string;
-  errored?: boolean;
-}
-
 const MAX_SECTION_LEN = 2900; // Slack section block text limit is 3000
 
-/** Build Block Kit blocks: section(text) + context(tools + loading). */
-function buildBlocks(mainText: string, tools: ToolEntry[], loading: boolean): KnownBlock[] {
-  const blocks: KnownBlock[] = [];
+interface BuildBlocksInput {
+  mainText: string;
+  currentTool: ToolCall | null;
+  toolCounts: ReadonlyMap<string, number>;
+  toolHistory: readonly ToolCall[];
+  loading: boolean;
+}
 
+interface BuildBlocksResult {
+  blocks: KnownBlock[];
+  attachments: SlackAttachment[];
+}
+
+/**
+ * Build Block Kit blocks with redesigned tool footer:
+ *  1. Section: main response text
+ *  2. Context: latest tool call (swapped, not appended)
+ *  3. Context: compact stats line (1× Bash, 4× Read, ...)
+ *  4. Attachment: full ordered tool history (expandable in Slack)
+ */
+function buildBlocks(input: BuildBlocksInput): BuildBlocksResult {
+  const { mainText, currentTool, toolCounts, toolHistory, loading } = input;
+  const blocks: KnownBlock[] = [];
+  const attachments: SlackAttachment[] = [];
+
+  // 1. Main text section
   if (mainText) {
     const display = mainText.length > MAX_SECTION_LEN ? `...${mainText.slice(-MAX_SECTION_LEN)}` : mainText;
     const section: SectionBlock = {
@@ -232,9 +262,13 @@ function buildBlocks(mainText: string, tools: ToolEntry[], loading: boolean): Kn
     blocks.push(section);
   }
 
-  if (tools.length > 0) {
-    const parts = tools.map((t) => (t.errored ? `${t.name} :x:` : t.name));
-    let toolLine = `:hammer_and_wrench: ${parts.join(" · ")}`;
+  // 2. Current tool detail — shows only the LATEST tool (swapped each update)
+  if (currentTool) {
+    const icon = currentTool.errored ? ":x:" : ":hammer_and_wrench:";
+    let toolLine = `${icon} *${currentTool.name}*`;
+    if (currentTool.hint) {
+      toolLine += ` \`${currentTool.hint}\``;
+    }
     if (loading) {
       toolLine += " :openrouter-loading:";
     }
@@ -261,7 +295,32 @@ function buildBlocks(mainText: string, tools: ToolEntry[], loading: boolean): Kn
     blocks.push(ctx);
   }
 
-  return blocks;
+  // 3. Stats line — compact tool usage counts
+  if (toolCounts.size > 0) {
+    const stats = formatToolStats(toolCounts);
+    const ctx: ContextBlock = {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: stats,
+        },
+      ],
+    };
+    blocks.push(ctx);
+  }
+
+  // 4. Expandable tool history — Slack auto-collapses long attachment text
+  if (!loading && toolHistory.length > 1) {
+    const historyText = formatToolHistory(toolHistory);
+    attachments.push({
+      color: "#808080",
+      text: historyText,
+      mrkdwn_in: ["text"],
+    });
+  }
+
+  return { blocks, attachments };
 }
 
 /**
@@ -312,7 +371,9 @@ async function runClaudeAndStream(
 
   // ─── Streaming state ─────────────────────────────────────────────────
   let mainText = "";
-  const tools: ToolEntry[] = [];
+  const toolHistory: ToolCall[] = [];
+  const toolCounts = new Map<string, number>();
+  let currentTool: ToolCall | null = null;
   let msgTs: string | undefined;
   let returnedSessionId: string | null = null;
   let hasOutput = false;
@@ -322,13 +383,28 @@ async function runClaudeAndStream(
 
   /** Post or update the Slack message with current blocks. */
   async function updateMessage(loading: boolean): Promise<void> {
-    const blocks = buildBlocks(mainText, tools, loading);
+    const { blocks, attachments } = buildBlocks({
+      mainText,
+      currentTool,
+      toolCounts,
+      toolHistory,
+      loading,
+    });
     if (blocks.length === 0) {
       return;
     }
-    const fallback = mainText || `Working... (${tools.length} tool${tools.length === 1 ? "" : "s"})`;
+    const totalTools = toolHistory.length;
+    const fallback = mainText || `Working... (${totalTools} tool${totalTools === 1 ? "" : "s"})`;
     hasOutput = true;
-    msgTs = await postOrUpdate(client, channel, threadTs, msgTs, fallback, blocks);
+    msgTs = await postOrUpdate(
+      client,
+      channel,
+      threadTs,
+      msgTs,
+      fallback,
+      blocks,
+      attachments.length > 0 ? attachments : undefined,
+    );
     dirty = false;
   }
 
@@ -383,12 +459,16 @@ async function runClaudeAndStream(
           mainText += segment.text;
           dirty = true;
         } else if (segment.kind === "tool_use" && segment.toolName) {
-          tools.push({
+          const tool: ToolCall = {
             name: segment.toolName,
-          });
+            hint: segment.toolHint ?? "",
+          };
+          toolHistory.push(tool);
+          currentTool = tool;
+          toolCounts.set(tool.name, (toolCounts.get(tool.name) ?? 0) + 1);
           dirty = true;
-        } else if (segment.kind === "tool_result" && segment.isError && tools.length > 0) {
-          tools[tools.length - 1].errored = true;
+        } else if (segment.kind === "tool_result" && segment.isError && currentTool) {
+          currentTool.errored = true;
           dirty = true;
         }
       }
