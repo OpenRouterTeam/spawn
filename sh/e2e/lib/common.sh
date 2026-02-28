@@ -157,7 +157,12 @@ make_app_name() {
   local agent="$1"
   local ts
   ts=$(date +%s)
-  printf "e2e-%s-%s" "${agent}" "${ts}"
+  # Include ACTIVE_CLOUD to avoid name collisions in multi-cloud parallel runs
+  if [ -n "${ACTIVE_CLOUD:-}" ]; then
+    printf "e2e-%s-%s-%s" "${ACTIVE_CLOUD}" "${agent}" "${ts}"
+  else
+    printf "e2e-%s-%s" "${agent}" "${ts}"
+  fi
 }
 
 format_duration() {
