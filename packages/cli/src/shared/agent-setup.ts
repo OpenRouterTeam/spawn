@@ -503,6 +503,25 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () => "source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
     },
+
+    hermes: {
+      name: "Hermes Agent",
+      cloudInitTier: "minimal",
+      preProvision: promptGithubAuth,
+      install: () =>
+        installAgent(
+          runner,
+          "Hermes Agent",
+          "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
+          300,
+        ),
+      envVars: (apiKey) => [
+        `OPENROUTER_API_KEY=${apiKey}`,
+        "OPENAI_BASE_URL=https://openrouter.ai/api/v1",
+        `OPENAI_API_KEY=${apiKey}`,
+      ],
+      launchCmd: () => "source ~/.spawnrc 2>/dev/null; hermes",
+    },
   };
 }
 

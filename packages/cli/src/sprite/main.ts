@@ -23,7 +23,7 @@ async function main() {
   const agentName = process.argv[2];
   if (!agentName) {
     console.error("Usage: bun run sprite/main.ts <agent>");
-    console.error("Agents: claude, codex, openclaw, opencode, kilocode, zeroclaw");
+    console.error("Agents: claude, codex, openclaw, opencode, kilocode, zeroclaw, hermes");
     process.exit(1);
   }
 
