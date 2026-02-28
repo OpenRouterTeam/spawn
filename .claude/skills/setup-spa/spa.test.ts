@@ -1,5 +1,16 @@
 import { describe, it, expect, mock, afterEach } from "bun:test";
-import { parseStreamEvent, stripMention, markdownToSlack, loadState, saveState, downloadSlackFile } from "./helpers";
+import {
+  parseStreamEvent,
+  stripMention,
+  markdownToSlack,
+  loadState,
+  saveState,
+  downloadSlackFile,
+  extractToolHint,
+  formatToolStats,
+  formatToolHistory,
+} from "./helpers";
+import type { ToolCall } from "./helpers";
 import { toRecord } from "@openrouter/spawn-shared";
 import streamEvents from "../../../fixtures/claude-code/stream-events.json";
 
@@ -20,11 +31,12 @@ describe("parseStreamEvent", () => {
     expect(result?.text).toContain("I'll look at the issue and check the repository structure.");
   });
 
-  it("parses assistant tool_use (Bash) from fixture with toolName", () => {
+  it("parses assistant tool_use (Bash) from fixture with toolName and toolHint", () => {
     // fixture[1]: assistant with tool_use Bash
     const result = parseStreamEvent(fixture(1));
     expect(result?.kind).toBe("tool_use");
     expect(result?.toolName).toBe("Bash");
+    expect(result?.toolHint).toContain("gh issue list");
     expect(result?.text).toContain(":hammer_and_wrench: *Bash*");
     expect(result?.text).toContain("gh issue list");
   });
@@ -38,11 +50,12 @@ describe("parseStreamEvent", () => {
     expect(result?.text).toContain("Fly.io deploy fails on arm64");
   });
 
-  it("parses assistant tool_use (Glob) from fixture with toolName", () => {
+  it("parses assistant tool_use (Glob) from fixture with toolName and toolHint", () => {
     // fixture[3]: assistant with tool_use Glob
     const result = parseStreamEvent(fixture(3));
     expect(result?.kind).toBe("tool_use");
     expect(result?.toolName).toBe("Glob");
+    expect(result?.toolHint).toBe("**/*.ts");
     expect(result?.text).toBe(":hammer_and_wrench: *Glob* `**/*.ts`");
   });
 
@@ -99,6 +112,7 @@ describe("parseStreamEvent", () => {
     };
     const result = parseStreamEvent(event);
     expect(result?.text).toContain("...");
+    expect(result?.toolHint).toContain("...");
     expect(result?.kind).toBe("tool_use");
   });
 
@@ -158,6 +172,7 @@ describe("parseStreamEvent", () => {
     const result = parseStreamEvent(event);
     expect(result?.kind).toBe("tool_use");
     expect(result?.toolName).toBe("Bash");
+    expect(result?.toolHint).toBe("");
     expect(result?.text).toBe(":hammer_and_wrench: *Bash*");
   });
 
@@ -310,6 +325,116 @@ describe("saveState", () => {
       mappings: [],
     });
     expect(typeof result.ok).toBe("boolean");
+  });
+});
+
+describe("extractToolHint", () => {
+  it("extracts command from input", () => {
+    const block: Record<string, unknown> = {
+      input: { command: "gh issue list --repo OpenRouterTeam/spawn" },
+    };
+    expect(extractToolHint(block)).toBe("gh issue list --repo OpenRouterTeam/spawn");
+  });
+
+  it("extracts pattern from input", () => {
+    const block: Record<string, unknown> = {
+      input: { pattern: "**/*.ts" },
+    };
+    expect(extractToolHint(block)).toBe("**/*.ts");
+  });
+
+  it("extracts file_path from input", () => {
+    const block: Record<string, unknown> = {
+      input: { file_path: "/home/user/spawn/index.ts" },
+    };
+    expect(extractToolHint(block)).toBe("/home/user/spawn/index.ts");
+  });
+
+  it("prefers command over pattern and file_path", () => {
+    const block: Record<string, unknown> = {
+      input: { command: "echo hi", pattern: "*.ts", file_path: "/foo" },
+    };
+    expect(extractToolHint(block)).toBe("echo hi");
+  });
+
+  it("truncates hints longer than 80 chars", () => {
+    const longCmd = "x".repeat(100);
+    const block: Record<string, unknown> = {
+      input: { command: longCmd },
+    };
+    const result = extractToolHint(block);
+    expect(result).toHaveLength(83); // 80 + "..."
+    expect(result).toEndWith("...");
+  });
+
+  it("returns empty string for missing input", () => {
+    expect(extractToolHint({})).toBe("");
+  });
+
+  it("returns empty string for input without recognized keys", () => {
+    const block: Record<string, unknown> = {
+      input: { query: "search term" },
+    };
+    expect(extractToolHint(block)).toBe("");
+  });
+});
+
+describe("formatToolStats", () => {
+  it("formats a single tool count", () => {
+    const counts = new Map([["Bash", 3]]);
+    expect(formatToolStats(counts)).toBe("3× Bash");
+  });
+
+  it("formats multiple tool counts", () => {
+    const counts = new Map<string, number>([
+      ["Bash", 1],
+      ["Read", 4],
+      ["Grep", 5],
+      ["Glob", 8],
+    ]);
+    expect(formatToolStats(counts)).toBe("1× Bash, 4× Read, 5× Grep, 8× Glob");
+  });
+
+  it("returns empty string for empty map", () => {
+    expect(formatToolStats(new Map())).toBe("");
+  });
+});
+
+describe("formatToolHistory", () => {
+  it("formats a single tool call", () => {
+    const history: ToolCall[] = [{ name: "Bash", hint: "echo hi" }];
+    expect(formatToolHistory(history)).toBe("1. ✓ Bash — echo hi");
+  });
+
+  it("formats multiple tool calls with numbering", () => {
+    const history: ToolCall[] = [
+      { name: "Bash", hint: "gh issue list" },
+      { name: "Glob", hint: "**/*.ts" },
+      { name: "Read", hint: "/home/user/index.ts" },
+    ];
+    const result = formatToolHistory(history);
+    expect(result).toBe(
+      "1. ✓ Bash — gh issue list\n2. ✓ Glob — **/*.ts\n3. ✓ Read — /home/user/index.ts",
+    );
+  });
+
+  it("marks errored tools with ✗", () => {
+    const history: ToolCall[] = [
+      { name: "Bash", hint: "rm -rf /", errored: true },
+      { name: "Read", hint: "file.ts" },
+    ];
+    const result = formatToolHistory(history);
+    expect(result).toContain("1. ✗ Bash — rm -rf /");
+    expect(result).toContain("2. ✓ Read — file.ts");
+  });
+
+  it("handles tools without hints", () => {
+    const history: ToolCall[] = [{ name: "Bash", hint: "" }];
+    expect(formatToolHistory(history)).toBe("1. ✓ Bash");
+  });
+
+  it("returns empty string for empty history", () => {
+    expect(formatToolHistory([])).toBe("");
   });
 });
 
