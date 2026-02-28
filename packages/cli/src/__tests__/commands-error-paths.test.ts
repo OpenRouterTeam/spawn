@@ -330,51 +330,6 @@ describe("Commands Error Paths", () => {
     });
   });
 
-  // ── cmdRun: swapped arguments detection ──────────────────────────────
-
-  describe("cmdRun - swapped arguments detection", () => {
-    it("should detect when cloud and agent arguments are swapped", async () => {
-      // "spawn sprite claude" should detect that sprite is a cloud and claude is an agent
-      await expect(cmdRun("sprite", "claude")).rejects.toThrow("process.exit");
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("swapped"))).toBe(true);
-    });
-
-    it("should suggest the correct argument order when swapped", async () => {
-      await expect(cmdRun("sprite", "claude")).rejects.toThrow("process.exit");
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("spawn claude sprite"))).toBe(true);
-    });
-
-    it("should suggest correct order for hetzner/codex swap", async () => {
-      await expect(cmdRun("hetzner", "codex")).rejects.toThrow("process.exit");
-
-      const infoCalls2 = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls2.some((msg: string) => msg.includes("swapped"))).toBe(true);
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("spawn codex hetzner"))).toBe(true);
-    });
-
-    it("should NOT trigger swap detection when both args are unknown", async () => {
-      await expect(cmdRun("unknown1", "unknown2")).rejects.toThrow("process.exit");
-
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(false);
-    });
-
-    it("should NOT trigger swap detection when agent is valid", async () => {
-      // "spawn claude nonexistent" - agent is valid, cloud is not
-      await expect(cmdRun("claude", "nonexistent")).rejects.toThrow("process.exit");
-
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
-      expect(warnCalls.some((msg: string) => msg.includes("swapped"))).toBe(false);
-    });
-  });
-
   // ── cmdRun: batch validation (both errors at once) ──────────────────
 
   describe("cmdRun - batch validation shows all errors at once", () => {

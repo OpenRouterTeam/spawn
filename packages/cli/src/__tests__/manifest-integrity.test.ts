@@ -53,35 +53,13 @@ describe("Manifest Integrity", () => {
   });
 
   // ── Agent definitions ───────────────────────────────────────────────
+  // Field type precision is covered by manifest-type-contracts.test.ts.
+  // Only naming conventions and uniqueness constraints live here.
 
   describe("agent definitions", () => {
-    it("should have required fields for every agent", () => {
-      for (const [key, agent] of Object.entries(manifest.agents)) {
-        expect(agent.name).toBeTruthy();
-        expect(agent.description).toBeTruthy();
-        expect(agent.url).toBeTruthy();
-        expect(agent.install).toBeTruthy();
-        expect(agent.launch).toBeTruthy();
-        expect(agent.env).toBeTruthy();
-      }
-    });
-
     it("should use lowercase-hyphen-underscore keys for agents", () => {
       for (const key of agents) {
         expect(key).toMatch(/^[a-z0-9_-]+$/);
-      }
-    });
-
-    it("should have valid URL format for agent urls", () => {
-      for (const [key, agent] of Object.entries(manifest.agents)) {
-        expect(agent.url).toMatch(/^https?:\/\//);
-      }
-    });
-
-    it("should have env as an object for every agent", () => {
-      for (const [key, agent] of Object.entries(manifest.agents)) {
-        expect(typeof agent.env).toBe("object");
-        expect(agent.env).not.toBeNull();
       }
     });
 
@@ -93,30 +71,13 @@ describe("Manifest Integrity", () => {
   });
 
   // ── Cloud definitions ───────────────────────────────────────────────
+  // Field type precision is covered by manifest-type-contracts.test.ts.
+  // Only naming conventions and uniqueness constraints live here.
 
   describe("cloud definitions", () => {
-    it("should have required fields for every cloud", () => {
-      for (const [key, cloud] of Object.entries(manifest.clouds)) {
-        expect(cloud.name).toBeTruthy();
-        expect(cloud.description).toBeTruthy();
-        expect(cloud.url).toBeTruthy();
-        expect(cloud.type).toBeTruthy();
-        expect(cloud.auth).toBeTruthy();
-        expect(cloud.provision_method).toBeTruthy();
-        expect(cloud.exec_method).toBeTruthy();
-        expect(cloud.interactive_method).toBeTruthy();
-      }
-    });
-
     it("should use lowercase-hyphen-underscore keys for clouds", () => {
       for (const key of clouds) {
         expect(key).toMatch(/^[a-z0-9_-]+$/);
-      }
-    });
-
-    it("should have valid URL format for cloud urls", () => {
-      for (const [key, cloud] of Object.entries(manifest.clouds)) {
-        expect(cloud.url).toMatch(/^https?:\/\//);
       }
     });
 

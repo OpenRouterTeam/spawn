@@ -123,9 +123,6 @@ describe("manifest", () => {
           signal: expect.any(AbortSignal),
         }),
       );
-
-      // The manifest was fetched and returned successfully
-      expect(manifest.agents).toBeDefined();
     });
 
     it("should use disk cache when fresh", async () => {

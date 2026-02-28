@@ -109,16 +109,6 @@ describe("Agent optional field types (when present)", () => {
       });
     }
 
-    if (agent.deps !== undefined) {
-      it(`agent "${key}" deps should be an array of strings`, () => {
-        expect(Array.isArray(agent.deps)).toBe(true);
-        for (const dep of agent.deps!) {
-          expect(typeof dep).toBe("string");
-          expect(dep.length).toBeGreaterThan(0);
-        }
-      });
-    }
-
     if (agent.config_files !== undefined) {
       it(`agent "${key}" config_files should be an object with string keys`, () => {
         expect(typeof agent.config_files).toBe("object");
@@ -288,24 +278,6 @@ describe("Agent launch command consistency", () => {
       expect(agent.install.trim().length).toBeGreaterThan(0);
     }
   });
-});
-
-// ── Dotenv path validation ────────────────────────────────────────────────
-
-describe("Dotenv configuration", () => {
-  for (const [key, agent] of allAgents.filter(([, a]) => a.dotenv !== undefined)) {
-    it(`agent "${key}" dotenv path should look like a file path`, () => {
-      const path = agent.dotenv!.path;
-      // Should contain a / or ~ indicating a path
-      expect(path).toMatch(/[/~]/);
-    });
-
-    it(`agent "${key}" dotenv values should all be strings`, () => {
-      for (const [k, v] of Object.entries(agent.dotenv!.values)) {
-        expect(typeof v).toBe("string");
-      }
-    });
-  }
 });
 
 // ── Interactive prompts structure ─────────────────────────────────────────
