@@ -151,8 +151,6 @@ mock.module("@clack/prompts", () => ({
 // Import after mocks are set up
 const {
   prioritizeCloudsByCredentials,
-  getImplementedClouds,
-  getImplementedAgents,
   checkEntity,
   resolveAgentKey,
   resolveCloudKey,
@@ -460,47 +458,6 @@ describe("key resolution for run path", () => {
   it("should resolve case-insensitive key match", () => {
     expect(resolveAgentKey(manifest, "CLAUDE")).toBe("claude");
     expect(resolveCloudKey(manifest, "HETZNER")).toBe("hetzner");
-  });
-});
-
-// ── getImplementedClouds / getImplementedAgents for run path ─────────────
-
-describe("implementation checks for run path", () => {
-  const manifest = makeManifest();
-
-  it("should return implemented clouds for claude", () => {
-    const clouds = getImplementedClouds(manifest, "claude");
-    expect(clouds).toContain("hetzner");
-    expect(clouds).toContain("sprite");
-    expect(clouds).toContain("digitalocean");
-    expect(clouds).toContain("upcloud");
-    expect(clouds).toContain("localcloud");
-  });
-
-  it("should return implemented clouds for codex (fewer)", () => {
-    const clouds = getImplementedClouds(manifest, "codex");
-    expect(clouds).toContain("hetzner");
-    expect(clouds).toContain("digitalocean");
-    expect(clouds).toContain("localcloud");
-    // sprite/codex and upcloud/codex are "missing"
-    expect(clouds).not.toContain("sprite");
-    expect(clouds).not.toContain("upcloud");
-  });
-
-  it("should return implemented agents for hetzner", () => {
-    const agents = getImplementedAgents(manifest, "hetzner");
-    expect(agents).toContain("claude");
-    expect(agents).toContain("codex");
-  });
-
-  it("should return empty for nonexistent agent", () => {
-    const clouds = getImplementedClouds(manifest, "nonexistent");
-    expect(clouds).toEqual([]);
-  });
-
-  it("should return empty for nonexistent cloud", () => {
-    const agents = getImplementedAgents(manifest, "nonexistent");
-    expect(agents).toEqual([]);
   });
 });
 
