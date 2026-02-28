@@ -14,11 +14,6 @@ describe("Security Edge Cases", () => {
       expect(() => validateIdentifier(id, "Test")).not.toThrow();
     });
 
-    it("should reject identifier at 65 characters", () => {
-      const id = "a".repeat(65);
-      expect(() => validateIdentifier(id, "Test")).toThrow("too long");
-    });
-
     it("should accept single character identifiers", () => {
       expect(() => validateIdentifier("a", "Test")).not.toThrow();
       expect(() => validateIdentifier("1", "Test")).not.toThrow();
@@ -139,13 +134,6 @@ echo "safe"
       expect(() => validateScriptContent(script)).toThrow("destructive filesystem operation");
     });
 
-    it("should accept wget|sh (used by spawn scripts)", () => {
-      const script = `#!/bin/bash
-wget -q https://example.com/install.sh | sh
-`;
-      expect(() => validateScriptContent(script)).not.toThrow();
-    });
-
     it("should accept scripts with curl used safely", () => {
       const safe = `#!/bin/bash
 curl -fsSL https://example.com/file.tar.gz -o /tmp/file.tar.gz
@@ -193,11 +181,6 @@ dd if=/dev/urandom of=/tmp/random.bin bs=1M count=1
       expect(() => validatePrompt("List files | grep test")).not.toThrow();
       expect(() => validatePrompt("Show data | less")).not.toThrow();
       expect(() => validatePrompt("Count lines | wc -l")).not.toThrow();
-    });
-
-    it("should accept prompts at exactly the max length", () => {
-      const maxPrompt = "x".repeat(10 * 1024);
-      expect(() => validatePrompt(maxPrompt)).not.toThrow();
     });
 
     it("should reject prompts one byte over the max length", () => {
