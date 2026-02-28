@@ -1,6 +1,8 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 import { createHash, createHmac } from "node:crypto";
 import {
@@ -36,7 +38,9 @@ const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 
 // ─── Credential Cache ────────────────────────────────────────────────────────
 
-export const AWS_CONFIG_PATH = `${process.env.HOME}/.config/spawn/aws.json`;
+export function getAwsConfigPath(): string {
+  return join(process.env.HOME || homedir(), ".config", "spawn", "aws.json");
+}
 
 const AwsCredsSchema = v.object({
   accessKeyId: v.string(),
@@ -45,13 +49,14 @@ const AwsCredsSchema = v.object({
 });
 
 export async function saveCredsToConfig(accessKeyId: string, secretAccessKey: string, region: string): Promise<void> {
-  const dir = AWS_CONFIG_PATH.replace(/\/[^/]+$/, "");
+  const configPath = getAwsConfigPath();
+  const dir = configPath.replace(/\/[^/]+$/, "");
   mkdirSync(dir, {
     recursive: true,
     mode: 0o700,
   });
   const payload = `{\n  "accessKeyId": ${jsonEscape(accessKeyId)},\n  "secretAccessKey": ${jsonEscape(secretAccessKey)},\n  "region": ${jsonEscape(region)}\n}\n`;
-  await Bun.write(AWS_CONFIG_PATH, payload, {
+  await Bun.write(configPath, payload, {
     mode: 0o600,
   });
 }
@@ -62,7 +67,7 @@ export function loadCredsFromConfig(): {
   region: string;
 } | null {
   try {
-    const raw = readFileSync(AWS_CONFIG_PATH, "utf-8");
+    const raw = readFileSync(getAwsConfigPath(), "utf-8");
     const data = parseJsonWith(raw, AwsCredsSchema);
     if (!data?.accessKeyId || !data?.secretAccessKey) {
       return null;
