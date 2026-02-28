@@ -4,5 +4,6 @@
   "zeroclaw": { "url": "https://avatars.githubusercontent.com/u/261820148?s=200&v=4", "ext": "png" },
   "codex":    { "url": "https://avatars.githubusercontent.com/u/14957082?s=200&v=4",  "ext": "png" },
   "opencode": { "url": "https://opencode.ai/apple-touch-icon.png",                     "ext": "png" },
-  "kilocode": { "url": "https://avatars.githubusercontent.com/u/201822503?s=200&v=4", "ext": "png" }
+  "kilocode": { "url": "https://avatars.githubusercontent.com/u/201822503?s=200&v=4", "ext": "png" },
+  "hermes":   { "url": "https://avatars.githubusercontent.com/u/100869521?s=200&v=4", "ext": "png" }
 }
