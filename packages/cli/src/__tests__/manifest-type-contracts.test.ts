@@ -102,34 +102,35 @@ describe("Agent OPENROUTER_API_KEY requirement", () => {
 // ── Agent optional field types ────────────────────────────────────────────
 
 describe("Agent optional field types (when present)", () => {
-  for (const [key, agent] of allAgents) {
-    it(`agent "${key}" pre_launch should be a string when present`, () => {
-      if (agent.pre_launch === undefined) {
-        return;
-      }
+  it("pre_launch should be a string for all agents that have it", () => {
+    const agentsWithPreLaunch = allAgents.filter(([, agent]) => agent.pre_launch !== undefined);
+    expect(agentsWithPreLaunch.length).toBeGreaterThan(0);
+    for (const [, agent] of agentsWithPreLaunch) {
       expect(typeof agent.pre_launch).toBe("string");
-    });
+    }
+  });
 
-    it(`agent "${key}" config_files should be an object with string keys when present`, () => {
-      if (agent.config_files === undefined) {
-        return;
-      }
+  it("config_files should be an object with string keys for all agents that have it", () => {
+    const agentsWithConfigFiles = allAgents.filter(([, agent]) => agent.config_files !== undefined);
+    expect(agentsWithConfigFiles.length).toBeGreaterThan(0);
+    for (const [, agent] of agentsWithConfigFiles) {
       expect(typeof agent.config_files).toBe("object");
       expect(agent.config_files).not.toBeNull();
-      for (const filePath of Object.keys(agent.config_files)) {
+      for (const filePath of Object.keys(agent.config_files!)) {
         expect(typeof filePath).toBe("string");
         expect(filePath.length).toBeGreaterThan(0);
       }
-    });
+    }
+  });
 
-    it(`agent "${key}" notes should be a non-empty string when present`, () => {
-      if (agent.notes === undefined) {
-        return;
-      }
+  it("notes should be a non-empty string for all agents that have it", () => {
+    const agentsWithNotes = allAgents.filter(([, agent]) => agent.notes !== undefined);
+    expect(agentsWithNotes.length).toBeGreaterThan(0);
+    for (const [, agent] of agentsWithNotes) {
       expect(typeof agent.notes).toBe("string");
-      expect(agent.notes.length).toBeGreaterThan(0);
-    });
-  }
+      expect(agent.notes!.length).toBeGreaterThan(0);
+    }
+  });
 });
 
 // ── Cloud required field types ────────────────────────────────────────────
@@ -184,32 +185,33 @@ describe("Cloud required field types", () => {
 // ── Cloud optional field types ────────────────────────────────────────────
 
 describe("Cloud optional field types (when present)", () => {
-  for (const [key, cloud] of allClouds) {
-    it(`cloud "${key}" defaults should be an object when present`, () => {
-      if (cloud.defaults === undefined) {
-        return;
-      }
+  it("defaults should be an object for all clouds that have it", () => {
+    const cloudsWithDefaults = allClouds.filter(([, cloud]) => cloud.defaults !== undefined);
+    expect(cloudsWithDefaults.length).toBeGreaterThan(0);
+    for (const [, cloud] of cloudsWithDefaults) {
       expect(typeof cloud.defaults).toBe("object");
       expect(cloud.defaults).not.toBeNull();
       expect(Array.isArray(cloud.defaults)).toBe(false);
-    });
+    }
+  });
 
-    it(`cloud "${key}" notes should be a non-empty string when present`, () => {
-      if (cloud.notes === undefined) {
-        return;
-      }
+  it("notes should be a non-empty string for all clouds that have it", () => {
+    const cloudsWithNotes = allClouds.filter(([, cloud]) => cloud.notes !== undefined);
+    expect(cloudsWithNotes.length).toBeGreaterThan(0);
+    for (const [, cloud] of cloudsWithNotes) {
       expect(typeof cloud.notes).toBe("string");
-      expect(cloud.notes.length).toBeGreaterThan(0);
-    });
+      expect(cloud.notes!.length).toBeGreaterThan(0);
+    }
+  });
 
-    it(`cloud "${key}" icon should be a valid URL string when present`, () => {
-      if (cloud.icon === undefined) {
-        return;
-      }
+  it("icon should be a valid URL string for all clouds that have it", () => {
+    const cloudsWithIcon = allClouds.filter(([, cloud]) => cloud.icon !== undefined);
+    expect(cloudsWithIcon.length).toBeGreaterThan(0);
+    for (const [, cloud] of cloudsWithIcon) {
       expect(typeof cloud.icon).toBe("string");
-      expect(cloud.icon).toMatch(/^https?:\/\//);
-    });
-  }
+      expect(cloud.icon!).toMatch(/^https?:\/\//);
+    }
+  });
 });
 
 // ── Cloud type value validation ───────────────────────────────────────────
