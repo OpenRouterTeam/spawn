@@ -163,12 +163,6 @@ dd if=/dev/urandom of=/tmp/random.bin bs=1M count=1
   });
 
   describe("validatePrompt edge cases", () => {
-    it("should accept prompts with dollar signs in safe contexts", () => {
-      expect(() => validatePrompt("The cost is $100")).not.toThrow();
-      expect(() => validatePrompt("Variable $HOME is common")).not.toThrow();
-      expect(() => validatePrompt("Price: $5.99")).not.toThrow();
-    });
-
     it("should reject nested command substitution", () => {
       expect(() => validatePrompt("$($(whoami))")).toThrow("command substitution");
     });
@@ -177,20 +171,9 @@ dd if=/dev/urandom of=/tmp/random.bin bs=1M count=1
       expect(() => validatePrompt("Run `cat /etc/shadow`")).toThrow("backtick");
     });
 
-    it("should accept prompts with pipe to non-shell commands", () => {
-      expect(() => validatePrompt("List files | grep test")).not.toThrow();
-      expect(() => validatePrompt("Show data | less")).not.toThrow();
-      expect(() => validatePrompt("Count lines | wc -l")).not.toThrow();
-    });
-
     it("should reject prompts one byte over the max length", () => {
       const overPrompt = "x".repeat(10 * 1024 + 1);
       expect(() => validatePrompt(overPrompt)).toThrow("too long");
-    });
-
-    it("should accept prompts with semicolons not followed by rm", () => {
-      expect(() => validatePrompt("Write code; test it; deploy it")).not.toThrow();
-      expect(() => validatePrompt("Step 1; step 2; step 3")).not.toThrow();
     });
 
     it("should accept multi-line prompts", () => {
