@@ -995,7 +995,7 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
     ],
     {
       stdio: [
-        "pipe",
+        "ignore",
         "inherit",
         "inherit",
       ],
@@ -1005,11 +1005,6 @@ export async function runServer(cmd: string, timeoutSecs?: number, ip?: string):
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
   const exitCode = await proc.exited;
-  try {
-    proc.stdin!.end();
-  } catch {
-    /* already closed */
-  }
   clearTimeout(timer);
 
   if (exitCode !== 0) {
@@ -1032,7 +1027,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
     ],
     {
       stdio: [
-        "pipe",
+        "ignore",
         "pipe",
         "pipe",
       ],
@@ -1047,11 +1042,6 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number, ip?: s
     new Response(proc.stderr).text(),
   ]);
   const exitCode = await proc.exited;
-  try {
-    proc.stdin!.end();
-  } catch {
-    /* already closed */
-  }
   clearTimeout(timer);
 
   if (exitCode !== 0) {
