@@ -44,7 +44,7 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 //
 // Why the client_secret is here and why that's acceptable:
 //   1. DigitalOcean's token exchange endpoint REQUIRES client_secret — their OAuth
-//      implementation does not support PKCE-only public client flows (as of 2026).
+//      implementation does not support PKCE-only public client flows (as of 2026-03).
 //   2. Open-source CLI tools are "public clients" (RFC 6749 §2.1) — any secret
 //      shipped in source code or a binary is extractable and provides zero
 //      confidentiality. This is a well-understood OAuth limitation.
@@ -55,8 +55,17 @@ const DO_OAUTH_TOKEN = "https://cloud.digitalocean.com/v1/oauth/token";
 //   5. This is the same pattern used by: gh CLI (GitHub), doctl (DigitalOcean),
 //      gcloud (Google), and az (Azure).
 //
-// If DigitalOcean adds PKCE support in the future, the client_secret should be
-// removed and replaced with code_challenge/code_verifier parameters.
+// TODO(#2041): PKCE migration — monitor and migrate when DigitalOcean adds support.
+//   Last checked: 2026-03 — PKCE without client_secret returns 401 invalid_request.
+//   Check status: POST to /v1/oauth/token with code_verifier but WITHOUT client_secret.
+//   If it succeeds, migrate using this checklist:
+//     1. Add code_verifier/code_challenge (S256) generation to tryDoOAuth()
+//     2. Include code_challenge + code_challenge_method in the authorize URL params
+//     3. Include code_verifier in the token exchange POST body
+//     4. Remove DO_CLIENT_SECRET constant and all client_secret params from token requests
+//     5. Remove client_secret from tryRefreshDoToken() refresh request body
+//     6. Update this comment to reflect the new PKCE-only flow
+//   Re-check every 6 months or when DigitalOcean announces OAuth/API updates.
 const DO_CLIENT_ID = "c82b64ac5f9cd4d03b686bebf17546c603b9c368a296a8c4c0718b1f405e4bdc";
 const DO_CLIENT_SECRET = "8083ef0317481d802d15b68f1c0b545b726720dbf52d00d17f649cc794efdfd9";
 
