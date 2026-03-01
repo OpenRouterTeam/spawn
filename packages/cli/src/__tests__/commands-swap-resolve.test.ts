@@ -305,7 +305,6 @@ describe("resolveAndLog via cmdRun", () => {
       expect(resolvedAgent).toBe(true);
       expect(resolvedCloud).toBe(true);
     });
-
   });
 
   describe("display name resolution", () => {
