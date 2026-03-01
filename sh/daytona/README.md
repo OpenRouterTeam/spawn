@@ -42,6 +42,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/opencode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/kilocode.sh)
 ```
 
+#### Hermes
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/daytona/hermes.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
