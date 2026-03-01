@@ -44,7 +44,7 @@ export interface CloudRunner {
 
 // ─── Install helpers ────────────────────────────────────────────────────────
 
-export async function installAgent(
+async function installAgent(
   runner: CloudRunner,
   agentName: string,
   installCmd: string,
@@ -63,7 +63,7 @@ export async function installAgent(
 /**
  * Upload a config file to the remote machine via a temp file and mv.
  */
-export async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
+async function uploadConfigFile(runner: CloudRunner, content: string, remotePath: string): Promise<void> {
   const tmpFile = join(tmpdir(), `spawn_config_${Date.now()}_${Math.random().toString(36).slice(2)}`);
   writeFileSync(tmpFile, content, {
     mode: 0o600,
@@ -96,7 +96,7 @@ export async function uploadConfigFile(runner: CloudRunner, content: string, rem
 
 // ─── Claude Code ─────────────────────────────────────────────────────────────
 
-export async function installClaudeCode(runner: CloudRunner): Promise<void> {
+async function installClaudeCode(runner: CloudRunner): Promise<void> {
   logStep("Installing Claude Code...");
 
   const claudePath = "$HOME/.npm-global/bin:$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.n/bin";
@@ -128,7 +128,7 @@ export async function installClaudeCode(runner: CloudRunner): Promise<void> {
   }
 }
 
-export async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promise<void> {
+async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promise<void> {
   logStep("Configuring Claude Code...");
 
   const escapedKey = jsonEscape(apiKey);
@@ -164,7 +164,7 @@ export async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string)
 let githubAuthRequested = false;
 let githubToken = "";
 
-export async function promptGithubAuth(): Promise<void> {
+async function promptGithubAuth(): Promise<void> {
   if (process.env.SPAWN_SKIP_GITHUB_AUTH) {
     return;
   }
@@ -248,7 +248,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
 
 // ─── Codex CLI Config ────────────────────────────────────────────────────────
 
-export async function setupCodexConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
+async function setupCodexConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
   logStep("Configuring Codex CLI for OpenRouter...");
   const config = `model = "openai/gpt-5-codex"
 model_provider = "openrouter"
@@ -264,7 +264,7 @@ wire_api = "responses"
 
 // ─── OpenClaw Config ─────────────────────────────────────────────────────────
 
-export async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId: string): Promise<void> {
+async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId: string): Promise<void> {
   logStep("Configuring openclaw...");
   await runner.runServer("mkdir -p ~/.openclaw");
 
@@ -294,7 +294,7 @@ export async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, m
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 }
 
-export async function startGateway(runner: CloudRunner): Promise<void> {
+async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   // Start the daemon AND wait for port 18789 in a single SSH session.
   // The polling loop doubles as a keepalive for the SSH session.
@@ -317,7 +317,7 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
 
 // ─── ZeroClaw Config ─────────────────────────────────────────────────────────
 
-export async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
+async function setupZeroclawConfig(runner: CloudRunner, _apiKey: string): Promise<void> {
   logStep("Configuring ZeroClaw for autonomous operation...");
 
   // Run onboard first to set up provider/key
@@ -350,7 +350,7 @@ policy = "allow_all"
  * resource-constrained instances (512 MB RAM). Idempotent — skips if
  * swap is already configured. Non-fatal if sudo is unavailable.
  */
-export async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void> {
+async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void> {
   if (typeof sizeMb !== "number" || sizeMb <= 0 || !Number.isInteger(sizeMb)) {
     throw new Error(`Invalid swap size: ${sizeMb}`);
   }
@@ -377,7 +377,7 @@ export async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promi
 
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
-export function openCodeInstallCmd(): string {
+function openCodeInstallCmd(): string {
   return 'OC_ARCH=$(uname -m); case "$OC_ARCH" in aarch64) OC_ARCH=arm64;; x86_64) OC_ARCH=x64;; esac; OC_OS=$(uname -s | tr A-Z a-z); mkdir -p /tmp/opencode-install "$HOME/.opencode/bin" && curl -fsSL -o /tmp/opencode-install/oc.tar.gz "https://github.com/sst/opencode/releases/latest/download/opencode-${OC_OS}-${OC_ARCH}.tar.gz" && tar xzf /tmp/opencode-install/oc.tar.gz -C /tmp/opencode-install && mv /tmp/opencode-install/opencode "$HOME/.opencode/bin/" && rm -rf /tmp/opencode-install && grep -q ".opencode/bin" "$HOME/.bashrc" 2>/dev/null || echo \'export PATH="$HOME/.opencode/bin:$PATH"\' >> "$HOME/.bashrc"; grep -q ".opencode/bin" "$HOME/.zshrc" 2>/dev/null || echo \'export PATH="$HOME/.opencode/bin:$PATH"\' >> "$HOME/.zshrc" 2>/dev/null; export PATH="$HOME/.opencode/bin:$PATH"';
 }
 

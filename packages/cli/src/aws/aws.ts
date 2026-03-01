@@ -957,7 +957,7 @@ export async function waitForInstance(maxAttempts = 60): Promise<void> {
 
 // ─── SSH Execution ──────────────────────────────────────────────────────────
 
-export async function waitForSsh(maxAttempts = 36): Promise<void> {
+async function waitForSsh(maxAttempts = 36): Promise<void> {
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   await sharedWaitForSsh({
     host: instanceIp,
