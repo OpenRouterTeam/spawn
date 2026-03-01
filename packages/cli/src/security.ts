@@ -313,60 +313,39 @@ export function validateServerIdentifier(id: string): void {
 }
 
 /**
- * Dangerous shell patterns blocked in launch commands.
- * SECURITY-CRITICAL: These patterns enable command injection when passed to `bash -lc`.
+ * Allowlist patterns for launch command segments (split on ';').
+ * SECURITY-CRITICAL: launch_cmd is passed directly to `bash -lc` via SSH.
+ *
+ * All valid launch commands produced by agent-setup.ts have the form:
+ *   source ~/.<rc-file> 2>/dev/null; [export PATH=<path>;] <binary> [args]
+ *
+ * The allowlist approach is strictly safer than a blocklist: any segment that
+ * does not match a known-good pattern is rejected, preventing injection via
+ * tampered ~/.spawn/history.json even for attack patterns not on a blocklist.
  */
-const LAUNCH_CMD_DANGEROUS_PATTERNS: ReadonlyArray<{
-  pattern: RegExp;
-  description: string;
-}> = [
-  {
-    pattern: /\$\(/,
-    description: "command substitution $()",
-  },
-  {
-    pattern: /`/,
-    description: "backtick command substitution",
-  },
-  {
-    pattern: /\|/,
-    description: "pipe operator",
-  },
-  {
-    pattern: /;\s*rm\b/,
-    description: "destructive command sequence (rm)",
-  },
-  {
-    pattern: /&&/,
-    description: "command chaining (&&)",
-  },
-  {
-    pattern: /\|\|/,
-    description: "command chaining (||)",
-  },
-  {
-    pattern: />\s*\//,
-    description: "redirection to absolute path",
-  },
-  {
-    pattern: /<\s*\//,
-    description: "input redirection from absolute path",
-  },
-  {
-    pattern: /\$\{/,
-    description: "variable expansion",
-  },
-];
+
+/** Matches: source ~/.<path> [2>/dev/null] — RC file sourcing */
+const LAUNCH_SOURCE_SEGMENT =
+  /^source\s+~\/\.[a-zA-Z0-9._-]+(\/[a-zA-Z0-9._-]+)*(\s+2>\/dev\/null)?$/;
+
+/** Matches: export PATH=<safe-path-value> — PATH setup */
+const LAUNCH_EXPORT_PATH_SEGMENT = /^export\s+PATH=[$a-zA-Z0-9_/:.~-]+$/;
+
+/** Matches: <binary> [simple-args] — final agent invocation */
+const LAUNCH_BINARY_SEGMENT = /^[a-z][a-z0-9._-]*(\s+[a-z][a-z0-9._-]*)*$/;
 
 /**
  * Validates a launch command from connection history before shell execution.
  * SECURITY-CRITICAL: launch_cmd is passed directly to `bash -lc` via SSH.
  * A tampered history file could inject arbitrary commands without this check.
  *
- * Blocks: $(...), backticks, pipes |, &&, ||, redirections to paths, ${...}
+ * Uses an allowlist: each semicolon-separated segment must be one of:
+ *   - source ~/.<rc-file> [2>/dev/null]  (preamble only)
+ *   - export PATH=<path>                 (preamble only)
+ *   - <binary> [simple-args]             (final segment)
  *
  * @param cmd - The launch command to validate
- * @throws Error if dangerous patterns are detected
+ * @throws Error if the command does not match the allowlist
  */
 export function validateLaunchCmd(cmd: string): void {
   if (!cmd || cmd.trim() === "") {
@@ -381,17 +360,47 @@ export function validateLaunchCmd(cmd: string): void {
     );
   }
 
-  for (const { pattern, description } of LAUNCH_CMD_DANGEROUS_PATTERNS) {
-    if (pattern.test(cmd)) {
+  const segments = cmd
+    .split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  if (segments.length === 0) {
+    return; // Effectively empty after splitting
+  }
+
+  const lastSegment = segments[segments.length - 1] ?? "";
+  const preamble = segments.slice(0, -1);
+
+  // All preamble segments must be source or export PATH commands
+  for (const segment of preamble) {
+    if (
+      !LAUNCH_SOURCE_SEGMENT.test(segment) &&
+      !LAUNCH_EXPORT_PATH_SEGMENT.test(segment)
+    ) {
       throw new Error(
-        `Invalid launch command in history: contains ${description}\n\n` +
-          `Command: "${cmd}"\n\n` +
-          "Launch commands should be simple executable invocations (e.g., 'claude', 'aider').\n" +
-          "Shell operators like pipes, command substitution, and chaining are not allowed.\n\n" +
+        "Invalid launch command in history: unexpected preamble segment\n\n" +
+          `Command: "${cmd}"\n` +
+          `Rejected segment: "${segment}"\n\n` +
+          "Preamble segments may only be:\n" +
+          "  • source ~/.<rc-file> [2>/dev/null]\n" +
+          "  • export PATH=<path>\n\n" +
           "Your spawn history file may be corrupted or tampered with.\n" +
           `To fix: run 'spawn list --clear' to reset history`,
       );
     }
+  }
+
+  // The final segment must be a simple binary invocation
+  if (!LAUNCH_BINARY_SEGMENT.test(lastSegment)) {
+    throw new Error(
+      "Invalid launch command in history: invalid agent invocation\n\n" +
+        `Command: "${cmd}"\n` +
+        `Rejected segment: "${lastSegment}"\n\n` +
+        "The final segment must be a simple binary name (e.g., 'claude', 'zeroclaw agent').\n\n" +
+        "Your spawn history file may be corrupted or tampered with.\n" +
+        `To fix: run 'spawn list --clear' to reset history`,
+    );
   }
 }
 
