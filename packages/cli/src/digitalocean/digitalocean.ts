@@ -202,7 +202,7 @@ function loadTokenFromConfig(): string | null {
   if (!token) {
     return null;
   }
-  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
+  if (!/^[a-zA-Z0-9._/@:+=-]+$/.test(token)) {
     return null;
   }
   return token;
@@ -217,7 +217,7 @@ function loadRefreshToken(): string | null {
   if (!refreshToken) {
     return null;
   }
-  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(refreshToken)) {
+  if (!/^[a-zA-Z0-9._/@:+=-]+$/.test(refreshToken)) {
     return null;
   }
   return refreshToken;
