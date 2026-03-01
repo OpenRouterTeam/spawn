@@ -11,6 +11,40 @@
 #             untrack_app (provided by common.sh)
 set -eo pipefail
 
+# Detected org — set during _sprite_validate_env.
+# Passed as -o flag to all sprite CLI calls to avoid config file races
+# from concurrent sprite exec calls corrupting ~/.sprites/sprites.json.
+_SPRITE_ORG=""
+
+# Helper: build org flags array for sprite CLI calls
+_sprite_org_flags() {
+  if [ -n "${_SPRITE_ORG}" ]; then
+    printf '%s' "-o ${_SPRITE_ORG}"
+  fi
+}
+
+# Helper: fix corrupted sprite config (double-closing-brace from concurrent writes)
+_sprite_fix_config() {
+  local cfg="${HOME}/.sprites/sprites.json"
+  if [ -f "${cfg}" ]; then
+    # Check for double-brace corruption (most common race condition pattern).
+    # The sprite CLI's concurrent writes append an extra } at the end.
+    # Use grep on the whole file for any line that is just }}
+    if grep -q '^}}$' "${cfg}" 2>/dev/null; then
+      local tmp="${cfg}.fix$$"
+      sed 's/^}}$/}/' "${cfg}" > "${tmp}" 2>/dev/null && mv "${tmp}" "${cfg}" 2>/dev/null || rm -f "${tmp}"
+    fi
+    # Also check if last non-empty line ends with }}
+    local last_content
+    last_content=$(tail -5 "${cfg}" | grep -v '^$' | tail -1)
+    if printf '%s' "${last_content}" | grep -q '}}$'; then
+      local tmp="${cfg}.fix$$"
+      # Replace the LAST occurrence of }} with }
+      sed '$ s/}}$/}/' "${cfg}" > "${tmp}" 2>/dev/null && mv "${tmp}" "${cfg}" 2>/dev/null || rm -f "${tmp}"
+    fi
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # _sprite_max_parallel
 #
@@ -18,7 +52,7 @@ set -eo pipefail
 # Cap to 2 agents at a time.
 # ---------------------------------------------------------------------------
 _sprite_max_parallel() {
-  printf '2'
+  printf '1'
 }
 
 # ---------------------------------------------------------------------------
@@ -42,12 +76,26 @@ _sprite_validate_env() {
     return 1
   fi
 
-  if ! sprite org list >/dev/null 2>&1; then
+  local org_output
+  org_output=$(sprite org list 2>/dev/null || true)
+  if [ -z "${org_output}" ]; then
     log_err "Sprite credentials are not valid. Run: sprite auth login"
     return 1
   fi
 
-  log_ok "Sprite credentials validated"
+  # Extract org name and cache it — all subsequent sprite CLI calls use -o flag
+  # to avoid concurrent config file reads/writes corrupting sprites.json
+  _SPRITE_ORG=$(printf '%s' "${org_output}" | sed -n 's/.*Currently selected org: *//p' | awk '{print $1}')
+  if [ -z "${_SPRITE_ORG}" ]; then
+    # Fallback: try SPRITE_ORG env var
+    _SPRITE_ORG="${SPRITE_ORG:-}"
+  fi
+
+  if [ -n "${_SPRITE_ORG}" ]; then
+    log_ok "Sprite credentials validated (org: ${_SPRITE_ORG})"
+  else
+    log_ok "Sprite credentials validated"
+  fi
   return 0
 }
 
@@ -62,6 +110,9 @@ _sprite_headless_env() {
   # local agent="$2"  # unused but part of the interface
 
   printf 'export SPRITE_NAME="%s"\n' "${app}"
+  if [ -n "${_SPRITE_ORG}" ]; then
+    printf 'export SPRITE_ORG="%s"\n' "${_SPRITE_ORG}"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -79,8 +130,10 @@ _sprite_provision_verify() {
   local log_dir="$2"
 
   # Check instance exists in sprite list
+  _sprite_fix_config
   local sprite_output
-  sprite_output=$(sprite list 2>/dev/null || true)
+  # shellcheck disable=SC2046
+  sprite_output=$(sprite $(_sprite_org_flags) list 2>/dev/null || true)
 
   if [ -z "${sprite_output}" ]; then
     log_err "Could not list Sprite instances"
@@ -107,27 +160,75 @@ _sprite_provision_verify() {
 # _sprite_exec APP CMD
 #
 # Execute CMD on the Sprite instance via the sprite CLI.
+# Uses direct command embedding (not $1 positional) so tilde expansion
+# and compound operators (&&, ||) work correctly on the remote side.
+# Retries up to 3 times when the sprite CLI itself fails (config corruption).
 # Returns the exit code of the remote command.
 # ---------------------------------------------------------------------------
 _sprite_exec() {
   local app="$1"
   local cmd="$2"
+  local _attempt=0
+  local _max=3
+  local _stderr_tmp="/tmp/sprite-exec-err.$$"
 
-  sprite exec -s "${app}" -- bash -c '$1' _ "${cmd}"
+  while [ "${_attempt}" -lt "${_max}" ]; do
+    _sprite_fix_config
+    # shellcheck disable=SC2046
+    sprite $(_sprite_org_flags) exec -s "${app}" -- bash -c "${cmd}" 2>"${_stderr_tmp}"
+    local _rc=$?
+    if [ "${_rc}" -eq 0 ]; then
+      rm -f "${_stderr_tmp}"
+      return 0
+    fi
+    # Retry on sprite CLI errors (config corruption, connection issues)
+    if grep -qiE 'config|migrate|initialize|connection refused' "${_stderr_tmp}" 2>/dev/null; then
+      _attempt=$((_attempt + 1))
+      if [ "${_attempt}" -lt "${_max}" ]; then
+        sleep 2
+        continue
+      fi
+    fi
+    rm -f "${_stderr_tmp}"
+    return "${_rc}"
+  done
+  rm -f "${_stderr_tmp}"
 }
 
 # ---------------------------------------------------------------------------
 # _sprite_exec_long APP CMD TIMEOUT
 #
 # Same as _sprite_exec but wraps the remote command in `timeout` for
-# long-running operations.
+# long-running operations. Retries on sprite CLI errors.
 # ---------------------------------------------------------------------------
 _sprite_exec_long() {
   local app="$1"
   local cmd="$2"
   local timeout="${3:-120}"
+  local _attempt=0
+  local _max=3
+  local _stderr_tmp="/tmp/sprite-execl-err.$$"
 
-  sprite exec -s "${app}" -- bash -c 'timeout "$1" bash -c "$2"' _ "${timeout}" "${cmd}"
+  while [ "${_attempt}" -lt "${_max}" ]; do
+    _sprite_fix_config
+    # shellcheck disable=SC2046
+    sprite $(_sprite_org_flags) exec -s "${app}" -- bash -c "timeout ${timeout} bash -c '${cmd}'" 2>"${_stderr_tmp}"
+    local _rc=$?
+    if [ "${_rc}" -eq 0 ]; then
+      rm -f "${_stderr_tmp}"
+      return 0
+    fi
+    if grep -qiE 'config|migrate|initialize|connection refused' "${_stderr_tmp}" 2>/dev/null; then
+      _attempt=$((_attempt + 1))
+      if [ "${_attempt}" -lt "${_max}" ]; then
+        sleep 2
+        continue
+      fi
+    fi
+    rm -f "${_stderr_tmp}"
+    return "${_rc}"
+  done
+  rm -f "${_stderr_tmp}"
 }
 
 # ---------------------------------------------------------------------------
@@ -140,14 +241,16 @@ _sprite_teardown() {
 
   log_step "Tearing down ${app}..."
 
-  sprite destroy "${app}" >/dev/null 2>&1 || true
+  # shellcheck disable=SC2046
+  sprite $(_sprite_org_flags) destroy "${app}" >/dev/null 2>&1 || true
 
   # Brief wait for destruction to propagate
   sleep 2
 
   # Verify deletion
   local sprite_output
-  sprite_output=$(sprite list 2>/dev/null || true)
+  # shellcheck disable=SC2046
+  sprite_output=$(sprite $(_sprite_org_flags) list 2>/dev/null || true)
 
   if printf '%s' "${sprite_output}" | grep -q "${app}"; then
     log_warn "Sprite instance ${app} may still exist"
@@ -171,7 +274,8 @@ _sprite_cleanup_stale() {
 
   # List all sprites
   local sprite_output
-  sprite_output=$(sprite list 2>/dev/null || true)
+  # shellcheck disable=SC2046
+  sprite_output=$(sprite $(_sprite_org_flags) list 2>/dev/null || true)
 
   if [ -z "${sprite_output}" ]; then
     log_info "Could not list Sprite instances or none found — skipping cleanup"
