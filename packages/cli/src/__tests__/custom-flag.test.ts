@@ -124,10 +124,9 @@ describe("Hetzner --custom prompts", () => {
     restoreEnv("HETZNER_LOCATION", savedLocation);
   });
 
-  it("promptServerType should return default in non-interactive mode", async () => {
+  it("promptServerType should return default without --custom", async () => {
     delete process.env.HETZNER_SERVER_TYPE;
     delete process.env.SPAWN_CUSTOM;
-    process.env.SPAWN_NON_INTERACTIVE = "1";
     const { promptServerType, DEFAULT_SERVER_TYPE } = await import("../hetzner/hetzner");
     const result = await promptServerType();
     expect(result).toBe(DEFAULT_SERVER_TYPE);
