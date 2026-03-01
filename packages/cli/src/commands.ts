@@ -2732,12 +2732,13 @@ export async function cmdLast(): Promise<void> {
 
   const label = buildRecordLabel(latest, manifest);
   const subtitle = buildRecordSubtitle(latest, manifest);
-  p.log.step(`Rerunning last spawn: ${pc.bold(label)} ${pc.dim(`(${subtitle})`)}`);
+  p.log.step(`Last spawn: ${pc.bold(label)} ${pc.dim(`(${subtitle})`)}`);
 
-  if (latest.name) {
-    process.env.SPAWN_NAME = latest.name;
-  }
-  await cmdRun(latest.agent, latest.cloud, latest.prompt);
+  // If the latest record has connection info (IP/server), let the user
+  // reconnect to the existing VM instead of blindly provisioning a new one.
+  // handleRecordAction already offers enter/reconnect/rerun/delete options
+  // and falls back to cmdRun when there's no connection.
+  await handleRecordAction(latest, manifest);
 }
 
 // ── Connect ────────────────────────────────────────────────────────────────────
