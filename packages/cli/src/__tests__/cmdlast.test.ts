@@ -195,7 +195,7 @@ describe("cmdLast", () => {
       },
     ];
 
-    it("should show 'Rerunning last spawn' when history exists", async () => {
+    it("should show 'Last spawn' when history exists", async () => {
       writeHistory(sampleRecords);
 
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
@@ -209,7 +209,7 @@ describe("cmdLast", () => {
       }
 
       const step = logStepOutput();
-      expect(step).toContain("Rerunning last spawn");
+      expect(step).toContain("Last spawn");
     });
 
     it("should select the most recent record (newest first)", async () => {
@@ -442,7 +442,7 @@ describe("cmdLast", () => {
 
       const step = logStepOutput();
       // Should handle old dates gracefully
-      expect(step).toContain("Rerunning");
+      expect(step).toContain("Last spawn");
     });
 
     it("should handle records with all metadata fields", async () => {
@@ -464,7 +464,7 @@ describe("cmdLast", () => {
       }
 
       const step = logStepOutput();
-      expect(step).toContain("Rerunning");
+      expect(step).toContain("Last spawn");
       expect(step).toContain("Claude Code");
     });
 
