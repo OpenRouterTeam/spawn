@@ -135,12 +135,6 @@ describe("checkEntity", () => {
     it("should return true for cloud key 'vultr'", () => {
       expect(checkEntity(manifest, "vultr", "cloud")).toBe(true);
     });
-
-    it("should return true for all three agent keys", () => {
-      for (const key of Object.keys(manifest.agents)) {
-        expect(checkEntity(manifest, key, "agent")).toBe(true);
-      }
-    });
   });
 
   // ── Wrong-type detection: cloud given as agent ──────────────────────────
@@ -157,12 +151,6 @@ describe("checkEntity", () => {
     it("should return false when 'vultr' is checked as agent", () => {
       expect(checkEntity(manifest, "vultr", "agent")).toBe(false);
     });
-
-    it("should return false for all three cloud keys when checked as agent", () => {
-      for (const key of Object.keys(manifest.clouds)) {
-        expect(checkEntity(manifest, key, "agent")).toBe(false);
-      }
-    });
   });
 
   // ── Wrong-type detection: agent given as cloud ──────────────────────────
@@ -178,12 +166,6 @@ describe("checkEntity", () => {
 
     it("should return false when 'cline' is checked as cloud", () => {
       expect(checkEntity(manifest, "cline", "cloud")).toBe(false);
-    });
-
-    it("should return false for all three agent keys when checked as cloud", () => {
-      for (const key of Object.keys(manifest.agents)) {
-        expect(checkEntity(manifest, key, "cloud")).toBe(false);
-      }
     });
   });
 
@@ -357,40 +339,6 @@ describe("checkEntity", () => {
       expect(checkEntity(single, "sprite", "agent")).toBe(false);
       // "claude" exists in agents but not clouds
       expect(checkEntity(single, "claude", "cloud")).toBe(false);
-    });
-  });
-
-  // ── Kind parameter consistency ──────────────────────────────────────────
-
-  describe("kind parameter consistency", () => {
-    it("should accept claude as agent but reject as cloud", () => {
-      expect(checkEntity(manifest, "claude", "agent")).toBe(true);
-      expect(checkEntity(manifest, "claude", "cloud")).toBe(false);
-    });
-
-    it("should accept codex as agent but reject as cloud", () => {
-      expect(checkEntity(manifest, "codex", "agent")).toBe(true);
-      expect(checkEntity(manifest, "codex", "cloud")).toBe(false);
-    });
-
-    it("should accept sprite as cloud but reject as agent", () => {
-      expect(checkEntity(manifest, "sprite", "cloud")).toBe(true);
-      expect(checkEntity(manifest, "sprite", "agent")).toBe(false);
-    });
-
-    it("should accept hetzner as cloud but reject as agent", () => {
-      expect(checkEntity(manifest, "hetzner", "cloud")).toBe(true);
-      expect(checkEntity(manifest, "hetzner", "agent")).toBe(false);
-    });
-
-    it("should accept vultr as cloud but reject as agent", () => {
-      expect(checkEntity(manifest, "vultr", "cloud")).toBe(true);
-      expect(checkEntity(manifest, "vultr", "agent")).toBe(false);
-    });
-
-    it("should accept cline as agent but reject as cloud", () => {
-      expect(checkEntity(manifest, "cline", "agent")).toBe(true);
-      expect(checkEntity(manifest, "cline", "cloud")).toBe(false);
     });
   });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { existsSync, writeFileSync, mkdirSync, rmSync, utimesSync } from "node:fs";
 import { join } from "node:path";
-import type { Manifest } from "../manifest";
+import type { Manifest, AgentDef, CloudDef } from "../manifest";
 import { loadManifest, agentKeys, cloudKeys, matrixStatus, countImplemented, isValidManifest } from "../manifest";
 import type { TestEnvironment } from "./test-helpers";
 import { createMockManifest, setupTestEnvironment, teardownTestEnvironment } from "./test-helpers";
@@ -668,7 +668,7 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should handle manifest with many agents", () => {
-      const agents: Record<string, any> = {};
+      const agents: Record<string, AgentDef> = {};
       for (let i = 0; i < 50; i++) {
         agents[`agent-${i}`] = mockManifest.agents.claude;
       }
@@ -683,7 +683,7 @@ describe("Manifest Cache Lifecycle", () => {
     });
 
     it("should handle manifest with many clouds", () => {
-      const clouds: Record<string, any> = {};
+      const clouds: Record<string, CloudDef> = {};
       for (let i = 0; i < 30; i++) {
         clouds[`cloud-${i}`] = mockManifest.clouds.sprite;
       }
