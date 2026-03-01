@@ -189,6 +189,9 @@ _digitalocean_exec_long() {
 # _digitalocean_teardown APP
 #
 # Deletes the droplet by its ID (read from the .meta file) and untracks it.
+# Retries the DELETE up to 3 times on failure, then polls the API to confirm
+# the droplet is actually gone (up to 60s). This prevents batch 2 from
+# launching while batch 1 droplets still occupy the account's droplet limit.
 # ---------------------------------------------------------------------------
 _digitalocean_teardown() {
   local app="$1"
@@ -211,17 +214,55 @@ _digitalocean_teardown() {
     return 0
   fi
 
-  local http_code
-  http_code=$(curl -sf -o /dev/null -w '%{http_code}' \
-    -X DELETE \
-    -H "Authorization: Bearer ${DO_API_TOKEN}" \
-    -H "Content-Type: application/json" \
-    "${_DO_API}/droplets/${droplet_id}" 2>/dev/null || true)
+  # Retry DELETE up to 3 times with --max-time to prevent hangs
+  local attempt=0
+  local delete_accepted=0
+  while [ "${attempt}" -lt 3 ]; do
+    attempt=$((attempt + 1))
 
-  if [ "${http_code}" = "204" ] || [ "${http_code}" = "404" ]; then
-    log_ok "Droplet ${app} (ID: ${droplet_id}) torn down"
-  else
-    log_warn "Droplet deletion returned HTTP ${http_code} for ${app} (ID: ${droplet_id})"
+    local http_code
+    http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+      --max-time 30 \
+      -X DELETE \
+      -H "Authorization: Bearer ${DO_API_TOKEN}" \
+      -H "Content-Type: application/json" \
+      "${_DO_API}/droplets/${droplet_id}" 2>/dev/null || printf '000')
+
+    if [ "${http_code}" = "204" ] || [ "${http_code}" = "404" ]; then
+      delete_accepted=1
+      break
+    fi
+
+    if [ "${attempt}" -lt 3 ]; then
+      log_warn "Droplet DELETE attempt ${attempt}/3 returned HTTP ${http_code} — retrying in 5s..."
+      sleep 5
+    else
+      log_warn "Droplet DELETE failed after 3 attempts (last HTTP ${http_code}) for ${app} (ID: ${droplet_id})"
+    fi
+  done
+
+  # Poll to confirm the droplet is actually gone (up to 60s).
+  # The API may accept the DELETE (204) but the droplet lingers briefly.
+  if [ "${delete_accepted}" -eq 1 ]; then
+    local poll_waited=0
+    while [ "${poll_waited}" -lt 60 ]; do
+      local check_code
+      check_code=$(curl -s -o /dev/null -w '%{http_code}' \
+        --max-time 10 \
+        -H "Authorization: Bearer ${DO_API_TOKEN}" \
+        "${_DO_API}/droplets/${droplet_id}" 2>/dev/null || printf '000')
+
+      if [ "${check_code}" = "404" ]; then
+        log_ok "Droplet ${app} (ID: ${droplet_id}) confirmed destroyed"
+        untrack_app "${app}"
+        return 0
+      fi
+
+      sleep 5
+      poll_waited=$((poll_waited + 5))
+    done
+
+    log_warn "Droplet ${app} (ID: ${droplet_id}) not yet gone after 60s — may still be deleting"
   fi
 
   untrack_app "${app}"
