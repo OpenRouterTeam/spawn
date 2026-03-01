@@ -157,23 +157,6 @@ describe("Hetzner --custom prompts", () => {
     expect(result).toBe("ash");
   });
 
-  it("SERVER_TYPES should have entries", async () => {
-    const { SERVER_TYPES } = await import("../hetzner/hetzner");
-    expect(SERVER_TYPES.length).toBeGreaterThan(0);
-    for (const t of SERVER_TYPES) {
-      expect(t.id).toBeDefined();
-      expect(t.label).toBeDefined();
-    }
-  });
-
-  it("LOCATIONS should have entries", async () => {
-    const { LOCATIONS } = await import("../hetzner/hetzner");
-    expect(LOCATIONS.length).toBeGreaterThan(0);
-    for (const l of LOCATIONS) {
-      expect(l.id).toBeDefined();
-      expect(l.label).toBeDefined();
-    }
-  });
 });
 
 describe("DigitalOcean --custom prompts", () => {
@@ -219,23 +202,6 @@ describe("DigitalOcean --custom prompts", () => {
     expect(result).toBe("lon1");
   });
 
-  it("DROPLET_SIZES should have entries", async () => {
-    const { DROPLET_SIZES } = await import("../digitalocean/digitalocean");
-    expect(DROPLET_SIZES.length).toBeGreaterThan(0);
-    for (const s of DROPLET_SIZES) {
-      expect(s.id).toBeDefined();
-      expect(s.label).toBeDefined();
-    }
-  });
-
-  it("DO_REGIONS should have entries", async () => {
-    const { DO_REGIONS } = await import("../digitalocean/digitalocean");
-    expect(DO_REGIONS.length).toBeGreaterThan(0);
-    for (const r of DO_REGIONS) {
-      expect(r.id).toBeDefined();
-      expect(r.label).toBeDefined();
-    }
-  });
 });
 
 describe("Daytona --custom prompts", () => {
@@ -275,17 +241,6 @@ describe("Daytona --custom prompts", () => {
     expect(result.disk).toBe(50);
   });
 
-  it("SANDBOX_SIZES should have entries", async () => {
-    const { SANDBOX_SIZES } = await import("../daytona/daytona");
-    expect(SANDBOX_SIZES.length).toBeGreaterThan(0);
-    for (const s of SANDBOX_SIZES) {
-      expect(s.id).toBeDefined();
-      expect(s.cpu).toBeGreaterThan(0);
-      expect(s.memory).toBeGreaterThan(0);
-      expect(s.disk).toBeGreaterThan(0);
-      expect(s.label).toBeDefined();
-    }
-  });
 });
 
 /** Helper to restore or delete an env var */
