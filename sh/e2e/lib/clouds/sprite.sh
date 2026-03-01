@@ -209,10 +209,14 @@ _sprite_exec_long() {
   local _max=3
   local _stderr_tmp="/tmp/sprite-execl-err.$$"
 
+  # Base64-encode the command to avoid shell injection via single-quote breakout
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
+
   while [ "${_attempt}" -lt "${_max}" ]; do
     _sprite_fix_config
     # shellcheck disable=SC2046
-    sprite $(_sprite_org_flags) exec -s "${app}" -- bash -c "timeout ${timeout} bash -c '${cmd}'" 2>"${_stderr_tmp}"
+    sprite $(_sprite_org_flags) exec -s "${app}" -- bash -c "timeout ${timeout} bash -c \"\$(printf '%s' '${encoded_cmd}' | base64 -d)\"" 2>"${_stderr_tmp}"
     local _rc=$?
     if [ "${_rc}" -eq 0 ]; then
       rm -f "${_stderr_tmp}"
