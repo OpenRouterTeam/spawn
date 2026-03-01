@@ -187,13 +187,27 @@ function getGcloudCmd(): string | null {
   return null;
 }
 
+/** Get gcloud path or throw a descriptive error. */
+function requireGcloudCmd(): string {
+  const cmd = getGcloudCmd();
+  if (!cmd) {
+    throw new Error(
+      "gcloud CLI not found. Install it first:\n" +
+        "  macOS:  brew install --cask google-cloud-sdk\n" +
+        "  Linux:  curl https://sdk.cloud.google.com | bash\n" +
+        "  Or run: spawn <agent> gcp  (auto-installs gcloud)",
+    );
+  }
+  return cmd;
+}
+
 /** Run a gcloud command and return stdout. */
 function gcloudSync(args: string[]): {
   stdout: string;
   stderr: string;
   exitCode: number;
 } {
-  const cmd = getGcloudCmd()!;
+  const cmd = requireGcloudCmd();
   const proc = Bun.spawnSync(
     [
       cmd,
@@ -221,7 +235,7 @@ async function gcloud(args: string[]): Promise<{
   stderr: string;
   exitCode: number;
 }> {
-  const cmd = getGcloudCmd()!;
+  const cmd = requireGcloudCmd();
   const proc = Bun.spawn(
     [
       cmd,
@@ -250,7 +264,7 @@ async function gcloud(args: string[]): Promise<{
 
 /** Run a gcloud command interactively (inheriting stdio). */
 async function gcloudInteractive(args: string[]): Promise<number> {
-  const cmd = getGcloudCmd()!;
+  const cmd = requireGcloudCmd();
   const proc = Bun.spawn(
     [
       cmd,

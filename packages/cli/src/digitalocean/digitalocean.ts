@@ -156,36 +156,28 @@ function getConfigPath(): string {
   return join(process.env.HOME || homedir(), ".config", "spawn", "digitalocean.json");
 }
 
-interface DoConfig {
-  api_key?: string;
-  token?: string;
-  refresh_token?: string;
-  expires_at?: number;
-  auth_method?: "oauth" | "manual";
-}
-
-function loadConfig(): DoConfig | null {
+function loadConfig(): Record<string, unknown> | null {
   try {
-    return JSON.parse(readFileSync(getConfigPath(), "utf-8"));
+    return parseJsonObj(readFileSync(getConfigPath(), "utf-8"));
   } catch {
     return null;
   }
 }
 
-async function saveConfig(config: DoConfig): Promise<void> {
+async function saveConfig(values: Record<string, unknown>): Promise<void> {
   const configPath = getConfigPath();
   const dir = configPath.replace(/\/[^/]+$/, "");
   mkdirSync(dir, {
     recursive: true,
     mode: 0o700,
   });
-  await Bun.write(configPath, JSON.stringify(config, null, 2) + "\n", {
+  await Bun.write(configPath, JSON.stringify(values, null, 2) + "\n", {
     mode: 0o600,
   });
 }
 
 async function saveTokenToConfig(token: string, refreshToken?: string, expiresIn?: number): Promise<void> {
-  const config: DoConfig = {
+  const config: Record<string, unknown> = {
     api_key: token,
     token,
   };
@@ -204,7 +196,9 @@ function loadTokenFromConfig(): string | null {
   if (!data) {
     return null;
   }
-  const token = data.api_key || data.token || "";
+  const apiKey = isString(data.api_key) ? data.api_key : "";
+  const tok = isString(data.token) ? data.token : "";
+  const token = apiKey || tok;
   if (!token) {
     return null;
   }
@@ -216,22 +210,30 @@ function loadTokenFromConfig(): string | null {
 
 function loadRefreshToken(): string | null {
   const data = loadConfig();
-  if (!data?.refresh_token) {
+  if (!data) {
     return null;
   }
-  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(data.refresh_token)) {
+  const refreshToken = isString(data.refresh_token) ? data.refresh_token : "";
+  if (!refreshToken) {
     return null;
   }
-  return data.refresh_token;
+  if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(refreshToken)) {
+    return null;
+  }
+  return refreshToken;
 }
 
 function isTokenExpired(): boolean {
   const data = loadConfig();
-  if (!data?.expires_at) {
+  if (!data) {
+    return false;
+  }
+  const expiresAt = isNumber(data.expires_at) ? data.expires_at : 0;
+  if (!expiresAt) {
     return false;
   }
   // Consider expired 5 minutes before actual expiry
-  return Math.floor(Date.now() / 1000) >= data.expires_at - 300;
+  return Math.floor(Date.now() / 1000) >= expiresAt - 300;
 }
 
 // ─── Token Validation ────────────────────────────────────────────────────────
