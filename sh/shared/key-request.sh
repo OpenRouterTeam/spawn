@@ -89,13 +89,12 @@ process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
             # Allow alphanumeric plus safe chars needed by real tokens:
             #   - _ . / @  (standard API key chars)
             #   : + =      (base64 segments, URL-safe and base64 formats)
-            #   space       (prefixed token formats, e.g., "Bearer <token>")
             # Keep in sync with loadTokenFromConfig regex in packages/cli/src/digitalocean/digitalocean.ts
-            if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
+            if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@:+=-]+$ ]]; then
                 log "SECURITY: Invalid characters in config value for ${var_name}"
                 return 1
             fi
-            # SECURITY: val is already validated against ^[a-zA-Z0-9._/@:+=\ -]+$ above,
+            # SECURITY: val is already validated against ^[a-zA-Z0-9._/@:+=-]+$ above,
             # and var_name is validated against ^[A-Z_][A-Z0-9_]*$ by the caller.
             # Use export NAME=VALUE (bash 3.2 compatible; printf -v requires bash 4.0+).
             export "${var_name}=${val}"
