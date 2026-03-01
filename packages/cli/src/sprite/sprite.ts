@@ -422,9 +422,7 @@ export async function setupShellEnvironment(): Promise<void> {
     await runSpriteSilent("command -v zsh");
     const bashProfile = "# [spawn:bash]\nexec /usr/bin/zsh -l\n";
     const bpB64 = Buffer.from(bashProfile).toString("base64");
-    await runSprite(
-      `printf '%s' '${bpB64}' | base64 -d > ~/.bash_profile`,
-    );
+    await runSprite(`printf '%s' '${bpB64}' | base64 -d > ~/.bash_profile`);
   } catch {
     logWarn("zsh not available on sprite, keeping bash as default shell");
   }
