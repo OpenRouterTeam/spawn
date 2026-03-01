@@ -156,7 +156,6 @@ describe("Hetzner --custom prompts", () => {
     const result = await promptLocation();
     expect(result).toBe("ash");
   });
-
 });
 
 describe("DigitalOcean --custom prompts", () => {
@@ -201,7 +200,6 @@ describe("DigitalOcean --custom prompts", () => {
     const result = await promptDoRegion();
     expect(result).toBe("lon1");
   });
-
 });
 
 describe("Daytona --custom prompts", () => {
@@ -240,7 +238,6 @@ describe("Daytona --custom prompts", () => {
     expect(result.memory).toBe(8);
     expect(result.disk).toBe(50);
   });
-
 });
 
 /** Helper to restore or delete an env var */
