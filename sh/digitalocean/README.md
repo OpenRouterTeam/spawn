@@ -40,6 +40,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/opencode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/kilocode.sh)
 ```
 
+#### Hermes
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/digitalocean/hermes.sh)
+```
+
 ## Environment Variables
 
 | Variable | Description | Default |

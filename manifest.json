@@ -430,11 +430,11 @@
     "sprite/opencode": "implemented",
     "sprite/kilocode": "implemented",
     "local/hermes": "missing",
-    "hetzner/hermes": "missing",
+    "hetzner/hermes": "implemented",
     "aws/hermes": "implemented",
-    "daytona/hermes": "missing",
-    "digitalocean/hermes": "missing",
-    "gcp/hermes": "missing",
+    "daytona/hermes": "implemented",
+    "digitalocean/hermes": "implemented",
+    "gcp/hermes": "implemented",
     "sprite/hermes": "implemented"
   }
 }

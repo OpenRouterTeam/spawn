@@ -7,7 +7,7 @@ set -eo pipefail
 # ---------------------------------------------------------------------------
 ALL_AGENTS="claude openclaw zeroclaw codex opencode kilocode hermes"
 PROVISION_TIMEOUT="${PROVISION_TIMEOUT:-480}"
-INSTALL_WAIT="${INSTALL_WAIT:-300}"
+INSTALL_WAIT="${INSTALL_WAIT:-600}"
 INPUT_TEST_TIMEOUT="${INPUT_TEST_TIMEOUT:-120}"
 
 # Active cloud (set by load_cloud_driver)
