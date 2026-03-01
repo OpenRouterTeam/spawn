@@ -409,20 +409,20 @@ export async function setupShellEnvironment(): Promise<void> {
   await runSpriteSilent(`sed -i '/exec \\/usr\\/bin\\/zsh/d' ~/.bashrc ~/.bash_profile 2>/dev/null; true`);
 
   // Upload and append PATH config to .bashrc and .zshrc
-  const pathConfig = `\n# [spawn:path]\nexport PATH="\${HOME}/.npm-global/bin:\${HOME}/.bun/bin:/.sprite/languages/bun/bin:\${PATH}"\n`;
+  const pathConfig = `\n# [spawn:path]\nexport PATH="\${HOME}/.npm-global/bin:\${HOME}/.local/bin:\${HOME}/.bun/bin:/.sprite/languages/bun/bin:\${PATH}"\n`;
   const pathB64 = Buffer.from(pathConfig).toString("base64");
   await runSprite(
     `printf '%s' '${pathB64}' | base64 -d >> ~/.bashrc && printf '%s' '${pathB64}' | base64 -d >> ~/.zshrc`,
   );
 
-  // Switch bash to zsh if available
+  // Switch interactive login shells to zsh (if available).
+  // Only modify .bash_profile — NOT .bashrc — so non-interactive bash
+  // (e.g., `sprite exec ... bash -c CMD`) still works and sources PATH config.
   try {
     await runSpriteSilent("command -v zsh");
-    const bashConfig = "# [spawn:bash]\nexec /usr/bin/zsh -l\n";
-    const bashB64 = Buffer.from(bashConfig).toString("base64");
-    await runSprite(
-      `printf '%s' '${bashB64}' | base64 -d > ~/.bash_profile && printf '%s' '${bashB64}' | base64 -d > ~/.bashrc`,
-    );
+    const bashProfile = "# [spawn:bash]\nexec /usr/bin/zsh -l\n";
+    const bpB64 = Buffer.from(bashProfile).toString("base64");
+    await runSprite(`printf '%s' '${bpB64}' | base64 -d > ~/.bash_profile`);
   } catch {
     logWarn("zsh not available on sprite, keeping bash as default shell");
   }

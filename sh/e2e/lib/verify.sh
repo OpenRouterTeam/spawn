@@ -301,9 +301,9 @@ verify_zeroclaw() {
   local app="$1"
   local failures=0
 
-  # Binary check (requires cargo env)
+  # Binary check (requires cargo bin in PATH — cargo/env may not exist on all clouds)
   log_step "Checking zeroclaw binary..."
-  if cloud_exec "${app}" "source ~/.cargo/env 2>/dev/null; command -v zeroclaw" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "export PATH=\$HOME/.cargo/bin:\$PATH; source ~/.cargo/env 2>/dev/null; command -v zeroclaw" >/dev/null 2>&1; then
     log_ok "zeroclaw binary found"
   else
     log_err "zeroclaw binary not found"

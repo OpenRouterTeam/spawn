@@ -80,11 +80,18 @@ CLOUD_ENV
     waited=$((waited + 5))
   done
 
-  # Kill if still running (the interactive SSH session hangs)
+  # Kill if still running (the interactive SSH/CLI session hangs)
   if [ ! -f "${exit_file}" ]; then
     log_warn "Provision timed out after ${PROVISION_TIMEOUT}s — killing (install may still succeed)"
+    # Kill the entire process tree — the subshell spawns bun → sprite exec -tty
+    # which won't die from just killing the subshell PID. Without this, orphaned
+    # sprite exec sessions keep running and corrupt the sprite config file.
+    pkill -P "${pid}" 2>/dev/null || true
     kill "${pid}" 2>/dev/null || true
     wait "${pid}" 2>/dev/null || true
+    # Also kill any lingering sprite exec processes for this specific app
+    pkill -f "sprite.*exec.*${app_name}" 2>/dev/null || true
+    sleep 1
   fi
 
   # Even if provision "failed" (timeout), the instance may exist and install may have completed.
