@@ -79,19 +79,29 @@ input_test_openclaw() {
 
   log_step "Running input test for openclaw..."
 
-  # Pre-check: verify the gateway is running on :18789
-  log_step "Checking openclaw gateway on :18789..."
-  if ! cloud_exec "${app}" "curl -sf http://localhost:18789/health >/dev/null 2>&1 || ss -tlnp | grep -q 18789" >/dev/null 2>&1; then
-    log_warn "openclaw gateway not detected on :18789 — attempting test anyway"
-  fi
+  # Ensure the gateway is running (it may have died after provisioning)
+  log_step "Ensuring openclaw gateway is running on :18789..."
+  cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then \
+      echo 'Gateway already running'; \
+    else \
+      _oc_bin=\$(command -v openclaw) || exit 1; \
+      if command -v setsid >/dev/null 2>&1; then setsid \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & \
+      else nohup \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; \
+      elapsed=0; while [ \$elapsed -lt 30 ]; do \
+        if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo 'Gateway started'; break; fi; \
+        sleep 1; elapsed=\$((elapsed + 1)); \
+      done; \
+    fi" >/dev/null 2>&1 || log_warn "Failed to start openclaw gateway"
 
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw -p \"\$PROMPT\""
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw agent --message \"\$PROMPT\" --session-id e2e-test --json --timeout 60"
 
   local output
   output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true
@@ -268,7 +278,7 @@ verify_openclaw() {
 
   # Binary check
   log_step "Checking openclaw binary..."
-  if cloud_exec "${app}" "PATH=\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v openclaw" >/dev/null 2>&1; then
     log_ok "openclaw binary found"
   else
     log_err "openclaw binary not found"
