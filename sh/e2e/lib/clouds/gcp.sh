@@ -182,10 +182,14 @@ _gcp_exec_long() {
 
   local alive_count=$((timeout / 15 + 1))
 
+  # Base64-encode the command to avoid shell injection via single-quote breakout
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
+
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=10 -o LogLevel=ERROR -o BatchMode=yes \
       -o "ServerAliveInterval=15" -o "ServerAliveCountMax=${alive_count}" \
-      "${ssh_user}@${_GCP_INSTANCE_IP}" "timeout ${timeout} bash -c '${cmd}'"
+      "${ssh_user}@${_GCP_INSTANCE_IP}" "timeout ${timeout} bash -c \"\$(printf '%s' '${encoded_cmd}' | base64 -d)\""
 }
 
 # ---------------------------------------------------------------------------
