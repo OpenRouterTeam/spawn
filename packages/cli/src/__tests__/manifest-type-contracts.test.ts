@@ -299,99 +299,74 @@ describe("Interactive prompts structure", () => {
 
 // ── Agent metadata field types ────────────────────────────────────────
 
-describe("Agent metadata field types (when present)", () => {
+// These fields are present on all current agents — no conditional guards needed.
+describe("Agent metadata field types", () => {
   for (const [key, agent] of allAgents) {
-    if (agent.creator !== undefined) {
-      it(`agent "${key}" creator should be a non-empty string`, () => {
+    describe(`agent "${key}"`, () => {
+      it("creator should be a non-empty string", () => {
         expect(typeof agent.creator).toBe("string");
         expect(agent.creator!.length).toBeGreaterThan(0);
       });
-    }
 
-    if (agent.repo !== undefined) {
-      it(`agent "${key}" repo should match owner/repo format`, () => {
+      it("repo should match owner/repo format", () => {
         expect(typeof agent.repo).toBe("string");
         expect(agent.repo).toMatch(/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/);
       });
-    }
 
-    if (agent.license !== undefined) {
-      it(`agent "${key}" license should be a non-empty string`, () => {
+      it("license should be a non-empty string", () => {
         expect(typeof agent.license).toBe("string");
         expect(agent.license!.length).toBeGreaterThan(0);
       });
-    }
 
-    if (agent.created !== undefined) {
-      it(`agent "${key}" created should be YYYY-MM format`, () => {
+      it("created should be YYYY-MM format", () => {
         expect(typeof agent.created).toBe("string");
         expect(agent.created).toMatch(/^\d{4}-\d{2}$/);
       });
-    }
 
-    if (agent.added !== undefined) {
-      it(`agent "${key}" added should be YYYY-MM format`, () => {
+      it("added should be YYYY-MM format", () => {
         expect(typeof agent.added).toBe("string");
         expect(agent.added).toMatch(/^\d{4}-\d{2}$/);
       });
-    }
 
-    if (agent.github_stars !== undefined) {
-      it(`agent "${key}" github_stars should be a non-negative number`, () => {
+      it("github_stars should be a non-negative integer", () => {
         expect(typeof agent.github_stars).toBe("number");
         expect(agent.github_stars!).toBeGreaterThanOrEqual(0);
         expect(Number.isInteger(agent.github_stars)).toBe(true);
       });
-    }
 
-    if (agent.stars_updated !== undefined) {
-      it(`agent "${key}" stars_updated should be YYYY-MM-DD format`, () => {
+      it("stars_updated should be YYYY-MM-DD format", () => {
         expect(typeof agent.stars_updated).toBe("string");
         expect(agent.stars_updated).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       });
-    }
 
-    if (agent.language !== undefined) {
-      it(`agent "${key}" language should be a non-empty string`, () => {
+      it("language should be a non-empty string", () => {
         expect(typeof agent.language).toBe("string");
         expect(agent.language!.length).toBeGreaterThan(0);
       });
-    }
 
-    if (agent.runtime !== undefined) {
-      it(`agent "${key}" runtime should be a non-empty string`, () => {
+      it("runtime should be a non-empty string", () => {
         expect(typeof agent.runtime).toBe("string");
         expect(agent.runtime!.length).toBeGreaterThan(0);
       });
-    }
 
-    if (agent.category !== undefined) {
-      it(`agent "${key}" category should be cli, tui, or ide-extension`, () => {
+      it("category should be cli, tui, or ide-extension", () => {
         expect(typeof agent.category).toBe("string");
-        expect([
-          "cli",
-          "tui",
-          "ide-extension",
-        ]).toContain(agent.category);
+        expect(["cli", "tui", "ide-extension"]).toContain(agent.category);
       });
-    }
 
-    if (agent.tagline !== undefined) {
-      it(`agent "${key}" tagline should be a non-empty string`, () => {
+      it("tagline should be a non-empty string", () => {
         expect(typeof agent.tagline).toBe("string");
         expect(agent.tagline!.length).toBeGreaterThan(0);
       });
-    }
 
-    if (agent.tags !== undefined) {
-      it(`agent "${key}" tags should be an array of non-empty strings`, () => {
+      it("tags should be an array of non-empty strings", () => {
         expect(Array.isArray(agent.tags)).toBe(true);
         for (const tag of agent.tags!) {
           expect(typeof tag).toBe("string");
           expect(tag.length).toBeGreaterThan(0);
         }
       });
-    }
+    });
   }
 });
 
