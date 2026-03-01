@@ -14,7 +14,7 @@ import {
   toKebabCase,
   defaultSpawnName,
 } from "../shared/ui";
-import { sleep, spawnInteractive } from "../shared/ssh";
+import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
 import { hasMessage } from "@openrouter/spawn-shared";
 import { getSpawnDir } from "../history.js";
 
@@ -449,7 +449,7 @@ export function saveVmConnection(): void {
 /**
  * Run a command on the remote sprite. Retries on transient errors.
  */
-export async function runSprite(cmd: string): Promise<void> {
+export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void> {
   const spriteCmd = getSpriteCmd()!;
   await spriteRetry("sprite exec", async () => {
     const proc = Bun.spawn(
@@ -472,7 +472,10 @@ export async function runSprite(cmd: string): Promise<void> {
         ],
       },
     );
+    const timeout = (timeoutSecs || 300) * 1000;
+    const timer = setTimeout(() => killWithTimeout(proc), timeout);
     const exitCode = await proc.exited;
+    clearTimeout(timer);
     if (exitCode !== 0) {
       throw new Error(`sprite exec failed (exit ${exitCode}): ${cmd.slice(0, 80)}`);
     }
