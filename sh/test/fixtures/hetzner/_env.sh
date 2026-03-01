@@ -1,4 +1,0 @@
-export HCLOUD_TOKEN="test-token-hetzner"
-export HETZNER_SERVER_NAME="test-srv"
-export HETZNER_SERVER_TYPE="cx23"
-export HETZNER_LOCATION="fsn1"
