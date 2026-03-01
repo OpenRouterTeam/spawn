@@ -294,7 +294,63 @@ async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId:
   await uploadConfigFile(runner, config, "$HOME/.openclaw/openclaw.json");
 }
 
-async function startGateway(runner: CloudRunner): Promise<void> {
+export async function setupOpenclawBatched(
+  runner: CloudRunner,
+  envContent: string,
+  apiKey: string,
+  modelId: string,
+): Promise<void> {
+  logStep("Setting up OpenClaw (install check + env + config)...");
+
+  const envB64 = Buffer.from(envContent).toString("base64");
+
+  const gatewayToken = crypto.randomUUID().replace(/-/g, "");
+  const configJson = JSON.stringify({
+    env: {
+      OPENROUTER_API_KEY: apiKey,
+    },
+    gateway: {
+      mode: "local",
+      auth: {
+        token: gatewayToken,
+      },
+    },
+    agents: {
+      defaults: {
+        model: {
+          primary: modelId,
+        },
+      },
+    },
+  });
+  const configB64 = Buffer.from(configJson).toString("base64");
+
+  const script = [
+    'echo "==> Checking openclaw..."',
+    'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
+    "if command -v openclaw >/dev/null 2>&1; then",
+    '  echo "    openclaw found at $(command -v openclaw)"',
+    "else",
+    '  echo "    openclaw not found, installing..."',
+    "  mkdir -p ~/.npm-global/bin && npm install -g --prefix $HOME/.npm-global openclaw",
+    '  export PATH="$HOME/.npm-global/bin:$PATH"',
+    '  command -v openclaw || { echo "ERROR: openclaw install failed"; exit 1; }',
+    "fi",
+    'echo "==> Writing environment variables..."',
+    `printf '%s' '${envB64}' | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc`,
+    "grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc",
+    "grep -q 'source ~/.spawnrc' ~/.zshrc 2>/dev/null || echo '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.zshrc",
+    'echo "==> Writing openclaw config..."',
+    "mkdir -p ~/.openclaw",
+    `printf '%s' '${configB64}' | base64 -d > ~/.openclaw/openclaw.json && chmod 600 ~/.openclaw/openclaw.json`,
+    'echo "==> Setup complete"',
+  ].join("\n");
+
+  await runner.runServer(script);
+  logInfo("OpenClaw setup complete (install + env + config)");
+}
+
+export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
   // Start the daemon AND wait for port 18789 in a single SSH session.
   // The polling loop doubles as a keepalive for the SSH session.
@@ -381,6 +437,26 @@ function openCodeInstallCmd(): string {
   return 'OC_ARCH=$(uname -m); case "$OC_ARCH" in aarch64) OC_ARCH=arm64;; x86_64) OC_ARCH=x64;; esac; OC_OS=$(uname -s | tr A-Z a-z); mkdir -p /tmp/opencode-install "$HOME/.opencode/bin" && curl -fsSL -o /tmp/opencode-install/oc.tar.gz "https://github.com/sst/opencode/releases/latest/download/opencode-${OC_OS}-${OC_ARCH}.tar.gz" && tar xzf /tmp/opencode-install/oc.tar.gz -C /tmp/opencode-install && mv /tmp/opencode-install/opencode "$HOME/.opencode/bin/" && rm -rf /tmp/opencode-install && grep -q ".opencode/bin" "$HOME/.bashrc" 2>/dev/null || echo \'export PATH="$HOME/.opencode/bin:$PATH"\' >> "$HOME/.bashrc"; grep -q ".opencode/bin" "$HOME/.zshrc" 2>/dev/null || echo \'export PATH="$HOME/.opencode/bin:$PATH"\' >> "$HOME/.zshrc" 2>/dev/null; export PATH="$HOME/.opencode/bin:$PATH"';
 }
 
+// ─── npm prefix helper ────────────────────────────────────────────────────────
+
+/**
+ * Shell snippet that detects whether npm's global bin is in PATH.
+ * Sets _NPM_G_FLAGS to "--prefix ~/.npm-global" when npm's global bin dir
+ * is NOT reachable from PATH (e.g. Sprite VMs where node is under
+ * /.sprite/languages/node/nvm/... but that bin dir isn't in PATH).
+ *
+ * IMPORTANT: We use --prefix per-command instead of `npm config set prefix`
+ * because writing .npmrc with a prefix conflicts with nvm (even when nvm
+ * isn't loaded, npm from an nvm install detects .npmrc prefix and errors).
+ */
+const NPM_PREFIX_SETUP =
+  '_NPM_G_FLAGS=""; ' +
+  '_npm_gbin="$(npm prefix -g 2>/dev/null || echo /usr/local)/bin"; ' +
+  'if ! [ -w "$(npm prefix -g 2>/dev/null || echo /usr/local)" ] || ' +
+  '! printf "%s" ":${PATH}:" | grep -qF ":${_npm_gbin}:"; then ' +
+  'mkdir -p ~/.npm-global/bin; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
+  'export PATH="$HOME/.npm-global/bin:$PATH"';
+
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
 const ZEROCLAW_INSTALL_URL =
@@ -414,7 +490,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Codex CLI",
-          "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @openai/codex && " +
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @openai/codex && ` +
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
@@ -435,7 +511,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "openclaw",
-          "source ~/.bashrc && mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g openclaw && " +
+          `source ~/.bashrc 2>/dev/null; ${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} openclaw && ` +
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
@@ -471,7 +547,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Kilo Code",
-          "mkdir -p ~/.npm-global/bin && npm config set prefix ~/.npm-global && npm install -g @kilocode/cli && " +
+          `${NPM_PREFIX_SETUP} && npm install -g \${_NPM_G_FLAGS} @kilocode/cli && ` +
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
@@ -503,7 +579,8 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         "ZEROCLAW_PROVIDER=openrouter",
       ],
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
-      launchCmd: () => "source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
+      launchCmd: () =>
+        'export PATH="$HOME/.cargo/bin:$PATH"; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent',
     },
 
     hermes: {
