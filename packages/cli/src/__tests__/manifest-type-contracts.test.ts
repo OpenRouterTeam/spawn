@@ -103,29 +103,32 @@ describe("Agent OPENROUTER_API_KEY requirement", () => {
 
 describe("Agent optional field types (when present)", () => {
   for (const [key, agent] of allAgents) {
-    if (agent.pre_launch !== undefined) {
-      it(`agent "${key}" pre_launch should be a string`, () => {
-        expect(typeof agent.pre_launch).toBe("string");
-      });
-    }
+    it(`agent "${key}" pre_launch should be a string when present`, () => {
+      if (agent.pre_launch === undefined) {
+        return;
+      }
+      expect(typeof agent.pre_launch).toBe("string");
+    });
 
-    if (agent.config_files !== undefined) {
-      it(`agent "${key}" config_files should be an object with string keys`, () => {
-        expect(typeof agent.config_files).toBe("object");
-        expect(agent.config_files).not.toBeNull();
-        for (const filePath of Object.keys(agent.config_files!)) {
-          expect(typeof filePath).toBe("string");
-          expect(filePath.length).toBeGreaterThan(0);
-        }
-      });
-    }
+    it(`agent "${key}" config_files should be an object with string keys when present`, () => {
+      if (agent.config_files === undefined) {
+        return;
+      }
+      expect(typeof agent.config_files).toBe("object");
+      expect(agent.config_files).not.toBeNull();
+      for (const filePath of Object.keys(agent.config_files)) {
+        expect(typeof filePath).toBe("string");
+        expect(filePath.length).toBeGreaterThan(0);
+      }
+    });
 
-    if (agent.notes !== undefined) {
-      it(`agent "${key}" notes should be a non-empty string`, () => {
-        expect(typeof agent.notes).toBe("string");
-        expect(agent.notes!.length).toBeGreaterThan(0);
-      });
-    }
+    it(`agent "${key}" notes should be a non-empty string when present`, () => {
+      if (agent.notes === undefined) {
+        return;
+      }
+      expect(typeof agent.notes).toBe("string");
+      expect(agent.notes.length).toBeGreaterThan(0);
+    });
   }
 });
 
@@ -182,27 +185,30 @@ describe("Cloud required field types", () => {
 
 describe("Cloud optional field types (when present)", () => {
   for (const [key, cloud] of allClouds) {
-    if (cloud.defaults !== undefined) {
-      it(`cloud "${key}" defaults should be an object`, () => {
-        expect(typeof cloud.defaults).toBe("object");
-        expect(cloud.defaults).not.toBeNull();
-        expect(Array.isArray(cloud.defaults)).toBe(false);
-      });
-    }
+    it(`cloud "${key}" defaults should be an object when present`, () => {
+      if (cloud.defaults === undefined) {
+        return;
+      }
+      expect(typeof cloud.defaults).toBe("object");
+      expect(cloud.defaults).not.toBeNull();
+      expect(Array.isArray(cloud.defaults)).toBe(false);
+    });
 
-    if (cloud.notes !== undefined) {
-      it(`cloud "${key}" notes should be a non-empty string`, () => {
-        expect(typeof cloud.notes).toBe("string");
-        expect(cloud.notes!.length).toBeGreaterThan(0);
-      });
-    }
+    it(`cloud "${key}" notes should be a non-empty string when present`, () => {
+      if (cloud.notes === undefined) {
+        return;
+      }
+      expect(typeof cloud.notes).toBe("string");
+      expect(cloud.notes.length).toBeGreaterThan(0);
+    });
 
-    if (cloud.icon !== undefined) {
-      it(`cloud "${key}" icon should be a valid URL string`, () => {
-        expect(typeof cloud.icon).toBe("string");
-        expect(cloud.icon).toMatch(/^https?:\/\//);
-      });
-    }
+    it(`cloud "${key}" icon should be a valid URL string when present`, () => {
+      if (cloud.icon === undefined) {
+        return;
+      }
+      expect(typeof cloud.icon).toBe("string");
+      expect(cloud.icon).toMatch(/^https?:\/\//);
+    });
   }
 });
 
@@ -283,18 +289,18 @@ describe("Agent launch command consistency", () => {
 // ── Interactive prompts structure ─────────────────────────────────────────
 
 describe("Interactive prompts structure", () => {
-  for (const [key, agent] of allAgents.filter(([, a]) => a.interactive_prompts !== undefined)) {
-    for (const [promptKey, entry] of Object.entries(agent.interactive_prompts!)) {
-      it(`agent "${key}" prompt "${promptKey}" should have non-empty prompt text`, () => {
+  it("all interactive_prompts entries should have non-empty prompt text and string defaults", () => {
+    for (const [key, agent] of allAgents) {
+      if (agent.interactive_prompts === undefined) {
+        continue;
+      }
+      for (const [promptKey, entry] of Object.entries(agent.interactive_prompts)) {
         expect(entry.prompt.trim().length).toBeGreaterThan(0);
-      });
-
-      it(`agent "${key}" prompt "${promptKey}" default should be defined`, () => {
         expect(entry.default).toBeDefined();
         expect(typeof entry.default).toBe("string");
-      });
+      }
     }
-  }
+  });
 });
 
 // ── Agent metadata field types ────────────────────────────────────────
@@ -377,19 +383,17 @@ describe("Agent metadata field types", () => {
 // ── Config files structure ────────────────────────────────────────────────
 
 describe("Config files structure", () => {
-  for (const [key, agent] of allAgents.filter(([, a]) => a.config_files !== undefined)) {
-    it(`agent "${key}" config file paths should look like file paths`, () => {
-      for (const filePath of Object.keys(agent.config_files!)) {
+  it("config file paths should look like file paths and values should be objects", () => {
+    for (const [key, agent] of allAgents) {
+      if (agent.config_files === undefined) {
+        continue;
+      }
+      for (const [filePath, content] of Object.entries(agent.config_files)) {
         // Should contain / or ~ or . indicating a path
         expect(filePath).toMatch(/[/~.]/);
-      }
-    });
-
-    it(`agent "${key}" config file values should be objects`, () => {
-      for (const [path, content] of Object.entries(agent.config_files!)) {
         expect(typeof content).toBe("object");
         expect(content).not.toBeNull();
       }
-    });
-  }
+    }
+  });
 });
