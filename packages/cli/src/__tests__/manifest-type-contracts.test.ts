@@ -351,7 +351,11 @@ describe("Agent metadata field types", () => {
 
       it("category should be cli, tui, or ide-extension", () => {
         expect(typeof agent.category).toBe("string");
-        expect(["cli", "tui", "ide-extension"]).toContain(agent.category);
+        expect([
+          "cli",
+          "tui",
+          "ide-extension",
+        ]).toContain(agent.category);
       });
 
       it("tagline should be a non-empty string", () => {
