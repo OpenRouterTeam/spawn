@@ -347,6 +347,10 @@ export async function promptServerType(): Promise<string> {
     return process.env.HETZNER_SERVER_TYPE;
   }
 
+  if (process.env.SPAWN_CUSTOM !== "1") {
+    return DEFAULT_SERVER_TYPE;
+  }
+
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     return DEFAULT_SERVER_TYPE;
   }
