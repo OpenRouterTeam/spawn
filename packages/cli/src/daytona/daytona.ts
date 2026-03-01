@@ -556,7 +556,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
 
 // ─── Cloud Init ──────────────────────────────────────────────────────────────
 
-export async function waitForSsh(maxAttempts = 20): Promise<void> {
+async function waitForSsh(maxAttempts = 20): Promise<void> {
   logStep("Waiting for SSH connectivity...");
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {

@@ -165,7 +165,7 @@ export function clearHistory(): number {
 /** Check for pending connection data and merge it into the last history entry.
  *  Bash scripts write connection info to last-connection.json after successful spawn.
  *  This function merges that data into the history and persists it. */
-export function mergeLastConnection(): void {
+function mergeLastConnection(): void {
   const connPath = getConnectionPath();
   if (!existsSync(connPath)) {
     return;

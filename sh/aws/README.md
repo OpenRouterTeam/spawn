@@ -48,6 +48,12 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/opencode.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/kilocode.sh)
 ```
 
+#### Hermes Agent
+
+```bash
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/aws/hermes.sh)
+```
+
 ## Non-Interactive Mode
 
 ```bash
