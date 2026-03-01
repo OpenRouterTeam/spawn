@@ -15,7 +15,6 @@
 # ============================================================
 
 log_info()  { printf '[github-auth] %s\n' "$*" >&2; }
-log_step()  { printf '[github-auth] %s\n' "$*" >&2; }
 log_error() { printf '[github-auth] ERROR: %s\n' "$*" >&2; }
 
 # ============================================================
@@ -42,7 +41,7 @@ _install_gh_apt() {
     local SUDO=""
     if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
 
-    log_step "Adding GitHub CLI APT repository..."
+    log_info "Adding GitHub CLI APT repository..."
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | ${SUDO} dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
     ${SUDO} chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -72,7 +71,7 @@ ensure_gh_cli() {
         return 0
     fi
 
-    log_step "Installing GitHub CLI (gh)..."
+    log_info "Installing GitHub CLI (gh)..."
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
         _install_gh_brew || return 1
@@ -150,7 +149,7 @@ _fetch_gh_latest_version() {
 _download_and_install_gh() {
     local version="${1}" gh_os="${2}" gh_arch="${3}"
 
-    log_step "Downloading gh v${version} for ${gh_os}/${gh_arch}..."
+    log_info "Downloading gh v${version} for ${gh_os}/${gh_arch}..."
 
     local tarball="gh_${version}_${gh_os}_${gh_arch}.tar.gz"
     local url="https://github.com/cli/cli/releases/download/v${version}/${tarball}"
@@ -184,7 +183,7 @@ _download_and_install_gh() {
 }
 
 _install_gh_binary() {
-    log_step "Installing gh from GitHub releases (binary fallback)..."
+    log_info "Installing gh from GitHub releases (binary fallback)..."
 
     local platform
     platform=$(_detect_gh_platform) || return 1
@@ -228,7 +227,7 @@ ensure_gh_auth() {
             return 0
         fi
 
-        log_step "Persisting GITHUB_TOKEN to gh credential store..."
+        log_info "Persisting GITHUB_TOKEN to gh credential store..."
         # GITHUB_TOKEN is already unset above so gh auth login won't refuse
         # with "The value of the GITHUB_TOKEN environment variable is being
         # used for authentication."
@@ -246,7 +245,7 @@ ensure_gh_auth() {
     else
         # Device code flow — works on headless/remote servers
         # Shows a URL + code; user opens URL in local browser and enters the code
-        log_step "Authenticating via device code flow..."
+        log_info "Authenticating via device code flow..."
         log_info "A URL and code will appear below. Open the URL in your browser and enter the code."
         gh auth login --web -p https -h github.com || {
             log_error "GitHub authentication failed"
