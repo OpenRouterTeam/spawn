@@ -90,7 +90,7 @@ process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
             #   - _ . / @  (standard API key chars)
             #   : + =      (base64 segments, URL-safe and base64 formats)
             #   space       (prefixed token formats, e.g., "Bearer <token>")
-            # Must match CLI's loadTokenFromConfig regex in cli/src/digitalocean/digitalocean.ts
+            # Keep in sync with loadTokenFromConfig regex in packages/cli/src/digitalocean/digitalocean.ts
             if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@:+=\ -]+$ ]]; then
                 log "SECURITY: Invalid characters in config value for ${var_name}"
                 return 1
