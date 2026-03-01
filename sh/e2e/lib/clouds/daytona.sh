@@ -228,8 +228,12 @@ _daytona_exec_long() {
     ssh_args="${ssh_args} -o Port=${_DT_PORT}"
   fi
 
+  # Base64-encode the command to avoid shell injection via single-quote breakout
+  local encoded_cmd
+  encoded_cmd=$(printf '%s' "${cmd}" | base64 | tr -d '\n')
+
   # shellcheck disable=SC2086
-  ssh ${ssh_args} "${_DT_TOKEN}@${_DT_HOST}" "timeout ${timeout} bash -c '${cmd}'"
+  ssh ${ssh_args} "${_DT_TOKEN}@${_DT_HOST}" "timeout ${timeout} bash -c \"\$(printf '%s' '${encoded_cmd}' | base64 -d)\""
 }
 
 # ---------------------------------------------------------------------------
