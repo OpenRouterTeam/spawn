@@ -431,7 +431,7 @@
     "sprite/kilocode": "implemented",
     "local/hermes": "missing",
     "hetzner/hermes": "missing",
-    "aws/hermes": "missing",
+    "aws/hermes": "implemented",
     "daytona/hermes": "missing",
     "digitalocean/hermes": "missing",
     "gcp/hermes": "missing",
