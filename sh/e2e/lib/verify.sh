@@ -55,8 +55,8 @@ input_test_codex() {
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
   local remote_cmd
-  remote_cmd="source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; \
-    export PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
+  remote_cmd="source ~/.spawnrc 2>/dev/null; \
+    export PATH=\$HOME/.npm-global/bin:\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
     PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); codex exec \"\$PROMPT\""
 
@@ -337,7 +337,7 @@ verify_codex() {
 
   # Binary check
   log_step "Checking codex binary..."
-  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v codex" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v codex" >/dev/null 2>&1; then
     log_ok "codex binary found"
   else
     log_err "codex binary not found"
@@ -396,7 +396,7 @@ verify_kilocode() {
 
   # Binary check
   log_step "Checking kilocode binary..."
-  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; source ~/.zshrc 2>/dev/null; command -v kilocode" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH command -v kilocode" >/dev/null 2>&1; then
     log_ok "kilocode binary found"
   else
     log_err "kilocode binary not found"
@@ -430,7 +430,7 @@ verify_hermes() {
 
   # Binary check
   log_step "Checking hermes binary..."
-  if cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; command -v hermes" >/dev/null 2>&1; then
+  if cloud_exec "${app}" "PATH=\$HOME/.local/bin:\$HOME/.bun/bin:\$PATH command -v hermes" >/dev/null 2>&1; then
     log_ok "hermes binary found"
   else
     log_err "hermes binary not found"
