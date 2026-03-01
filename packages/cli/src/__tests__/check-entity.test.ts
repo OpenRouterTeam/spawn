@@ -135,7 +135,6 @@ describe("checkEntity", () => {
     it("should return true for cloud key 'vultr'", () => {
       expect(checkEntity(manifest, "vultr", "cloud")).toBe(true);
     });
-
   });
 
   // ── Wrong-type detection: cloud given as agent ──────────────────────────
