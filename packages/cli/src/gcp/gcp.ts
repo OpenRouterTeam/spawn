@@ -762,7 +762,7 @@ export async function createInstance(
 
 // ─── SSH Operations ─────────────────────────────────────────────────────────
 
-export async function waitForSsh(maxAttempts = 36): Promise<void> {
+async function waitForSsh(maxAttempts = 36): Promise<void> {
   const username = resolveUsername();
   const keyOpts = getSshKeyOpts(await ensureSshKeys());
   await sharedWaitForSsh({

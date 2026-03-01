@@ -84,7 +84,7 @@ function getUpdateFailedPath(): string {
   return path.join(process.env.HOME || homedir(), ".config", "spawn", ".update-failed");
 }
 
-export function isUpdateBackedOff(): boolean {
+function isUpdateBackedOff(): boolean {
   try {
     const failedPath = getUpdateFailedPath();
     const content = fs.readFileSync(failedPath, "utf8").trim();
