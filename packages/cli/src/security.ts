@@ -325,8 +325,7 @@ export function validateServerIdentifier(id: string): void {
  */
 
 /** Matches: source ~/.<path> [2>/dev/null] — RC file sourcing */
-const LAUNCH_SOURCE_SEGMENT =
-  /^source\s+~\/\.[a-zA-Z0-9._-]+(\/[a-zA-Z0-9._-]+)*(\s+2>\/dev\/null)?$/;
+const LAUNCH_SOURCE_SEGMENT = /^source\s+~\/\.[a-zA-Z0-9._-]+(\/[a-zA-Z0-9._-]+)*(\s+2>\/dev\/null)?$/;
 
 /** Matches: export PATH=<safe-path-value> — PATH setup */
 const LAUNCH_EXPORT_PATH_SEGMENT = /^export\s+PATH=[$a-zA-Z0-9_/:.~-]+$/;
@@ -374,10 +373,7 @@ export function validateLaunchCmd(cmd: string): void {
 
   // All preamble segments must be source or export PATH commands
   for (const segment of preamble) {
-    if (
-      !LAUNCH_SOURCE_SEGMENT.test(segment) &&
-      !LAUNCH_EXPORT_PATH_SEGMENT.test(segment)
-    ) {
+    if (!LAUNCH_SOURCE_SEGMENT.test(segment) && !LAUNCH_EXPORT_PATH_SEGMENT.test(segment)) {
       throw new Error(
         "Invalid launch command in history: unexpected preamble segment\n\n" +
           `Command: "${cmd}"\n` +
