@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import { loadManifest } from "../manifest";
-import { isString } from "@openrouter/spawn-shared";
+import { isString } from "../shared/type-guards";
 
 /**
- * Tests for cmdInteractive() in commands.ts.
+ * Tests for cmdInteractive() in commands/interactive.ts.
  *
  * cmdInteractive is the primary user entry point (invoked with bare `spawn`).
  * It has zero test coverage for:
@@ -24,36 +24,19 @@ let selectCallIndex = 0;
 let selectReturnValues: any[] = [];
 let isCancelValues: Set<any> = new Set();
 
-// Mock @clack/prompts
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-const mockLogStep = mock(() => {});
-const mockLogWarn = mock(() => {});
-const mockIntro = mock(() => {});
-const mockOutro = mock(() => {});
-const mockCancel = mock(() => {});
-const mockConfirm = mock(async () => true);
-const mockSpinnerStart = mock(() => {});
-const mockSpinnerStop = mock(() => {});
-const mockSpinnerMessage = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mockSpinnerStart,
-    stop: mockSpinnerStop,
-    message: mockSpinnerMessage,
-  }),
-  log: {
-    step: mockLogStep,
-    info: mockLogInfo,
-    error: mockLogError,
-    warn: mockLogWarn,
-  },
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logWarn: mockLogWarn,
   intro: mockIntro,
   outro: mockOutro,
   cancel: mockCancel,
   confirm: mockConfirm,
-  text: mock(async () => undefined),
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+  spinnerMessage: mockSpinnerMessage,
+} = mockClackPrompts({
   autocomplete: mock(async () => {
     const value = selectReturnValues[selectCallIndex] ?? "claude";
     selectCallIndex++;
@@ -64,8 +47,8 @@ mock.module("@clack/prompts", () => ({
     selectCallIndex++;
     return value;
   }),
-  isCancel: (value: any) => isCancelValues.has(value),
-}));
+  isCancel: (value: unknown) => isCancelValues.has(value),
+});
 
 // Import commands after mock setup
 const { cmdInteractive } = await import("../commands.js");

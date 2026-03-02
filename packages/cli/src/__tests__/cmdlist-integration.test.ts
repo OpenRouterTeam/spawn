@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:te
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import type { SpawnRecord } from "../history";
 
 /**
@@ -27,35 +27,14 @@ import type { SpawnRecord } from "../history";
 
 const mockManifest = createMockManifest();
 
-// Mock @clack/prompts
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-const mockLogStep = mock(() => {});
-const mockLogSuccess = mock(() => {});
-const mockSpinnerStart = mock(() => {});
-const mockSpinnerStop = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mockSpinnerStart,
-    stop: mockSpinnerStop,
-    message: mock(() => {}),
-  }),
-  log: {
-    step: mockLogStep,
-    info: mockLogInfo,
-    error: mockLogError,
-    warn: mock(() => {}),
-    success: mockLogSuccess,
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
-  select: mock(() => {}),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  isCancel: () => false,
-}));
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logSuccess: mockLogSuccess,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+} = mockClackPrompts();
 
 // Import after mock setup
 const { cmdList, resolveDisplayName } = await import("../commands.js");

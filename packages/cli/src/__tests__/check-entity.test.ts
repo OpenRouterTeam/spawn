@@ -3,7 +3,7 @@ import { checkEntity } from "../commands";
 import type { Manifest } from "../manifest";
 
 /**
- * Tests for checkEntity (commands.ts:182-206).
+ * Tests for checkEntity (commands/shared.ts).
  *
  * checkEntity validates that a user-provided value exists in the manifest
  * as the expected entity kind (agent or cloud). It returns true if valid,
@@ -16,7 +16,7 @@ import type { Manifest } from "../manifest";
  *    "Did you mean X?" suggestion.
  * 3. Generic error: no close match found -- returns false with list command hint.
  *
- * This function is called in cmdRun (commands.ts:396-397) for both agent
+ * This function is called in cmdRun (commands/run.ts) for both agent
  * and cloud validation, making it critical for the run pipeline.
  */
 

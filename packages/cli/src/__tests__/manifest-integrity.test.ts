@@ -176,11 +176,9 @@ describe("Manifest Integrity", () => {
 
       for (const [key] of sample) {
         const scriptPath = join(REPO_ROOT, "sh", key + ".sh");
-        if (existsSync(scriptPath)) {
-          const content = readFileSync(scriptPath, "utf-8");
-          if (!content.trimStart().startsWith("#!")) {
-            badScripts.push(key + ".sh");
-          }
+        const content = readFileSync(scriptPath, "utf-8");
+        if (!content.trimStart().startsWith("#!")) {
+          badScripts.push(key + ".sh");
         }
       }
 
@@ -194,11 +192,9 @@ describe("Manifest Integrity", () => {
 
       for (const [key] of sample) {
         const scriptPath = join(REPO_ROOT, "sh", key + ".sh");
-        if (existsSync(scriptPath)) {
-          const content = readFileSync(scriptPath, "utf-8");
-          if (!content.includes("set -eo pipefail")) {
-            badScripts.push(key + ".sh");
-          }
+        const content = readFileSync(scriptPath, "utf-8");
+        if (!content.includes("set -eo pipefail")) {
+          badScripts.push(key + ".sh");
         }
       }
 

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import { loadManifest } from "../manifest";
-import { isString } from "@openrouter/spawn-shared";
+import { isString } from "../shared/type-guards";
 
 /**
- * Tests for commands.ts error/validation paths that call process.exit(1).
+ * Tests for commands/ error/validation paths that call process.exit(1).
  *
  * - cmdRun with invalid identifiers (injection characters, path traversal)
  * - cmdRun with unknown agent or cloud names
@@ -18,34 +18,14 @@ import { isString } from "@openrouter/spawn-shared";
 
 const mockManifest = createMockManifest();
 
-// Mock @clack/prompts to prevent TTY output and capture error/info messages
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-const mockLogStep = mock(() => {});
-const mockLogWarn = mock(() => {});
-const mockSpinnerStart = mock(() => {});
-const mockSpinnerStop = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mockSpinnerStart,
-    stop: mockSpinnerStop,
-    message: mock(() => {}),
-  }),
-  log: {
-    step: mockLogStep,
-    info: mockLogInfo,
-    error: mockLogError,
-    warn: mockLogWarn,
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
-  select: mock(() => {}),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  isCancel: () => false,
-}));
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logWarn: mockLogWarn,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+} = mockClackPrompts();
 
 // Import commands after @clack/prompts mock is set up
 const { cmdRun, cmdAgentInfo } = await import("../commands.js");

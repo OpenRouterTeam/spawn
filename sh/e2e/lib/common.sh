@@ -58,7 +58,7 @@ log_info() {
 # ---------------------------------------------------------------------------
 # load_cloud_driver CLOUD
 #
-# Sources the cloud-specific driver and creates generic wrappers.
+# Sources the cloud-specific driver and sets ACTIVE_CLOUD for wrapper dispatch.
 # ---------------------------------------------------------------------------
 load_cloud_driver() {
   local cloud="$1"
@@ -76,28 +76,33 @@ load_cloud_driver() {
 
   source "${driver_file}"
 
-  # Create generic wrappers that delegate to cloud-specific functions
-  eval "cloud_validate_env() { _${cloud}_validate_env \"\$@\"; }"
-  eval "cloud_headless_env() { _${cloud}_headless_env \"\$@\"; }"
-  eval "cloud_provision_verify() { _${cloud}_provision_verify \"\$@\"; }"
-  eval "cloud_exec() { _${cloud}_exec \"\$@\"; }"
-  eval "cloud_exec_long() { _${cloud}_exec_long \"\$@\"; }"
-  eval "cloud_teardown() { _${cloud}_teardown \"\$@\"; }"
-  eval "cloud_cleanup_stale() { _${cloud}_cleanup_stale \"\$@\"; }"
+  log_step "Loaded cloud driver: ${cloud}"
+}
 
-  # Optional: per-cloud parallelism cap (returns max agents to run concurrently)
-  if type "_${cloud}_max_parallel" >/dev/null 2>&1; then
-    eval "cloud_max_parallel() { _${cloud}_max_parallel \"\$@\"; }"
+# ---------------------------------------------------------------------------
+# Cloud wrapper functions — use ACTIVE_CLOUD for indirection (set by load_cloud_driver)
+# ---------------------------------------------------------------------------
+cloud_validate_env()     { "_${ACTIVE_CLOUD}_validate_env" "$@"; }
+cloud_headless_env()     { "_${ACTIVE_CLOUD}_headless_env" "$@"; }
+cloud_provision_verify() { "_${ACTIVE_CLOUD}_provision_verify" "$@"; }
+cloud_exec()             { "_${ACTIVE_CLOUD}_exec" "$@"; }
+cloud_exec_long()        { "_${ACTIVE_CLOUD}_exec_long" "$@"; }
+cloud_teardown()         { "_${ACTIVE_CLOUD}_teardown" "$@"; }
+cloud_cleanup_stale()    { "_${ACTIVE_CLOUD}_cleanup_stale" "$@"; }
+
+cloud_max_parallel() {
+  if type "_${ACTIVE_CLOUD}_max_parallel" >/dev/null 2>&1; then
+    "_${ACTIVE_CLOUD}_max_parallel" "$@"
   else
-    # Default: no cap (return a large number)
-    eval "cloud_max_parallel() { printf '99'; }"
+    printf '99'
   fi
+}
 
-  # Optional: per-cloud install wait override (seconds to poll for .spawnrc)
-  if type "_${cloud}_install_wait" >/dev/null 2>&1; then
-    eval "cloud_install_wait() { _${cloud}_install_wait \"\$@\"; }"
+cloud_install_wait() {
+  if type "_${ACTIVE_CLOUD}_install_wait" >/dev/null 2>&1; then
+    "_${ACTIVE_CLOUD}_install_wait" "$@"
   else
-    eval "cloud_install_wait() { printf '%s' \"\${INSTALL_WAIT}\"; }"
+    printf '%s' "${INSTALL_WAIT}"
   fi
 }
 

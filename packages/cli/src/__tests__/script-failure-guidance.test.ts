@@ -21,7 +21,7 @@ function getSignalGuidance(...args: Parameters<typeof _getSignalGuidance>): stri
 }
 
 /**
- * Tests for getScriptFailureGuidance() in commands.ts.
+ * Tests for getScriptFailureGuidance() in commands/run.ts.
  *
  * This function maps exit codes from failed spawn scripts to user-facing
  * guidance strings. It was recently modified (PRs #450, #449) but has

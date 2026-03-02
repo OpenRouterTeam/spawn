@@ -28,10 +28,11 @@ The installer uses bun to build the TypeScript CLI into a standalone JavaScript 
 cli/
 ├── src/
 │   ├── index.ts        # Entry point (routes commands to handlers)
-│   ├── commands.ts     # All command implementations
+│   ├── commands/       # Per-command modules (interactive, list, run, etc.)
+│   │   └── index.ts    # Barrel re-export
+│   ├── commands.ts     # Compatibility shim → re-exports from commands/index.ts
 │   ├── manifest.ts     # Manifest fetching and caching logic
 │   ├── update-check.ts # Auto-update check (once per day)
-│   ├── version.ts      # Version constant
 │   └── __tests__/      # Test suite (Bun test runner)
 ├── ../sh/cli/install.sh # Installer (auto-installs bun if needed, lives in sh/cli/)
 ├── package.json        # Package metadata and dependencies
@@ -195,11 +196,11 @@ bun run dev claude sprite
 - Routes to appropriate command handler
 - Minimal logic (just dispatching)
 
-**`src/commands.ts`**
-- All command implementations
-- Interactive picker UI
-- Script execution logic
-- Help text
+**`src/commands/`**
+- Per-command modules: `interactive.ts`, `list.ts`, `run.ts`, `delete.ts`, `update.ts`, etc.
+- `shared.ts` — helpers, entity resolution, fuzzy matching, credential hints
+- `index.ts` — barrel re-export for backward compat
+- `commands.ts` at root is a thin shim that re-exports from `commands/index.ts`
 
 **`src/manifest.ts`**
 - Manifest fetching from GitHub
@@ -212,7 +213,7 @@ bun run dev claude sprite
 
 ### Adding a New Command
 
-1. Add command handler in `src/commands.ts`:
+1. Add a new file `src/commands/mycommand.ts`:
    ```typescript
    export async function cmdMyCommand() {
      const manifest = await loadManifest();
@@ -220,14 +221,19 @@ bun run dev claude sprite
    }
    ```
 
-2. Add routing in `src/index.ts`:
+2. Re-export from `src/commands/index.ts`:
+   ```typescript
+   export { cmdMyCommand } from "./mycommand.js";
+   ```
+
+3. Add routing in `src/index.ts`:
    ```typescript
    case "mycommand":
      await cmdMyCommand();
      break;
    ```
 
-3. Update help text in `src/commands.ts` → `cmdHelp()`
+4. Update help text in `src/commands/help.ts` → `cmdHelp()`
 
 ## Design Rationale
 

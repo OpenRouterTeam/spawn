@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { mockClackPrompts } from "./test-helpers";
 import type { SpawnRecord } from "../history.js";
 import { clearHistory, loadHistory, saveSpawnRecord, filterHistory, getHistoryPath } from "../history.js";
 
 /**
- * Tests for clearHistory (history.ts) and cmdListClear (commands.ts).
+ * Tests for clearHistory (history.ts) and cmdListClear (commands/list.ts).
  *
  * clearHistory is invoked via `spawn list --clear` and performs a destructive
  * operation (deleting the history file). It has zero existing test coverage.
@@ -282,31 +283,7 @@ describe("clearHistory", () => {
 
 // ── cmdListClear via mock.module ─────────────────────────────────────────────
 
-const mockLogInfo = mock(() => {});
-const mockLogSuccess = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mock(() => {}),
-    stop: mock(() => {}),
-    message: mock(() => {}),
-  }),
-  log: {
-    step: mock(() => {}),
-    info: mockLogInfo,
-    error: mock(() => {}),
-    warn: mock(() => {}),
-    success: mockLogSuccess,
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
-  select: mock(() => {}),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  isCancel: () => false,
-  confirm: mock(() => Promise.resolve(true)),
-}));
+const { logInfo: mockLogInfo, logSuccess: mockLogSuccess } = mockClackPrompts();
 
 // Import after mock setup
 const { cmdListClear } = await import("../commands.js");

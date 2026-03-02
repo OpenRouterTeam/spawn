@@ -13,9 +13,8 @@ import { createMockManifest } from "./test-helpers";
  * checks both keys AND display names to find the best match for a typo.
  *
  * This function was added in PR #414 and is used in:
- * - validateAgent (commands.ts:177) — error suggestions for unknown agents
- * - validateCloud (commands.ts:206) — error suggestions for unknown clouds
- * - showInfoOrError (index.ts:112-113) — fallback suggestions for unknown commands
+ * - checkEntity (commands/shared.ts) — error suggestions for unknown agents/clouds
+ * - showInfoOrError (index.ts) — fallback suggestions for unknown commands
  *
  * It has a nuanced priority system:
  * 1. Check Levenshtein distance to each key

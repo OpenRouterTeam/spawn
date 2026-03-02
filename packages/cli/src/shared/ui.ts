@@ -4,7 +4,7 @@
 import * as p from "@clack/prompts";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { isString } from "@openrouter/spawn-shared";
+import { isString } from "./type-guards";
 
 const RED = "\x1b[0;31m";
 const GREEN = "\x1b[0;32m";
@@ -183,8 +183,8 @@ export function openBrowser(url: string): void {
 
 // ─── Result-based retry ────────────────────────────────────────────────
 
-import type { Result } from "@openrouter/spawn-shared";
-export { type Result, Ok, Err } from "@openrouter/spawn-shared";
+import type { Result } from "./result";
+export { type Result, Ok, Err } from "./result";
 
 /**
  * Phase-aware retry helper using the Result monad.

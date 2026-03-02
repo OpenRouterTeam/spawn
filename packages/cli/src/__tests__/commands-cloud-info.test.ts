@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import { loadManifest } from "../manifest";
 
 /**
- * Tests for cmdCloudInfo and related cloud validation paths in commands.ts.
+ * Tests for cmdCloudInfo and related cloud validation paths in commands/info.ts.
  *
  * cmdCloudInfo had zero test coverage despite being a user-facing command.
  * These tests exercise the actual exported function with:
@@ -48,34 +48,14 @@ const manifestWithCloudNotes = {
   },
 };
 
-// Mock @clack/prompts
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-const mockLogStep = mock(() => {});
-const mockLogWarn = mock(() => {});
-const mockSpinnerStart = mock(() => {});
-const mockSpinnerStop = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mockSpinnerStart,
-    stop: mockSpinnerStop,
-    message: mock(() => {}),
-  }),
-  log: {
-    step: mockLogStep,
-    info: mockLogInfo,
-    error: mockLogError,
-    warn: mockLogWarn,
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
-  select: mock(() => {}),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  isCancel: () => false,
-}));
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logWarn: mockLogWarn,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+} = mockClackPrompts();
 
 // Import commands after mock setup
 const { cmdCloudInfo } = await import("../commands.js");

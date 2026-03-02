@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import { loadManifest } from "../manifest";
 
 /**
  * Tests for the display-name suggestion branches in validateAgent and
- * validateCloud (commands.ts lines 145-199).
+ * validateCloud (commands/shared.ts).
  *
  * When a user types an unknown agent or cloud, validateAgent/validateCloud:
  *   1. Try findClosestMatch on keys (e.g. "claud" -> "claude")
@@ -101,35 +101,14 @@ const manifestWithDistinctNames = {
   },
 };
 
-// Mock @clack/prompts
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-const mockLogStep = mock(() => {});
-const mockLogWarn = mock(() => {});
-const mockSpinnerStart = mock(() => {});
-const mockSpinnerStop = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mockSpinnerStart,
-    stop: mockSpinnerStop,
-    message: mock(() => {}),
-  }),
-  log: {
-    step: mockLogStep,
-    info: mockLogInfo,
-    error: mockLogError,
-    warn: mockLogWarn,
-    success: mock(() => {}),
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
-  select: mock(() => {}),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  isCancel: () => false,
-}));
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logWarn: mockLogWarn,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+} = mockClackPrompts();
 
 // Import commands after mock setup
 const { cmdRun, cmdAgentInfo, cmdCloudInfo, findClosestMatch } = await import("../commands.js");

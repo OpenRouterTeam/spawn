@@ -32,7 +32,7 @@ import {
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
-import { parseJsonWith } from "@openrouter/spawn-shared";
+import { parseJsonWith } from "../shared/parse";
 import { saveVmConnection } from "../history.js";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
@@ -341,6 +341,7 @@ async function lightsailRest(target: string, body = "{}"): Promise<string> {
     method: "POST",
     headers: reqHeaders,
     body,
+    signal: AbortSignal.timeout(30_000),
   });
   const text = await resp.text();
 
@@ -488,6 +489,9 @@ export async function ensureAwsCli(): Promise<void> {
 
 export async function authenticate(): Promise<void> {
   const region = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || "us-east-1";
+  if (!validateRegionName(region)) {
+    throw new Error(`Invalid AWS region: ${region}. Must match /^[a-zA-Z0-9_-]{1,63}$/`);
+  }
   awsRegion = region;
   const skipCache = process.env.SPAWN_REAUTH === "1";
 
@@ -532,6 +536,9 @@ export async function authenticate(): Promise<void> {
     const cached = loadCredsFromConfig();
     if (cached) {
       const cachedRegion = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || cached.region;
+      if (!validateRegionName(cachedRegion)) {
+        throw new Error(`Invalid AWS region: ${cachedRegion}. Must match /^[a-zA-Z0-9_-]{1,63}$/`);
+      }
       process.env.AWS_ACCESS_KEY_ID = cached.accessKeyId;
       process.env.AWS_SECRET_ACCESS_KEY = cached.secretAccessKey;
       process.env.AWS_DEFAULT_REGION = cachedRegion;
@@ -612,7 +619,11 @@ export async function authenticate(): Promise<void> {
 
 export async function promptRegion(): Promise<void> {
   if (process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION) {
-    awsRegion = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || "us-east-1";
+    const envRegion = process.env.AWS_DEFAULT_REGION || process.env.LIGHTSAIL_REGION || "us-east-1";
+    if (!validateRegionName(envRegion)) {
+      throw new Error(`Invalid AWS region: ${envRegion}. Must match /^[a-zA-Z0-9_-]{1,63}$/`);
+    }
+    awsRegion = envRegion;
     return;
   }
   if (process.env.SPAWN_CUSTOM !== "1") {

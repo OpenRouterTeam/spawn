@@ -1,6 +1,6 @@
 /**
  * Guidance data structures for error and signal reporting.
- * Extracted from commands.ts to improve maintainability and reduce cognitive complexity.
+ * Used by getScriptFailureGuidance in commands/run.ts.
  */
 
 import pc from "picocolors";
@@ -24,7 +24,7 @@ export function buildDashboardHint(dashboardUrl?: string): string {
     : "  - Check your cloud provider dashboard to stop or delete any unused servers";
 }
 
-// Note: Exit code 1 uses specialHandling because it needs credentialHints from commands.ts to avoid circular deps
+// Note: Exit code 1 uses specialHandling because it needs credentialHints from commands/run.ts to avoid circular deps
 export const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
   130: {
     header: "Script was interrupted (Ctrl+C).",
@@ -80,7 +80,7 @@ export const EXIT_CODE_GUIDANCE: Record<number, ExitCodeEntry> = {
     header: "Common causes:",
     lines: [],
     includeDashboard: true,
-    // specialHandling is set in getScriptFailureGuidance in commands.ts
+    // specialHandling is set in getScriptFailureGuidance in commands/run.ts
     // to avoid circular dependency with credentialHints
     specialHandling: () => [],
   },
