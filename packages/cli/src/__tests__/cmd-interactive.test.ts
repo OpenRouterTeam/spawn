@@ -4,7 +4,7 @@ import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 
 /**
- * Tests for cmdInteractive() in commands.ts.
+ * Tests for cmdInteractive() in commands/interactive.ts.
  *
  * cmdInteractive is the primary user entry point (invoked with bare `spawn`).
  * It has zero test coverage for:

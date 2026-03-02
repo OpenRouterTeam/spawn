@@ -4,7 +4,7 @@ import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 
 /**
- * Tests for detectAndFixSwappedArgs and resolveAndLog logic in commands.ts.
+ * Tests for detectAndFixSwappedArgs and resolveAndLog logic in commands/run.ts.
  *
  * These functions handle two important CLI UX features:
  * - Swapped argument detection: "spawn sprite claude" -> "spawn claude sprite"

@@ -5,7 +5,7 @@ import { isString } from "../shared/type-guards";
 
 /**
  * Tests for cmdRun display-name resolution and validateImplementation
- * suggestion paths in commands.ts.
+ * suggestion paths in commands/run.ts.
  *
  * - cmdRun resolving case-insensitive display names and logging "Resolved" messages
  * - cmdRun resolving case-insensitive keys (e.g. "Claude" -> "claude")

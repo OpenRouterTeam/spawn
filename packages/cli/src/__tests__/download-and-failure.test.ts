@@ -5,7 +5,7 @@ import { isString } from "../shared/type-guards";
 
 /**
  * Tests for the download fallback pipeline and script failure reporting
- * through real exported code paths in commands.ts.
+ * through real exported code paths in commands/run.ts.
  *
  * - downloadScriptWithFallback: primary URL succeeds (real code path through cmdRun)
  * - downloadScriptWithFallback: primary fails, fallback succeeds (real cmdRun)

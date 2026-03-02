@@ -6,7 +6,7 @@ import pkg from "../../package.json" with { type: "json" };
 const VERSION = pkg.version;
 
 /**
- * Tests for cmdUpdate and script download/execution paths in commands.ts.
+ * Tests for cmdUpdate and script download/execution paths in commands/update.ts and commands/run.ts.
  *
  * These functions have zero test coverage in the existing test suite:
  * - cmdUpdate: checks for CLI updates by fetching remote package.json

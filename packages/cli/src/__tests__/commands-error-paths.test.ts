@@ -4,7 +4,7 @@ import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 
 /**
- * Tests for commands.ts error/validation paths that call process.exit(1).
+ * Tests for commands/ error/validation paths that call process.exit(1).
  *
  * - cmdRun with invalid identifiers (injection characters, path traversal)
  * - cmdRun with unknown agent or cloud names

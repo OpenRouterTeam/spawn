@@ -7,7 +7,7 @@ import type { SpawnRecord } from "../history.js";
 import { clearHistory, loadHistory, saveSpawnRecord, filterHistory, getHistoryPath } from "../history.js";
 
 /**
- * Tests for clearHistory (history.ts) and cmdListClear (commands.ts).
+ * Tests for clearHistory (history.ts) and cmdListClear (commands/list.ts).
  *
  * clearHistory is invoked via `spawn list --clear` and performs a destructive
  * operation (deleting the history file). It has zero existing test coverage.

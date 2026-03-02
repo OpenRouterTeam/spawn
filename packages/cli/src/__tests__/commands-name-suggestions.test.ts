@@ -4,7 +4,7 @@ import { loadManifest } from "../manifest";
 
 /**
  * Tests for the display-name suggestion branches in validateAgent and
- * validateCloud (commands.ts lines 145-199).
+ * validateCloud (commands/shared.ts).
  *
  * When a user types an unknown agent or cloud, validateAgent/validateCloud:
  *   1. Try findClosestMatch on keys (e.g. "claud" -> "claude")

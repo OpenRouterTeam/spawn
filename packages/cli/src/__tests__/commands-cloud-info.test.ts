@@ -3,7 +3,7 @@ import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts 
 import { loadManifest } from "../manifest";
 
 /**
- * Tests for cmdCloudInfo and related cloud validation paths in commands.ts.
+ * Tests for cmdCloudInfo and related cloud validation paths in commands/info.ts.
  *
  * cmdCloudInfo had zero test coverage despite being a user-facing command.
  * These tests exercise the actual exported function with:

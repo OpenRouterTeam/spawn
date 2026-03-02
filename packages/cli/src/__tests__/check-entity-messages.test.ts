@@ -3,7 +3,7 @@ import { mockClackPrompts } from "./test-helpers";
 import type { Manifest } from "../manifest";
 
 /**
- * Tests for checkEntity output messages (commands.ts:177-216).
+ * Tests for checkEntity output messages (commands/shared.ts).
  *
  * The existing check-entity.test.ts verifies return values (true/false)
  * but does not capture the messages output via @clack/prompts log calls.
