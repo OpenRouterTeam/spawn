@@ -460,44 +460,79 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
   });
 
   logStep("Waiting for cloud-init to complete...");
-  for (let attempt = 1; attempt <= 60; attempt++) {
-    try {
-      const proc = Bun.spawn(
-        [
-          "ssh",
-          ...SSH_BASE_OPTS,
-          ...keyOpts,
-          `root@${serverIp}`,
-          "test -f /root/.cloud-init-complete && echo done",
-        ],
-        {
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe",
-          ],
-        },
-      );
-      // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-      const [stdout] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      const exitCode = await proc.exited;
-      if (exitCode === 0 && stdout.includes("done")) {
-        logInfo("Cloud-init complete");
-        return;
+
+  // Single SSH connection that polls on the server side.
+  // Previous approach spawned a new SSH process every 5s (60 handshakes = ~90s overhead).
+  // This does one handshake and loops on the remote, printing progress lines we read locally.
+  const proc = Bun.spawn(
+    [
+      "ssh",
+      ...SSH_BASE_OPTS,
+      ...keyOpts,
+      `root@${serverIp}`,
+      "i=0; while [ $i -lt 150 ]; do " +
+        "if test -f /root/.cloud-init-complete; then echo CLOUD_INIT_DONE; exit 0; fi; " +
+        "i=$((i + 1)); echo CLOUD_INIT_WAIT_$i; sleep 2; " +
+        "done; echo CLOUD_INIT_TIMEOUT; exit 1",
+    ],
+    {
+      stdio: [
+        "ignore",
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
+
+  // 5 min hard timeout — kill the SSH process if it hangs
+  const timer = setTimeout(() => killWithTimeout(proc), 310_000);
+
+  // Drain stderr in background to prevent pipe buffer deadlock
+  const stderrDrain = new Response(proc.stderr).text();
+
+  // Read stdout line-by-line for progress
+  try {
+    const reader = proc.stdout.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let lastProgress = 0;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) { break; }
+      buf += decoder.decode(value, { stream: true });
+
+      let nlIdx = buf.indexOf("\n");
+      while (nlIdx !== -1) {
+        const line = buf.slice(0, nlIdx).trim();
+        buf = buf.slice(nlIdx + 1);
+
+        if (line === "CLOUD_INIT_DONE") {
+          clearTimeout(timer);
+          await stderrDrain;
+          logInfo("Cloud-init complete");
+          return;
+        }
+        if (line.startsWith("CLOUD_INIT_WAIT_")) {
+          const num = Number.parseInt(line.slice(16), 10);
+          if (num > lastProgress) {
+            lastProgress = num;
+            // Show elapsed seconds (each iteration = 2s)
+            logStep(`Cloud-init in progress (${num * 2}s elapsed)`);
+          }
+        }
+        nlIdx = buf.indexOf("\n");
       }
-    } catch {
-      // ignore
     }
-    if (attempt >= 60) {
-      logWarn("Cloud-init marker not found, continuing anyway...");
-      return;
-    }
-    logStep(`Cloud-init in progress (${attempt}/60)`);
-    await sleep(5000);
+  } catch {
+    // SSH connection dropped — fall through
   }
+
+  clearTimeout(timer);
+  await stderrDrain;
+  await proc.exited;
+
+  logWarn("Cloud-init marker not found, continuing anyway...");
 }
 
 export async function runServer(cmd: string, timeoutSecs?: number, ip?: string): Promise<void> {
