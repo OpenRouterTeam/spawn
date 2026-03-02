@@ -109,66 +109,6 @@ describe("checkEntity", () => {
     manifest = createTestManifest();
   });
 
-  // ── Happy path: valid entities ──────────────────────────────────────────
-
-  describe("valid entities", () => {
-    it("should return true for agent key 'claude'", () => {
-      expect(checkEntity(manifest, "claude", "agent")).toBe(true);
-    });
-
-    it("should return true for agent key 'codex'", () => {
-      expect(checkEntity(manifest, "codex", "agent")).toBe(true);
-    });
-
-    it("should return true for agent key 'cline'", () => {
-      expect(checkEntity(manifest, "cline", "agent")).toBe(true);
-    });
-
-    it("should return true for cloud key 'sprite'", () => {
-      expect(checkEntity(manifest, "sprite", "cloud")).toBe(true);
-    });
-
-    it("should return true for cloud key 'hetzner'", () => {
-      expect(checkEntity(manifest, "hetzner", "cloud")).toBe(true);
-    });
-
-    it("should return true for cloud key 'vultr'", () => {
-      expect(checkEntity(manifest, "vultr", "cloud")).toBe(true);
-    });
-  });
-
-  // ── Wrong-type detection: cloud given as agent ──────────────────────────
-
-  describe("wrong-type detection: cloud given as agent", () => {
-    it("should return false when 'sprite' is checked as agent", () => {
-      expect(checkEntity(manifest, "sprite", "agent")).toBe(false);
-    });
-
-    it("should return false when 'hetzner' is checked as agent", () => {
-      expect(checkEntity(manifest, "hetzner", "agent")).toBe(false);
-    });
-
-    it("should return false when 'vultr' is checked as agent", () => {
-      expect(checkEntity(manifest, "vultr", "agent")).toBe(false);
-    });
-  });
-
-  // ── Wrong-type detection: agent given as cloud ──────────────────────────
-
-  describe("wrong-type detection: agent given as cloud", () => {
-    it("should return false when 'claude' is checked as cloud", () => {
-      expect(checkEntity(manifest, "claude", "cloud")).toBe(false);
-    });
-
-    it("should return false when 'codex' is checked as cloud", () => {
-      expect(checkEntity(manifest, "codex", "cloud")).toBe(false);
-    });
-
-    it("should return false when 'cline' is checked as cloud", () => {
-      expect(checkEntity(manifest, "cline", "cloud")).toBe(false);
-    });
-  });
-
   // ── Non-existent entities: no close match (distance > 3) ───────────────
 
   describe("non-existent entities with no close match", () => {

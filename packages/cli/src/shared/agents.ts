@@ -21,11 +21,6 @@ export interface AgentConfig {
   envVars: (apiKey: string) => string[];
   /** Agent-specific configuration (settings files, etc.). */
   configure?: (apiKey: string, modelId?: string) => Promise<void>;
-  /**
-   * Batched setup: install + env + configure in a single SSH session.
-   * When provided, orchestrate.ts calls this instead of the separate install / env / configure steps.
-   */
-  setup?: (envContent: string, apiKey: string, modelId?: string) => Promise<void>;
   /** Pre-launch hook (e.g., start gateway daemon). */
   preLaunch?: () => Promise<void>;
   /** Optional tip or warning shown to the user just before the agent launches. */

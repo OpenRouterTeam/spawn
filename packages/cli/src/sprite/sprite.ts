@@ -434,6 +434,7 @@ export function saveVmConnection(): void {
   const dir = getSpawnDir();
   mkdirSync(dir, {
     recursive: true,
+    mode: 0o700,
   });
   const json: Record<string, string> = {
     ip: "sprite-console",
@@ -441,7 +442,9 @@ export function saveVmConnection(): void {
     server_name: spriteName,
     cloud: "sprite",
   };
-  writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n");
+  writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n", {
+    mode: 0o600,
+  });
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────

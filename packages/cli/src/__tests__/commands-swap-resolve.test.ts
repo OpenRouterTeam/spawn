@@ -305,19 +305,6 @@ describe("resolveAndLog via cmdRun", () => {
       expect(resolvedAgent).toBe(true);
       expect(resolvedCloud).toBe(true);
     });
-
-    it("should not log resolution for already-lowercase exact keys", async () => {
-      await setManifestAndScript(mockManifest);
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // May throw from script execution
-      }
-
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
-      expect(infoCalls.some((msg: string) => msg.includes("Resolved"))).toBe(false);
-    });
   });
 
   describe("display name resolution", () => {

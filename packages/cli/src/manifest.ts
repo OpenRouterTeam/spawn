@@ -198,6 +198,7 @@ function tryLoadFromDiskCache(): Manifest | null {
 function updateCache(manifest: Manifest): Manifest {
   writeCache(manifest);
   _cached = manifest;
+  _staleCache = false;
   return manifest;
 }
 
@@ -233,6 +234,7 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
   const local = tryLoadLocalManifest();
   if (local) {
     _cached = local;
+    _staleCache = false;
     return local;
   }
 
@@ -241,6 +243,7 @@ export async function loadManifest(forceRefresh = false): Promise<Manifest> {
     const cached = tryLoadFromDiskCache();
     if (cached) {
       _cached = cached;
+      _staleCache = false;
       return cached;
     }
   }
