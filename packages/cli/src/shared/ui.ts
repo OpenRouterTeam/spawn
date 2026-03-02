@@ -2,6 +2,8 @@
 // @clack/prompts is bundled into cli.js at build time.
 
 import * as p from "@clack/prompts";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { isString } from "@openrouter/spawn-shared";
 
 const RED = "\x1b[0;31m";
@@ -203,6 +205,14 @@ export async function withRetry<T>(
     await new Promise((r) => setTimeout(r, delaySec * 1000));
   }
   throw new Error("unreachable");
+}
+
+/**
+ * Return the path to the per-cloud config file: ~/.config/spawn/{cloud}.json
+ * Shared by all cloud modules to avoid repeating the same path construction.
+ */
+export function getSpawnCloudConfigPath(cloud: string): string {
+  return join(process.env.HOME || homedir(), ".config", "spawn", `${cloud}.json`);
 }
 
 /** JSON-escape a string (returns the quoted JSON string). */

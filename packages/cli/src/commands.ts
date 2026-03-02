@@ -5,7 +5,6 @@ import * as v from "valibot";
 import { parseJsonWith, isString } from "@openrouter/spawn-shared";
 import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
-import { homedir } from "node:os";
 import * as path from "node:path";
 import type { Manifest } from "./manifest.js";
 import {
@@ -53,7 +52,7 @@ import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAut
 import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "./daytona/daytona.js";
 import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "./sprite/sprite.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "./shared/ssh.js";
-import { toKebabCase, prepareStdinForHandoff } from "./shared/ui.js";
+import { toKebabCase, prepareStdinForHandoff, getSpawnCloudConfigPath } from "./shared/ui.js";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -896,7 +895,7 @@ function getAuthHint(manifest: Manifest, cloud: string): string | undefined {
 /** Check if credentials are saved in ~/.config/spawn/{cloud}.json */
 function hasCloudConfigCredentials(cloud: string): boolean {
   try {
-    const configPath = path.join(process.env.HOME || homedir(), ".config/spawn", `${cloud}.json`);
+    const configPath = getSpawnCloudConfigPath(cloud);
     if (!fs.existsSync(configPath)) {
       return false;
     }

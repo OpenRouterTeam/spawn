@@ -1,8 +1,6 @@
 // digitalocean/digitalocean.ts — Core DigitalOcean provider: API, auth, SSH, provisioning
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 
 import {
   logInfo,
@@ -11,6 +9,7 @@ import {
   logStep,
   prompt,
   openBrowser,
+  getSpawnCloudConfigPath,
   validateServerName,
   validateRegionName,
   toKebabCase,
@@ -152,20 +151,16 @@ async function doApi(
 
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
-function getConfigPath(): string {
-  return join(process.env.HOME || homedir(), ".config", "spawn", "digitalocean.json");
-}
-
 function loadConfig(): Record<string, unknown> | null {
   try {
-    return parseJsonObj(readFileSync(getConfigPath(), "utf-8"));
+    return parseJsonObj(readFileSync(getSpawnCloudConfigPath("digitalocean"), "utf-8"));
   } catch {
     return null;
   }
 }
 
 async function saveConfig(values: Record<string, unknown>): Promise<void> {
-  const configPath = getConfigPath();
+  const configPath = getSpawnCloudConfigPath("digitalocean");
   const dir = configPath.replace(/\/[^/]+$/, "");
   mkdirSync(dir, {
     recursive: true,

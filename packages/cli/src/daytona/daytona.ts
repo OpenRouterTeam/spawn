@@ -1,8 +1,6 @@
 // daytona/daytona.ts — Core Daytona provider: API, SSH, provisioning, execution
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 
 import {
   logInfo,
@@ -11,6 +9,7 @@ import {
   logStep,
   prompt,
   jsonEscape,
+  getSpawnCloudConfigPath,
   validateServerName,
   toKebabCase,
   defaultSpawnName,
@@ -100,12 +99,8 @@ function extractApiError(text: string, fallback = "Unknown error"): string {
 
 // ─── Token Management ────────────────────────────────────────────────────────
 
-function getConfigPath(): string {
-  return join(process.env.HOME || homedir(), ".config", "spawn", "daytona.json");
-}
-
 async function saveTokenToConfig(token: string): Promise<void> {
-  const configPath = getConfigPath();
+  const configPath = getSpawnCloudConfigPath("daytona");
   const dir = configPath.replace(/\/[^/]+$/, "");
   mkdirSync(dir, {
     recursive: true,
@@ -119,7 +114,7 @@ async function saveTokenToConfig(token: string): Promise<void> {
 
 function loadTokenFromConfig(): string | null {
   try {
-    const data = JSON.parse(readFileSync(getConfigPath(), "utf-8"));
+    const data = JSON.parse(readFileSync(getSpawnCloudConfigPath("daytona"), "utf-8"));
     const token = data.api_key || data.token || "";
     if (!token) {
       return null;

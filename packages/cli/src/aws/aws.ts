@@ -1,8 +1,6 @@
 // aws/aws.ts — Core AWS Lightsail provider: auth, provisioning, SSH execution
 
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 
 import { createHash, createHmac } from "node:crypto";
 import {
@@ -12,6 +10,7 @@ import {
   logStep,
   prompt,
   selectFromList,
+  getSpawnCloudConfigPath,
   validateServerName,
   validateRegionName,
   toKebabCase,
@@ -39,7 +38,7 @@ const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
 // ─── Credential Cache ────────────────────────────────────────────────────────
 
 export function getAwsConfigPath(): string {
-  return join(process.env.HOME || homedir(), ".config", "spawn", "aws.json");
+  return getSpawnCloudConfigPath("aws");
 }
 
 const AwsCredsSchema = v.object({

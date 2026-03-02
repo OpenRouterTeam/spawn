@@ -1,8 +1,6 @@
 // hetzner/hetzner.ts — Core Hetzner Cloud provider: API, auth, SSH, provisioning
 
 import { mkdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 
 import {
   logInfo,
@@ -11,6 +9,7 @@ import {
   logStep,
   prompt,
   jsonEscape,
+  getSpawnCloudConfigPath,
   validateServerName,
   validateRegionName,
   toKebabCase,
@@ -91,12 +90,8 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
 
 // ─── Token Persistence ───────────────────────────────────────────────────────
 
-function getConfigPath(): string {
-  return join(process.env.HOME || homedir(), ".config", "spawn", "hetzner.json");
-}
-
 async function saveTokenToConfig(token: string): Promise<void> {
-  const configPath = getConfigPath();
+  const configPath = getSpawnCloudConfigPath("hetzner");
   const dir = configPath.replace(/\/[^/]+$/, "");
   mkdirSync(dir, {
     recursive: true,
@@ -110,7 +105,7 @@ async function saveTokenToConfig(token: string): Promise<void> {
 
 function loadTokenFromConfig(): string | null {
   try {
-    const data = JSON.parse(readFileSync(getConfigPath(), "utf-8"));
+    const data = JSON.parse(readFileSync(getSpawnCloudConfigPath("hetzner"), "utf-8"));
     const token = data.api_key || data.token || "";
     if (!token) {
       return null;
