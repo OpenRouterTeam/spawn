@@ -14,13 +14,12 @@
     },
     "packages/cli": {
       "name": "@openrouter/spawn",
-      "version": "0.10.3",
+      "version": "0.11.24",
       "bin": {
         "spawn": "cli.js",
       },
       "dependencies": {
         "@clack/prompts": "1.0.0",
-        "@openrouter/spawn-shared": "workspace:*",
         "picocolors": "1.1.1",
         "valibot": "1.2.0",
       },
@@ -31,7 +30,7 @@
     },
     "packages/shared": {
       "name": "@openrouter/spawn-shared",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "valibot": "1.2.0",
       },

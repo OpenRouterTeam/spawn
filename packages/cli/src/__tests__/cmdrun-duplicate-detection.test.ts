@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import { loadManifest } from "../manifest";
-import { isString } from "@openrouter/spawn-shared";
+import { isString } from "../shared/type-guards";
 
 /**
  * Tests for the --name duplicate detection feature (issue #1864).

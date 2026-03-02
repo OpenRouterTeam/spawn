@@ -6,7 +6,8 @@ import { homedir } from "node:os";
 import path from "node:path";
 import pc from "picocolors";
 import * as v from "valibot";
-import { parseJsonWith, hasStatus } from "@openrouter/spawn-shared";
+import { parseJsonWith } from "./shared/parse";
+import { hasStatus } from "./shared/type-guards";
 import pkg from "../package.json" with { type: "json" };
 import { RAW_BASE } from "./manifest.js";
 

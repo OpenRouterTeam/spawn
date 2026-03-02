@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import { loadManifest } from "../manifest";
-import { isString } from "@openrouter/spawn-shared";
+import { isString } from "../shared/type-guards";
 
 /**
  * Tests for detectAndFixSwappedArgs and resolveAndLog logic in commands.ts.

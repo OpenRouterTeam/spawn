@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test";
-import { isNumber } from "@openrouter/spawn-shared";
+import { isNumber } from "../shared/type-guards.js";
 
 // ── Mock only oauth (needed to avoid interactive prompts) ─────────────
 

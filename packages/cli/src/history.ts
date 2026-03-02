@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "
 import { join, resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { validateConnectionIP, validateUsername, validateServerIdentifier, validateLaunchCmd } from "./security.js";
-import { isString } from "@openrouter/spawn-shared";
+import { isString } from "./shared/type-guards";
 
 export interface VMConnection {
   ip: string;

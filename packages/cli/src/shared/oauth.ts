@@ -1,7 +1,7 @@
 // shared/oauth.ts — OpenRouter OAuth flow + API key management
 
 import * as v from "valibot";
-import { parseJsonWith } from "@openrouter/spawn-shared";
+import { parseJsonWith } from "./parse";
 import { logInfo, logWarn, logError, logStep, prompt, openBrowser, validateModelId } from "./ui";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────

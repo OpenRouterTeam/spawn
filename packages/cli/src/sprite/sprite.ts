@@ -15,7 +15,7 @@ import {
   defaultSpawnName,
 } from "../shared/ui";
 import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
-import { hasMessage } from "@openrouter/spawn-shared";
+import { hasMessage } from "../shared/type-guards";
 import { getSpawnDir } from "../history.js";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────

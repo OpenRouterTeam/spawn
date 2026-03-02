@@ -19,7 +19,8 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { parseJsonObj, isString, isNumber, toObjectArray } from "@openrouter/spawn-shared";
+import { parseJsonObj } from "../shared/parse";
+import { isString, isNumber, toObjectArray } from "../shared/type-guards";
 import {
   SSH_BASE_OPTS,
   SSH_INTERACTIVE_OPTS,

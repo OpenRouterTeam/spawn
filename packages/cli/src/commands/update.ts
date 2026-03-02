@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { parseJsonWith } from "@openrouter/spawn-shared";
+import { parseJsonWith } from "../shared/parse.js";
 import { RAW_BASE } from "../manifest.js";
 import { VERSION, PkgVersionSchema, getErrorMessage } from "./shared.js";
 

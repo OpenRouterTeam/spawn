@@ -2,7 +2,7 @@ import "../unicode-detect.js"; // Must be first: configures TERM before clack re
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import * as v from "valibot";
-import { isString } from "@openrouter/spawn-shared";
+import { isString } from "../shared/type-guards.js";
 import * as fs from "node:fs";
 import type { Manifest } from "../manifest.js";
 import { loadManifest, agentKeys, cloudKeys, matrixStatus, isStaleCache } from "../manifest.js";
