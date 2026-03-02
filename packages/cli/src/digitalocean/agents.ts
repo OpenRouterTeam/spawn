@@ -3,4 +3,7 @@
 import { runServer, uploadFile } from "./digitalocean";
 import { createCloudAgents } from "../shared/agent-setup";
 
-export const { agents, resolveAgent } = createCloudAgents({ runServer, uploadFile });
+export const { agents, resolveAgent } = createCloudAgents({
+  runServer,
+  uploadFile,
+});
