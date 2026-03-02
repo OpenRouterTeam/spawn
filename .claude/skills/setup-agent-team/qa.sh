@@ -183,8 +183,8 @@ done
 
 log "Pre-cycle cleanup done."
 
-# --- Fixtures mode: load cloud credentials ---
-if [[ "${RUN_MODE}" == "fixtures" ]]; then
+# --- Load cloud credentials (quality + fixtures modes) ---
+if [[ "${RUN_MODE}" == "fixtures" ]] || [[ "${RUN_MODE}" == "quality" ]]; then
     if [[ -f "${REPO_ROOT}/sh/shared/key-request.sh" ]]; then
         source "${REPO_ROOT}/sh/shared/key-request.sh"
         load_cloud_keys_from_config
@@ -267,11 +267,6 @@ HARD_TIMEOUT=$((CYCLE_TIMEOUT + 300))
 
 log "Hard timeout: ${HARD_TIMEOUT}s"
 
-# Run claude in background, output goes to log file.
-claude -p "$(cat "${PROMPT_FILE}")" >> "${LOG_FILE}" 2>&1 &
-CLAUDE_PID=$!
-log "Claude started (pid=${CLAUDE_PID})"
-
 # Kill claude and its full process tree reliably
 kill_claude() {
     if kill -0 "${CLAUDE_PID}" 2>/dev/null; then
@@ -284,27 +279,126 @@ kill_claude() {
     fi
 }
 
-# Watchdog: wall-clock timeout as safety net
-WALL_START=$(date +%s)
+# Run a single Claude attempt. Sets CLAUDE_EXIT to the exit code.
+run_claude_attempt() {
+    claude -p "$(cat "${PROMPT_FILE}")" >> "${LOG_FILE}" 2>&1 &
+    CLAUDE_PID=$!
+    log "Claude started (pid=${CLAUDE_PID})"
 
-while kill -0 "${CLAUDE_PID}" 2>/dev/null; do
-    sleep 30
-    WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
+    # Watchdog: wall-clock timeout as safety net
+    WALL_START=$(date +%s)
 
-    if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
-        log "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
-        kill_claude
-        break
+    while kill -0 "${CLAUDE_PID}" 2>/dev/null; do
+        sleep 30
+        WALL_ELAPSED=$(( $(date +%s) - WALL_START ))
+
+        if [[ "${WALL_ELAPSED}" -ge "${HARD_TIMEOUT}" ]]; then
+            log "Hard timeout: ${WALL_ELAPSED}s elapsed — killing process"
+            kill_claude
+            break
+        fi
+    done
+
+    wait "${CLAUDE_PID}" 2>/dev/null
+    CLAUDE_EXIT=$?
+}
+
+# File a GitHub issue reporting persistent QA failure
+file_failure_issue() {
+    local attempts="$1"
+
+    log "All ${attempts} attempts failed — filing GitHub issue"
+
+    # Extract the last 80 lines of the log for the issue body (safe via --body-file)
+    local issue_body_file
+    issue_body_file=$(mktemp /tmp/qa-issue-body-XXXXXX.md)
+
+    cat > "${issue_body_file}" <<ISSUE_HEADER
+## QA ${RUN_MODE} cycle failed after ${attempts} attempts
+
+**Run mode**: \`${RUN_MODE}\`
+**Team name**: \`${TEAM_NAME}\`
+**Timestamp**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+The scheduled QA cycle failed ${attempts} consecutive times. Manual investigation is needed.
+
+### Log tail (last 80 lines)
+
+\`\`\`
+ISSUE_HEADER
+
+    tail -80 "${LOG_FILE}" >> "${issue_body_file}" 2>/dev/null || printf '(log not available)\n' >> "${issue_body_file}"
+
+    cat >> "${issue_body_file}" <<'ISSUE_FOOTER'
+```
+
+### Next steps
+
+1. Check the full log on the QA VM
+2. Run `bun test` locally to reproduce
+3. Investigate and fix the root cause
+
+---
+*Filed automatically by `qa.sh` after exhausting retries.*
+ISSUE_FOOTER
+
+    gh issue create \
+        --repo OpenRouterTeam/spawn \
+        --title "bug(qa): ${RUN_MODE} cycle failed after ${attempts} attempts" \
+        --body-file "${issue_body_file}" \
+        --label "bug" \
+        2>&1 | tee -a "${LOG_FILE}" || log "WARNING: Failed to file GitHub issue"
+
+    rm -f "${issue_body_file}" 2>/dev/null || true
+}
+
+# --- Quality mode: retry up to 3 times, then file issue ---
+if [[ "${RUN_MODE}" == "quality" ]]; then
+    MAX_ATTEMPTS=3
+    ATTEMPT=0
+    CLAUDE_EXIT=1
+
+    while [[ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]]; do
+        ATTEMPT=$((ATTEMPT + 1))
+        log "--- Quality attempt ${ATTEMPT}/${MAX_ATTEMPTS} ---"
+
+        # Reset worktree state between retries (skip on first attempt)
+        if [[ "${ATTEMPT}" -gt 1 ]]; then
+            log "Cleaning up before retry..."
+            git worktree prune 2>/dev/null || true
+            safe_rm_worktree "${WORKTREE_BASE}"
+            git pull --rebase origin main 2>&1 | tee -a "${LOG_FILE}" || true
+        fi
+
+        run_claude_attempt
+
+        if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+            log "Cycle completed successfully on attempt ${ATTEMPT}"
+            break
+        fi
+
+        log "Attempt ${ATTEMPT} failed (exit_code=${CLAUDE_EXIT})"
+
+        if [[ "${ATTEMPT}" -lt "${MAX_ATTEMPTS}" ]]; then
+            log "Waiting 30s before retry..."
+            sleep 30
+        fi
+    done
+
+    # All attempts exhausted — file a GitHub issue
+    if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
+        file_failure_issue "${MAX_ATTEMPTS}"
     fi
-done
 
-wait "${CLAUDE_PID}" 2>/dev/null
-CLAUDE_EXIT=$?
-
-if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
-    log "Cycle completed successfully"
+# --- All other modes: single attempt ---
 else
-    log "Cycle failed (exit_code=${CLAUDE_EXIT})"
+    run_claude_attempt
+
+    if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+        log "Cycle completed successfully"
+    else
+        log "Cycle failed (exit_code=${CLAUDE_EXIT})"
+    fi
 fi
 
 # Note: cleanup (worktree prune, prompt file removal, final log) handled by trap
