@@ -15,6 +15,11 @@ _ensure_bun() {
     command -v bun &>/dev/null || { printf '\033[0;31mbun not found after install\033[0m\n' >&2; exit 1; }
 }
 
+# Run command in the foreground so bun gets full terminal access (raw mode,
+# arrow keys for interactive prompts).  The old pattern backgrounded the child
+# with & + wait so a SIGTERM trap could forward the signal, but that removed
+# bun from the foreground process group and broke @clack/prompts multiselect.
+# Now SIGTERM is detected from exit code 143 (128 + 15) after the child exits.
 _run_with_restart() {
     local attempt=0
     local backoff=2
@@ -24,10 +29,12 @@ _run_with_restart() {
         "$@"
         local exit_code=$?
 
+        # Normal exit
         if [ "$exit_code" -eq 0 ]; then
             return 0
         fi
 
+        # SIGTERM (143) or SIGKILL (137) — attempt restart
         if [ "$exit_code" -eq 143 ] || [ "$exit_code" -eq 137 ]; then
             printf '\033[0;33m[spawn/%s] Agent process terminated (exit %s). The droplet is likely still running.\033[0m\n' \
                 "$_AGENT_NAME" "$exit_code" >&2
@@ -46,6 +53,7 @@ _run_with_restart() {
             fi
         fi
 
+        # Other failure — exit with the original code
         return "$exit_code"
     done
 }
