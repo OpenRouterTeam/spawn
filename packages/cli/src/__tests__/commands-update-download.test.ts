@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import { loadManifest } from "../manifest";
 import { isString } from "@openrouter/spawn-shared";
 import pkg from "../../package.json" with { type: "json" };
@@ -21,34 +21,14 @@ const VERSION = pkg.version;
 
 const mockManifest = createMockManifest();
 
-// Mock @clack/prompts
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-const mockLogStep = mock(() => {});
-const mockSpinnerStart = mock(() => {});
-const mockSpinnerStop = mock(() => {});
-const mockSpinnerMessage = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mockSpinnerStart,
-    stop: mockSpinnerStop,
-    message: mockSpinnerMessage,
-  }),
-  log: {
-    step: mockLogStep,
-    info: mockLogInfo,
-    warn: mock(() => {}),
-    error: mockLogError,
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
-  select: mock(() => {}),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  isCancel: () => false,
-}));
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+  spinnerMessage: mockSpinnerMessage,
+} = mockClackPrompts();
 
 // Mock node:child_process to prevent real subprocess calls in tests:
 // - execSync: used by performUpdate() to run curl|bash install — without this mock,

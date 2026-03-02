@@ -1,30 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { mockClackPrompts } from "./test-helpers";
 import { preflightCredentialCheck } from "../commands";
 import type { Manifest } from "../manifest";
 
-// Mock @clack/prompts
-const mockLog = {
-  warn: mock(() => {}),
-  info: mock(() => {}),
-};
-const mockConfirm = mock(() => Promise.resolve(true));
 const mockIsCancel = mock(() => false);
-mock.module("@clack/prompts", () => ({
-  log: mockLog,
-  confirm: mockConfirm,
+const clackMocks = mockClackPrompts({
   isCancel: mockIsCancel,
-  // Stubs for other imports commands.ts might use
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  select: mock(() => Promise.resolve("")),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  spinner: mock(() => ({
-    start: mock(() => {}),
-    stop: mock(() => {}),
-    message: mock(() => {}),
-  })),
-}));
+});
+const mockLog = {
+  warn: clackMocks.logWarn,
+  info: clackMocks.logInfo,
+};
+const mockConfirm = clackMocks.confirm;
 
 function makeManifest(cloudAuth: string): Manifest {
   const m: Manifest = {

@@ -2,7 +2,7 @@ import type { spyOn } from "bun:test";
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import type { Manifest } from "../manifest";
 import { loadManifest } from "../manifest";
-import { createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 
 /**
  * Tests for cmdMatrix, cmdAgents, and cmdClouds listing command output.
@@ -130,32 +130,7 @@ const multiTypeManifest: Manifest = {
   },
 };
 
-// ── Mock @clack/prompts ─────────────────────────────────────────────────────
-
-const mockSpinnerStart = mock(() => {});
-const mockSpinnerStop = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mockSpinnerStart,
-    stop: mockSpinnerStop,
-    message: mock(() => {}),
-  }),
-  log: {
-    step: mock(() => {}),
-    info: mock(() => {}),
-    warn: mock(() => {}),
-    error: mock(() => {}),
-    success: mock(() => {}),
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
-  select: mock(() => {}),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  isCancel: () => false,
-}));
+const { spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop } = mockClackPrompts();
 
 const { cmdMatrix, cmdAgents, cmdClouds, getTerminalWidth } = await import("../commands.js");
 

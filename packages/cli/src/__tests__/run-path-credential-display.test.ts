@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { mockClackPrompts } from "./test-helpers";
 import type { Manifest } from "../manifest";
 
 /**
@@ -123,30 +124,9 @@ const mockExit = spyOn(process, "exit").mockImplementation(() => {
   throw new Error("process.exit called");
 });
 
-const mockLog = {
-  step: mock(() => {}),
-  info: mock(() => {}),
-  error: mock(() => {}),
-  warn: mock(() => {}),
-  success: mock(() => {}),
-};
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mock(() => {}),
-    stop: mock(() => {}),
-    message: mock(() => {}),
-  }),
-  log: mockLog,
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
+mockClackPrompts({
   select: mock(() => Promise.resolve("hetzner")),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  confirm: mock(() => Promise.resolve(true)),
-  isCancel: () => false,
-}));
+});
 
 // Import after mocks are set up
 const {

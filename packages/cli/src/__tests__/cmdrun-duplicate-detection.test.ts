@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:te
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { createMockManifest, createConsoleMocks, restoreMocks } from "./test-helpers";
+import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts } from "./test-helpers";
 import { loadManifest } from "../manifest";
 import { isString } from "@openrouter/spawn-shared";
 
@@ -21,40 +21,20 @@ const mockManifest = createMockManifest();
 
 // ── Clack mock refs ──────────────────────────────────────────────────────────
 
-const mockLogWarn = mock(() => {});
-const mockLogStep = mock(() => {});
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-const mockSpinnerStart = mock(() => {});
-const mockSpinnerStop = mock(() => {});
-const mockSpinnerMessage = mock(() => {});
-
 // select returns "rerun" to exercise the "Spawn a new VM" path
 const mockSelect = mock(async () => "rerun");
 
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mockSpinnerStart,
-    stop: mockSpinnerStop,
-    message: mockSpinnerMessage,
-  }),
-  log: {
-    step: mockLogStep,
-    info: mockLogInfo,
-    warn: mockLogWarn,
-    error: mockLogError,
-    success: mock(() => {}),
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
+const {
+  logWarn: mockLogWarn,
+  logStep: mockLogStep,
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+  spinnerMessage: mockSpinnerMessage,
+} = mockClackPrompts({
   select: mockSelect,
-  autocomplete: mock(async () => "claude"),
-  // First call: returns SPAWN_NAME value (set by --name).
-  // Second call (after rerun clears SPAWN_NAME): returns undefined so no duplicate re-check.
-  text: mock(async () => undefined),
-  isCancel: () => false,
-}));
+});
 
 const { cmdRun } = await import("../commands.js");
 

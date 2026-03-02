@@ -8,26 +8,12 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { mockClackPrompts } from "./test-helpers";
 
-// ── Mock @clack/prompts ─────────────────────────────────────────────────────
-
-mock.module("@clack/prompts", () => ({
-  multiselect: mock(() => Promise.resolve([])),
-  isCancel: () => false,
-  log: {
-    info: mock(() => {}),
-    warn: mock(() => {}),
-    error: mock(() => {}),
-    step: mock(() => {}),
-    message: mock(() => {}),
-  },
-  spinner: () => ({
-    start: mock(() => {}),
-    stop: mock(() => {}),
-  }),
+mockClackPrompts({
   select: mock(() => Promise.resolve("")),
   text: mock(() => Promise.resolve("")),
-}));
+});
 
 // ── Import after @clack/prompts mock ────────────────────────────────────────
 
