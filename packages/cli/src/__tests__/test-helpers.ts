@@ -87,6 +87,90 @@ export function restoreMocks(
   });
 }
 
+// ── @clack/prompts Mock ──────────────────────────────────────────────────────
+
+export interface ClackPromptsMock {
+  logStep: ReturnType<typeof mock>;
+  logInfo: ReturnType<typeof mock>;
+  logError: ReturnType<typeof mock>;
+  logWarn: ReturnType<typeof mock>;
+  logSuccess: ReturnType<typeof mock>;
+  logMessage: ReturnType<typeof mock>;
+  spinnerStart: ReturnType<typeof mock>;
+  spinnerStop: ReturnType<typeof mock>;
+  spinnerMessage: ReturnType<typeof mock>;
+  intro: ReturnType<typeof mock>;
+  outro: ReturnType<typeof mock>;
+  cancel: ReturnType<typeof mock>;
+  select: ReturnType<typeof mock>;
+  autocomplete: ReturnType<typeof mock>;
+  text: ReturnType<typeof mock>;
+  confirm: ReturnType<typeof mock>;
+  multiselect: ReturnType<typeof mock>;
+  isCancel: (...args: unknown[]) => boolean;
+}
+
+/**
+ * Creates a centralized @clack/prompts mock and registers it via mock.module().
+ *
+ * Returns an object of individual mock refs that tests can use for assertions.
+ * Pass `overrides` to customize specific functions (e.g., custom `select` behavior).
+ *
+ * MUST be called at module top level (before dynamic imports of modules that use @clack/prompts).
+ */
+export function mockClackPrompts(
+  overrides?: Partial<ClackPromptsMock>,
+): ClackPromptsMock {
+  const mocks: ClackPromptsMock = {
+    logStep: mock(() => {}),
+    logInfo: mock(() => {}),
+    logError: mock(() => {}),
+    logWarn: mock(() => {}),
+    logSuccess: mock(() => {}),
+    logMessage: mock(() => {}),
+    spinnerStart: mock(() => {}),
+    spinnerStop: mock(() => {}),
+    spinnerMessage: mock(() => {}),
+    intro: mock(() => {}),
+    outro: mock(() => {}),
+    cancel: mock(() => {}),
+    select: mock(() => {}),
+    autocomplete: mock(async () => "claude"),
+    text: mock(async () => undefined),
+    confirm: mock(async () => true),
+    multiselect: mock(() => Promise.resolve([])),
+    isCancel: () => false,
+    ...overrides,
+  };
+
+  mock.module("@clack/prompts", () => ({
+    spinner: () => ({
+      start: mocks.spinnerStart,
+      stop: mocks.spinnerStop,
+      message: mocks.spinnerMessage,
+    }),
+    log: {
+      step: mocks.logStep,
+      info: mocks.logInfo,
+      error: mocks.logError,
+      warn: mocks.logWarn,
+      success: mocks.logSuccess,
+      message: mocks.logMessage,
+    },
+    intro: mocks.intro,
+    outro: mocks.outro,
+    cancel: mocks.cancel,
+    select: mocks.select,
+    autocomplete: mocks.autocomplete,
+    text: mocks.text,
+    confirm: mocks.confirm,
+    multiselect: mocks.multiselect,
+    isCancel: mocks.isCancel,
+  }));
+
+  return mocks;
+}
+
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────
 
 export function mockSuccessfulFetch(data: any) {
