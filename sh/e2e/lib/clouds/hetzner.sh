@@ -303,3 +303,14 @@ _hetzner_cleanup_stale() {
 _hetzner_max_parallel() {
   printf '5'
 }
+
+# ---------------------------------------------------------------------------
+# _hetzner_install_wait
+#
+# cx23 servers are small (2 vCPU, 4GB RAM). Rust compilation (zeroclaw)
+# and npm installs (hermes) can take 12-15 minutes. Override the default
+# 600s to give more time.
+# ---------------------------------------------------------------------------
+_hetzner_install_wait() {
+  printf '900'
+}

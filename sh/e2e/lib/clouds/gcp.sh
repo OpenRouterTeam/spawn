@@ -333,3 +333,13 @@ EOF
     log_info "Skipped ${skipped} recent instance(s)"
   fi
 }
+
+# ---------------------------------------------------------------------------
+# _gcp_max_parallel
+#
+# GCP free-tier accounts typically allow ~8 in-use IP addresses.
+# Cap parallel agents to avoid quota exhaustion during E2E runs.
+# ---------------------------------------------------------------------------
+_gcp_max_parallel() {
+  printf '5'
+}
