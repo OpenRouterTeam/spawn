@@ -246,7 +246,7 @@ _sprite_teardown() {
   log_step "Tearing down ${app}..."
 
   # shellcheck disable=SC2046
-  sprite $(_sprite_org_flags) destroy "${app}" >/dev/null 2>&1 || true
+  sprite $(_sprite_org_flags) destroy --force "${app}" >/dev/null 2>&1 || true
 
   # Brief wait for destruction to propagate
   sleep 2
