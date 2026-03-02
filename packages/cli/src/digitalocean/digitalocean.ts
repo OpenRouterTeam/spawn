@@ -1170,13 +1170,11 @@ export async function destroyServer(dropletId?: string): Promise<void> {
     return;
   }
 
+  // Any non-204 status is a failure — extract the best error message available
   const data = parseJsonObj(text);
-  if (data?.message) {
-    logError(`Failed to destroy droplet ${id}: ${data.message}`);
-    logWarn("The droplet may still be running and incurring charges.");
-    logWarn(`Delete it manually at: ${DO_DASHBOARD_URL}`);
-    throw new Error("Droplet deletion failed");
-  }
-
-  logInfo(`Droplet ${id} destroyed`);
+  const errMsg = isString(data?.message) ? data.message : text.slice(0, 200) || `HTTP ${status}`;
+  logError(`Failed to destroy droplet ${id}: ${errMsg}`);
+  logWarn("The droplet may still be running and incurring charges.");
+  logWarn(`Delete it manually at: ${DO_DASHBOARD_URL}`);
+  throw new Error("Droplet deletion failed");
 }
