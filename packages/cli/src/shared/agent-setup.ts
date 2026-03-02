@@ -557,3 +557,18 @@ export function resolveAgent(agents: Record<string, AgentConfig>, name: string):
   }
   return agent;
 }
+
+/**
+ * Factory that creates agents + resolveAgent for a given CloudRunner.
+ * Replaces the identical 16-line boilerplate in each cloud's agents.ts.
+ */
+export function createCloudAgents(runner: CloudRunner): {
+  agents: Record<string, AgentConfig>;
+  resolveAgent: (name: string) => AgentConfig;
+} {
+  const agentMap = createAgents(runner);
+  return {
+    agents: agentMap,
+    resolveAgent: (name: string) => resolveAgent(agentMap, name),
+  };
+}
