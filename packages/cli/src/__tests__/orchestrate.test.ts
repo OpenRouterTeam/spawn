@@ -57,23 +57,23 @@ function createMockAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
     name: "TestAgent",
     install: mock(() => Promise.resolve()),
-    envVars: mock((key: string) => [`OPENROUTER_API_KEY=${key}`]),
+    envVars: mock((key: string) => [
+      `OPENROUTER_API_KEY=${key}`,
+    ]),
     launchCmd: mock(() => "test-agent --start"),
     ...overrides,
   };
 }
 
 /** Run orchestration and catch the process.exit throw. */
-async function runOrchestrationSafe(
-  cloud: CloudOrchestrator,
-  agent: AgentConfig,
-  agentName: string,
-): Promise<void> {
+async function runOrchestrationSafe(cloud: CloudOrchestrator, agent: AgentConfig, agentName: string): Promise<void> {
   try {
     await runOrchestration(cloud, agent, agentName);
   } catch (e) {
     // process.exit mock throws to stop execution — that's expected
-    if (e instanceof Error && e.message.startsWith("__EXIT_")) { return; }
+    if (e instanceof Error && e.message.startsWith("__EXIT_")) {
+      return;
+    }
     throw e;
   }
 }
@@ -103,16 +103,34 @@ describe("runOrchestration", () => {
   it("calls all cloud lifecycle methods in correct order", async () => {
     const callOrder: string[] = [];
     const cloud = createMockCloud({
-      authenticate: mock(async () => { callOrder.push("authenticate"); }),
-      promptSize: mock(async () => { callOrder.push("promptSize"); }),
-      getServerName: mock(async () => { callOrder.push("getServerName"); return "srv"; }),
-      createServer: mock(async () => { callOrder.push("createServer"); }),
-      waitForReady: mock(async () => { callOrder.push("waitForReady"); }),
-      interactiveSession: mock(async () => { callOrder.push("interactiveSession"); return 0; }),
-      saveLaunchCmd: mock(() => { callOrder.push("saveLaunchCmd"); }),
+      authenticate: mock(async () => {
+        callOrder.push("authenticate");
+      }),
+      promptSize: mock(async () => {
+        callOrder.push("promptSize");
+      }),
+      getServerName: mock(async () => {
+        callOrder.push("getServerName");
+        return "srv";
+      }),
+      createServer: mock(async () => {
+        callOrder.push("createServer");
+      }),
+      waitForReady: mock(async () => {
+        callOrder.push("waitForReady");
+      }),
+      interactiveSession: mock(async () => {
+        callOrder.push("interactiveSession");
+        return 0;
+      }),
+      saveLaunchCmd: mock(() => {
+        callOrder.push("saveLaunchCmd");
+      }),
     });
     const agent = createMockAgent({
-      install: mock(async () => { callOrder.push("install"); }),
+      install: mock(async () => {
+        callOrder.push("install");
+      }),
     });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
@@ -141,9 +159,13 @@ describe("runOrchestration", () => {
   });
 
   it("passes API key to agent.envVars", async () => {
-    const envVarsFn = mock((key: string) => [`OPENROUTER_API_KEY=${key}`]);
+    const envVarsFn = mock((key: string) => [
+      `OPENROUTER_API_KEY=${key}`,
+    ]);
     const cloud = createMockCloud();
-    const agent = createMockAgent({ envVars: envVarsFn });
+    const agent = createMockAgent({
+      envVars: envVarsFn,
+    });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
@@ -183,7 +205,9 @@ describe("runOrchestration", () => {
   it("calls preProvision when defined", async () => {
     const preProvision = mock(() => Promise.resolve());
     const cloud = createMockCloud();
-    const agent = createMockAgent({ preProvision });
+    const agent = createMockAgent({
+      preProvision,
+    });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
@@ -195,7 +219,9 @@ describe("runOrchestration", () => {
   it("continues when preProvision throws (non-fatal)", async () => {
     const preProvision = mock(() => Promise.reject(new Error("pre-provision boom")));
     const cloud = createMockCloud();
-    const agent = createMockAgent({ preProvision });
+    const agent = createMockAgent({
+      preProvision,
+    });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
@@ -236,7 +262,9 @@ describe("runOrchestration", () => {
 
   it("uses 'openrouter/auto' as default model when modelDefault is not set", async () => {
     const cloud = createMockCloud();
-    const agent = createMockAgent({ modelPrompt: true }); // no modelDefault
+    const agent = createMockAgent({
+      modelPrompt: true,
+    }); // no modelDefault
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
@@ -261,7 +289,9 @@ describe("runOrchestration", () => {
   it("calls configure when defined on agent", async () => {
     const configure = mock(() => Promise.resolve());
     const cloud = createMockCloud();
-    const agent = createMockAgent({ configure });
+    const agent = createMockAgent({
+      configure,
+    });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
@@ -286,7 +316,9 @@ describe("runOrchestration", () => {
   it("calls preLaunch when defined", async () => {
     const preLaunch = mock(() => Promise.resolve());
     const cloud = createMockCloud();
-    const agent = createMockAgent({ preLaunch });
+    const agent = createMockAgent({
+      preLaunch,
+    });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
@@ -376,7 +408,9 @@ describe("runOrchestration", () => {
   it("calls agent.install during orchestration", async () => {
     const install = mock(() => Promise.resolve());
     const cloud = createMockCloud();
-    const agent = createMockAgent({ install });
+    const agent = createMockAgent({
+      install,
+    });
 
     await runOrchestrationSafe(cloud, agent, "testagent");
 
