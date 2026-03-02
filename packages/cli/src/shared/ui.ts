@@ -28,6 +28,16 @@ export function logStep(msg: string): void {
   process.stderr.write(`${CYAN}${msg}${NC}\n`);
 }
 
+/** Overwrite the current line with a status message (no newline). Call logStepDone() when finished. */
+export function logStepInline(msg: string): void {
+  process.stderr.write(`\r${CYAN}${msg}${NC}\x1b[K`);
+}
+
+/** End an inline status line by moving to the next line. */
+export function logStepDone(): void {
+  process.stderr.write("\r\x1b[K");
+}
+
 /** Prompt for a line of user input. Throws if non-interactive.
  *  Uses @clack/prompts instead of Node readline to avoid Bun #1707
  *  where readline interfaces silently close after @clack/prompts runs

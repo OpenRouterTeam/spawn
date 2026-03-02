@@ -9,6 +9,8 @@ import {
   logWarn,
   logError,
   logStep,
+  logStepInline,
+  logStepDone,
   prompt,
   selectFromList,
   validateServerName,
@@ -808,15 +810,17 @@ export async function waitForCloudInit(maxAttempts = 60): Promise<void> {
         new Response(proc.stderr).text(),
       ]);
       if ((await proc.exited) === 0) {
+        logStepDone();
         logInfo("Startup script completed");
         return;
       }
     } catch {
       // ignore
     }
-    logStep(`Startup script running (${attempt}/${maxAttempts})`);
+    logStepInline(`Startup script running (${attempt}/${maxAttempts})`);
     await sleep(5000);
   }
+  logStepDone();
   logWarn("Startup script may not have completed, continuing...");
 }
 

@@ -7,6 +7,8 @@ import {
   logWarn,
   logError,
   logStep,
+  logStepInline,
+  logStepDone,
   prompt,
   jsonEscape,
   getSpawnCloudConfigPath,
@@ -547,15 +549,17 @@ async function waitForSsh(maxAttempts = 20): Promise<void> {
     try {
       const output = await runServerCapture("echo ok");
       if (output.includes("ok")) {
+        logStepDone();
         logInfo("SSH is ready");
         return;
       }
     } catch {
       // ignore
     }
-    logStep(`SSH not ready yet (${attempt}/${maxAttempts})`);
+    logStepInline(`SSH not ready yet (${attempt}/${maxAttempts})`);
     await sleep(5000);
   }
+  logStepDone();
   logError(`SSH connectivity failed after ${maxAttempts} attempts`);
   throw new Error("SSH wait timeout");
 }

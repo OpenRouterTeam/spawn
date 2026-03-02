@@ -1,6 +1,6 @@
 // shared/ssh.ts — Shared SSH wait utility with TCP pre-check and stderr capture
 
-import { logInfo, logStep, logError } from "./ui";
+import { logInfo, logStep, logStepInline, logStepDone, logError } from "./ui";
 import { connect } from "node:net";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 
@@ -209,14 +209,16 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
     attempt += 1;
     const open = await tcpCheck(host, 22, 2000);
     if (open) {
+      logStepDone();
       logInfo("SSH port 22 is open");
       break;
     }
-    logStep(`SSH port closed (${attempt}/${maxAttempts})`);
+    logStepInline(`SSH port closed (${attempt}/${maxAttempts})`);
     await sleep(2000);
   }
 
   if (attempt >= maxAttempts) {
+    logStepDone();
     logError(`SSH port 22 never opened after ${maxAttempts} attempts`);
     throw new Error("SSH connectivity timeout — port 22 never opened");
   }

@@ -9,6 +9,8 @@ import {
   logWarn,
   logError,
   logStep,
+  logStepInline,
+  logStepDone,
   prompt,
   validateServerName,
   toKebabCase,
@@ -381,13 +383,15 @@ export async function verifySpriteConnectivity(maxAttempts = 6): Promise<void> {
       "ok",
     ]);
     if (proc.exitCode === 0) {
+      logStepDone();
       logInfo(`Sprite '${spriteName}' is ready`);
       return;
     }
-    logStep(`Sprite not ready, retrying (${attempt}/${maxAttempts})...`);
+    logStepInline(`Sprite not ready, retrying (${attempt}/${maxAttempts})...`);
     await sleep(CONNECTIVITY_POLL_DELAY * 1000);
   }
 
+  logStepDone();
   logError(`Sprite '${spriteName}' failed to respond after ${maxAttempts} attempts`);
   logError("Try: sprite list, sprite logs, or recreate the sprite");
   throw new Error("Sprite connectivity timeout");

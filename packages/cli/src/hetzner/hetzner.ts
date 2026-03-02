@@ -7,6 +7,8 @@ import {
   logWarn,
   logError,
   logStep,
+  logStepInline,
+  logStepDone,
   prompt,
   jsonEscape,
   getSpawnCloudConfigPath,
@@ -484,6 +486,7 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
       ]);
       const exitCode = await proc.exited;
       if (exitCode === 0 && stdout.includes("done")) {
+        logStepDone();
         logInfo("Cloud-init complete");
         return;
       }
@@ -491,10 +494,11 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
       // ignore
     }
     if (attempt >= 60) {
+      logStepDone();
       logWarn("Cloud-init marker not found, continuing anyway...");
       return;
     }
-    logStep(`Cloud-init in progress (${attempt}/60)`);
+    logStepInline(`Cloud-init in progress (${attempt}/60)`);
     await sleep(5000);
   }
 }

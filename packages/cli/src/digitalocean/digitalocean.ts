@@ -7,6 +7,8 @@ import {
   logWarn,
   logError,
   logStep,
+  logStepInline,
+  logStepDone,
   prompt,
   openBrowser,
   getSpawnCloudConfigPath,
@@ -865,6 +867,7 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
       const publicNet = v4Networks.find((n) => n.type === "public");
       if (publicNet?.ip_address) {
         doServerIp = isString(publicNet.ip_address) ? publicNet.ip_address : "";
+        logStepDone();
         logInfo(`Droplet active, IP: ${doServerIp}`);
         return;
       }
@@ -875,9 +878,10 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
       throw new Error("Droplet activation timeout");
     }
 
-    logStep(`Droplet status: ${status || "unknown"} (${attempt}/${maxAttempts})`);
+    logStepInline(`Droplet status: ${status || "unknown"} (${attempt}/${maxAttempts})`);
     await sleep(5000);
   }
+  logStepDone();
 }
 
 // ─── SSH Execution ───────────────────────────────────────────────────────────
@@ -959,15 +963,17 @@ export async function waitForCloudInit(ip?: string, _maxAttempts = 60): Promise<
         new Response(proc.stderr).text(),
       ]);
       if ((await proc.exited) === 0 && stdout.includes("done")) {
+        logStepDone();
         logInfo("Cloud-init complete");
         return;
       }
     } catch {
       /* ignore */
     }
-    logStep(`Cloud-init in progress (${attempt}/20)`);
+    logStepInline(`Cloud-init in progress (${attempt}/20)`);
     await sleep(5000);
   }
+  logStepDone();
   logWarn("Cloud-init marker not found, continuing anyway...");
 }
 
