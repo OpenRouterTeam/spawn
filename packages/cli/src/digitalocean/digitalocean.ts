@@ -105,10 +105,7 @@ async function doApi(
   endpoint: string,
   body?: string,
   maxRetries = 3,
-): Promise<{
-  status: number;
-  text: string;
-}> {
+): Promise<string> {
   const url = `${DO_API_BASE}${endpoint}`;
 
   let interval = 2;
@@ -134,10 +131,10 @@ async function doApi(
         interval = Math.min(interval * 2, 30);
         continue;
       }
-      return {
-        status: resp.status,
-        text,
-      };
+      if (!resp.ok) {
+        throw new Error(`DigitalOcean API error ${resp.status} for ${method} ${endpoint}: ${text.slice(0, 200)}`);
+      }
+      return text;
     } catch (err) {
       if (attempt >= maxRetries) {
         throw err;
@@ -239,7 +236,7 @@ async function testDoToken(): Promise<boolean> {
     return false;
   }
   try {
-    const { text } = await doApi("GET", "/account", undefined, 1);
+    const text = await doApi("GET", "/account", undefined, 1);
     return text.includes('"uuid"');
   } catch {
     return false;
@@ -606,8 +603,8 @@ export async function ensureSshKey(): Promise<void> {
     }
 
     // Check if key is registered with DigitalOcean
-    const { text } = await doApi("GET", "/account/keys");
-    const data = parseJsonObj(text);
+    const keysText = await doApi("GET", "/account/keys");
+    const data = parseJsonObj(keysText);
     const keys = toObjectArray(data?.ssh_keys);
 
     const found = keys.some((k: Record<string, unknown>) => {
@@ -627,16 +624,22 @@ export async function ensureSshKey(): Promise<void> {
       name: `spawn-${key.name}`,
       public_key: pubKey,
     });
-    const { text: regText } = await doApi("POST", "/account/keys", body);
-
-    if (regText.includes('"id"')) {
-      logInfo(`SSH key '${key.name}' registered with DigitalOcean`);
+    let regText: string;
+    try {
+      regText = await doApi("POST", "/account/keys", body);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Key may already exist under a different name — non-fatal
+      if (msg.includes("already been taken") || msg.includes("already in use")) {
+        logInfo(`SSH key '${key.name}' already registered (under a different name)`);
+        continue;
+      }
+      logWarn(`SSH key '${key.name}' registration may have failed, continuing...`);
       continue;
     }
 
-    // Key may already exist under a different name — non-fatal
-    if (regText.includes("already been taken") || regText.includes("already in use")) {
-      logInfo(`SSH key '${key.name}' already registered (under a different name)`);
+    if (regText.includes('"id"')) {
+      logInfo(`SSH key '${key.name}' registered with DigitalOcean`);
       continue;
     }
 
@@ -818,7 +821,7 @@ export async function createServer(
   logStep(`Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion})...`);
 
   // Get all SSH key IDs
-  const { text: keysText } = await doApi("GET", "/account/keys");
+  const keysText = await doApi("GET", "/account/keys");
   const keysData = parseJsonObj(keysText);
   const sshKeyIds: number[] = toObjectArray(keysData?.ssh_keys)
     .map((k) => (isNumber(k.id) ? k.id : 0))
@@ -836,7 +839,7 @@ export async function createServer(
     monitoring: false,
   });
 
-  const { text: createText } = await doApi("POST", "/droplets", body);
+  const createText = await doApi("POST", "/droplets", body);
   const createData = parseJsonObj(createText);
 
   if (!createData?.droplet?.id) {
@@ -863,7 +866,7 @@ async function waitForDropletActive(dropletId: string, maxAttempts = 60): Promis
   logStep("Waiting for droplet to become active...");
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const { text } = await doApi("GET", `/droplets/${dropletId}`);
+    const text = await doApi("GET", `/droplets/${dropletId}`);
     const data = parseJsonObj(text);
     const status = data?.droplet?.status;
 
@@ -1162,19 +1165,7 @@ export async function destroyServer(dropletId?: string): Promise<void> {
   }
 
   logStep(`Destroying DigitalOcean droplet ${id}...`);
-  const { status, text } = await doApi("DELETE", `/droplets/${id}`);
-
-  // DELETE returns 204 No Content on success (empty body)
-  if (status === 204) {
-    logInfo(`Droplet ${id} destroyed`);
-    return;
-  }
-
-  // Any non-204 status is a failure — extract the best error message available
-  const data = parseJsonObj(text);
-  const errMsg = isString(data?.message) ? data.message : text.slice(0, 200) || `HTTP ${status}`;
-  logError(`Failed to destroy droplet ${id}: ${errMsg}`);
-  logWarn("The droplet may still be running and incurring charges.");
-  logWarn(`Delete it manually at: ${DO_DASHBOARD_URL}`);
-  throw new Error("Droplet deletion failed");
+  // doApi throws on non-2xx; DELETE returns 204 No Content on success
+  await doApi("DELETE", `/droplets/${id}`);
+  logInfo(`Droplet ${id} destroyed`);
 }
