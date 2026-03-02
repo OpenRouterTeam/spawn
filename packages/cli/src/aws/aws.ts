@@ -339,6 +339,7 @@ async function lightsailRest(target: string, body = "{}"): Promise<string> {
     method: "POST",
     headers: reqHeaders,
     body,
+    signal: AbortSignal.timeout(30_000),
   });
   const text = await resp.text();
 
