@@ -14,6 +14,7 @@ spawn openclaw local
 spawn zeroclaw local
 spawn codex local
 spawn kilocode local
+spawn hermes local
 ```
 
 Or run directly without the CLI:
@@ -24,6 +25,7 @@ bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/openclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/zeroclaw.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/codex.sh)
 bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/kilocode.sh)
+bash <(curl -fsSL https://openrouter.ai/labs/spawn/local/hermes.sh)
 ```
 
 ## Non-Interactive Mode

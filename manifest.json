@@ -429,7 +429,7 @@
     "sprite/codex": "implemented",
     "sprite/opencode": "implemented",
     "sprite/kilocode": "implemented",
-    "local/hermes": "missing",
+    "local/hermes": "implemented",
     "hetzner/hermes": "implemented",
     "aws/hermes": "implemented",
     "daytona/hermes": "implemented",
