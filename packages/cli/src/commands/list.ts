@@ -3,12 +3,7 @@ import pc from "picocolors";
 import type { Manifest } from "../manifest.js";
 import { loadManifest, agentKeys, cloudKeys } from "../manifest.js";
 import type { SpawnRecord } from "../history.js";
-import {
-  filterHistory,
-  clearHistory,
-  removeRecord,
-  getActiveServers,
-} from "../history.js";
+import { filterHistory, clearHistory, removeRecord, getActiveServers } from "../history.js";
 import {
   handleCancel,
   getErrorMessage,

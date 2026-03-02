@@ -3,12 +3,7 @@ import pc from "picocolors";
 import type { Manifest } from "../manifest.js";
 import type { VMConnection } from "../history.js";
 import { getHistoryPath } from "../history.js";
-import {
-  validateConnectionIP,
-  validateUsername,
-  validateServerIdentifier,
-  validateLaunchCmd,
-} from "../security.js";
+import { validateConnectionIP, validateUsername, validateServerIdentifier, validateLaunchCmd } from "../security.js";
 import { SSH_INTERACTIVE_OPTS, spawnInteractive } from "../shared/ssh.js";
 import { getErrorMessage } from "./shared.js";
 
@@ -101,7 +96,11 @@ export async function cmdConnect(connection: VMConnection): Promise<void> {
 }
 
 /** SSH into a VM and launch the agent directly */
-export async function cmdEnterAgent(connection: VMConnection, agentKey: string, manifest: Manifest | null): Promise<void> {
+export async function cmdEnterAgent(
+  connection: VMConnection,
+  agentKey: string,
+  manifest: Manifest | null,
+): Promise<void> {
   // SECURITY: Validate all connection parameters before use
   try {
     validateConnectionIP(connection.ip);

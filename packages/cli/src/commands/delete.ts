@@ -3,15 +3,8 @@ import pc from "picocolors";
 import type { Manifest } from "../manifest.js";
 import { loadManifest } from "../manifest.js";
 import type { SpawnRecord } from "../history.js";
-import {
-  getActiveServers,
-  markRecordDeleted,
-  getHistoryPath,
-} from "../history.js";
-import {
-  validateServerIdentifier,
-  validateMetadataValue,
-} from "../security.js";
+import { getActiveServers, markRecordDeleted, getHistoryPath } from "../history.js";
+import { validateServerIdentifier, validateMetadataValue } from "../security.js";
 import { destroyServer as hetznerDestroyServer, ensureHcloudToken } from "../hetzner/hetzner.js";
 import { destroyServer as doDestroyServer, ensureDoToken } from "../digitalocean/digitalocean.js";
 import {
@@ -23,10 +16,7 @@ import {
 import { destroyServer as awsDestroyServer, ensureAwsCli, authenticate as awsAuthenticate } from "../aws/aws.js";
 import { destroyServer as daytonaDestroyServer, ensureDaytonaToken } from "../daytona/daytona.js";
 import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuthenticated } from "../sprite/sprite.js";
-import {
-  getErrorMessage,
-  isInteractiveTTY,
-} from "./shared.js";
+import { getErrorMessage, isInteractiveTTY } from "./shared.js";
 import { resolveListFilters, activeServerPicker } from "./list.js";
 
 /** Execute server deletion for a given record using TypeScript cloud modules */

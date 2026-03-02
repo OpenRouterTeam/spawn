@@ -5,18 +5,9 @@ import * as v from "valibot";
 import { isString } from "@openrouter/spawn-shared";
 import * as fs from "node:fs";
 import type { Manifest } from "../manifest.js";
-import {
-  loadManifest,
-  agentKeys,
-  cloudKeys,
-  matrixStatus,
-  isStaleCache,
-} from "../manifest.js";
+import { loadManifest, agentKeys, cloudKeys, matrixStatus, isStaleCache } from "../manifest.js";
 import pkg from "../../package.json" with { type: "json" };
-import {
-  validateIdentifier,
-  validatePrompt,
-} from "../security.js";
+import { validateIdentifier, validatePrompt } from "../security.js";
 import { getSpawnCloudConfigPath } from "../shared/ui.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -730,7 +721,12 @@ export function printAuthVariableStatus(authVars: string[], cloudUrl?: string): 
 }
 
 /** Print quick-start instructions showing credential status and example spawn command */
-export function printQuickStart(opts: { auth: string; authVars: string[]; cloudUrl?: string; spawnCmd?: string }): void {
+export function printQuickStart(opts: {
+  auth: string;
+  authVars: string[];
+  cloudUrl?: string;
+  spawnCmd?: string;
+}): void {
   console.log();
 
   if (checkAllCredentialsReady(opts.auth) && opts.spawnCmd) {
