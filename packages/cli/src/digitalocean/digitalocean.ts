@@ -100,12 +100,7 @@ export function getState() {
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 
-async function doApi(
-  method: string,
-  endpoint: string,
-  body?: string,
-  maxRetries = 3,
-): Promise<string> {
+async function doApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
   const url = `${DO_API_BASE}${endpoint}`;
 
   let interval = 2;
