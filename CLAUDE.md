@@ -104,7 +104,8 @@ spawn/
     cli/
       src/index.ts               # CLI entry point (bun/TypeScript)
       src/manifest.ts            # Manifest fetch + cache logic
-      src/commands.ts            # All subcommands (interactive, list, run, etc.)
+      src/commands/              # Per-command modules (interactive, list, run, etc.)
+      src/commands.ts            # Compatibility shim → re-exports from commands/
       package.json               # npm package (@openrouter/spawn)
     shared/
       src/parse.ts               # parseJsonWith(text, schema) and parseJsonRaw(text)

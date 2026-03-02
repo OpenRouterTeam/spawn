@@ -13,7 +13,7 @@ import {
 import { createMockManifest, createEmptyManifest } from "./test-helpers";
 
 /**
- * Tests for exported utility functions in commands.ts that lacked
+ * Tests for exported utility functions in commands/ that lacked
  * direct unit test coverage.
  *
  * Previously tested functions like levenshtein, findClosestMatch,
@@ -374,7 +374,7 @@ describe("calculateColumnWidth (actual export)", () => {
   });
 
   it("should expand beyond minimum for long items", () => {
-    // COL_PADDING is 2 in commands.ts
+    // COL_PADDING is 2 in commands/info.ts
     const result = calculateColumnWidth(
       [
         "long-item-name",
@@ -429,7 +429,7 @@ describe("getTerminalWidth", () => {
   });
 });
 
-// ── getImplementedClouds (actual export from commands.ts) ─────────────────────
+// ── getImplementedClouds (actual export from commands/shared.ts) ───────────────
 
 describe("getImplementedClouds (actual export)", () => {
   it("should return implemented clouds for a given agent", () => {

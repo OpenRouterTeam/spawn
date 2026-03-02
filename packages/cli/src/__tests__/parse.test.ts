@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import * as v from "valibot";
-import { parseJsonWith, parseJsonRaw } from "@openrouter/spawn-shared";
+import { parseJsonWith, parseJsonRaw } from "../shared/parse";
 
 describe("parseJsonWith", () => {
   const NumberSchema = v.object({

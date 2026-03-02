@@ -13,7 +13,7 @@ import {
   interactiveSession,
 } from "./daytona";
 import type { SandboxSize } from "./daytona";
-import { resolveAgent } from "./agents";
+import { agents, resolveAgent } from "./agents";
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
 import type { CloudOrchestrator } from "../shared/orchestrate";
@@ -22,7 +22,7 @@ async function main() {
   const agentName = process.argv[2];
   if (!agentName) {
     console.error("Usage: bun run daytona/main.ts <agent>");
-    console.error("Agents: claude, codex, openclaw, opencode, kilocode, zeroclaw");
+    console.error(`Agents: ${Object.keys(agents).join(", ")}`);
     process.exit(1);
   }
 

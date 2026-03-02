@@ -28,7 +28,8 @@ import {
   spawnInteractive,
 } from "../shared/ssh";
 import { ensureSshKeys, getSshFingerprint, getSshKeyOpts } from "../shared/ssh-keys";
-import { parseJsonObj, isString, isNumber, toObjectArray, toRecord } from "@openrouter/spawn-shared";
+import { parseJsonObj } from "../shared/parse";
+import { isString, isNumber, toObjectArray, toRecord } from "../shared/type-guards";
 import { saveVmConnection } from "../history.js";
 
 const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
@@ -74,6 +75,9 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
         await sleep(interval * 1000);
         interval = Math.min(interval * 2, 30);
         continue;
+      }
+      if (!resp.ok) {
+        throw new Error(`Hetzner API error (HTTP ${resp.status}): ${text.slice(0, 200)}`);
       }
       return text;
     } catch (err) {

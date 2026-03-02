@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Result } from "./ui";
 import { logInfo, logWarn, logError, logStep, prompt, jsonEscape, withRetry, Ok, Err } from "./ui";
-import { hasMessage } from "@openrouter/spawn-shared";
+import { hasMessage } from "./type-guards";
 import type { AgentConfig } from "./agents";
 
 /**

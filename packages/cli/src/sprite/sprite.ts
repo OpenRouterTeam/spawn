@@ -15,7 +15,7 @@ import {
   defaultSpawnName,
 } from "../shared/ui";
 import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
-import { hasMessage } from "@openrouter/spawn-shared";
+import { hasMessage } from "../shared/type-guards";
 import { getSpawnDir } from "../history.js";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
@@ -642,7 +642,10 @@ export async function destroyServer(name?: string): Promise<void> {
   );
   // Drain stderr before awaiting exit to prevent pipe buffer deadlock
   const stderrText = new Response(proc.stderr).text();
+  // 60s timeout — sprite destroy should not hang indefinitely
+  const timer = setTimeout(() => killWithTimeout(proc), 60_000);
   const exitCode = await proc.exited;
+  clearTimeout(timer);
   if (exitCode !== 0) {
     logError(`Failed to destroy sprite '${target}'`);
     logError(`Delete it manually: sprite destroy ${target}`);

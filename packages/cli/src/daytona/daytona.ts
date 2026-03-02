@@ -18,7 +18,8 @@ import {
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
-import { parseJsonObj, isString } from "@openrouter/spawn-shared";
+import { parseJsonObj } from "../shared/parse";
+import { isString } from "../shared/type-guards";
 import { saveVmConnection } from "../history.js";
 import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
 
@@ -71,6 +72,9 @@ async function daytonaApi(method: string, endpoint: string, body?: string, maxRe
         interval = Math.min(interval * 2, 30);
         continue;
       }
+      if (!resp.ok) {
+        throw new Error(`Daytona API error ${resp.status}: ${extractApiError(text)}`);
+      }
       return text;
     } catch (err) {
       if (attempt >= maxRetries) {
@@ -82,10 +86,6 @@ async function daytonaApi(method: string, endpoint: string, body?: string, maxRe
     }
   }
   throw new Error("daytonaApi: unreachable");
-}
-
-function hasApiError(text: string): boolean {
-  return /"statusCode"\s*:\s*4|"unauthorized"|"forbidden"/i.test(text);
 }
 
 function extractApiError(text: string, fallback = "Unknown error"): string {
@@ -133,10 +133,7 @@ async function testDaytonaToken(): Promise<boolean> {
     return false;
   }
   try {
-    const resp = await daytonaApi("GET", "/sandbox?page=1&limit=1", undefined, 1);
-    if (hasApiError(resp)) {
-      return false;
-    }
+    await daytonaApi("GET", "/sandbox?page=1&limit=1", undefined, 1);
     return true;
   } catch {
     return false;
@@ -647,11 +644,11 @@ export async function destroyServer(id?: string): Promise<void> {
   }
 
   logStep(`Destroying sandbox ${targetId}...`);
-  const response = await daytonaApi("DELETE", `/sandbox/${targetId}`);
-
-  if (response && hasApiError(response)) {
+  try {
+    await daytonaApi("DELETE", `/sandbox/${targetId}`);
+  } catch (err) {
     logError(`Failed to destroy sandbox ${targetId}`);
-    logError(`API Error: ${extractApiError(response)}`);
+    logError(err instanceof Error ? err.message : "Unknown error");
     logWarn("The sandbox may still be running and incurring charges.");
     logWarn(`Delete it manually at: ${DAYTONA_DASHBOARD_URL}`);
     throw new Error("Sandbox deletion failed");

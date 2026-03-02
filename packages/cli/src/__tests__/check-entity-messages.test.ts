@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test";
+import { describe, it, expect, beforeEach } from "bun:test";
+import { mockClackPrompts } from "./test-helpers";
 import type { Manifest } from "../manifest";
 
 /**
- * Tests for checkEntity output messages (commands.ts:177-216).
+ * Tests for checkEntity output messages (commands/shared.ts).
  *
  * The existing check-entity.test.ts verifies return values (true/false)
  * but does not capture the messages output via @clack/prompts log calls.
@@ -14,32 +15,7 @@ import type { Manifest } from "../manifest";
  * 4. No match at all: just the listCmd hint (existing)
  */
 
-// ── Mock @clack/prompts ─────────────────────────────────────────────────────
-
-const mockLogError = mock(() => {});
-const mockLogInfo = mock(() => {});
-
-mock.module("@clack/prompts", () => ({
-  spinner: () => ({
-    start: mock(() => {}),
-    stop: mock(() => {}),
-    message: mock(() => {}),
-  }),
-  log: {
-    step: mock(() => {}),
-    info: mockLogInfo,
-    warn: mock(() => {}),
-    error: mockLogError,
-    success: mock(() => {}),
-  },
-  intro: mock(() => {}),
-  outro: mock(() => {}),
-  cancel: mock(() => {}),
-  select: mock(() => {}),
-  autocomplete: mock(async () => "claude"),
-  text: mock(async () => undefined),
-  isCancel: () => false,
-}));
+const { logError: mockLogError, logInfo: mockLogInfo } = mockClackPrompts();
 
 // Import after mocking
 const { checkEntity } = await import("../commands.js");

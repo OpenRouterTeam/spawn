@@ -30,7 +30,7 @@ import {
 } from "../shared/ssh";
 import { ensureSshKeys, getSshKeyOpts } from "../shared/ssh-keys";
 import * as v from "valibot";
-import { parseJsonWith } from "@openrouter/spawn-shared";
+import { parseJsonWith } from "../shared/parse";
 import { saveVmConnection } from "../history.js";
 
 const DASHBOARD_URL = "https://lightsail.aws.amazon.com/";
