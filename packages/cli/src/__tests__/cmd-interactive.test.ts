@@ -24,7 +24,19 @@ let selectCallIndex = 0;
 let selectReturnValues: any[] = [];
 let isCancelValues: Set<any> = new Set();
 
-const { logError: mockLogError, logInfo: mockLogInfo, logStep: mockLogStep, logWarn: mockLogWarn, intro: mockIntro, outro: mockOutro, cancel: mockCancel, confirm: mockConfirm, spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop, spinnerMessage: mockSpinnerMessage } = mockClackPrompts({
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logWarn: mockLogWarn,
+  intro: mockIntro,
+  outro: mockOutro,
+  cancel: mockCancel,
+  confirm: mockConfirm,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+  spinnerMessage: mockSpinnerMessage,
+} = mockClackPrompts({
   autocomplete: mock(async () => {
     const value = selectReturnValues[selectCallIndex] ?? "claude";
     selectCallIndex++;

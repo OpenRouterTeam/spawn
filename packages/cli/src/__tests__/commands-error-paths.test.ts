@@ -18,7 +18,14 @@ import { isString } from "@openrouter/spawn-shared";
 
 const mockManifest = createMockManifest();
 
-const { logError: mockLogError, logInfo: mockLogInfo, logStep: mockLogStep, logWarn: mockLogWarn, spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop } = mockClackPrompts();
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logWarn: mockLogWarn,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+} = mockClackPrompts();
 
 // Import commands after @clack/prompts mock is set up
 const { cmdRun, cmdAgentInfo } = await import("../commands.js");

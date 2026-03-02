@@ -118,9 +118,7 @@ export interface ClackPromptsMock {
  *
  * MUST be called at module top level (before dynamic imports of modules that use @clack/prompts).
  */
-export function mockClackPrompts(
-  overrides?: Partial<ClackPromptsMock>,
-): ClackPromptsMock {
+export function mockClackPrompts(overrides?: Partial<ClackPromptsMock>): ClackPromptsMock {
   const mocks: ClackPromptsMock = {
     logStep: mock(() => {}),
     logInfo: mock(() => {}),

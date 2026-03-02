@@ -22,7 +22,15 @@ import { isString } from "@openrouter/spawn-shared";
 
 const mockManifest = createMockManifest();
 
-const { logError: mockLogError, logInfo: mockLogInfo, logStep: mockLogStep, logWarn: mockLogWarn, spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop, spinnerMessage: mockSpinnerMessage } = mockClackPrompts();
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logWarn: mockLogWarn,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+  spinnerMessage: mockSpinnerMessage,
+} = mockClackPrompts();
 
 // Import after mock setup
 const { cmdRun } = await import("../commands.js");

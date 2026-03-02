@@ -24,7 +24,15 @@ const mockManifest = createMockManifest();
 // select returns "rerun" to exercise the "Spawn a new VM" path
 const mockSelect = mock(async () => "rerun");
 
-const { logWarn: mockLogWarn, logStep: mockLogStep, logError: mockLogError, logInfo: mockLogInfo, spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop, spinnerMessage: mockSpinnerMessage } = mockClackPrompts({
+const {
+  logWarn: mockLogWarn,
+  logStep: mockLogStep,
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+  spinnerMessage: mockSpinnerMessage,
+} = mockClackPrompts({
   select: mockSelect,
 });
 

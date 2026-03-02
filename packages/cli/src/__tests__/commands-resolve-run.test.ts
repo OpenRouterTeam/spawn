@@ -124,7 +124,14 @@ const noCloudManifest = {
   },
 };
 
-const { logError: mockLogError, logInfo: mockLogInfo, logStep: mockLogStep, logWarn: mockLogWarn, spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop } = mockClackPrompts();
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logWarn: mockLogWarn,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+} = mockClackPrompts();
 
 // Import commands after mock setup
 const { cmdRun } = await import("../commands.js");

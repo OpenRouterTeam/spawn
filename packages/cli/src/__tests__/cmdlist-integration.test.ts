@@ -27,7 +27,14 @@ import type { SpawnRecord } from "../history";
 
 const mockManifest = createMockManifest();
 
-const { logError: mockLogError, logInfo: mockLogInfo, logStep: mockLogStep, logSuccess: mockLogSuccess, spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop } = mockClackPrompts();
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  logSuccess: mockLogSuccess,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+} = mockClackPrompts();
 
 // Import after mock setup
 const { cmdList, resolveDisplayName } = await import("../commands.js");

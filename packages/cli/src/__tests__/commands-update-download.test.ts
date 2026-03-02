@@ -21,7 +21,14 @@ const VERSION = pkg.version;
 
 const mockManifest = createMockManifest();
 
-const { logError: mockLogError, logInfo: mockLogInfo, logStep: mockLogStep, spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop, spinnerMessage: mockSpinnerMessage } = mockClackPrompts();
+const {
+  logError: mockLogError,
+  logInfo: mockLogInfo,
+  logStep: mockLogStep,
+  spinnerStart: mockSpinnerStart,
+  spinnerStop: mockSpinnerStop,
+  spinnerMessage: mockSpinnerMessage,
+} = mockClackPrompts();
 
 // Mock node:child_process to prevent real subprocess calls in tests:
 // - execSync: used by performUpdate() to run curl|bash install — without this mock,
