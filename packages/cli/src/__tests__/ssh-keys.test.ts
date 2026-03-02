@@ -62,14 +62,19 @@ function createFakeKeyPair(name: string, keyType: "ed25519" | "rsa" = "ed25519")
   const privPath = join(sshDir, name);
   const pubPath = `${privPath}.pub`;
 
-  writeFileSync(privPath, "fake-private-key\n", { mode: 0o600 });
+  writeFileSync(privPath, "fake-private-key\n", {
+    mode: 0o600,
+  });
   if (keyType === "ed25519") {
     writeFileSync(pubPath, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFake test\n");
   } else {
     writeFileSync(pubPath, "ssh-rsa AAAAFake test\n");
   }
 
-  return { privPath, pubPath };
+  return {
+    privPath,
+    pubPath,
+  };
 }
 
 /** Build a minimal ReadableSyncSubprocess with stdout containing text. */
@@ -82,7 +87,11 @@ function makeSyncResult(text: string, exitCode = 0): Bun.SyncSubprocess<"pipe", 
     success: exitCode === 0,
     pid: 0,
     resourceUsage: {
-      cpuTime: { system: 0, user: 0, total: 0 },
+      cpuTime: {
+        system: 0,
+        user: 0,
+        total: 0,
+      },
       maxRSS: 0,
       sharedMemorySize: 0,
       unsharedDataSize: 0,
@@ -122,7 +131,9 @@ function sshKeygenMd5Result(): Bun.SyncSubprocess<"pipe", "pipe"> {
  */
 function sshKeygenGenerateResult(privPath: string): Bun.SyncSubprocess<"pipe", "pipe"> {
   const pubPath = `${privPath}.pub`;
-  writeFileSync(privPath, "fake-private-key\n", { mode: 0o600 });
+  writeFileSync(privPath, "fake-private-key\n", {
+    mode: 0o600,
+  });
   writeFileSync(pubPath, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFake spawn\n");
   return makeSyncResult("");
 }
@@ -204,7 +215,10 @@ describe("discoverSshKeys", () => {
 describe("generateSshKey", () => {
   it("generates an ed25519 key and returns the pair", () => {
     const sshDir = join(tmpDir, ".ssh");
-    mkdirSync(sshDir, { recursive: true, mode: 0o700 });
+    mkdirSync(sshDir, {
+      recursive: true,
+      mode: 0o700,
+    });
     const privPath = join(sshDir, "id_ed25519");
 
     const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenGenerateResult(privPath));
@@ -246,7 +260,10 @@ describe("getSshFingerprint", () => {
 describe("ensureSshKeys", () => {
   it("generates a key when no keys are found", async () => {
     const sshDir = join(tmpDir, ".ssh");
-    mkdirSync(sshDir, { recursive: true, mode: 0o700 });
+    mkdirSync(sshDir, {
+      recursive: true,
+      mode: 0o700,
+    });
     const privPath = join(sshDir, "id_ed25519");
 
     const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenGenerateResult(privPath));
