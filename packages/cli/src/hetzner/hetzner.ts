@@ -40,14 +40,6 @@ let hcloudToken = "";
 let hetznerServerId = "";
 let hetznerServerIp = "";
 
-export function getState() {
-  return {
-    hcloudToken,
-    hetznerServerId,
-    hetznerServerIp,
-  };
-}
-
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function hetznerApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
@@ -67,7 +59,10 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
       if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
         opts.body = body;
       }
-      const resp = await fetch(url, opts);
+      const resp = await fetch(url, {
+        ...opts,
+        signal: AbortSignal.timeout(30_000),
+      });
       const text = await resp.text();
 
       if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {

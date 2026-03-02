@@ -90,14 +90,6 @@ let doToken = "";
 let doDropletId = "";
 let doServerIp = "";
 
-export function getState() {
-  return {
-    doToken,
-    doDropletId,
-    doServerIp,
-  };
-}
-
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function doApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
@@ -117,7 +109,10 @@ async function doApi(method: string, endpoint: string, body?: string, maxRetries
       if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
         opts.body = body;
       }
-      const resp = await fetch(url, opts);
+      const resp = await fetch(url, {
+        ...opts,
+        signal: AbortSignal.timeout(30_000),
+      });
       const text = await resp.text();
 
       if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {

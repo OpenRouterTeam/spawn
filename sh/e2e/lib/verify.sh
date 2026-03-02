@@ -89,11 +89,16 @@ input_test_openclaw() {
       _oc_bin=\$(command -v openclaw) || exit 1; \
       if command -v setsid >/dev/null 2>&1; then setsid \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & \
       else nohup \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; \
-      elapsed=0; while [ \$elapsed -lt 30 ]; do \
-        if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo 'Gateway started'; break; fi; \
+      elapsed=0; _gw_up=0; while [ \$elapsed -lt 30 ]; do \
+        if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo 'Gateway started'; _gw_up=1; break; fi; \
         sleep 1; elapsed=\$((elapsed + 1)); \
       done; \
-    fi" >/dev/null 2>&1 || log_warn "Failed to start openclaw gateway"
+      if [ \$_gw_up -eq 0 ]; then echo 'Gateway failed to start after 30s'; cat /tmp/openclaw-gateway.log 2>/dev/null; exit 1; fi; \
+    fi" >/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    log_err "OpenClaw gateway failed to start"
+    return 1
+  fi
 
   local encoded_prompt
   encoded_prompt=$(printf '%s' "${INPUT_TEST_PROMPT}" | base64 -w 0 2>/dev/null || printf '%s' "${INPUT_TEST_PROMPT}" | base64)
@@ -101,7 +106,7 @@ input_test_openclaw() {
   remote_cmd="source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     rm -rf /tmp/e2e-test && mkdir -p /tmp/e2e-test && cd /tmp/e2e-test && git init -q; \
-    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw agent --message \"\$PROMPT\" --session-id e2e-test --json --timeout 60"
+    PROMPT=\$(printf '%s' '${encoded_prompt}' | base64 -d); openclaw agent --message \"\$PROMPT\" --session-id e2e-test --json"
 
   local output
   output=$(cloud_exec_long "${app}" "${remote_cmd}" "${INPUT_TEST_TIMEOUT}" 2>&1) || true

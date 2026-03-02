@@ -27,13 +27,6 @@ const CONNECTIVITY_POLL_DELAY = Number.parseInt(process.env.SPRITE_CONNECTIVITY_
 let spriteName = "";
 let spriteOrg = "";
 
-export function getState() {
-  return {
-    spriteName,
-    spriteOrg,
-  };
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Run a command locally and return { exitCode, stdout, stderr }. */

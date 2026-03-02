@@ -143,16 +143,6 @@ let gcpInstanceName = "";
 let gcpServerIp = "";
 let gcpUsername = "";
 
-export function getState() {
-  return {
-    gcpProject,
-    gcpZone,
-    gcpInstanceName,
-    gcpServerIp,
-    gcpUsername,
-  };
-}
-
 // ─── gcloud CLI Wrapper ─────────────────────────────────────────────────────
 
 function getGcloudCmd(): string | null {
