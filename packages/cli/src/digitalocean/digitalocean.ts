@@ -125,7 +125,10 @@ async function doApi(
       if (body && (method === "POST" || method === "PUT" || method === "PATCH")) {
         opts.body = body;
       }
-      const resp = await fetch(url, opts);
+      const resp = await fetch(url, {
+        ...opts,
+        signal: AbortSignal.timeout(30_000),
+      });
       const text = await resp.text();
 
       if ((resp.status === 429 || resp.status >= 500) && attempt < maxRetries) {
