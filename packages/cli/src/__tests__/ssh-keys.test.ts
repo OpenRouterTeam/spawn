@@ -1,11 +1,11 @@
 /**
  * ssh-keys.test.ts — Tests for shared SSH key discovery, selection, and generation.
  *
- * Uses real temp directories instead of mocking node:fs (which would bleed
- * into other test files via Bun's global mock.module).
+ * Uses real temp directories for filesystem tests and spyOn(Bun, "spawnSync")
+ * to mock ssh-keygen invocations — no real subprocess calls.
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { mockClackPrompts } from "./test-helpers";
@@ -47,7 +47,12 @@ function cleanupTmpHome() {
   }
 }
 
-/** Create a fake SSH key pair in the temp ~/.ssh directory. */
+/**
+ * Create a fake SSH key pair in the temp ~/.ssh directory.
+ * Writes placeholder key files — no subprocess calls.
+ * The getKeyType function internally calls Bun.spawnSync(["ssh-keygen", "-lf", ...]);
+ * tests that exercise key type detection must mock Bun.spawnSync separately.
+ */
 function createFakeKeyPair(name: string, keyType: "ed25519" | "rsa" = "ed25519") {
   const sshDir = join(tmpDir, ".ssh");
   mkdirSync(sshDir, {
@@ -57,73 +62,80 @@ function createFakeKeyPair(name: string, keyType: "ed25519" | "rsa" = "ed25519")
   const privPath = join(sshDir, name);
   const pubPath = `${privPath}.pub`;
 
-  // Write minimal valid key files that ssh-keygen can read
+  writeFileSync(privPath, "fake-private-key\n", {
+    mode: 0o600,
+  });
   if (keyType === "ed25519") {
-    // Generate a real ed25519 key pair so ssh-keygen -lf works
-    const result = Bun.spawnSync(
-      [
-        "ssh-keygen",
-        "-t",
-        "ed25519",
-        "-f",
-        privPath,
-        "-N",
-        "",
-        "-q",
-        "-C",
-        "test",
-      ],
-      {
-        stdio: [
-          "ignore",
-          "ignore",
-          "ignore",
-        ],
-      },
-    );
-    if (result.exitCode !== 0) {
-      // Fallback: write placeholder files (ssh-keygen -lf may not work but existsSync will)
-      writeFileSync(privPath, "fake-private-key\n", {
-        mode: 0o600,
-      });
-      writeFileSync(pubPath, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFake test\n");
-    }
+    writeFileSync(pubPath, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFake test\n");
   } else {
-    const result = Bun.spawnSync(
-      [
-        "ssh-keygen",
-        "-t",
-        "rsa",
-        "-b",
-        "2048",
-        "-f",
-        privPath,
-        "-N",
-        "",
-        "-q",
-        "-C",
-        "test",
-      ],
-      {
-        stdio: [
-          "ignore",
-          "ignore",
-          "ignore",
-        ],
-      },
-    );
-    if (result.exitCode !== 0) {
-      writeFileSync(privPath, "fake-private-key\n", {
-        mode: 0o600,
-      });
-      writeFileSync(pubPath, "ssh-rsa AAAAFake test\n");
-    }
+    writeFileSync(pubPath, "ssh-rsa AAAAFake test\n");
   }
 
   return {
     privPath,
     pubPath,
   };
+}
+
+/** Build a minimal ReadableSyncSubprocess with stdout containing text. */
+function makeSyncResult(text: string, exitCode = 0): Bun.SyncSubprocess<"pipe", "pipe"> {
+  const buf = Buffer.from(text);
+  return {
+    exitCode,
+    stdout: buf,
+    stderr: Buffer.alloc(0),
+    success: exitCode === 0,
+    pid: 0,
+    resourceUsage: {
+      cpuTime: {
+        system: 0,
+        user: 0,
+        total: 0,
+      },
+      maxRSS: 0,
+      sharedMemorySize: 0,
+      unsharedDataSize: 0,
+      unsharedStackSize: 0,
+      minorPageFaults: 0,
+      majorPageFaults: 0,
+      swapCount: 0,
+      inBlock: 0,
+      outBlock: 0,
+      ipcMessagesSent: 0,
+      ipcMessagesReceived: 0,
+      signalsReceived: 0,
+      voluntaryContextSwitches: 0,
+      involuntaryContextSwitches: 0,
+    },
+  };
+}
+
+/**
+ * Build a mock spawnSync implementation that returns ssh-keygen -lf output
+ * for a given key type ("ED25519" or "RSA").
+ */
+function sshKeygenLfResult(keyType: string): Bun.SyncSubprocess<"pipe", "pipe"> {
+  return makeSyncResult(`256 SHA256:fakehash user@host (${keyType})`);
+}
+
+/**
+ * Build a mock spawnSync result that simulates ssh-keygen -lf -E md5 output.
+ */
+function sshKeygenMd5Result(): Bun.SyncSubprocess<"pipe", "pipe"> {
+  return makeSyncResult("256 MD5:aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99 user@host (ED25519)");
+}
+
+/**
+ * Build a mock spawnSync result that simulates successful ssh-keygen key generation.
+ * Also writes the expected output files so existsSync checks pass.
+ */
+function sshKeygenGenerateResult(privPath: string): Bun.SyncSubprocess<"pipe", "pipe"> {
+  const pubPath = `${privPath}.pub`;
+  writeFileSync(privPath, "fake-private-key\n", {
+    mode: 0o600,
+  });
+  writeFileSync(pubPath, "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFake spawn\n");
+  return makeSyncResult("");
 }
 
 // ─── Setup / Teardown ───────────────────────────────────────────────────────
@@ -169,7 +181,9 @@ describe("discoverSshKeys", () => {
 
   it("discovers a single key pair", () => {
     createFakeKeyPair("id_ed25519", "ed25519");
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenLfResult("ED25519"));
     const keys = discoverSshKeys();
+    spawnSpy.mockRestore();
     expect(keys).toHaveLength(1);
     expect(keys[0].name).toBe("id_ed25519");
     expect(keys[0].type).toContain("ED25519");
@@ -181,7 +195,14 @@ describe("discoverSshKeys", () => {
     createFakeKeyPair("id_rsa", "rsa");
     createFakeKeyPair("id_ed25519", "ed25519");
 
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
+      const pubPath = args[args.length - 1];
+      const type = pubPath.includes("ed25519") ? "ED25519" : "RSA";
+      return sshKeygenLfResult(type);
+    });
+
     const keys = discoverSshKeys();
+    spawnSpy.mockRestore();
     expect(keys).toHaveLength(2);
     // ED25519 should sort first
     expect(keys[0].name).toBe("id_ed25519");
@@ -193,7 +214,17 @@ describe("discoverSshKeys", () => {
 
 describe("generateSshKey", () => {
   it("generates an ed25519 key and returns the pair", () => {
+    const sshDir = join(tmpDir, ".ssh");
+    mkdirSync(sshDir, {
+      recursive: true,
+      mode: 0o700,
+    });
+    const privPath = join(sshDir, "id_ed25519");
+
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenGenerateResult(privPath));
+
     const pair = generateSshKey();
+    spawnSpy.mockRestore();
     expect(pair.name).toBe("id_ed25519");
     expect(pair.type).toBe("ED25519");
     expect(pair.privPath).toContain("id_ed25519");
@@ -206,16 +237,20 @@ describe("generateSshKey", () => {
 // ─── getSshFingerprint ──────────────────────────────────────────────────────
 
 describe("getSshFingerprint", () => {
-  it("extracts MD5 fingerprint from a real key", () => {
+  it("extracts MD5 fingerprint from key output", () => {
     const { pubPath } = createFakeKeyPair("id_ed25519", "ed25519");
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenMd5Result());
     const fp = getSshFingerprint(pubPath);
+    spawnSpy.mockRestore();
     // Should be a colon-separated hex string
     expect(fp).toMatch(/^[a-f0-9:]+$/);
     expect(fp.split(":")).toHaveLength(16);
   });
 
   it("returns empty string for non-existent file", () => {
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(makeSyncResult("", 1));
     const fp = getSshFingerprint("/tmp/nonexistent.pub");
+    spawnSpy.mockRestore();
     expect(fp).toBe("");
   });
 });
@@ -224,7 +259,17 @@ describe("getSshFingerprint", () => {
 
 describe("ensureSshKeys", () => {
   it("generates a key when no keys are found", async () => {
+    const sshDir = join(tmpDir, ".ssh");
+    mkdirSync(sshDir, {
+      recursive: true,
+      mode: 0o700,
+    });
+    const privPath = join(sshDir, "id_ed25519");
+
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenGenerateResult(privPath));
+
     const keys = await ensureSshKeys();
+    spawnSpy.mockRestore();
     expect(keys).toHaveLength(1);
     expect(keys[0].name).toBe("id_ed25519");
     expect(existsSync(keys[0].privPath)).toBe(true);
@@ -232,7 +277,9 @@ describe("ensureSshKeys", () => {
 
   it("uses single key silently when only one is found", async () => {
     createFakeKeyPair("id_rsa", "rsa");
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenLfResult("RSA"));
     const keys = await ensureSshKeys();
+    spawnSpy.mockRestore();
     expect(keys).toHaveLength(1);
     expect(keys[0].name).toBe("id_rsa");
   });
@@ -242,7 +289,14 @@ describe("ensureSshKeys", () => {
     createFakeKeyPair("id_ed25519", "ed25519");
     createFakeKeyPair("id_rsa", "rsa");
 
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
+      const pubPath = args[args.length - 1];
+      const type = pubPath.includes("ed25519") ? "ED25519" : "RSA";
+      return sshKeygenLfResult(type);
+    });
+
     const keys = await ensureSshKeys();
+    spawnSpy.mockRestore();
     expect(keys).toHaveLength(2);
   });
 
@@ -252,15 +306,24 @@ describe("ensureSshKeys", () => {
     createFakeKeyPair("id_ed25519", "ed25519");
     createFakeKeyPair("id_rsa", "rsa");
 
+    const spawnSpy = spyOn(Bun, "spawnSync").mockImplementation((args: string[]) => {
+      const pubPath = args[args.length - 1];
+      const type = pubPath.includes("ed25519") ? "ED25519" : "RSA";
+      return sshKeygenLfResult(type);
+    });
+
     const keys = await ensureSshKeys();
+    spawnSpy.mockRestore();
     expect(keys).toHaveLength(2);
   });
 
   it("caches results across calls", async () => {
     createFakeKeyPair("id_ed25519", "ed25519");
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue(sshKeygenLfResult("ED25519"));
 
     const keys1 = await ensureSshKeys();
     const keys2 = await ensureSshKeys();
+    spawnSpy.mockRestore();
     expect(keys1).toEqual(keys2);
   });
 });
