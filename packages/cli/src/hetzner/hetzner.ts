@@ -76,6 +76,9 @@ async function hetznerApi(method: string, endpoint: string, body?: string, maxRe
         interval = Math.min(interval * 2, 30);
         continue;
       }
+      if (!resp.ok) {
+        throw new Error(`Hetzner API error (HTTP ${resp.status}): ${text.slice(0, 200)}`);
+      }
       return text;
     } catch (err) {
       if (attempt >= maxRetries) {
