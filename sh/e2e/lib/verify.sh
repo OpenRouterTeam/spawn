@@ -90,7 +90,7 @@ input_test_openclaw() {
       if command -v setsid >/dev/null 2>&1; then setsid \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & \
       else nohup \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; \
       elapsed=0; while [ \$elapsed -lt 30 ]; do \
-        if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo 'Gateway started'; break; fi; \
+        if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo 'Gateway started'; sleep 5; break; fi; \
         sleep 1; elapsed=\$((elapsed + 1)); \
       done; \
     fi" >/dev/null 2>&1 || log_warn "Failed to start openclaw gateway"

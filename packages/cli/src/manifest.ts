@@ -207,18 +207,25 @@ function tryLoadLocalManifest(): Manifest | null {
     return null;
   }
 
-  try {
-    // Try loading manifest.json from current directory (development mode)
-    const localPath = join(process.cwd(), "manifest.json");
-    if (existsSync(localPath)) {
-      const raw = JSON.parse(readFileSync(localPath, "utf-8"));
-      const data = stripDangerousKeys(raw);
-      if (isValidManifest(data)) {
-        return data;
+  // Candidate paths: cwd first, then SPAWN_CLI_DIR (used by e2e tests)
+  const candidates = [join(process.cwd(), "manifest.json")];
+  const cliDir = process.env.SPAWN_CLI_DIR;
+  if (cliDir) {
+    candidates.push(join(cliDir, "manifest.json"));
+  }
+
+  for (const localPath of candidates) {
+    try {
+      if (existsSync(localPath)) {
+        const raw = JSON.parse(readFileSync(localPath, "utf-8"));
+        const data = stripDangerousKeys(raw);
+        if (isValidManifest(data)) {
+          return data;
+        }
       }
+    } catch (_err) {
+      // Local manifest not found or invalid - try next candidate
     }
-  } catch (_err) {
-    // Local manifest not found or invalid - not an error, just continue
   }
   return null;
 }
