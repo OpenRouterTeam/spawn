@@ -91,16 +91,8 @@ describe("needsBun", () => {
 });
 
 describe("NODE_INSTALL_CMD", () => {
-  it("is a non-empty string", () => {
-    expect(typeof NODE_INSTALL_CMD).toBe("string");
-    expect(NODE_INSTALL_CMD.length).toBeGreaterThan(0);
-  });
-
-  it("installs Node 22", () => {
-    expect(NODE_INSTALL_CMD).toContain("22");
-  });
-
-  it("downloads and runs an install script", () => {
+  it("is a curl-based install command targeting Node 22", () => {
     expect(NODE_INSTALL_CMD).toContain("curl");
+    expect(NODE_INSTALL_CMD).toContain("22");
   });
 });
