@@ -90,14 +90,6 @@ let doToken = "";
 let doDropletId = "";
 let doServerIp = "";
 
-export function getState() {
-  return {
-    doToken,
-    doDropletId,
-    doServerIp,
-  };
-}
-
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function doApi(

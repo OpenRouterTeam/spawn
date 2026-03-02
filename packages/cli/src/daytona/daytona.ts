@@ -34,16 +34,6 @@ let sshToken = "";
 let sshHost = "";
 let sshPort = "";
 
-export function getState() {
-  return {
-    daytonaApiKey,
-    sandboxId,
-    sshToken,
-    sshHost,
-    sshPort,
-  };
-}
-
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function daytonaApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {

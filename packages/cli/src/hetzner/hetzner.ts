@@ -40,14 +40,6 @@ let hcloudToken = "";
 let hetznerServerId = "";
 let hetznerServerIp = "";
 
-export function getState() {
-  return {
-    hcloudToken,
-    hetznerServerId,
-    hetznerServerIp,
-  };
-}
-
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 async function hetznerApi(method: string, endpoint: string, body?: string, maxRetries = 3): Promise<string> {
