@@ -12,6 +12,7 @@ import {
   prompt,
   jsonEscape,
   getSpawnCloudConfigPath,
+  loadApiToken,
   validateServerName,
   validateRegionName,
   toKebabCase,
@@ -105,20 +106,7 @@ async function saveTokenToConfig(token: string): Promise<void> {
 }
 
 function loadTokenFromConfig(): string | null {
-  try {
-    const data = JSON.parse(readFileSync(getSpawnCloudConfigPath("hetzner"), "utf-8"));
-    const token = data.api_key || data.token || "";
-    if (!token) {
-      return null;
-    }
-    // Security: validate token chars
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
-      return null;
-    }
-    return token;
-  } catch {
-    return null;
-  }
+  return loadApiToken("hetzner");
 }
 
 // ─── Token Validation ────────────────────────────────────────────────────────

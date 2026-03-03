@@ -12,6 +12,7 @@ import {
   prompt,
   jsonEscape,
   getSpawnCloudConfigPath,
+  loadApiToken,
   validateServerName,
   toKebabCase,
   defaultSpawnName,
@@ -108,19 +109,7 @@ async function saveTokenToConfig(token: string): Promise<void> {
 }
 
 function loadTokenFromConfig(): string | null {
-  try {
-    const data = JSON.parse(readFileSync(getSpawnCloudConfigPath("daytona"), "utf-8"));
-    const token = data.api_key || data.token || "";
-    if (!token) {
-      return null;
-    }
-    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
-      return null;
-    }
-    return token;
-  } catch {
-    return null;
-  }
+  return loadApiToken("daytona");
 }
 
 async function testDaytonaToken(): Promise<boolean> {

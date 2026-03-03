@@ -2,6 +2,7 @@
 // @clack/prompts is bundled into cli.js at build time.
 
 import * as p from "@clack/prompts";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { isString } from "./type-guards";
@@ -223,6 +224,27 @@ export async function withRetry<T>(
  */
 export function getSpawnCloudConfigPath(cloud: string): string {
   return join(process.env.HOME || homedir(), ".config", "spawn", `${cloud}.json`);
+}
+
+/**
+ * Load an API token from the per-cloud config file.
+ * Reads `api_key` or `token` field and validates allowed characters.
+ * Returns null if the file is missing, unreadable, or the token is invalid.
+ */
+export function loadApiToken(cloud: string): string | null {
+  try {
+    const data = JSON.parse(readFileSync(getSpawnCloudConfigPath(cloud), "utf-8"));
+    const token = (isString(data.api_key) ? data.api_key : "") || (isString(data.token) ? data.token : "");
+    if (!token) {
+      return null;
+    }
+    if (!/^[a-zA-Z0-9._/@:+=, -]+$/.test(token)) {
+      return null;
+    }
+    return token;
+  } catch {
+    return null;
+  }
 }
 
 /** JSON-escape a string (returns the quoted JSON string). */

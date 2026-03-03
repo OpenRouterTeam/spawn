@@ -21,14 +21,14 @@ export const executor = {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
+const FETCH_TIMEOUT = 10000; // 10 seconds
+const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
+
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
 const PkgVersionSchema = v.object({
   version: v.string(),
 });
-
-const FETCH_TIMEOUT = 10000; // 10 seconds
-const UPDATE_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
 
 // Validate RAW_BASE matches expected GitHub raw content URL pattern (defense-in-depth, CWE-78)
 const GITHUB_RAW_URL_PATTERN =
