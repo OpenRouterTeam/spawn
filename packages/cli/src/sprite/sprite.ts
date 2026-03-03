@@ -1,6 +1,6 @@
 // sprite/sprite.ts — Core Sprite provider: CLI installation, auth, provisioning, execution
 
-import { existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -18,7 +18,7 @@ import {
 } from "../shared/ui";
 import { sleep, spawnInteractive, killWithTimeout } from "../shared/ssh";
 import { hasMessage } from "../shared/type-guards";
-import { getSpawnDir } from "../history.js";
+import { saveVmConnection as saveVmConnectionToHistory } from "../history.js";
 
 // ─── Configurable Constants ──────────────────────────────────────────────────
 
@@ -428,20 +428,7 @@ export async function setupShellEnvironment(): Promise<void> {
 // ─── Connection Tracking ─────────────────────────────────────────────────────
 
 export function saveVmConnection(): void {
-  const dir = getSpawnDir();
-  mkdirSync(dir, {
-    recursive: true,
-    mode: 0o700,
-  });
-  const json: Record<string, string> = {
-    ip: "sprite-console",
-    user: process.env.USER || "root",
-    server_name: spriteName,
-    cloud: "sprite",
-  };
-  writeFileSync(`${dir}/last-connection.json`, JSON.stringify(json) + "\n", {
-    mode: 0o600,
-  });
+  saveVmConnectionToHistory("sprite-console", process.env.USER || "root", "", spriteName, "sprite");
 }
 
 // ─── Execution ───────────────────────────────────────────────────────────────
