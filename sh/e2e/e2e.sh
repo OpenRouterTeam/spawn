@@ -30,7 +30,6 @@ source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/provision.sh"
 source "${SCRIPT_DIR}/lib/verify.sh"
 source "${SCRIPT_DIR}/lib/teardown.sh"
-source "${SCRIPT_DIR}/lib/cleanup.sh"
 
 # ---------------------------------------------------------------------------
 # All supported clouds (excluding local — no infra to provision)
