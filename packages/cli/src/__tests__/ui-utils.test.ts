@@ -1,13 +1,7 @@
 import { describe, it, expect } from "bun:test";
 
-const {
-  validateServerName,
-  validateRegionName,
-  validateModelId,
-  toKebabCase,
-  sanitizeTermValue,
-  jsonEscape,
-} = await import("../shared/ui.js");
+const { validateServerName, validateRegionName, validateModelId, toKebabCase, sanitizeTermValue, jsonEscape } =
+  await import("../shared/ui.js");
 
 // ── validateServerName ──────────────────────────────────────────────
 
