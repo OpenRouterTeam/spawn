@@ -293,11 +293,10 @@ describe("Agent launch command consistency", () => {
 
 describe("Interactive prompts structure", () => {
   it("all interactive_prompts entries should have non-empty prompt text and string defaults", () => {
-    for (const [, agent] of allAgents) {
-      if (agent.interactive_prompts === undefined) {
-        continue;
-      }
-      for (const [, entry] of Object.entries(agent.interactive_prompts)) {
+    const agentsWithInteractivePrompts = allAgents.filter(([, agent]) => agent.interactive_prompts !== undefined);
+    expect(agentsWithInteractivePrompts.length).toBeGreaterThan(0);
+    for (const [, agent] of agentsWithInteractivePrompts) {
+      for (const [, entry] of Object.entries(agent.interactive_prompts!)) {
         expect(entry.prompt.trim().length).toBeGreaterThan(0);
         expect(entry.default).toBeDefined();
         expect(typeof entry.default).toBe("string");
@@ -387,11 +386,10 @@ describe("Agent metadata field types", () => {
 
 describe("Config files structure", () => {
   it("config file paths should look like file paths and values should be objects", () => {
-    for (const [, agent] of allAgents) {
-      if (agent.config_files === undefined) {
-        continue;
-      }
-      for (const [filePath, content] of Object.entries(agent.config_files)) {
+    const agentsWithConfigFiles = allAgents.filter(([, agent]) => agent.config_files !== undefined);
+    expect(agentsWithConfigFiles.length).toBeGreaterThan(0);
+    for (const [, agent] of agentsWithConfigFiles) {
+      for (const [filePath, content] of Object.entries(agent.config_files!)) {
         // Should contain / or ~ or . indicating a path
         expect(filePath).toMatch(/[/~.]/);
         expect(typeof content).toBe("object");
