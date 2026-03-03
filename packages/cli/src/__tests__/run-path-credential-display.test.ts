@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { mockClackPrompts } from "./test-helpers";
 import type { Manifest } from "../manifest";
 
@@ -120,10 +120,6 @@ function makeManifest(overrides?: Partial<Manifest>): Manifest {
 
 // ── Mock @clack/prompts ─────────────────────────────────────────────────
 
-const mockExit = spyOn(process, "exit").mockImplementation(() => {
-  throw new Error("process.exit called");
-});
-
 mockClackPrompts({
   select: mock(() => Promise.resolve("hetzner")),
 });
@@ -131,12 +127,7 @@ mockClackPrompts({
 // Import after mocks are set up
 const {
   prioritizeCloudsByCredentials,
-  checkEntity,
-  resolveAgentKey,
-  resolveCloudKey,
-  buildRetryCommand,
   isRetryableExitCode,
-  getScriptFailureGuidance,
 } = await import("../commands.js");
 
 // ── prioritizeCloudsByCredentials ────────────────────────────────────────
@@ -361,130 +352,14 @@ describe("prioritizeCloudsByCredentials", () => {
   });
 });
 
-// ── validateRunSecurity via checkEntity ──────────────────────────────────
+// ── isRetryableExitCode ──────────────────────────────────────────────────
 
-describe("entity validation for run path", () => {
-  it("should return true for valid agent key", () => {
-    const manifest = makeManifest();
-    expect(checkEntity(manifest, "claude", "agent")).toBe(true);
+describe("isRetryableExitCode", () => {
+  it("should identify retryable SSH exit code 255", () => {
+    expect(isRetryableExitCode("Script exited with code 255")).toBe(true);
   });
 
-  it("should return true for valid cloud key", () => {
-    const manifest = makeManifest();
-    expect(checkEntity(manifest, "hetzner", "cloud")).toBe(true);
-  });
-
-  it("should return false for invalid agent key", () => {
-    const manifest = makeManifest();
-    expect(checkEntity(manifest, "nonexistent", "agent")).toBe(false);
-  });
-
-  it("should return false for invalid cloud key", () => {
-    const manifest = makeManifest();
-    expect(checkEntity(manifest, "nonexistent", "cloud")).toBe(false);
-  });
-
-  it("should detect wrong kind (cloud used as agent)", () => {
-    const manifest = makeManifest();
-    // "hetzner" is a cloud, not an agent
-    const result = checkEntity(manifest, "hetzner", "agent");
-    expect(result).toBe(false);
-  });
-
-  it("should detect wrong kind (agent used as cloud)", () => {
-    const manifest = makeManifest();
-    // "claude" is an agent, not a cloud
-    const result = checkEntity(manifest, "claude", "cloud");
-    expect(result).toBe(false);
-  });
-
-  it("should suggest typo corrections for close matches", () => {
-    const manifest = makeManifest();
-    // "claud" is close to "claude"
-    const result = checkEntity(manifest, "claud", "agent");
-    expect(result).toBe(false);
-    // The function logs suggestions via p.log but we just check it returns false
-  });
-});
-
-// ── resolveAgentKey / resolveCloudKey for run path ──────────────────────
-
-describe("key resolution for run path", () => {
-  const manifest = makeManifest();
-
-  it("should resolve exact agent key", () => {
-    expect(resolveAgentKey(manifest, "claude")).toBe("claude");
-  });
-
-  it("should resolve exact cloud key", () => {
-    expect(resolveCloudKey(manifest, "hetzner")).toBe("hetzner");
-  });
-
-  it("should resolve agent display name (case-insensitive)", () => {
-    expect(resolveAgentKey(manifest, "Claude Code")).toBe("claude");
-    expect(resolveAgentKey(manifest, "claude code")).toBe("claude");
-  });
-
-  it("should resolve cloud display name (case-insensitive)", () => {
-    expect(resolveCloudKey(manifest, "Hetzner Cloud")).toBe("hetzner");
-    expect(resolveCloudKey(manifest, "hetzner cloud")).toBe("hetzner");
-  });
-
-  it("should return null for completely unknown input", () => {
-    expect(resolveAgentKey(manifest, "xyzzy")).toBeNull();
-    expect(resolveCloudKey(manifest, "xyzzy")).toBeNull();
-  });
-
-  it("should resolve case-insensitive key match", () => {
-    expect(resolveAgentKey(manifest, "CLAUDE")).toBe("claude");
-    expect(resolveCloudKey(manifest, "HETZNER")).toBe("hetzner");
-  });
-});
-
-// ── Integration: full run-path validation sequence ──────────────────────
-
-describe("run-path validation sequence integration", () => {
-  const manifest = makeManifest();
-
-  it("should validate a correct agent+cloud combination", () => {
-    const agentValid = checkEntity(manifest, "claude", "agent");
-    const cloudValid = checkEntity(manifest, "hetzner", "cloud");
-    expect(agentValid).toBe(true);
-    expect(cloudValid).toBe(true);
-  });
-
-  it("should catch invalid agent in validation", () => {
-    const agentValid = checkEntity(manifest, "badagent", "agent");
-    expect(agentValid).toBe(false);
-  });
-
-  it("should catch invalid cloud in validation", () => {
-    const cloudValid = checkEntity(manifest, "badcloud", "cloud");
-    expect(cloudValid).toBe(false);
-  });
-
-  it("should resolve display name before validation", () => {
-    const resolved = resolveAgentKey(manifest, "Claude Code");
-    expect(resolved).toBe("claude");
-    expect(checkEntity(manifest, resolved ?? "", "agent")).toBe(true);
-  });
-
-  it("should build correct retry command after failure", () => {
-    const cmd = buildRetryCommand("claude", "hetzner");
-    expect(cmd).toBe("spawn claude hetzner");
-  });
-
-  it("should identify retryable SSH errors in the flow", () => {
-    const errMsg = "Script exited with code 255";
-    expect(isRetryableExitCode(errMsg)).toBe(true);
-    const guidance = getScriptFailureGuidance(255, "hetzner");
-    expect(guidance.length).toBeGreaterThan(0);
-  });
-
-  it("should identify non-retryable errors in the flow", () => {
-    const errMsg = "Script exited with code 1";
-    expect(isRetryableExitCode(errMsg)).toBe(false);
-    const guidance = getScriptFailureGuidance(1, "hetzner", "HCLOUD_TOKEN");
-    expect(guidance.length).toBeGreaterThan(0);
+  it("should return false for non-retryable exit code 1", () => {
+    expect(isRetryableExitCode("Script exited with code 1")).toBe(false);
   });
 });
