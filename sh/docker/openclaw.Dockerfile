@@ -18,7 +18,7 @@ RUN apt-get update -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Bun
-RUN curl -fsSL https://bun.sh/install | bash
+RUN curl -fsSL --proto '=https' https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:/root/.local/bin:${PATH}"
 
 # OpenClaw via npm (Node runtime needs standard node_modules layout)

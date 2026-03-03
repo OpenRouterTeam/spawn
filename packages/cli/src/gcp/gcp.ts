@@ -642,7 +642,7 @@ function getStartupScript(username: string, tier: CloudInitTier = "full"): strin
   if (needsBun(tier)) {
     lines.push(
       "# Install Bun as the login user",
-      `su - "${username}" -c 'curl -fsSL https://bun.sh/install | bash' || true`,
+      `su - "${username}" -c 'curl --proto "=https" -fsSL https://bun.sh/install | bash' || true`,
       `ln -sf /home/${username}/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true`,
     );
   }

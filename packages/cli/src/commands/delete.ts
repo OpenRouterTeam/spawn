@@ -19,6 +19,55 @@ import { destroyServer as spriteDestroyServer, ensureSpriteCli, ensureSpriteAuth
 import { getErrorMessage, isInteractiveTTY } from "./shared.js";
 import { resolveListFilters, activeServerPicker } from "./list.js";
 
+/**
+ * Ensure credentials are available for a record's cloud provider.
+ * This may prompt the user interactively and must be called BEFORE
+ * starting any spinner to avoid overlapping UI elements.
+ */
+export async function ensureDeleteCredentials(record: SpawnRecord): Promise<void> {
+  const conn = record.connection;
+  if (!conn?.cloud || conn.cloud === "local") {
+    return;
+  }
+
+  switch (conn.cloud) {
+    case "hetzner":
+      await ensureHcloudToken();
+      break;
+    case "digitalocean":
+      await ensureDoToken();
+      break;
+    case "gcp": {
+      const zone = conn.metadata?.zone || "us-central1-a";
+      const project = conn.metadata?.project || "";
+      validateMetadataValue(zone, "GCP zone");
+      if (project) {
+        validateMetadataValue(project, "GCP project");
+      }
+      process.env.GCP_ZONE = zone;
+      if (project) {
+        process.env.GCP_PROJECT = project;
+      }
+      await gcpEnsureGcloudCli();
+      await gcpAuthenticate();
+      break;
+    }
+    case "aws":
+      await ensureAwsCli();
+      await awsAuthenticate();
+      break;
+    case "daytona":
+      await ensureDaytonaToken();
+      break;
+    case "sprite":
+      await ensureSpriteCli();
+      await ensureSpriteAuthenticated();
+      break;
+    default:
+      break;
+  }
+}
+
 /** Execute server deletion for a given record using TypeScript cloud modules */
 export async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
   const conn = record.connection;
@@ -147,6 +196,10 @@ export async function confirmAndDelete(record: SpawnRecord, manifest: Manifest |
     p.log.info("Delete cancelled.");
     return false;
   }
+
+  // Ensure credentials before starting the spinner so interactive
+  // prompts (e.g. expired API key entry) don't overlap with it.
+  await ensureDeleteCredentials(record);
 
   const s = p.spinner();
   s.start(`Deleting ${label}...`);

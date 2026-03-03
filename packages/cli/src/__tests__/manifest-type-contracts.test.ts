@@ -280,13 +280,8 @@ describe("Agent launch command consistency", () => {
       expect(agent.launch).not.toMatch(/\$\([^)]+\)/);
     }
   });
-
-  it("install commands should be strings (can contain pipe for curl|bash)", () => {
-    for (const [, agent] of allAgents) {
-      expect(typeof agent.install).toBe("string");
-      expect(agent.install.trim().length).toBeGreaterThan(0);
-    }
-  });
+  // Note: install field type/non-empty checks are covered by
+  // "Agent required field types" > "install should be a non-empty string"
 });
 
 // ── Interactive prompts structure ─────────────────────────────────────────
