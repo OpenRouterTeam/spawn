@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2154
 set -eo pipefail
 
 # Thin shim: ensures bun is available, runs bundled aws.js (local or from GitHub release)
