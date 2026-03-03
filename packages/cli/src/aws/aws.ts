@@ -507,7 +507,7 @@ export async function authenticate(): Promise<void> {
       logInfo(`AWS CLI ready, using region: ${region}`);
       return;
     }
-    logWarn("AWS CLI found but credentials invalid or expired");
+    logWarn("No AWS credentials available in local environment");
   }
 
   // 2. Check env vars for REST mode
@@ -553,10 +553,10 @@ export async function authenticate(): Promise<void> {
         ]);
         if (result.exitCode === 0) {
           lightsailMode = "cli";
-          logInfo(`AWS CLI ready with cached credentials, using region: ${cachedRegion}`);
+          logInfo(`AWS CLI ready with credentials cached by spawn. Using region: ${cachedRegion}`);
           return;
         }
-        logWarn("Cached AWS credentials invalid or expired");
+        logWarn("Credentials cached by spawn are invalid or expired");
         awsAccessKeyId = "";
         awsSecretAccessKey = "";
         delete process.env.AWS_ACCESS_KEY_ID;
