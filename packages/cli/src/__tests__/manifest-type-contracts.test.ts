@@ -243,7 +243,9 @@ describe("Env var interpolation patterns", () => {
   it("env values with ${...} should reference valid-looking env var names", () => {
     for (const [, agent] of allAgents) {
       for (const [, envVal] of Object.entries(agent.env)) {
-        const matches = [...envVal.matchAll(/\$\{([^}]+)\}/g)];
+        const matches = [
+          ...envVal.matchAll(/\$\{([^}]+)\}/g),
+        ];
         for (const match of matches) {
           const refName = match[1];
           // Referenced env var names should look like valid env vars
