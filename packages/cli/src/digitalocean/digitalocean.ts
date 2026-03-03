@@ -426,7 +426,6 @@ async function tryDoOAuth(): Promise<string | null> {
   const authUrl = `${DO_OAUTH_AUTHORIZE}?${authParams.toString()}`;
 
   logStep("Opening browser to authorize with DigitalOcean...");
-  logStep(`If the browser doesn't open, visit: ${authUrl}`);
   openBrowser(authUrl);
 
   // Wait up to 120 seconds
