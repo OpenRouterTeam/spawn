@@ -224,7 +224,7 @@ export PATH="${BUN_INSTALL}/bin:${HOME}/.local/bin:${PATH}"
 
 if ! command -v bun &>/dev/null; then
     log_step "bun not found. Installing bun..."
-    curl -fsSL https://bun.sh/install | bash
+    curl -fsSL --proto '=https' https://bun.sh/install | bash
 
     # Re-export so bun is available in this session immediately.
     # Use hard-coded paths alongside BUN_INSTALL — the bun installer may
