@@ -372,7 +372,6 @@ describe("Script download and execution", () => {
   });
 
   it("should show network error message when primary 500 and fallback 502", async () => {
-    const callIndex = 0;
     global.fetch = mock(async (url: string) => {
       if (isString(url) && url.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));

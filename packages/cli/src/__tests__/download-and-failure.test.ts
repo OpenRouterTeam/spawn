@@ -42,7 +42,7 @@ describe("Download and Failure Pipeline", () => {
 
   /** Set up fetch to return manifest from manifest URLs and custom responses for script URLs */
   function setupFetch(scriptHandler: (url: string) => Promise<Response>) {
-    global.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+    global.fetch = mock(async (url: string | URL | Request) => {
       const urlStr = isString(url) ? url : url instanceof URL ? url.toString() : url.url;
       if (urlStr.includes("manifest.json")) {
         return new Response(JSON.stringify(mockManifest));
@@ -280,9 +280,7 @@ describe("Download and Failure Pipeline", () => {
     });
 
     it("should show mixed error for primary 404 and fallback 500", async () => {
-      let callCount = 0;
       await setupFetch(async (url) => {
-        callCount++;
         if (url.includes("openrouter.ai")) {
           return new Response("Not Found", {
             status: 404,
