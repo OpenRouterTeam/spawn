@@ -783,7 +783,7 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   }
   if (needsBun(tier)) {
     lines.push(
-      "if ! command -v bun >/dev/null 2>&1; then curl -fsSL https://bun.sh/install | bash; fi",
+      "if ! command -v bun >/dev/null 2>&1; then curl --proto '=https' -fsSL https://bun.sh/install | bash; fi",
       "ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true",
     );
   }

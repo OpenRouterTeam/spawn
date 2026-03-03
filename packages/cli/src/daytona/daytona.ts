@@ -576,7 +576,7 @@ export async function waitForCloudInit(tier: CloudInitTier = "full"): Promise<vo
     parts.push(NODE_INSTALL_CMD);
   }
   if (needsBun(tier)) {
-    parts.push("curl -fsSL https://bun.sh/install | bash");
+    parts.push("curl --proto '=https' -fsSL https://bun.sh/install | bash");
   }
   parts.push(
     `echo 'export PATH="\${HOME}/.local/bin:\${HOME}/.bun/bin:\${PATH}"' >> ~/.bashrc`,
