@@ -132,7 +132,7 @@ const multiTypeManifest: Manifest = {
 
 const { spinnerStart: mockSpinnerStart, spinnerStop: mockSpinnerStop } = mockClackPrompts();
 
-const { cmdMatrix, cmdAgents, cmdClouds, getTerminalWidth } = await import("../commands.js");
+const { cmdMatrix, cmdAgents, cmdClouds } = await import("../commands.js");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

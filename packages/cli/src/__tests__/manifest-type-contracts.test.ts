@@ -68,7 +68,7 @@ describe("Agent required field types", () => {
       });
 
       it("env values should all be strings", () => {
-        for (const [envKey, envVal] of Object.entries(agent.env)) {
+        for (const [, envVal] of Object.entries(agent.env)) {
           expect(typeof envVal).toBe("string");
         }
       });
@@ -219,7 +219,7 @@ describe("Cloud optional field types (when present)", () => {
 describe("Cloud type values", () => {
   const validTypes = new Set<string>();
 
-  for (const [key, cloud] of allClouds) {
+  for (const [, cloud] of allClouds) {
     validTypes.add(cloud.type);
   }
 
@@ -241,11 +241,12 @@ describe("Cloud type values", () => {
 
 describe("Env var interpolation patterns", () => {
   it("env values with ${...} should reference valid-looking env var names", () => {
-    const varRefPattern = /\$\{([^}]+)\}/g;
-    for (const [key, agent] of allAgents) {
-      for (const [envKey, envVal] of Object.entries(agent.env)) {
-        let match;
-        while ((match = varRefPattern.exec(envVal)) !== null) {
+    for (const [, agent] of allAgents) {
+      for (const [, envVal] of Object.entries(agent.env)) {
+        const matches = [
+          ...envVal.matchAll(/\$\{([^}]+)\}/g),
+        ];
+        for (const match of matches) {
           const refName = match[1];
           // Referenced env var names should look like valid env vars
           expect(refName).toMatch(/^[A-Z][A-Z0-9_]*$/);
@@ -255,8 +256,8 @@ describe("Env var interpolation patterns", () => {
   });
 
   it("env values should not contain unmatched ${", () => {
-    for (const [key, agent] of allAgents) {
-      for (const [envKey, envVal] of Object.entries(agent.env)) {
+    for (const [, agent] of allAgents) {
+      for (const [, envVal] of Object.entries(agent.env)) {
         // Count ${ and } occurrences
         const opens = (envVal.match(/\$\{/g) || []).length;
         const closes = (envVal.match(/\}/g) || []).length;
@@ -271,7 +272,7 @@ describe("Env var interpolation patterns", () => {
 
 describe("Agent launch command consistency", () => {
   it("launch commands should not contain dangerous shell metacharacters", () => {
-    for (const [key, agent] of allAgents) {
+    for (const [, agent] of allAgents) {
       // Launch commands shouldn't have pipe-to-bash or command substitution
       expect(agent.launch).not.toMatch(/\|\s*bash/);
       expect(agent.launch).not.toMatch(/\|\s*sh/);
@@ -281,7 +282,7 @@ describe("Agent launch command consistency", () => {
   });
 
   it("install commands should be strings (can contain pipe for curl|bash)", () => {
-    for (const [key, agent] of allAgents) {
+    for (const [, agent] of allAgents) {
       expect(typeof agent.install).toBe("string");
       expect(agent.install.trim().length).toBeGreaterThan(0);
     }
@@ -292,11 +293,11 @@ describe("Agent launch command consistency", () => {
 
 describe("Interactive prompts structure", () => {
   it("all interactive_prompts entries should have non-empty prompt text and string defaults", () => {
-    for (const [key, agent] of allAgents) {
+    for (const [, agent] of allAgents) {
       if (agent.interactive_prompts === undefined) {
         continue;
       }
-      for (const [promptKey, entry] of Object.entries(agent.interactive_prompts)) {
+      for (const [, entry] of Object.entries(agent.interactive_prompts)) {
         expect(entry.prompt.trim().length).toBeGreaterThan(0);
         expect(entry.default).toBeDefined();
         expect(typeof entry.default).toBe("string");
@@ -386,7 +387,7 @@ describe("Agent metadata field types", () => {
 
 describe("Config files structure", () => {
   it("config file paths should look like file paths and values should be objects", () => {
-    for (const [key, agent] of allAgents) {
+    for (const [, agent] of allAgents) {
       if (agent.config_files === undefined) {
         continue;
       }

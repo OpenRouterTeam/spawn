@@ -39,7 +39,6 @@ describe("cmdLast", () => {
   let consoleMocks: ReturnType<typeof createConsoleMocks>;
   let originalFetch: typeof global.fetch;
   let processExitSpy: ReturnType<typeof spyOn>;
-  let cmdRunMock: ReturnType<typeof mock>;
 
   function writeHistory(records: SpawnRecord[]) {
     writeFileSync(join(testDir, "history.json"), JSON.stringify(records));
@@ -51,10 +50,6 @@ describe("cmdLast", () => {
 
   function logStepOutput(): string {
     return mockLogStep.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-  }
-
-  function consoleOutput(): string {
-    return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
   }
 
   beforeEach(async () => {
@@ -76,9 +71,6 @@ describe("cmdLast", () => {
     mockSpinnerStop.mockClear();
 
     originalFetch = global.fetch;
-
-    // Mock cmdRun to avoid actually spawning a process
-    cmdRunMock = mock(() => Promise.resolve());
 
     // Prime the manifest cache with mock data
     global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));

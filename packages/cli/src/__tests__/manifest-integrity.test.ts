@@ -96,7 +96,7 @@ describe("Manifest Integrity", () => {
         "implemented",
         "missing",
       ];
-      for (const [key, status] of matrixEntries) {
+      for (const [, status] of matrixEntries) {
         expect(validStatuses).toContain(status);
       }
     });

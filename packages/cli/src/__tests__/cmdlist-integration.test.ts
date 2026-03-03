@@ -37,7 +37,7 @@ const {
 } = mockClackPrompts();
 
 // Import after mock setup
-const { cmdList, resolveDisplayName } = await import("../commands.js");
+const { cmdList } = await import("../commands.js");
 const { loadManifest, _resetCacheForTesting } = await import("../manifest.js");
 
 // ── Test Setup ──────────────────────────────────────────────────────────────────
@@ -59,10 +59,6 @@ describe("cmdList integration", () => {
 
   function logInfoOutput(): string {
     return mockLogInfo.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-  }
-
-  function consoleErrorOutput(): string {
-    return consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
   }
 
   beforeEach(async () => {
