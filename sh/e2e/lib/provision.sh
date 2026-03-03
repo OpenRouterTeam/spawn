@@ -160,8 +160,18 @@ CLOUD_ENV
     zeroclaw)
       {
         printf 'export ZEROCLAW_PROVIDER=%q\n' "openrouter"
-        printf 'export OPENAI_API_KEY=%q\n' "${api_key}"
+      } >> "${env_tmp}"
+      ;;
+    hermes)
+      {
         printf 'export OPENAI_BASE_URL=%q\n' "https://openrouter.ai/api/v1"
+        printf 'export OPENAI_API_KEY=%q\n' "${api_key}"
+      } >> "${env_tmp}"
+      ;;
+    kilocode)
+      {
+        printf 'export KILO_PROVIDER_TYPE=%q\n' "openrouter"
+        printf 'export KILO_OPEN_ROUTER_API_KEY=%q\n' "${api_key}"
       } >> "${env_tmp}"
       ;;
   esac
