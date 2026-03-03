@@ -77,19 +77,22 @@ input_test_codex() {
 _openclaw_ensure_gateway() {
   local app="$1"
   log_step "Ensuring openclaw gateway is running on :18789..."
+  # Port check: ss works on all modern Linux; /dev/tcp works on macOS/some bash.
+  # Debian/Ubuntu bash is compiled WITHOUT /dev/tcp support, so ss must come first.
+  local port_check='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
-    if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then \
+    if ${port_check}; then \
       echo 'Gateway already running'; \
     else \
       _oc_bin=\$(command -v openclaw) || exit 1; \
       if command -v setsid >/dev/null 2>&1; then setsid \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & \
       else nohup \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; \
-      elapsed=0; _gw_up=0; while [ \$elapsed -lt 30 ]; do \
-        if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo 'Gateway started'; _gw_up=1; break; fi; \
+      elapsed=0; _gw_up=0; while [ \$elapsed -lt 180 ]; do \
+        if ${port_check}; then echo 'Gateway started'; _gw_up=1; break; fi; \
         sleep 1; elapsed=\$((elapsed + 1)); \
       done; \
-      if [ \$_gw_up -eq 0 ]; then echo 'Gateway failed to start after 30s'; cat /tmp/openclaw-gateway.log 2>/dev/null; exit 1; fi; \
+      if [ \$_gw_up -eq 0 ]; then echo 'Gateway failed to start after 180s'; cat /tmp/openclaw-gateway.log 2>/dev/null; exit 1; fi; \
     fi" >/dev/null 2>&1
   if [ $? -ne 0 ]; then
     log_err "OpenClaw gateway failed to start"
@@ -100,6 +103,7 @@ _openclaw_ensure_gateway() {
 _openclaw_restart_gateway() {
   local app="$1"
   log_step "Restarting openclaw gateway..."
+  local port_check_r='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
   cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
     export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
     _gw_pid=\$(lsof -ti tcp:18789 2>/dev/null || fuser 18789/tcp 2>/dev/null | tr -d ' ') && \
@@ -107,10 +111,15 @@ _openclaw_restart_gateway() {
     _oc_bin=\$(command -v openclaw) || exit 1; \
     if command -v setsid >/dev/null 2>&1; then setsid \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & \
     else nohup \"\$_oc_bin\" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; \
-    elapsed=0; while [ \$elapsed -lt 30 ]; do \
-      if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo 'Gateway restarted'; break; fi; \
+    elapsed=0; _gw_up=0; while [ \$elapsed -lt 180 ]; do \
+      if ${port_check_r}; then echo 'Gateway restarted'; _gw_up=1; break; fi; \
       sleep 1; elapsed=\$((elapsed + 1)); \
-    done" >/dev/null 2>&1 || log_warn "Failed to restart openclaw gateway"
+    done; \
+    if [ \$_gw_up -eq 0 ]; then echo 'Gateway restart failed after 180s'; cat /tmp/openclaw-gateway.log 2>/dev/null; exit 1; fi" >/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    log_err "OpenClaw gateway failed to restart"
+    return 1
+  fi
 }
 
 input_test_openclaw() {

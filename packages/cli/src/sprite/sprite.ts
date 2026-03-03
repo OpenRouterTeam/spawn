@@ -614,6 +614,7 @@ export async function destroyServer(name?: string): Promise<void> {
       cmd,
       ...orgFlags(),
       "destroy",
+      "--force",
       target,
     ],
     {

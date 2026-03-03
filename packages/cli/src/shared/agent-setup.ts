@@ -300,17 +300,24 @@ export async function startGateway(runner: CloudRunner): Promise<void> {
   // The polling loop doubles as a keepalive for the SSH session.
   // We resolve the full path to openclaw first because setsid replaces
   // the process image and doesn't inherit the parent shell's PATH.
+  // Port check: ss is available on all modern Linux; /dev/tcp works on macOS/some bash.
+  // Debian/Ubuntu bash is compiled WITHOUT /dev/tcp support, so we must not rely on it.
+  const portCheck =
+    'ss -tln 2>/dev/null | grep -q ":18789 " || ' +
+    '(echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || ' +
+    "nc -z 127.0.0.1 18789 2>/dev/null";
   const script =
     "source ~/.spawnrc 2>/dev/null; " +
     "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
     '_oc_bin=$(command -v openclaw) || { echo "openclaw not found in PATH"; exit 1; }; ' +
+    `if ${portCheck}; then echo "Gateway already running"; exit 0; fi; ` +
     'if command -v setsid >/dev/null 2>&1; then setsid "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & ' +
     'else nohup "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; ' +
-    "elapsed=0; while [ $elapsed -lt 120 ]; do " +
-    'if (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then echo "Gateway ready after ${elapsed}s"; exit 0; fi; ' +
+    "elapsed=0; while [ $elapsed -lt 300 ]; do " +
+    `if ${portCheck}; then echo "Gateway ready after \${elapsed}s"; exit 0; fi; ` +
     "printf '.'; sleep 1; elapsed=$((elapsed + 1)); " +
     "done; " +
-    'echo "Gateway failed to start after 120s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1';
+    'echo "Gateway failed to start after 300s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1';
   await runner.runServer(script);
   logInfo("OpenClaw gateway started");
 }
