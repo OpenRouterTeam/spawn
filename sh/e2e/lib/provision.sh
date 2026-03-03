@@ -58,8 +58,8 @@ provision_agent() {
     # Apply cloud-specific env vars (safe: only processes export VAR="VALUE" lines)
     while IFS= read -r _env_line; do
       if [[ "${_env_line}" =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=\"(.*)\"$ ]]; then
-        # Validate that value doesn't contain dangerous shell metacharacters
-        if [[ "${BASH_REMATCH[2]}" =~ [\$\`\;\&\|\<\>] ]]; then
+        # Validate value against a safe character whitelist
+        if ! [[ "${BASH_REMATCH[2]}" =~ ^[A-Za-z0-9@%+=:,./_-]*$ ]]; then
           log_err "Invalid characters in env value for ${BASH_REMATCH[1]}"
           continue
         fi
