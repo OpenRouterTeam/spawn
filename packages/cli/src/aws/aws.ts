@@ -797,7 +797,7 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
   if (needsBun(tier)) {
     lines.push(
       "# Install Bun",
-      "su - ubuntu -c 'curl --proto =https -fsSL https://bun.sh/install | bash'",
+      "su - ubuntu -c 'curl --proto \"=https\" -fsSL https://bun.sh/install | bash'",
       "ln -sf /home/ubuntu/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true",
     );
   }
