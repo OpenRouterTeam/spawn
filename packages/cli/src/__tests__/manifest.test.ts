@@ -132,7 +132,7 @@ describe("manifest", () => {
       });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
 
-      // Mock fetch (should not be called for fresh cache)
+      // Mock fetch — must NOT be called when cache is fresh
       global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
 
       const manifest = await loadManifest();
@@ -140,6 +140,7 @@ describe("manifest", () => {
       expect(manifest).toHaveProperty("agents");
       expect(manifest).toHaveProperty("clouds");
       expect(manifest).toHaveProperty("matrix");
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it("should refresh cache when forceRefresh is true", async () => {
