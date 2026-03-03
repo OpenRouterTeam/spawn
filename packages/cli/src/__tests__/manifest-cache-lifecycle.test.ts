@@ -463,32 +463,23 @@ describe("Manifest Cache Lifecycle", () => {
       expect(agentKeys(manifest)).toContain("claude");
     });
 
-    it("should use fresh disk cache without calling fetch", async () => {
+    it("should return cached instance without calling fetch again", async () => {
       mkdirSync(join(env.testDir, "spawn"), {
         recursive: true,
       });
       writeFileSync(env.cacheFile, JSON.stringify(mockManifest));
-      // Cache is fresh (just written)
 
-      global.fetch = mock(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({
-              agents: {},
-              clouds: {},
-              matrix: {},
-            }),
-          ),
-        ),
-      );
+      const fetchMock = mock(() => Promise.resolve(new Response(JSON.stringify(mockManifest))));
+      global.fetch = fetchMock;
 
-      // loadManifest(false) should check disk cache first
-      // Note: in-memory _cached may already be set from prior test, so we forceRefresh first
-      // to clear it, then test the non-forced path
-      const m1 = await loadManifest(true); // clears in-memory, fetches
-      // Now the in-memory cache is populated, so non-forced will return it
+      // loadManifest(true) populates in-memory cache, calls fetch once
+      const m1 = await loadManifest(true);
+      const callsAfterFirstLoad = fetchMock.mock.calls.length;
+
+      // loadManifest(false) returns in-memory cache without fetching again
       const m2 = await loadManifest(false);
-      expect(m2).toHaveProperty("agents");
+      expect(m2).toBe(m1);
+      expect(fetchMock.mock.calls.length).toBe(callsAfterFirstLoad);
     });
   });
 
