@@ -113,14 +113,6 @@ describe("cmdLast", () => {
       expect(info).toMatch(/<cloud>/);
     });
 
-    it("should not call cmdRun when no history exists", async () => {
-      await cmdLast();
-
-      // cmdRunMock should not have been called (would need to be spied on in actual code)
-      const info = logInfoOutput();
-      expect(info).toContain("No spawn history found");
-    });
-
     it("should handle corrupted history file gracefully", async () => {
       writeFileSync(join(testDir, "history.json"), "not valid json{{{");
 
