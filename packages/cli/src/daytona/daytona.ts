@@ -474,19 +474,13 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
   const content: Buffer = readFileSync(localPath);
   const b64 = content.toString("base64");
 
-  // Validate base64 only contains safe characters
-  if (/[^A-Za-z0-9+/=]/.test(b64)) {
-    logError("upload_file: base64 output contains unexpected characters");
-    throw new Error("Invalid base64");
-  }
-
   const args = [
     ...sshBaseArgs(),
     "-o",
     "BatchMode=yes",
     `${sshToken}@${sshHost}`,
     "--",
-    `printf '%s' '${b64}' | base64 -d > '${remotePath}'`,
+    `base64 -d > '${remotePath}'`,
   ];
 
   const proc = Bun.spawn(args, {
@@ -497,9 +491,13 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     ],
   });
   try {
-    proc.stdin!.end();
+    const stdin = proc.stdin;
+    if (stdin) {
+      stdin.write(b64 + "\n");
+      stdin.end();
+    }
   } catch {
-    /* already closed */
+    /* stdin already closed */
   }
   const exitCode = await proc.exited;
 
