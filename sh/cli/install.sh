@@ -2,7 +2,7 @@
 # Installer for the spawn CLI
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/cli/install.sh | bash
+#   curl -fsSL https://openrouter.ai/labs/spawn/cli/install.sh | bash
 #
 # This installs spawn via bun. If bun is not available, it auto-installs it first.
 #
@@ -12,6 +12,7 @@
 set -eo pipefail
 
 SPAWN_REPO="OpenRouterTeam/spawn"
+SPAWN_CDN="https://openrouter.ai/labs/spawn"
 SPAWN_RAW_BASE="https://raw.githubusercontent.com/${SPAWN_REPO}/main"
 MIN_BUN_VERSION="1.2.0"
 
@@ -62,7 +63,7 @@ ensure_min_bun_version() {
             echo "  bun upgrade"
             echo ""
             echo "Then re-run:"
-            echo "  curl -fsSL ${SPAWN_RAW_BASE}/sh/cli/install.sh | bash"
+            echo "  curl -fsSL ${SPAWN_CDN}/cli/install.sh | bash"
             exit 1
         fi
         log_info "bun upgraded to ${current}"
@@ -238,7 +239,7 @@ if ! command -v bun &>/dev/null; then
         echo "  curl -fsSL https://bun.sh/install | bash"
         echo ""
         echo "Then reopen your terminal and re-run:"
-        echo "  curl -fsSL ${SPAWN_RAW_BASE}/sh/cli/install.sh | bash"
+        echo "  curl -fsSL ${SPAWN_CDN}/cli/install.sh | bash"
         exit 1
     fi
 

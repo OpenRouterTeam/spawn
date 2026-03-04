@@ -66,6 +66,10 @@ export interface Manifest {
 
 const REPO = "OpenRouterTeam/spawn";
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/main` as const;
+/** Primary CDN for shell scripts — maps openrouter.ai/labs/spawn/* → repo sh/* */
+const SPAWN_CDN = "https://openrouter.ai/labs/spawn" as const;
+/** Static URL for version checks — GitHub release artifact, never changes with repo structure */
+const VERSION_URL = `https://github.com/${REPO}/releases/download/cli-latest/version` as const;
 // Dynamic getters so tests can override XDG_CACHE_HOME at runtime
 function getCacheDir(): string {
   return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "spawn");
@@ -311,4 +315,4 @@ export function _resetCacheForTesting(): void {
   _staleCache = false;
 }
 
-export { RAW_BASE, REPO, stripDangerousKeys };
+export { RAW_BASE, REPO, SPAWN_CDN, VERSION_URL, stripDangerousKeys };

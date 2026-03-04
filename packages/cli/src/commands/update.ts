@@ -1,12 +1,28 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { parseJsonWith } from "../shared/parse.js";
-import { RAW_BASE } from "../manifest.js";
+import { SPAWN_CDN, VERSION_URL, RAW_BASE } from "../manifest.js";
 import { VERSION, PkgVersionSchema, getErrorMessage } from "./shared.js";
 
-const INSTALL_CMD = `curl -fsSL ${RAW_BASE}/sh/cli/install.sh | bash`;
+const INSTALL_CMD = `curl -fsSL ${SPAWN_CDN}/cli/install.sh | bash`;
 
 async function fetchRemoteVersion(): Promise<string> {
+  // Primary: plain-text version file from GitHub release artifact (static URL)
+  try {
+    const res = await fetch(VERSION_URL, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.ok) {
+      const text = (await res.text()).trim();
+      if (text && /^\d+\.\d+\.\d+/.test(text)) {
+        return text;
+      }
+    }
+  } catch {
+    // Fall through to GitHub raw fallback
+  }
+
+  // Fallback: package.json from GitHub raw
   const res = await fetch(`${RAW_BASE}/packages/cli/package.json`, {
     signal: AbortSignal.timeout(10_000),
   });

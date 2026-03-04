@@ -67,7 +67,7 @@ All cloud provisioning and agent setup logic lives in TypeScript under `packages
 ## After Each Change
 
 1. `bash -n {file}` syntax check on all modified scripts
-2. `cd packages/cli && bunx @biomejs/biome lint src/` — **must pass with zero errors** on all modified TypeScript
+2. `cd packages/cli && bunx @biomejs/biome check src/` — **must pass with zero errors** (lint + format) on all modified TypeScript
 3. Update `manifest.json` matrix status to `"implemented"`
 4. Update the cloud's `sh/{cloud}/README.md` with usage instructions
 5. Commit with a descriptive message

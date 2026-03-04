@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import type { Manifest } from "../manifest.js";
-import { loadManifest, RAW_BASE, REPO } from "../manifest.js";
+import { loadManifest, SPAWN_CDN, RAW_BASE, REPO } from "../manifest.js";
 import {
   validateIdentifier,
   validateScriptContent,
@@ -176,7 +176,7 @@ function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, pro
   printDryRunSection("Agent", buildAgentLines(manifest.agents[agent]));
   printDryRunSection("Cloud", buildCloudLines(manifest.clouds[cloud]));
   printDryRunSection("Script", [
-    `  URL: ${RAW_BASE}/sh/${cloud}/${agent}.sh`,
+    `  URL: ${SPAWN_CDN}/${cloud}/${agent}.sh`,
   ]);
 
   const envLines = buildEnvironmentLines(manifest, agent);

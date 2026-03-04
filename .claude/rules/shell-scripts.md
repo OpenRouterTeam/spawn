@@ -18,7 +18,9 @@ macOS ships bash 3.2. All scripts MUST work on it:
 ## Conventions
 - `#!/bin/bash` + `set -eo pipefail` (no `u` flag)
 - Use `${VAR:-}` for all optional env var checks (`OPENROUTER_API_KEY`, cloud tokens, etc.)
-- Remote fallback URL: `https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/{path}` (shell scripts are under `sh/`, e.g., `sh/{cloud}/{agent}.sh`)
+- Primary script URL: `https://openrouter.ai/labs/spawn/{path}` (CDN proxy, maps to repo `sh/`, e.g., `{cloud}/{agent}.sh`)
+- Fallback script URL: `https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/{path}`
+- Version check URL: `https://github.com/OpenRouterTeam/spawn/releases/download/cli-latest/version` (GitHub release artifact)
 - All env vars documented in the cloud's `sh/{cloud}/README.md`
 
 ## Use Bun + TypeScript for Inline Scripting — NEVER python/python3

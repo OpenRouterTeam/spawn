@@ -65,7 +65,7 @@ For any other cloud directories found, read their TypeScript module in `packages
 For each successful API response:
 1. Validate it is valid JSON: `echo "$response" | jq . > /dev/null 2>&1`
 2. Pretty-print and save: `echo "$response" | jq . > fixtures/{cloud}/{endpoint}.json`
-3. Name convention: `ssh_keys.json`, `server_types.json`, `regions.json`, `account.json`
+3. Name convention: kebab-case — `ssh-keys.json`, `server-types.json`, `regions.json`, `account.json`
 
 ## Step 5 — Update Metadata
 
@@ -75,8 +75,8 @@ Create or update `fixtures/{cloud}/_metadata.json` for each cloud:
 {
   "recorded_at": "2024-01-15T12:00:00Z",
   "endpoints": {
-    "ssh_keys": "https://api.provider.com/v1/ssh_keys",
-    "server_types": "https://api.provider.com/v1/server_types"
+    "ssh-keys": "https://api.provider.com/v1/ssh_keys",
+    "server-types": "https://api.provider.com/v1/server_types"
   }
 }
 ```
