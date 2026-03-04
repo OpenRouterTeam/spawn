@@ -148,10 +148,20 @@ function printUpdateBanner(latestVersion: string): void {
  */
 function findUpdatedBinary(): string {
   try {
-    const result = executor.execFileSync("which", ["spawn"], {
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "ignore"],
-    });
+    const result = executor.execFileSync(
+      "which",
+      [
+        "spawn",
+      ],
+      {
+        encoding: "utf8",
+        stdio: [
+          "pipe",
+          "pipe",
+          "ignore",
+        ],
+      },
+    );
     const found = result ? result.toString().trim() : "";
     if (found) {
       return found;
@@ -200,14 +210,32 @@ function performAutoUpdate(latestVersion: string): void {
   try {
     // Two-step approach: fetch script bytes with curl, then execute via bash -c
     // This eliminates shell interpolation of RAW_BASE entirely (CWE-78, #2161)
-    const scriptBytes = executor.execFileSync("curl", ["-fsSL", `${RAW_BASE}/sh/cli/install.sh`], {
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "inherit"],
-    });
+    const scriptBytes = executor.execFileSync(
+      "curl",
+      [
+        "-fsSL",
+        `${RAW_BASE}/sh/cli/install.sh`,
+      ],
+      {
+        encoding: "utf8",
+        stdio: [
+          "pipe",
+          "pipe",
+          "inherit",
+        ],
+      },
+    );
     const scriptContent = scriptBytes ? scriptBytes.toString() : "";
-    executor.execFileSync("bash", ["-c", scriptContent], {
-      stdio: "inherit",
-    });
+    executor.execFileSync(
+      "bash",
+      [
+        "-c",
+        scriptContent,
+      ],
+      {
+        stdio: "inherit",
+      },
+    );
 
     console.error();
     console.error(pc.green(pc.bold(`${CHECK_MARK} Updated successfully!`)));

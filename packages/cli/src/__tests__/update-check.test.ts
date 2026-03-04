@@ -249,9 +249,15 @@ describe("update-check", () => {
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
-      const execFileSyncCalls: { file: string; args: string[] }[] = [];
+      const execFileSyncCalls: {
+        file: string;
+        args: string[];
+      }[] = [];
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string, args: string[]) => {
-        execFileSyncCalls.push({ file, args });
+        execFileSyncCalls.push({
+          file,
+          args,
+        });
       });
 
       const { checkForUpdates } = await import("../update-check.js");
@@ -268,9 +274,14 @@ describe("update-check", () => {
       expect(execFileSyncCalls[1].args[0]).toBe("-c");
       // 3. which spawn for binary lookup
       expect(execFileSyncCalls[2].file).toBe("which");
-      expect(execFileSyncCalls[2].args).toEqual(["spawn"]);
+      expect(execFileSyncCalls[2].args).toEqual([
+        "spawn",
+      ]);
       // 4. re-exec with original args
-      expect(execFileSyncCalls[3].args).toEqual(["claude", "sprite"]);
+      expect(execFileSyncCalls[3].args).toEqual([
+        "claude",
+        "sprite",
+      ]);
 
       // Should show rerunning message
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
@@ -352,9 +363,15 @@ describe("update-check", () => {
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
-      const execFileSyncCalls: { file: string; args: string[] }[] = [];
+      const execFileSyncCalls: {
+        file: string;
+        args: string[];
+      }[] = [];
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string, args: string[]) => {
-        execFileSyncCalls.push({ file, args });
+        execFileSyncCalls.push({
+          file,
+          args,
+        });
       });
 
       const { checkForUpdates } = await import("../update-check.js");
