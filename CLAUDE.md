@@ -1,16 +1,5 @@
 # Spawn
 
-## Culture: Embrace Bold Changes
-
-**This is mandatory.** When a change is right, helps the user, and is tasteful — make it. Do not shy away from large-scope work.
-
-- **Do NOT refuse work because it's "too big."** If the user asks for a codebase-wide refactor touching 50+ files, do it. Parallelize with agents. Ship it.
-- **Do NOT water down scope.** If the plan says "replace all 119 `as` casts across the codebase," you replace ALL 119, not 5 with a TODO for the rest.
-- **Do NOT propose half-measures.** Don't suggest "we could start with just one module" when the user wants the whole thing. The whole thing is the point.
-- **Parallelize aggressively.** Use the Task tool to spawn multiple agents working on independent files simultaneously. A 50-file change should NOT be sequential.
-- **Fix tests too.** If a new lint rule or code change breaks tests, fix every single test. Don't exclude test files from rules to avoid the work.
-- **Verify exhaustively.** After a big change: full lint (0 errors), full test suite (0 failures), full build (succeeds). No partial checks.
-
 Spawn is a matrix of **agents x clouds**. Every script provisions a cloud server, installs an agent, injects OpenRouter credentials, and drops the user into an interactive session.
 
 ## The Matrix
@@ -20,83 +9,7 @@ Spawn is a matrix of **agents x clouds**. Every script provisions a cloud server
 - **clouds** — cloud providers to run them on (Sprite, Hetzner, ...)
 - **matrix** — which `cloud/agent` combinations are `"implemented"` vs `"missing"`
 
-## How to Improve Spawn
-
-When run via `./discovery.sh`, your job is to pick ONE of these tasks and execute it:
-
-### 1. Fill a missing matrix entry
-
-Look at `manifest.json` → `matrix` for any `"missing"` entry. To implement it:
-
-- Find the **agent's** existing script on another cloud — it shows the install steps, config files, env vars, and launch command
-- The agent scripts are thin bash wrappers that bootstrap bun and run the TypeScript CLI
-- The script goes at `sh/{cloud}/{agent}.sh`
-
-**OpenRouter injection is mandatory.** Every agent script MUST:
-- Set `OPENROUTER_API_KEY` in the shell environment
-- Set provider-specific env vars (e.g., `ANTHROPIC_BASE_URL=https://openrouter.ai/api`)
-- These come from the agent's `env` field in `manifest.json`
-
-### 2. Add a new cloud provider (HIGH BAR)
-
-We are currently shipping with **7 curated clouds** (sorted by price):
-1. **local** — free (no provisioning)
-2. **hetzner** — ~€3.29/mo (CX22)
-3. **aws** — $3.50/mo (nano)
-4. **daytona** — pay-per-second sandboxes
-5. **digitalocean** — $4/mo (Basic droplet)
-6. **gcp** — $7.11/mo (e2-micro)
-7. **sprite** — managed cloud VMs
-
-**Do NOT add clouds speculatively.** Every cloud must be manually tested and verified end-to-end before shipping. Adding a cloud that can't be tested is worse than not having it.
-
-**Requirements to add a new cloud:**
-- **Prestige or unbeatable pricing** — must be a well-known brand OR beat our cheapest options
-- **Must be manually testable** — you need an account and can verify scripts work
-- **REST API or CLI with SSH/exec** — no proprietary-only access methods
-- **Test coverage is mandatory** — add unit tests in `packages/cli/src/__tests__/`
-
-Steps to add one:
-1. Add cloud-specific TypeScript module in `packages/cli/src/{cloud}/`
-2. Add an entry to `manifest.json` → `clouds`
-3. Add `"missing"` entries to the matrix for every existing agent
-4. Implement at least 2-3 agent scripts to prove the lib works
-5. Update the cloud's `sh/{cloud}/README.md`
-6. **Add test coverage** (mandatory) — add unit tests in `packages/cli/src/__tests__/`
-
-**DO NOT add GPU clouds** (CoreWeave, RunPod, etc.). Spawn agents call remote LLM APIs for inference — they need cheap CPU instances with SSH, not expensive GPU VMs.
-
-### 3. Add a new agent (only with community demand)
-
-Do NOT add agents speculatively. Only add one if there's **real community buzz**:
-
-**Required evidence (at least 2 of these):**
-- 1000+ GitHub stars on the agent's repo
-- Hacker News post with 50+ points (search: `https://hn.algolia.com/api/v1/search?query=AGENT_NAME`)
-- Reddit post with 100+ upvotes in r/LocalLLaMA, r/MachineLearning, or r/ChatGPT
-- Explicit user request in this repo's GitHub issues
-
-**Technical requirements:**
-- Installable via a single command (npm, pip, curl)
-- Accepts API keys via env vars (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY`)
-- Works with OpenRouter (natively or via `OPENAI_BASE_URL` override)
-
-To add: same steps as before (manifest.json entry, matrix entries, implement on 1+ cloud, README).
-
-### 4. Respond to GitHub issues
-
-Check `gh issue list --repo OpenRouterTeam/spawn --state open` for user requests:
-- If someone requests an agent or cloud, implement it and comment with the PR link
-- If something is already implemented, close the issue with a note
-- If a bug is reported, fix it
-
-### 5. Extend tests
-
-Tests use Bun's built-in test runner (`bun:test`). When adding a new cloud or agent:
-- Add unit tests in `packages/cli/src/__tests__/` with mocked fetch/prompts
-- Run `bun test` to verify
-
-## File Structure Convention
+## File Structure
 
 ```
 spawn/
@@ -124,12 +37,15 @@ spawn/
     {cloud}/
       {agent}.sh                 # Agent deployment scripts (thin bash → bun wrappers)
       README.md                  # Cloud-specific usage docs
-  .claude/skills/setup-agent-team/
-    trigger-server.ts            # HTTP trigger server (concurrent runs, dedup)
-    discovery.sh                 # Discovery cycle script (fill gaps, scout new clouds/agents)
-    refactor.sh                  # Dual-mode cycle script (issue fix or full refactor)
-    start-discovery.sh           # Launcher with secrets (gitignored)
-    start-refactor.sh            # Launcher with secrets (gitignored)
+  .claude/
+    rules/                       # Modular rules (auto-loaded by Claude Code)
+    scripts/                     # Hook scripts (enforce-worktree, validate-file, pre-merge-check)
+    skills/setup-agent-team/
+      trigger-server.ts          # HTTP trigger server (concurrent runs, dedup)
+      discovery.sh               # Discovery cycle script
+      refactor.sh                # Dual-mode cycle script (issue fix or full refactor)
+      start-discovery.sh         # Launcher with secrets (gitignored)
+      start-refactor.sh          # Launcher with secrets (gitignored)
   .github/workflows/
     discovery.yml                # Scheduled + issue-triggered discovery workflow
     refactor.yml                 # Scheduled + issue-triggered refactor workflow
@@ -137,26 +53,8 @@ spawn/
   discovery.sh                   # Run this to trigger one discovery cycle
   fixtures/                      # API response fixtures for testing
   README.md                      # User-facing docs
-  CLAUDE.md                      # This file - contributor guide
+  CLAUDE.md                      # This file — project overview
 ```
-
-## Documentation Policy
-
-**NEVER commit documentation files to the repository.** All documentation, testing guides, implementation notes, security audits, and similar files MUST be stored in `.docs/` directory (git-ignored).
-
-Examples of files that should NOT be committed:
-- `TESTING_*.md`
-- `SECURITY_AUDIT.md`
-- `IMPLEMENTATION_NOTES.md`
-- `TODO.md`
-- Any other internal documentation files
-
-The only documentation files allowed in the repository are:
-- `README.md` (user-facing)
-- `CLAUDE.md` (contributor guide)
-- Cloud-specific `README.md` files in `sh/{cloud}/README.md`
-
-If you need to create documentation during development, write it to `.docs/` and add `.docs/` to `.gitignore`.
 
 ### Architecture
 
@@ -165,251 +63,6 @@ All cloud provisioning and agent setup logic lives in TypeScript under `packages
 **`sh/shared/github-auth.sh`** — Standalone GitHub CLI installer + OAuth login helper. Used by `packages/cli/src/shared/agent-setup.ts` to set up `gh` on remote VMs.
 
 **`sh/shared/key-request.sh`** — API key provisioning helpers sourced by the QA harness (`qa.sh`) for loading cloud credentials from `~/.config/spawn/{cloud}.json`.
-
-## Shell Script Rules
-
-These rules are **non-negotiable** — violating them breaks remote execution for all users.
-
-### curl|bash Compatibility
-Every script MUST work when executed via `bash <(curl -fsSL URL)`:
-- **NEVER** use relative paths for sourcing (`source ./lib/...`, `source ../shared/...`)
-- **NEVER** rely on `$0`, `dirname $0`, or `BASH_SOURCE` resolving to a real filesystem path
-
-### macOS bash 3.x Compatibility
-macOS ships bash 3.2. All scripts MUST work on it:
-- **NO** `echo -e` — use `printf` for escape sequences
-- **NO** `source <(cmd)` inside `bash <(curl ...)` — use `eval "$(cmd)"` instead
-- **NO** `((var++))` with `set -e` — use `var=$((var + 1))` (avoids falsy-zero exit)
-- **NO** `local` keyword inside `( ... ) &` subshells — not function scope
-- **NO** `set -u` (nounset) — use `${VAR:-}` for optional env var checks instead
-
-### Conventions
-- `#!/bin/bash` + `set -eo pipefail` (no `u` flag)
-- Use `${VAR:-}` for all optional env var checks (`OPENROUTER_API_KEY`, cloud tokens, etc.)
-- Remote fallback URL: `https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/{path}` (shell scripts are under `sh/`, e.g., `sh/{cloud}/{agent}.sh`)
-- All env vars documented in the cloud's `sh/{cloud}/README.md`
-
-### Use Bun + TypeScript for Inline Scripting — NEVER python/python3
-When shell scripts need JSON processing, HTTP calls, crypto, or any non-trivial logic:
-- **ALWAYS** use `bun eval '...'` or write a temp `.ts` file and `bun run` it
-- **NEVER** use `python3 -c` or `python -c` for inline scripting — python is not a project dependency
-- Prefer `jq` for simple JSON extraction; fall back to `bun eval` when jq is unavailable
-- Pass data to bun via environment variables (e.g., `_DATA="${var}" bun eval "..."`) or temp files — never interpolate untrusted values into JS strings
-- For complex operations (SigV4 signing, API calls with retries), write a heredoc `.ts` file and `bun run` it
-
-### ESM Only — NEVER use require() or CommonJS
-All TypeScript code in `packages/cli/src/` MUST use ESM (`import`/`export`):
-- **NEVER** use `require()` — always use `import` (static or dynamic `await import()`)
-- **NEVER** use `module.exports` — always use `export` / `export default`
-- **NEVER** use `createRequire` — it's a CJS compatibility hack that triggers Bun bugs
-- The project is `"type": "module"` in `package.json` — CJS is not supported
-- For Node.js built-ins: `import fs from "fs"`, `import path from "path"`, etc.
-- For dynamic imports: `const mod = await import("./module.ts")`
-
-## Type Safety — No `as` Type Assertions
-
-**`as` type assertions are banned in all TypeScript code (production AND tests).** This is enforced by a GritQL biome plugin (`packages/cli/no-type-assertion.grit`).
-
-### Exemptions
-- `as const` — allowed (compile-time only, no runtime risk)
-- That's it. `as unknown` is also banned.
-
-### What to use instead
-
-**For API responses / parsed JSON — use valibot schema validation:**
-```typescript
-import * as v from "valibot";
-import { parseJsonWith } from "../shared/parse";
-
-// Declare schemas at module top level, not inside functions
-const UserSchema = v.object({ id: v.number(), name: v.string() });
-
-// Returns typed data or null — no `as` needed
-const user = parseJsonWith(responseText, UserSchema);
-```
-
-**For loose JSON objects (many optional fields):**
-```typescript
-const LooseObject = v.record(v.string(), v.unknown());
-function parseJson(text: string): Record<string, unknown> | null {
-  return parseJsonWith(text, LooseObject);
-}
-```
-
-**For narrowing `unknown` values — prefer valibot, fall back to simple type guards only for primitives:**
-```typescript
-// Prefer valibot for structured data (objects, nested fields, arrays of objects):
-const UserSchema = v.object({ id: v.number(), name: v.string() });
-const user = v.safeParse(UserSchema, data);
-
-// Simple type guards are OK ONLY for single primitives:
-typeof val === "string" ? val : ""
-typeof val === "number" ? val : 0
-Array.isArray(val) ? val : []
-```
-
-**NEVER write manual multi-level typeguards.** If you find yourself chaining `typeof`, `in`, or null checks more than one level deep, use a valibot schema instead:
-```typescript
-// WRONG — manual multi-level typeguard:
-if (input !== null && typeof input === "object" && "tool_input" in input &&
-    input.tool_input !== null && typeof input.tool_input === "object" &&
-    "file_path" in input.tool_input && typeof input.tool_input.file_path === "string") { ... }
-
-// RIGHT — valibot schema:
-const Schema = v.object({ tool_input: v.object({ file_path: v.string() }) });
-const result = v.safeParse(Schema, input);
-if (result.success) { result.output.tool_input.file_path; }
-```
-
-**Share schemas across files.** If multiple modules validate the same shape, extract the schema to a shared file (e.g., `.claude/scripts/schemas.ts`, `packages/shared/src/schemas.ts`) and import it. Do not duplicate schema definitions.
-
-**For test mocks — use proper Response objects instead of `as any`:**
-```typescript
-// WRONG: global.fetch = mock(() => Promise.resolve({ ok: true, json: async () => data }) as any);
-// RIGHT:
-global.fetch = mock(() => Promise.resolve(new Response(JSON.stringify(data))));
-// For errors:
-global.fetch = mock(() => Promise.resolve(new Response("Error", { status: 500 })));
-```
-
-**For type literals — use `satisfies` or typed variables:**
-```typescript
-// WRONG: const config = { ... } as AgentConfig;
-// RIGHT: const config: AgentConfig = { ... };
-// OR:    const config = { ... } satisfies AgentConfig;
-```
-
-### Shared utilities
-- `packages/shared/src/parse.ts` — `parseJsonWith(text, schema)` and `parseJsonRaw(text)`
-- `packages/shared/src/type-guards.ts` — `isString`, `isNumber`, `hasStatus`, `hasMessage`
-
-## Testing
-
-- **NEVER use vitest** — use Bun's built-in test runner (`bun:test`) exclusively
-- Test files go in `packages/cli/src/__tests__/`
-- Run tests with `bun test`
-- Use `import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"`
-- All tests must be pure unit tests with mocked fetch/prompts — **no subprocess spawning** (`execSync`, `spawnSync`, `Bun.spawn`)
-- Test fixtures (API response snapshots) go in `fixtures/{cloud}/`
-
-## CLI Version Management
-
-**CRITICAL: Bump the version on every CLI change!**
-
-- **ANY change to `packages/cli/` requires a version bump** in `packages/cli/package.json`
-- Use semantic versioning:
-  - **Patch** (0.2.X → 0.2.X+1): Bug fixes, minor improvements, documentation
-  - **Minor** (0.X.0 → 0.X+1.0): New features, significant improvements
-  - **Major** (X.0.0 → X+1.0.0): Breaking changes
-- The CLI has auto-update enabled — users get new versions immediately on next run
-- Version bumps ensure users always have the latest fixes and features
-- **NEVER commit `packages/cli/cli.js`** — it is a build artifact (already in `.gitignore`). It is produced during releases, not checked into the repo. Do NOT use `git add -f packages/cli/cli.js`.
-
-## Autonomous Loops
-
-When running autonomous discovery/refactoring loops (`./discovery.sh --loop`):
-
-- **Run `bash -n` on every changed .sh file** before committing — syntax errors break everything
-- **NEVER revert a prior fix** — don't undo previously applied compatibility fixes
-- **NEVER re-introduce deleted functions** — if a function was removed, don't call it
-- **Test after EACH iteration** — don't batch multiple changes without verification
-- **If a change breaks tests, STOP** — revert and ask for guidance rather than compounding the regression
-
-## Refactoring Service
-
-The automated refactoring service runs via `.claude/skills/setup-agent-team/`. It is triggered by GitHub Actions (on schedule, on issue open, or manual dispatch).
-
-### Architecture
-
-```
-trigger-server.ts   — HTTP server (port 8080), spawns refactor.sh per trigger
-start-refactor.sh   — Sets env vars (secrets, MAX_CONCURRENT), execs trigger-server
-refactor.sh         — Dual-mode: issue fix or full refactor cycle
-refactor.yml        — GitHub Actions workflow that POSTs to the trigger server
-```
-
-### Dual-Mode Cycles
-
-`refactor.sh` detects its mode from the `SPAWN_ISSUE` env var (set by trigger-server.ts):
-
-| | Issue Mode | Refactor Mode |
-|---|---|---|
-| **Trigger** | `?reason=issues&issue=N` | `?reason=schedule` |
-| **Teammates** | 2 (issue-fixer, issue-tester) | 6 (security, ux, complexity, test, branch, community) |
-| **Prompt timeout** | 15 min | 30 min |
-| **Hard timeout** | 20 min | 40 min |
-| **Worktree** | `/tmp/spawn-worktrees/issue-N/` | `/tmp/spawn-worktrees/refactor/` |
-| **Team name** | `spawn-issue-N` | `spawn-refactor` |
-| **Pre-cycle cleanup** | Skip | Branch/PR/worktree cleanup |
-| **Post-cycle commit** | Skip (uses PR workflow) | Direct commit to main |
-
-### Concurrency
-
-- `MAX_CONCURRENT=3` allows 1 refactor + 2 issue runs simultaneously
-- Each run gets an isolated worktree — no cross-contamination
-- Cleanup only touches its own worktree, never `rm -rf /tmp/spawn-worktrees`
-- Duplicate issue triggers (same issue number already running) return **409 Conflict**
-- Capacity full returns **429 Too Many Requests**
-
-### Modifying the Service
-
-- `start-refactor.sh` is **gitignored** (contains `TRIGGER_SECRET`) — edit locally only
-- `trigger-server.ts` and `refactor.sh` are committed — changes require a PR
-- After merging changes, restart the service for them to take effect
-- The refactor prompt uses `WORKTREE_BASE_PLACEHOLDER` which gets `sed`-substituted at runtime
-- Issue prompt uses heredoc variable expansion directly (not single-quoted)
-
-## Git Workflow
-
-- Always work in a **git worktree** — never edit files in the main checkout
-- Before creating a PR, check `git status` and `git log` to verify branch state
-- Use `gh pr create` from the worktree, then `gh pr merge --squash`
-- **Every PR must be MERGED or CLOSED with a comment** — never close silently
-- If a PR can't be merged (conflicts, superseded, wrong approach), close it with `gh pr close {number} --comment "Reason"`
-- Never rebase main or use `--force` unless explicitly asked
-
-### Worktree-First Workflow — MANDATORY
-
-**This is the #1 most important workflow rule.** A PreToolUse hook in `.claude/settings.json` **blocks all Write/Edit calls unless the target file is inside a git worktree**. Edits to the main checkout are always blocked.
-
-Before editing ANY files:
-
-1. **Create a worktree** with a feature branch:
-   ```bash
-   git worktree add /tmp/spawn-worktrees/FEATURE -b descriptive-branch-name
-   ```
-2. **Edit files using absolute paths** into the worktree:
-   ```
-   /tmp/spawn-worktrees/FEATURE/packages/cli/src/foo.ts   ← YES
-   /home/sprite/spawn/packages/cli/src/foo.ts              ← BLOCKED
-   ```
-3. **Commit and push** from the worktree:
-   ```bash
-   git -C /tmp/spawn-worktrees/FEATURE add -A
-   git -C /tmp/spawn-worktrees/FEATURE commit -m "message"
-   git -C /tmp/spawn-worktrees/FEATURE push -u origin HEAD
-   ```
-4. **Open a draft PR, then merge when done:**
-   ```bash
-   gh pr create --draft --repo OpenRouterTeam/spawn
-   gh pr ready NUMBER && gh pr merge --squash NUMBER
-   ```
-5. **Clean up** the worktree:
-   ```bash
-   git worktree remove /tmp/spawn-worktrees/FEATURE
-   ```
-
-**There is NO category of change exempt from this rule:**
-- CLAUDE.md edits → worktree + PR
-- Config file tweaks → worktree + PR
-- One-line bug fixes → worktree + PR
-- Test additions → worktree + PR
-- Documentation updates → worktree + PR
-- Manifest changes → worktree + PR
-
-**A finished PR (tests pass, lint clean) MUST be converted from draft and merged immediately.** Do not leave completed PRs in draft state.
-
-Draft PRs that go stale (no updates for 1 week) will be auto-closed.
 
 ## After Each Change
 
