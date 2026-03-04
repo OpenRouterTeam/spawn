@@ -115,7 +115,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
               });
             }
             // Validate code format
-            if (!/^[a-zA-Z0-9]{16,128}$/.test(code)) {
+            if (!/^[a-zA-Z0-9_-]{16,128}$/.test(code)) {
               return new Response("<html><body><h1>Invalid OAuth Code</h1></body></html>", {
                 status: 400,
                 headers: {
