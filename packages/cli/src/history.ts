@@ -130,6 +130,38 @@ export function loadHistory(): SpawnRecord[] {
 
 const MAX_HISTORY_ENTRIES = 100;
 
+/** Archive evicted records to a dated backup file so nothing is permanently lost. */
+function archiveRecords(records: SpawnRecord[]): void {
+  if (records.length === 0) {
+    return;
+  }
+  try {
+    const dir = getSpawnDir();
+    const date = new Date().toISOString().slice(0, 10);
+    const archivePath = join(dir, `history-${date}.json`);
+    let existing: SpawnRecord[] = [];
+    if (existsSync(archivePath)) {
+      try {
+        const data = JSON.parse(readFileSync(archivePath, "utf-8"));
+        if (Array.isArray(data)) {
+          existing = data;
+        }
+      } catch {
+        // Corrupted archive — overwrite
+      }
+    }
+    const merged = [
+      ...existing,
+      ...records,
+    ];
+    writeFileSync(archivePath, JSON.stringify(merged, null, 2) + "\n", {
+      mode: 0o600,
+    });
+  } catch {
+    // Non-fatal — archive failure should not block saving
+  }
+}
+
 export function saveSpawnRecord(record: SpawnRecord): void {
   const dir = getSpawnDir();
   if (!existsSync(dir)) {
@@ -140,9 +172,30 @@ export function saveSpawnRecord(record: SpawnRecord): void {
   }
   let history = loadHistory();
   history.push(record);
-  // Trim to most recent entries to prevent unbounded growth
+  // Smart trim: evict deleted records first, then oldest, and archive evicted
   if (history.length > MAX_HISTORY_ENTRIES) {
-    history = history.slice(history.length - MAX_HISTORY_ENTRIES);
+    const nonDeleted: SpawnRecord[] = [];
+    const deleted: SpawnRecord[] = [];
+    for (const r of history) {
+      if (r.connection?.deleted) {
+        deleted.push(r);
+      } else {
+        nonDeleted.push(r);
+      }
+    }
+    if (nonDeleted.length <= MAX_HISTORY_ENTRIES) {
+      // Removing deleted records is enough
+      history = nonDeleted;
+      archiveRecords(deleted);
+    } else {
+      // Still over limit — trim oldest non-deleted records too
+      const overflow = nonDeleted.slice(0, nonDeleted.length - MAX_HISTORY_ENTRIES);
+      history = nonDeleted.slice(nonDeleted.length - MAX_HISTORY_ENTRIES);
+      archiveRecords([
+        ...deleted,
+        ...overflow,
+      ]);
+    }
   }
   writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
     mode: 0o600,
