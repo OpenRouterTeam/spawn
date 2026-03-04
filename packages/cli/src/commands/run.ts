@@ -212,8 +212,9 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
     });
     if (res.ok) {
+      const text = await res.text();
       s.stop("Script downloaded");
-      return res.text();
+      return text;
     }
 
     // Fallback to GitHub raw
@@ -226,8 +227,9 @@ async function downloadScriptWithFallback(primaryUrl: string, fallbackUrl: strin
       reportDownloadFailure(primaryUrl, fallbackUrl, res.status, ghRes.status);
       process.exit(1);
     }
+    const text = await ghRes.text();
     s.stop("Script downloaded (fallback)");
-    return ghRes.text();
+    return text;
   } catch (err) {
     s.stop(pc.red("Download failed"));
     throw err;
