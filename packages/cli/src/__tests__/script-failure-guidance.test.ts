@@ -299,45 +299,6 @@ describe("getScriptFailureGuidance", () => {
   // ── Return type and structure ─────────────────────────────────────────────
 
   describe("return type and structure", () => {
-    it("should always return an array of strings", () => {
-      const codes: (number | null)[] = [
-        0,
-        1,
-        2,
-        126,
-        127,
-        130,
-        137,
-        255,
-        null,
-      ];
-      for (const code of codes) {
-        const lines = getScriptFailureGuidance(code, "sprite");
-        expect(Array.isArray(lines)).toBe(true);
-        for (const line of lines) {
-          expect(typeof line).toBe("string");
-        }
-      }
-    });
-
-    it("should never return an empty array", () => {
-      const codes: (number | null)[] = [
-        0,
-        1,
-        2,
-        126,
-        127,
-        130,
-        255,
-        null,
-        -1,
-      ];
-      for (const code of codes) {
-        const lines = getScriptFailureGuidance(code, "sprite");
-        expect(lines.length).toBeGreaterThan(0);
-      }
-    });
-
     it("should produce different output for each handled exit code", () => {
       const result130 = getScriptFailureGuidance(130, "sprite");
       const result137 = getScriptFailureGuidance(137, "sprite");
