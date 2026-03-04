@@ -10,6 +10,15 @@ const OAuthKeySchema = v.object({
   key: v.string(),
 });
 
+// ─── OAuth Code Validation ──────────────────────────────────────────────────
+
+/**
+ * Regex for validating OAuth authorization codes from the callback.
+ * Must accept alphanumeric, hyphens, and underscores — OAuth providers
+ * (GitHub, Google, etc.) use all of these in their auth codes.
+ */
+export const OAUTH_CODE_REGEX = /^[a-zA-Z0-9_-]{16,128}$/;
+
 // ─── Key Validation ──────────────────────────────────────────────────────────
 
 export async function verifyOpenrouterKey(apiKey: string): Promise<boolean> {
@@ -115,7 +124,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
               });
             }
             // Validate code format
-            if (!/^[a-zA-Z0-9]{16,128}$/.test(code)) {
+            if (!OAUTH_CODE_REGEX.test(code)) {
               return new Response("<html><body><h1>Invalid OAuth Code</h1></body></html>", {
                 status: 400,
                 headers: {
