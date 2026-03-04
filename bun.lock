@@ -3,6 +3,10 @@
   "configVersion": 1,
   "workspaces": {
     "": {},
+    ".claude/scripts": {
+      "name": "@spawn/hooks",
+      "version": "0.0.1",
+    },
     ".claude/skills/setup-spa": {
       "name": "spawn-slack-bot",
       "dependencies": {
@@ -14,7 +18,7 @@
     },
     "packages/cli": {
       "name": "@openrouter/spawn",
-      "version": "0.11.24",
+      "version": "0.12.13",
       "bin": {
         "spawn": "cli.js",
       },
@@ -74,6 +78,8 @@
     "@slack/types": ["@slack/types@2.20.0", "", {}, "sha512-PVF6P6nxzDMrzPC8fSCsnwaI+kF8YfEpxf3MqXmdyjyWTYsZQURpkK7WWUWvP5QpH55pB7zyYL9Qem/xSgc5VA=="],
 
     "@slack/web-api": ["@slack/web-api@7.14.1", "", { "dependencies": { "@slack/logger": "^4.0.0", "@slack/types": "^2.20.0", "@types/node": ">=18.0.0", "@types/retry": "0.12.0", "axios": "^1.13.5", "eventemitter3": "^5.0.1", "form-data": "^4.0.4", "is-electron": "2.2.2", "is-stream": "^2", "p-queue": "^6", "p-retry": "^4", "retry": "^0.13.1" } }, "sha512-RoygyteJeFswxDPJjUMESn9dldWVMD2xUcHHd9DenVavSfVC6FeVnSdDerOO7m8LLvw4Q132nQM4hX8JiF7dng=="],
+
+    "@spawn/hooks": ["@spawn/hooks@workspace:.claude/scripts"],
 
     "@types/body-parser": ["@types/body-parser@1.19.6", "", { "dependencies": { "@types/connect": "*", "@types/node": "*" } }, "sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g=="],
 
