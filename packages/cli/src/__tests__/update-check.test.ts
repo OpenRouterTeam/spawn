@@ -77,11 +77,7 @@ describe("update-check", () => {
     });
 
     it("should check for updates on every run", async () => {
-      const mockFetch = mock(() =>
-        Promise.resolve(
-          new Response("99.0.0\n"),
-        ),
-      );
+      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       // Mock execFileSync to prevent actual update + re-exec
@@ -97,11 +93,7 @@ describe("update-check", () => {
     });
 
     it("should auto-update when newer version is available", async () => {
-      const mockFetch = mock(() =>
-        Promise.resolve(
-          new Response("99.0.0\n"),
-        ),
-      );
+      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       // Mock execFileSync to prevent actual update + re-exec
@@ -129,11 +121,7 @@ describe("update-check", () => {
     });
 
     it("should not update when up to date", async () => {
-      const mockFetch = mock(() =>
-        Promise.resolve(
-          new Response("0.2.3\n"),
-        ),
-      );
+      const mockFetch = mock(() => Promise.resolve(new Response("0.2.3\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       // Mock executor to prevent actual commands
@@ -165,11 +153,7 @@ describe("update-check", () => {
     });
 
     it("should handle update failures gracefully", async () => {
-      const mockFetch = mock(() =>
-        Promise.resolve(
-          new Response("99.0.0\n"),
-        ),
-      );
+      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       // Mock execFileSync to throw an error (curl fetch fails)
@@ -221,11 +205,7 @@ describe("update-check", () => {
         "sprite",
       ];
 
-      const mockFetch = mock(() =>
-        Promise.resolve(
-          new Response("99.0.0\n"),
-        ),
-      );
+      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
@@ -288,11 +268,7 @@ describe("update-check", () => {
         "sprite",
       ];
 
-      const mockFetch = mock(() =>
-        Promise.resolve(
-          new Response("99.0.0\n"),
-        ),
-      );
+      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
@@ -327,11 +303,7 @@ describe("update-check", () => {
         "/usr/local/bin/spawn",
       ];
 
-      const mockFetch = mock(() =>
-        Promise.resolve(
-          new Response("99.0.0\n"),
-        ),
-      );
+      const mockFetch = mock(() => Promise.resolve(new Response("99.0.0\n")));
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
