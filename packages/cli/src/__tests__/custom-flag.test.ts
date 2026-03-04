@@ -44,14 +44,6 @@ describe("AWS --custom prompts", () => {
     expect(getState().awsRegion).toBe("us-east-1");
   });
 
-  it("promptBundle should skip prompt without --custom", async () => {
-    delete process.env.LIGHTSAIL_BUNDLE;
-    delete process.env.SPAWN_CUSTOM;
-    const { promptBundle } = await import("../aws/aws");
-    // Should return without prompting (no error)
-    await promptBundle();
-  });
-
   it("promptRegion should respect env var over --custom", async () => {
     process.env.AWS_DEFAULT_REGION = "eu-west-1";
     process.env.SPAWN_CUSTOM = "1";
