@@ -88,9 +88,8 @@ describe("update-check", () => {
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
-      // Mock execSync and execFileSync to prevent actual update + re-exec
+      // Mock execFileSync to prevent actual update + re-exec
       const { executor } = await import("../update-check.js");
-      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
@@ -98,7 +97,6 @@ describe("update-check", () => {
 
       expect(fetchSpy).toHaveBeenCalled();
       fetchSpy.mockRestore();
-      execSyncSpy.mockRestore();
       execFileSyncSpy.mockRestore();
     });
 
@@ -114,9 +112,8 @@ describe("update-check", () => {
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
-      // Mock execSync and execFileSync to prevent actual update + re-exec
+      // Mock execFileSync to prevent actual update + re-exec
       const { executor } = await import("../update-check.js");
-      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
@@ -129,14 +126,13 @@ describe("update-check", () => {
       expect(output).toContain("99.0.0");
       expect(output).toContain("Updating automatically");
 
-      // Should have run the install script + which spawn lookup
-      expect(execSyncSpy).toHaveBeenCalled();
+      // Should have called execFileSync for curl, bash, which, and re-exec
+      expect(execFileSyncSpy).toHaveBeenCalled();
 
       // Should have exited
       expect(processExitSpy).toHaveBeenCalledWith(0);
 
       fetchSpy.mockRestore();
-      execSyncSpy.mockRestore();
       execFileSyncSpy.mockRestore();
     });
 
@@ -154,19 +150,16 @@ describe("update-check", () => {
 
       // Mock executor to prevent actual commands
       const { executor } = await import("../update-check.js");
-      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
       const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
       // Should not auto-update (no install script, no re-exec)
-      expect(execSyncSpy).not.toHaveBeenCalled();
       expect(execFileSyncSpy).not.toHaveBeenCalled();
       expect(processExitSpy).not.toHaveBeenCalled();
 
       fetchSpy.mockRestore();
-      execSyncSpy.mockRestore();
       execFileSyncSpy.mockRestore();
     });
 
@@ -195,9 +188,9 @@ describe("update-check", () => {
       );
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
-      // Mock execSync to throw an error
+      // Mock execFileSync to throw an error (curl fetch fails)
       const { executor } = await import("../update-check.js");
-      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {
         throw new Error("Update failed");
       });
 
@@ -213,7 +206,7 @@ describe("update-check", () => {
       expect(processExitSpy).not.toHaveBeenCalled();
 
       fetchSpy.mockRestore();
-      execSyncSpy.mockRestore();
+      execFileSyncSpy.mockRestore();
     });
 
     it("should handle bad response format", async () => {
@@ -256,24 +249,36 @@ describe("update-check", () => {
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
-      const execSyncCalls: string[] = [];
-      const execSyncSpy = spyOn(executor, "execSync").mockImplementation((cmd: string) => {
-        execSyncCalls.push(cmd);
+      const execFileSyncCalls: {
+        file: string;
+        args: string[];
+      }[] = [];
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string, args: string[]) => {
+        execFileSyncCalls.push({
+          file,
+          args,
+        });
       });
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
-      // execSync called twice: install script + "which spawn" for binary lookup
-      expect(execSyncCalls.length).toBe(2);
-      expect(execSyncCalls[0]).toContain("install.sh");
-      expect(execSyncCalls[1]).toContain("which spawn");
-
-      // execFileSync called once for re-exec (no shell interpretation)
-      expect(execFileSyncSpy).toHaveBeenCalledTimes(1);
-      expect(execFileSyncSpy.mock.calls[0][0]).toContain("spawn");
-      expect(execFileSyncSpy.mock.calls[0][1]).toEqual([
+      // execFileSync called 4 times: curl (fetch script), bash (run script), which (find binary), re-exec
+      expect(execFileSyncCalls.length).toBe(4);
+      // 1. curl to fetch install script
+      expect(execFileSyncCalls[0].file).toBe("curl");
+      expect(execFileSyncCalls[0].args).toContain("-fsSL");
+      expect(execFileSyncCalls[0].args.some((a) => a.includes("install.sh"))).toBe(true);
+      // 2. bash to execute fetched script
+      expect(execFileSyncCalls[1].file).toBe("bash");
+      expect(execFileSyncCalls[1].args[0]).toBe("-c");
+      // 3. which spawn for binary lookup
+      expect(execFileSyncCalls[2].file).toBe("which");
+      expect(execFileSyncCalls[2].args).toEqual([
+        "spawn",
+      ]);
+      // 4. re-exec with original args
+      expect(execFileSyncCalls[3].args).toEqual([
         "claude",
         "sprite",
       ]);
@@ -283,13 +288,13 @@ describe("update-check", () => {
       expect(output).toContain("Rerunning");
 
       // Should set SPAWN_NO_UPDATE_CHECK=1 to prevent infinite loop
-      expect(execFileSyncSpy.mock.calls[0][2]).toHaveProperty("env");
-      expect(execFileSyncSpy.mock.calls[0][2].env.SPAWN_NO_UPDATE_CHECK).toBe("1");
+      const reexecCall = execFileSyncSpy.mock.calls[3];
+      expect(reexecCall[2]).toHaveProperty("env");
+      expect(reexecCall[2].env.SPAWN_NO_UPDATE_CHECK).toBe("1");
 
       expect(processExitSpy).toHaveBeenCalledWith(0);
 
       fetchSpy.mockRestore();
-      execSyncSpy.mockRestore();
       execFileSyncSpy.mockRestore();
       process.argv = originalArgv;
     });
@@ -315,14 +320,17 @@ describe("update-check", () => {
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
-      const execSyncSpy = spyOn(executor, "execSync").mockImplementation(() => {});
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {
-        // Re-exec fails with exit code 42
-        const err = new Error("Command failed");
-        Object.assign(err, {
-          status: 42,
-        });
-        throw err;
+      let callCount = 0;
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string) => {
+        callCount++;
+        // First 3 calls succeed (curl, bash, which), 4th call (re-exec) fails
+        if (callCount >= 4) {
+          const err = new Error("Command failed");
+          Object.assign(err, {
+            status: 42,
+          });
+          throw err;
+        }
       });
 
       const { checkForUpdates } = await import("../update-check.js");
@@ -332,7 +340,6 @@ describe("update-check", () => {
       expect(processExitSpy).toHaveBeenCalledWith(42);
 
       fetchSpy.mockRestore();
-      execSyncSpy.mockRestore();
       execFileSyncSpy.mockRestore();
       process.argv = originalArgv;
     });
@@ -356,23 +363,27 @@ describe("update-check", () => {
       const fetchSpy = spyOn(global, "fetch").mockImplementation(mockFetch);
 
       const { executor } = await import("../update-check.js");
-      const calls: string[] = [];
-      const execSyncSpy = spyOn(executor, "execSync").mockImplementation((cmd: string) => {
-        calls.push(cmd);
+      const execFileSyncCalls: {
+        file: string;
+        args: string[];
+      }[] = [];
+      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation((file: string, args: string[]) => {
+        execFileSyncCalls.push({
+          file,
+          args,
+        });
       });
-      const execFileSyncSpy = spyOn(executor, "execFileSync").mockImplementation(() => {});
 
       const { checkForUpdates } = await import("../update-check.js");
       await checkForUpdates();
 
-      // Two execSync calls: install script + "which spawn" for binary lookup
-      expect(calls.length).toBe(2);
-      expect(calls[0]).toContain("install.sh");
-      expect(calls[1]).toContain("which spawn");
-
-      // execFileSync called once for re-exec (even with no args)
-      expect(execFileSyncSpy).toHaveBeenCalledTimes(1);
-      expect(execFileSyncSpy.mock.calls[0][1]).toEqual([]);
+      // execFileSync called 4 times: curl, bash, which, re-exec
+      expect(execFileSyncCalls.length).toBe(4);
+      expect(execFileSyncCalls[0].file).toBe("curl");
+      expect(execFileSyncCalls[1].file).toBe("bash");
+      expect(execFileSyncCalls[2].file).toBe("which");
+      // re-exec with no args
+      expect(execFileSyncCalls[3].args).toEqual([]);
 
       // Should show restarting message
       const output = consoleErrorSpy.mock.calls.map((call) => call[0]).join("\n");
@@ -381,7 +392,6 @@ describe("update-check", () => {
       expect(processExitSpy).toHaveBeenCalledWith(0);
 
       fetchSpy.mockRestore();
-      execSyncSpy.mockRestore();
       execFileSyncSpy.mockRestore();
       process.argv = originalArgv;
     });
