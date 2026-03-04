@@ -205,10 +205,12 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
   // ── Phase 1: TCP probe ────────────────────────────────────────────────────
   logStep("Waiting for SSH port to open...");
   let attempt = 0;
+  let tcpOpen = false;
   while (attempt < maxAttempts) {
     attempt += 1;
     const open = await tcpCheck(host, 22, 2000);
     if (open) {
+      tcpOpen = true;
       logStepDone();
       logInfo("SSH port 22 is open");
       break;
@@ -217,7 +219,7 @@ export async function waitForSsh(opts: WaitForSshOpts): Promise<void> {
     await sleep(2000);
   }
 
-  if (attempt >= maxAttempts) {
+  if (!tcpOpen) {
     logStepDone();
     logError(`SSH port 22 never opened after ${maxAttempts} attempts`);
     throw new Error("SSH connectivity timeout — port 22 never opened");
