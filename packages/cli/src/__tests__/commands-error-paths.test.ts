@@ -104,9 +104,9 @@ describe("Commands Error Paths", () => {
 
     it("should accept agent name at exactly 64 characters", async () => {
       const name64 = "a".repeat(64);
-      // This will pass identifier validation but fail at validateAgent (unknown agent)
+      // This will pass identifier validation but fail at validateEntity (unknown agent)
       await expect(cmdRun(name64, "sprite")).rejects.toThrow("process.exit");
-      // It should get past identifier validation -- the error should be from validateAgent
+      // It should get past identifier validation -- the error should be from validateEntity
       expect(mockLogError).toHaveBeenCalled();
     });
   });

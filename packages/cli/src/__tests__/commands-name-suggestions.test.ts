@@ -3,10 +3,10 @@ import { createMockManifest, createConsoleMocks, restoreMocks, mockClackPrompts 
 import { loadManifest } from "../manifest";
 
 /**
- * Tests for the display-name suggestion branches in validateAgent and
- * validateCloud (commands/shared.ts).
+ * Tests for the display-name suggestion branches in validateEntity
+ * (commands/shared.ts) for both "agent" and "cloud" kinds.
  *
- * When a user types an unknown agent or cloud, validateAgent/validateCloud:
+ * When a user types an unknown agent or cloud, validateEntity:
  *   1. Try findClosestMatch on keys (e.g. "claud" -> "claude")
  *   2. If that fails, try findClosestMatch on display names (e.g. "Codx" -> "Codex")
  *      and then look up the corresponding key
@@ -15,8 +15,8 @@ import { loadManifest } from "../manifest";
  * The display-name suggestion path (step 2) was NOT previously tested.
  *
  * This file covers:
- * - validateAgent: display name suggestion when key suggestion fails
- * - validateCloud: display name suggestion when key suggestion fails
+ * - validateEntity (agent): display name suggestion when key suggestion fails
+ * - validateEntity (cloud): display name suggestion when key suggestion fails
  * - Both key AND display name suggestions returning null (very different input)
  * - findClosestMatch with display names via the full cmdRun / cmdAgentInfo paths
  */
@@ -146,9 +146,9 @@ describe("Display Name Suggestions in Validation Errors", () => {
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
 
-  // ── validateAgent: display name suggestion path ─────────────────────
+  // ── validateEntity (agent): display name suggestion path ────────────
 
-  describe("validateAgent - display name suggestion", () => {
+  describe("validateEntity (agent) - display name suggestion", () => {
     it("should suggest key via display name when key-based suggestion fails", async () => {
       // "codex" is far from keys ["cc", "ap", "oi"] (all distance > 3)
       // But "Codex Pro" display name is close to "codex" via findClosestMatch
@@ -217,9 +217,9 @@ describe("Display Name Suggestions in Validation Errors", () => {
     });
   });
 
-  // ── validateCloud: display name suggestion path ─────────────────────
+  // ── validateEntity (cloud): display name suggestion path ────────────
 
-  describe("validateCloud - display name suggestion", () => {
+  describe("validateEntity (cloud) - display name suggestion", () => {
     it("should suggest key via display name when key-based suggestion fails", async () => {
       // "hetzner-cloud" -> display name "Hetzner Cloud":
       //   "hetzner-cloud" vs "hetzner cloud" -> distance 1 -> match!
@@ -269,7 +269,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
     });
   });
 
-  // ── cmdAgentInfo: display name suggestion via validateAgent ──────────
+  // ── cmdAgentInfo: display name suggestion via validateEntity ─────────
 
   describe("cmdAgentInfo - display name suggestion", () => {
     it("should show display name suggestion for unknown agent via cmdAgentInfo", async () => {
@@ -289,7 +289,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
     });
   });
 
-  // ── cmdCloudInfo: display name suggestion via validateCloud ──────────
+  // ── cmdCloudInfo: display name suggestion via validateEntity ─────────
 
   describe("cmdCloudInfo - display name suggestion", () => {
     it("should show display name suggestion for unknown cloud via cmdCloudInfo", async () => {
@@ -375,7 +375,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
       await expect(cmdRun("claude-code", "hetzner-cloud")).rejects.toThrow("process.exit");
 
       const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
-      // Should fail on the agent first (validateAgent runs before validateCloud)
+      // Should fail on the agent first (agent validation runs before cloud validation)
       expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
     });
   });
