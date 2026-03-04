@@ -42,7 +42,7 @@ _install_gh_apt() {
     if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
 
     log_info "Adding GitHub CLI APT repository..."
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    curl -fsSL --proto '=https' https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | ${SUDO} dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
     ${SUDO} chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
     printf 'deb [arch=%s signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' \
@@ -130,7 +130,7 @@ _detect_gh_platform() {
 # Fetch the latest gh release version string from GitHub API
 _fetch_gh_latest_version() {
     local latest_version
-    latest_version=$(curl -fsSL "https://api.github.com/repos/cli/cli/releases/latest" \
+    latest_version=$(curl -fsSL --proto '=https' "https://api.github.com/repos/cli/cli/releases/latest" \
         | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/') || {
         log_error "Failed to fetch latest gh release version"
         return 1
@@ -156,7 +156,7 @@ _download_and_install_gh() {
     local tmpdir
     tmpdir=$(mktemp -d)
 
-    curl -fsSL "${url}" -o "${tmpdir}/${tarball}" || {
+    curl -fsSL --proto '=https' "${url}" -o "${tmpdir}/${tarball}" || {
         log_error "Failed to download ${url}"
         rm -rf "${tmpdir}"
         return 1

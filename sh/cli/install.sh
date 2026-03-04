@@ -198,7 +198,7 @@ build_and_install() {
     trap 'rm -rf "${tmpdir}"' EXIT
 
     log_step "Downloading pre-built CLI binary..."
-    curl -fsSL "https://github.com/${SPAWN_REPO}/releases/download/cli-latest/cli.js" -o "${tmpdir}/cli.js"
+    curl -fsSL --proto '=https' "https://github.com/${SPAWN_REPO}/releases/download/cli-latest/cli.js" -o "${tmpdir}/cli.js"
     if [ ! -s "${tmpdir}/cli.js" ]; then
         log_error "Failed to download pre-built binary"
         exit 1

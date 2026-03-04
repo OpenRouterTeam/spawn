@@ -28,6 +28,6 @@ fi
 # Remote — download and run compiled TypeScript bundle
 AWS_JS=$(mktemp)
 trap 'rm -f "$AWS_JS"' EXIT
-curl -fsSL "https://github.com/OpenRouterTeam/spawn/releases/download/aws-latest/aws.js" -o "$AWS_JS" \
+curl -fsSL --proto '=https' "https://github.com/OpenRouterTeam/spawn/releases/download/aws-latest/aws.js" -o "$AWS_JS" \
     || { printf '\033[0;31mFailed to download aws.js\033[0m\n' >&2; exit 1; }
 exec bun run "$AWS_JS" hermes "$@"
