@@ -105,10 +105,6 @@ async function saveTokenToConfig(token: string): Promise<void> {
   });
 }
 
-function loadTokenFromConfig(): string | null {
-  return loadApiToken("hetzner");
-}
-
 // ─── Token Validation ────────────────────────────────────────────────────────
 
 async function testHcloudToken(): Promise<boolean> {
@@ -146,7 +142,7 @@ export async function ensureHcloudToken(): Promise<void> {
   }
 
   // 2. Saved config
-  const saved = loadTokenFromConfig();
+  const saved = loadApiToken("hetzner");
   if (saved) {
     hcloudToken = saved;
     if (await testHcloudToken()) {
