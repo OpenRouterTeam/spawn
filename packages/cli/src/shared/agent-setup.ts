@@ -108,10 +108,10 @@ async function installClaudeCode(runner: CloudRunner): Promise<void> {
     `if [ -f ~/.bash_profile ] && grep -q 'spawn:env\\|Claude Code PATH\\|spawn:path' ~/.bash_profile 2>/dev/null; then rm -f ~/.bash_profile; fi`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
     `echo "==> Installing Claude Code (method 1/2: curl installer)..."`,
-    "curl -fsSL https://claude.ai/install.sh | bash || true",
+    "curl --proto '=https' -fsSL https://claude.ai/install.sh | bash || true",
     `export PATH="${claudePath}:$PATH"`,
     `if command -v claude >/dev/null 2>&1; then ${finalize}; exit 0; fi`,
-    "if ! command -v node >/dev/null 2>&1; then export N_PREFIX=$HOME/.n; curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; export PATH=$N_PREFIX/bin:$PATH; fi",
+    "if ! command -v node >/dev/null 2>&1; then export N_PREFIX=$HOME/.n; curl --proto '=https' -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22 || true; export PATH=$N_PREFIX/bin:$PATH; fi",
     `echo "==> Installing Claude Code (method 2/2: npm)..."`,
     "npm install -g @anthropic-ai/claude-code || true",
     `export PATH="${claudePath}:$PATH"`,
@@ -208,7 +208,7 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
     return;
   }
 
-  let ghCmd = "curl -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
+  let ghCmd = "curl --proto '=https' -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash";
   let localTmpFile = "";
   if (githubToken) {
     const escaped = githubToken.replace(/'/g, "'\\''");
@@ -385,7 +385,7 @@ async function ensureSwapSpace(runner: CloudRunner, sizeMb = 1024): Promise<void
 // ─── OpenCode Install Command ────────────────────────────────────────────────
 
 function openCodeInstallCmd(): string {
-  return 'OC_ARCH=$(uname -m); case "$OC_ARCH" in aarch64) OC_ARCH=arm64;; x86_64) OC_ARCH=x64;; esac; OC_OS=$(uname -s | tr A-Z a-z); mkdir -p /tmp/opencode-install "$HOME/.opencode/bin" && curl -fsSL -o /tmp/opencode-install/oc.tar.gz "https://github.com/sst/opencode/releases/latest/download/opencode-${OC_OS}-${OC_ARCH}.tar.gz" && tar xzf /tmp/opencode-install/oc.tar.gz -C /tmp/opencode-install && mv /tmp/opencode-install/opencode "$HOME/.opencode/bin/" && rm -rf /tmp/opencode-install && grep -q ".opencode/bin" "$HOME/.bashrc" 2>/dev/null || echo \'export PATH="$HOME/.opencode/bin:$PATH"\' >> "$HOME/.bashrc"; grep -q ".opencode/bin" "$HOME/.zshrc" 2>/dev/null || echo \'export PATH="$HOME/.opencode/bin:$PATH"\' >> "$HOME/.zshrc" 2>/dev/null; export PATH="$HOME/.opencode/bin:$PATH"';
+  return 'OC_ARCH=$(uname -m); case "$OC_ARCH" in aarch64) OC_ARCH=arm64;; x86_64) OC_ARCH=x64;; esac; OC_OS=$(uname -s | tr A-Z a-z); mkdir -p /tmp/opencode-install "$HOME/.opencode/bin" && curl --proto \'=https\' -fsSL -o /tmp/opencode-install/oc.tar.gz "https://github.com/sst/opencode/releases/latest/download/opencode-${OC_OS}-${OC_ARCH}.tar.gz" && tar xzf /tmp/opencode-install/oc.tar.gz -C /tmp/opencode-install && mv /tmp/opencode-install/opencode "$HOME/.opencode/bin/" && rm -rf /tmp/opencode-install && grep -q ".opencode/bin" "$HOME/.bashrc" 2>/dev/null || echo \'export PATH="$HOME/.opencode/bin:$PATH"\' >> "$HOME/.bashrc"; grep -q ".opencode/bin" "$HOME/.zshrc" 2>/dev/null || echo \'export PATH="$HOME/.opencode/bin:$PATH"\' >> "$HOME/.zshrc" 2>/dev/null; export PATH="$HOME/.opencode/bin:$PATH"';
 }
 
 // ─── npm prefix helper ────────────────────────────────────────────────────────
@@ -521,7 +521,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         await installAgent(
           runner,
           "ZeroClaw",
-          `curl -LsSf ${ZEROCLAW_INSTALL_URL} | bash -s -- --install-rust --install-system-deps --prefer-prebuilt`,
+          `curl --proto '=https' -LsSf ${ZEROCLAW_INSTALL_URL} | bash -s -- --install-rust --install-system-deps --prefer-prebuilt`,
           600, // 10 min: swap-backed compilation is slower than the 5-min default
         );
       },
@@ -542,7 +542,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
         installAgent(
           runner,
           "Hermes Agent",
-          "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
+          "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
           300,
         ),
       envVars: (apiKey) => [

@@ -357,7 +357,7 @@ export async function ensureGcloudCli(): Promise<void> {
       "-c",
       [
         "_gcp_tmp=$(mktemp -d)",
-        `curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" -o "$_gcp_tmp/gcloud.tar.gz"`,
+        `curl --proto "=https" -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" -o "$_gcp_tmp/gcloud.tar.gz"`,
         `tar -xzf "$_gcp_tmp/gcloud.tar.gz" -C "$HOME"`,
         `"$HOME/google-cloud-sdk/install.sh" --quiet --path-update true`,
         `rm -rf "$_gcp_tmp"`,
@@ -636,7 +636,7 @@ function getStartupScript(username: string, tier: CloudInitTier = "full"): strin
       "# Install Node.js 22 via n (run as root so it installs to /usr/local/bin/)",
       `${NODE_INSTALL_CMD} || true`,
       "# Install Claude Code as the login user",
-      `su - "${username}" -c 'curl -fsSL https://claude.ai/install.sh | bash' || true`,
+      `su - "${username}" -c 'curl --proto "=https" -fsSL https://claude.ai/install.sh | bash' || true`,
     );
   }
   if (needsBun(tier)) {
