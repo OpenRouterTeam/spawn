@@ -89,7 +89,7 @@ process.stdout.write(d[process.env._VAR] || d.api_key || d.token || '');
             # Allow alphanumeric plus safe chars needed by real tokens:
             #   - _ . / @  (standard API key chars)
             #   : + =      (base64 segments, URL-safe and base64 formats)
-            # Keep in sync with loadTokenFromConfig regex in packages/cli/src/digitalocean/digitalocean.ts
+            # Standalone validation — no corresponding regex in TypeScript cloud modules
             if [[ ! "${val}" =~ ^[a-zA-Z0-9._/@:+=-]+$ ]]; then
                 log "SECURITY: Invalid characters in config value for ${var_name}"
                 return 1
