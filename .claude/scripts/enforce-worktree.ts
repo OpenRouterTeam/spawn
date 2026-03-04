@@ -5,22 +5,29 @@
  * Blocks (exit 2) if the file is in the main checkout or on the main branch.
  */
 
-import { execFileSync } from "child_process";
-import { dirname } from "path";
-import { existsSync } from "fs";
+import { execFileSync } from "node:child_process";
+import { dirname } from "node:path";
+import { existsSync } from "node:fs";
 import { FilePathInput, parseStdin } from "./schemas.ts";
 
 const raw = await Bun.stdin.text();
 const parsed = parseStdin(raw, FilePathInput);
-if (!parsed) process.exit(0);
+if (!parsed) {
+  process.exit(0);
+}
 
 const filePath = parsed.tool_input.file_path;
 
 const dir = dirname(filePath);
-if (!existsSync(dir)) process.exit(0);
+if (!existsSync(dir)) {
+  process.exit(0);
+}
 
 function git(...args: string[]): string {
-  return execFileSync("git", args, { cwd: dir, encoding: "utf-8" }).trim();
+  return execFileSync("git", args, {
+    cwd: dir,
+    encoding: "utf-8",
+  }).trim();
 }
 
 let gitDir: string;
@@ -35,8 +42,19 @@ try {
 
 // Resolve to absolute paths
 const resolveFromDir = (p: string) => {
-  if (p.startsWith("/")) return p;
-  return execFileSync("realpath", ["-m", `${dir}/${p}`], { encoding: "utf-8" }).trim();
+  if (p.startsWith("/")) {
+    return p;
+  }
+  return execFileSync(
+    "realpath",
+    [
+      "-m",
+      `${dir}/${p}`,
+    ],
+    {
+      encoding: "utf-8",
+    },
+  ).trim();
 };
 
 const absGitDir = resolveFromDir(gitDir);
@@ -58,6 +76,8 @@ try {
 
 if (branch === "main") {
   console.error("BLOCKED: Cannot edit on main branch, even in a worktree.");
-  console.error("Create a worktree with a feature branch: git worktree add /tmp/spawn-worktrees/FEATURE -b branch-name");
+  console.error(
+    "Create a worktree with a feature branch: git worktree add /tmp/spawn-worktrees/FEATURE -b branch-name",
+  );
   process.exit(2);
 }

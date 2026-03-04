@@ -6,12 +6,14 @@
  * Blocks (exit 2) if biome check or bun test fails.
  */
 
-import { execFileSync } from "child_process";
+import { execFileSync } from "node:child_process";
 import { CommandInput, parseStdin } from "./schemas.ts";
 
 const raw = await Bun.stdin.text();
 const parsed = parseStdin(raw, CommandInput);
-if (!parsed) process.exit(0);
+if (!parsed) {
+  process.exit(0);
+}
 
 const command = parsed.tool_input.command;
 
@@ -32,9 +34,16 @@ if (worktreeMatch) {
   repoRoot = worktreeMatch[0];
 } else {
   try {
-    repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-      encoding: "utf-8",
-    }).trim();
+    repoRoot = execFileSync(
+      "git",
+      [
+        "rev-parse",
+        "--show-toplevel",
+      ],
+      {
+        encoding: "utf-8",
+      },
+    ).trim();
   } catch {
     // Not in a git repo — let it pass
     process.exit(0);
@@ -46,12 +55,24 @@ const cliDir = `${repoRoot}/packages/cli`;
 // Run biome check
 console.error(`Pre-merge gate: running biome check in ${cliDir}...`);
 try {
-  execFileSync("bunx", ["@biomejs/biome", "check", "src/"], {
-    cwd: cliDir,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "inherit"],
-    timeout: 120_000,
-  });
+  execFileSync(
+    "bunx",
+    [
+      "@biomejs/biome",
+      "check",
+      "src/",
+    ],
+    {
+      cwd: cliDir,
+      encoding: "utf-8",
+      stdio: [
+        "pipe",
+        "pipe",
+        "inherit",
+      ],
+      timeout: 120_000,
+    },
+  );
 } catch {
   fail(`BLOCKED: biome check failed in ${cliDir}. Fix lint/format errors before merging.`);
 }
@@ -59,12 +80,22 @@ try {
 // Run bun test
 console.error(`Pre-merge gate: running bun test in ${cliDir}...`);
 try {
-  execFileSync("bun", ["test"], {
-    cwd: cliDir,
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "inherit"],
-    timeout: 120_000,
-  });
+  execFileSync(
+    "bun",
+    [
+      "test",
+    ],
+    {
+      cwd: cliDir,
+      encoding: "utf-8",
+      stdio: [
+        "pipe",
+        "pipe",
+        "inherit",
+      ],
+      timeout: 120_000,
+    },
+  );
 } catch {
   fail(`BLOCKED: bun test failed in ${cliDir}. Fix failing tests before merging.`);
 }

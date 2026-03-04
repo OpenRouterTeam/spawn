@@ -8,19 +8,27 @@
  * Blocks (exit 2) on any failure.
  */
 
-import { execFileSync } from "child_process";
-import { dirname, resolve } from "path";
-import { existsSync, readFileSync } from "fs";
+import { execFileSync } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 
 const file = process.env.CLAUDE_FILE;
-if (!file) process.exit(0);
+if (!file) {
+  process.exit(0);
+}
 
 function fail(msg: string): never {
   console.error(msg);
   process.exit(2);
 }
 
-function run(cmd: string, args: string[], opts?: { cwd?: string }): string {
+function run(
+  cmd: string,
+  args: string[],
+  opts?: {
+    cwd?: string;
+  },
+): string {
   return execFileSync(cmd, args, {
     encoding: "utf-8",
     cwd: opts?.cwd,
@@ -32,7 +40,10 @@ function run(cmd: string, args: string[], opts?: { cwd?: string }): string {
 if (file.endsWith(".sh")) {
   // bash -n syntax check
   try {
-    run("bash", ["-n", file]);
+    run("bash", [
+      "-n",
+      file,
+    ]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     fail(`SYNTAX ERROR in ${file}\n${msg}`);
@@ -91,7 +102,17 @@ if (file.endsWith(".ts")) {
   if (biomeDir) {
     // Run biome lint
     try {
-      run("bunx", ["@biomejs/biome", "lint", file], { cwd: biomeDir });
+      run(
+        "bunx",
+        [
+          "@biomejs/biome",
+          "lint",
+          file,
+        ],
+        {
+          cwd: biomeDir,
+        },
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       fail(`BIOME LINT FAILED for ${file}\n${msg}`);
@@ -99,7 +120,17 @@ if (file.endsWith(".ts")) {
 
     // Run biome format
     try {
-      run("bunx", ["@biomejs/biome", "format", file], { cwd: biomeDir });
+      run(
+        "bunx",
+        [
+          "@biomejs/biome",
+          "format",
+          file,
+        ],
+        {
+          cwd: biomeDir,
+        },
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       fail(`BIOME FORMAT FAILED for ${file}\n${msg}`);

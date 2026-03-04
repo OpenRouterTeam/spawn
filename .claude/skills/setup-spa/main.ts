@@ -316,11 +316,16 @@ function buildBlocks(input: BuildBlocksInput): BuildBlocksResult {
     attachments.push({
       color: "#808080",
       text: historyText,
-      mrkdwn_in: ["text"],
+      mrkdwn_in: [
+        "text",
+      ],
     });
   }
 
-  return { blocks, attachments };
+  return {
+    blocks,
+    attachments,
+  };
 }
 
 /**
