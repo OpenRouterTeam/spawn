@@ -32,23 +32,14 @@ describe("getScriptFailureGuidance", () => {
   // ── Exit code 127: command not found ──────────────────────────────────────
 
   describe("exit code 127 (command not found)", () => {
-    it("should return guidance about missing commands", () => {
-      const lines = getScriptFailureGuidance(127, "hetzner");
-      expect(lines[0]).toContain("command was not found");
-    });
-
-    it("should list required tools: bash, curl, ssh, jq", () => {
+    it("should return guidance about missing commands with required tools and cloud name", () => {
       const lines = getScriptFailureGuidance(127, "hetzner");
       const joined = lines.join("\n");
+      expect(lines[0]).toContain("command was not found");
       expect(joined).toContain("bash");
       expect(joined).toContain("curl");
       expect(joined).toContain("ssh");
       expect(joined).toContain("jq");
-    });
-
-    it("should reference the cloud name for CLI tools", () => {
-      const lines = getScriptFailureGuidance(127, "hetzner");
-      const joined = lines.join("\n");
       expect(joined).toContain("spawn hetzner");
     });
 
@@ -68,34 +59,15 @@ describe("getScriptFailureGuidance", () => {
   // ── Exit code 126: permission denied ──────────────────────────────────────
 
   describe("exit code 126 (permission denied)", () => {
-    it("should mention permission denied", () => {
+    it("should mention permission denied, causes, issue link, and return 4 lines", () => {
       const lines = getScriptFailureGuidance(126, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("permission denied");
-    });
-
-    it("should mention command could not be executed", () => {
-      const lines = getScriptFailureGuidance(126, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("could not be executed");
-    });
-
-    it("should suggest possible causes", () => {
-      const lines = getScriptFailureGuidance(126, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("execute permissions");
       expect(joined).toContain("root/sudo");
-    });
-
-    it("should include a link to report the issue", () => {
-      const lines = getScriptFailureGuidance(126, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("github.com");
       expect(joined).toContain("issues");
-    });
-
-    it("should return exactly 4 guidance lines", () => {
-      const lines = getScriptFailureGuidance(126, "sprite");
       expect(lines).toHaveLength(4);
     });
   });
@@ -103,38 +75,20 @@ describe("getScriptFailureGuidance", () => {
   // ── Exit code 1: generic failure ──────────────────────────────────────────
 
   describe("exit code 1 (generic failure)", () => {
-    it("should start with Common causes", () => {
+    it("should start with Common causes, mention credentials, and reference cloud name", () => {
       const lines = getScriptFailureGuidance(1, "digital-ocean");
+      const joined = lines.join("\n");
       expect(lines[0]).toBe("Common causes:");
-    });
-
-    it("should mention credentials", () => {
-      const lines = getScriptFailureGuidance(1, "digital-ocean");
-      const joined = lines.join("\n");
       expect(joined).toContain("credentials");
-    });
-
-    it("should reference the cloud name for setup", () => {
-      const lines = getScriptFailureGuidance(1, "digital-ocean");
-      const joined = lines.join("\n");
       expect(joined).toContain("spawn digital-ocean");
     });
 
-    it("should mention API error causes", () => {
+    it("should mention API error causes, provisioning failure, and return at least 4 lines", () => {
       const lines = getScriptFailureGuidance(1, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("API error");
       expect(joined).toContain("quota");
-    });
-
-    it("should mention server provisioning failure", () => {
-      const lines = getScriptFailureGuidance(1, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("provisioning failed");
-    });
-
-    it("should return at least 4 guidance lines", () => {
-      const lines = getScriptFailureGuidance(1, "sprite");
       expect(lines.length).toBeGreaterThanOrEqual(4);
     });
   });
@@ -142,40 +96,17 @@ describe("getScriptFailureGuidance", () => {
   // ── Default case: unknown/other exit codes ────────────────────────────────
 
   describe("default case (unknown exit codes)", () => {
-    it("should start with Common causes for unknown exit code", () => {
+    it("should return common causes with credentials, rate limits, dependencies, and cloud name", () => {
       const lines = getScriptFailureGuidance(42, "linode");
+      const joined = lines.join("\n");
       expect(lines[0]).toBe("Common causes:");
-    });
-
-    it("should mention credentials for unknown exit code", () => {
-      const lines = getScriptFailureGuidance(42, "linode");
-      const joined = lines.join("\n");
       expect(joined).toContain("credentials");
-    });
-
-    it("should mention rate limit or quota", () => {
-      const lines = getScriptFailureGuidance(42, "linode");
-      const joined = lines.join("\n");
       expect(joined).toContain("rate limit");
       expect(joined).toContain("quota");
-    });
-
-    it("should mention missing local dependencies", () => {
-      const lines = getScriptFailureGuidance(42, "linode");
-      const joined = lines.join("\n");
       expect(joined).toContain("SSH");
       expect(joined).toContain("curl");
       expect(joined).toContain("jq");
-    });
-
-    it("should reference the cloud name for setup instructions", () => {
-      const lines = getScriptFailureGuidance(42, "linode");
-      const joined = lines.join("\n");
       expect(joined).toContain("spawn linode");
-    });
-
-    it("should return at least 4 guidance lines", () => {
-      const lines = getScriptFailureGuidance(42, "linode");
       expect(lines.length).toBeGreaterThanOrEqual(4);
     });
   });
@@ -183,25 +114,12 @@ describe("getScriptFailureGuidance", () => {
   // ── null exit code (no exit code extracted) ───────────────────────────────
 
   describe("null exit code", () => {
-    it("should fall through to default case", () => {
+    it("should fall through to default case with credentials and cloud name", () => {
       const lines = getScriptFailureGuidance(null, "sprite");
+      const joined = lines.join("\n");
       expect(lines[0]).toBe("Common causes:");
-    });
-
-    it("should mention credentials", () => {
-      const lines = getScriptFailureGuidance(null, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("credentials");
-    });
-
-    it("should reference the cloud name", () => {
-      const lines = getScriptFailureGuidance(null, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("spawn sprite");
-    });
-
-    it("should return at least 4 guidance lines", () => {
-      const lines = getScriptFailureGuidance(null, "sprite");
       expect(lines.length).toBeGreaterThanOrEqual(4);
     });
   });
@@ -209,32 +127,13 @@ describe("getScriptFailureGuidance", () => {
   // ── Exit code 130: user interrupt (Ctrl+C) ────────────────────────────────
 
   describe("exit code 130 (user interrupt)", () => {
-    it("should mention Ctrl+C", () => {
+    it("should mention Ctrl+C, interruption, orphaned server warning, and return 3 lines", () => {
       const lines = getScriptFailureGuidance(130, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("Ctrl+C");
-    });
-
-    it("should mention script was interrupted", () => {
-      const lines = getScriptFailureGuidance(130, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("interrupted");
-    });
-
-    it("should warn server may still be running", () => {
-      const lines = getScriptFailureGuidance(130, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("may still be running");
-    });
-
-    it("should suggest checking cloud provider dashboard", () => {
-      const lines = getScriptFailureGuidance(130, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("cloud provider dashboard");
-    });
-
-    it("should return exactly 3 guidance lines", () => {
-      const lines = getScriptFailureGuidance(130, "sprite");
       expect(lines).toHaveLength(3);
     });
   });
@@ -242,33 +141,14 @@ describe("getScriptFailureGuidance", () => {
   // ── Exit code 137: killed (OOM / timeout) ─────────────────────────────────
 
   describe("exit code 137 (killed)", () => {
-    it("should mention script was killed", () => {
+    it("should mention killed, timeout/OOM, larger instance suggestion, and return 4 lines", () => {
       const lines = getScriptFailureGuidance(137, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("killed");
-    });
-
-    it("should mention timeout or out of memory", () => {
-      const lines = getScriptFailureGuidance(137, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("timeout");
       expect(joined).toContain("out of memory");
-    });
-
-    it("should suggest trying a larger instance", () => {
-      const lines = getScriptFailureGuidance(137, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("larger instance size");
-    });
-
-    it("should suggest checking cloud provider dashboard", () => {
-      const lines = getScriptFailureGuidance(137, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("cloud provider dashboard");
-    });
-
-    it("should return exactly 4 guidance lines", () => {
-      const lines = getScriptFailureGuidance(137, "sprite");
       expect(lines).toHaveLength(4);
     });
   });
@@ -276,33 +156,14 @@ describe("getScriptFailureGuidance", () => {
   // ── Exit code 255: SSH connection failed ───────────────────────────────────
 
   describe("exit code 255 (SSH failure)", () => {
-    it("should mention SSH connection failed", () => {
+    it("should mention SSH failure, booting, firewall, termination, and return 4 lines", () => {
       const lines = getScriptFailureGuidance(255, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("SSH connection failed");
-    });
-
-    it("should mention server still booting", () => {
-      const lines = getScriptFailureGuidance(255, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("still booting");
-    });
-
-    it("should mention firewall blocking SSH", () => {
-      const lines = getScriptFailureGuidance(255, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("Firewall");
       expect(joined).toContain("SSH");
-    });
-
-    it("should mention server termination", () => {
-      const lines = getScriptFailureGuidance(255, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("terminated");
-    });
-
-    it("should return exactly 4 guidance lines", () => {
-      const lines = getScriptFailureGuidance(255, "sprite");
       expect(lines).toHaveLength(4);
     });
   });
@@ -310,27 +171,13 @@ describe("getScriptFailureGuidance", () => {
   // ── Exit code 2: shell syntax error ────────────────────────────────────────
 
   describe("exit code 2 (shell syntax error)", () => {
-    it("should mention shell syntax or argument error", () => {
+    it("should mention syntax error, bug report link, and return 2 lines", () => {
       const lines = getScriptFailureGuidance(2, "sprite");
       const joined = lines.join("\n");
       expect(joined).toContain("Shell syntax or argument error");
-    });
-
-    it("should suggest this is likely a bug in the script", () => {
-      const lines = getScriptFailureGuidance(2, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("bug in the script");
-    });
-
-    it("should include a link to report the issue", () => {
-      const lines = getScriptFailureGuidance(2, "sprite");
-      const joined = lines.join("\n");
       expect(joined).toContain("github.com");
       expect(joined).toContain("issues");
-    });
-
-    it("should return exactly 2 guidance lines", () => {
-      const lines = getScriptFailureGuidance(2, "sprite");
       expect(lines).toHaveLength(2);
     });
   });
@@ -523,66 +370,41 @@ describe("getScriptFailureGuidance", () => {
 
 describe("getSignalGuidance", () => {
   describe("SIGKILL", () => {
-    it("should mention OOM killer", () => {
+    it("should mention OOM killer, larger instance size, and cloud provider dashboard", () => {
       const lines = getSignalGuidance("SIGKILL");
       const joined = lines.join("\n");
       expect(joined).toContain("SIGKILL");
       expect(joined).toContain("Out of memory");
-    });
-
-    it("should suggest a larger instance size", () => {
-      const lines = getSignalGuidance("SIGKILL");
-      const joined = lines.join("\n");
       expect(joined).toContain("larger instance size");
-    });
-
-    it("should suggest checking cloud provider dashboard", () => {
-      const lines = getSignalGuidance("SIGKILL");
-      const joined = lines.join("\n");
       expect(joined).toContain("cloud provider dashboard");
     });
   });
 
   describe("SIGTERM", () => {
-    it("should mention process was terminated", () => {
+    it("should mention process was terminated and server shutdown", () => {
       const lines = getSignalGuidance("SIGTERM");
       const joined = lines.join("\n");
       expect(joined).toContain("terminated");
       expect(joined).toContain("SIGTERM");
-    });
-
-    it("should mention server shutdown or billing", () => {
-      const lines = getSignalGuidance("SIGTERM");
-      const joined = lines.join("\n");
       expect(joined).toContain("shutdown");
     });
   });
 
   describe("SIGINT", () => {
-    it("should mention Ctrl+C", () => {
+    it("should mention Ctrl+C and warn about orphaned servers", () => {
       const lines = getSignalGuidance("SIGINT");
       const joined = lines.join("\n");
       expect(joined).toContain("Ctrl+C");
-    });
-
-    it("should warn about orphaned servers", () => {
-      const lines = getSignalGuidance("SIGINT");
-      const joined = lines.join("\n");
       expect(joined).toContain("cloud provider dashboard");
     });
   });
 
   describe("SIGHUP", () => {
-    it("should mention terminal disconnection", () => {
+    it("should mention terminal disconnection and suggest tmux/screen", () => {
       const lines = getSignalGuidance("SIGHUP");
       const joined = lines.join("\n");
       expect(joined).toContain("terminal connection");
       expect(joined).toContain("SIGHUP");
-    });
-
-    it("should suggest tmux/screen", () => {
-      const lines = getSignalGuidance("SIGHUP");
-      const joined = lines.join("\n");
       expect(joined).toContain("tmux");
     });
   });
