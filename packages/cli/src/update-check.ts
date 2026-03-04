@@ -218,6 +218,8 @@ function performAutoUpdate(latestVersion: string): void {
     const scriptBytes = executor.execFileSync(
       "curl",
       [
+        "--proto",
+        "=https",
         "-fsSL",
         installUrl,
       ],

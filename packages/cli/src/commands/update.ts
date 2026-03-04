@@ -1,10 +1,12 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
+import { execFileSync } from "node:child_process";
 import { parseJsonWith } from "../shared/parse.js";
 import { SPAWN_CDN, VERSION_URL, RAW_BASE } from "../manifest.js";
 import { VERSION, PkgVersionSchema, getErrorMessage } from "./shared.js";
 
-const INSTALL_CMD = `curl -fsSL ${SPAWN_CDN}/cli/install.sh | bash`;
+const INSTALL_URL = `${SPAWN_CDN}/cli/install.sh`;
+const INSTALL_CMD = `curl --proto '=https' -fsSL ${INSTALL_URL} | bash`;
 
 async function fetchRemoteVersion(): Promise<string> {
   // Primary: plain-text version file from GitHub release artifact (static URL)
@@ -37,12 +39,36 @@ async function fetchRemoteVersion(): Promise<string> {
 }
 
 async function performUpdate(_remoteVersion: string): Promise<void> {
-  const { execSync } = await import("node:child_process");
   try {
-    execSync(INSTALL_CMD, {
-      stdio: "inherit",
-      shell: "/bin/bash",
-    });
+    // Two-step: fetch with --proto '=https', then execute via bash -c
+    // Prevents protocol downgrade on hostile networks (matches update-check.ts pattern)
+    const scriptContent = execFileSync(
+      "curl",
+      [
+        "--proto",
+        "=https",
+        "-fsSL",
+        INSTALL_URL,
+      ],
+      {
+        encoding: "utf8",
+        stdio: [
+          "pipe",
+          "pipe",
+          "inherit",
+        ],
+      },
+    );
+    execFileSync(
+      "bash",
+      [
+        "-c",
+        scriptContent ?? "",
+      ],
+      {
+        stdio: "inherit",
+      },
+    );
     console.log();
     p.log.success("Updated successfully!");
     p.log.info("Run spawn again to use the new version.");
