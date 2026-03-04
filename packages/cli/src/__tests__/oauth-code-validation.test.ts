@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { OAUTH_CODE_REGEX } from "../shared/oauth";
+import { OAUTH_CODE_REGEX } from "../shared/oauth-constants";
 
 describe("OAUTH_CODE_REGEX", () => {
   it("accepts alphanumeric, hyphens, and underscores (regression #2116)", () => {

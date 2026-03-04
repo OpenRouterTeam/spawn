@@ -3,21 +3,13 @@
 import * as v from "valibot";
 import { parseJsonWith } from "./parse";
 import { logInfo, logWarn, logError, logStep, prompt, openBrowser, validateModelId } from "./ui";
+import { OAUTH_CODE_REGEX } from "./oauth-constants";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const OAuthKeySchema = v.object({
   key: v.string(),
 });
-
-// ─── OAuth Code Validation ──────────────────────────────────────────────────
-
-/**
- * Regex for validating OAuth authorization codes from the callback.
- * Must accept alphanumeric, hyphens, and underscores — OAuth providers
- * (GitHub, Google, etc.) use all of these in their auth codes.
- */
-export const OAUTH_CODE_REGEX = /^[a-zA-Z0-9_-]{16,128}$/;
 
 // ─── Key Validation ──────────────────────────────────────────────────────────
 
