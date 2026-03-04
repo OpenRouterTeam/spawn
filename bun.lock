@@ -6,6 +6,9 @@
     ".claude/scripts": {
       "name": "@spawn/hooks",
       "version": "0.0.1",
+      "dependencies": {
+        "valibot": "^1.0.0",
+      },
     },
     ".claude/skills/setup-spa": {
       "name": "spawn-slack-bot",
@@ -18,7 +21,7 @@
     },
     "packages/cli": {
       "name": "@openrouter/spawn",
-      "version": "0.12.13",
+      "version": "0.12.14",
       "bin": {
         "spawn": "cli.js",
       },

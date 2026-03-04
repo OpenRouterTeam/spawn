@@ -7,28 +7,13 @@
  */
 
 import { execFileSync } from "child_process";
+import { CommandInput, parseStdin } from "./schemas.ts";
 
 const raw = await Bun.stdin.text();
-let command: string | undefined;
+const parsed = parseStdin(raw, CommandInput);
+if (!parsed) process.exit(0);
 
-try {
-  const input: unknown = JSON.parse(raw);
-  if (
-    input !== null &&
-    typeof input === "object" &&
-    "tool_input" in input &&
-    input.tool_input !== null &&
-    typeof input.tool_input === "object" &&
-    "command" in input.tool_input &&
-    typeof input.tool_input.command === "string"
-  ) {
-    command = input.tool_input.command;
-  }
-} catch {
-  // Malformed JSON — let it pass
-}
-
-if (!command) process.exit(0);
+const command = parsed.tool_input.command;
 
 // Only intercept gh pr merge / gh pr ready
 if (!command.includes("gh pr merge") && !command.includes("gh pr ready")) {

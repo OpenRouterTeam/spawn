@@ -2,5 +2,8 @@
   "name": "@spawn/hooks",
   "private": true,
   "type": "module",
-  "version": "0.0.1"
+  "version": "0.0.1",
+  "dependencies": {
+    "valibot": "^1.0.0"
+  }
 }

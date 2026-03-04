@@ -8,28 +8,13 @@
 import { execFileSync } from "child_process";
 import { dirname } from "path";
 import { existsSync } from "fs";
+import { FilePathInput, parseStdin } from "./schemas.ts";
 
 const raw = await Bun.stdin.text();
-let filePath: string | undefined;
+const parsed = parseStdin(raw, FilePathInput);
+if (!parsed) process.exit(0);
 
-try {
-  const input: unknown = JSON.parse(raw);
-  if (
-    input !== null &&
-    typeof input === "object" &&
-    "tool_input" in input &&
-    input.tool_input !== null &&
-    typeof input.tool_input === "object" &&
-    "file_path" in input.tool_input &&
-    typeof input.tool_input.file_path === "string"
-  ) {
-    filePath = input.tool_input.file_path;
-  }
-} catch {
-  // Malformed JSON — let it pass
-}
-
-if (!filePath) process.exit(0);
+const filePath = parsed.tool_input.file_path;
 
 const dir = dirname(filePath);
 if (!existsSync(dir)) process.exit(0);

@@ -236,21 +236,32 @@ function parseJson(text: string): Record<string, unknown> | null {
 }
 ```
 
-**For narrowing `unknown` values — use type guards:**
+**For narrowing `unknown` values — prefer valibot, fall back to simple type guards only for primitives:**
 ```typescript
+// Prefer valibot for structured data (objects, nested fields, arrays of objects):
+const UserSchema = v.object({ id: v.number(), name: v.string() });
+const user = v.safeParse(UserSchema, data);
+
+// Simple type guards are OK ONLY for single primitives:
 typeof val === "string" ? val : ""
 typeof val === "number" ? val : 0
 Array.isArray(val) ? val : []
 ```
 
-**For array-of-objects narrowing:**
+**NEVER write manual multi-level typeguards.** If you find yourself chaining `typeof`, `in`, or null checks more than one level deep, use a valibot schema instead:
 ```typescript
-function toObjectArray(val: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(val)) return [];
-  return val.filter((item): item is Record<string, unknown> =>
-    item !== null && typeof item === "object" && !Array.isArray(item));
-}
+// WRONG — manual multi-level typeguard:
+if (input !== null && typeof input === "object" && "tool_input" in input &&
+    input.tool_input !== null && typeof input.tool_input === "object" &&
+    "file_path" in input.tool_input && typeof input.tool_input.file_path === "string") { ... }
+
+// RIGHT — valibot schema:
+const Schema = v.object({ tool_input: v.object({ file_path: v.string() }) });
+const result = v.safeParse(Schema, input);
+if (result.success) { result.output.tool_input.file_path; }
 ```
+
+**Share schemas across files.** If multiple modules validate the same shape, extract the schema to a shared file (e.g., `.claude/scripts/schemas.ts`, `packages/shared/src/schemas.ts`) and import it. Do not duplicate schema definitions.
 
 **For test mocks — use proper Response objects instead of `as any`:**
 ```typescript
