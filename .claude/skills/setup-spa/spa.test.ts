@@ -331,28 +331,38 @@ describe("saveState", () => {
 describe("extractToolHint", () => {
   it("extracts command from input", () => {
     const block: Record<string, unknown> = {
-      input: { command: "gh issue list --repo OpenRouterTeam/spawn" },
+      input: {
+        command: "gh issue list --repo OpenRouterTeam/spawn",
+      },
     };
     expect(extractToolHint(block)).toBe("gh issue list --repo OpenRouterTeam/spawn");
   });
 
   it("extracts pattern from input", () => {
     const block: Record<string, unknown> = {
-      input: { pattern: "**/*.ts" },
+      input: {
+        pattern: "**/*.ts",
+      },
     };
     expect(extractToolHint(block)).toBe("**/*.ts");
   });
 
   it("extracts file_path from input", () => {
     const block: Record<string, unknown> = {
-      input: { file_path: "/home/user/spawn/index.ts" },
+      input: {
+        file_path: "/home/user/spawn/index.ts",
+      },
     };
     expect(extractToolHint(block)).toBe("/home/user/spawn/index.ts");
   });
 
   it("prefers command over pattern and file_path", () => {
     const block: Record<string, unknown> = {
-      input: { command: "echo hi", pattern: "*.ts", file_path: "/foo" },
+      input: {
+        command: "echo hi",
+        pattern: "*.ts",
+        file_path: "/foo",
+      },
     };
     expect(extractToolHint(block)).toBe("echo hi");
   });
@@ -360,7 +370,9 @@ describe("extractToolHint", () => {
   it("truncates hints longer than 80 chars", () => {
     const longCmd = "x".repeat(100);
     const block: Record<string, unknown> = {
-      input: { command: longCmd },
+      input: {
+        command: longCmd,
+      },
     };
     const result = extractToolHint(block);
     expect(result).toHaveLength(83); // 80 + "..."
@@ -373,7 +385,9 @@ describe("extractToolHint", () => {
 
   it("returns empty string for input without recognized keys", () => {
     const block: Record<string, unknown> = {
-      input: { query: "search term" },
+      input: {
+        query: "search term",
+      },
     };
     expect(extractToolHint(block)).toBe("");
   });
@@ -381,16 +395,33 @@ describe("extractToolHint", () => {
 
 describe("formatToolStats", () => {
   it("formats a single tool count", () => {
-    const counts = new Map([["Bash", 3]]);
+    const counts = new Map([
+      [
+        "Bash",
+        3,
+      ],
+    ]);
     expect(formatToolStats(counts)).toBe("3× Bash");
   });
 
   it("formats multiple tool counts", () => {
     const counts = new Map<string, number>([
-      ["Bash", 1],
-      ["Read", 4],
-      ["Grep", 5],
-      ["Glob", 8],
+      [
+        "Bash",
+        1,
+      ],
+      [
+        "Read",
+        4,
+      ],
+      [
+        "Grep",
+        5,
+      ],
+      [
+        "Glob",
+        8,
+      ],
     ]);
     expect(formatToolStats(counts)).toBe("1× Bash, 4× Read, 5× Grep, 8× Glob");
   });
@@ -402,26 +433,45 @@ describe("formatToolStats", () => {
 
 describe("formatToolHistory", () => {
   it("formats a single tool call", () => {
-    const history: ToolCall[] = [{ name: "Bash", hint: "echo hi" }];
+    const history: ToolCall[] = [
+      {
+        name: "Bash",
+        hint: "echo hi",
+      },
+    ];
     expect(formatToolHistory(history)).toBe("1. ✓ Bash — echo hi");
   });
 
   it("formats multiple tool calls with numbering", () => {
     const history: ToolCall[] = [
-      { name: "Bash", hint: "gh issue list" },
-      { name: "Glob", hint: "**/*.ts" },
-      { name: "Read", hint: "/home/user/index.ts" },
+      {
+        name: "Bash",
+        hint: "gh issue list",
+      },
+      {
+        name: "Glob",
+        hint: "**/*.ts",
+      },
+      {
+        name: "Read",
+        hint: "/home/user/index.ts",
+      },
     ];
     const result = formatToolHistory(history);
-    expect(result).toBe(
-      "1. ✓ Bash — gh issue list\n2. ✓ Glob — **/*.ts\n3. ✓ Read — /home/user/index.ts",
-    );
+    expect(result).toBe("1. ✓ Bash — gh issue list\n2. ✓ Glob — **/*.ts\n3. ✓ Read — /home/user/index.ts");
   });
 
   it("marks errored tools with ✗", () => {
     const history: ToolCall[] = [
-      { name: "Bash", hint: "rm -rf /", errored: true },
-      { name: "Read", hint: "file.ts" },
+      {
+        name: "Bash",
+        hint: "rm -rf /",
+        errored: true,
+      },
+      {
+        name: "Read",
+        hint: "file.ts",
+      },
     ];
     const result = formatToolHistory(history);
     expect(result).toContain("1. ✗ Bash — rm -rf /");
@@ -429,7 +479,12 @@ describe("formatToolHistory", () => {
   });
 
   it("handles tools without hints", () => {
-    const history: ToolCall[] = [{ name: "Bash", hint: "" }];
+    const history: ToolCall[] = [
+      {
+        name: "Bash",
+        hint: "",
+      },
+    ];
     expect(formatToolHistory(history)).toBe("1. ✓ Bash");
   });
 
