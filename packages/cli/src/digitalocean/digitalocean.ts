@@ -18,6 +18,7 @@ import {
   defaultSpawnName,
   sanitizeTermValue,
   selectFromList,
+  loadApiToken,
 } from "../shared/ui";
 import type { CloudInitTier } from "../shared/agents";
 import { getPackagesForTier, needsNode, needsBun, NODE_INSTALL_CMD } from "../shared/cloud-init";
@@ -174,23 +175,6 @@ async function saveTokenToConfig(token: string, refreshToken?: string, expiresIn
     config.expires_at = Math.floor(Date.now() / 1000) + expiresIn;
   }
   await saveConfig(config);
-}
-
-function loadTokenFromConfig(): string | null {
-  const data = loadConfig();
-  if (!data) {
-    return null;
-  }
-  const apiKey = isString(data.api_key) ? data.api_key : "";
-  const tok = isString(data.token) ? data.token : "";
-  const token = apiKey || tok;
-  if (!token) {
-    return null;
-  }
-  if (!/^[a-zA-Z0-9._/@:+=-]+$/.test(token)) {
-    return null;
-  }
-  return token;
 }
 
 function loadRefreshToken(): string | null {
@@ -513,7 +497,7 @@ export async function ensureDoToken(): Promise<boolean> {
   }
 
   // 2. Saved config (check expiry first, try refresh if needed)
-  const saved = loadTokenFromConfig();
+  const saved = loadApiToken("digitalocean");
   if (saved) {
     if (isTokenExpired()) {
       logWarn("Saved DigitalOcean token has expired, trying refresh...");

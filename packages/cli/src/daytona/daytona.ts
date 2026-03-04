@@ -108,10 +108,6 @@ async function saveTokenToConfig(token: string): Promise<void> {
   });
 }
 
-function loadTokenFromConfig(): string | null {
-  return loadApiToken("daytona");
-}
-
 async function testDaytonaToken(): Promise<boolean> {
   if (!daytonaApiKey) {
     return false;
@@ -138,7 +134,7 @@ export async function ensureDaytonaToken(): Promise<void> {
   }
 
   // 2. Saved config
-  const saved = loadTokenFromConfig();
+  const saved = loadApiToken("daytona");
   if (saved) {
     daytonaApiKey = saved;
     if (await testDaytonaToken()) {
