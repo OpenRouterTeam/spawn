@@ -1,6 +1,6 @@
 import "./unicode-detect.js"; // Ensure TERM is set before using symbols
-import type { ExecSyncOptions, ExecFileSyncOptions } from "node:child_process";
-import { execSync as nodeExecSync, execFileSync as nodeExecFileSync } from "node:child_process";
+import type { ExecFileSyncOptions } from "node:child_process";
+import { execFileSync as nodeExecFileSync } from "node:child_process";
 import fs from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -15,7 +15,6 @@ const VERSION = pkg.version;
 
 // Internal executor for testability - can be replaced in tests
 export const executor = {
-  execSync: (cmd: string, options?: ExecSyncOptions) => nodeExecSync(cmd, options),
   execFileSync: (file: string, args: string[], options?: ExecFileSyncOptions) => nodeExecFileSync(file, args, options),
 };
 
@@ -149,9 +148,9 @@ function printUpdateBanner(latestVersion: string): void {
  */
 function findUpdatedBinary(): string {
   try {
-    const result = executor.execSync("which spawn 2>/dev/null", {
+    const result = executor.execFileSync("which", ["spawn"], {
       encoding: "utf8",
-      shell: "/bin/bash",
+      stdio: ["pipe", "pipe", "ignore"],
     });
     const found = result ? result.toString().trim() : "";
     if (found) {
@@ -199,9 +198,15 @@ function performAutoUpdate(latestVersion: string): void {
   }
 
   try {
-    executor.execSync(`curl -fsSL ${RAW_BASE}/sh/cli/install.sh | bash`, {
+    // Two-step approach: fetch script bytes with curl, then execute via bash -c
+    // This eliminates shell interpolation of RAW_BASE entirely (CWE-78, #2161)
+    const scriptBytes = executor.execFileSync("curl", ["-fsSL", `${RAW_BASE}/sh/cli/install.sh`], {
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "inherit"],
+    });
+    const scriptContent = scriptBytes ? scriptBytes.toString() : "";
+    executor.execFileSync("bash", ["-c", scriptContent], {
       stdio: "inherit",
-      shell: "/bin/bash",
     });
 
     console.error();
