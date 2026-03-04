@@ -1,14 +1,14 @@
 #!/bin/bash
 # Standalone GitHub auth helper — installs gh CLI and runs OAuth login
-# Sourceable by any agent script, or executable directly via curl|bash
+# Executable directly via curl|bash; also sourceable using the CDN URL with eval.
 #
-# Usage (sourced):
-#   source sh/shared/github-auth.sh
-#   ensure_github_auth
-#
-# Usage (direct):
-#   bash sh/shared/github-auth.sh
+# Usage (via curl|bash — recommended):
+#   curl -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh | bash
 #   curl -fsSL https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/sh/shared/github-auth.sh | bash
+#
+# Usage (sourced using absolute path or CDN URL):
+#   eval "$(curl -fsSL https://openrouter.ai/labs/spawn/shared/github-auth.sh)"
+#   ensure_github_auth
 
 # ============================================================
 # Logging helpers
