@@ -35,7 +35,9 @@ export function toRecord(val: unknown): Record<string, unknown> | null {
  * Filters out non-object items.
  */
 export function toObjectArray(val: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(val)) return [];
+  if (!Array.isArray(val)) {
+    return [];
+  }
   return val.filter(
     (item): item is Record<string, unknown> => item !== null && typeof item === "object" && !Array.isArray(item),
   );
