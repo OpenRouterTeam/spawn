@@ -3,6 +3,7 @@
 import * as v from "valibot";
 import { parseJsonWith } from "./parse";
 import { logInfo, logWarn, logError, logStep, prompt, openBrowser, validateModelId } from "./ui";
+import { OAUTH_CODE_REGEX } from "./oauth-constants";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
               });
             }
             // Validate code format
-            if (!/^[a-zA-Z0-9]{16,128}$/.test(code)) {
+            if (!OAUTH_CODE_REGEX.test(code)) {
               return new Response("<html><body><h1>Invalid OAuth Code</h1></body></html>", {
                 status: 400,
                 headers: {
