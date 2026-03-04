@@ -413,7 +413,7 @@ const NPM_PREFIX_SETUP =
 const ZEROCLAW_INSTALL_URL =
   "https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh";
 
-export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
+function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   return {
     claude: {
       name: "Claude Code",
@@ -555,7 +555,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   };
 }
 
-export function resolveAgent(agents: Record<string, AgentConfig>, name: string): AgentConfig {
+function resolveAgent(agents: Record<string, AgentConfig>, name: string): AgentConfig {
   const agent = agents[name.toLowerCase()];
   if (!agent) {
     logError(`Unknown agent: ${name}`);
