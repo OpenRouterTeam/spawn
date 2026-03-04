@@ -425,7 +425,7 @@ async function installAwsCli(): Promise<void> {
       [
         "sh",
         "-c",
-        'tmp=$(mktemp -d) && curl -fsSL "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "$tmp/AWSCLIV2.pkg" && sudo installer -pkg "$tmp/AWSCLIV2.pkg" -target / && rm -rf "$tmp"',
+        'tmp=$(mktemp -d) && curl --proto "=https" -fsSL "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "$tmp/AWSCLIV2.pkg" && sudo installer -pkg "$tmp/AWSCLIV2.pkg" -target / && rm -rf "$tmp"',
       ],
       {
         stdio: [
@@ -445,7 +445,7 @@ async function installAwsCli(): Promise<void> {
       [
         "sh",
         "-c",
-        'tmp=$(mktemp -d) && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$tmp/awscliv2.zip" && unzip -q "$tmp/awscliv2.zip" -d "$tmp" && sudo "$tmp/aws/install" && rm -rf "$tmp"',
+        'tmp=$(mktemp -d) && curl --proto "=https" -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$tmp/awscliv2.zip" && unzip -q "$tmp/awscliv2.zip" -d "$tmp" && sudo "$tmp/aws/install" && rm -rf "$tmp"',
       ],
       {
         stdio: [
@@ -791,7 +791,7 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
       "# Install Node.js 22 via n (run as root so it installs to /usr/local/bin/)",
       `${NODE_INSTALL_CMD} || true`,
       "# Install Claude Code",
-      "su - ubuntu -c 'curl -fsSL https://claude.ai/install.sh | bash'",
+      "su - ubuntu -c 'curl --proto \"=https\" -fsSL https://claude.ai/install.sh | bash'",
     );
   }
   if (needsBun(tier)) {

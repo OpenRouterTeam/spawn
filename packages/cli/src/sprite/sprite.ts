@@ -144,7 +144,7 @@ export async function ensureSpriteCli(): Promise<void> {
     [
       "sh",
       "-c",
-      "curl -fsSL https://sprites.dev/install.sh | bash",
+      "curl --proto '=https' -fsSL https://sprites.dev/install.sh | bash",
     ],
     {
       stdio: [
