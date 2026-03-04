@@ -89,24 +89,26 @@ if (file.endsWith(".ts")) {
     }
   }
 
-  // Find biome config
-  const dir = dirname(file);
+  // Find biome config by walking up from the file's directory to the repo root
   let biomeDir: string | null = null;
-
-  if (existsSync(resolve(dir, "biome.json")) || existsSync(resolve(dir, "biome.jsonc"))) {
-    biomeDir = dir;
-  } else if (existsSync(resolve(dir, "..", "biome.json")) || existsSync(resolve(dir, "..", "biome.jsonc"))) {
-    biomeDir = resolve(dir, "..");
+  let searchDir = dirname(file);
+  const root = resolve("/");
+  while (searchDir !== root) {
+    if (existsSync(resolve(searchDir, "biome.json")) || existsSync(resolve(searchDir, "biome.jsonc"))) {
+      biomeDir = searchDir;
+      break;
+    }
+    searchDir = resolve(searchDir, "..");
   }
 
   if (biomeDir) {
-    // Run biome lint
+    // Run biome check (lint + format) in a single pass
     try {
       run(
         "bunx",
         [
           "@biomejs/biome",
-          "lint",
+          "check",
           file,
         ],
         {
@@ -115,25 +117,7 @@ if (file.endsWith(".ts")) {
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      fail(`BIOME LINT FAILED for ${file}\n${msg}`);
-    }
-
-    // Run biome format
-    try {
-      run(
-        "bunx",
-        [
-          "@biomejs/biome",
-          "format",
-          file,
-        ],
-        {
-          cwd: biomeDir,
-        },
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      fail(`BIOME FORMAT FAILED for ${file}\n${msg}`);
+      fail(`BIOME CHECK FAILED for ${file}\n${msg}`);
     }
   }
 }

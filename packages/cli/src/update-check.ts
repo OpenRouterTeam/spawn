@@ -9,7 +9,7 @@ import * as v from "valibot";
 import { parseJsonWith } from "./shared/parse";
 import { hasStatus } from "./shared/type-guards";
 import pkg from "../package.json" with { type: "json" };
-import { RAW_BASE } from "./manifest.js";
+import { SPAWN_CDN, VERSION_URL, RAW_BASE } from "./manifest.js";
 
 const VERSION = pkg.version;
 
@@ -29,13 +29,6 @@ const PkgVersionSchema = v.object({
   version: v.string(),
 });
 
-// Validate RAW_BASE matches expected GitHub raw content URL pattern (defense-in-depth, CWE-78)
-const GITHUB_RAW_URL_PATTERN =
-  /^https:\/\/raw\.githubusercontent\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-if (!GITHUB_RAW_URL_PATTERN.test(RAW_BASE)) {
-  throw new Error(`RAW_BASE URL does not match expected GitHub raw URL pattern: ${RAW_BASE}`);
-}
-
 // Use ASCII-safe symbols when unicode is disabled (SSH, dumb terminals)
 const isAscii = process.env.TERM === "linux";
 const CHECK_MARK = isAscii ? "*" : "\u2713";
@@ -44,6 +37,22 @@ const CROSS_MARK = isAscii ? "x" : "\u2717";
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function fetchLatestVersion(): Promise<string | null> {
+  // Primary: plain-text version file from GitHub release artifact (static URL)
+  try {
+    const res = await fetch(VERSION_URL, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+    });
+    if (res.ok) {
+      const text = (await res.text()).trim();
+      if (text && /^\d+\.\d+\.\d+/.test(text)) {
+        return text;
+      }
+    }
+  } catch {
+    // Fall through to GitHub raw fallback
+  }
+
+  // Fallback: package.json from GitHub raw
   try {
     const res = await fetch(`${RAW_BASE}/packages/cli/package.json`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
@@ -51,7 +60,6 @@ async function fetchLatestVersion(): Promise<string | null> {
     if (!res.ok) {
       return null;
     }
-
     const data = parseJsonWith(await res.text(), PkgVersionSchema);
     return data?.version ?? null;
   } catch {
@@ -202,19 +210,16 @@ function reExecWithArgs(): void {
 function performAutoUpdate(latestVersion: string): void {
   printUpdateBanner(latestVersion);
 
-  // Validate RAW_BASE immediately before use to prevent command injection (CWE-78, #1819)
-  if (!GITHUB_RAW_URL_PATTERN.test(RAW_BASE)) {
-    throw new Error(`Security: RAW_BASE failed pre-execution validation: ${RAW_BASE}`);
-  }
+  // Hardcoded CDN URL — no variable interpolation, eliminates CWE-78 concern entirely
+  const installUrl = `${SPAWN_CDN}/cli/install.sh`;
 
   try {
     // Two-step approach: fetch script bytes with curl, then execute via bash -c
-    // This eliminates shell interpolation of RAW_BASE entirely (CWE-78, #2161)
     const scriptBytes = executor.execFileSync(
       "curl",
       [
         "-fsSL",
-        `${RAW_BASE}/sh/cli/install.sh`,
+        installUrl,
       ],
       {
         encoding: "utf8",
@@ -247,7 +252,7 @@ function performAutoUpdate(latestVersion: string): void {
     console.error(pc.red(pc.bold(`${CROSS_MARK} Auto-update failed`)));
     console.error(pc.dim("  Please update manually:"));
     console.error();
-    console.error(pc.cyan(`  curl -fsSL ${RAW_BASE}/sh/cli/install.sh | bash`));
+    console.error(pc.cyan(`  curl -fsSL ${installUrl} | bash`));
     console.error();
     // Continue with original command despite update failure
   }
