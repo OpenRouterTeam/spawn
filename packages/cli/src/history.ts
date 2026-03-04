@@ -150,7 +150,10 @@ function archiveRecords(records: SpawnRecord[]): void {
         // Corrupted archive — overwrite
       }
     }
-    const merged = [...existing, ...records];
+    const merged = [
+      ...existing,
+      ...records,
+    ];
     writeFileSync(archivePath, JSON.stringify(merged, null, 2) + "\n", {
       mode: 0o600,
     });
@@ -188,7 +191,10 @@ export function saveSpawnRecord(record: SpawnRecord): void {
       // Still over limit — trim oldest non-deleted records too
       const overflow = nonDeleted.slice(0, nonDeleted.length - MAX_HISTORY_ENTRIES);
       history = nonDeleted.slice(nonDeleted.length - MAX_HISTORY_ENTRIES);
-      archiveRecords([...deleted, ...overflow]);
+      archiveRecords([
+        ...deleted,
+        ...overflow,
+      ]);
     }
   }
   writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {

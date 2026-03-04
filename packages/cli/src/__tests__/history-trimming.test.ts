@@ -597,7 +597,9 @@ describe("History Trimming and Boundaries", () => {
 
       // Pre-create a directory with the archive name to cause write to fail
       const date = new Date().toISOString().slice(0, 10);
-      mkdirSync(join(testDir, `history-${date}.json`), { recursive: true });
+      mkdirSync(join(testDir, `history-${date}.json`), {
+        recursive: true,
+      });
 
       // Save should still work even though archive write fails
       saveSpawnRecord({
