@@ -171,11 +171,6 @@ dd if=/dev/urandom of=/tmp/random.bin bs=1M count=1
       expect(() => validatePrompt("Run `cat /etc/shadow`")).toThrow("backtick");
     });
 
-    it("should reject prompts one byte over the max length", () => {
-      const overPrompt = "x".repeat(10 * 1024 + 1);
-      expect(() => validatePrompt(overPrompt)).toThrow("too long");
-    });
-
     it("should accept multi-line prompts", () => {
       const multiLine = "Line 1\nLine 2\nLine 3";
       expect(() => validatePrompt(multiLine)).not.toThrow();

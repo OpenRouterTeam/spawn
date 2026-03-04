@@ -187,7 +187,7 @@ describe("Download and Failure Pipeline", () => {
   // ── downloadScriptWithFallback: both fail ─────────────────────────
 
   describe("download - both URLs fail", () => {
-    it("should show 'script not found' when both return 404", async () => {
+    it("should show script-not-found error with recovery hints when both return 404", async () => {
       await setupFetch(async () => {
         return new Response("Not Found", {
           status: 404,
@@ -202,48 +202,13 @@ describe("Download and Failure Pipeline", () => {
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      // reportDownloadFailure should log specific 404 error
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("doesn't exist");
-    });
-
-    it("should suggest verifying the combination when both return 404", async () => {
-      await setupFetch(
-        async () =>
-          new Response("Not Found", {
-            status: 404,
-          }),
-      );
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
-
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("spawn matrix");
-    });
-
-    it("should suggest reporting the issue when both return 404", async () => {
-      await setupFetch(
-        async () =>
-          new Response("Not Found", {
-            status: 404,
-          }),
-      );
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
-
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("Report it");
     });
 
-    it("should show server error message when both return 500", async () => {
+    it("should show server error with retry hint when both return 500", async () => {
       await setupFetch(
         async () =>
           new Response("Server Error", {
@@ -259,23 +224,6 @@ describe("Download and Failure Pipeline", () => {
 
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("HTTP 500");
-    });
-
-    it("should mention temporary server issues on 500 errors", async () => {
-      await setupFetch(
-        async () =>
-          new Response("Server Error", {
-            status: 500,
-          }),
-      );
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
-
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("temporarily unavailable");
     });
 
@@ -308,7 +256,7 @@ describe("Download and Failure Pipeline", () => {
   // ── downloadScriptWithFallback: network error (fetch throws) ──────
 
   describe("download - network error", () => {
-    it("should call reportDownloadError when fetch throws", async () => {
+    it("should exit 1 and include the network error message", async () => {
       await setupFetch(async () => {
         throw new Error("DNS resolution failed");
       });
@@ -325,7 +273,7 @@ describe("Download and Failure Pipeline", () => {
       expect(errorOutput).toContain("DNS resolution failed");
     });
 
-    it("should show troubleshooting steps on network error", async () => {
+    it("should show troubleshooting hints including firewall, connection check, and fallback URL", async () => {
       await setupFetch(async () => {
         throw new Error("Network timeout");
       });
@@ -339,35 +287,7 @@ describe("Download and Failure Pipeline", () => {
       const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("Next steps");
       expect(errorOutput).toContain("internet connection");
-    });
-
-    it("should suggest spawn list for verification on network error", async () => {
-      await setupFetch(async () => {
-        throw new Error("Connection refused");
-      });
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
-
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
-      expect(errorOutput).toContain("Firewall or proxy");
-    });
-
-    it("should show the GitHub raw URL for manual access on network error", async () => {
-      await setupFetch(async () => {
-        throw new Error("ETIMEDOUT");
-      });
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
-
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      expect(errorOutput).toContain("Firewall");
       expect(errorOutput).toContain("raw.githubusercontent.com");
     });
   });
