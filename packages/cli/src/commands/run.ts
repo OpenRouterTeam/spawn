@@ -576,6 +576,7 @@ function runBashScript(
       console.error();
       p.log.warn("SSH connection lost. Your server is likely still running.");
       p.log.warn("To reconnect, re-run the same spawn command.");
+      return undefined; // Don't report as failure — user already has clear guidance
     }
 
     return errMsg;
