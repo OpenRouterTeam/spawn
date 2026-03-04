@@ -15,7 +15,7 @@ import {
   preflightCredentialCheck,
   getAuthHint,
 } from "./shared.js";
-import { execScript } from "./run.js";
+import { execScript, showDryRunPreview } from "./run.js";
 
 // Prompt user to select an agent with hints and type-ahead filtering
 async function selectAgent(manifest: Manifest): Promise<string> {
@@ -170,6 +170,11 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
   const { clouds, hintOverrides } = getAndValidateCloudChoices(manifest, resolvedAgent);
   const cloudChoice = await selectCloud(manifest, clouds, hintOverrides);
 
+  if (dryRun) {
+    showDryRunPreview(manifest, resolvedAgent, cloudChoice, prompt);
+    return;
+  }
+
   await preflightCredentialCheck(manifest, cloudChoice);
 
   const spawnName = await promptSpawnName();
@@ -186,7 +191,7 @@ export async function cmdAgentInteractive(agent: string, prompt?: string, dryRun
     prompt,
     getAuthHint(manifest, cloudChoice),
     manifest.clouds[cloudChoice].url,
-    dryRun,
+    undefined,
     spawnName,
   );
 }

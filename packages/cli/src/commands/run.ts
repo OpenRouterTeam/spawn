@@ -170,7 +170,7 @@ function buildPromptLines(prompt: string): string[] {
   return lines;
 }
 
-function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, prompt?: string): void {
+export function showDryRunPreview(manifest: Manifest, agent: string, cloud: string, prompt?: string): void {
   p.log.info(pc.bold("Dry run -- no resources will be provisioned\n"));
 
   printDryRunSection("Agent", buildAgentLines(manifest.agents[agent]));
