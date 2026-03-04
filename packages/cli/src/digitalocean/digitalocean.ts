@@ -570,17 +570,17 @@ export async function ensureDoToken(): Promise<boolean> {
 export async function ensureSshKey(): Promise<void> {
   const selectedKeys = await ensureSshKeys();
 
+  // Fetch registered keys once before the loop to avoid N+1 API calls
+  const keysText = await doApi("GET", "/account/keys");
+  const data = parseJsonObj(keysText);
+  const keys = toObjectArray(data?.ssh_keys);
+
   for (const key of selectedKeys) {
     const fingerprint = getSshFingerprint(key.pubPath);
     if (!fingerprint) {
       logWarn(`Could not determine fingerprint for SSH key '${key.name}'`);
       continue;
     }
-
-    // Check if key is registered with DigitalOcean
-    const keysText = await doApi("GET", "/account/keys");
-    const data = parseJsonObj(keysText);
-    const keys = toObjectArray(data?.ssh_keys);
 
     const found = keys.some((k: Record<string, unknown>) => {
       const fp = k.fingerprint || "";
