@@ -62,7 +62,10 @@ export function getConnectionPath(): string {
   return join(getSpawnDir(), "last-connection.json");
 }
 
-/** Save VM connection info to last-connection.json for later reconnection/deletion. */
+/** Save VM connection info directly into history.json.
+ *  Finds the most recent record matching this cloud that has no connection yet
+ *  and attaches the connection data to it. This is called during provisioning
+ *  so the connection is persisted immediately — not deferred to a lazy merge. */
 export function saveVmConnection(
   ip: string,
   user: string,
@@ -77,6 +80,38 @@ export function saveVmConnection(
     recursive: true,
     mode: 0o700,
   });
+
+  const connData: VMConnection = {
+    ip,
+    user,
+    server_id: serverId || undefined,
+    server_name: serverName || undefined,
+    cloud: cloud || undefined,
+    launch_cmd: launchCmd || undefined,
+    metadata: metadata && Object.keys(metadata).length > 0 ? metadata : undefined,
+  };
+
+  // Merge directly into history — find the most recent record for this cloud
+  // that doesn't have a connection yet (the record created by saveSpawnRecord).
+  const history = loadHistory();
+  let merged = false;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const r = history[i];
+    if (r.cloud === cloud && !r.connection) {
+      r.connection = connData;
+      merged = true;
+      break;
+    }
+  }
+
+  if (merged) {
+    writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
+      mode: 0o600,
+    });
+  }
+
+  // Also write last-connection.json for backward compatibility
+  // (other tools or older CLI versions may still read it)
   const json: Record<string, unknown> = {
     ip,
     user,
@@ -101,8 +136,26 @@ export function saveVmConnection(
   });
 }
 
-/** Save launch command to the last-connection.json file. */
+/** Save launch command to the most recent history record's connection. */
 export function saveLaunchCmd(launchCmd: string): void {
+  // Update history directly — find the most recent record with a connection
+  try {
+    const history = loadHistory();
+    for (let i = history.length - 1; i >= 0; i--) {
+      const conn = history[i].connection;
+      if (conn) {
+        conn.launch_cmd = launchCmd;
+        writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
+          mode: 0o600,
+        });
+        break;
+      }
+    }
+  } catch {
+    // non-fatal
+  }
+
+  // Also update last-connection.json for backward compatibility
   const connFile = getConnectionPath();
   try {
     const data = JSON.parse(readFileSync(connFile, "utf-8"));
@@ -281,16 +334,21 @@ function mergeLastConnection(): void {
 
     const history = loadHistory();
 
-    if (history.length > 0) {
-      // Update the most recent entry with connection info
-      const latest = history[history.length - 1];
-      if (!latest.connection) {
-        latest.connection = connData;
-        // Save updated history
-        writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
-          mode: 0o600,
-        });
+    // Find the most recent entry without a connection and merge into it.
+    // Search backwards so we match the right record even if earlier records
+    // already have connections (e.g., from concurrent spawns).
+    let merged = false;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (!history[i].connection) {
+        history[i].connection = connData;
+        merged = true;
+        break;
       }
+    }
+    if (merged) {
+      writeFileSync(getHistoryPath(), JSON.stringify(history, null, 2) + "\n", {
+        mode: 0o600,
+      });
     }
 
     // Clean up the connection file after merging
