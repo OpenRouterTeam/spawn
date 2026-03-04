@@ -36,7 +36,8 @@ export function getPackagesForTier(tier: CloudInitTier = "full"): string[] {
 }
 
 /** Node 22 install via `n` bootstrapped directly from curl (no apt nodejs/npm). */
-export const NODE_INSTALL_CMD = "curl --proto '=https' -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22";
+export const NODE_INSTALL_CMD =
+  "curl --proto '=https' -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s install 22";
 
 export function needsNode(tier: CloudInitTier = "full"): boolean {
   return tier === "node" || tier === "full";
