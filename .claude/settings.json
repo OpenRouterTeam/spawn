@@ -15,6 +15,15 @@
             "command": "bash -c 'INPUT=$(cat); FILE=$(echo \"$INPUT\" | jq -r \".tool_input.file_path // empty\"); [ -z \"$FILE\" ] && exit 0; DIR=$(dirname \"$FILE\"); [ ! -d \"$DIR\" ] && exit 0; GD=$(cd \"$DIR\" && git rev-parse --git-dir 2>/dev/null) || exit 0; GC=$(cd \"$DIR\" && git rev-parse --git-common-dir 2>/dev/null) || exit 0; AGD=$(cd \"$DIR\" && cd \"$GD\" && pwd); AGC=$(cd \"$DIR\" && cd \"$GC\" && pwd); if [ \"$AGD\" = \"$AGC\" ]; then echo \"BLOCKED: Edits must happen in a git worktree, not the main checkout.\" >&2; echo \"Create a worktree first: git worktree add /tmp/spawn-worktrees/FEATURE -b branch-name\" >&2; echo \"Then use absolute paths under /tmp/spawn-worktrees/FEATURE/ for all edits.\" >&2; exit 2; fi; BRANCH=$(cd \"$DIR\" && git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$BRANCH\" = \"main\" ]; then echo \"BLOCKED: Cannot edit on main branch, even in a worktree.\" >&2; echo \"Create a worktree with a feature branch: git worktree add /tmp/spawn-worktrees/FEATURE -b branch-name\" >&2; exit 2; fi'"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r \".tool_input.command // empty\"); echo \"$CMD\" | grep -qE \"gh pr (merge|ready)\" || exit 0; WT=$(echo \"$CMD\" | grep -oE \"/tmp/spawn-worktrees/[a-zA-Z0-9._-]+\" | head -1); if [ -n \"$WT\" ] && [ -d \"$WT/packages/cli\" ]; then ROOT=\"$WT\"; else ROOT=$(git rev-parse --show-toplevel 2>/dev/null); fi; if [ -z \"$ROOT\" ] || [ ! -d \"$ROOT/packages/cli\" ]; then echo \"WARNING: Could not find spawn repo for pre-merge checks\" >&2; exit 0; fi; cd \"$ROOT/packages/cli\" || exit 2; echo \"Pre-merge gate: running biome check + bun test in $ROOT/packages/cli ...\" >&2; bunx @biomejs/biome check src/ 2>&1 || { echo \"BLOCKED: biome check failed — fix lint/format issues before merging\" >&2; exit 2; }; bun test 2>&1 || { echo \"BLOCKED: tests failed — fix failures before merging\" >&2; exit 2; }; echo \"Pre-merge checks passed\" >&2'"
+          }
+        ]
       }
     ],
     "PostToolUse": [
