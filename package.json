@@ -1,5 +1,5 @@
 {
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", ".claude/skills/setup-spa"]
+  "workspaces": ["packages/*", ".claude/skills/setup-spa", ".claude/scripts"]
 }
