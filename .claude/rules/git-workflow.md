@@ -17,23 +17,28 @@ Before editing ANY files:
    ```bash
    git worktree add /tmp/spawn-worktrees/FEATURE -b descriptive-branch-name
    ```
-2. **Edit files using absolute paths** into the worktree:
+2. **Install dependencies** — worktrees do NOT share `node_modules`:
+   ```bash
+   cd /tmp/spawn-worktrees/FEATURE && bun install
+   ```
+   This is **mandatory** before running tests, biome, or any bun commands in the worktree. Skipping this causes `Cannot find package` errors that block the pre-merge hook.
+3. **Edit files using absolute paths** into the worktree:
    ```
    /tmp/spawn-worktrees/FEATURE/packages/cli/src/foo.ts   ← YES
    /home/sprite/spawn/packages/cli/src/foo.ts              ← BLOCKED
    ```
-3. **Commit and push** from the worktree:
+4. **Commit and push** from the worktree:
    ```bash
    git -C /tmp/spawn-worktrees/FEATURE add -A
    git -C /tmp/spawn-worktrees/FEATURE commit -m "message"
    git -C /tmp/spawn-worktrees/FEATURE push -u origin HEAD
    ```
-4. **Open a draft PR, then merge when done:**
+5. **Open a draft PR, then merge when done:**
    ```bash
    gh pr create --draft --repo OpenRouterTeam/spawn
    gh pr ready NUMBER && gh pr merge --squash NUMBER
    ```
-5. **Clean up** the worktree:
+6. **Clean up** the worktree:
    ```bash
    git worktree remove /tmp/spawn-worktrees/FEATURE
    ```
