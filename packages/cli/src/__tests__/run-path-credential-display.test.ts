@@ -3,18 +3,11 @@ import { mockClackPrompts } from "./test-helpers";
 import type { Manifest } from "../manifest";
 
 /**
- * Tests for critical-path functions in the `spawn <agent> <cloud>` run flow
- * that had ZERO test coverage:
+ * Tests for critical-path functions in the `spawn <agent> <cloud>` run flow:
  *
  * - prioritizeCloudsByCredentials: sorts clouds by credential availability,
  *   builds hint overrides, counts clouds with credentials
- * - buildCredentialStatusLines: builds credential status lines for dry-run preview
- * - formatAuthVarLine: formats individual auth env var display lines
- * - validateRunSecurity: validates agent/cloud/prompt before execution
- * - validateEntities: validates agent + cloud exist in manifest before execution
- *
- * These functions are all in the hot path of cmdRun (the primary CLI flow).
- * A bug in any of them breaks the user experience for every spawn invocation.
+ * - isRetryableExitCode: identifies exit codes that warrant a retry suggestion
  */
 
 // ── Test manifest ───────────────────────────────────────────────────────
