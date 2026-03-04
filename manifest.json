@@ -114,7 +114,7 @@
         }
       },
       "notes": "Rust-based agent framework built by Harvard/MIT/Sundai.Club communities. Natively supports OpenRouter via OPENROUTER_API_KEY + ZEROCLAW_PROVIDER=openrouter. Requires compilation from source (~5-10 min).",
-      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/zeroclaw.jpg",
+      "icon": "https://raw.githubusercontent.com/OpenRouterTeam/spawn/main/assets/agents/zeroclaw.png",
       "featured_cloud": [
         "hetzner",
         "gcp",

@@ -182,14 +182,14 @@ export async function ensureHcloudToken(): Promise<void> {
 export async function ensureSshKey(): Promise<void> {
   const selectedKeys = await ensureSshKeys();
 
+  // Fetch registered keys once before the loop to avoid N+1 API calls
+  const resp = await hetznerApi("GET", "/ssh_keys");
+  const data = parseJsonObj(resp);
+  const sshKeys = toObjectArray(data?.ssh_keys);
+
   for (const key of selectedKeys) {
     const fingerprint = getSshFingerprint(key.pubPath);
     const pubKey = readFileSync(key.pubPath, "utf-8").trim();
-
-    // Check if key is already registered
-    const resp = await hetznerApi("GET", "/ssh_keys");
-    const data = parseJsonObj(resp);
-    const sshKeys = toObjectArray(data?.ssh_keys);
 
     const alreadyRegistered = sshKeys.some((k) => fingerprint && k.fingerprint === fingerprint);
 

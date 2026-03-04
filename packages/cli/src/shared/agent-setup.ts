@@ -163,6 +163,35 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
 
 let githubAuthRequested = false;
 let githubToken = "";
+let hostGitName = "";
+let hostGitEmail = "";
+
+/** Read a git config value from the host machine, returning "" on failure. */
+function readHostGitConfig(key: string): string {
+  try {
+    const result = Bun.spawnSync(
+      [
+        "git",
+        "config",
+        "--global",
+        key,
+      ],
+      {
+        stdio: [
+          "ignore",
+          "pipe",
+          "ignore",
+        ],
+      },
+    );
+    if (result.exitCode === 0) {
+      return new TextDecoder().decode(result.stdout).trim();
+    }
+  } catch {
+    /* ignore — git may not be installed on host */
+  }
+  return "";
+}
 
 async function promptGithubAuth(): Promise<void> {
   if (process.env.SPAWN_SKIP_GITHUB_AUTH) {
@@ -197,6 +226,10 @@ async function promptGithubAuth(): Promise<void> {
         /* ignore */
       }
     }
+
+    // Capture host git identity to propagate to the remote VM
+    hostGitName = readHostGitConfig("user.name");
+    hostGitEmail = readHostGitConfig("user.email");
   }
 }
 
@@ -242,6 +275,26 @@ export async function offerGithubAuth(runner: CloudRunner): Promise<void> {
       } catch {
         /* ignore */
       }
+    }
+  }
+
+  // Propagate host git identity to the remote VM
+  if (hostGitName || hostGitEmail) {
+    logStep("Configuring git identity...");
+    const cmds: string[] = [];
+    if (hostGitName) {
+      const escaped = hostGitName.replace(/'/g, "'\\''");
+      cmds.push(`git config --global user.name '${escaped}'`);
+    }
+    if (hostGitEmail) {
+      const escaped = hostGitEmail.replace(/'/g, "'\\''");
+      cmds.push(`git config --global user.email '${escaped}'`);
+    }
+    try {
+      await runner.runServer(cmds.join(" && "));
+      logInfo("Git identity configured from host");
+    } catch {
+      logWarn("Git identity setup failed (non-fatal, continuing)");
     }
   }
 }
@@ -413,7 +466,7 @@ const NPM_PREFIX_SETUP =
 const ZEROCLAW_INSTALL_URL =
   "https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh";
 
-export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
+function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   return {
     claude: {
       name: "Claude Code",
@@ -555,7 +608,7 @@ export function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
   };
 }
 
-export function resolveAgent(agents: Record<string, AgentConfig>, name: string): AgentConfig {
+function resolveAgent(agents: Record<string, AgentConfig>, name: string): AgentConfig {
   const agent = agents[name.toLowerCase()];
   if (!agent) {
     logError(`Unknown agent: ${name}`);
