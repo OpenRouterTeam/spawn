@@ -145,17 +145,22 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
     "dangerouslySkipPermissions": true
   }
 }`;
-  const globalState = `{
-  "hasCompletedOnboarding": true,
-  "bypassPermissionsModeAccepted": true
-}`;
 
   const settingsB64 = Buffer.from(settingsJson).toString("base64");
-  const stateB64 = Buffer.from(globalState).toString("base64");
 
-  await runner.runServer(
-    `mkdir -p ~/.claude && printf '%s' '${settingsB64}' | base64 -d > ~/.claude/settings.json && chmod 600 ~/.claude/settings.json && printf '%s' '${stateB64}' | base64 -d > ~/.claude.json && chmod 600 ~/.claude.json && touch ~/.claude/CLAUDE.md`,
-  );
+  // Build ~/.claude.json on the remote using $HOME so the workspace trust
+  // entry uses the actual home directory path (e.g. /root, /home/user).
+  // This pre-accepts the "Quick safety check" trust dialog for the home dir.
+  const stateScript = [
+    "mkdir -p ~/.claude",
+    `printf '%s' '${settingsB64}' | base64 -d > ~/.claude/settings.json`,
+    "chmod 600 ~/.claude/settings.json",
+    'printf \'{"hasCompletedOnboarding":true,"bypassPermissionsModeAccepted":true,"%s":{"hasTrustDialogAccepted":true}}\\n\' "$HOME" > ~/.claude.json',
+    "chmod 600 ~/.claude.json",
+    "touch ~/.claude/CLAUDE.md",
+  ].join(" && ");
+
+  await runner.runServer(stateScript);
   logInfo("Claude Code configured");
 }
 
