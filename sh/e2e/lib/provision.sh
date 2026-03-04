@@ -185,10 +185,10 @@ CLOUD_ENV
   env_b64=$(base64 < "${env_tmp}" | tr -d '\n')
   rm -f "${env_tmp}"
 
-  # Use double-quoting around env_b64 in the remote command to prevent word
-  # splitting. Base64 output is shell-safe ([A-Za-z0-9+/=]), but quoting is
-  # defensive best practice against any upstream corruption.
-  if cloud_exec "${app_name}" "printf '%s' \"${env_b64}\" | base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
+  # Pass env_b64 via stdin to avoid interpolating it into the remote command
+  # string. This eliminates any risk of shell injection if the base64 payload
+  # were ever to contain unexpected characters.
+  if printf '%s' "${env_b64}" | cloud_exec "${app_name}" "base64 -d > ~/.spawnrc && chmod 600 ~/.spawnrc && \
     grep -q 'source ~/.spawnrc' ~/.bashrc 2>/dev/null || printf '%s\n' '[ -f ~/.spawnrc ] && source ~/.spawnrc' >> ~/.bashrc" >/dev/null 2>&1; then
     log_ok "Manual .spawnrc created successfully"
   else
