@@ -2,7 +2,7 @@
 
 Launch any AI agent on any cloud with a single command. Coding agents, research agents, self-hosted AI tools — Spawn deploys them all. All models powered by [OpenRouter](https://openrouter.ai). (ALPHA software, use at your own risk!)
 
-**6 agents. 7 clouds. 42 working combinations. Zero config.**
+**7 agents. 7 clouds. 49 working combinations. Zero config.**
 
 ## Install
 
@@ -47,6 +47,9 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
 | `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
 | `spawn <agent> <cloud> --debug` | Show all commands being executed |
+| `spawn <agent> <cloud> --headless` | Provision and exit (no interactive session) |
+| `spawn <agent> <cloud> --output json` | Headless mode with structured JSON on stdout |
+| `spawn <agent> <cloud> --custom` | Show interactive size/region pickers |
 | `spawn <agent>` | Show available clouds for an agent |
 | `spawn <cloud>` | Show available agents for a cloud |
 | `spawn matrix` | Full agent x cloud matrix |
@@ -168,6 +171,7 @@ If an agent fails to install or launch on a cloud:
 | [**Codex CLI**](https://github.com/openai/codex) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**OpenCode**](https://github.com/sst/opencode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | [**Kilo Code**](https://github.com/Kilo-Org/kilocode) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ### How it works
 
