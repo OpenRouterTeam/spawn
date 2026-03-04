@@ -349,28 +349,78 @@ async function setupOpenclawConfig(runner: CloudRunner, apiKey: string, modelId:
 
 export async function startGateway(runner: CloudRunner): Promise<void> {
   logStep("Starting OpenClaw gateway daemon...");
-  // Start the daemon AND wait for port 18789 in a single SSH session.
-  // The polling loop doubles as a keepalive for the SSH session.
-  // We resolve the full path to openclaw first because setsid replaces
-  // the process image and doesn't inherit the parent shell's PATH.
+
+  // On Linux with systemd: install a supervised service (Restart=always) +
+  // hourly cron heartbeat as a belt-and-suspenders backup.
+  // On macOS/other: fall back to setsid/nohup (unsupervised).
+  // Base64-encode files to avoid heredoc/quoting issues across cloud SSH.
+
   // Port check: ss is available on all modern Linux; /dev/tcp works on macOS/some bash.
-  // Debian/Ubuntu bash is compiled WITHOUT /dev/tcp support, so we must not rely on it.
+  // Debian/Ubuntu bash is compiled WITHOUT /dev/tcp support, so we must not rely on it alone.
   const portCheck =
     'ss -tln 2>/dev/null | grep -q ":18789 " || ' +
     "(echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || " +
     "nc -z 127.0.0.1 18789 2>/dev/null";
-  const script =
-    "source ~/.spawnrc 2>/dev/null; " +
-    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-    '_oc_bin=$(command -v openclaw) || { echo "openclaw not found in PATH"; exit 1; }; ' +
-    `if ${portCheck}; then echo "Gateway already running"; exit 0; fi; ` +
-    'if command -v setsid >/dev/null 2>&1; then setsid "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & ' +
-    'else nohup "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi; ' +
-    "elapsed=0; while [ $elapsed -lt 300 ]; do " +
-    `if ${portCheck}; then echo "Gateway ready after \${elapsed}s"; exit 0; fi; ` +
-    "printf '.'; sleep 1; elapsed=$((elapsed + 1)); " +
-    "done; " +
-    'echo "Gateway failed to start after 300s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1';
+
+  const wrapperScript = [
+    "#!/bin/bash",
+    'source "$HOME/.spawnrc" 2>/dev/null',
+    'export PATH="$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH"',
+    "exec openclaw gateway",
+  ].join("\n");
+
+  // __USER__ and __HOME__ are sed-substituted at deploy time
+  const unitFile = [
+    "[Unit]",
+    "Description=OpenClaw Gateway",
+    "After=network.target",
+    "",
+    "[Service]",
+    "Type=simple",
+    "ExecStart=/usr/local/bin/openclaw-gateway-wrapper",
+    "Restart=always",
+    "RestartSec=5",
+    "User=__USER__",
+    "Environment=HOME=__HOME__",
+    "StandardOutput=append:/tmp/openclaw-gateway.log",
+    "StandardError=append:/tmp/openclaw-gateway.log",
+    "",
+    "[Install]",
+    "WantedBy=multi-user.target",
+  ].join("\n");
+
+  const wrapperB64 = Buffer.from(wrapperScript).toString("base64");
+  const unitB64 = Buffer.from(unitFile).toString("base64");
+
+  const script = [
+    "source ~/.spawnrc 2>/dev/null",
+    "export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH",
+    "if command -v systemctl >/dev/null 2>&1; then",
+    '  _sudo=""',
+    '  [ "$(id -u)" != "0" ] && _sudo="sudo"',
+    "  printf '%s' '" + wrapperB64 + "' | base64 -d | $_sudo tee /usr/local/bin/openclaw-gateway-wrapper > /dev/null",
+    "  $_sudo chmod +x /usr/local/bin/openclaw-gateway-wrapper",
+    "  printf '%s' '" + unitB64 + "' | base64 -d > /tmp/openclaw-gateway.unit.tmp",
+    '  sed -i "s|__USER__|$(whoami)|;s|__HOME__|$HOME|" /tmp/openclaw-gateway.unit.tmp',
+    "  $_sudo mv /tmp/openclaw-gateway.unit.tmp /etc/systemd/system/openclaw-gateway.service",
+    "  $_sudo systemctl daemon-reload",
+    "  $_sudo systemctl enable openclaw-gateway 2>/dev/null",
+    "  $_sudo systemctl restart openclaw-gateway",
+    '  _cron_restart="systemctl restart openclaw-gateway"',
+    '  [ "$(id -u)" != "0" ] && _cron_restart="sudo systemctl restart openclaw-gateway"',
+    '  (crontab -l 2>/dev/null | grep -v openclaw-gateway; echo "0 * * * * nc -z 127.0.0.1 18789 2>/dev/null || $_cron_restart >> /tmp/openclaw-gateway.log 2>&1") | crontab - 2>/dev/null || true',
+    "else",
+    '  _oc_bin=$(command -v openclaw) || { echo "openclaw not found in PATH"; exit 1; }',
+    `  if ${portCheck}; then echo "Gateway already running"; exit 0; fi`,
+    '  if command -v setsid >/dev/null 2>&1; then setsid "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null &',
+    '  else nohup "$_oc_bin" gateway > /tmp/openclaw-gateway.log 2>&1 < /dev/null & fi',
+    "fi",
+    "elapsed=0; while [ $elapsed -lt 300 ]; do",
+    `  if ${portCheck}; then echo "Gateway ready after \${elapsed}s"; exit 0; fi`,
+    "  printf '.'; sleep 1; elapsed=$((elapsed + 1))",
+    "done",
+    'echo "Gateway failed to start after 300s"; tail -20 /tmp/openclaw-gateway.log 2>/dev/null; exit 1',
+  ].join("\n");
   await runner.runServer(script);
   logInfo("OpenClaw gateway started");
 }
@@ -529,7 +579,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       preLaunchMsg:
         "Set up one channel at a time in the OpenClaw TUI. Wait for each channel to fully complete before pasting the next token — concurrent token pastes can cause setup to hang.",
       launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
+        "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
+        'if command -v systemctl >/dev/null 2>&1; then _sudo=""; [ "$(id -u)" != "0" ] && _sudo="sudo"; $_sudo systemctl start openclaw-gateway 2>/dev/null; fi; ' +
+        "_gw_wait=0; while [ $_gw_wait -lt 15 ]; do " +
+        'if ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then break; fi; ' +
+        "sleep 1; _gw_wait=$((_gw_wait + 1)); " +
+        "done; " +
+        "openclaw tui",
     },
 
     opencode: {
