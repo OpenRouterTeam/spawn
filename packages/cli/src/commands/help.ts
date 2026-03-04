@@ -1,5 +1,5 @@
 import pc from "picocolors";
-import { RAW_BASE, REPO } from "../manifest.js";
+import { SPAWN_CDN, REPO } from "../manifest.js";
 
 function getHelpUsageSection(): string {
   return `${pc.bold("USAGE")}
@@ -69,7 +69,7 @@ function getHelpAuthSection(): string {
 
 function getHelpInstallSection(): string {
   return `${pc.bold("INSTALL")}
-  curl -fsSL ${RAW_BASE}/sh/cli/install.sh | bash`;
+  curl -fsSL ${SPAWN_CDN}/cli/install.sh | bash`;
 }
 
 function getHelpTroubleshootingSection(): string {

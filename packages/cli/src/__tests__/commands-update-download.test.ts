@@ -78,12 +78,8 @@ describe("cmdUpdate", () => {
 
   it("should report up-to-date when remote version matches current", async () => {
     global.fetch = mock(async (url: string) => {
-      if (isString(url) && url.includes("package.json")) {
-        return new Response(
-          JSON.stringify({
-            version: VERSION,
-          }),
-        );
+      if (isString(url) && url.includes("/version")) {
+        return new Response(`${VERSION}\n`);
       }
       return new Response("Not Found", {
         status: 404,
@@ -101,12 +97,8 @@ describe("cmdUpdate", () => {
 
   it("should report available update when remote version differs", async () => {
     global.fetch = mock(async (url: string) => {
-      if (isString(url) && url.includes("package.json")) {
-        return new Response(
-          JSON.stringify({
-            version: "99.99.99",
-          }),
-        );
+      if (isString(url) && url.includes("/version")) {
+        return new Response("99.99.99\n");
       }
       return new Response("Not Found", {
         status: 404,
@@ -154,12 +146,8 @@ describe("cmdUpdate", () => {
 
   it("should handle update failure gracefully", async () => {
     global.fetch = mock(async (url: string) => {
-      if (isString(url) && url.includes("package.json")) {
-        return new Response(
-          JSON.stringify({
-            version: "99.99.99",
-          }),
-        );
+      if (isString(url) && url.includes("/version")) {
+        return new Response("99.99.99\n");
       }
       return new Response("Not Found", {
         status: 404,
@@ -193,12 +181,8 @@ describe("cmdUpdate", () => {
 
   it("should show version in spinner stop during update", async () => {
     global.fetch = mock(async (url: string) => {
-      if (isString(url) && url.includes("package.json")) {
-        return new Response(
-          JSON.stringify({
-            version: "2.0.0",
-          }),
-        );
+      if (isString(url) && url.includes("/version")) {
+        return new Response("2.0.0\n");
       }
       return new Response("Error", {
         status: 500,

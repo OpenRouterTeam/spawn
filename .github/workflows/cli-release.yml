@@ -41,6 +41,10 @@ jobs:
         working-directory: packages/cli
         run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
 
+      - name: Create version file
+        working-directory: packages/cli
+        run: jq -r .version package.json > version
+
       - name: Update cli-latest release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -50,17 +54,19 @@ jobs:
           git tag -d cli-latest 2>/dev/null || true
           git push origin :refs/tags/cli-latest 2>/dev/null || true
 
-          # Create new release with built cli.js
+          # Create new release with built cli.js and version file
           gh release create cli-latest \
             --title "CLI v${{ steps.version.outputs.version }}" \
             --notes "Pre-built CLI binary (auto-updated on every push to main).
 
           This release is used as a fallback by \`install.sh\` when the local build fails (e.g. Termux proot).
+          The \`version\` file is used by the CLI's auto-update check.
 
           **Version:** ${{ steps.version.outputs.version }}
           **Built:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --prerelease \
-            packages/cli/cli.js
+            packages/cli/cli.js \
+            packages/cli/version
 
       - name: Upload cloud bundles
         env:
