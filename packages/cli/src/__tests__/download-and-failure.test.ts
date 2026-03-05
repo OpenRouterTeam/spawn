@@ -4,33 +4,21 @@ import { loadManifest } from "../manifest";
 import { isString } from "../shared/type-guards";
 
 /**
- * Tests for the download fallback pipeline and script failure reporting
- * through real exported code paths in commands/run.ts.
+ * Tests for the download failure pipeline through real code paths in commands/run.ts.
  *
- * - downloadScriptWithFallback: primary URL succeeds (real code path through cmdRun)
- * - downloadScriptWithFallback: primary fails, fallback succeeds (real cmdRun)
+ * Success paths (primary download, fallback download, script validation) are covered
+ * by cmdrun-happy-path.test.ts. This file focuses exclusively on failure scenarios:
+ *
  * - downloadScriptWithFallback: both fail with 404 (reportDownloadFailure 404+404 path)
  * - downloadScriptWithFallback: primary 500, fallback 500 (server error path)
  * - downloadScriptWithFallback: primary 404, fallback 500 (mixed error path)
  * - downloadScriptWithFallback: network error (reportDownloadError path)
- * - reportScriptFailure: exit code extraction from error message
- * - reportScriptFailure: specific guidance for codes 1, 2, 126, 127, 130, 137, 255
- * - reportScriptFailure: unknown exit code (default guidance)
- * - execScript: validateScriptContent rejection of bad scripts
- * - execScript: interrupted script (code 130) handling
  */
 
 const mockManifest = createMockManifest();
 
-const {
-  logError: mockLogError,
-  logInfo: mockLogInfo,
-  logStep: mockLogStep,
-  logWarn: mockLogWarn,
-  spinnerStart: mockSpinnerStart,
-  spinnerStop: mockSpinnerStop,
-  spinnerMessage: mockSpinnerMessage,
-} = mockClackPrompts();
+// Mock @clack/prompts to prevent real terminal output
+mockClackPrompts();
 
 // Import after mock setup
 const { cmdRun } = await import("../commands.js");
@@ -54,13 +42,6 @@ describe("Download and Failure Pipeline", () => {
 
   beforeEach(async () => {
     consoleMocks = createConsoleMocks();
-    mockLogError.mockClear();
-    mockLogInfo.mockClear();
-    mockLogStep.mockClear();
-    mockLogWarn.mockClear();
-    mockSpinnerStart.mockClear();
-    mockSpinnerStop.mockClear();
-    mockSpinnerMessage.mockClear();
 
     processExitSpy = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
@@ -75,116 +56,9 @@ describe("Download and Failure Pipeline", () => {
     restoreMocks(consoleMocks.log, consoleMocks.error);
   });
 
-  // ── downloadScriptWithFallback: primary URL succeeds ──────────────
-
-  describe("download - primary URL succeeds", () => {
-    it("should download script from primary URL and attempt execution", async () => {
-      await setupFetch(async (url) => {
-        // Primary URL succeeds with a valid-looking script
-        if (url.includes("openrouter.ai")) {
-          return new Response("#!/bin/bash\nexit 0");
-        }
-        throw new Error("Should not reach fallback");
-      });
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Will throw from bash execution or process.exit
-      }
-
-      // Spinner should show "Downloading" and then "Script downloaded"
-      expect(mockSpinnerStart).toHaveBeenCalled();
-      const startCalls = mockSpinnerStart.mock.calls.map((c: unknown[]) => c.join(" "));
-      expect(startCalls.some((msg: string) => msg.includes("Downloading"))).toBe(true);
-
-      // Stop should show "Script downloaded" (without "(fallback)")
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
-      expect(stopCalls.some((msg: string) => msg.includes("Script downloaded"))).toBe(true);
-    });
-
-    it("should not try fallback when primary succeeds", async () => {
-      let fallbackCalled = false;
-      await setupFetch(async (url) => {
-        if (url.includes("openrouter.ai")) {
-          return new Response("#!/bin/bash\nexit 0");
-        }
-        fallbackCalled = true;
-        return new Response("#!/bin/bash\nexit 0");
-      });
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected
-      }
-
-      expect(fallbackCalled).toBe(false);
-    });
-  });
-
-  // ── downloadScriptWithFallback: primary fails, fallback succeeds ──
-
-  describe("download - primary fails, fallback succeeds", () => {
-    it("should fall back to GitHub raw URL when primary returns 404", async () => {
-      await setupFetch(async (url) => {
-        if (url.includes("openrouter.ai")) {
-          return new Response("Not Found", {
-            status: 404,
-          });
-        }
-        // GitHub raw fallback succeeds
-        if (url.includes("raw.githubusercontent.com")) {
-          return new Response("#!/bin/bash\nexit 0");
-        }
-        return new Response("Server Error", {
-          status: 500,
-        });
-      });
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected from execution
-      }
-
-      // Spinner should have shown "Trying fallback source..."
-      const msgCalls = mockSpinnerMessage.mock.calls.map((c: unknown[]) => c.join(" "));
-      expect(msgCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
-
-      // Stop should show "Script downloaded (fallback)"
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
-      expect(stopCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
-    });
-
-    it("should fall back to GitHub raw URL when primary returns 500", async () => {
-      await setupFetch(async (url) => {
-        if (url.includes("openrouter.ai")) {
-          return new Response("Server Error", {
-            status: 500,
-          });
-        }
-        if (url.includes("raw.githubusercontent.com")) {
-          return new Response("#!/bin/bash\nexit 0");
-        }
-        return new Response("Server Error", {
-          status: 500,
-        });
-      });
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected from execution
-      }
-
-      // Should still succeed with fallback
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
-      expect(stopCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
-    });
-  });
-
   // ── downloadScriptWithFallback: both fail ─────────────────────────
+  // Success paths (primary download, fallback download) are covered
+  // by cmdrun-happy-path.test.ts.
 
   describe("download - both URLs fail", () => {
     it("should show script-not-found error with recovery hints when both return 404", async () => {
@@ -292,45 +166,6 @@ describe("Download and Failure Pipeline", () => {
     });
   });
 
-  // ── execScript: validateScriptContent rejection ───────────────────
-
-  describe("execScript - script content validation", () => {
-    it("should reject script missing shebang line", async () => {
-      await setupFetch(async (url) => {
-        if (url.includes("openrouter.ai")) {
-          return new Response("no shebang here");
-        }
-        return new Response("Not Found", {
-          status: 404,
-        });
-      });
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected: validateScriptContent should reject
-      }
-
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it("should reject HTML response masquerading as script", async () => {
-      await setupFetch(async (url) => {
-        if (url.includes("openrouter.ai")) {
-          return new Response("<!DOCTYPE html>\n<html><body>Error page</body></html>");
-        }
-        return new Response("Not Found", {
-          status: 404,
-        });
-      });
-
-      try {
-        await cmdRun("claude", "sprite");
-      } catch {
-        // Expected: validateScriptContent should reject HTML
-      }
-
-      expect(processExitSpy).toHaveBeenCalledWith(1);
-    });
-  });
+  // Script content validation tests are covered by cmdrun-happy-path.test.ts
+  // (script content validation during download).
 });
