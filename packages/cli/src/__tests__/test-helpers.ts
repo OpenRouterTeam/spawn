@@ -175,10 +175,6 @@ export function mockSuccessfulFetch(data: unknown) {
   return mock(() => Promise.resolve(new Response(JSON.stringify(data))));
 }
 
-export function mockFailedFetch(error = "Network error") {
-  return mock(() => Promise.reject(new Error(error)));
-}
-
 // ── Test Environment Setup ─────────────────────────────────────────────────────
 
 export interface TestEnvironment {
