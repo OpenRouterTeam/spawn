@@ -516,69 +516,6 @@ const NPM_PREFIX_SETUP =
   'mkdir -p ~/.npm-global/bin; _NPM_G_FLAGS="--prefix $HOME/.npm-global"; fi; ' +
   'export PATH="$HOME/.npm-global/bin:$PATH"';
 
-// ─── Docker Image Extraction ──────────────────────────────────────────────────
-
-const DOCKER_IMAGE_PREFIX = "ghcr.io/openrouterteam/spawn-";
-
-/**
- * Try to extract a pre-built agent from a Docker image pulled during cloud-init.
- * Returns true if extraction succeeded, false if Docker/image unavailable.
- *
- * How it works:
- *   1. Check if Docker is installed and the image was pulled
- *   2. Create a temporary container from the image
- *   3. Copy /root/. from the container to /root/ on the host
- *   4. Remove the temporary container
- *
- * The agent then runs natively on the host (not in a container).
- */
-async function tryInstallFromDocker(runner: CloudRunner, agentName: string, dockerImage: string): Promise<boolean> {
-  logStep(`Checking for pre-built Docker image (${agentName})...`);
-  const script = [
-    // Bail if Docker isn't installed
-    "command -v docker >/dev/null 2>&1 || exit 1",
-    // Bail if image hasn't been pulled yet
-    `docker images -q "${dockerImage}" 2>/dev/null | grep -q . || exit 1`,
-    // Create temp container, copy only known agent directories, clean up
-    `_cid=$(docker create "${dockerImage}")`,
-    'docker cp "$_cid":/root/.claude /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.bun /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.local /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.npm /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.cargo /root/ 2>/dev/null || true',
-    'docker cp "$_cid":/root/.opencode /root/ 2>/dev/null || true',
-    'docker rm "$_cid" >/dev/null',
-    'echo "==> Agent extracted from Docker image"',
-  ].join("\n");
-
-  try {
-    await runner.runServer(script, 60);
-    logInfo(`${agentName} extracted from Docker image`);
-    return true;
-  } catch {
-    logInfo("Docker image not available, falling back to normal install");
-    return false;
-  }
-}
-
-/**
- * Wrap an agent's install function with Docker image extraction.
- * Tries Docker first; falls back to the original install if unavailable.
- */
-function withDockerInstall(
-  runner: CloudRunner,
-  agentName: string,
-  dockerImage: string,
-  originalInstall: () => Promise<void>,
-): () => Promise<void> {
-  return async () => {
-    const extracted = await tryInstallFromDocker(runner, agentName, dockerImage);
-    if (!extracted) {
-      await originalInstall();
-    }
-  };
-}
-
 // ─── Default Agent Definitions ───────────────────────────────────────────────
 
 const ZEROCLAW_INSTALL_URL =
@@ -589,11 +526,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     claude: {
       name: "Claude Code",
       cloudInitTier: "minimal",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}claude:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "Claude Code", `${DOCKER_IMAGE_PREFIX}claude:latest`, () =>
-        installClaudeCode(runner),
-      ),
+      install: () => installClaudeCode(runner),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
@@ -610,9 +544,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     codex: {
       name: "Codex CLI",
       cloudInitTier: "node",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}codex:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "Codex CLI", `${DOCKER_IMAGE_PREFIX}codex:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "Codex CLI",
@@ -620,7 +553,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
@@ -631,11 +563,10 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     openclaw: {
       name: "OpenClaw",
       cloudInitTier: "full",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}openclaw:latest`,
       preProvision: promptGithubAuth,
       modelPrompt: true,
       modelDefault: "openrouter/auto",
-      install: withDockerInstall(runner, "OpenClaw", `${DOCKER_IMAGE_PREFIX}openclaw:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "openclaw",
@@ -643,7 +574,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,
@@ -660,11 +590,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     opencode: {
       name: "OpenCode",
       cloudInitTier: "minimal",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}opencode:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "OpenCode", `${DOCKER_IMAGE_PREFIX}opencode:latest`, () =>
-        installAgent(runner, "OpenCode", openCodeInstallCmd()),
-      ),
+      install: () => installAgent(runner, "OpenCode", openCodeInstallCmd()),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
@@ -674,9 +601,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     kilocode: {
       name: "Kilo Code",
       cloudInitTier: "node",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}kilocode:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "Kilo Code", `${DOCKER_IMAGE_PREFIX}kilocode:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "Kilo Code",
@@ -684,7 +610,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "KILO_PROVIDER_TYPE=openrouter",
@@ -696,9 +621,8 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     zeroclaw: {
       name: "ZeroClaw",
       cloudInitTier: "minimal",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}zeroclaw:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "ZeroClaw", `${DOCKER_IMAGE_PREFIX}zeroclaw:latest`, async () => {
+      install: async () => {
         // Add swap before building — low-memory instances (e.g., AWS nano 512 MB)
         // OOM during Rust compilation if --prefer-prebuilt falls back to source.
         await ensureSwapSpace(runner);
@@ -708,7 +632,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
           `curl --proto '=https' -LsSf ${ZEROCLAW_INSTALL_URL} | bash -s -- --install-rust --install-system-deps --prefer-prebuilt`,
           600, // 10 min: swap-backed compilation is slower than the 5-min default
         );
-      }),
+      },
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ZEROCLAW_PROVIDER=openrouter",
@@ -721,16 +645,14 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
     hermes: {
       name: "Hermes Agent",
       cloudInitTier: "minimal",
-      dockerImage: `${DOCKER_IMAGE_PREFIX}hermes:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "Hermes Agent", `${DOCKER_IMAGE_PREFIX}hermes:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "Hermes Agent",
           "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
           300,
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "OPENAI_BASE_URL=https://openrouter.ai/api/v1",
