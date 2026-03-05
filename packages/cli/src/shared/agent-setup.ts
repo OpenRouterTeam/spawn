@@ -584,13 +584,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       preLaunchMsg:
         "Set up one channel at a time in the OpenClaw TUI. Wait for each channel to fully complete before pasting the next token — concurrent token pastes can cause setup to hang.",
       launchCmd: () =>
-        "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; " +
-        'if command -v systemctl >/dev/null 2>&1; then _sudo=""; [ "$(id -u)" != "0" ] && _sudo="sudo"; $_sudo systemctl start openclaw-gateway 2>/dev/null; fi; ' +
-        "_gw_wait=0; while [ $_gw_wait -lt 15 ]; do " +
-        'if ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null; then break; fi; ' +
-        "sleep 1; _gw_wait=$((_gw_wait + 1)); " +
-        "done; " +
-        "openclaw tui",
+        "source ~/.spawnrc 2>/dev/null; export PATH=$HOME/.npm-global/bin:$HOME/.bun/bin:$HOME/.local/bin:$PATH; openclaw tui",
     },
 
     opencode: {
@@ -645,7 +639,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       ],
       configure: (apiKey) => setupZeroclawConfig(runner, apiKey),
       launchCmd: () =>
-        'export PATH="$HOME/.cargo/bin:$PATH"; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent',
+        "export PATH=$HOME/.cargo/bin:$PATH; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
     },
 
     hermes: {
