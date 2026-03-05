@@ -210,9 +210,11 @@ describe("validateLaunchCmd", () => {
       ).not.toThrow();
     });
 
-    it("should accept zeroclaw launch command with cargo env", () => {
+    it("should accept zeroclaw launch command with cargo env and PATH", () => {
       expect(() =>
-        validateLaunchCmd("source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent"),
+        validateLaunchCmd(
+          "export PATH=$HOME/.cargo/bin:$PATH; source ~/.cargo/env 2>/dev/null; source ~/.spawnrc 2>/dev/null; zeroclaw agent",
+        ),
       ).not.toThrow();
     });
 
