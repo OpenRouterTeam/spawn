@@ -93,6 +93,8 @@ function checkUnknownFlags(args: string[]): void {
     console.error(`    ${pc.cyan("--headless")}          Non-interactive mode (no prompts, no SSH session)`);
     console.error(`    ${pc.cyan("--output json")}       Output structured JSON to stdout`);
     console.error(`    ${pc.cyan("--custom")}            Show interactive size/region pickers`);
+    console.error(`    ${pc.cyan("--zone, --region")}    Set zone/region (e.g. us-east1-b, nyc3)`);
+    console.error(`    ${pc.cyan("--size, --machine-type")}  Set instance size (e.g. e2-standard-4, s-2vcpu-4gb)`);
     console.error(`    ${pc.cyan("--name")}              Set the spawn/resource name`);
     console.error(`    ${pc.cyan("--reauth")}            Force re-prompting for cloud credentials`);
     console.error(`    ${pc.cyan("--help, -h")}          Show help information`);
@@ -765,6 +767,42 @@ async function main(): Promise<void> {
   filteredArgs.splice(0, filteredArgs.length, ...nameFilteredArgs);
   if (nameFlag) {
     process.env.SPAWN_NAME = nameFlag;
+  }
+
+  // Extract --zone / --region <value> flag (maps to cloud-specific env vars)
+  const [zoneFlag, zoneFilteredArgs] = extractFlagValue(
+    filteredArgs,
+    [
+      "--zone",
+      "--region",
+    ],
+    "zone/region",
+    "spawn <agent> gcp --zone us-east1-b",
+  );
+  filteredArgs.splice(0, filteredArgs.length, ...zoneFilteredArgs);
+  if (zoneFlag) {
+    process.env.GCP_ZONE = zoneFlag;
+    process.env.DO_REGION = zoneFlag;
+    process.env.HETZNER_LOCATION = zoneFlag;
+    process.env.AWS_DEFAULT_REGION = zoneFlag;
+  }
+
+  // Extract --machine-type / --size <value> flag (maps to cloud-specific env vars)
+  const [sizeFlag, sizeFilteredArgs] = extractFlagValue(
+    filteredArgs,
+    [
+      "--machine-type",
+      "--size",
+    ],
+    "machine type/size",
+    "spawn <agent> gcp --machine-type e2-standard-4",
+  );
+  filteredArgs.splice(0, filteredArgs.length, ...sizeFilteredArgs);
+  if (sizeFlag) {
+    process.env.GCP_MACHINE_TYPE = sizeFlag;
+    process.env.DO_DROPLET_SIZE = sizeFlag;
+    process.env.HETZNER_SERVER_TYPE = sizeFlag;
+    process.env.LIGHTSAIL_BUNDLE = sizeFlag;
   }
 
   // --output implies --headless

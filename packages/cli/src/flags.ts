@@ -24,6 +24,10 @@ export const KNOWN_FLAGS = new Set([
   "--clear",
   "--custom",
   "--reauth",
+  "--zone",
+  "--region",
+  "--machine-type",
+  "--size",
 ]);
 
 /** Return the first unknown flag in args, or null if all are known/positional */

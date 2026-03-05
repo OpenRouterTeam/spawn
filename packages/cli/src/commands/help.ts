@@ -6,6 +6,8 @@ function getHelpUsageSection(): string {
   spawn                              Interactive agent + cloud picker
   spawn <agent> <cloud>              Launch agent on cloud directly
   spawn <agent> <cloud> --dry-run    Preview what would be provisioned (or -n)
+  spawn <agent> <cloud> --zone <zone>  Set zone/region (works for all clouds)
+  spawn <agent> <cloud> --size <type>  Set instance size/type (works for all clouds)
   spawn <agent> <cloud> --custom      Show interactive size/region pickers
   spawn <agent> <cloud> --headless   Provision and exit (no interactive session)
   spawn <agent> <cloud> --output json
@@ -44,6 +46,9 @@ function getHelpExamplesSection(): string {
   spawn codex sprite -p "Add tests"  ${pc.dim("# Short form of --prompt")}
   spawn openclaw aws -f instructions.txt
                                      ${pc.dim("# Read prompt from file (short for --prompt-file)")}
+  spawn claude gcp --zone us-east1-b  ${pc.dim("# Use a specific GCP zone")}
+  spawn claude gcp --size e2-standard-4
+                                     ${pc.dim("# Use a specific machine type")}
   spawn opencode gcp --dry-run       ${pc.dim("# Preview without provisioning")}
   spawn claude hetzner --headless    ${pc.dim("# Provision, print connection info, exit")}
   spawn claude hetzner --output json ${pc.dim("# Structured JSON output on stdout")}
