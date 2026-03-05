@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Base packages
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
-      curl git ca-certificates unzip && \
+      curl git ca-certificates unzip xz-utils && \
     rm -rf /var/lib/apt/lists/*
 
 # Hermes Agent

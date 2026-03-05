@@ -1148,6 +1148,18 @@ export async function promptSpawnName(): Promise<void> {
     return;
   }
 
+  // Honour DO_DROPLET_NAME so headless/e2e callers can control the droplet name
+  if (process.env.DO_DROPLET_NAME) {
+    const name = process.env.DO_DROPLET_NAME;
+    if (validateServerName(name)) {
+      process.env.SPAWN_NAME_DISPLAY = name;
+      process.env.SPAWN_NAME_KEBAB = name;
+      logInfo(`Using resource name: ${name}`);
+      return;
+    }
+    logWarn(`Invalid DO_DROPLET_NAME '${name}', falling back to prompt`);
+  }
+
   let kebab: string;
   if (process.env.SPAWN_NON_INTERACTIVE === "1") {
     kebab = (process.env.SPAWN_NAME ? toKebabCase(process.env.SPAWN_NAME) : "") || defaultSpawnName();

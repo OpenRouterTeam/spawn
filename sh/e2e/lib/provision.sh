@@ -56,15 +56,25 @@ provision_agent() {
     export OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
 
     # Apply cloud-specific env vars (safe: only processes export VAR="VALUE" lines)
+    # Uses sed instead of BASH_REMATCH for macOS bash 3.2 compatibility
     while IFS= read -r _env_line; do
-      if [[ "${_env_line}" =~ ^export[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)=\"(.*)\"$ ]]; then
-        # Validate value against a safe character whitelist
-        if ! [[ "${BASH_REMATCH[2]}" =~ ^[A-Za-z0-9@%+=:,./_-]*$ ]]; then
-          log_err "Invalid characters in env value for ${BASH_REMATCH[1]}"
-          continue
-        fi
-        export "${BASH_REMATCH[1]}"="${BASH_REMATCH[2]}"
+      # Skip lines that don't look like export VAR="VALUE"
+      case "${_env_line}" in
+        export\ *=*) ;;
+        *) continue ;;
+      esac
+      # Extract variable name and value using sed
+      _env_name=$(printf '%s' "${_env_line}" | sed -n 's/^export  *\([A-Za-z_][A-Za-z0-9_]*\)="\(.*\)"$/\1/p')
+      _env_val=$(printf '%s' "${_env_line}" | sed -n 's/^export  *\([A-Za-z_][A-Za-z0-9_]*\)="\(.*\)"$/\2/p')
+      if [ -z "${_env_name}" ]; then
+        continue
       fi
+      # Validate value against a safe character whitelist
+      if printf '%s' "${_env_val}" | grep -qE '[^A-Za-z0-9@%+=:,./_-]'; then
+        log_err "Invalid characters in env value for ${_env_name}"
+        continue
+      fi
+      export "${_env_name}=${_env_val}"
     done <<CLOUD_ENV
 $(cloud_headless_env "${app_name}" "${agent}")
 CLOUD_ENV
