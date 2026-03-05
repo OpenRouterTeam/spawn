@@ -208,7 +208,7 @@ _download_and_install_gh() {
 
     # Extract expected checksum for our tarball from the checksums file
     local expected_checksum
-    expected_checksum=$(grep -F " ${tarball}" "${checksums_file}" | awk '{print $1}')
+    expected_checksum=$(grep "  ${tarball}"'$' "${checksums_file}" | awk '{print $1}')
     if [[ -z "${expected_checksum}" ]]; then
         log_error "Checksum for ${tarball} not found in checksums.txt"
         rm -rf "${tmpdir}"
