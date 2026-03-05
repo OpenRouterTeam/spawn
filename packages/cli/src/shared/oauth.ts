@@ -152,7 +152,7 @@ async function tryOauthFlow(callbackPort = 5180, agentSlug?: string, cloudSlug?:
   logInfo(`OAuth server listening on port ${actualPort}`);
 
   const callbackUrl = `http://localhost:${actualPort}/callback`;
-  let authUrl = `https://openrouter.ai/auth?callback_url=${callbackUrl}&state=${csrfState}`;
+  let authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUrl)}&state=${csrfState}`;
   if (agentSlug) {
     authUrl += `&spawn_agent=${encodeURIComponent(agentSlug)}`;
   }
