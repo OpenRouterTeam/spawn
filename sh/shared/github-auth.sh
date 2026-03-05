@@ -129,15 +129,38 @@ _detect_gh_platform() {
 
 # Fetch the latest gh release version string from GitHub API
 _fetch_gh_latest_version() {
-    local latest_version
-    latest_version=$(curl -fsSL --proto '=https' "https://api.github.com/repos/cli/cli/releases/latest" \
-        | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/') || {
+    local api_response
+    api_response=$(curl -fsSL --proto '=https' "https://api.github.com/repos/cli/cli/releases/latest") || {
         log_error "Failed to fetch latest gh release version"
         return 1
     }
 
+    local latest_version=""
+    # Prefer jq for safe JSON parsing; fall back to bun eval (never python)
+    if command -v jq &>/dev/null; then
+        latest_version=$(printf '%s' "${api_response}" | jq -r '.tag_name // empty' 2>/dev/null) || true
+    elif command -v bun &>/dev/null; then
+        latest_version=$(_GH_API_RESPONSE="${api_response}" bun eval "
+            const data = JSON.parse(process.env._GH_API_RESPONSE || '{}');
+            const tag = typeof data.tag_name === 'string' ? data.tag_name : '';
+            process.stdout.write(tag);
+        " 2>/dev/null) || true
+    else
+        log_error "Neither jq nor bun available for safe JSON parsing"
+        return 1
+    fi
+
+    # Strip leading 'v' prefix if present (tag_name is e.g. "v2.62.0")
+    latest_version="${latest_version#v}"
+
     if [[ -z "${latest_version}" ]]; then
         log_error "Could not determine latest gh version"
+        return 1
+    fi
+
+    # Validate version looks like a semver (digits and dots only)
+    if [[ ! "${latest_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        log_error "Unexpected version format: ${latest_version}"
         return 1
     fi
 
@@ -161,6 +184,49 @@ _download_and_install_gh() {
         rm -rf "${tmpdir}"
         return 1
     }
+
+    # Verify SHA256 checksum before extracting (CWE-494: integrity check)
+    local checksums_url="https://github.com/cli/cli/releases/download/v${version}/gh_${version}_checksums.txt"
+    local checksums_file="${tmpdir}/gh_${version}_checksums.txt"
+    curl -fsSL --proto '=https' "${checksums_url}" -o "${checksums_file}" || {
+        log_error "Failed to download checksums from ${checksums_url}"
+        rm -rf "${tmpdir}"
+        return 1
+    }
+
+    # Use sha256sum on Linux, shasum -a 256 on macOS
+    local sha_cmd=""
+    if command -v sha256sum &>/dev/null; then
+        sha_cmd="sha256sum"
+    elif command -v shasum &>/dev/null; then
+        sha_cmd="shasum -a 256"
+    else
+        log_error "No SHA256 tool available (need sha256sum or shasum)"
+        rm -rf "${tmpdir}"
+        return 1
+    fi
+
+    # Extract expected checksum for our tarball from the checksums file
+    local expected_checksum
+    expected_checksum=$(grep "${tarball}" "${checksums_file}" | awk '{print $1}')
+    if [[ -z "${expected_checksum}" ]]; then
+        log_error "Checksum for ${tarball} not found in checksums.txt"
+        rm -rf "${tmpdir}"
+        return 1
+    fi
+
+    # Compute actual checksum of downloaded file
+    local actual_checksum
+    actual_checksum=$(cd "${tmpdir}" && ${sha_cmd} "${tarball}" | awk '{print $1}')
+    if [[ "${actual_checksum}" != "${expected_checksum}" ]]; then
+        log_error "SHA256 checksum mismatch for ${tarball}"
+        log_error "  expected: ${expected_checksum}"
+        log_error "  actual:   ${actual_checksum}"
+        rm -rf "${tmpdir}"
+        return 1
+    fi
+
+    log_info "SHA256 checksum verified for ${tarball}"
 
     tar -xzf "${tmpdir}/${tarball}" -C "${tmpdir}" || {
         log_error "Failed to extract ${tarball}"
