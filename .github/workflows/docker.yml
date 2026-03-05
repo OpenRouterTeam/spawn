@@ -6,7 +6,7 @@ on:
     paths:
       - "sh/docker/**"
   schedule:
-    # Daily: pick up new openclaw releases
+    # Daily: pick up new agent releases
     - cron: "0 6 * * *"
   workflow_dispatch:
 
@@ -15,8 +15,12 @@ permissions:
   contents: read
 
 jobs:
-  build-openclaw:
+  build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: [claude, codex, openclaw, opencode, kilocode, zeroclaw, hermes]
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +33,6 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: sh/docker/openclaw.Dockerfile
+          file: sh/docker/${{ matrix.agent }}.Dockerfile
           push: true
-          tags: ghcr.io/openrouterteam/spawn-openclaw:latest
+          tags: ghcr.io/openrouterteam/spawn-${{ matrix.agent }}:latest

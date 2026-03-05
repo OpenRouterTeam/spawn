@@ -29,6 +29,8 @@ export interface AgentConfig {
   launchCmd: () => string;
   /** Cloud-init dependency tier. Defaults to "full" if unset. */
   cloudInitTier?: CloudInitTier;
+  /** Docker image for pre-built agent extraction (e.g. "ghcr.io/openrouterteam/spawn-claude:latest"). */
+  dockerImage?: string;
 }
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────

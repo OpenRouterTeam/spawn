@@ -752,7 +752,7 @@ export async function promptDoRegion(): Promise<string> {
 
 // ─── Provisioning ────────────────────────────────────────────────────────────
 
-function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
+function getCloudInitUserdata(tier: CloudInitTier = "full", agentName?: string): string {
   const packages = getPackagesForTier(tier);
   const lines = [
     "#!/bin/bash",
@@ -771,6 +771,17 @@ function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
       "ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true",
     );
   }
+  // Install Docker + pull pre-built agent image in background (non-blocking)
+  if (agentName) {
+    if (!/^[a-z0-9-]+$/.test(agentName)) {
+      throw new Error(`Invalid agent name: ${agentName}`);
+    }
+    lines.push(
+      "# Install Docker + pull agent image (background, non-blocking)",
+      "curl -fsSL https://get.docker.com | sh",
+      `docker pull "ghcr.io/openrouterteam/spawn-${agentName}:latest" &`,
+    );
+  }
   lines.push(
     'for rc in ~/.bashrc ~/.zshrc; do grep -q ".bun/bin" "$rc" 2>/dev/null || echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> "$rc"; done',
     "touch /root/.cloud-init-complete",
@@ -783,17 +794,19 @@ export async function createServer(
   tier?: CloudInitTier,
   dropletSize?: string,
   region?: string,
+  agentName?: string,
 ): Promise<void> {
   const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
   const effectiveRegion = region || process.env.DO_REGION || "nyc3";
-  const image = "ubuntu-24-04-x64";
 
   if (!validateRegionName(effectiveRegion)) {
     logError("Invalid DO_REGION");
     throw new Error("Invalid region");
   }
 
-  logStep(`Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion})...`);
+  logStep(
+    `Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion}, image: ubuntu-24-04-x64)...`,
+  );
 
   // Get all SSH key IDs
   const keysText = await doApi("GET", "/account/keys");
@@ -802,14 +815,13 @@ export async function createServer(
     .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter((n) => n > 0);
 
-  const userdata = getCloudInitUserdata(tier);
   const body = JSON.stringify({
     name,
     region: effectiveRegion,
     size,
-    image,
+    image: "ubuntu-24-04-x64",
     ssh_keys: sshKeyIds,
-    user_data: userdata,
+    user_data: getCloudInitUserdata(tier, agentName),
     backups: false,
     monitoring: false,
   });
