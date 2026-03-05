@@ -461,10 +461,13 @@ export async function runSprite(cmd: string, timeoutSecs?: number): Promise<void
     );
     const timeout = (timeoutSecs || 300) * 1000;
     const timer = setTimeout(() => killWithTimeout(proc), timeout);
-    const exitCode = await proc.exited;
-    clearTimeout(timer);
-    if (exitCode !== 0) {
-      throw new Error(`sprite exec failed (exit ${exitCode}): ${cmd.slice(0, 80)}`);
+    try {
+      const exitCode = await proc.exited;
+      if (exitCode !== 0) {
+        throw new Error(`sprite exec failed (exit ${exitCode}): ${cmd.slice(0, 80)}`);
+      }
+    } finally {
+      clearTimeout(timer);
     }
   });
 }
@@ -492,9 +495,15 @@ async function runSpriteSilent(cmd: string): Promise<void> {
       ],
     },
   );
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`sprite exec (silent) failed (exit ${exitCode})`);
+  // 60s timeout — silent commands should not hang indefinitely
+  const timer = setTimeout(() => killWithTimeout(proc), 60_000);
+  try {
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) {
+      throw new Error(`sprite exec (silent) failed (exit ${exitCode})`);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -629,8 +638,12 @@ export async function destroyServer(name?: string): Promise<void> {
   const stderrText = new Response(proc.stderr).text();
   // 60s timeout — sprite destroy should not hang indefinitely
   const timer = setTimeout(() => killWithTimeout(proc), 60_000);
-  const exitCode = await proc.exited;
-  clearTimeout(timer);
+  let exitCode: number;
+  try {
+    exitCode = await proc.exited;
+  } finally {
+    clearTimeout(timer);
+  }
   if (exitCode !== 0) {
     logError(`Failed to destroy sprite '${target}'`);
     logError(`Delete it manually: sprite destroy ${target}`);

@@ -120,7 +120,7 @@ export function killWithTimeout(
   } catch {
     return;
   }
-  setTimeout(() => {
+  const sigkillTimer = setTimeout(() => {
     try {
       if (!proc.killed) {
         proc.kill(9);
@@ -129,6 +129,9 @@ export function killWithTimeout(
       /* already dead */
     }
   }, gracePeriodMs);
+  // Don't let this timer keep the event loop alive — the process may already
+  // be dead from SIGTERM, so there's no reason to block exit for 5 seconds.
+  sigkillTimer.unref();
 }
 
 // ─── TCP Pre-Check ───────────────────────────────────────────────────────────

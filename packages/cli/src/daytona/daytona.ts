@@ -389,14 +389,15 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
   }
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  const exitCode = await proc.exited;
-  clearTimeout(timer);
-
-  // Brief sleep to let gateway release connection slot
-  await sleep(1000);
-
-  if (exitCode !== 0) {
-    throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
+  try {
+    const exitCode = await proc.exited;
+    // Brief sleep to let gateway release connection slot
+    await sleep(1000);
+    if (exitCode !== 0) {
+      throw new Error(`run_server failed (exit ${exitCode}): ${cmd}`);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -426,20 +427,21 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
   }
   const timeout = (timeoutSecs || 300) * 1000;
   const timer = setTimeout(() => killWithTimeout(proc), timeout);
-  // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
-  const [stdout] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ]);
-  const exitCode = await proc.exited;
-  clearTimeout(timer);
-
-  await sleep(1000);
-
-  if (exitCode !== 0) {
-    throw new Error(`run_server_capture failed (exit ${exitCode})`);
+  try {
+    // Drain both pipes before awaiting exit to prevent pipe buffer deadlock
+    const [stdout] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    const exitCode = await proc.exited;
+    await sleep(1000);
+    if (exitCode !== 0) {
+      throw new Error(`run_server_capture failed (exit ${exitCode})`);
+    }
+    return stdout.trim();
+  } finally {
+    clearTimeout(timer);
   }
-  return stdout.trim();
 }
 
 /**
