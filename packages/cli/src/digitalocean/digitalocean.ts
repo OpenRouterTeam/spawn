@@ -771,16 +771,13 @@ function getCloudInitUserdata(tier: CloudInitTier = "full", agentName?: string):
       "ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun 2>/dev/null || true",
     );
   }
-  // Install Docker + pull pre-built agent image in background (non-blocking)
+  // Pull pre-built agent image in background (non-blocking).
+  // Docker is already installed via the marketplace image (docker-20-04).
   if (agentName) {
     if (!/^[a-z0-9-]+$/.test(agentName)) {
       throw new Error(`Invalid agent name: ${agentName}`);
     }
-    lines.push(
-      "# Install Docker + pull agent image (background, non-blocking)",
-      "curl -fsSL https://get.docker.com | sh",
-      `docker pull "ghcr.io/openrouterteam/spawn-${agentName}:latest" &`,
-    );
+    lines.push(`docker pull "ghcr.io/openrouterteam/spawn-${agentName}:latest" &`);
   }
   lines.push(
     'for rc in ~/.bashrc ~/.zshrc; do grep -q ".bun/bin" "$rc" 2>/dev/null || echo \'export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"\' >> "$rc"; done',
@@ -804,9 +801,11 @@ export async function createServer(
     throw new Error("Invalid region");
   }
 
-  logStep(
-    `Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion}, image: ubuntu-24-04-x64)...`,
-  );
+  // Use the Docker marketplace image when an agent is specified (Docker pre-installed),
+  // otherwise fall back to the plain Ubuntu image.
+  const image = agentName ? "docker-20-04" : "ubuntu-24-04-x64";
+
+  logStep(`Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion}, image: ${image})...`);
 
   // Get all SSH key IDs
   const keysText = await doApi("GET", "/account/keys");
@@ -819,7 +818,7 @@ export async function createServer(
     name,
     region: effectiveRegion,
     size,
-    image: "ubuntu-24-04-x64",
+    image,
     ssh_keys: sshKeyIds,
     user_data: getCloudInitUserdata(tier, agentName),
     backups: false,
