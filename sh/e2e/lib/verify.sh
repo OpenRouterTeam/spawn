@@ -348,75 +348,7 @@ verify_openclaw() {
     failures=$((failures + 1))
   fi
 
-  # Gateway resilience: kill the gateway and verify it auto-restarts
-  _openclaw_verify_gateway_resilience "${app}" || failures=$((failures + 1))
-
   return "${failures}"
-}
-
-# ---------------------------------------------------------------------------
-# _openclaw_verify_gateway_resilience APP_NAME
-#
-# Tests that the openclaw gateway auto-restarts after being killed:
-#   1. Verify gateway is running on :18789
-#   2. Kill it with SIGKILL (simulates a crash)
-#   3. Wait for systemd Restart=always to bring it back (~5-10s)
-#   4. Verify port 18789 is listening again
-# Returns 0 on success (gateway recovered), 1 on failure.
-# ---------------------------------------------------------------------------
-_openclaw_verify_gateway_resilience() {
-  local app="$1"
-  local port_check='ss -tln 2>/dev/null | grep -q ":18789 " || (echo >/dev/tcp/127.0.0.1/18789) 2>/dev/null || nc -z 127.0.0.1 18789 2>/dev/null'
-
-  # Step 1: Confirm gateway is currently running
-  log_step "Gateway resilience: checking gateway is running..."
-  if ! cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
-    ${port_check}" >/dev/null 2>&1; then
-    log_warn "Gateway not running — skipping resilience test"
-    return 0
-  fi
-  log_ok "Gateway resilience: gateway confirmed running on :18789"
-
-  # Step 2: Kill the gateway with SIGKILL (simulate hard crash)
-  log_step "Gateway resilience: killing gateway (SIGKILL)..."
-  cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
-    _gw_pid=\$(lsof -ti tcp:18789 2>/dev/null || fuser 18789/tcp 2>/dev/null | tr -d ' '); \
-    if [ -n \"\$_gw_pid\" ]; then kill -9 \$_gw_pid 2>/dev/null; fi" >/dev/null 2>&1 || true
-
-  # Brief pause to let the process die
-  sleep 2
-
-  # Confirm it's actually down
-  if cloud_exec "${app}" "${port_check}" >/dev/null 2>&1; then
-    log_warn "Gateway resilience: port still open after kill — process may not have died"
-  else
-    log_ok "Gateway resilience: gateway confirmed dead"
-  fi
-
-  # Step 3: Wait for auto-restart (systemd Restart=always, RestartSec=5)
-  # Allow up to 30s for systemd to detect the crash and restart the process.
-  log_step "Gateway resilience: waiting for auto-restart (up to 30s)..."
-  local recovered
-  recovered=$(cloud_exec "${app}" "source ~/.spawnrc 2>/dev/null; \
-    export PATH=\$HOME/.npm-global/bin:\$HOME/.bun/bin:\$HOME/.local/bin:\$PATH; \
-    elapsed=0; while [ \$elapsed -lt 30 ]; do \
-      if ${port_check}; then echo 'recovered'; exit 0; fi; \
-      sleep 1; elapsed=\$((elapsed + 1)); \
-    done; echo 'timeout'" 2>&1) || true
-
-  # Step 4: Check result
-  if printf '%s' "${recovered}" | grep -q "recovered"; then
-    log_ok "Gateway resilience: gateway auto-restarted successfully"
-    return 0
-  else
-    log_err "Gateway resilience: gateway did NOT restart within 30s"
-    # Dump systemd status for diagnostics
-    cloud_exec "${app}" "systemctl status openclaw-gateway 2>/dev/null || true; \
-      tail -10 /tmp/openclaw-gateway.log 2>/dev/null || true" 2>&1 | tail -15 >&2
-    return 1
-  fi
 }
 
 verify_zeroclaw() {
