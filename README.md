@@ -46,7 +46,6 @@ spawn delete -c hetzner                  # Delete a server on Hetzner
 | `spawn <agent> <cloud> --dry-run` | Preview without provisioning |
 | `spawn <agent> <cloud> -p "text"` | Non-interactive with prompt |
 | `spawn <agent> <cloud> --prompt-file f.txt` | Prompt from file |
-| `spawn <agent> <cloud> --debug` | Show all commands being executed |
 | `spawn <agent> <cloud> --headless` | Provision and exit (no interactive session) |
 | `spawn <agent> <cloud> --output json` | Headless mode with structured JSON on stdout |
 | `spawn <agent> <cloud> --custom` | Show interactive size/region pickers |
