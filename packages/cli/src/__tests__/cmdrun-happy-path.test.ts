@@ -181,10 +181,10 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      const startCalls = mockSpinnerStart.mock.calls.map((c: any[]) => c[0]);
+      const startCalls = mockSpinnerStart.mock.calls.map((c: unknown[]) => c[0]);
       expect(startCalls.some((msg: string) => msg.includes("Downloading"))).toBe(true);
 
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c[0]);
+      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c[0]);
       expect(stopCalls.some((msg: string) => isString(msg) && msg.includes("downloaded"))).toBe(true);
     });
 
@@ -230,7 +230,7 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      const messageCalls = mockSpinnerMessage.mock.calls.map((c: any[]) => c[0]);
+      const messageCalls = mockSpinnerMessage.mock.calls.map((c: unknown[]) => c[0]);
       expect(messageCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
     });
 
@@ -244,7 +244,7 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c[0]);
+      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c[0]);
       expect(stopCalls.some((msg: string) => isString(msg) && msg.includes("fallback"))).toBe(true);
     });
   });
@@ -492,7 +492,7 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite", undefined, true);
 
-      const allOutput = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const allOutput = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(allOutput).toContain("Claude Code");
       expect(allOutput).toContain("Sprite");
     });
@@ -505,7 +505,7 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite", "Fix bugs", true);
 
-      const allOutput = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const allOutput = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(allOutput).toContain("Fix bugs");
     });
   });
@@ -521,7 +521,7 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
       expect(launchMsg).toBeDefined();
       expect(launchMsg).toContain("Claude Code");
@@ -536,7 +536,7 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite", "Fix bugs");
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
       expect(launchMsg).toContain("with prompt");
     });
@@ -549,7 +549,7 @@ describe("cmdRun happy-path pipeline", () => {
 
       await cmdRun("claude", "sprite");
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
       expect(launchMsg).not.toContain("with prompt");
     });
@@ -571,10 +571,10 @@ describe("cmdRun happy-path pipeline", () => {
         // Expected - validateScriptContent rejects scripts without shebang
       }
 
-      const clackErrors = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const clackErrors = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       const errOutput = [
         ...clackErrors,
-        ...consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")),
+        ...consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")),
       ].join("\n");
       expect(errOutput).toContain("valid bash script");
     });
@@ -592,10 +592,10 @@ describe("cmdRun happy-path pipeline", () => {
         // Expected
       }
 
-      const clackErrors = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const clackErrors = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       const errOutput = [
         ...clackErrors,
-        ...consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")),
+        ...consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")),
       ].join("\n");
       expect(errOutput).toContain("dangerous");
     });

@@ -142,7 +142,7 @@ function setManifest(manifest: Manifest) {
 }
 
 function captureOutput(consoleMock: ReturnType<typeof spyOn>): string {
-  return consoleMock.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+  return consoleMock.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
 }
 
 // ── cmdMatrix tests ──────────────────────────────────────────────────────────

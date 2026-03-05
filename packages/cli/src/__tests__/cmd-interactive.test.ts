@@ -125,7 +125,7 @@ describe("cmdInteractive", () => {
         // Expected
       }
 
-      const outroOutput = mockOutro.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const outroOutput = mockOutro.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(outroOutput.toLowerCase()).toContain("cancelled");
     });
 
@@ -157,7 +157,7 @@ describe("cmdInteractive", () => {
         // Expected
       }
 
-      const outroOutput = mockOutro.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const outroOutput = mockOutro.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(outroOutput.toLowerCase()).toContain("cancelled");
     });
 
@@ -176,7 +176,7 @@ describe("cmdInteractive", () => {
         // Expected
       }
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
       expect(launchMsg).toBeUndefined();
     });
@@ -235,7 +235,7 @@ describe("cmdInteractive", () => {
         // Expected
       }
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Codex"))).toBe(true);
     });
 
@@ -264,7 +264,7 @@ describe("cmdInteractive", () => {
         // Expected
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);
     });
   });
@@ -310,7 +310,7 @@ describe("cmdInteractive", () => {
 
       await cmdInteractive();
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
       expect(launchMsg).toBeDefined();
       expect(launchMsg).toContain("Claude Code");
@@ -333,7 +333,7 @@ describe("cmdInteractive", () => {
 
       await cmdInteractive();
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       const hintMsg = infoCalls.find((msg: string) => msg.includes("Next time"));
       expect(hintMsg).toBeDefined();
       expect(hintMsg).toContain("spawn claude sprite");
@@ -376,7 +376,7 @@ describe("cmdInteractive", () => {
 
       await cmdInteractive();
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       const launchMsg = stepCalls.find((msg: string) => msg.includes("Launching"));
       expect(launchMsg).toBeDefined();
       expect(launchMsg).toContain("Codex");
@@ -467,7 +467,7 @@ describe("cmdInteractive", () => {
 
       await cmdInteractive();
 
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      const warnCalls = mockLogWarn.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(warnCalls.some((msg: string) => msg.includes("SPRITE_API_KEY"))).toBe(true);
     });
 
@@ -503,7 +503,7 @@ describe("cmdInteractive", () => {
 
       await cmdInteractive();
 
-      const warnCalls = mockLogWarn.mock.calls.map((c: any[]) => c.join(" "));
+      const warnCalls = mockLogWarn.mock.calls.map((c: unknown[]) => c.join(" "));
       const credWarn = warnCalls.find((msg: string) => msg.includes("Missing credentials"));
       expect(credWarn).toBeUndefined();
 

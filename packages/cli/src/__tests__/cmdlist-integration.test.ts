@@ -54,11 +54,11 @@ describe("cmdList integration", () => {
   }
 
   function consoleOutput(): string {
-    return consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    return consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
   }
 
   function logInfoOutput(): string {
-    return mockLogInfo.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    return mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
   }
 
   beforeEach(async () => {

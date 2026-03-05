@@ -171,7 +171,7 @@ export function mockClackPrompts(overrides?: Partial<ClackPromptsMock>): ClackPr
 
 // ── Fetch Mocks ────────────────────────────────────────────────────────────────
 
-export function mockSuccessfulFetch(data: any) {
+export function mockSuccessfulFetch(data: unknown) {
   return mock(() => Promise.resolve(new Response(JSON.stringify(data))));
 }
 

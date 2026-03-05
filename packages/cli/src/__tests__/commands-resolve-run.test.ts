@@ -201,7 +201,7 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution or process.exit
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("claude"))).toBe(true);
     });
 
@@ -214,7 +214,7 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution or process.exit
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("hetzner"))).toBe(true);
     });
 
@@ -227,7 +227,7 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution or process.exit
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       const resolvedAgent = infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("claude"));
       const resolvedCloud = infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("hetzner"));
       expect(resolvedAgent).toBe(true);
@@ -243,7 +243,7 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved"))).toBe(false);
     });
 
@@ -256,7 +256,7 @@ describe("cmdRun - display name resolution", () => {
         // May throw
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved") && msg.includes("claude"))).toBe(true);
     });
   });
@@ -273,7 +273,7 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution
       }
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("Claude Code") && msg.includes("Hetzner Cloud"))).toBe(true);
     });
 
@@ -286,7 +286,7 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution
       }
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
     });
 
@@ -299,7 +299,7 @@ describe("cmdRun - display name resolution", () => {
         // May throw from script execution
       }
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(false);
     });
   });
@@ -334,7 +334,7 @@ describe("cmdRun - display name resolution", () => {
         // Expected: process.exit from validateImplementation
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should show the "see all N options" message since claude has 4 implemented clouds
       expect(infoCalls.some((msg: string) => msg.includes("4") && msg.includes("cloud"))).toBe(true);
       // Should also suggest up to 3 example commands
@@ -358,7 +358,7 @@ describe("cmdRun - display name resolution", () => {
         // Expected
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Count example spawn commands (not the "see all" hint)
       const exampleCmds = infoCalls.filter(
         (msg: string) => msg.includes("spawn claude") && !msg.includes("see all") && !msg.includes("to see"),
@@ -377,7 +377,7 @@ describe("cmdRun - display name resolution", () => {
         // Expected
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // codex has 1 implemented cloud (sprite), so no "see all" hint
       expect(infoCalls.some((msg: string) => msg.includes("to see all"))).toBe(false);
     });
@@ -395,7 +395,7 @@ describe("cmdRun - display name resolution", () => {
         // Expected
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("no implemented cloud providers"))).toBe(true);
     });
 
@@ -408,7 +408,7 @@ describe("cmdRun - display name resolution", () => {
         // Expected
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn matrix"))).toBe(true);
     });
   });
@@ -425,7 +425,7 @@ describe("cmdRun - display name resolution", () => {
         // Expected: will fail at validateIdentifier (spaces)
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Resolved"))).toBe(false);
     });
 
@@ -438,7 +438,7 @@ describe("cmdRun - display name resolution", () => {
         // Expected
       }
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // No cloud resolution message should appear
       expect(infoCalls.some((msg: string) => msg.includes("Resolved") && !msg.includes("claude"))).toBe(false);
     });

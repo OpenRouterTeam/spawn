@@ -91,7 +91,7 @@ describe("cmdUpdate", () => {
     expect(mockSpinnerStart).toHaveBeenCalled();
     expect(mockSpinnerStop).toHaveBeenCalled();
     // The spinner stop message should indicate up-to-date
-    const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+    const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(stopCalls.some((msg: string) => msg.includes("up to date"))).toBe(true);
   });
 
@@ -109,7 +109,7 @@ describe("cmdUpdate", () => {
 
     expect(mockSpinnerStart).toHaveBeenCalled();
     // Should show update message with version transition
-    const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+    const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(stopCalls.some((msg: string) => msg.includes("99.99.99"))).toBe(true);
   });
 
@@ -125,10 +125,10 @@ describe("cmdUpdate", () => {
 
     expect(mockSpinnerStart).toHaveBeenCalled();
     // Should show failed message
-    const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+    const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(stopCalls.some((msg: string) => msg.includes("Failed"))).toBe(true);
     // Should output error details
-    const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(errorOutput).toContain("Error:");
   });
 
@@ -140,7 +140,7 @@ describe("cmdUpdate", () => {
     await cmdUpdate();
 
     expect(mockSpinnerStart).toHaveBeenCalled();
-    const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+    const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(stopCalls.some((msg: string) => msg.includes("Failed"))).toBe(true);
   });
 
@@ -159,7 +159,7 @@ describe("cmdUpdate", () => {
     await cmdUpdate();
 
     // Should show the update version in spinner stop
-    const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+    const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(stopCalls.some((msg: string) => msg.includes("99.99.99"))).toBe(true);
   });
 
@@ -175,7 +175,7 @@ describe("cmdUpdate", () => {
 
     await cmdUpdate();
 
-    const startCalls = mockSpinnerStart.mock.calls.map((c: any[]) => c.join(" "));
+    const startCalls = mockSpinnerStart.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(startCalls.some((msg: string) => msg.includes("Checking"))).toBe(true);
   });
 
@@ -192,7 +192,7 @@ describe("cmdUpdate", () => {
     await cmdUpdate();
 
     // cmdUpdate now uses s.stop() with version info instead of s.message()
-    const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+    const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(stopCalls.some((msg: string) => msg.includes("2.0.0"))).toBe(true);
   });
 });
@@ -245,7 +245,7 @@ describe("Script download and execution", () => {
     expect(processExitSpy).toHaveBeenCalledWith(1);
 
     // Should show 404-specific error messaging
-    const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(errorOutput).toContain("doesn't exist");
   });
 
@@ -263,7 +263,7 @@ describe("Script download and execution", () => {
     await expect(cmdRun("claude", "sprite")).rejects.toThrow("process.exit");
 
     expect(processExitSpy).toHaveBeenCalledWith(1);
-    const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(errorOutput).toContain("HTTP 500");
   });
 
@@ -283,7 +283,7 @@ describe("Script download and execution", () => {
       // Expected - either process.exit or thrown error
     }
 
-    const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(errorOutput).toContain("Next steps");
   });
 
@@ -329,7 +329,7 @@ describe("Script download and execution", () => {
     expect(scriptUrls.some((u) => u.includes("raw.githubusercontent.com"))).toBe(true);
 
     // Should show fallback spinner message
-    const messageCalls = mockSpinnerMessage.mock.calls.map((c: any[]) => c.join(" "));
+    const messageCalls = mockSpinnerMessage.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(messageCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
   });
 
@@ -351,7 +351,7 @@ describe("Script download and execution", () => {
       // Expected
     }
 
-    const startCalls = mockSpinnerStart.mock.calls.map((c: any[]) => c.join(" "));
+    const startCalls = mockSpinnerStart.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(startCalls.some((msg: string) => msg.includes("Download"))).toBe(true);
   });
 
@@ -383,7 +383,7 @@ describe("Script download and execution", () => {
       // Expected
     }
 
-    const allOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    const allOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(allOutput).toContain("try again");
   });
 
@@ -405,7 +405,7 @@ describe("Script download and execution", () => {
       // Expected - bash execution in test env
     }
 
-    const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+    const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
     expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
   });
 });

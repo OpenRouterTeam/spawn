@@ -119,14 +119,14 @@ describe("Commands Error Paths", () => {
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
       // Should show "Unknown agent" error via @clack/prompts log.error
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
     });
 
     it("should suggest spawn agents command for unknown agent", async () => {
       await expect(cmdRun("nonexistent", "sprite")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn agents"))).toBe(true);
     });
 
@@ -134,14 +134,14 @@ describe("Commands Error Paths", () => {
       await expect(cmdRun("claude", "nonexistent")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown cloud"))).toBe(true);
     });
 
     it("should suggest spawn clouds command for unknown cloud", async () => {
       await expect(cmdRun("claude", "nonexistent")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn clouds"))).toBe(true);
     });
   });
@@ -159,7 +159,7 @@ describe("Commands Error Paths", () => {
       // hetzner/codex is "missing", but sprite/codex is "implemented"
       await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should suggest sprite as an alternative
       expect(infoCalls.some((msg: string) => msg.includes("spawn codex sprite"))).toBe(true);
     });
@@ -167,7 +167,7 @@ describe("Commands Error Paths", () => {
     it("should show how many clouds are available", async () => {
       await expect(cmdRun("codex", "hetzner")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // codex has 1 implemented cloud (sprite)
       expect(infoCalls.some((msg: string) => msg.includes("1 cloud"))).toBe(true);
     });
@@ -215,7 +215,7 @@ describe("Commands Error Paths", () => {
       await expect(cmdAgentInfo("nonexistent")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
     });
 
@@ -285,7 +285,7 @@ describe("Commands Error Paths", () => {
 
       // The log.step should have been called with the launch message
       // (meaning validation passed and it attempted to download)
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("Claude Code") && msg.includes("Sprite"))).toBe(true);
     });
 
@@ -305,7 +305,7 @@ describe("Commands Error Paths", () => {
         // Expected
       }
 
-      const stepCalls = mockLogStep.mock.calls.map((c: any[]) => c.join(" "));
+      const stepCalls = mockLogStep.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stepCalls.some((msg: string) => msg.includes("with prompt"))).toBe(true);
     });
   });
@@ -317,7 +317,7 @@ describe("Commands Error Paths", () => {
       await expect(cmdRun("badagent", "badcloud")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       const hasAgentError = errorCalls.some((msg: string) => msg.includes("Unknown agent"));
       const hasCloudError = errorCalls.some((msg: string) => msg.includes("Unknown cloud"));
       // Both errors should be reported, not just the first one
@@ -329,7 +329,7 @@ describe("Commands Error Paths", () => {
       // "spawn badagent codex" - badagent is unknown, codex is an agent not a cloud
       await expect(cmdRun("badagent", "codex")).rejects.toThrow("process.exit");
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       const hasAgentError = errorCalls.some((msg: string) => msg.includes("Unknown agent"));
       const hasCloudError = errorCalls.some((msg: string) => msg.includes("Unknown cloud"));
       expect(hasAgentError).toBe(true);
@@ -355,7 +355,7 @@ describe("Commands Error Paths", () => {
       await expect(cmdRun("claude", "codex")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes('"codex" is an agent'))).toBe(true);
       expect(infoCalls.some((msg: string) => msg.includes("spawn <agent> <cloud>"))).toBe(true);
     });
@@ -366,7 +366,7 @@ describe("Commands Error Paths", () => {
       await expect(cmdRun("hetzner", "sprite")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes('"hetzner" is a cloud provider'))).toBe(true);
       expect(infoCalls.some((msg: string) => msg.includes("spawn <agent> <cloud>"))).toBe(true);
     });
