@@ -773,10 +773,13 @@ function getCloudInitUserdata(tier: CloudInitTier = "full", agentName?: string):
   }
   // Install Docker + pull pre-built agent image in background (non-blocking)
   if (agentName) {
+    if (!/^[a-z0-9-]+$/.test(agentName)) {
+      throw new Error(`Invalid agent name: ${agentName}`);
+    }
     lines.push(
       "# Install Docker + pull agent image (background, non-blocking)",
       "curl -fsSL https://get.docker.com | sh",
-      `docker pull ghcr.io/openrouterteam/spawn-${agentName}:latest &`,
+      `docker pull "ghcr.io/openrouterteam/spawn-${agentName}:latest" &`,
     );
   }
   lines.push(

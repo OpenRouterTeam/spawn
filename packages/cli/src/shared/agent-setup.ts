@@ -538,10 +538,15 @@ async function tryInstallFromDocker(runner: CloudRunner, agentName: string, dock
     // Bail if Docker isn't installed
     "command -v docker >/dev/null 2>&1 || exit 1",
     // Bail if image hasn't been pulled yet
-    `docker images -q ${dockerImage} 2>/dev/null | grep -q . || exit 1`,
-    // Create temp container, copy files, clean up
-    `_cid=$(docker create ${dockerImage})`,
-    'docker cp "$_cid":/root/. /root/',
+    `docker images -q "${dockerImage}" 2>/dev/null | grep -q . || exit 1`,
+    // Create temp container, copy only known agent directories, clean up
+    `_cid=$(docker create "${dockerImage}")`,
+    'docker cp "$_cid":/root/.claude /root/ 2>/dev/null || true',
+    'docker cp "$_cid":/root/.bun /root/ 2>/dev/null || true',
+    'docker cp "$_cid":/root/.local /root/ 2>/dev/null || true',
+    'docker cp "$_cid":/root/.npm /root/ 2>/dev/null || true',
+    'docker cp "$_cid":/root/.cargo /root/ 2>/dev/null || true',
+    'docker cp "$_cid":/root/.opencode /root/ 2>/dev/null || true',
     'docker rm "$_cid" >/dev/null',
     'echo "==> Agent extracted from Docker image"',
   ].join("\n");
