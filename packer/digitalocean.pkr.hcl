@@ -79,6 +79,14 @@ source "digitalocean" "agent" {
 build {
   sources = ["source.digitalocean.agent"]
 
+  # 0. Wait for cloud-init / apt lock to be released
+  provisioner "shell" {
+    inline = [
+      "cloud-init status --wait || true",
+      "while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 2; done",
+    ]
+  }
+
   # 1. System update
   provisioner "shell" {
     inline = [
