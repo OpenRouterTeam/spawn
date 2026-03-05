@@ -155,7 +155,7 @@ async function setupClaudeCodeConfig(runner: CloudRunner, apiKey: string): Promi
     "mkdir -p ~/.claude",
     `printf '%s' '${settingsB64}' | base64 -d > ~/.claude/settings.json`,
     "chmod 600 ~/.claude/settings.json",
-    'printf \'{"hasCompletedOnboarding":true,"bypassPermissionsModeAccepted":true,"%s":{"hasTrustDialogAccepted":true}}\\n\' "$HOME" > ~/.claude.json',
+    'printf \'{"hasCompletedOnboarding":true,"bypassPermissionsModeAccepted":true,"projects":{"%s":{"hasTrustDialogAccepted":true}}}\\n\' "$HOME" > ~/.claude.json',
     "chmod 600 ~/.claude.json",
     "touch ~/.claude/CLAUDE.md",
   ].join(" && ");
