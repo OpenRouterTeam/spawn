@@ -24,7 +24,7 @@ import { resolveListFilters, activeServerPicker } from "./list.js";
  * This may prompt the user interactively and must be called BEFORE
  * starting any spinner to avoid overlapping UI elements.
  */
-export async function ensureDeleteCredentials(record: SpawnRecord): Promise<void> {
+async function ensureDeleteCredentials(record: SpawnRecord): Promise<void> {
   const conn = record.connection;
   if (!conn?.cloud || conn.cloud === "local") {
     return;
@@ -69,7 +69,7 @@ export async function ensureDeleteCredentials(record: SpawnRecord): Promise<void
 }
 
 /** Execute server deletion for a given record using TypeScript cloud modules */
-export async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
+async function execDeleteServer(record: SpawnRecord): Promise<boolean> {
   const conn = record.connection;
   if (!conn?.cloud || conn.cloud === "local") {
     return false;
