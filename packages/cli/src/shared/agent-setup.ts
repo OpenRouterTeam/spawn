@@ -639,10 +639,11 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "OpenClaw",
       cloudInitTier: "full",
       dockerImage: `${DOCKER_IMAGE_PREFIX}openclaw:latest`,
+      slowInstall: true,
       preProvision: promptGithubAuth,
       modelPrompt: true,
       modelDefault: "openrouter/auto",
-      install: () =>
+      install: withDockerInstall(runner, "OpenClaw", `${DOCKER_IMAGE_PREFIX}openclaw:latest`, () =>
         installAgent(
           runner,
           "openclaw",
@@ -650,6 +651,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
+      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,
