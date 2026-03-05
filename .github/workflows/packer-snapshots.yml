@@ -1,0 +1,95 @@
+name: Packer DigitalOcean Snapshots
+
+on:
+  schedule:
+    # 4 AM UTC daily (before docker at 6 AM)
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: "Single agent to build (leave empty for all)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      agents: ${{ steps.set-matrix.outputs.agents }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: set-matrix
+        run: |
+          if [ -n "${{ inputs.agent }}" ]; then
+            echo "agents=[\"${{ inputs.agent }}\"]" >> "$GITHUB_OUTPUT"
+          else
+            agents=$(jq -c 'keys' packer/agents.json)
+            echo "agents=${agents}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 3
+      fail-fast: false
+      matrix:
+        agent: ${{ fromJson(needs.matrix.outputs.agents) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: latest
+
+      - name: Read agent config
+        id: agent-config
+        run: |
+          tier=$(jq -r '.["${{ matrix.agent }}"].tier' packer/agents.json)
+          install=$(jq -c '.["${{ matrix.agent }}"].install' packer/agents.json)
+          echo "tier=${tier}" >> "$GITHUB_OUTPUT"
+          echo "install=${install}" >> "$GITHUB_OUTPUT"
+
+      - name: Packer init
+        working-directory: packer
+        run: packer init digitalocean.pkr.hcl
+
+      - name: Packer build
+        working-directory: packer
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DO_API_TOKEN }}
+        run: |
+          packer build \
+            -var "do_api_token=${DIGITALOCEAN_TOKEN}" \
+            -var "agent_name=${{ matrix.agent }}" \
+            -var "cloud_init_tier=${{ steps.agent-config.outputs.tier }}" \
+            -var "install_commands=${{ steps.agent-config.outputs.install }}" \
+            digitalocean.pkr.hcl
+
+  cleanup:
+    needs: [matrix, build]
+    if: always()
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        agent: ${{ fromJson(needs.matrix.outputs.agents) }}
+    steps:
+      - name: Delete old snapshots
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+        run: |
+          # List snapshots for this agent, sorted by creation date
+          snapshots=$(curl -s -H "Authorization: Bearer ${DO_API_TOKEN}" \
+            "https://api.digitalocean.com/v2/images?private=true&per_page=50&tag_name=spawn-${{ matrix.agent }}" \
+            | jq -r '.images | sort_by(.created_at) | reverse | .[1:] | .[].id')
+
+          for id in $snapshots; do
+            echo "Deleting old snapshot: ${id}"
+            curl -s -X DELETE -H "Authorization: Bearer ${DO_API_TOKEN}" \
+              "https://api.digitalocean.com/v2/images/${id}"
+          done

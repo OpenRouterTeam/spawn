@@ -1,0 +1,45 @@
+{
+  "claude": {
+    "tier": "minimal",
+    "install": [
+      "curl -fsSL https://claude.ai/install.sh | bash || npm install -g @anthropic-ai/claude-code"
+    ]
+  },
+  "codex": {
+    "tier": "node",
+    "install": [
+      "npm install -g @openai/codex"
+    ]
+  },
+  "openclaw": {
+    "tier": "full",
+    "install": [
+      "npm install -g openclaw"
+    ]
+  },
+  "opencode": {
+    "tier": "minimal",
+    "install": [
+      "curl -fsSL https://opencode.ai/install | bash"
+    ]
+  },
+  "kilocode": {
+    "tier": "node",
+    "install": [
+      "npm install -g @kilocode/cli"
+    ]
+  },
+  "zeroclaw": {
+    "tier": "minimal",
+    "install": [
+      "fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile",
+      "curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/a117be64fdaa31779204beadf2942c8aef57d0e5/scripts/bootstrap.sh | bash -s -- --install-rust --install-system-deps --prefer-prebuilt"
+    ]
+  },
+  "hermes": {
+    "tier": "minimal",
+    "install": [
+      "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash"
+    ]
+  }
+}
