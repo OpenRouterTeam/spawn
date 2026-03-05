@@ -1,0 +1,2 @@
+*.auto.pkrvars.json
+.packer.d/
