@@ -538,15 +538,10 @@ async function tryInstallFromDocker(runner: CloudRunner, agentName: string, dock
     // Bail if Docker isn't installed
     "command -v docker >/dev/null 2>&1 || { echo '==> Docker not installed'; exit 1; }",
     // Wait for any in-progress docker pull (started during cloud-init)
-    'echo "==> Checking for docker pull process..."',
-    'ps aux | grep "docker pull" | grep -v grep || echo "==> No docker pull process found"',
-    'echo "==> Docker pull log:"; cat /tmp/docker-pull.log 2>/dev/null || echo "(no log)"',
     'if pgrep -f "docker pull" >/dev/null 2>&1; then',
     '  echo "==> Waiting for Docker image pull to complete..."',
     '  while pgrep -f "docker pull" >/dev/null 2>&1; do sleep 2; done',
     "fi",
-    // Check available images
-    'echo "==> Available Docker images:"; docker images 2>/dev/null',
     // Bail if image hasn't been pulled yet
     `docker images -q "${dockerImage}" 2>/dev/null | grep -q . || { echo "==> Image ${dockerImage} not found"; exit 1; }`,
     // Create temp container, copy only known agent directories, clean up
@@ -601,9 +596,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "minimal",
       dockerImage: `${DOCKER_IMAGE_PREFIX}claude:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "Claude Code", `${DOCKER_IMAGE_PREFIX}claude:latest`, () =>
-        installClaudeCode(runner),
-      ),
+      install: () => installClaudeCode(runner),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "ANTHROPIC_BASE_URL=https://openrouter.ai/api",
@@ -622,7 +615,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "node",
       dockerImage: `${DOCKER_IMAGE_PREFIX}codex:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "Codex CLI", `${DOCKER_IMAGE_PREFIX}codex:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "Codex CLI",
@@ -630,7 +623,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
@@ -645,7 +637,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       preProvision: promptGithubAuth,
       modelPrompt: true,
       modelDefault: "openrouter/auto",
-      install: withDockerInstall(runner, "OpenClaw", `${DOCKER_IMAGE_PREFIX}openclaw:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "openclaw",
@@ -653,7 +645,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         `ANTHROPIC_API_KEY=${apiKey}`,
@@ -672,9 +663,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "minimal",
       dockerImage: `${DOCKER_IMAGE_PREFIX}opencode:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "OpenCode", `${DOCKER_IMAGE_PREFIX}opencode:latest`, () =>
-        installAgent(runner, "OpenCode", openCodeInstallCmd()),
-      ),
+      install: () => installAgent(runner, "OpenCode", openCodeInstallCmd()),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
       ],
@@ -686,7 +675,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "node",
       dockerImage: `${DOCKER_IMAGE_PREFIX}kilocode:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "Kilo Code", `${DOCKER_IMAGE_PREFIX}kilocode:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "Kilo Code",
@@ -694,7 +683,6 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
             "{ grep -qF '.npm-global/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.bashrc; } && " +
             "{ [ ! -f ~/.zshrc ] || grep -qF '.npm-global/bin' ~/.zshrc 2>/dev/null || echo 'export PATH=\"$HOME/.npm-global/bin:$PATH\"' >> ~/.zshrc; }",
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "KILO_PROVIDER_TYPE=openrouter",
@@ -707,6 +695,7 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       name: "ZeroClaw",
       cloudInitTier: "minimal",
       dockerImage: `${DOCKER_IMAGE_PREFIX}zeroclaw:latest`,
+      slowInstall: true,
       preProvision: promptGithubAuth,
       install: withDockerInstall(runner, "ZeroClaw", `${DOCKER_IMAGE_PREFIX}zeroclaw:latest`, async () => {
         // Add swap before building — low-memory instances (e.g., AWS nano 512 MB)
@@ -733,14 +722,13 @@ function createAgents(runner: CloudRunner): Record<string, AgentConfig> {
       cloudInitTier: "minimal",
       dockerImage: `${DOCKER_IMAGE_PREFIX}hermes:latest`,
       preProvision: promptGithubAuth,
-      install: withDockerInstall(runner, "Hermes Agent", `${DOCKER_IMAGE_PREFIX}hermes:latest`, () =>
+      install: () =>
         installAgent(
           runner,
           "Hermes Agent",
           "curl --proto '=https' -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
           300,
         ),
-      ),
       envVars: (apiKey) => [
         `OPENROUTER_API_KEY=${apiKey}`,
         "OPENAI_BASE_URL=https://openrouter.ai/api/v1",

@@ -54,7 +54,7 @@ async function main() {
       region = await promptDoRegion();
     },
     async createServer(name: string) {
-      await createDroplet(name, agent.cloudInitTier, dropletSize, region, agentName);
+      await createDroplet(name, agent.cloudInitTier, dropletSize, region, agent.slowInstall ? agentName : undefined);
     },
     getServerName,
     async waitForReady() {
