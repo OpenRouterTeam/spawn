@@ -95,11 +95,11 @@ describe("Download and Failure Pipeline", () => {
 
       // Spinner should show "Downloading" and then "Script downloaded"
       expect(mockSpinnerStart).toHaveBeenCalled();
-      const startCalls = mockSpinnerStart.mock.calls.map((c: any[]) => c.join(" "));
+      const startCalls = mockSpinnerStart.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(startCalls.some((msg: string) => msg.includes("Downloading"))).toBe(true);
 
       // Stop should show "Script downloaded" (without "(fallback)")
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stopCalls.some((msg: string) => msg.includes("Script downloaded"))).toBe(true);
     });
 
@@ -149,11 +149,11 @@ describe("Download and Failure Pipeline", () => {
       }
 
       // Spinner should have shown "Trying fallback source..."
-      const msgCalls = mockSpinnerMessage.mock.calls.map((c: any[]) => c.join(" "));
+      const msgCalls = mockSpinnerMessage.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(msgCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
 
       // Stop should show "Script downloaded (fallback)"
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stopCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
     });
 
@@ -179,7 +179,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       // Should still succeed with fallback
-      const stopCalls = mockSpinnerStop.mock.calls.map((c: any[]) => c.join(" "));
+      const stopCalls = mockSpinnerStop.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(stopCalls.some((msg: string) => msg.includes("fallback"))).toBe(true);
     });
   });
@@ -202,7 +202,7 @@ describe("Download and Failure Pipeline", () => {
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("doesn't exist");
       expect(errorOutput).toContain("spawn matrix");
       expect(errorOutput).toContain("Report it");
@@ -222,7 +222,7 @@ describe("Download and Failure Pipeline", () => {
         // Expected
       }
 
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("HTTP 500");
       expect(errorOutput).toContain("temporarily unavailable");
     });
@@ -246,7 +246,7 @@ describe("Download and Failure Pipeline", () => {
       }
 
       // Should show HTTP error codes in console output (not the "script not found" path)
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("HTTP 404");
       // 500 from fallback should mention server issues
       expect(errorOutput).toContain("temporarily unavailable");
@@ -269,7 +269,7 @@ describe("Download and Failure Pipeline", () => {
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("DNS resolution failed");
     });
 
@@ -284,7 +284,7 @@ describe("Download and Failure Pipeline", () => {
         // Expected
       }
 
-      const errorOutput = consoleMocks.error.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const errorOutput = consoleMocks.error.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(errorOutput).toContain("Next steps");
       expect(errorOutput).toContain("internet connection");
       expect(errorOutput).toContain("Firewall");

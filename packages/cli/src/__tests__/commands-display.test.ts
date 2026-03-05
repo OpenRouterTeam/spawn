@@ -124,20 +124,20 @@ describe("Commands Display Output", () => {
   describe("cmdAgentInfo - happy path", () => {
     it("should display agent name and description for claude", async () => {
       await cmdAgentInfo("claude");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Claude Code");
       expect(output).toContain("AI coding assistant");
     });
 
     it("should display Available clouds header", async () => {
       await cmdAgentInfo("claude");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Available clouds");
     });
 
     it("should list implemented clouds for claude", async () => {
       await cmdAgentInfo("claude");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       // claude is implemented on both sprite and hetzner
       expect(output).toContain("sprite");
       expect(output).toContain("hetzner");
@@ -145,14 +145,14 @@ describe("Commands Display Output", () => {
 
     it("should show launch command hint for each cloud", async () => {
       await cmdAgentInfo("claude");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn claude sprite");
       expect(output).toContain("spawn claude hetzner");
     });
 
     it("should show codex agent info with only sprite cloud", async () => {
       await cmdAgentInfo("codex");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Codex");
       expect(output).toContain("AI pair programmer");
       expect(output).toContain("spawn codex sprite");
@@ -164,7 +164,7 @@ describe("Commands Display Output", () => {
       await loadManifest(true);
 
       await cmdAgentInfo("claude");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("No implemented clouds");
     });
 
@@ -180,13 +180,13 @@ describe("Commands Display Output", () => {
   describe("cmdHelp", () => {
     it("should display usage section", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("USAGE");
     });
 
     it("should show all subcommands", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn list");
       expect(output).toContain("spawn agents");
       expect(output).toContain("spawn clouds");
@@ -197,39 +197,39 @@ describe("Commands Display Output", () => {
 
     it("should show examples section", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("EXAMPLES");
     });
 
     it("should show authentication section", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("AUTHENTICATION");
       expect(output).toContain("OpenRouter");
     });
 
     it("should show troubleshooting section", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("TROUBLESHOOTING");
     });
 
     it("should show --prompt and --prompt-file usage", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("--prompt");
       expect(output).toContain("--prompt-file");
     });
 
     it("should mention SPAWN_NO_UNICODE env var", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("SPAWN_NO_UNICODE");
     });
 
     it("should show install section with curl command", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("INSTALL");
       expect(output).toContain("curl");
       expect(output).toContain("install.sh");
@@ -237,7 +237,7 @@ describe("Commands Display Output", () => {
 
     it("should show repository URL", () => {
       cmdHelp();
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("OpenRouterTeam/spawn");
     });
   });
@@ -247,7 +247,7 @@ describe("Commands Display Output", () => {
   describe("cmdAgentInfo - cloud type display", () => {
     it("should show cloud type for each implemented cloud", async () => {
       await cmdAgentInfo("claude");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       // sprite has type "vm", hetzner has type "cloud"
       expect(output).toContain("vm");
       expect(output).toContain("cloud");
@@ -269,13 +269,13 @@ describe("Commands Display Output", () => {
       await loadManifest(true);
 
       await cmdAgentInfo("codex");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Natively supports OpenRouter");
     });
 
     it("should not show notes line when agent has no notes", async () => {
       await cmdAgentInfo("claude");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       // claude in mock manifest has no notes field
       expect(output).not.toContain("Natively supports");
     });
@@ -289,7 +289,7 @@ describe("Commands Display Output", () => {
       await loadManifest(true);
 
       await cmdAgentInfo("claude");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn claude sprite");
       expect(output).toContain("spawn claude hetzner");
       expect(output).toContain("spawn claude vultr");

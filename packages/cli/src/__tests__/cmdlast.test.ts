@@ -45,11 +45,11 @@ describe("cmdLast", () => {
   }
 
   function logInfoOutput(): string {
-    return mockLogInfo.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    return mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
   }
 
   function logStepOutput(): string {
-    return mockLogStep.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+    return mockLogStep.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
   }
 
   beforeEach(async () => {

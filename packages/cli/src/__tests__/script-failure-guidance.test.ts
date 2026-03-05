@@ -383,24 +383,7 @@ describe("getSignalGuidance", () => {
     });
   });
 
-  describe("return type", () => {
-    it("should always return string arrays", () => {
-      const signals = [
-        "SIGKILL",
-        "SIGTERM",
-        "SIGINT",
-        "SIGHUP",
-        "SIGUSR1",
-      ];
-      for (const sig of signals) {
-        const lines = getSignalGuidance(sig);
-        expect(Array.isArray(lines)).toBe(true);
-        for (const line of lines) {
-          expect(typeof line).toBe("string");
-        }
-      }
-    });
-
+  describe("signal output uniqueness", () => {
     it("should produce different output for each handled signal", () => {
       const sigkill = getSignalGuidance("SIGKILL").join("\n");
       const sigterm = getSignalGuidance("SIGTERM").join("\n");

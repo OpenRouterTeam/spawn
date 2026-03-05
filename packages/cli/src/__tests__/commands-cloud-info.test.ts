@@ -95,54 +95,54 @@ describe("cmdCloudInfo", () => {
   describe("valid cloud with agents", () => {
     it("should display cloud name and description", async () => {
       await cmdCloudInfo("sprite");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Sprite");
       expect(output).toContain("Lightweight VMs");
     });
 
     it("should show Available agents header", async () => {
       await cmdCloudInfo("sprite");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Available agents");
     });
 
     it("should list implemented agents for sprite", async () => {
       await cmdCloudInfo("sprite");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("claude");
       expect(output).toContain("codex");
     });
 
     it("should show launch command hint for each agent", async () => {
       await cmdCloudInfo("sprite");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn claude sprite");
       expect(output).toContain("spawn codex sprite");
     });
 
     it("should only show implemented agents for hetzner", async () => {
       await cmdCloudInfo("hetzner");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("spawn claude hetzner");
       expect(output).not.toContain("spawn codex hetzner");
     });
 
     it("should show hetzner description", async () => {
       await cmdCloudInfo("hetzner");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Hetzner Cloud");
       expect(output).toContain("European cloud provider");
     });
 
     it("should show cloud type in output", async () => {
       await cmdCloudInfo("sprite");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Type: vm");
     });
 
     it("should show cloud type for hetzner", async () => {
       await cmdCloudInfo("hetzner");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Type: cloud");
     });
   });
@@ -155,7 +155,7 @@ describe("cmdCloudInfo", () => {
       await loadManifest(true);
 
       await cmdCloudInfo("sprite");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Requires sprite-cli to be installed");
     });
   });
@@ -168,7 +168,7 @@ describe("cmdCloudInfo", () => {
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("No implemented agents");
     });
 
@@ -177,7 +177,7 @@ describe("cmdCloudInfo", () => {
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("Empty Cloud");
       expect(output).toContain("Cloud with no agents");
     });
@@ -187,7 +187,7 @@ describe("cmdCloudInfo", () => {
       await loadManifest(true);
 
       await cmdCloudInfo("emptycloud");
-      const output = consoleMocks.log.mock.calls.map((c: any[]) => c.join(" ")).join("\n");
+      const output = consoleMocks.log.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
       expect(output).toContain("special setup instructions");
     });
   });
@@ -199,35 +199,35 @@ describe("cmdCloudInfo", () => {
       await expect(cmdCloudInfo("nonexistent")).rejects.toThrow("process.exit");
       expect(processExitSpy).toHaveBeenCalledWith(1);
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown cloud"))).toBe(true);
     });
 
     it("should suggest spawn clouds command", async () => {
       await expect(cmdCloudInfo("nonexistent")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn clouds"))).toBe(true);
     });
 
     it("should suggest closest match for typo", async () => {
       await expect(cmdCloudInfo("sprit")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("sprite"))).toBe(true);
     });
 
     it("should suggest closest match for different typo", async () => {
       await expect(cmdCloudInfo("hetzne")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("hetzner"))).toBe(true);
     });
 
     it("should not suggest match for very different name", async () => {
       await expect(cmdCloudInfo("kubernetes")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Did you mean"))).toBe(false);
       expect(infoCalls.some((msg: string) => msg.includes("spawn clouds"))).toBe(true);
     });

@@ -169,7 +169,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
       // This tests the nameSuggestion branch!
       await expect(cmdRun("claude-code", "sp")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should suggest "cc" (the key for "Claude Code") with the display name
       expect(infoCalls.some((msg: string) => msg.includes("cc") && msg.includes("Claude Code"))).toBe(true);
     });
@@ -180,14 +180,14 @@ describe("Display Name Suggestions in Validation Errors", () => {
       //   "codex-pro" vs "codex pro" -> distance 1 -> match!
       await expect(cmdRun("codex-pro", "sp")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("ap") && msg.includes("Codex Pro"))).toBe(true);
     });
 
     it("should show 'Unknown agent' error even with display name suggestion", async () => {
       await expect(cmdRun("claude-code", "sp")).rejects.toThrow("process.exit");
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
     });
 
@@ -195,7 +195,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
       // "xyzzyplugh" is far from all keys and all display names
       await expect(cmdRun("xyzzyplugh", "sp")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // No "Did you mean" suggestion
       expect(infoCalls.some((msg: string) => msg.includes("Did you mean"))).toBe(false);
       // But should still suggest "spawn agents"
@@ -210,7 +210,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
       // "claud" is close to key "claude" (distance 1)
       await expect(cmdRun("claud", "sprite")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should suggest via key match and always show display name for clarity
       expect(infoCalls.some((msg: string) => msg.includes("claude"))).toBe(true);
       expect(infoCalls.some((msg: string) => msg.includes("Claude Code"))).toBe(true);
@@ -226,7 +226,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
       // But key "hz" is far (distance > 3) from "hetzner-cloud"
       await expect(cmdRun("cc", "hetzner-cloud")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("hz") && msg.includes("Hetzner Cloud"))).toBe(true);
     });
 
@@ -236,21 +236,21 @@ describe("Display Name Suggestions in Validation Errors", () => {
       // Key "dc" (2 chars) is far from "digitalocen" -> key suggestion fails
       await expect(cmdRun("cc", "digitalocen")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("dc") && msg.includes("DigitalOcean"))).toBe(true);
     });
 
     it("should show 'Unknown cloud' error even with display name suggestion", async () => {
       await expect(cmdRun("cc", "hetzner-cloud")).rejects.toThrow("process.exit");
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(errorCalls.some((msg: string) => msg.includes("Unknown cloud"))).toBe(true);
     });
 
     it("should not show display name suggestion when both key and name fail", async () => {
       await expect(cmdRun("cc", "xyzzyplugh")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("Did you mean"))).toBe(false);
       expect(infoCalls.some((msg: string) => msg.includes("spawn clouds"))).toBe(true);
     });
@@ -262,7 +262,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
       // "sprit" is close to key "sprite" (distance 1)
       await expect(cmdRun("claude", "sprit")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("sprite"))).toBe(true);
       // Should always show display name for clarity
       expect(infoCalls.some((msg: string) => msg.includes("Sprite"))).toBe(true);
@@ -276,14 +276,14 @@ describe("Display Name Suggestions in Validation Errors", () => {
       // "claude-code" -> display "Claude Code" -> key "cc"
       await expect(cmdAgentInfo("claude-code")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("cc") && msg.includes("Claude Code"))).toBe(true);
     });
 
     it("should show spawn agents hint for completely unknown agent", async () => {
       await expect(cmdAgentInfo("totallyunknown")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn agents"))).toBe(true);
       expect(infoCalls.some((msg: string) => msg.includes("Did you mean"))).toBe(false);
     });
@@ -297,14 +297,14 @@ describe("Display Name Suggestions in Validation Errors", () => {
       //   "sprite-cloud" vs "sprite cloud" -> distance 1 -> match!
       await expect(cmdCloudInfo("sprite-cloud")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("sp") && msg.includes("Sprite Cloud"))).toBe(true);
     });
 
     it("should show spawn clouds hint for completely unknown cloud", async () => {
       await expect(cmdCloudInfo("totallyunknown")).rejects.toThrow("process.exit");
 
-      const infoCalls = mockLogInfo.mock.calls.map((c: any[]) => c.join(" "));
+      const infoCalls = mockLogInfo.mock.calls.map((c: unknown[]) => c.join(" "));
       expect(infoCalls.some((msg: string) => msg.includes("spawn clouds"))).toBe(true);
       expect(infoCalls.some((msg: string) => msg.includes("Did you mean"))).toBe(false);
     });
@@ -374,7 +374,7 @@ describe("Display Name Suggestions in Validation Errors", () => {
       // cmdRun processes agent first, so agent error fires first
       await expect(cmdRun("claude-code", "hetzner-cloud")).rejects.toThrow("process.exit");
 
-      const errorCalls = mockLogError.mock.calls.map((c: any[]) => c.join(" "));
+      const errorCalls = mockLogError.mock.calls.map((c: unknown[]) => c.join(" "));
       // Should fail on the agent first (agent validation runs before cloud validation)
       expect(errorCalls.some((msg: string) => msg.includes("Unknown agent"))).toBe(true);
     });
