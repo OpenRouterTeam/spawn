@@ -750,56 +750,6 @@ export async function promptDoRegion(): Promise<string> {
   return selectFromList(items, "DigitalOcean region", DEFAULT_DO_REGION);
 }
 
-// ─── Snapshot Lookup ─────────────────────────────────────────────────────────
-
-/**
- * Find the latest pre-built Packer snapshot for an agent.
- * Returns the numeric image ID or null if none found / on error.
- */
-export async function findSpawnSnapshot(agentName: string): Promise<string | null> {
-  try {
-    const text = await doApi("GET", `/images?private=true&per_page=50&tag_name=spawn-${agentName}`, undefined, 1);
-    const data = parseJsonObj(text);
-    const images = toObjectArray(data?.images);
-    if (images.length === 0) {
-      return null;
-    }
-    // Sort by created_at descending and pick the latest
-    images.sort((a, b) => {
-      const aDate = isString(a.created_at) ? a.created_at : "";
-      const bDate = isString(b.created_at) ? b.created_at : "";
-      return bDate.localeCompare(aDate);
-    });
-    const latestId = images[0].id;
-    if (isNumber(latestId) && latestId > 0) {
-      logInfo(`Found pre-built snapshot for ${agentName} (ID: ${latestId})`);
-      return String(latestId);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// ─── SSH-Only Wait (for snapshot-based boots) ────────────────────────────────
-
-/**
- * Wait for SSH to become available without waiting for cloud-init.
- * Used when booting from a pre-built snapshot (no cloud-init needed).
- */
-export async function waitForSshOnly(ip?: string): Promise<void> {
-  const serverIp = ip || doServerIp;
-  const selectedKeys = await ensureSshKeys();
-  const keyOpts = getSshKeyOpts(selectedKeys);
-  await sharedWaitForSsh({
-    host: serverIp,
-    user: "root",
-    maxAttempts: 36,
-    extraSshOpts: keyOpts,
-  });
-  logInfo("SSH available (snapshot boot — skipping cloud-init)");
-}
-
 // ─── Provisioning ────────────────────────────────────────────────────────────
 
 function getCloudInitUserdata(tier: CloudInitTier = "full"): string {
@@ -833,21 +783,17 @@ export async function createServer(
   tier?: CloudInitTier,
   dropletSize?: string,
   region?: string,
-  snapshotId?: string,
 ): Promise<void> {
   const size = dropletSize || process.env.DO_DROPLET_SIZE || "s-2vcpu-4gb";
   const effectiveRegion = region || process.env.DO_REGION || "nyc3";
-  const image = snapshotId ? Number(snapshotId) : "ubuntu-24-04-x64";
+  const image = "ubuntu-24-04-x64";
 
   if (!validateRegionName(effectiveRegion)) {
     logError("Invalid DO_REGION");
     throw new Error("Invalid region");
   }
 
-  const imageLabel = snapshotId ? `snapshot ${snapshotId}` : "ubuntu-24-04-x64";
-  logStep(
-    `Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion}, image: ${imageLabel})...`,
-  );
+  logStep(`Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion})...`);
 
   // Get all SSH key IDs
   const keysText = await doApi("GET", "/account/keys");
@@ -856,20 +802,17 @@ export async function createServer(
     .map((k) => (isNumber(k.id) ? k.id : 0))
     .filter((n) => n > 0);
 
-  const dropletBody: Record<string, unknown> = {
+  const userdata = getCloudInitUserdata(tier);
+  const body = JSON.stringify({
     name,
     region: effectiveRegion,
     size,
     image,
     ssh_keys: sshKeyIds,
+    user_data: userdata,
     backups: false,
     monitoring: false,
-  };
-  // Only include cloud-init userdata when booting from a base image (not a snapshot)
-  if (!snapshotId) {
-    dropletBody.user_data = getCloudInitUserdata(tier);
-  }
-  const body = JSON.stringify(dropletBody);
+  });
 
   const createText = await doApi("POST", "/droplets", body);
   const createData = parseJsonObj(createText);

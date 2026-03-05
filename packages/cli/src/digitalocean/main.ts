@@ -10,8 +10,6 @@ import {
   createServer as createDroplet,
   getServerName,
   waitForCloudInit,
-  waitForSshOnly,
-  findSpawnSnapshot,
   runServer,
   uploadFile,
   interactiveSession,
@@ -20,7 +18,7 @@ import { agents, resolveAgent } from "./agents";
 import { saveLaunchCmd } from "../history.js";
 import { runOrchestration } from "../shared/orchestrate";
 import type { CloudOrchestrator } from "../shared/orchestrate";
-import { logInfo, logStep } from "../shared/ui";
+import { logStep } from "../shared/ui";
 
 async function main() {
   const agentName = process.argv[2];
@@ -34,7 +32,6 @@ async function main() {
 
   let dropletSize = "";
   let region = "";
-  let snapshotId: string | null = null;
 
   const cloud: CloudOrchestrator = {
     cloudName: "digitalocean",
@@ -47,8 +44,6 @@ async function main() {
       await promptSpawnName();
       const usedBrowserAuth = await ensureDoToken();
       await ensureSshKey();
-      // Look for a pre-built snapshot after auth (needs valid token)
-      snapshotId = await findSpawnSnapshot(agentName);
       if (usedBrowserAuth) {
         logStep("Next step: OpenRouter authentication (opening browser in 5s)...");
         await new Promise((r) => setTimeout(r, 5000));
@@ -59,31 +54,17 @@ async function main() {
       region = await promptDoRegion();
     },
     async createServer(name: string) {
-      await createDroplet(name, agent.cloudInitTier, dropletSize, region, snapshotId || undefined);
+      await createDroplet(name, agent.cloudInitTier, dropletSize, region);
     },
     getServerName,
     async waitForReady() {
-      if (snapshotId) {
-        await waitForSshOnly();
-      } else {
-        await waitForCloudInit();
-      }
+      await waitForCloudInit();
     },
     interactiveSession,
     saveLaunchCmd,
   };
 
-  // When using a snapshot, skip the agent install step (already pre-installed)
-  const effectiveAgent = snapshotId
-    ? {
-        ...agent,
-        install: async () => {
-          logInfo("Agent pre-installed (snapshot)");
-        },
-      }
-    : agent;
-
-  await runOrchestration(cloud, effectiveAgent, agentName);
+  await runOrchestration(cloud, agent, agentName);
 }
 
 main().catch((err) => {
