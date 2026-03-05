@@ -772,7 +772,7 @@ function getCloudInitUserdata(tier: CloudInitTier = "full", agentName?: string):
     );
   }
   // Pull pre-built agent image in background (non-blocking).
-  // Docker is already installed via the marketplace image (docker-20-04).
+  // Docker is already installed via the marketplace image (docker-22-04).
   if (agentName) {
     if (!/^[a-z0-9-]+$/.test(agentName)) {
       throw new Error(`Invalid agent name: ${agentName}`);
@@ -803,7 +803,7 @@ export async function createServer(
 
   // Use the Docker marketplace image when an agent is specified (Docker pre-installed),
   // otherwise fall back to the plain Ubuntu image.
-  const image = agentName ? "docker-20-04" : "ubuntu-24-04-x64";
+  const image = agentName ? "docker-22-04" : "ubuntu-24-04-x64";
 
   logStep(`Creating DigitalOcean droplet '${name}' (size: ${size}, region: ${effectiveRegion}, image: ${image})...`);
 
