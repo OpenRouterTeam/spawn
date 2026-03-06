@@ -29,11 +29,6 @@ export interface AgentConfig {
   launchCmd: () => string;
   /** Cloud-init dependency tier. Defaults to "full" if unset. */
   cloudInitTier?: CloudInitTier;
-  /** Docker image for pre-built agent extraction (e.g. "ghcr.io/openrouterteam/spawn-claude:latest"). */
-  dockerImage?: string;
-  /** If true, Docker + image pull are added to cloud-init for faster extraction.
-   *  Only worth it for agents with slow installs (e.g. Rust compilation). */
-  slowInstall?: boolean;
   /** Skip tarball install attempt (e.g., already using snapshot). */
   skipTarball?: boolean;
 }
