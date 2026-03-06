@@ -708,12 +708,6 @@ export function validatePrompt(prompt: string): void {
       description: "file redirection to path",
       suggestion: "Ask the agent to save output instead of using redirection syntax",
     },
-    // Redirection to simple filenames without extensions (3+ chars to avoid math like "> 5")
-    {
-      pattern: />>?\s*[a-zA-Z_]\w{2,}/,
-      description: "file redirection to path",
-      suggestion: "Ask the agent to save output instead of using redirection syntax",
-    },
   ];
 
   for (const { pattern, description, suggestion } of dangerousPatterns) {
@@ -729,21 +723,5 @@ export function validatePrompt(prompt: string): void {
           `  Write: "Fix the directory listing issues"`,
       );
     }
-  }
-
-  // Generic check for suspicious operator combinations
-  // Exclude comparison expressions (like "a > b && c < d") by checking for comparison context
-  // Pattern matches doubled operators but not when used in comparison expressions
-  const hasDoubledOperators = /[;&|<>]\s*[;&|<>]/.test(prompt);
-  const looksLikeComparison = /\w\s*[<>!=]=?\s*\w\s*&&\s*\w\s*[<>!=]=?\s*\w/.test(prompt);
-
-  if (hasDoubledOperators && !looksLikeComparison) {
-    throw new Error(
-      "Your prompt contains shell operators that could be unsafe.\n\n" +
-        "Please describe what you want in plain English without shell syntax.\n\n" +
-        "Example:\n" +
-        `  Instead of: "Build a web server && deploy it"\n` +
-        `  Write: "Build a web server and deploy it"`,
-    );
   }
 }
