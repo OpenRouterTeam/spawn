@@ -31,11 +31,32 @@ const DAYTONA_DASHBOARD_URL = "https://app.daytona.io/";
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-let daytonaApiKey = "";
-let sandboxId = "";
-let sshToken = "";
-let sshHost = "";
-let sshPort = "";
+export interface DaytonaState {
+  apiKey: string;
+  sandboxId: string;
+  sshToken: string;
+  sshHost: string;
+  sshPort: string;
+}
+
+let _state: DaytonaState = {
+  apiKey: "",
+  sandboxId: "",
+  sshToken: "",
+  sshHost: "",
+  sshPort: "",
+};
+
+/** Reset session state — used in tests for isolation. */
+export function resetDaytonaState(): void {
+  _state = {
+    apiKey: "",
+    sandboxId: "",
+    sshToken: "",
+    sshHost: "",
+    sshPort: "",
+  };
+}
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 
@@ -47,7 +68,7 @@ async function daytonaApi(method: string, endpoint: string, body?: string, maxRe
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${daytonaApiKey}`,
+        Authorization: `Bearer ${_state.apiKey}`,
       };
       const opts: RequestInit = {
         method,
@@ -109,7 +130,7 @@ async function saveTokenToConfig(token: string): Promise<void> {
 }
 
 async function testDaytonaToken(): Promise<boolean> {
-  if (!daytonaApiKey) {
+  if (!_state.apiKey) {
     return false;
   }
   try {
@@ -123,26 +144,26 @@ async function testDaytonaToken(): Promise<boolean> {
 export async function ensureDaytonaToken(): Promise<void> {
   // 1. Env var
   if (process.env.DAYTONA_API_KEY) {
-    daytonaApiKey = process.env.DAYTONA_API_KEY.trim();
+    _state.apiKey = process.env.DAYTONA_API_KEY.trim();
     if (await testDaytonaToken()) {
       logInfo("Using Daytona API key from environment");
-      await saveTokenToConfig(daytonaApiKey);
+      await saveTokenToConfig(_state.apiKey);
       return;
     }
     logWarn("DAYTONA_API_KEY from environment is invalid");
-    daytonaApiKey = "";
+    _state.apiKey = "";
   }
 
   // 2. Saved config
   const saved = loadApiToken("daytona");
   if (saved) {
-    daytonaApiKey = saved;
+    _state.apiKey = saved;
     if (await testDaytonaToken()) {
       logInfo("Using saved Daytona API key");
       return;
     }
     logWarn("Saved Daytona token is invalid or expired");
-    daytonaApiKey = "";
+    _state.apiKey = "";
   }
 
   // 3. Manual token entry
@@ -152,13 +173,13 @@ export async function ensureDaytonaToken(): Promise<void> {
   if (!token) {
     throw new Error("No token provided");
   }
-  daytonaApiKey = token.trim();
+  _state.apiKey = token.trim();
   if (!(await testDaytonaToken())) {
     logError("Token is invalid");
-    daytonaApiKey = "";
+    _state.apiKey = "";
     throw new Error("Invalid Daytona token");
   }
-  await saveTokenToConfig(daytonaApiKey);
+  await saveTokenToConfig(_state.apiKey);
   logInfo("Using manually entered Daytona API key");
 }
 
@@ -185,8 +206,8 @@ function sshBaseArgs(): string[] {
     "-o",
     "PubkeyAuthentication=no",
   ];
-  if (sshPort) {
-    args.push("-o", `Port=${sshPort}`);
+  if (_state.sshPort) {
+    args.push("-o", `Port=${_state.sshPort}`);
   }
   return args;
 }
@@ -260,28 +281,28 @@ export async function promptSandboxSize(): Promise<SandboxSize> {
 async function setupSshAccess(): Promise<void> {
   logStep("Setting up SSH access...");
 
-  const sshResp = await daytonaApi("POST", `/sandbox/${sandboxId}/ssh-access?expiresInMinutes=480`);
+  const sshResp = await daytonaApi("POST", `/sandbox/${_state.sandboxId}/ssh-access?expiresInMinutes=480`);
   const data = parseJsonObj(sshResp);
   if (!data) {
     logError("Failed to parse SSH access response");
     throw new Error("SSH access parse failure");
   }
 
-  sshToken = isString(data.token) ? data.token : "";
+  _state.sshToken = isString(data.token) ? data.token : "";
   const sshCommand = isString(data.sshCommand) ? data.sshCommand : "";
 
-  if (!sshToken) {
+  if (!_state.sshToken) {
     logError(`Failed to get SSH access: ${extractApiError(sshResp)}`);
     throw new Error("SSH access failed");
   }
 
   // Parse host from sshCommand (e.g., "ssh -p 2222 TOKEN@HOST" or "ssh TOKEN@HOST")
   const hostMatch = sshCommand.match(/[^@ ]+$/);
-  sshHost = hostMatch ? hostMatch[0] : "ssh.app.daytona.io";
+  _state.sshHost = hostMatch ? hostMatch[0] : "ssh.app.daytona.io";
 
   // Parse port if present
   const portMatch = sshCommand.match(/-p\s+(\d+)/);
-  sshPort = portMatch ? portMatch[1] : "";
+  _state.sshPort = portMatch ? portMatch[1] : "";
 
   logInfo("SSH access ready");
 }
@@ -315,20 +336,20 @@ export async function createServer(name: string, sandboxSize?: SandboxSize): Pro
   const response = await daytonaApi("POST", "/sandbox", body);
   const data = parseJsonObj(response);
 
-  sandboxId = isString(data?.id) ? data.id : "";
-  if (!sandboxId) {
+  _state.sandboxId = isString(data?.id) ? data.id : "";
+  if (!_state.sandboxId) {
     logError(`Failed to create sandbox: ${extractApiError(response)}`);
     throw new Error("Sandbox creation failed");
   }
 
-  logInfo(`Sandbox created: ${sandboxId}`);
+  logInfo(`Sandbox created: ${_state.sandboxId}`);
 
   // Wait for sandbox to reach started state
   logStep("Waiting for sandbox to start...");
   const maxWait = 120;
   let waited = 0;
   while (waited < maxWait) {
-    const statusResp = await daytonaApi("GET", `/sandbox/${sandboxId}`);
+    const statusResp = await daytonaApi("GET", `/sandbox/${_state.sandboxId}`);
     const statusData = parseJsonObj(statusResp);
     const state = isString(statusData?.state) ? statusData.state : "";
 
@@ -357,7 +378,7 @@ export async function createServer(name: string, sandboxSize?: SandboxSize): Pro
   saveVmConnection(
     "daytona-sandbox",
     "daytona",
-    sandboxId,
+    _state.sandboxId,
     name,
     "daytona",
     undefined,
@@ -378,7 +399,7 @@ export async function runServer(cmd: string, timeoutSecs?: number): Promise<void
     ...sshBaseArgs(),
     "-o",
     "BatchMode=yes",
-    `${sshToken}@${sshHost}`,
+    `${_state.sshToken}@${_state.sshHost}`,
     "--",
     fullCmd,
   ];
@@ -417,7 +438,7 @@ export async function runServerCapture(cmd: string, timeoutSecs?: number): Promi
     ...sshBaseArgs(),
     "-o",
     "BatchMode=yes",
-    `${sshToken}@${sshHost}`,
+    `${_state.sshToken}@${_state.sshHost}`,
     "--",
     fullCmd,
   ];
@@ -474,7 +495,7 @@ export async function uploadFile(localPath: string, remotePath: string): Promise
     ...sshBaseArgs(),
     "-o",
     "BatchMode=yes",
-    `${sshToken}@${sshHost}`,
+    `${_state.sshToken}@${_state.sshHost}`,
     "--",
     `base64 -d > '${remotePath}'`,
   ];
@@ -514,7 +535,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
   const args = [
     ...sshBaseArgs(),
     "-t", // Force PTY allocation
-    `${sshToken}@${sshHost}`,
+    `${_state.sshToken}@${_state.sshHost}`,
     "--",
     fullCmd,
   ];
@@ -523,7 +544,7 @@ export async function interactiveSession(cmd: string): Promise<number> {
 
   // Post-session summary
   process.stderr.write("\n");
-  logWarn(`Session ended. Your sandbox '${sandboxId}' may still be running.`);
+  logWarn(`Session ended. Your sandbox '${_state.sandboxId}' may still be running.`);
   logWarn("Remember to delete it when you're done to avoid ongoing charges.");
   logWarn("");
   logWarn("Manage or delete it in your dashboard:");
@@ -628,7 +649,7 @@ export async function promptSpawnName(): Promise<void> {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 export async function destroyServer(id?: string): Promise<void> {
-  const targetId = id || sandboxId;
+  const targetId = id || _state.sandboxId;
   if (!targetId) {
     logWarn("No sandbox ID to destroy");
     return;
