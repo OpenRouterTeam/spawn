@@ -61,25 +61,14 @@ describe("Icon Integrity", () => {
       });
 
       it(`${id} manifest icon URL ends with .png`, () => {
-        const parsed = v.safeParse(IconEntry, manifest.agents[id]);
-        expect(parsed.success).toBe(true);
-        if (!parsed.success) {
-          return;
-        }
-        expect(parsed.output.icon).toEndWith(`${id}.png`);
+        const parsed = v.parse(IconEntry, manifest.agents[id]);
+        expect(parsed.icon).toEndWith(`${id}.png`);
       });
 
       it(`${id} .sources.json ext is "png"`, () => {
         expect(id in AGENT_SOURCES).toBe(true);
-        if (!(id in AGENT_SOURCES)) {
-          return;
-        }
-        const parsed = v.safeParse(SourceEntry, AGENT_SOURCES[id]);
-        expect(parsed.success).toBe(true);
-        if (!parsed.success) {
-          return;
-        }
-        expect(parsed.output.ext).toBe("png");
+        const parsed = v.parse(SourceEntry, AGENT_SOURCES[id]);
+        expect(parsed.ext).toBe("png");
       });
     }
 
@@ -114,15 +103,8 @@ describe("Icon Integrity", () => {
 
       it(`${id} .sources.json ext is "png"`, () => {
         expect(id in CLOUD_SOURCES).toBe(true);
-        if (!(id in CLOUD_SOURCES)) {
-          return;
-        }
-        const src = v.safeParse(SourceEntry, CLOUD_SOURCES[id]);
-        expect(src.success).toBe(true);
-        if (!src.success) {
-          return;
-        }
-        expect(src.output.ext).toBe("png");
+        const src = v.parse(SourceEntry, CLOUD_SOURCES[id]);
+        expect(src.ext).toBe("png");
       });
     }
 
